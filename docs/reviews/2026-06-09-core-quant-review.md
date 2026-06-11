@@ -195,3 +195,35 @@ Residual risk concentrates in three places:
 - Highest-leverage single action: add **golden parity fixtures** (QuantLib/published values) for Heston, SABR, Black-76, Bachelier, and schedule generation — the pattern already proven for day counts; would have caught the Blocker and three Majors.
 - The schedule fixes (anchor-multiple generation, LongFront merge, EOM intermediate-only) should land together with regenerated test expectations — several existing tests codify the buggy behavior, so the test updates are the spec decision, not collateral churn.
 - References used in verification: El Euch & Rosenbaum (2019) Thm 4.1; Lewis (2000); Albrecher et al. (2007) little trap; Hagan et al. (2002) §2.17; Diethelm-Ford-Freed (2004); Fang & Oosterlee (2008); Frye & Jacobs (2012); Altman (1968, 1995); Ohlson (1980); Zmijewski (1984); EBA GL/2017/16; ISDA 2006 Definitions §4.12/4.16; ICMA Rule 251; Fed/UK holiday observance rules; Yang-Zhang (2000); Higham (2005); Joe-Kuo Sobol tables (dims 21–40 provenance still unverified — worth a golden test).
+
+---
+
+# Implementation Status — reconciled 2026-06-11
+
+Full audit of every finding against the working tree (three independent verification passes, evidence at file:line confirmed for each item).
+
+## Scorecard
+
+| Severity | Total | Fixed | Doc-fix (as prescribed) | Superseded (fixed differently) | Deferred (recorded) | Outstanding |
+|---|---|---|---|---|---|---|
+| Blocker | 4 | 4 | — | — | — | 0 |
+| Major | 29 | 28 | — | — | — | 1 partial |
+| Moderate | ~30 | 26 | 3 | — | 1 | 0 |
+| Minor | ~19 | 14 | 2 | 2 | 1 | 1 sub-item |
+
+**Open Questions: 10 of 10 resolved** (decisions recorded inline in code/tests: VolBucketPct multiplicative; roll_forward realized-forward; from_f64; Z''/central-tendency/WARF to published values; binding renames to canonical Rust; usny=Fed K.8 / brbd=B3 documented; amount_decimal added; expr cache deleted; MonotoneConvex negative-rate support — see Remaining item 5).
+
+## Notable: golden tests found real bugs after the review
+
+- The Sobol Joe-Kuo golden test (added per the Minor finding) caught **wrong direction numbers for dims 18–39 and a missing dim 40** (out-of-bounds panic) — corrected to the published table (commit 767b3933f). QMC sequences for dims ≥ 18 changed (now correct).
+- The Parlett recurrence cross-term sign error in the generator-matrix logarithm was found and fixed while implementing the KS-regularization stamping (verified against scipy.linalg.logm).
+
+## Remaining items (deliberate)
+
+1. **External QuantLib/published golden fixtures for vol models** (the partial Major): in-module regression tests were added (rough-Heston vs classical-Heston at H≈0.5, martingale conditions, Hagan reference impl, parity-under-clamp), but `tests/golden/data/` still has no QuantLib-pinned Heston/SABR/Black/Bachelier fixtures. Highest-leverage remaining work.
+2. **FX delta surface merged-strike-grid redesign** (Moderate): short-expiry smile flattening; limitation documented at `delta_vol_surface.rs`.
+3. **Workspace lint inheritance** (Minor): `[workspace.lints]` annotated as aspirational in the root Cargo.toml; flipping on `[lints] workspace = true` is a separate churn decision.
+4. **Normal-vol output from the swaption cube** (Minor sub-item): cube still quotes lognormal only (shift support mitigates); feature addition, not a defect.
+5. **Open Question 10 — MonotoneConvex rejects DF > 1 (negative-rate) curves**: **RESOLVED 2026-06-11** (user decision: support negative-rate curves). The `validate_monotone_nonincreasing` rejection was removed from `MonotoneConvexStrategy` (DF must still be > 0 and finite), and the Hagan-West positivity projection is now auto-conditional: applied only when all discrete forwards are non-negative, skipped for genuine negative-rate curves so negative forwards interpolate faithfully; `DiscountCurve` builds DF > 1 MonotoneConvex curves under `ValidationMode::NegativeRateFriendly`/`Raw`, and the obsolete bootstrap guard in `valuations/calibration/targets/discount.rs` was removed.
+
+All decisions that changed semantics (NPV cutoff/holder-view deposits, Money from_f64 wire format, binding renames, CDS front accrual, hazard bump errors, USNY/GBLO observance, Sobol dims ≥ 18) carry inline comments citing this review, with regenerated goldens documenting provenance.

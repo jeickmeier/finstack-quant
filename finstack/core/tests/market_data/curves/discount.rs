@@ -769,6 +769,47 @@ fn negative_rate_environment() {
     assert!(curve.zero(1.0) < 0.0, "Zero rate should be negative");
 }
 
+/// MonotoneConvex supports negative-rate (DF > 1) curves end-to-end.
+///
+/// Per the 2026-06-11 decision resolving Open Question 10 of the core quant
+/// review, MonotoneConvex auto-detects negative discrete forwards and skips
+/// the Hagan-West positivity amelioration, so a flat -1% curve (EUR/CHF/JPY
+/// style) builds and interpolates faithfully.
+#[test]
+fn negative_rate_environment_monotone_convex() {
+    let rate = -0.01_f64;
+    let knots: Vec<(f64, f64)> = [0.0, 1.0, 2.0, 3.0, 5.0]
+        .iter()
+        .map(|&t| (t, (-rate * t).exp()))
+        .collect();
+
+    let curve = DiscountCurve::builder("EUR-NEG-MC")
+        .base_date(sample_base_date())
+        .knots(knots)
+        .interp(InterpStyle::MonotoneConvex)
+        .validation(
+            finstack_core::market_data::term_structures::ValidationMode::NegativeRateFriendly {
+                forward_floor: -0.05,
+            },
+        )
+        .build()
+        .expect("MonotoneConvex negative-rate curve should build");
+
+    // DF > 1 at and between knots; zero rate round-trips the flat -1%.
+    for t in [0.5, 1.0, 1.7, 2.5, 3.0, 4.2, 5.0] {
+        let df = curve.df(t);
+        assert!(
+            df > 1.0,
+            "DF({t}) = {df} should exceed 1 for negative rates"
+        );
+        let zero = curve.zero(t);
+        assert!(
+            (zero - rate).abs() < 1e-9,
+            "zero rate at t={t} should be ~ -1%, got {zero}"
+        );
+    }
+}
+
 #[test]
 fn credit_curve_construction() {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();

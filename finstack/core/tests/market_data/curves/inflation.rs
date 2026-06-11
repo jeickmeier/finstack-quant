@@ -199,7 +199,8 @@ mod serde_tests {
 
     #[test]
     fn roundtrip_all_interp_styles() {
-        // Note: MonotoneConvex requires non-increasing values, so it's not suitable for CPI levels
+        // Note: MonotoneConvex interprets values as discount factors (Hagan-West
+        // forward-rate construction), so it's not suitable for CPI levels
         let interp_styles = [
             InterpStyle::Linear,
             InterpStyle::LogLinear,

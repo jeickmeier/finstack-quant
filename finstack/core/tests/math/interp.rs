@@ -881,16 +881,22 @@ mod cubic_hermite_specific {
 mod monotone_convex_specific {
     use super::*;
 
+    /// Increasing DFs (negative forward rates) are accepted: per the
+    /// 2026-06-11 decision resolving Open Question 10 of the core quant
+    /// review, MonotoneConvex must support negative-rate curves
+    /// (EUR/CHF/JPY) where DF > 1 is legitimate.
     #[test]
-    fn rejects_increasing_dfs() {
+    fn accepts_increasing_dfs_negative_rates() {
         let increasing_dfs = vec![0.9, 0.95, 1.0, 1.05].into_boxed_slice();
-        let result = new_strict!(
+        let interp = new_strict!(
             Interpolator<MonotoneConvexStrategy>,
             standard_knots(),
             increasing_dfs,
             ExtrapolationPolicy::default()
-        );
-        assert!(result.is_err(), "Should reject increasing DFs (arbitrage)");
+        )
+        .expect("increasing DFs (negative rates) should build");
+        let mid = interp.interp(0.5);
+        assert!(mid.is_finite() && mid > 0.0);
     }
 
     #[test]
@@ -1104,21 +1110,28 @@ mod monotone_convex_specific {
         }
     }
 
+    /// Non-monotone DFs (sign-changing forwards) now build successfully and
+    /// round-trip the knot values exactly. Updated per the 2026-06-11
+    /// negative-rate decision (core quant review Open Question 10).
     #[test]
     fn sign_change_in_slopes() {
         let knots = vec![0.0, 1.0, 2.0, 3.0, 4.0].into_boxed_slice();
-        let non_monotone = vec![1.0, 0.9, 0.85, 0.86, 0.84].into_boxed_slice();
+        let non_monotone = vec![1.0, 0.9, 0.85, 0.86, 0.84];
 
-        let result = new_strict!(
+        let interp = new_strict!(
             Interpolator<MonotoneConvexStrategy>,
             knots,
-            non_monotone,
+            non_monotone.clone().into_boxed_slice(),
             ExtrapolationPolicy::FlatZero
-        );
-        assert!(
-            result.is_err(),
-            "Interpolator<MonotoneConvexStrategy> should reject non-monotone input"
-        );
+        )
+        .expect("non-monotone (mixed-sign forward) input should build");
+
+        for (i, &df) in non_monotone.iter().enumerate() {
+            assert!(
+                approx_eq(interp.interp(i as f64), df, 1e-12),
+                "knot {i} DF should round-trip"
+            );
+        }
     }
 
     #[test]
@@ -1821,6 +1834,188 @@ mod monotone_convex_positivity {
                         "negative forward {fwd} at t={x} (seed={seed}, curve={curve_idx}, knots={knots:?})"
                     );
                 }
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Negative-rate curve support (decision 2026-06-11, core quant review OQ 10)
+// ============================================================================
+//
+// Per Hagan & West (2006), forward-positivity enforcement is an optional
+// amelioration valid only for positive curves. MonotoneConvex auto-detects
+// negative discrete forwards and skips the projection so negative-rate
+// curves (EUR/CHF/JPY, DF > 1) interpolate faithfully.
+
+mod monotone_convex_negative_rates {
+    use super::*;
+    use finstack_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+
+    /// Sample the instantaneous forward f(t) = -DF'(t)/DF(t).
+    fn fwd_at(interp: &Interpolator<MonotoneConvexStrategy>, t: f64) -> f64 {
+        -interp.interp_prime(t) / interp.interp(t)
+    }
+
+    /// Flat -1% continuous curve: DF(t) = e^{+0.01 t} > 1, increasing.
+    /// Builds, round-trips the flat -1% zero rate, and the interpolated
+    /// forwards are ~ -1% everywhere (no zero-clamping).
+    #[test]
+    fn flat_negative_one_percent_curve() {
+        let rate = -0.01_f64;
+        let knot_times = [0.0, 1.0, 2.0, 3.0, 5.0, 10.0];
+        let dfs: Vec<f64> = knot_times.iter().map(|&t| (-rate * t).exp()).collect();
+
+        let interp = new_strict!(
+            Interpolator<MonotoneConvexStrategy>,
+            knot_times.to_vec().into_boxed_slice(),
+            dfs.clone().into_boxed_slice(),
+            ExtrapolationPolicy::FlatForward
+        )
+        .expect("flat -1% curve (DF > 1) should build");
+
+        // Knot DFs round-trip exactly (tolerance 1e-10).
+        for (&t, &df) in knot_times.iter().zip(dfs.iter()) {
+            if t > 0.0 {
+                assert!(df > 1.0, "DF({t}) must exceed 1");
+            }
+            assert!(
+                approx_eq(interp.interp(t), df, 1e-10),
+                "DF at knot t={t} should round-trip"
+            );
+        }
+
+        // Between knots: zero rate and forwards are both ~ -1%.
+        for i in 0..80 {
+            let t = 0.05 + 10.0 * (i as f64) / 80.0;
+            if t > 10.0 {
+                break;
+            }
+            let df = interp.interp(t);
+            let zero = -df.ln() / t;
+            assert!(
+                approx_eq(zero, rate, 1e-9),
+                "zero rate at t={t} should be -1%, got {zero}"
+            );
+            let fwd = fwd_at(&interp, t);
+            assert!(
+                approx_eq(fwd, rate, 1e-9),
+                "forward at t={t} should be -1% (no zero-clamping), got {fwd}"
+            );
+        }
+    }
+
+    /// Mixed curve crossing zero: discrete forwards +50bp -> -30bp -> +20bp.
+    /// Builds, segment-average forwards reproduce the discrete forwards, and
+    /// the negative segment's forwards are genuinely negative (no clamping).
+    #[test]
+    fn mixed_sign_forwards_not_clamped() {
+        let fds = [0.005_f64, -0.003, 0.002];
+        let knot_times = [0.0_f64, 1.0, 2.0, 3.0];
+        let mut dfs = vec![1.0_f64];
+        for (i, fd) in fds.iter().enumerate() {
+            let dt = knot_times[i + 1] - knot_times[i];
+            dfs.push(dfs[i] * (-fd * dt).exp());
+        }
+
+        let interp = new_strict!(
+            Interpolator<MonotoneConvexStrategy>,
+            knot_times.to_vec().into_boxed_slice(),
+            dfs.clone().into_boxed_slice(),
+            ExtrapolationPolicy::FlatForward
+        )
+        .expect("mixed-sign forward curve should build");
+
+        // Knot DFs round-trip.
+        for (&t, &df) in knot_times.iter().zip(dfs.iter()) {
+            assert!(
+                approx_eq(interp.interp(t), df, 1e-12),
+                "DF at knot t={t} should round-trip"
+            );
+        }
+
+        // Segment-average forwards reproduce the discrete forwards: the
+        // monotone-convex interpolant integrates g(x) to zero per segment.
+        for (i, fd) in fds.iter().enumerate() {
+            let (t0, t1) = (knot_times[i], knot_times[i + 1]);
+            let avg = (interp.interp(t0) / interp.interp(t1)).ln() / (t1 - t0);
+            assert!(
+                approx_eq(avg, *fd, 1e-10),
+                "segment {i} average forward {avg} should equal discrete {fd}"
+            );
+        }
+
+        // The negative segment [1, 2] must produce negative forwards at its
+        // midpoint — the positivity projection must NOT clamp them to zero.
+        let fwd_mid = fwd_at(&interp, 1.5);
+        assert!(
+            fwd_mid < -0.003,
+            "midpoint forward of -30bp segment should be negative and below \
+             the discrete forward (interior dip), got {fwd_mid}"
+        );
+    }
+
+    /// Seeded property companion to `forwards_non_negative_on_stressed_curves`:
+    /// all-negative-forward curves (rates in [-1.5%, -5bp]) build, round-trip
+    /// knot DFs, produce finite forwards, and retain negative forwards
+    /// (projection skipped — no clamping toward zero).
+    #[test]
+    fn negative_rate_curves_interpolate_faithfully() {
+        for seed in [7_u64, 42, 1234, 987_654] {
+            let mut rng = Pcg64Rng::new(seed);
+
+            for curve_idx in 0..50 {
+                let n = 4 + (rng.uniform() * 7.0) as usize;
+                let mut knots = Vec::with_capacity(n);
+                let mut t = 0.0;
+                knots.push(t);
+                for _ in 1..n {
+                    t += 0.05 + 1.95 * rng.uniform();
+                    knots.push(t);
+                }
+
+                // All-negative discrete forwards in [-1.5%, -5bp].
+                let mut dfs = vec![1.0_f64];
+                for i in 1..n {
+                    let fd = -(0.0005 + 0.0145 * rng.uniform());
+                    let dt = knots[i] - knots[i - 1];
+                    dfs.push(dfs[i - 1] * (-fd * dt).exp());
+                }
+
+                let interp = new_strict!(
+                    Interpolator<MonotoneConvexStrategy>,
+                    knots.clone().into(),
+                    dfs.clone().into(),
+                    ExtrapolationPolicy::FlatForward
+                )
+                .expect("negative-rate curve should build");
+
+                for (i, &df) in dfs.iter().enumerate() {
+                    assert!(
+                        approx_eq(interp.interp(knots[i]), df, 1e-10),
+                        "knot DF round-trip (seed={seed}, curve={curve_idx})"
+                    );
+                }
+
+                let t_max = knots[n - 1];
+                let mut min_fwd = f64::INFINITY;
+                for s in 0..=200 {
+                    let x = t_max * (s as f64) / 200.0;
+                    let df = interp.interp(x);
+                    let fwd = -interp.interp_prime(x) / df;
+                    assert!(
+                        df.is_finite() && df > 0.0 && fwd.is_finite(),
+                        "non-finite DF/forward at t={x} (seed={seed}, curve={curve_idx})"
+                    );
+                    min_fwd = min_fwd.min(fwd);
+                }
+                // Discrete forwards are all <= -5bp, so the interpolated
+                // forward must be genuinely negative somewhere: clamping
+                // toward zero would violate this.
+                assert!(
+                    min_fwd < -0.0005,
+                    "forwards were clamped (min {min_fwd}; seed={seed}, curve={curve_idx})"
+                );
             }
         }
     }

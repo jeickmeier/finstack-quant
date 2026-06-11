@@ -1105,7 +1105,11 @@ impl DiscountCurve {
     /// monotonic discount factors with a -50bp implied-forward floor. For deeply
     /// negative-rate markets (CHF, JPY, EUR historical), pass
     /// [`ValidationMode::NegativeRateFriendly`] (or `Raw`) via
-    /// [`DiscountCurveBuilder::validation`].
+    /// [`DiscountCurveBuilder::validation`]. All interpolation styles —
+    /// including the default MonotoneConvex — support increasing-DF
+    /// (negative-rate) inputs; MonotoneConvex auto-detects negative discrete
+    /// forwards and skips its Hagan-West positivity amelioration so negative
+    /// rates interpolate faithfully.
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> DiscountCurveBuilder {
         let id: CurveId = id.into();
@@ -1571,8 +1575,6 @@ impl DiscountCurveBuilder {
 
         if !self.allow_non_monotonic {
             validate_monotonic_df(&knots_vec, &dfs_vec)?;
-        } else if self.style == InterpStyle::MonotoneConvex {
-            validate_monotone_convex_compatible_df(&knots_vec, &dfs_vec)?;
         }
 
         if let Some(min_fwd) = self.min_forward_rate {
@@ -1621,25 +1623,6 @@ fn validate_monotonic_df(knots: &[f64], dfs: &[f64]) -> crate::Result<()> {
     if let Some((i, prev, curr)) = crate::math::interp::utils::find_monotone_violation(dfs, 1e-14) {
         return Err(crate::Error::Validation(format!(
             "Discount factors must be non-increasing: DF(t={:.4}) = {:.12} > DF(t={:.4}) = {:.12}",
-            knots[i + 1],
-            curr,
-            knots[i],
-            prev
-        )));
-    }
-    Ok(())
-}
-
-/// Validate DF input compatibility with MonotoneConvex interpolation.
-///
-/// MonotoneConvex (Hagan-West) requires a positive, non-increasing DF term structure.
-fn validate_monotone_convex_compatible_df(knots: &[f64], dfs: &[f64]) -> crate::Result<()> {
-    if let Some((i, prev, curr)) = crate::math::interp::utils::find_monotone_violation(dfs, 1e-14) {
-        return Err(crate::Error::Validation(format!(
-            "InterpStyle::MonotoneConvex requires non-increasing discount factors. \
-             Found DF(t={:.4}) = {:.12} > DF(t={:.4}) = {:.12}. \
-             Use LogLinear/Linear (and allow_non_monotonic) for negative-rate / increasing-DF inputs, \
-             or fix the input curve.",
             knots[i + 1],
             curr,
             knots[i],

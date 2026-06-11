@@ -140,15 +140,6 @@ pub(crate) fn validate_finite_series(values: &[f64]) -> crate::Result<()> {
     Ok(())
 }
 
-/// Validate sequence is non-increasing (monotone) in addition to positivity.
-pub(crate) fn validate_monotone_nonincreasing(values: &[f64]) -> crate::Result<()> {
-    validate_positive_series(values)?;
-    if values.windows(2).any(|w| w[1] > w[0]) {
-        return Err(InputError::Invalid.into());
-    }
-    Ok(())
-}
-
 /// Find the first violation of non-increasing monotonicity with a relative tolerance.
 ///
 /// Returns `Some((index, prev_value, curr_value))` for the first pair where

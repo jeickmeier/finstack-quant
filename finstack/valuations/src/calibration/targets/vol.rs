@@ -425,7 +425,7 @@ Set params.expiry_extrapolation='clamp' to allow flat extrapolation.",
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use crate::instruments::OptionType;
     use crate::market::conventions::ids::OptionConventionId;
     use crate::market::quotes::ids::QuoteId;

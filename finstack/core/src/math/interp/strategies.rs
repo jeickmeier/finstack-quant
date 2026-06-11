@@ -10,8 +10,8 @@ use super::{
     traits::InterpolationStrategy,
     types::ExtrapolationPolicy,
     utils::{
-        locate_segment_unchecked, validate_knot_spacing, validate_monotone_nonincreasing,
-        validate_positive_series, MIN_RELATIVE_KNOT_GAP,
+        locate_segment_unchecked, validate_knot_spacing, validate_positive_series,
+        MIN_RELATIVE_KNOT_GAP,
     },
 };
 use std::vec::Vec;
@@ -793,8 +793,19 @@ pub const DEFAULT_MONOTONE_CONVEX_EPSILON: f64 = 1e-14;
 ///
 /// Implements the full Hagan–West monotone-convex interpolation method that operates
 /// on **forward rates** (not yields). This is the industry standard for yield curve
-/// construction used by Bloomberg and other systems, as it guarantees positive and
-/// continuous forward rates.
+/// construction used by Bloomberg and other systems, guaranteeing continuous forward
+/// rates.
+///
+/// # Negative-rate curves
+///
+/// Per Hagan & West (2006), forward-positivity enforcement is an *optional
+/// amelioration* that is only valid for positive curves. This strategy
+/// auto-detects the regime at construction: if **all** discrete forwards are
+/// non-negative, the positivity projection is applied (forwards stay ≥ 0); if
+/// **any** discrete forward is negative (an increasing-DF / DF > 1 segment,
+/// as in EUR/CHF/JPY negative-rate markets), the projection is skipped
+/// entirely so negative forwards interpolate faithfully without clamping.
+/// DF values must still be strictly positive and finite.
 ///
 /// # Algorithm Overview
 ///
@@ -828,8 +839,10 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         values: &[f64],
         _extrapolation: ExtrapolationPolicy,
     ) -> crate::Result<Self> {
-        // Validate monotone non-increasing (arbitrage-free)
-        validate_monotone_nonincreasing(values)?;
+        // DF values must be strictly positive and finite; increasing DFs
+        // (negative forward rates) are accepted to support negative-rate
+        // curves (EUR/CHF/JPY).
+        validate_positive_series(values)?;
         validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
 
         // Build using default epsilon
@@ -958,8 +971,9 @@ impl MonotoneConvexStrategy {
 
         // Same knot-spacing validation as the other strategy constructors.
         validate_knot_spacing(knots, MIN_RELATIVE_KNOT_GAP)?;
-        // Validate monotone non-increasing
-        validate_monotone_nonincreasing(values)?;
+        // DF values must be strictly positive and finite; increasing DFs
+        // (negative forward rates) are accepted.
+        validate_positive_series(values)?;
 
         Self::build_hagan_west(knots, values, epsilon)
     }
@@ -1024,9 +1038,16 @@ impl MonotoneConvexStrategy {
             let last_idx = (n.saturating_sub(3)).min(fd.len().saturating_sub(1));
             f[n - 1] = 1.5 * fd[n - 2] - 0.5 * fd[last_idx];
 
-            // Apply monotonicity constraints to ensure positive forwards
-            // and avoid overshoots
-            Self::apply_monotonicity_constraints(&mut f, &fd, epsilon);
+            // Apply the Hagan-West forward-positivity amelioration only when
+            // every discrete forward is non-negative. Per Hagan & West (2006),
+            // positivity enforcement is an optional amelioration that is only
+            // valid for positive curves; if any discrete forward is negative
+            // the input is a genuine negative-rate curve (DF > 1 somewhere)
+            // and the projection is skipped so negative forwards interpolate
+            // faithfully instead of being clamped toward zero.
+            if fd.iter().all(|&v| v >= 0.0) {
+                Self::apply_monotonicity_constraints(&mut f, &fd, epsilon);
+            }
         }
 
         Ok(Self {
@@ -1136,10 +1157,10 @@ impl MonotoneConvexStrategy {
 
                 // The non-negative-forward invariant is infeasible when
                 // fd_i ≤ 0: any non-zero (α, β) will push the segment below
-                // zero somewhere and no η > 0 can rescue it. Flatten. Callers
-                // running on genuine negative-rate curves should use a
-                // shifted-lognormal / displaced interpolator rather than
-                // monotone-convex.
+                // zero somewhere and no η > 0 can rescue it. Flatten. (Since
+                // the projection only runs when all discrete forwards are
+                // non-negative, this branch only sees fd_i == 0; genuine
+                // negative-rate curves skip the projection entirely.)
                 if fd_i <= 0.0 {
                     f[i] = fd_i;
                     f[i + 1] = fd_i;

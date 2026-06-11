@@ -212,7 +212,8 @@ mod serde_tests {
 
     #[test]
     fn roundtrip_multiple_interp_styles() {
-        // Note: MonotoneConvex requires non-increasing values, so it's not suitable for forward rates
+        // Note: MonotoneConvex interprets values as discount factors (Hagan-West
+        // forward-rate construction), so it's not suitable for forward rates
         let interp_styles = [
             InterpStyle::Linear,
             InterpStyle::LogLinear,
