@@ -88,7 +88,7 @@ class TestEuropeanPricer:
         assert lhs == pytest.approx(rhs, abs=2.0)
 
     def test_result_attributes(self, pricer: EuropeanPricer) -> None:
-        """MonteCarloResult exposes stderr, ci_lower, ci_upper, num_paths."""
+        """MoneyEstimate exposes stderr, ci_lower, ci_upper, num_paths."""
         result = pricer.price_call(
             spot=100.0,
             strike=100.0,

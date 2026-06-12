@@ -121,7 +121,7 @@ pub mod time_grid;
 pub mod traits;
 
 // --- Pricing infrastructure ---
-pub(crate) mod barriers;
+pub mod barriers;
 pub mod engine;
 pub mod engine_fractional;
 pub mod greeks;
@@ -159,7 +159,7 @@ pub mod prelude {
     pub use super::rng::sobol::SobolRng;
 
     // --- Processes ---
-    pub use super::process::bates::BatesParams;
+    pub use super::process::bates::{BatesParams, BatesProcess};
     pub use super::process::brownian::{BrownianParams, BrownianProcess, MultiBrownianProcess};
     pub use super::process::cir::{CirParams, CirPlusPlusProcess, CirProcess};
     pub use super::process::correlation::{apply_correlation, cholesky_decomposition};
@@ -177,7 +177,7 @@ pub mod prelude {
     // per scheme. The prelude is a curated list on top of that.
     pub use super::discretization::{
         CheyetteRoughEuler, EulerMaruyama, ExactGbm, ExactHullWhite1F, ExactMultiGbm,
-        ExactMultiGbmCorrelated, ExactSchwartzSmith, JumpEuler, Milstein, QeCir, QeHeston,
+        ExactMultiGbmCorrelated, ExactSchwartzSmith, JumpEuler, Milstein, QeBates, QeCir, QeHeston,
         RoughBergomiEuler, RoughHestonHybrid,
     };
 

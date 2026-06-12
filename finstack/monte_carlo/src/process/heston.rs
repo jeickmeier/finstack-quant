@@ -209,11 +209,13 @@ impl HestonParams {
         })
     }
 
-    /// Check Feller condition: 2κθ > σ_v²
+    /// Check Feller condition: 2κθ ≥ σ_v²
     ///
-    /// When satisfied, the variance process stays strictly positive.
+    /// When satisfied, the variance process never attains zero. The boundary
+    /// case is included (non-attainment holds iff 2κθ ≥ σ_v², Feller 1951),
+    /// matching `CirParams::satisfies_feller`.
     pub fn satisfies_feller(&self) -> bool {
-        2.0 * self.kappa * self.theta > self.sigma_v * self.sigma_v
+        2.0 * self.kappa * self.theta >= self.sigma_v * self.sigma_v
     }
 }
 

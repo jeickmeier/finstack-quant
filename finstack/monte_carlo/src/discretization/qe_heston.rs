@@ -99,11 +99,22 @@ impl QeHeston {
     }
 
     /// Create with custom ψ_c threshold.
-    pub fn with_psi_c(psi_c: f64) -> Self {
-        Self {
+    ///
+    /// Andersen (2008, §3.2.4) requires ψ_c ∈ \[1, 2\]: Case A's
+    /// `sqrt(2/ψ·(2/ψ − 1))` is real only for ψ ≤ 2, and ψ < 1 would route
+    /// draws Case B cannot represent into the exponential branch.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_core::Error::Validation`] when `psi_c` is not in
+    /// \[1, 2\] (a ψ_c above 2 lets ψ ∈ (2, ψ_c\] reach Case A and produce
+    /// NaN variance draws).
+    pub fn with_psi_c(psi_c: f64) -> finstack_core::Result<Self> {
+        super::qe_common::validate_psi_c(psi_c)?;
+        Ok(Self {
             psi_c,
             int_var_method: IntegratedVarianceMethod::default(),
-        }
+        })
     }
 
     /// Set the integrated variance method.
@@ -313,7 +324,12 @@ impl Discretization<HestonProcess> for QeHeston {
                 }
             }
         } else {
-            (params.r - params.q) * dt - 0.5 * int_var + orthogonal_diffusion
+            // Degenerate σ_v → 0: the variance path is deterministic, so the
+            // spot must carry the FULL diffusion √(∫v)·z[0]. Reusing the
+            // orthogonal term (scaled by √(1−ρ²)) here would understate the
+            // spot volatility by the correlated fraction — with ρ = −0.7 that
+            // is a ~29% vol shortfall.
+            (params.r - params.q) * dt - 0.5 * int_var + int_var.sqrt() * z[0]
         };
 
         let s_next = s_t * log_increment.exp();
@@ -547,7 +563,7 @@ mod tests {
     #[test]
     fn test_with_psi_c() {
         // Test custom psi_c threshold
-        let qe = QeHeston::with_psi_c(2.0);
+        let qe = QeHeston::with_psi_c(2.0).expect("psi_c = 2.0 is the Andersen upper bound");
         let params = HestonParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
 
         // Variance should remain positive
@@ -555,6 +571,17 @@ mod tests {
             let v = qe.step_variance(0.04, params.kappa, params.theta, params.sigma_v, 0.1, z);
             assert!(v >= 0.0);
         }
+    }
+
+    #[test]
+    fn test_with_psi_c_rejects_out_of_band_threshold() {
+        // ψ_c > 2 would let ψ ∈ (2, ψ_c] reach Case A's sqrt of a negative
+        // argument and silently propagate NaN through the path.
+        assert!(QeHeston::with_psi_c(3.0).is_err());
+        assert!(QeHeston::with_psi_c(0.5).is_err());
+        assert!(QeHeston::with_psi_c(f64::NAN).is_err());
+        assert!(QeHeston::with_psi_c(1.0).is_ok());
+        assert!(QeHeston::with_psi_c(1.5).is_ok());
     }
 
     #[test]

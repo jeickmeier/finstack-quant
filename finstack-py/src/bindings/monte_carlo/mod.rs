@@ -35,7 +35,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(
         py,
         [
-            "MonteCarloResult",
+            "MoneyEstimate",
             "Estimate",
             "TimeGrid",
             "McEngine",
@@ -48,10 +48,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "price_european_put",
             "price_heston_call",
             "price_heston_put",
-            "fd_delta",
-            "fd_delta_crn",
-            "fd_gamma",
-            "fd_gamma_crn",
+            "finite_diff_delta",
+            "finite_diff_delta_crn",
+            "finite_diff_gamma",
+            "finite_diff_gamma_crn",
         ],
     )?;
     m.setattr("__all__", all)?;

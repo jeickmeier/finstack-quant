@@ -2,8 +2,14 @@
 //!
 //! Start with [`gbm`] for vanilla equity / FX-style simulations and
 //! [`brownian`] for additive Gaussian dynamics. This module also exposes
-//! Heston, CIR, Hull-White / Vasicek, jump-diffusion, Bates, and Schwartz-Smith
-//! models.
+//! Heston, CIR, Hull-White / Vasicek, jump-diffusion, Bates, and
+//! Schwartz-Smith models.
+//!
+//! The Bates process must be paired with its dedicated
+//! [`crate::discretization::qe_bates::QeBates`] scheme — the generic Euler
+//! schemes silently drop both its jumps and the spot–vol correlation while
+//! still subtracting the jump compensator from the drift (see the
+//! [`bates`] module docs).
 //!
 //! Important assumptions such as time units, rate / volatility quoting, and
 //! state-vector layout are documented in each process module. Use

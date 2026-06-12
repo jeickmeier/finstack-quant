@@ -551,19 +551,23 @@ impl AsianOptionMcPricer {
                 // payoff for both seasoned and unseasoned options. The seasoned
                 // path therefore keeps the variance reduction instead of
                 // discarding the geometric pass.
-                let control_analytical = seasoned_geometric_asian_control(
-                    spot,
-                    inst.strike,
-                    r,
-                    q,
-                    sigma,
-                    discount_factor,
-                    hist_prod_log,
-                    hist_count,
-                    &future_fixing_times,
-                    true,
-                    Some(drift_schedule.as_ref()),
-                );
+                // The MC payoffs (xs/ys) are notional-scaled while the
+                // closed form is per unit notional, so the control mean must
+                // be scaled to the same units before the CV adjustment.
+                let control_analytical = inst.notional.amount()
+                    * seasoned_geometric_asian_control(
+                        spot,
+                        inst.strike,
+                        r,
+                        q,
+                        sigma,
+                        discount_factor,
+                        hist_prod_log,
+                        hist_count,
+                        &future_fixing_times,
+                        true,
+                        Some(drift_schedule.as_ref()),
+                    );
                 let adj = apply_control_variate(
                     mean_x,
                     var_x,
@@ -656,19 +660,22 @@ impl AsianOptionMcPricer {
 
                 // Seasoning-aware analytic control variate (W-07) — see the
                 // call branch above for the rationale.
-                let control_analytical = seasoned_geometric_asian_control(
-                    spot,
-                    inst.strike,
-                    r,
-                    q,
-                    sigma,
-                    discount_factor,
-                    hist_prod_log,
-                    hist_count,
-                    &future_fixing_times,
-                    false,
-                    Some(drift_schedule.as_ref()),
-                );
+                // Scale the per-unit closed form to the notional-scaled MC
+                // payoff units (see the call branch above).
+                let control_analytical = inst.notional.amount()
+                    * seasoned_geometric_asian_control(
+                        spot,
+                        inst.strike,
+                        r,
+                        q,
+                        sigma,
+                        discount_factor,
+                        hist_prod_log,
+                        hist_count,
+                        &future_fixing_times,
+                        false,
+                        Some(drift_schedule.as_ref()),
+                    );
                 let adj = apply_control_variate(
                     mean_x,
                     var_x,

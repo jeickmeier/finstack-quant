@@ -70,6 +70,7 @@ pub struct PythonBindingDefaults {
 
 /// Common path-count, seed, and parallel-execution defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PricerRuntimeDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -81,6 +82,7 @@ pub struct PricerRuntimeDefaults {
 
 /// Generic engine runtime defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EngineDefaults {
     /// Whether parallel execution is requested by default.
     pub use_parallel: bool,
@@ -92,6 +94,7 @@ pub struct EngineDefaults {
 
 /// Engine-builder runtime defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EngineBuilderDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -105,6 +108,7 @@ pub struct EngineBuilderDefaults {
 
 /// Path-dependent pricer runtime defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PathDependentPricerDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -128,6 +132,7 @@ pub struct PathDependentPricerDefaults {
 
 /// LSMC runtime defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LsmcRuntimeDefaults {
     /// Root RNG seed.
     pub seed: u64,
@@ -137,6 +142,7 @@ pub struct LsmcRuntimeDefaults {
 
 /// Shared rate-exotic Monte Carlo defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RateExoticDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -152,6 +158,7 @@ pub struct RateExoticDefaults {
 
 /// Swaption LSMC defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SwaptionLsmcDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -165,6 +172,7 @@ pub struct SwaptionLsmcDefaults {
 
 /// LMM Bermudan swaption defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LmmBermudanDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -180,6 +188,7 @@ pub struct LmmBermudanDefaults {
 
 /// Cheyette rough-vol Bermudan swaption defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CheyetteRoughDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -191,6 +200,7 @@ pub struct CheyetteRoughDefaults {
 
 /// Merton PIK-bond Monte Carlo defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MertonPikBondDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -204,6 +214,7 @@ pub struct MertonPikBondDefaults {
 
 /// Python pricer defaults with default time-grid step count.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PythonPricerDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -217,6 +228,7 @@ pub struct PythonPricerDefaults {
 
 /// Python engine constructor defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PythonEngineDefaults {
     /// Root RNG seed.
     pub seed: u64,
@@ -228,6 +240,7 @@ pub struct PythonEngineDefaults {
 
 /// Python LSMC pricer defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PythonLsmcDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,
@@ -245,6 +258,7 @@ pub struct PythonLsmcDefaults {
 
 /// Python finite-difference Greek estimator defaults.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PythonGreekDefaults {
     /// Number of Monte Carlo paths.
     pub num_paths: usize,

@@ -248,7 +248,7 @@ class TestMonteCarloNamespace:
             EuropeanPricer,
             LsmcPricer,
             McEngine,
-            MonteCarloResult,
+            MoneyEstimate,
             PathDependentPricer,
             price_european_call,
             price_european_put,

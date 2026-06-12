@@ -128,17 +128,20 @@ impl Payoff for BasketCall {
     /// Process a path event at maturity.
     ///
     /// Extracts asset values from path state using pre-cached keys.
-    /// If an asset value is not found in the path state, it defaults to 0.0.
-    /// This default ensures that missing assets contribute zero to the basket value,
-    /// which may be appropriate for basket options where some assets might not be
-    /// present in all scenarios.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any asset's state key is missing or non-finite (e.g. the
+    /// process `num_assets` does not match the basket) — see
+    /// [`super::require_finite_state`]. A silent 0.0 default would pin
+    /// worst-of baskets to zero.
     fn on_event(&mut self, state: &mut PathState) {
         // Update terminal value if at maturity
         if state.step == self.maturity_step {
             // Extract asset values using pre-cached keys and scratch space.
             self.asset_values.clear();
             for &key in &self.spot_keys {
-                let value = state.get(key).unwrap_or(0.0);
+                let value = super::require_finite_state(state.get(key), key, state.step);
                 self.asset_values.push(value);
             }
 
@@ -156,6 +159,10 @@ impl Payoff for BasketCall {
     fn reset(&mut self) {
         self.terminal_basket_value = 0.0;
         self.asset_values.clear();
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 }
 
@@ -234,14 +241,18 @@ impl Payoff for BasketPut {
     /// Process a path event at maturity.
     ///
     /// Extracts asset values from path state using pre-cached keys.
-    /// If an asset value is not found in the path state, it defaults to 0.0.
-    /// This default ensures that missing assets contribute zero to the basket value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any asset's state key is missing or non-finite — see
+    /// [`super::require_finite_state`]. A silent 0.0 default would make a
+    /// worst-of basket put pay the full strike.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
             // Extract asset values using pre-cached keys and scratch space.
             self.asset_values.clear();
             for &key in &self.spot_keys {
-                let value = state.get(key).unwrap_or(0.0);
+                let value = super::require_finite_state(state.get(key), key, state.step);
                 self.asset_values.push(value);
             }
 
@@ -259,6 +270,10 @@ impl Payoff for BasketPut {
     fn reset(&mut self) {
         self.terminal_basket_value = 0.0;
         self.asset_values.clear();
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 }
 
@@ -322,14 +337,19 @@ impl ExchangeOption {
 impl Payoff for ExchangeOption {
     /// Process a path event at maturity.
     ///
-    /// Extracts terminal values for both assets from path state using pre-cached keys.
-    /// If an asset value is not found in the path state, it defaults to 0.0. For
-    /// exchange options, defaults result in a payoff of max(0 - 0, 0) = 0 (zero
-    /// payoff when both assets are missing).
+    /// Extracts terminal values for both assets from path state using
+    /// pre-cached keys.
+    ///
+    /// # Panics
+    ///
+    /// Panics if either asset's state key is missing or non-finite — see
+    /// [`super::require_finite_state`].
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
-            self.terminal_s1 = state.get(self.key1).unwrap_or(0.0);
-            self.terminal_s2 = state.get(self.key2).unwrap_or(0.0);
+            self.terminal_s1 =
+                super::require_finite_state(state.get(self.key1), self.key1, state.step);
+            self.terminal_s2 =
+                super::require_finite_state(state.get(self.key2), self.key2, state.step);
         }
     }
 
@@ -342,6 +362,10 @@ impl Payoff for ExchangeOption {
     fn reset(&mut self) {
         self.terminal_s1 = 0.0;
         self.terminal_s2 = 0.0;
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 }
 
@@ -386,8 +410,10 @@ pub fn margrabe_exchange_option(
 ) -> f64 {
     use finstack_core::math::special_functions::norm_cdf;
 
-    // Combined volatility
-    let sigma_sq = sigma1 * sigma1 + sigma2 * sigma2 - 2.0 * rho * sigma1 * sigma2;
+    // Combined volatility. The algebraic expression can land at −1e−18 in
+    // floating point for ρ → 1 with σ₁ ≈ σ₂; clamp so the sqrt cannot
+    // produce a NaN that slips past the degenerate-vol guard below.
+    let sigma_sq = (sigma1 * sigma1 + sigma2 * sigma2 - 2.0 * rho * sigma1 * sigma2).max(0.0);
     let sigma = sigma_sq.sqrt();
 
     // Edge case: if combined volatility is zero, return intrinsic value

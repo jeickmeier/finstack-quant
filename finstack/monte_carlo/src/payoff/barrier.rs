@@ -114,11 +114,25 @@ pub struct BarrierOptionPayoff {
     /// barrier shift on top of the bridge would double-count the
     /// correction, so the true (unshifted) barrier is always used here.
     pub use_gobet_miri: bool,
+    /// When `Some(r)`, knock-out rebates are paid **at the hit time** τ and
+    /// compounded forward to maturity at the continuously compounded rate
+    /// `r`, so the engine's maturity discount factor `DF(T)` nets to the
+    /// correct `DF(τ)`. `None` keeps the at-expiry convention. See
+    /// [`Self::with_rebate_at_hit`].
+    rebate_at_hit_rate: Option<f64>,
+    /// Year fraction from t = 0 to `maturity_step` (Σ step_dts), used to
+    /// grow at-hit rebates forward to maturity.
+    total_time: f64,
 
     // State
     terminal_spot: f64,
     barrier_hit: bool,
     previous_spot: f64,
+    /// Year fraction at which the barrier was first hit (valid only when
+    /// `barrier_hit` is true). The bridge detects intra-interval crossings,
+    /// so τ is recorded at the end of the crossing interval — an O(Δt)
+    /// approximation consistent with the rest of the monitoring.
+    hit_time: f64,
 }
 
 impl BarrierOptionPayoff {
@@ -136,6 +150,8 @@ impl BarrierOptionPayoff {
         time_grid: &TimeGrid,
         use_gobet_miri: bool,
     ) -> Self {
+        let step_dts: Vec<f64> = time_grid.dts().to_vec();
+        let total_time: f64 = step_dts.iter().take(maturity_step).sum();
         Self {
             strike,
             barrier,
@@ -145,12 +161,30 @@ impl BarrierOptionPayoff {
             notional,
             maturity_step,
             sigma,
-            step_dts: time_grid.dts().to_vec(),
+            step_dts,
             use_gobet_miri,
+            rebate_at_hit_rate: None,
+            total_time,
             terminal_spot: 0.0,
             barrier_hit: false,
             previous_spot: 0.0,
+            hit_time: 0.0,
         }
+    }
+
+    /// Pay knock-out rebates at the hit time instead of at expiry.
+    ///
+    /// `rate` is the continuously compounded flat rate used to compound the
+    /// rebate forward from the hit time τ to maturity T, so the engine's
+    /// single maturity discount factor nets to `DF(τ)`:
+    /// `DF(T) · R·e^{r(T−τ)} = R·DF(τ)`. This is the dominant market
+    /// convention for knock-out rebates. Knock-in rebates (paid when the
+    /// barrier is never touched) are unaffected — there is no hit time and
+    /// they pay at expiry by definition.
+    #[must_use]
+    pub fn with_rebate_at_hit(mut self, rate: f64) -> Self {
+        self.rebate_at_hit_rate = Some(rate);
+        self
     }
 
     /// Check if option is active based on barrier status.
@@ -177,7 +211,13 @@ impl Payoff for BarrierOptionPayoff {
     }
 
     fn on_event(&mut self, state: &mut PathState) {
-        let current_spot = state.spot().unwrap_or(0.0);
+        // Ignore events beyond the payoff's maturity: a longer engine grid
+        // must not flip the knockout state after expiry.
+        if state.step > self.maturity_step {
+            return;
+        }
+
+        let current_spot = super::require_finite_state(state.spot(), "SPOT", state.step);
 
         if state.step == 0 {
             self.previous_spot = current_spot;
@@ -188,6 +228,7 @@ impl Payoff for BarrierOptionPayoff {
             };
             if breached {
                 self.barrier_hit = true;
+                self.hit_time = 0.0;
             }
             return;
         }
@@ -197,7 +238,13 @@ impl Payoff for BarrierOptionPayoff {
             // Use independent uniform random from PathState for bridge sampling
             // so the barrier hit probability is statistically correct.
             let uniform_random = state.uniform_random();
-            let dt = self.step_dts.get(state.step - 1).copied().unwrap_or(0.0);
+            // A payoff grid shorter than the engine grid is a wiring bug: a
+            // silent dt = 0 here would disable the bridge correction.
+            let dt = super::require_finite_state(
+                self.step_dts.get(state.step - 1).copied(),
+                "step_dts",
+                state.step,
+            );
             // Prefer the process's local instantaneous variance when available
             // (e.g. Heston). For deterministic-vol processes the state carries
             // no variance entry and we fall back to the configured flat sigma.
@@ -224,6 +271,9 @@ impl Payoff for BarrierOptionPayoff {
 
             if hit {
                 self.barrier_hit = true;
+                // τ at the end of the crossing interval (O(Δt), consistent
+                // with the monitoring resolution).
+                self.hit_time = self.step_dts.iter().take(state.step).sum();
             }
         }
 
@@ -245,8 +295,16 @@ impl Payoff for BarrierOptionPayoff {
             };
             Money::new(intrinsic * self.notional, currency)
         } else {
-            // Rebate payment
-            let rebate_amount = self.rebate.unwrap_or(0.0);
+            // Rebate payment. With at-hit timing configured and an actual
+            // hit (knock-out), compound the rebate forward from τ to
+            // maturity so the engine's DF(T) nets to DF(τ). A knock-in that
+            // never touched the barrier has no hit time and pays at expiry.
+            let mut rebate_amount = self.rebate.unwrap_or(0.0);
+            if let Some(rate) = self.rebate_at_hit_rate {
+                if self.barrier_hit {
+                    rebate_amount *= (rate * (self.total_time - self.hit_time)).exp();
+                }
+            }
             Money::new(rebate_amount * self.notional, currency)
         }
     }
@@ -255,6 +313,11 @@ impl Payoff for BarrierOptionPayoff {
         self.terminal_spot = 0.0;
         self.barrier_hit = false;
         self.previous_spot = 0.0;
+        self.hit_time = 0.0;
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 }
 
@@ -269,6 +332,90 @@ mod tests {
         state.set(state_keys::SPOT, spot);
         state.set_uniform_random(uniform_random);
         state
+    }
+
+    /// At-hit knock-out rebates are compounded forward from the hit time τ
+    /// to maturity at the configured rate, so the engine's DF(T) nets to
+    /// DF(τ): value = R·e^{r(T−τ)}·N.
+    #[test]
+    fn test_rebate_at_hit_grows_forward_from_hit_time() {
+        let rate = 0.05;
+        let rebate = 5.0;
+        let grid = TimeGrid::uniform(1.0, 10).expect("grid should build");
+        let mut payoff = BarrierOptionPayoff::new(
+            100.0,
+            120.0,
+            BarrierType::UpAndOut,
+            OptionKind::Call,
+            Some(rebate),
+            1.0,
+            10,
+            0.2,
+            &grid,
+            false,
+        )
+        .with_rebate_at_hit(rate);
+
+        // Discrete breach at step 4 ⇒ τ = 0.4 on the uniform 0.1 grid.
+        payoff.on_event(&mut create_path_state(0, 0.0, 100.0, 0.5));
+        for step in 1..=10usize {
+            let spot = if step >= 4 { 125.0 } else { 100.0 };
+            payoff.on_event(&mut create_path_state(step, step as f64 * 0.1, spot, 0.5));
+        }
+
+        let expected = rebate * (rate * (1.0 - 0.4)).exp();
+        let value = payoff.value(Currency::USD).amount();
+        assert!(
+            (value - expected).abs() < 1e-10,
+            "at-hit rebate should compound forward: got {value}, expected {expected}"
+        );
+
+        // Without at-hit timing the same path pays the flat rebate.
+        let mut payoff_expiry = BarrierOptionPayoff::new(
+            100.0,
+            120.0,
+            BarrierType::UpAndOut,
+            OptionKind::Call,
+            Some(rebate),
+            1.0,
+            10,
+            0.2,
+            &grid,
+            false,
+        );
+        payoff_expiry.on_event(&mut create_path_state(0, 0.0, 100.0, 0.5));
+        for step in 1..=10usize {
+            let spot = if step >= 4 { 125.0 } else { 100.0 };
+            payoff_expiry.on_event(&mut create_path_state(step, step as f64 * 0.1, spot, 0.5));
+        }
+        assert!((payoff_expiry.value(Currency::USD).amount() - rebate).abs() < 1e-10);
+    }
+
+    /// A knock-in that never touches the barrier pays its rebate at expiry
+    /// even when at-hit timing is configured — there is no hit time.
+    #[test]
+    fn test_rebate_at_hit_leaves_knock_in_expiry_rebate_unchanged() {
+        let rebate = 5.0;
+        let grid = TimeGrid::uniform(1.0, 10).expect("grid should build");
+        let mut payoff = BarrierOptionPayoff::new(
+            100.0,
+            120.0,
+            BarrierType::UpAndIn,
+            OptionKind::Call,
+            Some(rebate),
+            1.0,
+            10,
+            0.2,
+            &grid,
+            false,
+        )
+        .with_rebate_at_hit(0.05);
+
+        payoff.on_event(&mut create_path_state(0, 0.0, 100.0, 0.5));
+        for step in 1..=10usize {
+            payoff.on_event(&mut create_path_state(step, step as f64 * 0.1, 100.0, 0.5));
+        }
+        assert!((payoff.value(Currency::USD).amount() - rebate).abs() < 1e-10);
     }
 
     #[test]

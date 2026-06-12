@@ -114,9 +114,8 @@ impl BarrierOptionHestonMcPricer {
         let maturity_step = time_grid.num_steps();
 
         // Create barrier payoff (uses vol-surface sigma for bridge correction)
-        super::pricer::warn_mc_at_hit_rebate_approximation(inst);
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
-        let payoff = BarrierOptionPayoff::new(
+        let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
             inst.barrier.amount(),
             mc_barrier_type,
@@ -128,6 +127,9 @@ impl BarrierOptionHestonMcPricer {
             &time_grid,
             inst.use_gobet_miri,
         );
+        if super::pricer::wants_at_hit_rebate(inst) {
+            payoff = payoff.with_rebate_at_hit(r);
+        }
 
         let num_paths = inst
             .pricing_overrides

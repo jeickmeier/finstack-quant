@@ -55,17 +55,18 @@
 /// crossing is guaranteed.
 #[must_use]
 pub fn bridge_hit_probability(s_t: f64, s_t_dt: f64, barrier: f64, sigma: f64, dt: f64) -> f64 {
-    if dt <= 0.0 || sigma <= 0.0 {
-        return 0.0;
-    }
-
-    // Check if barrier is between the two observations
+    // A barrier between the two observations is a guaranteed crossing
+    // regardless of σ or Δt, so this check must run before the
+    // degenerate-input guard: σ = 0 or Δt = 0 must not turn a definite
+    // discrete crossing into probability 0.
     let min_s = s_t.min(s_t_dt);
     let max_s = s_t.max(s_t_dt);
-
     if barrier >= min_s && barrier <= max_s {
-        // Barrier is between observations - definitely hit
         return 1.0;
+    }
+
+    if dt <= 0.0 || sigma <= 0.0 {
+        return 0.0;
     }
 
     // Both observations on same side of barrier
@@ -130,8 +131,9 @@ pub fn check_barrier_hit(
             // Both below barrier - check bridge probability
             if s_t < barrier && s_t_dt < barrier {
                 let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
-                // Only hit if random sample falls within probability
-                return uniform_random > 0.0 && uniform_random < p_hit;
+                // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
+                // guarantees u ∈ (0, 1), so no boundary guard is needed.
+                return uniform_random < p_hit;
             }
 
             false
@@ -145,8 +147,9 @@ pub fn check_barrier_hit(
             // Both above barrier - check bridge probability
             if s_t > barrier && s_t_dt > barrier {
                 let p_hit = bridge_hit_probability(s_t, s_t_dt, barrier, sigma, dt);
-                // Only hit if random sample falls within probability
-                return uniform_random > 0.0 && uniform_random < p_hit;
+                // Textbook inverse-CDF test: hit iff u < p. `fill_u01`
+                // guarantees u ∈ (0, 1), so no boundary guard is needed.
+                return uniform_random < p_hit;
             }
 
             false
@@ -213,7 +216,9 @@ mod tests {
 
     #[test]
     fn test_barrier_check_no_hit_up() {
-        // Well below barrier with low random number
+        // Well below barrier: the bridge hit probability here is ≈ 1.3e-8,
+        // so any ordinary uniform draw must report no hit. (`fill_u01`
+        // guarantees u ∈ (0, 1), so exactly-zero draws cannot occur.)
         assert!(!check_barrier_hit(
             80.0,
             85.0,
@@ -221,7 +226,7 @@ mod tests {
             BarrierDirection::Up,
             0.2,
             0.1,
-            0.0
+            0.5
         ));
     }
 

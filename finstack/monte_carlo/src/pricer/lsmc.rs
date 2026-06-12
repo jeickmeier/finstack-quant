@@ -144,9 +144,15 @@ impl LsmcConfig {
     ///
     /// Verifies that `num_paths > 0`, `exercise_dates` is non-empty with
     /// strictly positive step indices, and every date satisfies
-    /// `0 < date <= num_steps`. An index of `num_steps` corresponds to the
-    /// terminal exercise (European boundary condition); any index strictly
-    /// greater is a caller bug.
+    /// `0 < date <= num_steps`. Dates are sorted and de-duplicated: a
+    /// duplicate exercise date would run the same-step regression twice with
+    /// already-exercised cashflows, corrupting the second pass.
+    ///
+    /// An index of `num_steps` corresponds to the terminal exercise. Note
+    /// that the pricer **always** applies terminal exercise at `num_steps`
+    /// (American boundary condition) whether or not it is listed — a
+    /// Bermudan whose last exercise right ends strictly before maturity is
+    /// not representable; set `num_steps` to the last exercise step instead.
     pub fn new(
         num_paths: usize,
         exercise_dates: Vec<usize>,
@@ -174,6 +180,10 @@ impl LsmcConfig {
                  must satisfy 0 < date <= num_steps"
             )));
         }
+        let mut exercise_dates = exercise_dates;
+        exercise_dates.sort_unstable();
+        exercise_dates.dedup();
+
         let defaults = &crate::registry::embedded_defaults_or_panic().rust.lsmc;
         Ok(Self {
             num_paths,
@@ -985,7 +995,7 @@ mod tests {
     #[test]
     fn test_lsmc_high_degree_polynomial() {
         // Test with degree-5 polynomial (can be ill-conditioned)
-        // This tests QR robustness vs Cholesky
+        // Exercises the SVD solver's relative singular-value truncation
         let exercise_dates = vec![25, 50, 75, 100];
         let config = LsmcConfig::new(5_000, exercise_dates, 100)
             .unwrap()

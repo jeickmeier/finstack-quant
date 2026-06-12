@@ -154,12 +154,17 @@ impl StochasticProcess for CirProcess {
     }
 
     fn drift(&self, _t: f64, x: &[f64], out: &mut [f64]) {
-        // μ(v) = κ(θ - v)
-        out[0] = self.params.kappa * (self.params.theta - x[0]);
+        // μ(v) = κ(θ − v⁺): full-truncation Euler (Lord, Koekkoek & van Dijk
+        // 2010) — both drift and diffusion read the truncated state v⁺ while
+        // the state itself may go negative. This matches the Heston variance
+        // leg; mixing truncated diffusion with raw-state drift ("partial
+        // truncation") is a different scheme with a different bias.
+        let v = x[0].max(0.0);
+        out[0] = self.params.kappa * (self.params.theta - v);
     }
 
     fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
-        // σ(v) = σ√v (ensure non-negative under sqrt)
+        // σ(v) = σ√(v⁺) — full truncation, see `drift`.
         let v = x[0].max(0.0);
         out[0] = self.params.sigma * v.sqrt();
     }

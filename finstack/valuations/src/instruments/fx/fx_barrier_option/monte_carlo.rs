@@ -98,6 +98,15 @@ impl FxBarrierPayoff {
         })
     }
 
+    /// Pay knock-out rebates at the hit time, compounded forward at the
+    /// (domestic) continuously compounded `rate` — see
+    /// [`BarrierOptionPayoff::with_rebate_at_hit`].
+    #[must_use]
+    pub fn with_rebate_at_hit(mut self, rate: f64) -> Self {
+        self.inner = self.inner.with_rebate_at_hit(rate);
+        self
+    }
+
     /// Create a standard FX barrier with continuous monitoring.
     ///
     /// `use_gobet_miri` defaults to `false` to match the

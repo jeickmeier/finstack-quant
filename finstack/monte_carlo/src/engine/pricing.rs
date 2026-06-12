@@ -35,16 +35,19 @@ pub struct McEngine {
 /// extra paths when the threshold is easy.
 pub(super) const AUTO_STOP_MIN_SAMPLES: usize = 5_000;
 
-/// Calculate adaptive chunk size for parallel MC execution.
+/// Calculate the default chunk size for MC execution.
 ///
-/// Balances load distribution across cores with cache efficiency.
-/// Target: 4 chunks per thread for good load balancing.
+/// This is a **pure function of `num_paths`** by design: the chunk partition
+/// fixes the `OnlineStats::merge` reduction tree, and floating-point merges
+/// are order-sensitive, so any dependence on `rayon::current_num_threads()`
+/// would make results differ across machines, `RAYON_NUM_THREADS` settings,
+/// and native-vs-wasm hosts for the same `(seed, num_paths, num_steps)`.
+///
+/// Targets 64 chunks for large runs (ample work-stealing granularity up to
+/// 64 threads), with a 100-path floor to amortize per-chunk overhead and a
+/// 10 000-path ceiling to bound per-chunk cache footprint.
 pub(super) fn adaptive_chunk_size(num_paths: usize) -> usize {
-    let num_cpus = rayon::current_num_threads();
-    // Target 4 chunks per thread for load balancing
-    // Min 100 paths per chunk to amortize overhead
-    // Max 10_000 paths to avoid cache thrashing
-    (num_paths / (num_cpus * 4)).clamp(100, 10_000)
+    (num_paths / 64).clamp(100, 10_000)
 }
 
 /// Build the engine-side correlation factor for shock transformation.
@@ -126,6 +129,49 @@ impl McEngine {
         &self.config
     }
 
+    /// Validate that a process requiring a dedicated scheme is paired with it.
+    ///
+    /// Processes with dynamics a generic scheme cannot see (discrete
+    /// dividends, jumps) declare a [`StochasticProcess::dedicated_scheme`];
+    /// pairing them with anything else silently simulates the diffusion only.
+    pub(super) fn validate_scheme_pairing<P, D>(process: &P, disc: &D) -> Result<()>
+    where
+        P: StochasticProcess,
+        D: Discretization<P>,
+    {
+        if let Some(required) = process.dedicated_scheme() {
+            let actual = disc.scheme_id();
+            if actual != required {
+                return Err(finstack_core::Error::Validation(format!(
+                    "this process requires its dedicated discretization '{required}' but was \
+                     paired with '{actual}': a generic scheme silently simulates only the \
+                     diffusion (dropping dividends/jumps) and produces systematically wrong \
+                     prices"
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate that the payoff's event schedule fits the configured grid.
+    ///
+    /// A maturity or fixing step beyond the grid would silently never fire
+    /// (terminal spots stay 0.0, Asian averages shrink), so reject the
+    /// configuration up front.
+    pub(super) fn validate_payoff_schedule<F: Payoff>(&self, payoff: &F) -> Result<()> {
+        if let Some(max_step) = payoff.max_event_step() {
+            let steps = self.config.time_grid.num_steps();
+            if max_step > steps {
+                return Err(finstack_core::Error::Validation(format!(
+                    "payoff expects an event at step {max_step} but the time grid has only \
+                     {steps} steps: maturity/fixing steps beyond the grid would silently \
+                     never fire"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     pub(super) fn validate_runtime<R, P>(
         &self,
         rng: &R,
@@ -170,6 +216,17 @@ impl McEngine {
             return Err(finstack_core::Error::Validation(
                 "StochasticProcess::dim() must be at least 1; a zero-dimensional process \
                  has no state to simulate"
+                    .to_string(),
+            ));
+        }
+
+        if process.requires_injected_noise() {
+            return Err(finstack_core::Error::Validation(
+                "this process requires externally injected noise (e.g. Volterra/fBM \
+                 increments for rough-volatility models); the generic engine would fill \
+                 those factor slots with i.i.d. N(0,1) draws and silently produce wrong \
+                 dynamics. Drive it through engine_fractional::simulate_path_fractional \
+                 or its dedicated pricer instead."
                     .to_string(),
             ));
         }
@@ -288,7 +345,9 @@ impl McEngine {
     /// serial and parallel paths return bit-identical estimates: both reduce
     /// per-path values through the same chunk -> `OnlineStats::merge` tree, and the
     /// per-path values themselves come from `rng.split(path_id)`, independent of
-    /// thread count (see INVARIANTS.md §2.1).
+    /// thread count. The default chunk size is a pure function of `num_paths`
+    /// (never of the thread count), so results are also bit-identical across
+    /// machines, `RAYON_NUM_THREADS` settings, and native-vs-wasm hosts.
     ///
     /// # Examples
     ///
@@ -350,6 +409,8 @@ impl McEngine {
         .entered();
 
         self.validate_runtime(rng, process, initial_state, discount_factor, None)?;
+        Self::validate_scheme_pairing(process, disc)?;
+        self.validate_payoff_schedule(payoff)?;
 
         let estimate = self.run_loops(
             rng,
@@ -456,6 +517,8 @@ impl McEngine {
             discount_factor,
             Some(&process_params),
         )?;
+        Self::validate_scheme_pairing(process, disc)?;
+        self.validate_payoff_schedule(payoff)?;
 
         let capture_enabled = self.config.path_capture.enabled;
 
@@ -523,10 +586,25 @@ impl McEngine {
         };
 
         let money_estimate = MoneyEstimate::from_estimate(estimate, currency);
-        match paths {
+        // Stamp the run with its execution policy so results are auditable
+        // and replayable. The engine cannot observe the RNG seed (it receives
+        // a constructed stream); pricers that derive the stream from a seed
+        // fill `run.seed` on the returned result.
+        let run = crate::results::RunMetadata {
+            seed: None,
+            use_parallel: self.config.use_parallel,
+            antithetic: self.config.antithetic,
+            chunk_size: self
+                .config
+                .chunk_size
+                .unwrap_or_else(|| adaptive_chunk_size(self.config.num_paths)),
+            num_steps: self.config.time_grid.num_steps(),
+        };
+        let result = match paths {
             Some(paths) => MonteCarloResult::with_paths(money_estimate, paths),
             None => MonteCarloResult::new(money_estimate),
-        }
+        };
+        result.with_run_metadata(run)
     }
 
     /// Dispatch to serial or parallel path loop and return the aggregate
@@ -642,9 +720,9 @@ impl McEngine {
 
         // Reduce via the same chunk -> merge tree as `price_parallel` so that, for
         // a splittable RNG with auto-stopping disabled, serial and parallel results
-        // are bit-identical (INVARIANTS.md §2.1). Auto-stopping has no parallel
-        // counterpart, so it runs as a single chunk with a running accumulator that
-        // evaluates the stopping rule sequentially.
+        // are bit-identical (workspace determinism invariant). Auto-stopping has no
+        // parallel counterpart, so it runs as a single chunk with a running
+        // accumulator that evaluates the stopping rule sequentially.
         let chunk_ranges: Vec<Range<usize>> = if self.config.target_ci_half_width.is_some() {
             std::iter::once(0..self.config.num_paths).collect()
         } else {
@@ -678,10 +756,18 @@ impl McEngine {
                 };
 
                 payoff_local.reset();
-                payoff_local.on_path_start(&mut *path_rng);
+                // Mirror the path-start randomness for the antithetic leg:
+                // both legs read the SAME underlying draws, the anti leg
+                // mirrored (u → 1−u, z → −z). Drawing the anti leg's
+                // path-start values independently would silently destroy the
+                // antithetic coupling for payoff-level randomness.
                 if let Some(p) = payoff_anti.as_mut() {
+                    let mut mirror = crate::traits::MirroredStream(path_rng.clone());
+                    payoff_local.on_path_start(&mut *path_rng);
                     p.reset();
-                    p.on_path_start(&mut *path_rng);
+                    p.on_path_start(&mut mirror);
+                } else {
+                    payoff_local.on_path_start(&mut *path_rng);
                 }
 
                 let should_capture = capture
@@ -856,10 +942,15 @@ impl McEngine {
                     let mut path_rng = rng.split(path_id as u64).ok_or_else(|| finstack_core::Error::Validation("RandomStream does not support stream splitting; use a splittable generator such as PhiloxRng or run in serial mode without per-path splitting".to_string()))?;
 
                     payoff_clone.reset();
-                    payoff_clone.on_path_start(&mut path_rng);
+                    // Mirror path-start randomness for the antithetic leg —
+                    // see the serial loop for the rationale.
                     if let Some(p) = payoff_anti.as_mut() {
+                        let mut mirror = crate::traits::MirroredStream(path_rng.clone());
+                        payoff_clone.on_path_start(&mut path_rng);
                         p.reset();
-                        p.on_path_start(&mut path_rng);
+                        p.on_path_start(&mut mirror);
+                    } else {
+                        payoff_clone.on_path_start(&mut path_rng);
                     }
 
                     let should_capture = capture

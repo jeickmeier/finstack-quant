@@ -189,7 +189,7 @@ impl CheyetteRoughVolParams {
         if !hurst.is_rough() {
             tracing::warn!(
                 h = hurst.value(),
-                "CheyetteRoughVol Hurst exponent H = {:.4} is not rough (H < 0.5). \
+                "CheyetteRoughVol Hurst exponent H = {:.4} is not rough (H >= 0.5). \
                  The model is designed for rough volatility; results may not \
                  match empirical behavior.",
                 hurst.value()
@@ -301,6 +301,12 @@ impl StochasticProcess for CheyetteRoughVolProcess {
         // z[1] = RL Volterra increment ΔỸ,
         // z[2] = unit-variance driving Brownian normal Z̃
         3
+    }
+
+    fn requires_injected_noise(&self) -> bool {
+        // z[1]/z[2] must be Volterra increments and their driving normals,
+        // generated jointly on the full grid; i.i.d. engine noise is invalid.
+        true
     }
 
     /// Formal no-op: actual drift is applied by the Cheyette rough vol discretization.

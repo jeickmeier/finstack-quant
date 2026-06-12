@@ -46,7 +46,6 @@
 //!
 //! For more realistic models, see:
 //! - [`crate::process::heston::HestonProcess`] for stochastic volatility
-//! - [`crate::process::bates::BatesProcess`] for jumps + stochastic vol
 //! - Local volatility models for calibrated smiles
 //!
 //! # References

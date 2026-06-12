@@ -5,19 +5,19 @@ use finstack_monte_carlo::results::MoneyEstimate;
 use pyo3::prelude::*;
 
 /// Monte Carlo pricing result with discounted statistics.
-#[pyclass(name = "MonteCarloResult", module = "finstack.monte_carlo", frozen)]
-pub struct PyMonteCarloResult {
+#[pyclass(name = "MoneyEstimate", module = "finstack.monte_carlo", frozen)]
+pub struct PyMoneyEstimate {
     inner: MoneyEstimate,
 }
 
-impl PyMonteCarloResult {
+impl PyMoneyEstimate {
     pub(super) fn from_inner(inner: MoneyEstimate) -> Self {
         Self { inner }
     }
 }
 
 #[pymethods]
-impl PyMonteCarloResult {
+impl PyMoneyEstimate {
     /// Discounted mean present value.
     #[getter]
     fn mean(&self) -> PyMoney {
@@ -103,7 +103,7 @@ impl PyMonteCarloResult {
 
     fn __repr__(&self) -> String {
         format!(
-            "MonteCarloResult(mean={}, stderr={:.6}, n={})",
+            "MoneyEstimate(mean={}, stderr={:.6}, n={})",
             self.inner.mean, self.inner.stderr, self.inner.num_paths,
         )
     }
@@ -204,7 +204,7 @@ impl PyEstimate {
 }
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyMonteCarloResult>()?;
+    m.add_class::<PyMoneyEstimate>()?;
     m.add_class::<PyEstimate>()?;
     Ok(())
 }

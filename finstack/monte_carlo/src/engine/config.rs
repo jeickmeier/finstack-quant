@@ -20,8 +20,10 @@ pub const MAX_CAPTURED_PATHS: usize = 100_000;
 /// manually or via [`McEngineBuilder`]. All time values are year fractions.
 #[derive(Debug, Clone)]
 pub struct McEngineConfig {
-    /// Requested number of independent path estimators
-    /// (capped at [`MAX_NUM_PATHS`] at runtime).
+    /// Requested number of independent path estimators. Values above
+    /// [`MAX_NUM_PATHS`] are rejected (not capped) at runtime. A value of 1
+    /// is accepted but yields an undefined (`NaN`) standard error — at least
+    /// 2 paths are needed for a sample variance.
     ///
     /// With [`Self::antithetic`] disabled this equals the number of simulated
     /// sample paths. With antithetic pairing enabled the engine runs
@@ -33,12 +35,20 @@ pub struct McEngineConfig {
     pub num_paths: usize,
     /// Time grid for discretization
     pub time_grid: TimeGrid,
-    /// Optional target CI half-width for auto-stopping
+    /// Optional target CI half-width for auto-stopping.
+    ///
+    /// Auto-stopping is an optional-stopping rule conditioned on the running
+    /// confidence interval, so the stopped estimator carries a small bias;
+    /// a 5 000-sample warm-up keeps the half-width estimate stable before
+    /// the rule is evaluated. Serial-only.
     pub target_ci_half_width: Option<f64>,
-    /// Use parallel execution (requires parallel feature)
+    /// Use parallel execution (requires an RNG that supports deterministic
+    /// stream splitting, e.g. `PhiloxRng`; rayon support is always compiled
+    /// in).
     pub use_parallel: bool,
-    /// Chunk size for parallel execution. `None` selects an adaptive chunk size
-    /// from the path and CPU counts; `Some(n)` uses exactly `n` paths per chunk.
+    /// Chunk size of the deterministic reduction tree. `None` selects a
+    /// default that is a pure function of `num_paths` (never of the thread
+    /// count); `Some(n)` uses exactly `n` paths per chunk.
     pub chunk_size: Option<usize>,
     /// Path capture configuration
     pub path_capture: PathCaptureConfig,

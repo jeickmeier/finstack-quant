@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 
 /// Serializable result shape returned to JavaScript.
 ///
-/// Field layout mirrors the accessors on the Python `MonteCarloResult`
+/// Field layout mirrors the accessors on the Python `MoneyEstimate`
 /// binding so both hosts see the same vocabulary.
 #[derive(serde::Serialize)]
 struct McResultJs {
@@ -90,6 +90,14 @@ fn estimate_to_js(est: &MoneyEstimate) -> Result<JsValue, JsValue> {
     McResultJs::from_estimate(est).to_js_value()
 }
 
+/// Resolve the embedded binding defaults from the registry.
+fn binding_defaults(
+) -> Result<&'static finstack_monte_carlo::registry::PythonBindingDefaults, JsValue> {
+    finstack_monte_carlo::registry::embedded_defaults()
+        .map(|defaults| &defaults.python_bindings)
+        .map_err(to_js_err)
+}
+
 /// Price a European call option via Monte Carlo under GBM dynamics.
 ///
 /// Returns a JSON object with `mean`, `currency`, `stderr`, `std_dev`,
@@ -155,7 +163,10 @@ fn price_european(
     currency: Option<String>,
 ) -> Result<JsValue, JsValue> {
     let ccy = resolve_currency(currency.as_deref())?;
-    let steps = num_steps.unwrap_or(252);
+    let steps = match num_steps {
+        Some(steps) => steps,
+        None => binding_defaults()?.european_pricer.num_steps,
+    };
     let pricer = build_pricer(num_paths, seed);
     let est = if is_call {
         pricer.price_gbm_call(spot, strike, rate, div_yield, vol, expiry, steps, ccy)
@@ -316,10 +327,15 @@ fn price_asian(
     };
 
     let ccy = resolve_currency(currency.as_deref())?;
-    let steps = num_steps.unwrap_or(252);
+    let steps = match num_steps {
+        Some(steps) => steps,
+        None => binding_defaults()?.path_dependent_pricer.num_steps,
+    };
     let fixing_steps = default_fixing_steps(steps);
     let df = (-rate * expiry).exp();
-    let config = PathDependentPricerConfig::new(num_paths).with_seed(seed);
+    let config = PathDependentPricerConfig::new(num_paths)
+        .with_seed(seed)
+        .with_parallel(false);
     let pricer = PathDependentPricer::new(config);
     let process = GbmProcess::with_params(rate, div_yield, vol).map_err(to_js_err)?;
     let est = if is_call {
@@ -633,11 +649,7 @@ fn prepare_lsmc_gbm(
     use finstack_monte_carlo::pricer::basis::build_lsmc_basis_from_name;
     use finstack_monte_carlo::pricer::lsmc::LsmcConfig;
 
-    let defaults = finstack_monte_carlo::registry::embedded_defaults()
-        .map_err(|err| to_js_err(err.to_string()))?
-        .python_bindings
-        .lsmc
-        .clone();
+    let defaults = &binding_defaults()?.lsmc;
     let currency = resolve_currency(currency.as_deref())?;
     let num_steps = num_steps.unwrap_or(defaults.num_steps);
     let exercise_dates: Vec<usize> = (1..=num_steps).collect();
@@ -689,7 +701,10 @@ fn price_heston(
     use finstack_monte_carlo::time_grid::TimeGrid;
 
     let ccy = resolve_currency(currency.as_deref())?;
-    let steps = num_steps.unwrap_or(252);
+    let steps = match num_steps {
+        Some(steps) => steps,
+        None => binding_defaults()?.european_pricer.num_steps,
+    };
     let time_grid = TimeGrid::uniform(expiry, steps).map_err(to_js_err)?;
     let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid).with_parallel(false));
     let rng = PhiloxRng::new(seed);

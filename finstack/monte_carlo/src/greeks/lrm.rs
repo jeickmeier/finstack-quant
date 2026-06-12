@@ -19,6 +19,18 @@ use crate::online_stats::OnlineStats;
 ///
 /// where `Z = W_T / √T`.
 ///
+/// # Payoff contract
+///
+/// The terminal score is the score of the *terminal marginal density*, so
+/// this estimator is unbiased **only for payoffs that are functions of `S_T`
+/// alone** (European-style). For path-dependent payoffs (Asian averages,
+/// barriers, lookbacks) only the first-transition density depends on `S₀`:
+/// pass the *first-step* shock together with the *first step's* Δt instead
+/// (Glasserman 2003, §7.3) — this is what
+/// [`PathDependentPricer::price_with_lrm_greeks`](crate::pricer::path_dependent::PathDependentPricer::price_with_lrm_greeks)
+/// does. Feeding terminal shocks with a path-dependent payoff silently
+/// biases delta (≈ ×0.5 for a uniform-fixing Asian).
+///
 /// # Arguments
 ///
 /// * `payoffs` - Payoff values from MC paths
@@ -67,6 +79,13 @@ pub fn lrm_delta(
 ///
 /// Returns Vega scaled by 0.01 (sensitivity per 1% volatility change).
 ///
+/// # Payoff contract
+///
+/// Unbiased **only for payoffs that are functions of `S_T` alone**. For
+/// path-dependent payoffs the score of the joint path density is the sum of
+/// per-transition scores `Σᵢ [(zᵢ² − 1)/σ − √Δtᵢ·zᵢ]`; compute those sums
+/// per path and use [`lrm_vega_from_scores`].
+///
 /// # References
 ///
 /// Glasserman (2003), *Monte Carlo Methods in Financial Engineering*, Prop 7.3.4.
@@ -88,6 +107,40 @@ pub fn lrm_vega(
         stats.update(vega_contribution * 0.01);
     }
 
+    (stats.mean(), stats.stderr())
+}
+
+/// Compute vega from precomputed per-path log-density score sums.
+///
+/// For a payoff measurable with respect to the *discretized path*, the σ
+/// score of the joint transition density is the sum of per-step scores
+/// (Glasserman 2003, §7.3):
+/// ```text
+/// ∂ln(p)/∂σ = Σᵢ [(zᵢ² − 1)/σ − √Δtᵢ·zᵢ]
+/// ```
+/// where `zᵢ` is the standardized shock of step i. Callers compute the sum
+/// per path (e.g. by reconstructing `zᵢ` from consecutive spots under exact
+/// GBM stepping) and pass one score per payoff.
+///
+/// Returns vega scaled by 0.01 (sensitivity per 1% volatility change), with
+/// its standard error.
+///
+/// # Caveat
+///
+/// The LR estimator differentiates the path *density* only. If the payoff
+/// functional itself depends explicitly on σ (e.g. a barrier payoff using a
+/// σ-dependent Brownian-bridge crossing probability), the `E[∂f/∂σ]` term is
+/// not captured and must be handled separately.
+#[must_use]
+pub fn lrm_vega_from_scores(
+    payoffs: &[f64],
+    path_scores: &[f64],
+    discount_factor: f64,
+) -> (f64, f64) {
+    let mut stats = OnlineStats::new();
+    for (&payoff, &score) in payoffs.iter().zip(path_scores) {
+        stats.update(discount_factor * payoff * score * 0.01);
+    }
     (stats.mean(), stats.stderr())
 }
 

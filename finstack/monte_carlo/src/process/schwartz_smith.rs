@@ -6,17 +6,25 @@
 //! # SDE
 //!
 //! ```text
-//! dX_t = -κ_X X_t dt + σ_X dW_X      // Short-term deviation (mean-reverting)
-//! dY_t = μ_Y dt + σ_Y dW_Y           // Long-term trend (GBM)
-//! S_t = exp(X_t + Y_t)               // Spot price
+//! dX_t = (-κ_X X_t - λ_X) dt + σ_X dW_X   // Short-term deviation (mean-reverting)
+//! dY_t = μ_Y dt + σ_Y dW_Y                // Long-term trend (arithmetic BM on log-price)
+//! S_t = exp(X_t + Y_t)                    // Spot price
 //! ```
 //!
 //! where:
 //! - X_t: Short-term deviation from long-term trend (OU process)
-//! - Y_t: Long-term trend (arithmetic Brownian motion)
+//! - Y_t: Long-term trend (arithmetic Brownian motion on the log price)
 //! - κ_X: Mean reversion speed for short-term component
+//! - λ_X: Constant short-term risk-premium drift shift (0 under the physical
+//!   measure; Schwartz & Smith (2000) risk-neutralize the short-term factor
+//!   by subtracting the constant λ_χ at **unchanged** κ — not by inflating κ)
 //! - σ_X, σ_Y: Volatilities
 //! - ρ: Correlation between X and Y
+//!
+//! # References
+//!
+//! - Schwartz, E. & Smith, J. E. (2000). "Short-Term Variations and Long-Term
+//!   Dynamics in Commodity Prices." *Management Science*, 46(7), 893–911.
 
 use super::super::traits::StochasticProcess;
 
@@ -33,6 +41,13 @@ pub struct SchwartzSmithParams {
     pub sigma_y: f64,
     /// Correlation between X and Y (ρ)
     pub rho: f64,
+    /// Constant risk-premium drift shift for the short-term factor (λ_X).
+    ///
+    /// Under the risk-neutral measure the short-term factor follows
+    /// `dX = (−κ_X X − λ_X) dt + σ_X dW*` (Schwartz & Smith 2000): a constant
+    /// drift shift at unchanged κ_X. Defaults to 0 (physical measure).
+    #[serde(default)]
+    pub lambda_x: f64,
 }
 
 impl SchwartzSmithParams {
@@ -89,7 +104,28 @@ impl SchwartzSmithParams {
             mu_y,
             sigma_y,
             rho,
+            lambda_x: 0.0,
         })
+    }
+
+    /// Set the constant short-term risk-premium drift shift λ_X.
+    ///
+    /// Use this to express the Schwartz-Smith risk-neutral dynamics
+    /// `dX = (−κ_X X − λ_X) dt + σ_X dW*`. The mean-reversion speed κ_X is
+    /// unchanged under the measure change.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_core::Error::Validation`] when `lambda_x` is not
+    /// finite.
+    pub fn with_lambda_x(mut self, lambda_x: f64) -> finstack_core::Result<Self> {
+        if !lambda_x.is_finite() {
+            return Err(finstack_core::Error::Validation(format!(
+                "Schwartz-Smith lambda_x must be finite, got {lambda_x}"
+            )));
+        }
+        self.lambda_x = lambda_x;
+        Ok(self)
     }
 }
 
@@ -162,6 +198,46 @@ impl SchwartzSmithProcess {
         assert_eq!(state.len(), 2, "State must have dimension 2");
         (state[0] + state[1]).exp()
     }
+
+    /// Model futures price `F(0, τ) = E[S_τ]` under these dynamics.
+    ///
+    /// Schwartz & Smith (2000), eq. (9), adapted to this parameterization
+    /// (X mean-reverting with constant drift shift −λ_X, Y arithmetic BM on
+    /// the log price):
+    ///
+    /// ```text
+    /// ln F(0, τ) = e^{−κτ}·X₀ + Y₀ + A(τ)
+    /// A(τ) = μ_Y·τ − (1 − e^{−κτ})·λ_X/κ
+    ///        + ½[ (1 − e^{−2κτ})·σ_X²/(2κ) + σ_Y²·τ
+    ///             + 2(1 − e^{−κτ})·ρ·σ_X·σ_Y/κ ]
+    /// ```
+    ///
+    /// When the parameters carry the risk-neutral drift (λ_X set, μ_Y = μ*),
+    /// this is the arbitrage-free futures curve and the simulated spot
+    /// satisfies `E[S_τ] = F(0, τ)` exactly under the exact discretization.
+    ///
+    /// # References
+    ///
+    /// - Schwartz, E. & Smith, J. E. (2000). "Short-Term Variations and
+    ///   Long-Term Dynamics in Commodity Prices." *Management Science*,
+    ///   46(7), 893–911 (eq. 9).
+    #[must_use]
+    pub fn futures_price(&self, tau: f64) -> f64 {
+        let p = &self.params;
+        let kappa = p.kappa_x;
+        // (1 − e^{−κτ})/κ via exp_m1, stable as κτ → 0.
+        let one_minus_exp_over_kappa = -(-kappa * tau).exp_m1() / kappa;
+        let exp_kappa_tau = (-kappa * tau).exp();
+
+        let var_x = p.sigma_x * p.sigma_x * (-(-2.0 * kappa * tau).exp_m1()) / (2.0 * kappa);
+        let var_y = p.sigma_y * p.sigma_y * tau;
+        let cov_xy = 2.0 * p.rho * p.sigma_x * p.sigma_y * one_minus_exp_over_kappa;
+
+        let a_tau =
+            p.mu_y * tau - p.lambda_x * one_minus_exp_over_kappa + 0.5 * (var_x + var_y + cov_xy);
+
+        (exp_kappa_tau * self.initial[0] + self.initial[1] + a_tau).exp()
+    }
 }
 
 impl StochasticProcess for SchwartzSmithProcess {
@@ -174,8 +250,8 @@ impl StochasticProcess for SchwartzSmithProcess {
     }
 
     fn drift(&self, _t: f64, x: &[f64], out: &mut [f64]) {
-        // dX: -κ_X * X (mean-reverting to zero)
-        out[0] = -self.params.kappa_x * x[0];
+        // dX: -κ_X·X − λ_X (mean reversion plus constant risk-premium shift)
+        out[0] = -self.params.kappa_x * x[0] - self.params.lambda_x;
         // dY: μ_Y (constant drift)
         out[1] = self.params.mu_y;
     }
@@ -204,6 +280,76 @@ impl StochasticProcess for SchwartzSmithProcess {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Near-zero vols: ln F(0,τ) reduces to the deterministic
+    /// e^{−κτ}X₀ + Y₀ + μτ − (1 − e^{−κτ})λ/κ.
+    #[test]
+    fn test_futures_price_deterministic_limit() {
+        let (kappa, mu, lambda, tau) = (1.5, 0.03, 0.02, 2.0);
+        let params = SchwartzSmithParams::new(kappa, 1e-9, mu, 1e-9, 0.0)
+            .unwrap()
+            .with_lambda_x(lambda)
+            .unwrap();
+        let (x0, y0) = (0.1, 4.5);
+        let process = SchwartzSmithProcess::new(params, x0, y0);
+
+        let one_minus = 1.0 - (-kappa * tau).exp();
+        let expected =
+            ((-kappa * tau).exp() * x0 + y0 + mu * tau - lambda * one_minus / kappa).exp();
+        let f = process.futures_price(tau);
+        assert!(
+            (f / expected - 1.0).abs() < 1e-10,
+            "futures {f} should match deterministic limit {expected}"
+        );
+    }
+
+    /// Engine-level pin: under the exact discretization, E[S_τ] must equal
+    /// the closed-form futures price within MC stderr — this is the
+    /// arbitrage consistency the futures reconstruction exists to provide.
+    #[test]
+    fn test_simulated_terminal_spot_matches_futures_price() {
+        use super::super::super::discretization::schwartz_smith::ExactSchwartzSmith;
+        use super::super::super::engine::McEngine;
+        use super::super::super::payoff::vanilla::Forward;
+        use super::super::super::rng::philox::PhiloxRng;
+        use finstack_core::currency::Currency;
+
+        let params = SchwartzSmithParams::new(1.5, 0.30, 0.02, 0.15, -0.4)
+            .unwrap()
+            .with_lambda_x(0.05)
+            .unwrap();
+        let process = SchwartzSmithProcess::from_spot(params, 90.0, Some(0.1));
+        let disc = ExactSchwartzSmith::from_process(&process).expect("disc");
+
+        let t = 1.0;
+        let steps = 12usize;
+        let engine = McEngine::builder()
+            .num_paths(100_000)
+            .uniform_grid(t, steps)
+            .parallel(false)
+            .build()
+            .expect("engine");
+        let payoff = Forward::long(0.0, 1.0, steps);
+        let result = engine
+            .price(
+                &PhiloxRng::new(7),
+                &process,
+                &disc,
+                &process.initial_state(),
+                &payoff,
+                Currency::USD,
+                1.0,
+            )
+            .expect("pricing");
+
+        let futures = process.futures_price(t);
+        let mean = result.mean.amount();
+        let tol = 4.0 * result.stderr;
+        assert!(
+            (mean - futures).abs() < tol,
+            "E[S_T] = {mean:.4} should match futures {futures:.4} within {tol:.4}"
+        );
+    }
 
     #[test]
     fn test_schwartz_smith_creation() {

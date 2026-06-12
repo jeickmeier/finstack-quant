@@ -84,8 +84,8 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         // Conditional standard deviation: Std[r_{t+Δt}|r_t]
         // For small κΔt, use Taylor expansion to avoid numerical issues
         let std_dev = if (kappa * dt).abs() < 1e-8 {
-            // Taylor: √[(1 - e^{-2κΔt})/(2κ)] ≈ √Δt [1 - κΔt/3 + ...]
-            sigma * dt.sqrt() * (1.0 - kappa * dt / 3.0)
+            // Taylor: √[(1 - e^{-2κΔt})/(2κ)] = √Δt·(1 - κΔt/2 + O((κΔt)²))
+            sigma * dt.sqrt() * (1.0 - kappa * dt / 2.0)
         } else {
             sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
         };

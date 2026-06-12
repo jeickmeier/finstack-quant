@@ -27,24 +27,17 @@ use finstack_monte_carlo::pricer::path_dependent::{
 };
 use finstack_monte_carlo::process::gbm::{GbmParams, GbmProcess};
 
-/// The MC payoffs pay rebates at expiry; warn when an at-hit KO rebate is
-/// requested so the timing approximation is visible in production logs.
-pub(crate) fn warn_mc_at_hit_rebate_approximation(inst: &BarrierOption) {
-    use crate::instruments::exotics::barrier_option::types::BarrierType;
+/// Whether the instrument's rebate should be paid at the hit time.
+///
+/// When true, the MC payoff is configured via
+/// [`BarrierOptionPayoff::with_rebate_at_hit`] so the rebate compounds
+/// forward from the hit time τ at the flat rate and the engine's maturity
+/// discount factor nets to `DF(τ)` — exact at-hit discounting, matching the
+/// analytical [`crate::models::closed_form::barrier::barrier_rebate`] with
+/// [`RebateTiming::AtHit`](crate::models::closed_form::barrier::RebateTiming::AtHit).
+pub(crate) fn wants_at_hit_rebate(inst: &BarrierOption) -> bool {
     use crate::models::closed_form::barrier::RebateTiming;
-    if inst.rebate.is_some()
-        && inst.rebate_timing == RebateTiming::AtHit
-        && matches!(
-            inst.barrier_type,
-            BarrierType::UpAndOut | BarrierType::DownAndOut
-        )
-    {
-        tracing::warn!(
-            instrument_id = %inst.id,
-            "barrier MC pricer approximates the at-hit knock-out rebate as paid at expiry; \
-             use the analytical pricer for exact at-hit rebate discounting"
-        );
-    }
+    inst.rebate.is_some() && inst.rebate_timing == RebateTiming::AtHit
 }
 
 /// Barrier option Monte Carlo pricer.
@@ -142,9 +135,8 @@ impl BarrierOptionMcPricer {
         let maturity_step = num_steps;
 
         // Create payoff (using vol surface time for barrier adjustment calculations)
-        warn_mc_at_hit_rebate_approximation(inst);
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
-        let payoff = BarrierOptionPayoff::new(
+        let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
             inst.barrier.amount(),
             mc_barrier_type,
@@ -156,6 +148,9 @@ impl BarrierOptionMcPricer {
             &time_grid,
             inst.use_gobet_miri,
         );
+        if wants_at_hit_rebate(inst) {
+            payoff = payoff.with_rebate_at_hit(r);
+        }
 
         // Derive deterministic seed from instrument ID and scenario
 
@@ -250,9 +245,8 @@ impl BarrierOptionMcPricer {
         let time_grid = finstack_monte_carlo::time_grid::TimeGrid::uniform(t_vol, num_steps)?;
         // See `price_internal` for the maturity_step = num_steps rationale.
         let maturity_step = num_steps;
-        warn_mc_at_hit_rebate_approximation(inst);
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
-        let payoff = BarrierOptionPayoff::new(
+        let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
             inst.barrier.amount(),
             mc_barrier_type,
@@ -264,6 +258,9 @@ impl BarrierOptionMcPricer {
             &time_grid,
             inst.use_gobet_miri,
         );
+        if wants_at_hit_rebate(inst) {
+            payoff = payoff.with_rebate_at_hit(r);
+        }
 
         // Seed
 
@@ -417,10 +414,10 @@ use crate::models::closed_form::barrier::{
 };
 /// Broadie-Glasserman-Kou / Gobet-Miri discrete barrier adjustment constant.
 ///
-/// β = -ζ(1/2) / √(2π) ≈ 0.5825971579390106 (full f64 precision). Kept
-/// numerically identical to `finstack_monte_carlo::barriers::corrections::GOBET_MIRI_BETA`
-/// but redefined here to keep the analytical barrier path independent of the MC module layout.
-const BG_BETA: f64 = 0.582_597_157_939_010_6;
+/// β = -ζ(1/2) / √(2π) ≈ 0.5825971579390106. Re-exported from the canonical
+/// definition in `finstack_monte_carlo::barriers::corrections` so the
+/// analytical and MC stacks can never drift apart.
+const BG_BETA: f64 = finstack_monte_carlo::barriers::corrections::GOBET_MIRI_BETA;
 
 /// Barrier option analytical pricer (continuous monitoring).
 ///

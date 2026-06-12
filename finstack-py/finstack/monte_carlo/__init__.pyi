@@ -14,22 +14,26 @@ from collections.abc import Sequence
 from finstack.core.money import Money
 
 __all__ = [
-    "MonteCarloResult",
     "Estimate",
-    "TimeGrid",
-    "McEngine",
     "EuropeanPricer",
-    "PathDependentPricer",
     "LsmcPricer",
+    "McEngine",
+    "MoneyEstimate",
+    "PathDependentPricer",
+    "TimeGrid",
     "black_scholes_call",
     "black_scholes_put",
+    "finite_diff_delta",
+    "finite_diff_delta_crn",
+    "finite_diff_gamma",
+    "finite_diff_gamma_crn",
     "price_european_call",
     "price_european_put",
     "price_heston_call",
     "price_heston_put",
 ]
 
-class MonteCarloResult:
+class MoneyEstimate:
     """Discounted Monte Carlo estimate with money units and confidence bands.
 
     Args:
@@ -652,7 +656,7 @@ class McEngine:
         div_yield: float,
         vol: float,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price a European call on the engine's grid under GBM.
 
         Args:
@@ -681,7 +685,7 @@ class McEngine:
         div_yield: float,
         vol: float,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price a European put on the engine's grid under GBM.
 
         Args:
@@ -795,7 +799,7 @@ class EuropeanPricer:
         expiry: float,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price a European call.
 
         Args:
@@ -828,7 +832,7 @@ class EuropeanPricer:
         expiry: float,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price a European put.
 
         Args:
@@ -901,7 +905,7 @@ class PathDependentPricer:
         expiry: float,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price an arithmetic Asian call (post-initial fixings at every step).
 
         Args:
@@ -936,7 +940,7 @@ class PathDependentPricer:
         expiry: float,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price an arithmetic Asian put (post-initial fixings at every step).
 
         Args:
@@ -1088,7 +1092,7 @@ class LsmcPricer:
         expiry: float,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price an American put via LSMC.
 
         Args:
@@ -1121,7 +1125,7 @@ class LsmcPricer:
         expiry: float,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Price an American call via LSMC.
 
         Args:
@@ -1155,7 +1159,7 @@ class LsmcPricer:
         pricing_seed: int,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Two-pass unbiased American put price.
 
         Mitigates the in-sample upward bias of single-pass LSMC by fitting
@@ -1176,7 +1180,7 @@ class LsmcPricer:
             currency: ISO string or None for USD.
 
         Returns:
-            Out-of-sample MonteCarloResult.
+            Out-of-sample MoneyEstimate.
         """
         ...
 
@@ -1191,7 +1195,7 @@ class LsmcPricer:
         pricing_seed: int,
         num_steps: int | None = None,
         currency: str | None = None,
-    ) -> MonteCarloResult:
+    ) -> MoneyEstimate:
         """Two-pass unbiased American call price.
 
         See :meth:`price_american_put_unbiased` for the bias-mitigation
@@ -1274,7 +1278,7 @@ def price_european_call(
     seed: int | None = None,
     num_steps: int | None = None,
     currency: str | None = None,
-) -> MonteCarloResult:
+) -> MoneyEstimate:
     """Monte Carlo European call under GBM (standalone convenience).
 
     Args:
@@ -1310,7 +1314,7 @@ def price_european_put(
     seed: int | None = None,
     num_steps: int | None = None,
     currency: str | None = None,
-) -> MonteCarloResult:
+) -> MoneyEstimate:
     """Monte Carlo European put under GBM (standalone convenience).
 
     Args:
@@ -1350,7 +1354,7 @@ def price_heston_call(
     seed: int | None = None,
     num_steps: int | None = None,
     currency: str | None = None,
-) -> MonteCarloResult:
+) -> MoneyEstimate:
     """Monte Carlo European call under Heston stochastic volatility."""
     ...
 
@@ -1369,11 +1373,11 @@ def price_heston_put(
     seed: int | None = None,
     num_steps: int | None = None,
     currency: str | None = None,
-) -> MonteCarloResult:
+) -> MoneyEstimate:
     """Monte Carlo European put under Heston stochastic volatility."""
     ...
 
-def fd_delta(
+def finite_diff_delta(
     spot: float,
     strike: float,
     rate: float,
@@ -1391,7 +1395,7 @@ def fd_delta(
 
     Reports a conservative upper bound on the standard error that treats
     the bumped and base runs as if they were statistically independent.
-    For hedge-ratio sizing prefer :func:`fd_delta_crn`, which returns the
+    For hedge-ratio sizing prefer :func:`finite_diff_delta_crn`, which returns the
     tighter paired CRN stderr.
 
     Args:
@@ -1413,7 +1417,7 @@ def fd_delta(
     """
     ...
 
-def fd_delta_crn(
+def finite_diff_delta_crn(
     spot: float,
     strike: float,
     rate: float,
@@ -1432,7 +1436,7 @@ def fd_delta_crn(
     Computes per-path paired differences and reports their true standard
     error, which exploits CRN cancellation and is typically 1–2 orders of
     magnitude tighter than the independence bound returned by
-    :func:`fd_delta`. Always runs serially.
+    :func:`finite_diff_delta`. Always runs serially.
 
     Args:
         spot: Spot price.
@@ -1453,7 +1457,7 @@ def fd_delta_crn(
     """
     ...
 
-def fd_gamma(
+def finite_diff_gamma(
     spot: float,
     strike: float,
     rate: float,
@@ -1469,12 +1473,12 @@ def fd_gamma(
 ) -> tuple[float, float]:
     """Finite-difference gamma (independence-bound stderr).
 
-    See :func:`fd_gamma_crn` for the tighter paired CRN variant. Returns
+    See :func:`finite_diff_gamma_crn` for the tighter paired CRN variant. Returns
     ``(gamma, stderr)``.
     """
     ...
 
-def fd_gamma_crn(
+def finite_diff_gamma_crn(
     spot: float,
     strike: float,
     rate: float,

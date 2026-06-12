@@ -1,21 +1,14 @@
 //! Pricer bindings — European, Path-Dependent, LSMC.
 
-use super::engine::resolve_currency;
-use super::results::PyMonteCarloResult;
+use super::engine::{py_mc_defaults, resolve_currency};
+use super::results::PyMoneyEstimate;
 use crate::errors::core_to_py;
 use finstack_core::currency::Currency;
 use finstack_monte_carlo::pricer::basis::{build_lsmc_basis, BasisKind, LsmcBasis};
 use finstack_monte_carlo::pricer::european::EuropeanPricer;
 use finstack_monte_carlo::pricer::lsmc::{LsmcConfig, LsmcPricer};
 use finstack_monte_carlo::process::gbm::GbmProcess;
-use finstack_monte_carlo::registry::{embedded_defaults, PythonBindingDefaults};
 use pyo3::prelude::*;
-
-fn py_mc_defaults() -> PyResult<&'static PythonBindingDefaults> {
-    embedded_defaults()
-        .map(|defaults| &defaults.python_bindings)
-        .map_err(core_to_py)
-}
 
 /// Convenience pricer for European options under GBM dynamics.
 #[pyclass(name = "EuropeanPricer", module = "finstack.monte_carlo", frozen)]
@@ -72,14 +65,14 @@ impl PyEuropeanPricer {
         expiry: f64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
         let num_steps = num_steps.unwrap_or(py_mc_defaults()?.european_pricer.num_steps);
         let pricer = self.build_pricer();
         py.detach(|| {
             pricer.price_gbm_call(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
@@ -100,14 +93,14 @@ impl PyEuropeanPricer {
         expiry: f64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
         let num_steps = num_steps.unwrap_or(py_mc_defaults()?.european_pricer.num_steps);
         let pricer = self.build_pricer();
         py.detach(|| {
             pricer.price_gbm_put(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
@@ -172,7 +165,7 @@ impl PyPathDependentPricer {
         expiry: f64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         use finstack_monte_carlo::payoff::asian::{
             default_fixing_steps, AsianCall, AveragingMethod,
         };
@@ -202,7 +195,7 @@ impl PyPathDependentPricer {
         expiry: f64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         use finstack_monte_carlo::payoff::asian::{
             default_fixing_steps, AsianPut, AveragingMethod,
         };
@@ -247,7 +240,7 @@ impl PyPathDependentPricer {
         num_steps: usize,
         currency: finstack_core::currency::Currency,
         discount_factor: f64,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         use finstack_monte_carlo::pricer::path_dependent::{
             PathDependentPricer, PathDependentPricerConfig,
         };
@@ -268,7 +261,7 @@ impl PyPathDependentPricer {
                 discount_factor,
             )
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 }
@@ -406,7 +399,7 @@ impl PyLsmcPricer {
         expiry: f64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         use finstack_monte_carlo::pricer::lsmc::AmericanPut;
 
         let exercise = AmericanPut::new(strike).map_err(core_to_py)?;
@@ -423,7 +416,7 @@ impl PyLsmcPricer {
                 rate,
             )
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
@@ -443,7 +436,7 @@ impl PyLsmcPricer {
         expiry: f64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         use finstack_monte_carlo::pricer::lsmc::AmericanCall;
 
         let exercise = AmericanCall::new(strike).map_err(core_to_py)?;
@@ -460,7 +453,7 @@ impl PyLsmcPricer {
                 rate,
             )
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
@@ -490,7 +483,7 @@ impl PyLsmcPricer {
         pricing_seed: u64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         use finstack_monte_carlo::pricer::lsmc::AmericanPut;
 
         let exercise = AmericanPut::new(strike).map_err(core_to_py)?;
@@ -508,7 +501,7 @@ impl PyLsmcPricer {
                 pricing_seed,
             )
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
@@ -533,7 +526,7 @@ impl PyLsmcPricer {
         pricing_seed: u64,
         num_steps: Option<usize>,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         use finstack_monte_carlo::pricer::lsmc::AmericanCall;
 
         let exercise = AmericanCall::new(strike).map_err(core_to_py)?;
@@ -551,7 +544,7 @@ impl PyLsmcPricer {
                 pricing_seed,
             )
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 

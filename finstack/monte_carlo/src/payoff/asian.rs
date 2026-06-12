@@ -156,21 +156,26 @@ impl AsianCall {
 }
 
 impl Payoff for AsianCall {
+    /// Accumulate the spot fixing when the current step is a fixing step.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `SPOT` is missing or non-finite at a fixing step — see
+    /// [`super::require_finite_state`].
     fn on_event(&mut self, state: &mut PathState) {
         if self.fixing_set.contains(&state.step) {
-            if let Some(spot) = state.spot() {
-                match self.averaging {
-                    AveragingMethod::Arithmetic => {
-                        // Use Kahan summation for numerical stability
-                        self.kahan_add(spot);
-                    }
-                    AveragingMethod::Geometric => {
-                        // Store as log-sum for numerical stability
-                        self.product_spots += spot.ln();
-                    }
+            let spot = super::require_finite_state(state.spot(), "SPOT", state.step);
+            match self.averaging {
+                AveragingMethod::Arithmetic => {
+                    // Use Kahan summation for numerical stability
+                    self.kahan_add(spot);
                 }
-                self.num_fixings_seen += 1;
+                AveragingMethod::Geometric => {
+                    // Store as log-sum for numerical stability
+                    self.product_spots += spot.ln();
+                }
             }
+            self.num_fixings_seen += 1;
         }
     }
 
@@ -178,6 +183,13 @@ impl Payoff for AsianCall {
         let average = self.compute_average();
         let intrinsic = (average - self.strike).max(0.0);
         Money::new(intrinsic * self.notional, currency)
+    }
+
+    /// The last contracted fixing step: the engine validates that the time
+    /// grid reaches it, so configured fixings can never silently fall off
+    /// the grid and shrink the average.
+    fn max_event_step(&self) -> Option<usize> {
+        self.fixing_steps.iter().max().copied()
     }
 
     fn reset(&mut self) {
@@ -295,20 +307,25 @@ impl AsianPut {
 }
 
 impl Payoff for AsianPut {
+    /// Accumulate the spot fixing when the current step is a fixing step.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `SPOT` is missing or non-finite at a fixing step — see
+    /// [`super::require_finite_state`].
     fn on_event(&mut self, state: &mut PathState) {
         if self.fixing_set.contains(&state.step) {
-            if let Some(spot) = state.spot() {
-                match self.averaging {
-                    AveragingMethod::Arithmetic => {
-                        // Use Kahan summation for numerical stability
-                        self.kahan_add(spot);
-                    }
-                    AveragingMethod::Geometric => {
-                        self.product_spots += spot.ln();
-                    }
+            let spot = super::require_finite_state(state.spot(), "SPOT", state.step);
+            match self.averaging {
+                AveragingMethod::Arithmetic => {
+                    // Use Kahan summation for numerical stability
+                    self.kahan_add(spot);
                 }
-                self.num_fixings_seen += 1;
+                AveragingMethod::Geometric => {
+                    self.product_spots += spot.ln();
+                }
             }
+            self.num_fixings_seen += 1;
         }
     }
 
@@ -316,6 +333,13 @@ impl Payoff for AsianPut {
         let average = self.compute_average();
         let intrinsic = (self.strike - average).max(0.0);
         Money::new(intrinsic * self.notional, currency)
+    }
+
+    /// The last contracted fixing step: the engine validates that the time
+    /// grid reaches it, so configured fixings can never silently fall off
+    /// the grid and shrink the average.
+    fn max_event_step(&self) -> Option<usize> {
+        self.fixing_steps.iter().max().copied()
     }
 
     fn reset(&mut self) {

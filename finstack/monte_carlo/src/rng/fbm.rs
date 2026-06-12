@@ -10,10 +10,11 @@
 //!   increment covariance matrix. O(n³) one-time setup, O(n²) per path.
 //!   Best for validation and short grids (n ≲ 500).
 //!
-//! - [`HybridFbm`] — the hybrid scheme of Bennedsen, Lunde & Pakkanen (2017).
-//!   Uses exact Cholesky on a small near-field window and a power-law weighted
-//!   approximation for the far-field. O(n·b) per path where b is the window
-//!   size, enabling generation on large grids.
+//! - [`HybridFbm`] — windowed conditional-Gaussian recursion. Uses exact
+//!   Cholesky on the first b increments, then generates each later increment
+//!   from its exact conditional distribution given the previous b increments
+//!   (long-range dependence beyond the window is truncated). O(n·b) per path,
+//!   enabling generation on large grids.
 //!
 //! Both implement [`FractionalNoiseGenerator`], which decouples the correlation
 //! structure from the source of randomness: callers supply i.i.d. N(0,1) draws and
@@ -27,7 +28,7 @@
 //!   *Quantitative Finance*, 16(6), 887–904.
 
 use finstack_core::math::fractional::{
-    fbm_increment_covariance, fbm_increment_covariance_matrix, HurstExponent, MolchanGolosovKernel,
+    fbm_increment_covariance, fbm_increment_covariance_matrix, HurstExponent,
 };
 use finstack_core::{Error, Result};
 use nalgebra::DMatrix;
@@ -61,7 +62,7 @@ pub trait FractionalNoiseGenerator: Send + Sync {
     ///
     /// The input `normals` slice passed to [`generate`](Self::generate) must
     /// have length `num_steps() * normals_per_step()`. The default is 1: the
-    /// Cholesky and Molchan-Golosov hybrid fBM generators draw exactly one
+    /// Cholesky and windowed-conditional fBM generators draw exactly one
     /// normal per step. The Bennedsen-Lunde-Pakkanen hybrid scheme for the
     /// Riemann-Liouville Volterra process draws two per step (one for the
     /// driving Brownian increment, one for the exact near-field innovation),
@@ -174,27 +175,31 @@ pub struct HybridFbmConfig {
     pub near_field_size: Option<usize>,
 }
 
-/// Hybrid fBM generator (Bennedsen, Lunde, Pakkanen 2017).
+/// Windowed conditional-Gaussian fBM generator.
 ///
-/// Splits the Volterra integral into a near-field window (last b steps,
-/// handled exactly via a small Cholesky factor) and a far-field tail
-/// (approximated with power-law kernel weights from the Molchan-Golosov
-/// kernel).
+/// Generates each increment beyond the exact start-up window from its
+/// conditional Gaussian distribution given the previous b increments,
+/// truncating long-range dependence beyond the window. (Despite the legacy
+/// name, this is *not* the Bennedsen-Lunde-Pakkanen hybrid scheme — that
+/// scheme generates the Riemann-Liouville Volterra process from driving
+/// Brownian increments and lives in
+/// [`RiemannLiouvilleVolterra`](super::volterra::RiemannLiouvilleVolterra).)
 ///
 /// # Algorithm
 ///
 /// For the first b steps, generation is exact (identical to [`CholeskyFbm`]
-/// on a b × b sub-grid). For each subsequent step i ≥ b:
+/// on a b × b sub-grid). For each subsequent step i ≥ b, increment i is drawn
+/// from its exact conditional distribution given the previous b increments:
+/// a conditional-mean weight vector (solved from the true increment
+/// covariance) applied to the window, plus an innovation with the matching
+/// residual standard deviation. Dependence on increments older than the
+/// window is truncated; the truncation error decays with the window size and
+/// with H → 0.5 (where increments become independent).
 ///
-/// 1. **Near-field** — the cross-covariance of increment i with the previous
-///    b increments is resolved exactly via a row of the conditional-mean
-///    matrix plus a residual standard deviation for the innovation.
-///
-/// 2. **Far-field** — the contribution of increments 0..i−b is approximated
-///    by evaluating the Molchan-Golosov kernel at the midpoint of each older
-///    increment interval and weighting by the increment value.
-///
-/// This yields O(n·b) per-path cost instead of O(n²).
+/// This yields O(n·b) per-path cost instead of O(n²). The marginal variance
+/// of every increment is preserved up to the window-truncation drift, and
+/// covariances at lags ≤ b are matched against the achieved covariance of
+/// the generated window.
 ///
 /// # Complexity
 ///
@@ -214,12 +219,6 @@ pub struct HybridFbm {
     /// b increments and the residual standard deviation.
     /// `cond_weights[i - b]` = (`Vec<f64>` of length b, residual_std: `f64`).
     cond_weights: Vec<(Vec<f64>, f64)>,
-    /// Flat storage for the triangular far-field kernel weights. For step
-    /// `i = b + k` (k = 0, 1, ...), the kernel weights for old increments
-    /// 0..k live at `far_weights[k*(k-1)/2 .. k*(k-1)/2 + k]`. Storing as a
-    /// single allocation improves cache locality vs. the previous
-    /// `Vec<Vec<f64>>` layout, where each row chased a separate heap pointer.
-    far_weights: Vec<f64>,
 }
 
 impl HybridFbm {
@@ -262,14 +261,10 @@ impl HybridFbm {
         })?;
         let near_cholesky = near_chol.l();
 
-        // Build conditional-mean weights and far-field weights for steps b..n.
-        // far_weights uses triangular flat storage: total entries
-        // 0 + 1 + ... + (n-b-1) = (n-b)*(n-b-1)/2.
-        let kernel = MolchanGolosovKernel::new(h);
+        // Build conditional-mean weights for steps b..n. Each later increment
+        // is generated from its conditional Gaussian distribution given the
+        // previous b increments; dependence beyond the window is truncated.
         let mut cond_weights = Vec::with_capacity(n.saturating_sub(b));
-        let nb = n.saturating_sub(b);
-        let total_far = nb.saturating_mul(nb.saturating_sub(1)) / 2;
-        let mut far_weights = Vec::with_capacity(total_far);
 
         for i in b..n {
             // Covariance of increment i with the previous b increments.
@@ -325,18 +320,6 @@ impl HybridFbm {
             let cond_std = cond_var.sqrt();
 
             cond_weights.push((w.as_slice().to_vec(), cond_std));
-
-            // Far-field: kernel weights for old increments 0..i-b, appended
-            // contiguously to the flat triangular store.
-            let num_far = i.saturating_sub(b);
-            for j in 0..num_far {
-                // Midpoint of the j-th increment interval
-                let s_mid = 0.5 * (times[j] + times[j + 1]);
-                let t_mid = 0.5 * (times[i] + times[i + 1]);
-                let dt_j = times[j + 1] - times[j];
-                // Kernel weight: K(t_mid, s_mid) * sqrt(dt_j)
-                far_weights.push(kernel.evaluate(t_mid, s_mid) * dt_j.sqrt());
-            }
         }
 
         Ok(Self {
@@ -345,7 +328,6 @@ impl HybridFbm {
             near_field_size: b,
             near_cholesky,
             cond_weights,
-            far_weights,
         })
     }
 }
@@ -366,24 +348,19 @@ impl FractionalNoiseGenerator for HybridFbm {
             *out_i = sum;
         }
 
-        // Phase 2: conditional mean + far-field for steps b..n.
+        // Phase 2: windowed conditional recursion for steps b..n.
         for i in b..n {
             let idx = i - b;
             let (ref w, cond_std) = self.cond_weights[idx];
 
-            // Near-field: conditional mean from the previous b increments.
+            // Conditional mean from the previous b increments. Dependence on
+            // increments older than the window is truncated — adding an extra
+            // "far-field" term on top of the conditional mean would double
+            // count it (the window increments already carry that
+            // information) and break the increment variance.
             let mut val = 0.0;
             for k in 0..b {
                 val += w[k] * out[i - b + k];
-            }
-
-            // Far-field: kernel-weighted sum of old increments. The
-            // triangular flat storage layout puts row `idx` of length
-            // `idx` at offset `idx*(idx-1)/2`.
-            let row_start = idx * idx.saturating_sub(1) / 2;
-            let fw = &self.far_weights[row_start..row_start + idx];
-            for (j, &weight) in fw.iter().enumerate() {
-                val += weight * out[j];
             }
 
             // Innovation: residual std * independent normal.
@@ -644,6 +621,72 @@ mod tests {
             max_diff < 0.5,
             "hybrid should approximate cholesky, max_diff={max_diff}"
         );
+    }
+
+    #[test]
+    fn hybrid_covariance_matches_exact_beyond_near_field() {
+        // Reconstruct the linear map L implied by the generator by feeding
+        // unit vectors, then compare Cov = L·Lᵀ against the exact fBM
+        // increment covariance. The removed far-field construction inflated
+        // the variance of increments beyond the window by O(1) factors
+        // (quant review finding B4), which this test would have caught.
+        for &h in &[0.1, 0.3, 0.7] {
+            let n = 60;
+            let b = 20;
+            let times = uniform_grid(1.0, n);
+            let gen = HybridFbm::new(
+                &times,
+                h,
+                HybridFbmConfig {
+                    near_field_size: Some(b),
+                },
+            )
+            .unwrap();
+
+            // Column k of L is generate(e_k); the map is lower-triangular.
+            let mut l = vec![vec![0.0_f64; n]; n];
+            for k in 0..n {
+                let mut normals = vec![0.0; n];
+                normals[k] = 1.0;
+                let mut out = vec![0.0; n];
+                gen.generate(&normals, &mut out);
+                for (i, &v) in out.iter().enumerate() {
+                    l[i][k] = v;
+                }
+            }
+
+            let exact = fbm_increment_covariance_matrix(&times, h);
+            let mut max_rel_var: f64 = 0.0;
+            let mut max_norm_cov: f64 = 0.0;
+            for i in 0..n {
+                for j in 0..=i {
+                    let cov_ij: f64 = (0..n).map(|k| l[i][k] * l[j][k]).sum();
+                    let scale = (exact[(i, i)] * exact[(j, j)]).sqrt();
+                    if i == j {
+                        let rel = (cov_ij - exact[(i, i)]).abs() / exact[(i, i)];
+                        max_rel_var = max_rel_var.max(rel);
+                    } else {
+                        let norm = (cov_ij - exact[(i, j)]).abs() / scale;
+                        max_norm_cov = max_norm_cov.max(norm);
+                    }
+                }
+            }
+
+            // Variances must be preserved tightly; covariances at all lags
+            // must be close in correlation units. The window truncation
+            // drops correlations at lags > b, which decay like
+            // H(2H−1)·lag^{2H−2}, so the persistent-memory case (H > 0.5)
+            // gets a looser bound.
+            let cov_tol = if h > 0.5 { 0.08 } else { 0.03 };
+            assert!(
+                max_rel_var < 0.02,
+                "H={h}: max relative variance error {max_rel_var} >= 2%"
+            );
+            assert!(
+                max_norm_cov < cov_tol,
+                "H={h}: max normalized covariance error {max_norm_cov} >= {cov_tol}"
+            );
+        }
     }
 
     // -- Factory -----------------------------------------------------------

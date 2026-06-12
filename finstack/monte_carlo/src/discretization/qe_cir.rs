@@ -35,8 +35,17 @@ impl QeCir {
     }
 
     /// Create with custom ψ_c threshold.
-    pub fn with_psi_c(psi_c: f64) -> Self {
-        Self { psi_c }
+    ///
+    /// Andersen (2008, §3.2.4) requires ψ_c ∈ \[1, 2\]; see
+    /// [`super::qe_heston::QeHeston::with_psi_c`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_core::Error::Validation`] when `psi_c` is not in
+    /// \[1, 2\].
+    pub fn with_psi_c(psi_c: f64) -> finstack_core::Result<Self> {
+        super::qe_common::validate_psi_c(psi_c)?;
+        Ok(Self { psi_c })
     }
 
     /// One QE step of the CIR process.

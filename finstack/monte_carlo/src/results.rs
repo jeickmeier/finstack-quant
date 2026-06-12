@@ -117,6 +117,34 @@ impl std::fmt::Display for MoneyEstimate {
     }
 }
 
+/// Reproducibility metadata stamped on a Monte Carlo pricing run.
+///
+/// Records the execution policy that produced an estimate so results are
+/// auditable and replayable: the same `(seed, num_paths, num_steps,
+/// chunk_size)` reproduces the run bit-for-bit regardless of thread count or
+/// host (see the determinism notes on [`crate::engine::McEngine::price`]).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct RunMetadata {
+    /// Root RNG seed, when the calling pricer derived the stream from one.
+    ///
+    /// `None` when the engine was driven by an externally constructed
+    /// [`crate::traits::RandomStream`] whose seed the engine cannot observe.
+    #[serde(default)]
+    pub seed: Option<u64>,
+    /// Whether the run used the parallel execution path.
+    #[serde(default)]
+    pub use_parallel: bool,
+    /// Whether antithetic variates were enabled.
+    #[serde(default)]
+    pub antithetic: bool,
+    /// Effective chunk size of the deterministic reduction tree.
+    #[serde(default)]
+    pub chunk_size: usize,
+    /// Number of time-grid steps.
+    #[serde(default)]
+    pub num_steps: usize,
+}
+
 /// Monte Carlo pricing result with optional captured paths.
 ///
 /// The estimate always reflects all simulated discounted path values used by the
@@ -127,6 +155,9 @@ pub struct MonteCarloResult {
     pub estimate: MoneyEstimate,
     /// Optional captured-path subset for diagnostics and visualization.
     pub paths: Option<PathDataset>,
+    /// Reproducibility metadata for the run (execution policy and seed).
+    #[serde(default)]
+    pub run: Option<RunMetadata>,
 }
 
 impl MonteCarloResult {
@@ -135,6 +166,7 @@ impl MonteCarloResult {
         Self {
             estimate,
             paths: None,
+            run: None,
         }
     }
 
@@ -143,7 +175,15 @@ impl MonteCarloResult {
         Self {
             estimate,
             paths: Some(paths),
+            run: None,
         }
+    }
+
+    /// Attach reproducibility metadata for the run.
+    #[must_use]
+    pub fn with_run_metadata(mut self, run: RunMetadata) -> Self {
+        self.run = Some(run);
+        self
     }
 
     /// Return `true` when captured-path diagnostics are present.

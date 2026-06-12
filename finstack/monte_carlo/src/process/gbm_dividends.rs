@@ -17,7 +17,7 @@
 //!
 //! Between dividends, evolution follows standard GBM.
 
-use super::super::traits::{ProportionalDiffusion, StochasticProcess};
+use super::super::traits::StochasticProcess;
 use super::gbm::GbmParams;
 
 /// Dividend payment specification.
@@ -173,13 +173,16 @@ impl StochasticProcess for GbmWithDividends {
         // σ(S) = σ S
         out[0] = self.params.sigma * x[0];
     }
-}
 
-// Contract: continuous diffusion between dividend dates is `sigma * x[0]`,
-// so the proportional contract holds. Discrete dividends are applied by the
-// matched discretization (`ExactGbmWithDividends`) outside the Milstein step,
-// preserving the contract for the diffusion piece.
-impl ProportionalDiffusion for GbmWithDividends {}
+    /// Only [`ExactGbmWithDividends`](crate::discretization::exact_gbm_dividends::ExactGbmWithDividends)
+    /// applies the discrete dividend jumps; any generic scheme would silently
+    /// simulate plain GBM and bias the spot high by the PV of the dividend
+    /// stream. (This is also why the type deliberately does not implement
+    /// `ProportionalDiffusion`: Milstein-family schemes must not accept it.)
+    fn dedicated_scheme(&self) -> Option<&'static str> {
+        Some("exact_gbm_with_dividends")
+    }
+}
 
 #[cfg(test)]
 mod tests {

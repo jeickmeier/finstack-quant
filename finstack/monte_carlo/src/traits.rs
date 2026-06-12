@@ -89,9 +89,14 @@ pub trait RandomStream: Clone + Send + Sync {
     where
         Self: Sized;
 
-    /// Fill a buffer with uniform random numbers in [0, 1).
+    /// Fill a buffer with uniform random numbers in the open interval (0, 1).
     ///
     /// This is a vectorized operation for efficiency.
+    ///
+    /// Implementations must never return exactly 0.0 or 1.0: consumers feed
+    /// these values into inverse CDFs and logs, and antithetic sampling
+    /// mirrors them as `1 − u`, so either boundary value would produce
+    /// infinities. Use a grid-centred mapping such as `(bits + 0.5)·2⁻⁵³`.
     fn fill_u01(&mut self, out: &mut [f64]);
 
     /// Fill a buffer with standard normal random numbers N(0,1).
@@ -121,6 +126,42 @@ pub trait RandomStream: Clone + Send + Sync {
     /// The MC engine checks this before enabling parallel mode.
     fn supports_splitting(&self) -> bool {
         true // Default: most PRNGs support splitting
+    }
+}
+
+/// Antithetic mirror of a [`RandomStream`].
+///
+/// Reads the same underlying draws as the wrapped stream and mirrors them:
+/// normals are negated and uniforms mapped `u → 1 − u`. The engine hands a
+/// mirror of the primary leg's stream to the antithetic payoff's
+/// [`Payoff::on_path_start`], so per-path payoff randomness (e.g. default
+/// thresholds) stays antithetically coupled across the pair instead of being
+/// drawn independently — independent draws silently destroy the variance
+/// reduction for that randomness while leaving the estimator unbiased.
+#[derive(Clone)]
+pub(crate) struct MirroredStream<R: RandomStream>(pub(crate) R);
+
+impl<R: RandomStream> RandomStream for MirroredStream<R> {
+    fn split(&self, stream_id: u64) -> Option<Self> {
+        self.0.split(stream_id).map(MirroredStream)
+    }
+
+    fn fill_u01(&mut self, out: &mut [f64]) {
+        self.0.fill_u01(out);
+        for x in out {
+            *x = 1.0 - *x;
+        }
+    }
+
+    fn fill_std_normals(&mut self, out: &mut [f64]) {
+        self.0.fill_std_normals(out);
+        for x in out {
+            *x = -*x;
+        }
+    }
+
+    fn supports_splitting(&self) -> bool {
+        self.0.supports_splitting()
     }
 }
 
@@ -578,6 +619,34 @@ pub trait StochasticProcess: Send + Sync {
         None
     }
 
+    /// Whether this process requires externally injected noise in some factor
+    /// slots (e.g. Riemann-Liouville Volterra increments and driving normals
+    /// for rough-volatility models).
+    ///
+    /// The generic [`crate::engine::McEngine`] fills every factor slot with
+    /// i.i.d. N(0,1) draws, which is silently wrong for such processes — the
+    /// variance path would receive uncorrelated, unscaled noise with no
+    /// error. `McEngine` rejects processes that return `true`; drive them
+    /// through [`crate::engine_fractional::simulate_path_fractional`] (or a
+    /// dedicated pricer) instead.
+    fn requires_injected_noise(&self) -> bool {
+        false
+    }
+
+    /// Identifier of the dedicated discretization this process requires, if
+    /// any.
+    ///
+    /// Some processes carry dynamics a generic scheme cannot see — discrete
+    /// dividends ([`crate::process::gbm_dividends::GbmWithDividends`]) or
+    /// Poisson jumps ([`crate::process::bates::BatesProcess`]). Pairing them
+    /// with generic Euler-style schemes type-checks but silently simulates
+    /// only the diffusion, producing systematically wrong prices. Returning
+    /// `Some(id)` here makes the engine reject any scheme whose
+    /// [`Discretization::scheme_id`] differs from `id`.
+    fn dedicated_scheme(&self) -> Option<&'static str> {
+        None
+    }
+
     /// Populate a [`PathState`] from the raw state vector.
     ///
     /// This is the bridge between process-specific storage and payoff logic.
@@ -674,6 +743,16 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
     /// raw shocks before each `step` call.
     fn applies_correlation_internally(&self) -> bool {
         false
+    }
+
+    /// Identifier used to satisfy a process's
+    /// [`StochasticProcess::dedicated_scheme`] requirement.
+    ///
+    /// Generic schemes keep the default `"generic"`. A scheme written for a
+    /// specific process (e.g. `ExactGbmWithDividends`, `QeBates`) overrides
+    /// this with a stable name so the engine can verify the pairing.
+    fn scheme_id(&self) -> &'static str {
+        "generic"
     }
 }
 
@@ -806,6 +885,20 @@ pub trait Payoff: Send + Sync + Clone {
     /// is part of a payoff's reproducibility contract.
     fn needs_uniform_random(&self) -> bool {
         false
+    }
+
+    /// The largest grid step at which this payoff expects an event, if known.
+    ///
+    /// The engine validates that the time grid has at least this many steps
+    /// before simulating. Without this check, a maturity or fixing step
+    /// beyond the grid silently never fires: a European payoff keeps its
+    /// 0.0 terminal spot and an Asian average quietly shrinks — both produce
+    /// systematically wrong prices with no diagnostic.
+    ///
+    /// Return `None` (the default) when the payoff has no fixed event
+    /// schedule.
+    fn max_event_step(&self) -> Option<usize> {
+        None
     }
 }
 

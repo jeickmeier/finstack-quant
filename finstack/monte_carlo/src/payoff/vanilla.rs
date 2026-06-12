@@ -61,13 +61,20 @@ impl EuropeanCall {
 impl Payoff for EuropeanCall {
     /// Process a path event at maturity.
     ///
-    /// Captures the terminal spot price at maturity. If spot is not available
-    /// in the path state, defaults to 0.0, which will result in a zero payoff
-    /// value (since max(0 - K, 0) = 0).
+    /// Captures the terminal spot price at maturity.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the process did not populate a finite `SPOT` state variable
+    /// (process/payoff wiring bug) — see [`super::require_finite_state`].
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
-            self.terminal_spot = state.spot().unwrap_or(0.0);
+            self.terminal_spot = super::require_finite_state(state.spot(), "SPOT", state.step);
         }
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 
     fn value(&self, currency: Currency) -> Money {
@@ -116,13 +123,21 @@ impl EuropeanPut {
 impl Payoff for EuropeanPut {
     /// Process a path event at maturity.
     ///
-    /// Captures the terminal spot price at maturity. If spot is not available
-    /// in the path state, defaults to 0.0, which will result in the maximum
-    /// payoff value (since max(K - 0, 0) = K for puts).
+    /// Captures the terminal spot price at maturity.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the process did not populate a finite `SPOT` state variable
+    /// (process/payoff wiring bug) — see [`super::require_finite_state`]. A
+    /// silent 0.0 default would pay the full strike here.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
-            self.terminal_spot = state.spot().unwrap_or(0.0);
+            self.terminal_spot = super::require_finite_state(state.spot(), "SPOT", state.step);
         }
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 
     fn value(&self, currency: Currency) -> Money {
@@ -185,14 +200,21 @@ impl Digital {
 impl Payoff for Digital {
     /// Process a path event at maturity.
     ///
-    /// Captures the terminal spot price at maturity. If spot is not available
-    /// in the path state, defaults to 0.0. For digital options, this default
-    /// means: digital calls pay if 0.0 >= K (only if K <= 0), and digital puts
-    /// pay if 0.0 < K (always, if K > 0).
+    /// Captures the terminal spot price at maturity.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the process did not populate a finite `SPOT` state variable
+    /// (process/payoff wiring bug) — see [`super::require_finite_state`]. A
+    /// silent 0.0 default would make digital puts always pay.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
-            self.terminal_spot = state.spot().unwrap_or(0.0);
+            self.terminal_spot = super::require_finite_state(state.spot(), "SPOT", state.step);
         }
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 
     fn value(&self, currency: Currency) -> Money {
@@ -258,13 +280,21 @@ impl Forward {
 impl Payoff for Forward {
     /// Process a path event at maturity.
     ///
-    /// Captures the terminal spot price at maturity. If spot is not available
-    /// in the path state, defaults to 0.0, which will result in a payoff of
-    /// (0 - F) × N for long positions or (F - 0) × N for short positions.
+    /// Captures the terminal spot price at maturity.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the process did not populate a finite `SPOT` state variable
+    /// (process/payoff wiring bug) — see [`super::require_finite_state`]. A
+    /// silent 0.0 default would pay ±F × N.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
-            self.terminal_spot = state.spot().unwrap_or(0.0);
+            self.terminal_spot = super::require_finite_state(state.spot(), "SPOT", state.step);
         }
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 
     fn value(&self, currency: Currency) -> Money {

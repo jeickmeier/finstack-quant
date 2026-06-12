@@ -5,7 +5,9 @@
 //!
 //! # Exact Solutions
 //!
-//! - **X (OU)**: X_{t+Δt} = X_t e^{-κ_X Δt} + σ_X √[(1-e^{-2κ_X Δt})/(2κ_X)] Z_X
+//! - **X (OU with constant drift shift)**:
+//!   X_{t+Δt} = X_t e^{-κ_X Δt} − (λ_X/κ_X)(1 − e^{-κ_X Δt})
+//!   + σ_X √[(1-e^{-2κ_X Δt})/(2κ_X)] Z_X
 //! - **Y (ABM)**: Y_{t+Δt} = Y_t + μ_Y Δt + σ_Y √Δt Z_Y
 //!
 //! With correlation ρ, the shocks Z_X and Z_Y are correlated.
@@ -69,6 +71,7 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         let params = process.params();
         let kappa_x = params.kappa_x;
         let sigma_x = params.sigma_x;
+        let lambda_x = params.lambda_x;
         let mu_y = params.mu_y;
         let sigma_y = params.sigma_y;
 
@@ -77,14 +80,18 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         let mut z_corr = [0.0; 2];
         let _ = self.cholesky_factor.apply(z, &mut z_corr);
 
-        // Exact solution for X (OU process)
-        // X_{t+Δt} = X_t e^{-κ_X Δt} + σ_X √[(1-e^{-2κ_X Δt})/(2κ_X)] Z_X
+        // Exact solution for X (OU process with constant drift shift −λ_X)
+        // X_{t+Δt} = X_t e^{-κ_X Δt} − (λ_X/κ_X)(1 − e^{-κ_X Δt})
+        //          + σ_X √[(1-e^{-2κ_X Δt})/(2κ_X)] Z_X
+        // `exp_m1` keeps (1 − e^{-κΔt})/κ stable as κΔt → 0.
         let exp_kappa_dt = (-kappa_x * dt).exp();
-        let x_mean = x[0] * exp_kappa_dt;
+        let one_minus_exp_over_kappa = -(-kappa_x * dt).exp_m1() / kappa_x;
+        let x_mean = x[0] * exp_kappa_dt - lambda_x * one_minus_exp_over_kappa;
 
         let x_std = if (kappa_x * dt).abs() < 1e-8 {
-            // Taylor expansion for small κ_X Δt
-            sigma_x * dt.sqrt() * (1.0 - kappa_x * dt / 3.0)
+            // Taylor expansion for small κ_X Δt:
+            // √[(1 − e^{-2κΔt})/(2κ)] = √Δt·(1 − κΔt/2 + O((κΔt)²))
+            sigma_x * dt.sqrt() * (1.0 - kappa_x * dt / 2.0)
         } else {
             sigma_x * ((1.0 - (-2.0 * kappa_x * dt).exp()) / (2.0 * kappa_x)).sqrt()
         };

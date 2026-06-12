@@ -316,10 +316,11 @@ fn test_serial_vs_parallel_consistency() {
 
 #[test]
 fn test_serial_vs_parallel_bit_identical_for_varying_payoff() {
-    // INVARIANTS.md §2.1: with a splittable RNG and auto-stop disabled, serial and
-    // parallel must be bit-identical. `PathIndexedRng` yields a distinct, varying
-    // value per path id, and both engines use the SAME chunk size, so the per-path
-    // values and the chunk -> merge reduction tree match exactly.
+    // Workspace determinism invariant: with a splittable RNG and auto-stop
+    // disabled, serial and parallel must be bit-identical. `PathIndexedRng`
+    // yields a distinct, varying value per path id, and both engines use the
+    // SAME chunk size, so the per-path values and the chunk -> merge
+    // reduction tree match exactly.
     let build = |parallel: bool| {
         McEngine::builder()
             .num_paths(1000)
@@ -364,6 +365,149 @@ fn test_serial_vs_parallel_bit_identical_for_varying_payoff() {
     assert_eq!(serial.num_paths, parallel.num_paths);
     // Bit-identical, not merely close: the reduction tree and per-path values match.
     assert_eq!(serial.mean.amount(), parallel.mean.amount());
+}
+
+#[test]
+fn test_default_chunking_bit_identical_across_thread_pool_sizes() {
+    // The DEFAULT chunk size must be a pure function of `num_paths` — never
+    // of `rayon::current_num_threads()` — because the chunk partition fixes
+    // the float reduction tree. This locks the cross-machine determinism
+    // guarantee for default configs (quant review finding M6): the same
+    // (seed, paths, steps) must price bit-identically under 1-thread and
+    // multi-thread rayon pools, in both serial and parallel mode.
+    let price_in_pool = |threads: usize, parallel: bool| -> f64 {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .expect("test thread pool should build");
+        pool.install(|| {
+            let engine = McEngine::builder()
+                .num_paths(1000)
+                .uniform_grid(1.0, 10)
+                .parallel(parallel)
+                // No .chunk_size(): exercise the default (adaptive) path.
+                .build()
+                .expect("McEngine builder should succeed");
+            engine
+                .price(
+                    &PathIndexedRng::root(),
+                    &DummyProcess,
+                    &DummyDisc,
+                    &[100.0],
+                    &CapturedValuePayoff::default(),
+                    Currency::USD,
+                    1.0,
+                )
+                .expect("pricing should succeed")
+                .mean
+                .amount()
+        })
+    };
+
+    let serial_1 = price_in_pool(1, false);
+    let serial_8 = price_in_pool(8, false);
+    let parallel_1 = price_in_pool(1, true);
+    let parallel_8 = price_in_pool(8, true);
+
+    assert_eq!(serial_1.to_bits(), serial_8.to_bits());
+    assert_eq!(parallel_1.to_bits(), parallel_8.to_bits());
+    assert_eq!(serial_1.to_bits(), parallel_8.to_bits());
+}
+
+#[test]
+fn test_engine_rejects_generic_scheme_for_dedicated_process() {
+    // Processes with dynamics a generic scheme cannot see (discrete
+    // dividends, Bates jumps) must be rejected when paired with Euler-style
+    // schemes — that pairing type-checks but silently simulates only the
+    // diffusion.
+    use crate::discretization::euler::EulerMaruyama;
+    use crate::process::bates::{BatesParams, BatesProcess};
+    use crate::process::gbm::GbmParams;
+    use crate::process::gbm_dividends::{Dividend, GbmWithDividends};
+    use crate::process::heston::HestonParams;
+    use crate::process::jump_diffusion::MertonJumpParams;
+
+    let engine = McEngine::builder()
+        .num_paths(10)
+        .uniform_grid(1.0, 4)
+        .parallel(false)
+        .build()
+        .expect("engine should build");
+    let payoff = CapturedValuePayoff::default();
+    let rng = crate::rng::philox::PhiloxRng::new(1);
+
+    let div_process = GbmWithDividends::new(
+        GbmParams::new(0.05, 0.0, 0.2).expect("valid"),
+        vec![(0.5, Dividend::Cash(1.0))],
+    )
+    .expect("valid dividend schedule");
+    let err = engine
+        .price(
+            &rng,
+            &div_process,
+            &EulerMaruyama::new(),
+            &[100.0],
+            &payoff,
+            Currency::USD,
+            1.0,
+        )
+        .expect_err("Euler + GbmWithDividends must be rejected");
+    assert!(err.to_string().contains("dedicated discretization"));
+
+    let heston = HestonParams::new(0.05, 0.01, 1.7, 0.04, 0.3, -0.4, 0.04).expect("valid");
+    let jump = MertonJumpParams::new(0.05, 0.01, 0.0, 1.0, -0.05, 0.1).expect("valid");
+    let bates = BatesProcess::new(BatesParams::new(heston, jump).expect("matching r/q"));
+    let err = engine
+        .price(
+            &rng,
+            &bates,
+            &EulerMaruyama::new(),
+            &[100.0, 0.04],
+            &payoff,
+            Currency::USD,
+            1.0,
+        )
+        .expect_err("Euler + BatesProcess must be rejected");
+    assert!(err.to_string().contains("dedicated discretization"));
+}
+
+#[test]
+fn test_antithetic_mirrors_path_start_randomness() {
+    // `CapturedValuePayoff` pays the uniform it draws in `on_path_start`.
+    // With mirrored path-start randomness the antithetic leg receives
+    // exactly `1 − u`, so every pair averages to ½ and the standard error
+    // collapses to floating-point noise. Independent path-start draws (the
+    // old behavior) leave stderr at the i.i.d. level σ/√n ≈ 0.29/√n.
+    let engine = McEngine::builder()
+        .num_paths(1000)
+        .uniform_grid(1.0, 4)
+        .parallel(false)
+        .antithetic(true)
+        .build()
+        .expect("engine should build");
+
+    let result = engine
+        .price(
+            &crate::rng::philox::PhiloxRng::new(7),
+            &DummyProcess,
+            &DummyDisc,
+            &[100.0],
+            &CapturedValuePayoff::default(),
+            Currency::USD,
+            1.0,
+        )
+        .expect("pricing should succeed");
+
+    assert!(
+        (result.mean.amount() - 0.5).abs() < 1e-12,
+        "pair means must be exactly ½, got {}",
+        result.mean.amount()
+    );
+    assert!(
+        result.stderr < 1e-12,
+        "mirrored path-start draws must collapse the stderr, got {}",
+        result.stderr
+    );
 }
 
 /// A minimal RNG that declares it does not support splitting (mimicking SobolRng).

@@ -108,10 +108,17 @@ impl TimeGrid {
         let mut dts = Vec::with_capacity(num_steps);
 
         times.push(0.0);
-        for i in 1..=num_steps {
+        for i in 1..num_steps {
             times.push(i as f64 * dt);
             dts.push(dt);
         }
+        // Pin the final knot to t_max exactly: `num_steps * (t_max/num_steps)`
+        // can differ from t_max by 1 ulp, which would make
+        // `grid.time(num_steps) != grid.t_max()` and disagree with
+        // `from_times` (which derives t_max from the last knot).
+        let last_interior = times[num_steps - 1];
+        dts.push(t_max - last_interior);
+        times.push(t_max);
 
         Ok(Self { t_max, times, dts })
     }
@@ -155,8 +162,15 @@ impl TimeGrid {
         }
 
         for &required_time in required_times {
-            if required_time.is_finite() && required_time > 1e-10 && required_time <= t_max {
-                times.push(required_time);
+            // Accept times a float-noise tolerance past t_max (day-count year
+            // fractions routinely land 1 ulp beyond) by snapping them to the
+            // terminal knot instead of silently dropping the event.
+            if required_time.is_finite() && required_time > 1e-10 {
+                if required_time <= t_max {
+                    times.push(required_time);
+                } else if required_time - t_max < 1e-10 {
+                    times.push(t_max);
+                }
             }
         }
 
@@ -275,6 +289,16 @@ impl TimeGrid {
 }
 
 /// Map Bermudan exercise dates (as year fractions relative to maturity) to step indices.
+///
+/// Tree/lattice pricers cannot insert knots, so each date is **rounded to the
+/// nearest step** (up to half a step of displacement on coarse grids — use a
+/// finer grid or an exact-knot [`TimeGrid`] when that bias matters).
+///
+/// The output is sorted and de-duplicated: two dates that round to the same
+/// step yield one exercise opportunity, not a double-processed step. Dates up
+/// to one float-noise tolerance beyond maturity are clamped to the terminal
+/// step; dates materially beyond maturity are dropped (they cannot be
+/// represented on the grid).
 pub fn map_exercise_dates_to_steps(
     exercise_dates: &[f64],
     total_time: f64,
@@ -284,17 +308,20 @@ pub fn map_exercise_dates_to_steps(
     if total_time <= 0.0 || steps == 0 {
         return out;
     }
+    // Day-count year fractions can land a hair past maturity; treat anything
+    // within half a step of the terminal as the terminal exercise rather than
+    // silently dropping the right.
+    let max_ratio = 1.0 + 0.5 / steps as f64;
     for &ex_time in exercise_dates {
-        let ratio = if total_time != 0.0 {
-            ex_time / total_time
-        } else {
-            0.0
-        };
-        let step = (ratio * steps as f64).round() as usize;
-        if step <= steps {
-            out.push(step);
+        let ratio = ex_time / total_time;
+        if !(0.0..=max_ratio).contains(&ratio) {
+            continue;
         }
+        let step = (ratio * steps as f64).round() as usize;
+        out.push(step.min(steps));
     }
+    out.sort_unstable();
+    out.dedup();
     out
 }
 
@@ -387,5 +414,47 @@ mod tests {
         .expect("merged grid should succeed");
 
         assert_eq!(grid.times(), &[0.0, 0.25, 0.5, 0.75, 1.0]);
+    }
+
+    #[test]
+    fn test_uniform_final_knot_is_exactly_t_max() {
+        // `n * (t_max/n)` can differ from t_max by 1 ulp; the final knot must
+        // be pinned so `time(num_steps) == t_max()` for every constructor.
+        for &(t_max, n) in &[(0.7_f64, 7usize), (1.0, 252), (2.5, 3), (0.123456, 11)] {
+            let grid = TimeGrid::uniform(t_max, n).expect("grid");
+            assert_eq!(
+                grid.time(n).to_bits(),
+                t_max.to_bits(),
+                "t_max = {t_max}, n = {n}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_uniform_with_required_times_snaps_float_noise_past_t_max() {
+        // A required time 1 ulp past maturity (typical day-count noise) must
+        // snap to the terminal knot, not be silently dropped.
+        let just_past = 1.0 + f64::EPSILON;
+        let grid = TimeGrid::uniform_with_required_times(1.0, 4.0, 2, &[just_past])
+            .expect("merged grid should succeed");
+        assert_eq!(grid.t_max(), 1.0);
+        assert_eq!(grid.times().last(), Some(&1.0));
+    }
+
+    #[test]
+    fn test_map_exercise_dates_sorted_deduped_and_clamped() {
+        // Two dates rounding to the same step collapse to ONE exercise
+        // opportunity; unsorted input comes out sorted; a date within half a
+        // step past maturity clamps to the terminal step; a date materially
+        // beyond maturity is dropped.
+        let steps = map_exercise_dates_to_steps(&[0.74, 0.26, 0.24, 1.04, 2.0], 1.0, 4);
+        assert_eq!(steps, vec![1, 3, 4]);
+    }
+
+    #[test]
+    fn test_map_exercise_dates_rejects_degenerate_inputs() {
+        assert!(map_exercise_dates_to_steps(&[0.5], 0.0, 4).is_empty());
+        assert!(map_exercise_dates_to_steps(&[0.5], 1.0, 0).is_empty());
+        assert!(map_exercise_dates_to_steps(&[-0.5, f64::NAN], 1.0, 4).is_empty());
     }
 }

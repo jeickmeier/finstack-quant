@@ -168,7 +168,7 @@ impl RoughHestonParams {
         if !hurst.is_rough() {
             tracing::warn!(
                 h = hurst.value(),
-                "Rough Heston Hurst exponent H = {:.4} is not rough (H < 0.5). \
+                "Rough Heston Hurst exponent H = {:.4} is not rough (H >= 0.5). \
                  The model is designed for rough volatility; results may not \
                  match empirical skew behavior.",
                 hurst.value()

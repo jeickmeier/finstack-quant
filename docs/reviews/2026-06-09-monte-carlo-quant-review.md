@@ -1,5 +1,48 @@
 # Quant Finance Review — `finstack/monte_carlo` Crate and Bindings
 
+> **Remediation status (2026-06-12): COMPLETE for all Blockers and Majors.**
+> B1, M1, M2, M4 were fixed in earlier `fix/quant-review-findings` commits;
+> B2, B3, B4, M3, M5 (Bates reintroduced with a proper `QeBates` scheme —
+> QE variance + K0* spot leg with the compensator absorbed once + Poisson/
+> lognormal jumps — plus an engine-level martingale test), M6, M7, M8,
+> M9, M10 and the Moderate batch (fill_u01, Sobol scramble/aux streams, CIR
+> full truncation, Taylor coefficients, registry strict serde, BGK constant
+> unification, LSMC date hygiene, greeks module exports, bindings parity)
+> were fixed in this session. New regression tests: Asian CV notional
+> linearity, LRM closed-form unbiasedness, HybridFbm covariance
+> reconstruction, QE Case B CDF inversion + monotonicity, psi_c validation,
+> thread-pool-size bit-identity.
+>
+> **Moderate/Minor pass (same date):** antithetic `on_path_start` mirroring
+> (`MirroredStream` + stderr-collapse test); `RunMetadata` stamping on
+> `MonteCarloResult`; `requires_injected_noise` engine guard for rough
+> processes; `dedicated_scheme`/`scheme_id` pairing contract (rejects
+> Euler+`GbmWithDividends` and Euler+Bates); `ProportionalDiffusion` removed
+> from `GbmWithDividends` and added as a bound on `ExactMultiGbm`; QeHeston
+> σᵥ→0 fallback keeps full variance; Feller predicate unified to ≥; Philox
+> Random123 known-answer test + adjacent-stream correlation test; seed-doc
+> CRN example fixed; bridge sampling textbook u<p; loud errors replace
+> silent antithetic downgrades; `map_exercise_dates_to_steps`
+> sorted/deduped/tolerance-clamped; `TimeGrid::uniform` final knot pinned to
+> t_max; lsq relative SVD cutoff; `lmm_numeraire` doc corrected. Items
+> verified as already fixed upstream: HW1F θ-averaging, LMM Bermudan
+> pair-mean stderr, at-hit rebate (analytical `RebateTiming` + loud MC
+> approximation warning).
+>
+> **Model-improvement pass (same date) — nothing remains open.** The five
+> previously deferred features are implemented: randomized-QMC stderr via 16
+> independently Owen-scrambled replicates (valid CI, tested against
+> Black-Scholes); exact at-hit knock-out rebates in the MC barrier payoff
+> (hit-time tracking, forward compounding so DF(T) nets to DF(τ); wired in
+> the equity, Heston, and FX barrier pricers, approximation warns removed);
+> Schwartz-Smith futures reconstruction `futures_price(τ)` per SS(2000)
+> eq. 9 with the valuations MC pinning `E^Q[S_T]` to the market forward;
+> LMM predictor-corrector upgraded to Hunter–Jäckel–Joshi on log displaced
+> forwards (end-of-step corrector drift, exponential step exact for frozen
+> coefficients — terminal caplet now matches displaced Black within pure MC
+> error); and the Cheyette LSMC regression basis augmented with the
+> Volterra vol state (x, y, W̃_H).
+
 **Date:** 2026-06-09
 **Scope:** `finstack/monte_carlo` (~27k lines), `finstack-py/src/bindings/monte_carlo/`, `finstack-wasm/src/api/monte_carlo/`, plus the valuations pricers that directly consume the MC stack (rBergomi/rough-Heston/Cheyette, Asian/barrier exotics, Schwartz-Smith commodity).
 **Method:** Six parallel subsystem reviews (RNG/fBM, classic discretization, rough-vol stack, pricers/payoffs/barriers, engine/determinism/stats, Greeks/variance reduction, bindings parity). All Blocker-level findings were independently re-verified against source before inclusion.

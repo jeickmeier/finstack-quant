@@ -5,7 +5,7 @@
 
 use super::super::process::correlation::{cholesky_correlation, validate_correlation_matrix};
 use super::super::process::gbm::{GbmProcess, MultiGbmProcess};
-use super::super::traits::{Discretization, StochasticProcess};
+use super::super::traits::{Discretization, ProportionalDiffusion, StochasticProcess};
 use finstack_core::math::linalg::CholeskyError;
 
 /// Exact discretization for Geometric Brownian Motion.
@@ -112,9 +112,14 @@ fn recover_rate_coefficients<P: StochasticProcess>(
     (ctx.probe_drift[index], ctx.probe_diffusion[index])
 }
 
+// The `ProportionalDiffusion` bound is load-bearing: this scheme recovers
+// per-asset rate coefficients as `μ/x` and `σ/x` and exponentiates, which is
+// exact only when drift and diffusion are proportional to the state. Without
+// the bound, any process would compile and silently become a
+// frozen-coefficient log scheme.
 impl<P> Discretization<P> for ExactMultiGbm
 where
-    P: StochasticProcess,
+    P: StochasticProcess + ProportionalDiffusion,
 {
     fn step(&self, process: &P, _t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]) {
         let dim = process.dim();

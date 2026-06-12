@@ -520,6 +520,7 @@ impl RevolvingCreditPricer {
             mc_result: MonteCarloResult {
                 estimate,
                 paths: None,
+                run: None,
             },
             path_results,
         };

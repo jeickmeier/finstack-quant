@@ -288,18 +288,33 @@ export interface FxDeltaVolSurfaceConstructor {
   strikeToDelta(strike: number, forward: number, vol: number, expiry: number, rF: number): number;
 }
 
-/** Monte Carlo European pricer result (JSON object from Rust). */
+/** Monte Carlo pricer result (JSON object from Rust). */
 export interface MonteCarloEstimateJson {
   mean: number;
   currency: string;
   stderr: number;
-  std_dev: number | null;
+  /** Sample standard deviation (absent when not computed). */
+  std_dev?: number;
   ci_lower: number;
   ci_upper: number;
   /** Number of independent path estimators; equals `num_simulated_paths` without variance reduction, half of it with antithetic pairing. */
   num_paths: number;
   /** Total number of simulated sample paths; `2 * num_paths` with antithetic variates, otherwise equals `num_paths`. */
   num_simulated_paths: number;
+  /** Legacy skipped-path count; current engines reject non-finite payoffs. */
+  num_skipped: number;
+  /** Median of captured discounted path values (absent when paths are not captured). */
+  median?: number;
+  /** 25th percentile of captured discounted path values (absent when paths are not captured). */
+  percentile_25?: number;
+  /** 75th percentile of captured discounted path values (absent when paths are not captured). */
+  percentile_75?: number;
+  /** Minimum of captured discounted path values (absent when paths are not captured). */
+  min?: number;
+  /** Maximum of captured discounted path values (absent when paths are not captured). */
+  max?: number;
+  /** Relative standard error (`stderr / |mean|`); `Infinity` near zero mean. */
+  relative_stderr: number;
 }
 
 /** Variation margin calculator result (JSON object from Rust). */

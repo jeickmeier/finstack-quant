@@ -96,7 +96,7 @@ fn test_cir_params_serialization() {
 #[test]
 fn test_bates_params_serialization() {
     let heston = HestonParams::new(0.05, 0.02, 0.5, 0.04, 0.3, -0.7, 0.04).expect("valid");
-    let jump = MertonJumpParams::new(0.05, 0.02, 0.0, 1.0, -0.05, 0.1).unwrap();
+    let jump = MertonJumpParams::new(0.05, 0.02, 0.0, 1.0, -0.05, 0.1).expect("valid");
     let params = BatesParams::new(heston, jump).expect("matching r/q");
 
     let restored = roundtrip_json(&params);

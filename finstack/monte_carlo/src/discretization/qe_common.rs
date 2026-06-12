@@ -31,6 +31,20 @@ pub(crate) const QE_SMALL_MEAN_EPS: f64 = 1e-10;
 /// `sqrt` or otherwise destabilising the draw.
 pub(crate) const PSI_CLAMP_MAX: f64 = 10.0;
 
+/// Validate a user-supplied ψ_c switch threshold.
+///
+/// Andersen (2008, §3.2.4) requires ψ_c ∈ \[1, 2\]: Case A's
+/// `sqrt(2/ψ·(2/ψ − 1))` is real only for ψ ≤ 2, so a larger ψ_c would let
+/// ψ ∈ (2, ψ_c\] reach Case A and produce NaN draws.
+pub(crate) fn validate_psi_c(psi_c: f64) -> finstack_core::Result<()> {
+    if !(1.0..=2.0).contains(&psi_c) {
+        return Err(finstack_core::Error::Validation(format!(
+            "QE psi_c must lie in [1, 2] (Andersen 2008, §3.2.4), got {psi_c}"
+        )));
+    }
+    Ok(())
+}
+
 /// Conditional moments of the CIR-type variance update: returns `(m, s²)`.
 ///
 /// * `m  = E[v_{t+Δt} | v_t] = θ + (v_t − θ) e^{−κΔt}`
@@ -91,14 +105,18 @@ impl QeRegime {
         match *self {
             QeRegime::Quadratic { a, b_squared } => (a * (z + b_squared.sqrt()).powi(2)).max(0.0),
             QeRegime::Exponential { p, beta } => {
-                let u = norm_cdf(z);
-                // Collapse the `u <= p` and `|u - p| < EPS` branches into one
-                // so that numerically-near-boundary samples map to zero
-                // without a spurious division.
-                if u <= p || (u - p).abs() < f64::EPSILON {
+                // Clamp u away from 1 so the inverse CDF stays finite when
+                // `norm_cdf` saturates to exactly 1.0 for extreme shocks
+                // (z ≳ 8).
+                let u = norm_cdf(z).min(1.0 - f64::EPSILON);
+                if u <= p {
                     0.0
                 } else {
-                    (((1.0 - p) / (u - p)).ln() / beta).max(0.0)
+                    // Andersen (2008) eq. (25): Ψ⁻¹(u) = ln((1−p)/(1−u))/β
+                    // for p < u < 1. Monotone increasing in u, vanishing as
+                    // u → p⁺, so the z → v map preserves the coupling that
+                    // antithetic sampling and pathwise parity rely on.
+                    (((1.0 - p) / (1.0 - u)).ln() / beta).max(0.0)
                 }
             }
         }
@@ -272,6 +290,57 @@ mod tests {
             (mean - m_target).abs() < tol,
             "MC mean {mean:.6} should match conditional mean {m_target:.6} within {tol:.2e}",
         );
+    }
+
+    /// Case B sampling must invert the exact mixture CDF
+    /// `Ψ(x) = p + (1−p)(1−e^{−βx})` (Andersen 2008, eqs. (23)–(25)): for
+    /// every shock z with `Φ(z) > p`, `Ψ(sample(z)) = Φ(z)`. The previous
+    /// implementation used `ln((1−p)/(u−p))/β`, which has the same marginal
+    /// law but inverts the z → v coupling (quant review finding M3).
+    #[test]
+    fn case_b_sample_inverts_exact_mixture_cdf() {
+        // Parameters chosen so ψ > ψ_c = 1.5 forces Case B.
+        let (v_t, kappa, theta, sigma, dt, psi_c) = (0.0005, 0.5, 0.04, 1.0, 0.5, 1.5);
+        let regime = qe_regime(v_t, kappa, theta, sigma, dt, psi_c);
+        let QeRegime::Exponential { p, beta } = regime else {
+            panic!("test parameters must force Case B");
+        };
+        assert!(p < 1.0 && beta > 0.0);
+
+        for z in [-1.0, 0.0, 0.5, 1.0, 2.0, 3.5, 5.0] {
+            let u = norm_cdf(z);
+            let v = regime.sample(z);
+            if u <= p {
+                assert_eq!(v, 0.0, "atom at zero for u <= p");
+            } else {
+                let cdf = p + (1.0 - p) * (1.0 - (-beta * v).exp());
+                assert!(
+                    (cdf - u).abs() < 1e-12,
+                    "Ψ(sample(z)) should equal Φ(z) at z={z}: cdf={cdf}, u={u}"
+                );
+            }
+        }
+    }
+
+    /// The z → v map must be monotone non-decreasing — larger shocks mean
+    /// larger variance draws in both QE branches. The inverted Case B
+    /// formula was monotone *decreasing* on the exponential branch.
+    #[test]
+    fn case_b_sample_is_monotone_in_z() {
+        let (v_t, kappa, theta, sigma, dt, psi_c) = (0.0005, 0.5, 0.04, 1.0, 0.5, 1.5);
+        let regime = qe_regime(v_t, kappa, theta, sigma, dt, psi_c);
+        let mut prev = f64::NEG_INFINITY;
+        let mut z = -4.0;
+        while z <= 8.5 {
+            let v = regime.sample(z);
+            assert!(
+                v >= prev,
+                "Case B draw must be non-decreasing in z: v({z})={v} < {prev}"
+            );
+            assert!(v.is_finite());
+            prev = v;
+            z += 0.05;
+        }
     }
 
     /// QeHeston and QeCir should agree by construction: feeding the same

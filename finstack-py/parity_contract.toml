@@ -226,10 +226,32 @@ status = "exists"
 [crates.monte_carlo.modules]
 engine             = { python = "finstack.monte_carlo", status = "flattened", note = "McEngine and pricing helpers exposed flat on finstack.monte_carlo" }
 estimate           = { python = "finstack.monte_carlo", status = "flattened", note = "Estimate exposed flat on finstack.monte_carlo" }
+greeks             = { python = "finstack.monte_carlo", status = "flattened", note = "finite_diff_delta/_crn and finite_diff_gamma/_crn exposed flat on finstack.monte_carlo" }
 pricer             = { python = "finstack.monte_carlo", status = "flattened", note = "European, path-dependent, and LSMC pricers exposed flat on finstack.monte_carlo" }
-results            = { python = "finstack.monte_carlo", status = "flattened", note = "MonteCarloResult exposed flat on finstack.monte_carlo" }
+results            = { python = "finstack.monte_carlo", status = "flattened", note = "MoneyEstimate exposed flat on finstack.monte_carlo" }
 time_grid          = { python = "finstack.monte_carlo", status = "flattened", note = "TimeGrid exposed flat on finstack.monte_carlo" }
 variance_reduction = { python = "finstack.monte_carlo", status = "flattened", note = "Black-Scholes analytical helpers exposed flat on finstack.monte_carlo" }
+
+[crates.monte_carlo.symbols]
+public = [
+    "Estimate",
+    "EuropeanPricer",
+    "LsmcPricer",
+    "McEngine",
+    "MoneyEstimate",
+    "PathDependentPricer",
+    "TimeGrid",
+    "black_scholes_call",
+    "black_scholes_put",
+    "finite_diff_delta",
+    "finite_diff_delta_crn",
+    "finite_diff_gamma",
+    "finite_diff_gamma_crn",
+    "price_european_call",
+    "price_european_put",
+    "price_heston_call",
+    "price_heston_put",
+]
 
 # ---------------------------------------------------------------------------
 # finstack-valuations  →  finstack.valuations

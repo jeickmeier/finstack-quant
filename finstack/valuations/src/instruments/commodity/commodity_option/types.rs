@@ -62,7 +62,9 @@ pub enum CommodityPricingModel {
         mu_y: f64,
         /// Risk premium for short-term factor (lambda_x).
         ///
-        /// Under risk-neutral measure: dX = -(kappa + lambda_x) X dt + sigma_x dW_X
+        /// Under the risk-neutral measure the short-term factor receives a
+        /// constant drift shift at unchanged mean-reversion speed
+        /// (Schwartz & Smith 2000): dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X
         lambda_x: f64,
     },
 }
@@ -395,17 +397,15 @@ impl CommodityOption {
                 mu_y,
                 lambda_x,
             } => {
-                // Build risk-neutral Schwartz-Smith process.
-                // Under Q: dX = -(kappa + lambda_x) X dt + sigma_x dW_X
-                let rn_kappa = kappa + lambda_x;
-                if rn_kappa <= 0.0 {
-                    return Err(finstack_core::Error::Validation(
-                        "Risk-neutral kappa (kappa + lambda_x) must be positive".to_string(),
-                    ));
-                }
-
+                // Build risk-neutral Schwartz-Smith process. Schwartz & Smith
+                // (2000) risk-neutralize the short-term factor with a
+                // CONSTANT drift shift at unchanged mean-reversion speed:
+                //   dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X
+                // (inflating kappa by lambda_x would distort the futures
+                // volatility term structure e^{-kappa·tau}).
                 let ss_params =
-                    SchwartzSmithParams::new(rn_kappa, *sigma_x, *mu_y, *sigma_y, *rho_xy)?;
+                    SchwartzSmithParams::new(*kappa, *sigma_x, *mu_y, *sigma_y, *rho_xy)?
+                        .with_lambda_x(*lambda_x)?;
 
                 // Get initial spot price
                 let initial_spot = if let Some(spot) = self.spot_price(market)? {
@@ -414,7 +414,30 @@ impl CommodityOption {
                     self.forward_price(market, as_of)?
                 };
 
-                let process = SchwartzSmithProcess::from_spot(ss_params, initial_spot, None);
+                let mut process = SchwartzSmithProcess::from_spot(ss_params, initial_spot, None);
+
+                // Pin the simulated forward to the market: the closed-form
+                // futures curve F_model(0,T) (Schwartz-Smith 2000, eq. 9) is
+                // calibrated to the market forward by shifting the long-term
+                // drift — A(T) is linear in mu_y with coefficient T, so
+                //   mu_y* = mu_y + ln(F_mkt / F_model) / T
+                // makes E^Q[S_T] equal the same forward the Black-76 branch
+                // discounts. Without this, the SS-MC price embeds an
+                // arbitrary carry inconsistent with the price curve.
+                let market_forward = self.forward_price(market, as_of)?;
+                if market_forward > 0.0 && t > 0.0 {
+                    let model_forward = process.futures_price(t);
+                    let mu_adjustment = (market_forward / model_forward).ln() / t;
+                    let pinned_params = SchwartzSmithParams::new(
+                        *kappa,
+                        *sigma_x,
+                        *mu_y + mu_adjustment,
+                        *sigma_y,
+                        *rho_xy,
+                    )?
+                    .with_lambda_x(*lambda_x)?;
+                    process = SchwartzSmithProcess::from_spot(pinned_params, initial_spot, None);
+                }
                 let disc_scheme = ExactSchwartzSmith::from_process(&process)?;
 
                 // Discount factor

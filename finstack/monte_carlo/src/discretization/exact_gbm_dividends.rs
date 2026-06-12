@@ -129,6 +129,12 @@ impl Discretization<GbmWithDividends> for ExactGbmWithDividends {
     fn work_size(&self, _process: &GbmWithDividends) -> usize {
         0
     }
+
+    fn scheme_id(&self) -> &'static str {
+        // Satisfies `GbmWithDividends::dedicated_scheme` — this is the only
+        // scheme that applies the discrete dividend jumps.
+        "exact_gbm_with_dividends"
+    }
 }
 
 #[cfg(test)]

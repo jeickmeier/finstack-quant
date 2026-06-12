@@ -49,7 +49,7 @@
 //! - [`sobol::SobolRng`]: Low-discrepancy sequence for quasi-Monte Carlo
 //! - [`brownian_bridge::BrownianBridge`]: Path construction with variance reduction
 //! - [`fbm`]: True fractional-Brownian-motion increment generators
-//!   (Molchan-Golosov kernel)
+//!   (exact Cholesky and windowed conditional-Gaussian recursion)
 //! - [`volterra`]: Riemann-Liouville Volterra process increment generator for
 //!   the rough Bergomi model (Bennedsen-Lunde-Pakkanen hybrid scheme)
 //!

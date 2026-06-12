@@ -85,13 +85,12 @@ impl FxBarrierOptionMcPricer {
         // Standard FX barrier: the GBM drift `r_dom - r_for` (set above via
         // `GbmParams`) fully describes the dynamics. Quanto barriers are not
         // supported by this 1D MC payoff — see `FxBarrierPayoff` docs.
-        warn_mc_at_hit_rebate_approximation(inst);
         let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let mc_option_kind = match inst.option_type {
             crate::instruments::OptionType::Call => McOptionKind::Call,
             crate::instruments::OptionType::Put => McOptionKind::Put,
         };
-        let payoff = FxBarrierPayoff::new(
+        let mut payoff = FxBarrierPayoff::new(
             inst.strike,
             inst.barrier,
             mc_barrier_type,
@@ -105,6 +104,14 @@ impl FxBarrierOptionMcPricer {
             inst.quote_currency,
             inst.rebate,
         )?;
+        // Exact at-hit rebate timing: compound the rebate forward from the
+        // hit time at the domestic rate so DF(T) nets to DF(τ).
+        {
+            use crate::models::closed_form::barrier::RebateTiming;
+            if inst.rebate.is_some() && inst.rebate_timing == RebateTiming::AtHit {
+                payoff = payoff.with_rebate_at_hit(r_dom);
+            }
+        }
 
         // Derive deterministic seed from instrument ID and scenario
 
@@ -186,22 +193,6 @@ use crate::models::closed_form::barrier::{
     barrier_call_continuous, barrier_put_continuous, barrier_rebate, BarrierParams,
     BarrierType as AnalyticalBarrierType,
 };
-
-/// The MC path pays rebates at expiry; warn when an at-hit KO rebate is
-/// requested so the timing approximation is visible in production logs.
-fn warn_mc_at_hit_rebate_approximation(inst: &FxBarrierOption) {
-    use crate::models::closed_form::barrier::RebateTiming;
-    if inst.rebate.is_some()
-        && inst.rebate_timing == RebateTiming::AtHit
-        && !barrier_is_knock_in(inst.barrier_type)
-    {
-        tracing::warn!(
-            instrument_id = %inst.id,
-            "FX barrier MC pricer approximates the at-hit knock-out rebate as paid at expiry; \
-             use the analytical pricer for exact at-hit rebate discounting"
-        );
-    }
-}
 
 #[inline]
 fn barrier_is_knock_in(

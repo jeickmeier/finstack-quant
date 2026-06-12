@@ -15,10 +15,13 @@
 //! // Base pricing scenario.
 //! let base_seed = seed::derive_seed(&instrument_id, "base");
 //!
-//! // Greek calculation scenarios — pass scenario names directly:
-//! let delta_up_seed = seed::derive_seed(&instrument_id, "delta_up");
-//! let delta_down_seed = seed::derive_seed(&instrument_id, "delta_down");
-//! # let _ = (base_seed, delta_up_seed, delta_down_seed);
+//! // Finite-difference Greeks: every bump leg must share ONE seed scenario
+//! // so common random numbers cancel the Monte Carlo noise. Deriving
+//! // different seeds per leg (e.g. "delta_up" vs "delta_down") destroys the
+//! // CRN coupling and inflates the Greek's variance by O(σ²/h²).
+//! let greeks_seed = seed::derive_seed(&instrument_id, "greeks_crn");
+//! // ... use `greeks_seed` for the base, up, AND down valuations.
+//! # let _ = (base_seed, greeks_seed);
 //! ```
 
 use finstack_core::types::InstrumentId;

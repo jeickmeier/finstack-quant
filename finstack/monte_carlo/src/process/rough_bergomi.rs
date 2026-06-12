@@ -160,7 +160,7 @@ impl RoughBergomiParams {
         if !hurst.is_rough() {
             tracing::warn!(
                 h = hurst.value(),
-                "rBergomi Hurst exponent H = {:.4} is not rough (H < 0.5). \
+                "rBergomi Hurst exponent H = {:.4} is not rough (H >= 0.5). \
                  The model is designed for rough volatility; results may not \
                  match empirical skew behavior.",
                 hurst.value()
@@ -231,6 +231,12 @@ impl StochasticProcess for RoughBergomiProcess {
         // z[1] = RL Volterra increment ΔỸ (accumulated into the variance),
         // z[2] = unit-variance driving Brownian normal (spot–vol correlation).
         3
+    }
+
+    fn requires_injected_noise(&self) -> bool {
+        // z[1]/z[2] must be Volterra increments and their driving normals,
+        // generated jointly on the full grid; i.i.d. engine noise is invalid.
+        true
     }
 
     /// Formal no-op: actual drift is applied by the rBergomi discretization.

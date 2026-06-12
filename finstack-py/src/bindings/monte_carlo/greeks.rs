@@ -9,9 +9,7 @@ use super::engine::resolve_currency;
 use crate::errors::core_to_py;
 use finstack_monte_carlo::discretization::exact::ExactGbm;
 use finstack_monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_monte_carlo::greeks::finite_diff::{
-    finite_diff_delta, finite_diff_delta_crn, finite_diff_gamma, finite_diff_gamma_crn,
-};
+use finstack_monte_carlo::greeks::finite_diff;
 use finstack_monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
 use finstack_monte_carlo::process::gbm::GbmProcess;
 use finstack_monte_carlo::registry;
@@ -74,9 +72,7 @@ fn parse_option(name: &str) -> PyResult<OptionType> {
 
 fn build_engine(num_paths: usize, expiry: f64, num_steps: usize) -> PyResult<McEngine> {
     let time_grid = TimeGrid::uniform(expiry, num_steps).map_err(core_to_py)?;
-    let defaults = &registry::embedded_defaults_or_panic()
-        .python_bindings
-        .greeks;
+    let defaults = greek_defaults()?;
     let config = McEngineConfig::new(num_paths, time_grid)
         .with_parallel(defaults.use_parallel)
         .with_chunk_size(defaults.chunk_size)
@@ -84,10 +80,10 @@ fn build_engine(num_paths: usize, expiry: f64, num_steps: usize) -> PyResult<McE
     Ok(McEngine::new(config))
 }
 
-fn greek_defaults() -> &'static registry::PythonGreekDefaults {
-    &registry::embedded_defaults_or_panic()
-        .python_bindings
-        .greeks
+fn greek_defaults() -> PyResult<&'static registry::PythonGreekDefaults> {
+    registry::embedded_defaults()
+        .map(|defaults| &defaults.python_bindings.greeks)
+        .map_err(core_to_py)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -103,7 +99,7 @@ fn build_greek_setup(
     option_type: Option<&str>,
     currency: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<GreekSetup> {
-    let defaults = greek_defaults();
+    let defaults = greek_defaults()?;
     let num_paths = num_paths.unwrap_or(defaults.num_paths);
     let seed = seed.unwrap_or(defaults.seed);
     let num_steps = num_steps.unwrap_or(defaults.num_steps);
@@ -188,7 +184,7 @@ fn run_greek(
 
 /// Finite-difference delta for a vanilla European option under GBM.
 ///
-/// Reports the conservative independence-bound stderr. Use [`fd_delta_crn`]
+/// Reports the conservative independence-bound stderr. Use [`finite_diff_delta_crn`]
 /// for paired common-random-number stderr.
 ///
 /// Returns `(delta, stderr)`.
@@ -199,7 +195,7 @@ fn run_greek(
     num_paths=None, seed=None, num_steps=None,
     bump_size=None, option_type=None, currency=None,
 ))]
-fn fd_delta(
+fn finite_diff_delta(
     py: Python<'_>,
     spot: f64,
     strike: f64,
@@ -228,8 +224,8 @@ fn fd_delta(
         bump_size,
         option_type,
         currency,
-        finite_diff_delta,
-        finite_diff_delta,
+        finite_diff::finite_diff_delta,
+        finite_diff::finite_diff_delta,
     )
 }
 
@@ -243,7 +239,7 @@ fn fd_delta(
     num_paths=None, seed=None, num_steps=None,
     bump_size=None, option_type=None, currency=None,
 ))]
-fn fd_delta_crn(
+fn finite_diff_delta_crn(
     py: Python<'_>,
     spot: f64,
     strike: f64,
@@ -272,8 +268,8 @@ fn fd_delta_crn(
         bump_size,
         option_type,
         currency,
-        finite_diff_delta_crn,
-        finite_diff_delta_crn,
+        finite_diff::finite_diff_delta_crn,
+        finite_diff::finite_diff_delta_crn,
     )
 }
 
@@ -287,7 +283,7 @@ fn fd_delta_crn(
     num_paths=None, seed=None, num_steps=None,
     bump_size=None, option_type=None, currency=None,
 ))]
-fn fd_gamma(
+fn finite_diff_gamma(
     py: Python<'_>,
     spot: f64,
     strike: f64,
@@ -316,8 +312,8 @@ fn fd_gamma(
         bump_size,
         option_type,
         currency,
-        finite_diff_gamma,
-        finite_diff_gamma,
+        finite_diff::finite_diff_gamma,
+        finite_diff::finite_diff_gamma,
     )
 }
 
@@ -331,7 +327,7 @@ fn fd_gamma(
     num_paths=None, seed=None, num_steps=None,
     bump_size=None, option_type=None, currency=None,
 ))]
-fn fd_gamma_crn(
+fn finite_diff_gamma_crn(
     py: Python<'_>,
     spot: f64,
     strike: f64,
@@ -360,15 +356,15 @@ fn fd_gamma_crn(
         bump_size,
         option_type,
         currency,
-        finite_diff_gamma_crn,
-        finite_diff_gamma_crn,
+        finite_diff::finite_diff_gamma_crn,
+        finite_diff::finite_diff_gamma_crn,
     )
 }
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(fd_delta, m)?)?;
-    m.add_function(wrap_pyfunction!(fd_delta_crn, m)?)?;
-    m.add_function(wrap_pyfunction!(fd_gamma, m)?)?;
-    m.add_function(wrap_pyfunction!(fd_gamma_crn, m)?)?;
+    m.add_function(wrap_pyfunction!(finite_diff_delta, m)?)?;
+    m.add_function(wrap_pyfunction!(finite_diff_delta_crn, m)?)?;
+    m.add_function(wrap_pyfunction!(finite_diff_gamma, m)?)?;
+    m.add_function(wrap_pyfunction!(finite_diff_gamma_crn, m)?)?;
     Ok(())
 }

@@ -1,20 +1,33 @@
 //! Predictor-corrector discretization for the LMM/BGM forward rate model.
 //!
-//! Implements the Glasserman (2003) predictor-corrector scheme which averages
-//! drift evaluations at the current and predicted forward states to reduce
-//! discretization bias. Only "alive" forwards (those with fixing date T_i > t)
+//! Implements the Hunter–Jäckel–Joshi predictor-corrector scheme on the
+//! **log of the displaced forwards**: the proportional drift is averaged
+//! between an evaluation at the current state/time and an evaluation at the
+//! predicted state at the **end** of the step, and the update is a log-Euler
+//! exponential step. Only "alive" forwards (those with fixing date T_i > t)
 //! are evolved; dead forwards are frozen at their last value.
 //!
-//! # Algorithm (one time step t → t + dt)
+//! # Algorithm (one time step t → t + dt, per alive forward i)
 //!
-//! 1. Generate K standard normals `Z_1, …, Z_K` (provided by engine via `z`).
-//! 2. **Predictor**: Euler step with drift from current forwards `F(t)`.
-//! 3. **Corrector**: Recompute drift at predicted forwards, average with
-//!    predictor drift.
-//! 4. **Floor**: Clamp `F_i(t+dt) ≥ −d_i` (displaced diffusion floor).
+//! With `X_i = F_i + d_i` (displaced forward), proportional drift
+//! `m_i = drift_i / X_i`, and loadings `λ_i(t)`:
+//!
+//! 1. **Predictor** (log-Euler at the start of the step):
+//!    `X_i^pred = X_i · exp[(m_i(t, F) − ½|λ_i(t)|²)dt + λ_i(t)·Z √dt]`
+//! 2. **Corrector**: recompute the drift **at t + dt** on the predicted
+//!    state (so piecewise-constant loadings that change inside the step are
+//!    seen), average `m̄ = ½(m_i(t, F) + m_i(t+dt, F^pred))`.
+//! 3. **Final step**: `X_i(t+dt) = X_i · exp[(m̄ − ½|λ_i(t)|²)dt + λ_i(t)·Z √dt]`.
+//!
+//! The exponential update keeps `F_i > −d_i` by construction (no clamping
+//! floor concentrating mass at the boundary) and is **exact** for frozen
+//! coefficients — in particular the terminal-measure terminal forward, whose
+//! drift is identically zero, is simulated from its exact lognormal law.
 //!
 //! # References
 //!
+//! - Hunter, C., Jäckel, P. & Joshi, M. (2001). "Getting the Drift."
+//!   *Risk*, 14(7), 81–84.
 //! - Glasserman, P. (2003). *Monte Carlo Methods in Financial Engineering*,
 //!   Ch. 7, Springer.
 
@@ -67,48 +80,61 @@ impl Discretization<LmmProcess> for LmmPredictorCorrector {
         let (drift_curr, rest) = work.split_at_mut(n);
         process.drift(t, x, drift_curr);
 
-        // --- Compute diffusion increments and predictor step ---
+        // --- Predictor: log-Euler on the displaced forwards ---
         let (predicted, rest2) = rest.split_at_mut(n);
 
-        // Copy dead forwards unchanged
-        predicted[..first].copy_from_slice(&x[..first]);
+        // Copy dead forwards unchanged (and seed alive slots; overwritten below)
+        predicted.copy_from_slice(x);
 
-        // Compute diffusion shocks for alive forwards only
         for i in first..n {
-            let d_i_shifted = x[i] + params.displacements[i];
+            let x_disp = x[i] + params.displacements[i];
+            if x_disp <= 0.0 {
+                // Absorbed exactly at the displacement boundary (only
+                // reachable via an absorbed input state).
+                continue;
+            }
             let lam = params.factor_loadings(i, t);
             let mut diff_sum = 0.0;
+            let mut lam_sq = 0.0;
             for k in 0..nf {
                 diff_sum += lam[k] * z[k];
+                lam_sq += lam[k] * lam[k];
             }
-            let diffusion_inc = d_i_shifted * diff_sum * sqrt_dt;
-
-            // Predictor: F_i^pred = F_i + drift_curr_i * dt + diffusion_inc
-            predicted[i] = x[i] + drift_curr[i] * dt + diffusion_inc;
-
-            // Floor at displacement bound
-            predicted[i] = predicted[i].max(-params.displacements[i]);
+            let m_curr = drift_curr[i] / x_disp;
+            predicted[i] = x_disp * ((m_curr - 0.5 * lam_sq) * dt + diff_sum * sqrt_dt).exp()
+                - params.displacements[i];
         }
 
-        // --- Compute drift at predicted state ---
+        // --- Corrector drift at the END of the step on the predicted state
+        // (Hunter-Jäckel-Joshi): loadings with a breakpoint inside (t, t+dt]
+        // are evaluated on their new segment instead of staying stale.
         let drift_pred = &mut rest2[..n];
-        process.drift(t, predicted, drift_pred);
+        process.drift(t + dt, predicted, drift_pred);
 
-        // --- Corrector: average drifts, apply same diffusion (alive forwards only) ---
+        // --- Final log-Euler step with the averaged proportional drift ---
         for i in first..n {
-            let d_i_shifted = x[i] + params.displacements[i];
+            let x_disp = x[i] + params.displacements[i];
+            if x_disp <= 0.0 {
+                continue;
+            }
             let lam = params.factor_loadings(i, t);
             let mut diff_sum = 0.0;
+            let mut lam_sq = 0.0;
             for k in 0..nf {
                 diff_sum += lam[k] * z[k];
+                lam_sq += lam[k] * lam[k];
             }
-            let diffusion_inc = d_i_shifted * diff_sum * sqrt_dt;
-            let avg_drift = 0.5 * (drift_curr[i] + drift_pred[i]);
+            let m_curr = drift_curr[i] / x_disp;
+            let pred_disp = predicted[i] + params.displacements[i];
+            let m_pred = if pred_disp > 0.0 {
+                drift_pred[i] / pred_disp
+            } else {
+                0.0
+            };
+            let avg_m = 0.5 * (m_curr + m_pred);
 
-            x[i] += avg_drift * dt + diffusion_inc;
-
-            // Floor at displacement bound
-            x[i] = x[i].max(-params.displacements[i]);
+            x[i] = x_disp * ((avg_m - 0.5 * lam_sq) * dt + diff_sum * sqrt_dt).exp()
+                - params.displacements[i];
         }
     }
 
@@ -162,7 +188,7 @@ mod tests {
     }
 
     #[test]
-    fn test_zero_shocks_drift_only() {
+    fn test_zero_shocks_terminal_forward_follows_lognormal_median() {
         let params = simple_params();
         let process = LmmProcess::new(params);
         let disc = LmmPredictorCorrector::new();
@@ -173,11 +199,72 @@ mod tests {
 
         disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);
 
-        // With zero shocks, only drift affects the forwards.
-        // Terminal forward (index 2) should be unchanged (zero drift).
+        // The terminal forward is driftless under the terminal measure; the
+        // log-Euler step at zero shock lands on the lognormal MEDIAN:
+        // X_next = X·exp(−½|λ|²dt) with λ = [0.10, 0.10] ⇒ |λ|² = 0.02.
+        let expected = 0.035 * (-0.5 * 0.02 * 0.01_f64).exp() - 0.005;
         assert!(
-            (x[2] - 0.03).abs() < 1e-10,
-            "terminal forward should be unchanged with zero shocks"
+            (x[2] - expected).abs() < 1e-14,
+            "terminal forward should follow the exact lognormal zero-shock \
+             path: got {}, expected {expected}",
+            x[2]
+        );
+    }
+
+    /// The terminal-measure terminal forward is driftless, so the displaced
+    /// log-Euler step simulates its EXACT lognormal law and a caplet on it
+    /// must reproduce the displaced-Black price within pure MC error — no
+    /// discretization-bias allowance. The previous arithmetic-Euler step
+    /// carried an O(dt) bias here.
+    #[test]
+    fn test_terminal_caplet_matches_displaced_black() {
+        use crate::rng::philox::PhiloxRng;
+        use crate::traits::RandomStream;
+        use finstack_core::math::special_functions::norm_cdf;
+
+        let params = simple_params();
+        let process = LmmProcess::new(params);
+        let disc = LmmPredictorCorrector::new();
+        let ws = disc.work_size(&process);
+
+        let (t_expiry, num_steps) = (1.0, 8usize);
+        let dt = t_expiry / num_steps as f64;
+        let strike = 0.03;
+        let disp = 0.005;
+        let num_paths = 60_000usize;
+
+        let root = PhiloxRng::new(13);
+        let mut sum = 0.0;
+        let mut sum_sq = 0.0;
+        for path in 0..num_paths {
+            let mut rng = root.substream(path as u64);
+            let mut x = vec![0.03, 0.03, 0.03];
+            let mut work = vec![0.0; ws];
+            let mut z = vec![0.0; 2];
+            for step in 0..num_steps {
+                rng.fill_std_normals(&mut z);
+                disc.step(&process, step as f64 * dt, dt, &mut x, &z, &mut work);
+            }
+            let payoff = (x[2] - strike).max(0.0);
+            sum += payoff;
+            sum_sq += payoff * payoff;
+        }
+        let n = num_paths as f64;
+        let mean = sum / n;
+        let stderr = ((sum_sq / n - mean * mean) / n).sqrt();
+
+        // Displaced Black on X = F + d with σ² = |λ|² = 0.02.
+        let (x0, k_disp) = (0.03 + disp, strike + disp);
+        let sigma = 0.02_f64.sqrt();
+        let d1 = ((x0 / k_disp).ln() + 0.5 * sigma * sigma * t_expiry) / (sigma * t_expiry.sqrt());
+        let d2 = d1 - sigma * t_expiry.sqrt();
+        let black = x0 * norm_cdf(d1) - k_disp * norm_cdf(d2);
+
+        assert!(
+            (mean - black).abs() < 4.0 * stderr,
+            "terminal caplet {mean:.6} should match displaced Black {black:.6} \
+             within 4×stderr = {:.6}",
+            4.0 * stderr
         );
     }
 

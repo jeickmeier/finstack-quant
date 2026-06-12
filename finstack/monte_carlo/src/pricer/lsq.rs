@@ -52,7 +52,16 @@ pub fn solve_least_squares(design: &[f64], y: &[f64], n: usize, k: usize) -> Res
     // Solve least squares problem using SVD (more robust than QR for overdetermined systems)
     let svd = x_matrix.svd(true, true);
 
-    match svd.solve(&y_vector, 1e-10) {
+    // nalgebra's `eps` is an ABSOLUTE cutoff on singular values, so it must
+    // scale with σ_max: with raw polynomial bases of spot ≈ 100 the design
+    // entries reach 1e10 and a fixed 1e-10 never truncates, letting
+    // near-rank-deficient directions amplify regression noise into the
+    // exercise boundary. The standard relative cutoff is
+    // σ_max · ε_machine · max(n, k).
+    let sigma_max = svd.singular_values.iter().copied().fold(0.0_f64, f64::max);
+    let eps = sigma_max * f64::EPSILON * n.max(k) as f64;
+
+    match svd.solve(&y_vector, eps) {
         Ok(beta) => {
             // Convert back to Vec<f64>
             Ok(beta.as_slice().to_vec())

@@ -4,7 +4,7 @@
 //! models, including:
 //!
 //! - **Hurst exponent** — validated parameter H ∈ (0, 1) controlling path roughness
-//! - **Fractional kernels** — Molchan-Golosov Volterra representation kernel
+//! - **Fractional kernels** — Riemann–Liouville power-law Volterra kernel
 //! - **Covariance functions** — fBM covariance, variance, and covariance matrices for
 //!   both fBM values and increments
 //! - **Mittag-Leffler function** — generalized E_{α,β}(z) used in fractional calculus
@@ -88,7 +88,7 @@ impl HurstExponent {
 }
 
 // ---------------------------------------------------------------------------
-// MolchanGolosovKernel
+// RiemannLiouvilleKernel
 // ---------------------------------------------------------------------------
 
 /// Riemann–Liouville power-law kernel.
@@ -105,15 +105,15 @@ impl HurstExponent {
 /// (e.g. rough Bergomi) use the dedicated
 /// `finstack_monte_carlo::rng::volterra` generator rather than this kernel.
 #[derive(Debug, Clone, Copy)]
-pub struct MolchanGolosovKernel {
+pub struct RiemannLiouvilleKernel {
     /// The Hurst exponent.
     hurst_exp: HurstExponent,
     /// Precomputed normalisation constant c_H = √(2H).
     c_h: f64,
 }
 
-impl MolchanGolosovKernel {
-    /// Create a new Molchan-Golosov kernel for the given Hurst exponent.
+impl RiemannLiouvilleKernel {
+    /// Create a new Riemann–Liouville kernel for the given Hurst exponent.
     pub fn new(h: HurstExponent) -> Self {
         let c_h = (2.0 * h.value()).sqrt();
         Self { hurst_exp: h, c_h }
@@ -455,17 +455,17 @@ mod tests {
     // -- Kernel evaluation -------------------------------------------------
 
     #[test]
-    fn molchan_golosov_zero_when_t_leq_s() {
+    fn riemann_liouville_zero_when_t_leq_s() {
         let h = HurstExponent::new(0.3).unwrap();
-        let k = MolchanGolosovKernel::new(h);
+        let k = RiemannLiouvilleKernel::new(h);
         assert_eq!(k.evaluate(1.0, 1.0), 0.0);
         assert_eq!(k.evaluate(0.5, 1.0), 0.0);
     }
 
     #[test]
-    fn molchan_golosov_positive_when_t_gt_s() {
+    fn riemann_liouville_positive_when_t_gt_s() {
         let h = HurstExponent::new(0.3).unwrap();
-        let k = MolchanGolosovKernel::new(h);
+        let k = RiemannLiouvilleKernel::new(h);
         assert!(k.evaluate(1.0, 0.5) > 0.0);
     }
 

@@ -6,6 +6,4 @@
 //! bias of discretely monitored simulations.
 
 pub mod bridge;
-
-#[cfg(test)]
 pub mod corrections;

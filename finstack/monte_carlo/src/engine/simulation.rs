@@ -49,7 +49,14 @@ fn fill_shocks<R: RandomStream>(
     match hook {
         NoiseHook::Correlation(Some(cf)) => {
             rng.fill_std_normals(z_raw);
-            let _ = cf.apply(z_raw, z);
+            // Dimensions are validated at engine setup; a mismatch here would
+            // silently leave `z` holding the PREVIOUS step's shocks, so fail
+            // fast in debug builds rather than discarding the error.
+            let applied = cf.apply(z_raw, z);
+            debug_assert!(
+                applied.is_ok(),
+                "correlation factor dimension mismatch in shock hot path: {applied:?}"
+            );
         }
         NoiseHook::Correlation(None) => rng.fill_std_normals(z),
         NoiseHook::InjectFbm {

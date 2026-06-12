@@ -478,8 +478,15 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let num_exercises = exercise_step_indices.len();
         let num_paths = self.config.num_paths;
 
-        // states_at_exercise[ex_idx][path_idx] = (x, y)
-        let mut states_at_exercise: Vec<Vec<(f64, f64)>> =
+        // states_at_exercise[ex_idx][path_idx] = (x, y, W̃_H).
+        //
+        // The accumulated Volterra level W̃_H (work[0]) is recorded alongside
+        // the Markov states: under rough vol the instantaneous volatility
+        // σ(t) is a deterministic function of W̃_H, and the continuation
+        // value genuinely depends on it. Regressing on (x, y) alone makes
+        // the exercise policy blind to the vol state and systematically
+        // low-biases Bermudan values at high vol-of-vol.
+        let mut states_at_exercise: Vec<Vec<(f64, f64, f64)>> =
             vec![Vec::with_capacity(num_paths); num_exercises];
 
         // df_at_exercise[ex_idx][path_idx] = accumulated P(0, T_ex) along the path.
@@ -537,7 +544,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 // strictly increasing, so every exercise date is recorded
                 // exactly once — no terminal-state backfill is needed.
                 if ex_ptr < num_exercises && step + 1 == exercise_step_indices[ex_ptr] {
-                    states_at_exercise[ex_ptr].push((x[0], x[1]));
+                    states_at_exercise[ex_ptr].push((x[0], x[1], work[0]));
                     df_at_exercise[ex_ptr].push(cum_df);
                     ex_ptr += 1;
                 }
@@ -563,14 +570,20 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let is_train = |p: usize| !oos || p.is_multiple_of(2);
         let is_price = |p: usize| !oos || !p.is_multiple_of(2);
 
-        // Polynomial basis on the Cheyette state: [1, x, y, x^2, x*y, y^2, x^3]
+        // Polynomial basis on the augmented Cheyette state (x, y, W̃_H):
+        // degree 1 → [1, x, y, w]; degree 2 adds [x², x·y, y², w², x·w];
+        // degree 3 adds [x³]. The vol level w is a genuine extra state under
+        // rough vol (Mo4): without it the regression cannot distinguish
+        // high-vol from low-vol continuation regimes.
         let basis_degree = self.config.basis_degree;
-        let make_basis = |x_val: f64, y_val: f64| -> Vec<f64> {
-            let mut b = vec![1.0, x_val, y_val];
+        let make_basis = |x_val: f64, y_val: f64, w_val: f64| -> Vec<f64> {
+            let mut b = vec![1.0, x_val, y_val, w_val];
             if basis_degree >= 2 {
                 b.push(x_val * x_val);
                 b.push(x_val * y_val);
                 b.push(y_val * y_val);
+                b.push(w_val * w_val);
+                b.push(x_val * w_val);
             }
             if basis_degree >= 3 {
                 b.push(x_val * x_val * x_val);
@@ -592,9 +605,9 @@ impl BermudanSwaptionCheyetteRoughPricer {
 
             // Compute exercise values at each path
             let mut exercise_values: Vec<f64> = Vec::with_capacity(num_paths);
-            let mut basis_inputs: Vec<(f64, f64)> = Vec::with_capacity(num_paths);
+            let mut basis_inputs: Vec<(f64, f64, f64)> = Vec::with_capacity(num_paths);
 
-            for &(x_val, y_val) in states_at_exercise[ex_idx].iter().take(num_paths) {
+            for &(x_val, y_val, w_val) in states_at_exercise[ex_idx].iter().take(num_paths) {
                 // Reconstruct the realized swap value from the full Cheyette
                 // term structure (W-16): the prior flat-rate discounting
                 // `exp(-r_t * t_j)` is materially biased on steep curves.
@@ -607,7 +620,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 );
 
                 exercise_values.push(ev);
-                basis_inputs.push((x_val, y_val));
+                basis_inputs.push((x_val, y_val, w_val));
             }
 
             if ex_idx == num_exercises - 1 {
@@ -634,8 +647,8 @@ impl BermudanSwaptionCheyetteRoughPricer {
                 for (i, &ev) in exercise_values.iter().enumerate() {
                     if ev > 0.0 && is_train(i) {
                         itm_indices.push(i);
-                        let (x_val, y_val) = basis_inputs[i];
-                        itm_basis.push(make_basis(x_val, y_val));
+                        let (x_val, y_val, w_val) = basis_inputs[i];
+                        itm_basis.push(make_basis(x_val, y_val, w_val));
 
                         // Discount the future cashflow from its exercise date
                         // back to the current exercise date:
@@ -684,8 +697,8 @@ impl BermudanSwaptionCheyetteRoughPricer {
                         if ev <= 0.0 {
                             continue;
                         }
-                        let (x_val, y_val) = basis_inputs[i];
-                        let basis = make_basis(x_val, y_val);
+                        let (x_val, y_val, w_val) = basis_inputs[i];
+                        let basis = make_basis(x_val, y_val, w_val);
                         let cont_value: f64 =
                             basis.iter().zip(coeffs.iter()).map(|(b, c)| b * c).sum();
                         if ev > cont_value {

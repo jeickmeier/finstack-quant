@@ -84,7 +84,7 @@ impl PhiloxRng {
             key: seed,
             stream_id: 0,
             counter: 0,
-            idx: 4, // Force generation on first use
+            idx: 4, // Placeholder; the eager generate_block() below resets it.
             block: [0; 4],
             spare_normal: None,
         };
@@ -190,15 +190,20 @@ impl RandomStream for PhiloxRng {
         Some(PhiloxRng::with_stream(self.key, stream_id))
     }
 
-    /// Fill buffer with uniform random numbers in [0, 1).
+    /// Fill buffer with uniform random numbers in the open interval (0, 1).
     ///
     /// Hot path method - called on every timestep of every path.
+    ///
+    /// The grid-centred mapping `(bits + 0.5)·2⁻⁵³` never produces exactly
+    /// 0 or 1 (matching core's Sobol normal mapping), so inverse-CDF
+    /// consumers and the antithetic mirror `1 − u` are safe at both
+    /// boundaries.
     #[inline]
     fn fill_u01(&mut self, out: &mut [f64]) {
         for x in out {
-            // Convert u64 to [0, 1) using upper 53 bits
+            // Convert u64 to (0, 1) using the upper 53 bits, centred.
             let bits = self.next_u64() >> 11;
-            *x = (bits as f64) * (1.0 / (1u64 << 53) as f64);
+            *x = (bits as f64 + 0.5) * (1.0 / (1u64 << 53) as f64);
         }
     }
 
@@ -252,6 +257,56 @@ mod tests {
         let mut rng = PhiloxRng::new(42);
         let val = rng.next_u01();
         assert!((0.0..1.0).contains(&val));
+    }
+
+    /// Known-answer test against the Random123 reference distribution
+    /// (Salmon et al. 2011, `kat_vectors`): philox4x32-10 with
+    /// `ctr = {0,0,0,0}`, `key = {0,0}` must produce
+    /// `{0x6627e8d5, 0xe169c58d, 0xbc57ac4c, 0x9b00dbd8}`.
+    ///
+    /// `PhiloxRng::new(0)` maps exactly onto that input: key = seed = 0,
+    /// counter words = [counter_lo, counter_hi, stream_lo, stream_hi] =
+    /// {0,0,0,0} for the first block. Moment tests cannot detect a
+    /// transposed multiplier or a swapped Weyl constant; this can.
+    #[test]
+    fn test_philox_matches_random123_reference_vector() {
+        let mut rng = PhiloxRng::new(0);
+        let expected: [u32; 4] = [0x6627_e8d5, 0xe169_c58d, 0xbc57_ac4c, 0x9b00_dbd8];
+        for (i, &e) in expected.iter().enumerate() {
+            let got = rng.next_u32();
+            assert_eq!(got, e, "word {i}: got {got:#010x}, expected {e:#010x}");
+        }
+    }
+
+    /// Adjacent streams must be statistically uncorrelated, not merely
+    /// "first draws differ". A 4σ bound on the sample correlation of 20k
+    /// normal pairs is ≈ 0.028.
+    #[test]
+    fn test_adjacent_streams_uncorrelated() {
+        let n = 20_000;
+        let mut a = PhiloxRng::with_stream(42, 1);
+        let mut b = PhiloxRng::with_stream(42, 2);
+        let mut za = vec![0.0; n];
+        let mut zb = vec![0.0; n];
+        a.fill_std_normals(&mut za);
+        b.fill_std_normals(&mut zb);
+
+        let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+        let (ma, mb) = (mean(&za), mean(&zb));
+        let mut cov = 0.0;
+        let mut va = 0.0;
+        let mut vb = 0.0;
+        for (x, y) in za.iter().zip(&zb) {
+            cov += (x - ma) * (y - mb);
+            va += (x - ma) * (x - ma);
+            vb += (y - mb) * (y - mb);
+        }
+        let corr = cov / (va.sqrt() * vb.sqrt());
+        let bound = 4.0 / (n as f64).sqrt();
+        assert!(
+            corr.abs() < bound,
+            "adjacent streams correlated: |{corr}| >= {bound}"
+        );
     }
 
     #[test]

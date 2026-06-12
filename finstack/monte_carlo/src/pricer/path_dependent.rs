@@ -19,6 +19,26 @@ use crate::traits::{Discretization, RandomStream, StochasticProcess};
 use finstack_core::currency::Currency;
 use finstack_core::{Error, Result};
 
+/// Domain-separation salt for the per-path auxiliary-uniform Philox streams
+/// used alongside Sobol asset normals. Keeps the auxiliary key space disjoint
+/// from any other component keyed on the same user seed.
+const SOBOL_AUX_DOMAIN_SALT: u64 = 0x5350_4448_5F41_5558; // "SPDH_AUX"
+
+/// Domain-separation salt for the Sobol Owen-scrambling seed. XORing the user
+/// seed with this constant (and flooring at 1) guarantees scrambling is never
+/// silently disabled by a zero seed.
+const SOBOL_SCRAMBLE_DOMAIN_SALT: u64 = 0x534F_424F_4C53_4352; // "SOBOLSCR"
+
+/// Number of independently scrambled Sobol replicates used for the
+/// randomized-QMC error estimate.
+///
+/// Points within one scrambled Sobol sequence are deliberately dependent, so
+/// `sample_std/√n` over them is not a valid standard error. The standard
+/// remedy (Owen 1997; Glasserman 2003, §5.4) is R independent randomizations:
+/// the run is split into R replicates, each with its own Owen-scrambling
+/// seed, and the standard error is computed across the R replicate means.
+const SOBOL_QMC_REPLICATES: usize = 16;
+
 /// Configuration for path-dependent option pricing.
 #[derive(Debug, Clone)]
 pub struct PathDependentPricerConfig {
@@ -345,8 +365,6 @@ impl PathDependentPricer {
     {
         let sobol_dimension =
             self.validate_sobol_configuration(&time_grid, process.num_factors())?;
-        let mut sobol = SobolRng::try_new(sobol_dimension, self.config.seed)
-            .map_err(|err| Error::Validation(err.to_string()))?;
         let disc = ExactGbm::new();
         let initial_state = vec![initial_spot];
         let capture_enabled = self.config.path_capture.enabled;
@@ -373,7 +391,6 @@ impl PathDependentPricer {
             .use_brownian_bridge
             .then(|| BrownianBridge::new(num_steps));
 
-        let mut stats = OnlineStats::new();
         let mut state = vec![0.0; process.dim()];
         let mut work = vec![0.0; disc.work_size(process)];
         let mut z_step = vec![0.0; num_factors];
@@ -400,86 +417,140 @@ impl PathDependentPricer {
         };
         let mut payoff_local = payoff.clone();
 
-        for path_id in 0..self.config.num_paths {
-            sobol.fill_std_normals(&mut z_path);
-            fill_sobol_increments(
-                &z_path,
-                &mut z_increments,
-                &mut w_path,
-                bridge.as_ref(),
-                &time_grid,
-                num_factors,
-            )?;
+        // Randomized QMC: split the run into R independently scrambled
+        // replicates. The reported mean and standard error come from the R
+        // replicate means — the only statistically valid error estimate for
+        // QMC (points within one scrambled sequence are dependent by
+        // construction, so a plain sample stderr over them is meaningless).
+        let replicates = SOBOL_QMC_REPLICATES.min(self.config.num_paths.max(1));
+        let base_paths = self.config.num_paths / replicates;
+        let remainder = self.config.num_paths % replicates;
 
-            // Auxiliary uniforms are drawn from a per-path Philox so the Sobol
-            // stream only carries asset-dimension normals.
-            let mut adapter = SobolPathStream::new(
-                &z_increments,
-                PhiloxRng::new(self.config.seed ^ ((path_id as u64) << 1)),
-            );
+        let mut replicate_means = OnlineStats::new();
+        let mut overall = OnlineStats::new();
+        let mut path_id = 0usize;
 
-            payoff_local.reset();
-            payoff_local.on_path_start(&mut adapter);
+        for replicate in 0..replicates {
+            // Independent Owen scrambling per replicate: distinct seeds via a
+            // golden-ratio (Weyl) increment, floored at 1 because a zero
+            // scramble seed disables scrambling entirely (and the unscrambled
+            // sequence starts at the degenerate all-zeros point — every
+            // normal on the first path would map to the extreme grid-edge
+            // deviate ≈ −6.2σ).
+            let scramble_seed = (self.config.seed ^ SOBOL_SCRAMBLE_DOMAIN_SALT)
+                .wrapping_add((replicate as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
+                .max(1);
+            let mut sobol = SobolRng::try_new(sobol_dimension, scramble_seed)
+                .map_err(|err| Error::Validation(err.to_string()))?;
+            let replicate_paths = base_paths + usize::from(replicate < remainder);
+            let mut replicate_stats = OnlineStats::new();
 
-            let should_capture = capture_enabled
-                && self
-                    .config
-                    .path_capture
-                    .should_capture(path_id, self.config.num_paths);
-
-            let payoff_value = if should_capture {
-                let (value, path) = engine.simulate_path_with_capture(
-                    &mut adapter,
-                    process,
-                    &disc,
-                    &initial_state,
-                    &mut payoff_local,
-                    &mut state,
-                    &mut z_step,
-                    &mut z_raw,
-                    &mut work,
-                    correlation.as_ref(),
-                    path_id,
-                    discount_factor,
-                    currency,
+            for _ in 0..replicate_paths {
+                sobol.fill_std_normals(&mut z_path);
+                fill_sobol_increments(
+                    &z_path,
+                    &mut z_increments,
+                    &mut w_path,
+                    bridge.as_ref(),
+                    &time_grid,
+                    num_factors,
                 )?;
-                captured_paths.push(path);
-                value
-            } else {
-                engine.simulate_path(
-                    &mut adapter,
-                    process,
-                    &disc,
-                    &initial_state,
-                    &mut payoff_local,
-                    &mut state,
-                    &mut z_step,
-                    &mut z_raw,
-                    &mut work,
-                    correlation.as_ref(),
-                    currency,
-                )?
-            };
 
-            let discounted_value =
-                crate::engine::validate_discounted_payoff(path_id, payoff_value, discount_factor)?;
-            stats.update(discounted_value);
+                // Auxiliary uniforms are drawn from a per-path Philox so the
+                // Sobol stream only carries asset-dimension normals. Derive
+                // the per-path generator in COUNTER space (`with_stream`)
+                // under a fixed domain-separation salt: deriving in key space
+                // (`seed ^ f(path)`) would collide with the base stream of
+                // any component using the same seed and gives no
+                // counter-block disjointness guarantee.
+                let mut adapter = SobolPathStream::new(
+                    &z_increments,
+                    PhiloxRng::with_stream(
+                        self.config.seed ^ SOBOL_AUX_DOMAIN_SALT,
+                        path_id as u64,
+                    ),
+                );
+
+                payoff_local.reset();
+                payoff_local.on_path_start(&mut adapter);
+
+                let should_capture = capture_enabled
+                    && self
+                        .config
+                        .path_capture
+                        .should_capture(path_id, self.config.num_paths);
+
+                let payoff_value = if should_capture {
+                    let (value, path) = engine.simulate_path_with_capture(
+                        &mut adapter,
+                        process,
+                        &disc,
+                        &initial_state,
+                        &mut payoff_local,
+                        &mut state,
+                        &mut z_step,
+                        &mut z_raw,
+                        &mut work,
+                        correlation.as_ref(),
+                        path_id,
+                        discount_factor,
+                        currency,
+                    )?;
+                    captured_paths.push(path);
+                    value
+                } else {
+                    engine.simulate_path(
+                        &mut adapter,
+                        process,
+                        &disc,
+                        &initial_state,
+                        &mut payoff_local,
+                        &mut state,
+                        &mut z_step,
+                        &mut z_raw,
+                        &mut work,
+                        correlation.as_ref(),
+                        currency,
+                    )?
+                };
+
+                let discounted_value = crate::engine::validate_discounted_payoff(
+                    path_id,
+                    payoff_value,
+                    discount_factor,
+                )?;
+                replicate_stats.update(discounted_value);
+                overall.update(discounted_value);
+                path_id += 1;
+            }
+
+            if replicate_stats.count() > 0 {
+                replicate_means.update(replicate_stats.mean());
+            }
         }
 
+        // Mean and stderr across replicate means (valid RQMC error estimate);
+        // `num_paths` and `std_dev` keep the per-path semantics for
+        // reporting. With fewer than two replicates the stderr is undefined
+        // (NaN), matching plain-MC behavior at one path.
         let estimate = Estimate::new(
-            stats.mean(),
-            stats.stderr(),
-            stats.confidence_interval(0.05),
-            stats.count(),
+            replicate_means.mean(),
+            replicate_means.stderr(),
+            replicate_means.confidence_interval(0.05),
+            overall.count(),
         )
-        .with_std_dev(stats.std_dev());
+        .with_std_dev(overall.std_dev());
 
-        Ok(engine.finalize_captured_result(
+        let mut result = engine.finalize_captured_result(
             estimate,
             captured_paths,
             currency,
             Some(process.metadata()),
-        ))
+        );
+        if let Some(run) = result.run.as_mut() {
+            run.seed = Some(self.config.seed);
+        }
+        Ok(result)
     }
 
     /// Price a path-dependent option.
@@ -610,6 +681,17 @@ impl PathDependentPricer {
         P: Payoff,
     {
         self.config.validate()?;
+        // Path capture is incompatible with antithetic pairing (the engine
+        // rejects the combination); fail loudly instead of silently pricing
+        // with a different estimator than the caller configured.
+        if self.config.antithetic {
+            return Err(Error::Validation(
+                "price_with_paths cannot honor antithetic = true: path capture and \
+                 antithetic sampling are mutually exclusive. Disable antithetic or \
+                 use price() without capture."
+                    .to_string(),
+            ));
+        }
         if self.config.use_sobol {
             let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
             return self.price_with_sobol(
@@ -642,7 +724,7 @@ impl PathDependentPricer {
         let process_params = process.metadata();
 
         let rng = PhiloxRng::new(self.config.seed);
-        engine.price_with_capture(
+        let mut result = engine.price_with_capture(
             &rng,
             process,
             &disc,
@@ -651,14 +733,39 @@ impl PathDependentPricer {
             currency,
             discount_factor,
             process_params,
-        )
+        )?;
+        if let Some(run) = result.run.as_mut() {
+            run.seed = Some(self.config.seed);
+        }
+        Ok(result)
     }
 
     /// Price and compute LRM Greeks (delta, vega) for GBM using captured paths.
     ///
-    /// This uses the Likelihood Ratio Method, deriving the standardized terminal
-    /// shock `Z = W_T / √T` from terminal spots under GBM:
-    /// `Z = (ln(S_T/S_0) - (r - q - 0.5 σ^2) T) / (σ √T)`.
+    /// Uses the Likelihood Ratio Method with the score of the **joint path
+    /// density** (Glasserman 2003, §7.3), so the estimators are unbiased for
+    /// path-dependent payoffs (Asian averages, lookbacks, discretely
+    /// monitored barriers), not just terminal payoffs:
+    ///
+    /// - **Delta** — only the first transition density depends on `S₀`, so
+    ///   the score is `z₁ / (S₀ σ √Δt)` where `z₁` is the first step's
+    ///   standardized shock.
+    /// - **Vega** — the score is the per-step sum
+    ///   `Σᵢ [(zᵢ² − 1)/σ − √Δt·zᵢ]`.
+    ///
+    /// Per-step shocks are reconstructed exactly from consecutive captured
+    /// spots under the exact-GBM step:
+    /// `zᵢ = (ln(Sᵢ/Sᵢ₋₁) − (r − q − σ²/2)Δt) / (σ √Δt)`.
+    ///
+    /// # Caveat
+    ///
+    /// The LR estimator differentiates the path density only. For payoffs
+    /// whose *functional form* depends explicitly on σ (e.g. barrier payoffs
+    /// with a σ-dependent Brownian-bridge crossing correction), the
+    /// `E[∂f/∂σ]` term is not captured: the reported vega covers the
+    /// distributional σ-sensitivity but omits the payoff's explicit
+    /// σ-dependence. Prefer the CRN finite-difference helpers in
+    /// [`crate::greeks::finite_diff`] when that term matters.
     #[allow(clippy::too_many_arguments)]
     pub fn price_with_lrm_greeks<P>(
         &self,
@@ -677,6 +784,17 @@ impl PathDependentPricer {
         P: Payoff,
     {
         self.config.validate()?;
+        // LRM Greeks require full path capture, which is incompatible with
+        // antithetic pairing; fail loudly rather than silently changing the
+        // estimator the caller configured.
+        if self.config.antithetic {
+            return Err(Error::Validation(
+                "price_with_lrm_greeks cannot honor antithetic = true: it requires \
+                 full path capture, which is mutually exclusive with antithetic \
+                 sampling."
+                    .to_string(),
+            ));
+        }
         // Force path capture to get terminal spots and final discounted payoff values
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
         let engine_config = McEngineConfig {
@@ -723,46 +841,61 @@ impl PathDependentPricer {
             return Ok((estimate, None));
         }
 
-        // Build undiscounted payoffs and standardized terminal shocks.
+        // Build undiscounted payoffs and per-path joint-density scores by
+        // reconstructing each step's standardized shock from consecutive
+        // captured spots (exact under the ExactGbm step used above).
+        let dt = time_to_maturity / num_steps as f64;
+        let sqrt_dt = dt.sqrt();
+        let mu_dt = (rate - dividend_yield - 0.5 * volatility * volatility) * dt;
+
         let mut payoffs: Vec<f64> = Vec::with_capacity(paths.len());
-        let mut terminal_shocks: Vec<f64> = Vec::with_capacity(paths.len());
-        let mu = rate - dividend_yield - 0.5 * volatility * volatility;
+        let mut first_shocks: Vec<f64> = Vec::with_capacity(paths.len());
+        let mut vega_scores: Vec<f64> = Vec::with_capacity(paths.len());
         for p in paths {
-            // Final discounted payoff value is stored; un-discount it
-            let undisc = p.final_value / discount_factor;
-            payoffs.push(undisc);
-
-            // Terminal spot from last point's state var
-            if let Some(last) = p.terminal_point() {
-                if let Some(s_t) = last.spot() {
-                    let z_t = ((s_t / initial_spot).ln() - mu * time_to_maturity)
-                        / (volatility * time_to_maturity.sqrt());
-                    terminal_shocks.push(z_t);
-                }
+            let spots: Vec<f64> = p
+                .points
+                .iter()
+                .filter_map(super::super::paths::PathPoint::spot)
+                .collect();
+            // Grid points = steps + 1 (initial spot at step 0); skip a path
+            // whose capture is incomplete rather than misalign the scores.
+            if spots.len() != num_steps + 1 {
+                continue;
             }
+
+            let mut first_shock = 0.0;
+            let mut score_sum = 0.0;
+            for (k, w) in spots.windows(2).enumerate() {
+                let z = ((w[1] / w[0]).ln() - mu_dt) / (volatility * sqrt_dt);
+                if k == 0 {
+                    first_shock = z;
+                }
+                score_sum += (z * z - 1.0) / volatility - sqrt_dt * z;
+            }
+
+            // Final discounted payoff value is stored; un-discount it.
+            payoffs.push(p.final_value / discount_factor);
+            first_shocks.push(first_shock);
+            vega_scores.push(score_sum);
         }
 
-        if payoffs.len() == terminal_shocks.len() && !payoffs.is_empty() {
-            use super::super::greeks::lrm::{lrm_delta, lrm_vega};
-            let (delta, _) = lrm_delta(
-                &payoffs,
-                &terminal_shocks,
-                initial_spot,
-                volatility,
-                time_to_maturity,
-                discount_factor,
-            );
-            let (vega, _) = lrm_vega(
-                &payoffs,
-                &terminal_shocks,
-                volatility,
-                time_to_maturity,
-                discount_factor,
-            );
-            Ok((estimate, Some((delta, vega))))
-        } else {
-            Ok((estimate, None))
+        if payoffs.is_empty() {
+            return Ok((estimate, None));
         }
+
+        use super::super::greeks::lrm::{lrm_delta, lrm_vega_from_scores};
+        // Delta: only the first transition density depends on S₀, so the
+        // terminal-score helper is reused with the FIRST step's shock and Δt.
+        let (delta, _) = lrm_delta(
+            &payoffs,
+            &first_shocks,
+            initial_spot,
+            volatility,
+            dt,
+            discount_factor,
+        );
+        let (vega, _) = lrm_vega_from_scores(&payoffs, &vega_scores, discount_factor);
+        Ok((estimate, Some((delta, vega))))
     }
 
     /// Get configuration.
@@ -924,6 +1057,105 @@ mod tests {
         // Should get reasonable Asian option value
         assert!(result.mean.amount() > 0.0);
         assert!(result.mean.amount() < 20.0);
+    }
+
+    /// LRM Greeks must use the joint path-density score, not the terminal
+    /// marginal score (quant review finding B3). Discriminating case: a
+    /// single-fixing "Asian" at step n/2 is exactly a European call on
+    /// `S_{T/2}` paid at T, with closed forms
+    /// `delta = e^{-rT} e^{(r-q)τ} N(d₁)` and
+    /// `vega = e^{-rT} e^{(r-q)τ} S₀ φ(d₁) √τ` (per unit vol), τ = T/2.
+    /// The previous terminal-shock implementation converged to ≈ half the
+    /// true delta for this payoff.
+    #[test]
+    fn test_lrm_greeks_unbiased_for_path_dependent_payoff() {
+        use finstack_core::math::special_functions::{norm_cdf, norm_pdf};
+
+        let (s0, k, r, q, sigma, t) = (100.0, 100.0, 0.05, 0.01, 0.2, 1.0);
+        let num_steps = 10usize;
+        let fixing_step = num_steps / 2;
+        let tau = t * fixing_step as f64 / num_steps as f64;
+
+        let config = PathDependentPricerConfig::new(100_000)
+            .with_seed(42)
+            .with_parallel(false);
+        let pricer = PathDependentPricer::new(config);
+        let gbm = GbmProcess::new(GbmParams::new(r, q, sigma).unwrap());
+        let payoff = AsianCall::new(k, 1.0, AveragingMethod::Arithmetic, vec![fixing_step]);
+
+        let df = (-r * t).exp();
+        let (_, greeks) = pricer
+            .price_with_lrm_greeks(
+                &gbm,
+                s0,
+                t,
+                num_steps,
+                &payoff,
+                Currency::USD,
+                df,
+                r,
+                q,
+                sigma,
+            )
+            .expect("LRM pricing should succeed");
+        let (delta, vega) = greeks.expect("greeks should be computed");
+
+        let d1 = ((s0 / k).ln() + (r - q + 0.5 * sigma * sigma) * tau) / (sigma * tau.sqrt());
+        let growth = ((r - q) * tau).exp();
+        let delta_true = df * growth * norm_cdf(d1);
+        let vega_true = df * growth * s0 * norm_pdf(d1) * tau.sqrt() * 0.01;
+
+        // ≈5σ/8σ statistical tolerances at 100k paths; the old terminal-score
+        // estimator was off by ≈50% (≈0.3 absolute in delta), far outside.
+        assert!(
+            (delta - delta_true).abs() < 0.025,
+            "LRM delta {delta} should match closed form {delta_true}"
+        );
+        assert!(
+            (vega - vega_true).abs() < 0.05,
+            "LRM vega {vega} should match closed form {vega_true}"
+        );
+    }
+
+    /// Randomized-QMC error estimate: the stderr across independently
+    /// scrambled replicates must be finite, positive, and cover the true
+    /// error against the Black-Scholes closed form. (A single-scramble
+    /// "stderr" over dependent Sobol points has no such guarantee.)
+    #[test]
+    fn test_sobol_rqmc_stderr_covers_true_error() {
+        use crate::payoff::vanilla::EuropeanCall;
+        use crate::variance_reduction::control_variate::black_scholes_call;
+
+        let (s0, k, r, q, sigma, t) = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0);
+        let num_steps = 16usize;
+        let config = PathDependentPricerConfig::new(16_384)
+            .with_seed(42)
+            .with_parallel(false)
+            .with_sobol(true);
+        let pricer = PathDependentPricer::new(config);
+        let gbm = GbmProcess::new(GbmParams::new(r, q, sigma).unwrap());
+        let payoff = EuropeanCall::new(k, 1.0, num_steps);
+        let df = (-r * t).exp();
+
+        let result = pricer
+            .price_with_paths(&gbm, s0, t, num_steps, &payoff, Currency::USD, df)
+            .expect("sobol pricing should succeed");
+
+        let bs = black_scholes_call(s0, k, t, r, q, sigma);
+        let mean = result.estimate.mean.amount();
+        let stderr = result.estimate.stderr;
+
+        assert!(stderr.is_finite() && stderr > 0.0, "stderr = {stderr}");
+        assert!(
+            (mean - bs).abs() < 6.0 * stderr,
+            "RQMC mean {mean} should match BS {bs} within 6×stderr = {}",
+            6.0 * stderr
+        );
+        // QMC should beat the plain-MC error scale at this path count.
+        assert!(
+            stderr < 0.05,
+            "RQMC stderr should be tight at 16k paths, got {stderr}"
+        );
     }
 
     #[test]

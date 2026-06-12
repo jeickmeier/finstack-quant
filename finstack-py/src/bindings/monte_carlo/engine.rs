@@ -1,15 +1,23 @@
 //! McEngine binding (configured via `PyTimeGrid`) plus module-level
 //! convenience pricing functions.
 
-use super::results::PyMonteCarloResult;
+use super::results::PyMoneyEstimate;
 use super::time_grid::PyTimeGrid;
 use crate::bindings::core::currency::extract_currency;
 use crate::errors::core_to_py;
 use finstack_monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_monte_carlo::pricer::european::EuropeanPricer;
-use finstack_monte_carlo::registry;
+use finstack_monte_carlo::registry::{self, PythonBindingDefaults};
 use pyo3::prelude::*;
 use std::str::FromStr;
+
+/// Resolve the embedded Python-binding defaults, mapping registry errors to
+/// Python exceptions.
+pub(super) fn py_mc_defaults() -> PyResult<&'static PythonBindingDefaults> {
+    registry::embedded_defaults()
+        .map(|defaults| &defaults.python_bindings)
+        .map_err(core_to_py)
+}
 
 /// The core Monte Carlo engine for full control over simulation.
 #[pyclass(name = "McEngine", module = "finstack.monte_carlo", frozen)]
@@ -33,18 +41,16 @@ impl PyMcEngine {
         time_grid: &PyTimeGrid,
         seed: Option<u64>,
         use_parallel: Option<bool>,
-    ) -> Self {
-        let defaults = &registry::embedded_defaults_or_panic()
-            .python_bindings
-            .engine;
+    ) -> PyResult<Self> {
+        let defaults = &py_mc_defaults()?.engine;
         let seed = seed.unwrap_or(defaults.seed);
         let use_parallel = use_parallel.unwrap_or(defaults.use_parallel);
         let config =
             McEngineConfig::new(num_paths, time_grid.inner.clone()).with_parallel(use_parallel);
-        Self {
+        Ok(Self {
             inner: McEngine::new(config),
             seed,
-        }
+        })
     }
 
     /// Price a European call under GBM.
@@ -59,7 +65,7 @@ impl PyMcEngine {
         div_yield: f64,
         vol: f64,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
         py.detach(|| {
             price_european_gbm(
@@ -74,7 +80,7 @@ impl PyMcEngine {
                 ccy,
             )
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
@@ -90,7 +96,7 @@ impl PyMcEngine {
         div_yield: f64,
         vol: f64,
         currency: Option<&Bound<'_, PyAny>>,
-    ) -> PyResult<PyMonteCarloResult> {
+    ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
         py.detach(|| {
             price_european_gbm(
@@ -105,7 +111,7 @@ impl PyMcEngine {
                 ccy,
             )
         })
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
     }
 
@@ -181,9 +187,7 @@ pub(super) fn resolve_currency(
     match currency {
         Some(obj) => extract_currency(obj),
         None => {
-            let default_currency = &registry::embedded_defaults_or_panic()
-                .python_bindings
-                .default_currency;
+            let default_currency = &py_mc_defaults()?.default_currency;
             finstack_core::currency::Currency::from_str(default_currency).map_err(|e| {
                 crate::errors::value_error(format!("Failed to resolve default currency: {e}"))
             })
@@ -207,10 +211,8 @@ fn price_european_call(
     seed: Option<u64>,
     num_steps: Option<usize>,
     currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyMonteCarloResult> {
-    let defaults = &registry::embedded_defaults_or_panic()
-        .python_bindings
-        .european_pricer;
+) -> PyResult<PyMoneyEstimate> {
+    let defaults = &py_mc_defaults()?.european_pricer;
     let num_paths = num_paths.unwrap_or(defaults.num_paths);
     let seed = seed.unwrap_or(defaults.seed);
     let num_steps = num_steps.unwrap_or(defaults.num_steps);
@@ -219,7 +221,7 @@ fn price_european_call(
         .with_seed(seed)
         .with_parallel(defaults.use_parallel);
     py.detach(|| pricer.price_gbm_call(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy))
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
 }
 
@@ -239,10 +241,8 @@ fn price_european_put(
     seed: Option<u64>,
     num_steps: Option<usize>,
     currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyMonteCarloResult> {
-    let defaults = &registry::embedded_defaults_or_panic()
-        .python_bindings
-        .european_pricer;
+) -> PyResult<PyMoneyEstimate> {
+    let defaults = &py_mc_defaults()?.european_pricer;
     let num_paths = num_paths.unwrap_or(defaults.num_paths);
     let seed = seed.unwrap_or(defaults.seed);
     let num_steps = num_steps.unwrap_or(defaults.num_steps);
@@ -251,7 +251,7 @@ fn price_european_put(
         .with_seed(seed)
         .with_parallel(defaults.use_parallel);
     py.detach(|| pricer.price_gbm_put(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy))
-        .map(PyMonteCarloResult::from_inner)
+        .map(PyMoneyEstimate::from_inner)
         .map_err(core_to_py)
 }
 
@@ -273,16 +273,14 @@ fn price_heston(
     seed: Option<u64>,
     num_steps: Option<usize>,
     currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyMonteCarloResult> {
+) -> PyResult<PyMoneyEstimate> {
     use finstack_monte_carlo::discretization::QeHeston;
     use finstack_monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
     use finstack_monte_carlo::process::heston::HestonProcess;
     use finstack_monte_carlo::rng::philox::PhiloxRng;
     use finstack_monte_carlo::time_grid::TimeGrid;
 
-    let defaults = &registry::embedded_defaults_or_panic()
-        .python_bindings
-        .european_pricer;
+    let defaults = &py_mc_defaults()?.european_pricer;
     let num_paths = num_paths.unwrap_or(defaults.num_paths);
     let seed = seed.unwrap_or(defaults.seed);
     let num_steps = num_steps.unwrap_or(defaults.num_steps);
@@ -322,7 +320,7 @@ fn price_heston(
             )
         }
     })
-    .map(PyMonteCarloResult::from_inner)
+    .map(PyMoneyEstimate::from_inner)
     .map_err(core_to_py)
 }
 
@@ -345,7 +343,7 @@ fn price_heston_call(
     seed: Option<u64>,
     num_steps: Option<usize>,
     currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyMonteCarloResult> {
+) -> PyResult<PyMoneyEstimate> {
     price_heston(
         py, true, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry,
         num_paths, seed, num_steps, currency,
@@ -371,7 +369,7 @@ fn price_heston_put(
     seed: Option<u64>,
     num_steps: Option<usize>,
     currency: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyMonteCarloResult> {
+) -> PyResult<PyMoneyEstimate> {
     price_heston(
         py, false, spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry,
         num_paths, seed, num_steps, currency,

@@ -504,12 +504,11 @@ impl ConvertibleBondValuator {
                 let required_fraction =
                     trigger.required_days_above as f64 / trigger.observation_days.max(1) as f64;
 
-                // BGK β = −ζ(1/2) / √(2π). Kept numerically identical to
-                // `finstack_monte_carlo::barriers::corrections::GOBET_MIRI_BETA`
-                // but defined locally to keep this heuristic independent of
-                // the MC module layout. Scaled by `required_fraction` for the
+                // BGK β = −ζ(1/2) / √(2π), taken from the canonical
+                // definition in the MC crate so the analytical and MC stacks
+                // cannot drift apart. Scaled by `required_fraction` for the
                 // sustained observation requirement (heuristic extension).
-                const BGK_BETA: f64 = 0.582_597_157_939_010_6;
+                const BGK_BETA: f64 = finstack_monte_carlo::barriers::corrections::GOBET_MIRI_BETA;
                 let adj = BGK_BETA * required_fraction * self.volatility * window_years.sqrt();
                 let effective_trigger = nominal_trigger * (1.0 + adj);
 

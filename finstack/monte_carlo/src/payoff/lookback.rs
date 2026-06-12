@@ -149,6 +149,10 @@ impl Payoff for Lookback {
     fn reset(&mut self) {
         self.extreme_spot = self.initial_extreme;
     }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
+    }
 }
 
 /// Floating strike lookback call.
@@ -223,6 +227,10 @@ impl Payoff for FloatingStrikeLookbackCall {
         self.terminal_spot = 0.0;
         self.min_spot = self.initial_min;
     }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
+    }
 }
 
 /// Floating strike lookback put.
@@ -295,6 +303,10 @@ impl Payoff for FloatingStrikeLookbackPut {
     fn reset(&mut self) {
         self.terminal_spot = 0.0;
         self.max_spot = self.initial_max;
+    }
+
+    fn max_event_step(&self) -> Option<usize> {
+        Some(self.maturity_step)
     }
 }
 

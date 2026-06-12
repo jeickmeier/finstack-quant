@@ -194,9 +194,13 @@ impl LmmParams {
 ///
 /// The process uses the terminal measure (`T_N`) numeraire convention.
 /// [`populate_path_state`](StochasticProcess::populate_path_state) stores
-/// each forward rate as `indexed_spot(i)` and additionally computes the
-/// numeraire `P(t, T_N) / P(0, T_N)` from the current forwards (stored
-/// under `"lmm_numeraire"`).
+/// each forward rate as `indexed_spot(i)` and additionally stores, under
+/// `"lmm_numeraire"`, the product `Π_{j ≥ first_alive} 1/(1 + τ_j F_j)` —
+/// i.e. `P(t, T_N) / P(t, T_{first_alive})`, **not** `P(t, T_N)` itself:
+/// the stub discount over `[t, T_{first_alive})` is omitted (and nothing
+/// divides by `P(0, T_N)`). Consumers must either evaluate only at tenor
+/// dates where the stub is empty, or — like the Bermudan LSMC pricer —
+/// form ratios in which the common `T_{first_alive}` reference cancels.
 #[derive(Debug, Clone)]
 pub struct LmmProcess {
     /// Model parameters.
