@@ -5,7 +5,20 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 /// Convert a Python `datetime.date` to a Rust [`time::Date`].
+///
+/// Accepts any object exposing integer `year`/`month`/`day` attributes
+/// (`datetime.date`, `datetime.datetime`, `pandas.Timestamp`, …). Timezone
+/// information is ignored: a tz-aware timestamp contributes its wall-clock
+/// calendar date with no conversion.
 pub fn py_to_date(obj: &Bound<'_, PyAny>) -> PyResult<time::Date> {
+    if !(obj.hasattr("year")? && obj.hasattr("month")? && obj.hasattr("day")?) {
+        return Err(pyo3::exceptions::PyTypeError::new_err(format!(
+            "expected a date-like object with year/month/day attributes \
+             (datetime.date, datetime.datetime, or pandas.Timestamp), \
+             got {}; parse strings with datetime.date.fromisoformat() first",
+            obj.get_type().name()?
+        )));
+    }
     let year: i32 = obj.getattr("year")?.extract()?;
     let month: u8 = obj.getattr("month")?.extract()?;
     let day: u8 = obj.getattr("day")?.extract()?;

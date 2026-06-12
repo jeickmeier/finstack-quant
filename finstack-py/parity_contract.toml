@@ -111,8 +111,22 @@ correlation  = { python = "finstack.valuations.correlation", status = "exists", 
 drawdown     = { python = "finstack.analytics", status = "flattened", note = "Reachable via Performance.max_drawdown / .mean_drawdown / .drawdown_series / .drawdown_details" }
 lookback     = { python = "finstack.analytics", status = "flattened", note = "Reachable via Performance.lookback_returns" }
 performance  = { python = "finstack.analytics", status = "flattened", note = "Performance class is the sole entry point on finstack.analytics" }
-returns      = { python = "finstack.analytics", status = "flattened", note = "Reachable via Performance constructors (prices) / Performance.from_returns" }
+returns      = { python = "finstack.analytics", status = "flattened", note = "Reachable via Performance constructors (prices) / Performance.from_returns. Naming exception: Python Performance.from_returns takes a DataFrame; the Rust-shaped (dates, returns, ticker_names) constructor is Performance.from_returns_arrays" }
 risk_metrics = { python = "finstack.analytics", status = "flattened", note = "Reachable via Performance scalar methods (CAGR/Sharpe/Sortino/VaR/etc.)" }
+
+[crates.analytics.symbols]
+public = [
+    "AnalyticsError",
+    "BetaResult",
+    "DatedSeries",
+    "DrawdownEpisode",
+    "GreeksResult",
+    "LookbackReturns",
+    "MultiFactorResult",
+    "Performance",
+    "PeriodStats",
+    "RollingGreeks",
+]
 
 # ---------------------------------------------------------------------------
 # finstack-cashflows  →  finstack.cashflows

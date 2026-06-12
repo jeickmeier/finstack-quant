@@ -85,8 +85,12 @@ fn build_perf() -> WasmPerformance {
 #[wasm_bindgen_test]
 fn from_returns_exposes_active_dates() {
     let perf = build_perf();
+    // `dates()` is the full constructed grid; `activeDates()` matches it
+    // until a window is set.
     let dates = perf.dates();
     assert_eq!(dates.len(), fixture().dates.len());
+    let active = perf.active_dates();
+    assert_eq!(active, dates);
 }
 
 #[wasm_bindgen_test]
@@ -231,7 +235,9 @@ fn multi_factor_greeks_resolves_to_struct() {
 #[wasm_bindgen_test]
 fn lookback_returns_emit_mtd_qtd_ytd() {
     let perf = build_perf();
-    let raw = perf.lookback_returns("2025-01-12", None).unwrap();
+    let raw = perf
+        .lookback_returns("2025-01-12", None, None, None)
+        .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert_eq!(value["mtd"].as_array().unwrap().len(), 2);
     assert_eq!(value["qtd"].as_array().unwrap().len(), 2);
@@ -242,7 +248,7 @@ fn lookback_returns_emit_mtd_qtd_ytd() {
 fn period_stats_emit_win_rate() {
     let perf = build_perf();
     let raw = perf
-        .period_stats(0, Some("weekly".to_string()), None)
+        .period_stats(0, Some("weekly".to_string()), None, None)
         .unwrap();
     let value: serde_json::Value = serde_wasm_bindgen::from_value(raw).unwrap();
     assert!(value["win_rate"].as_f64().is_some());
@@ -253,10 +259,13 @@ fn period_stats_emit_win_rate() {
 #[wasm_bindgen_test]
 fn reset_date_range_narrows_active_dates() {
     let mut perf = build_perf();
+    let full_len = perf.dates().len();
     perf.reset_date_range("2025-01-05", "2025-01-10").unwrap();
-    let dates = perf.dates();
-    assert!(dates.first().map(String::as_str) == Some("2025-01-05"));
-    assert!(dates.last().map(String::as_str) == Some("2025-01-10"));
+    let active = perf.active_dates();
+    assert!(active.first().map(String::as_str) == Some("2025-01-05"));
+    assert!(active.last().map(String::as_str) == Some("2025-01-10"));
+    // `dates()` keeps Rust semantics: the full constructed grid.
+    assert_eq!(perf.dates().len(), full_len);
 }
 
 #[wasm_bindgen_test]

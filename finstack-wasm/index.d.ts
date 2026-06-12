@@ -450,14 +450,30 @@ export interface PeriodStats {
   kelly_criterion: number;
 }
 
-/** Dated rolling result returned by per-ticker rolling analytics. */
+/**
+ * Dated rolling result returned by per-ticker rolling analytics.
+ *
+ * Exactly one metric-named key (`sharpe`, `sortino`, `volatility`, or
+ * `return`) is present, matching the method that produced the series.
+ */
 export interface DatedSeries {
   dates: string[];
-  values?: Float64Array;
   sharpe?: Float64Array;
   sortino?: Float64Array;
   volatility?: Float64Array;
   return?: Float64Array;
+}
+
+/** Per-asset skewness/kurtosis pair returned by `skewKurt`. */
+export interface SkewKurtResult {
+  skewness: Float64Array;
+  kurtosis: Float64Array;
+}
+
+/** Per-asset VaR/ES pair returned by `valueAtRiskAndEs`. */
+export interface VarEsResult {
+  value_at_risk: Float64Array;
+  expected_shortfall: Float64Array;
 }
 
 /** OLS beta result with standard error and 95% confidence interval. */
@@ -533,8 +549,10 @@ export declare class Performance {
   tickerNames(): string[];
   benchmarkIdx(): number;
   freq(): string;
-  /** Active observation dates as ISO date strings. */
+  /** Full return-aligned date grid as ISO date strings (independent of any active window). */
   dates(): string[];
+  /** Dates of the currently active analysis window as ISO date strings. */
+  activeDates(): string[];
   cagr(): Float64Array;
   meanReturn(annualize?: boolean): Float64Array;
   volatility(annualize?: boolean): Float64Array;
@@ -550,6 +568,10 @@ export declare class Performance {
   skewness(): Float64Array;
   kurtosis(): Float64Array;
   geometricMean(): Float64Array;
+  /** Skewness and kurtosis from one moments pass per asset. */
+  skewKurt(): SkewKurtResult;
+  /** Historical VaR and expected shortfall from one tail pass per asset. */
+  valueAtRiskAndEs(confidence?: number): VarEsResult;
   downsideDeviation(mar?: number): Float64Array;
   maxDrawdownDuration(): number[];
   upCapture(): Float64Array;
@@ -588,8 +610,23 @@ export declare class Performance {
   rollingReturns(tickerIdx: number, window: number): DatedSeries;
   drawdownDetails(tickerIdx: number, n?: number): DrawdownEpisode[];
   multiFactorGreeks(tickerIdx: number, factorReturns: NumericMatrix): MultiFactorResult;
-  lookbackReturns(refDate: string, fiscalYearStartMonth?: number): LookbackReturns;
-  periodStats(tickerIdx: number, aggFreq?: string, fiscalYearStartMonth?: number): PeriodStats;
+  /**
+   * Period-to-date lookback returns. The FYTD window starts at the fiscal-year
+   * start adjusted to the next business day on `calendar` (default `"nyse"`);
+   * pass the calendar id matching your market for non-US panels.
+   */
+  lookbackReturns(
+    refDate: string,
+    fiscalYearStartMonth?: number,
+    fiscalYearStartDay?: number,
+    calendar?: string
+  ): LookbackReturns;
+  periodStats(
+    tickerIdx: number,
+    aggFreq?: string,
+    fiscalYearStartMonth?: number,
+    fiscalYearStartDay?: number
+  ): PeriodStats;
   /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
   free(): void;
 }

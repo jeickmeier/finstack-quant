@@ -789,6 +789,11 @@ pub(crate) fn sterling_ratio(cagr_val: f64, avg_dd: f64, risk_free_rate: f64) ->
 ///
 /// where `dd_i` are the max-drawdown depths of the top-N episodes.
 ///
+/// **Convention:** this is the *modified* Burke ratio, which divides by the
+/// RMS (`1/n` inside the root). The original Burke (1994) formulation — and
+/// R `PerformanceAnalytics`' default — uses `sqrt(Σ dd_i²)` without the
+/// `1/n`, so cross-tool comparisons will differ by a factor of `sqrt(n)`.
+///
 /// # Arguments
 ///
 /// * `cagr_val`       - Compound annual growth rate.

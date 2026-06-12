@@ -116,6 +116,14 @@ impl Performance {
     /// configured on this [`Performance`] instance, and uses the supplied
     /// minimum acceptable return.
     ///
+    /// # Arguments
+    ///
+    /// * `mar` - Minimum acceptable return **per period** (decimal), e.g. a
+    ///   monthly threshold for monthly data. Note this differs from
+    ///   [`Self::sharpe`], whose `risk_free_rate` is **annualized**: passing
+    ///   the same number to both compares different things. De-annualize an
+    ///   annual target with `(1 + annual)^(1/periods_per_year) - 1` first.
+    ///
     /// # Returns
     ///
     /// One Sortino ratio per ticker in column order. May return `±∞` for

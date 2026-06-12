@@ -17,6 +17,8 @@ from __future__ import annotations
 import datetime
 from typing import Sequence
 
+import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 __all__ = [
@@ -88,7 +90,7 @@ class PeriodStats:
 
     @property
     def cpc_ratio(self) -> float:
-        """Common-sense ratio (CPC)."""
+        """CPC index (profit_factor x win_rate x payoff_ratio)."""
 
     @property
     def kelly_criterion(self) -> float:
@@ -141,15 +143,16 @@ class GreeksResult:
 class RollingGreeks:
     """Rolling alpha and beta time series."""
 
+    @property
     def dates(self) -> list[datetime.date]:
         """Date labels for each rolling window."""
 
     @property
-    def alphas(self) -> list[float]:
+    def alphas(self) -> npt.NDArray[np.float64]:
         """Rolling alpha values."""
 
     @property
-    def betas(self) -> list[float]:
+    def betas(self) -> npt.NDArray[np.float64]:
         """Rolling beta values."""
 
     def to_dataframe(self) -> pd.DataFrame:
@@ -166,7 +169,7 @@ class MultiFactorResult:
         """Intercept (alpha)."""
 
     @property
-    def betas(self) -> list[float]:
+    def betas(self) -> npt.NDArray[np.float64]:
         """Factor betas."""
 
     @property
@@ -186,12 +189,15 @@ class MultiFactorResult:
 class DrawdownEpisode:
     """A single drawdown episode with timing and depth information."""
 
+    @property
     def start(self) -> datetime.date:
         """Start date of the drawdown."""
 
+    @property
     def valley(self) -> datetime.date:
         """Date of the maximum drawdown within this episode."""
 
+    @property
     def end(self) -> datetime.date | None:
         """Recovery date (``None`` if still in drawdown)."""
 
@@ -217,19 +223,19 @@ class LookbackReturns:
     """Period-to-date returns for each ticker."""
 
     @property
-    def mtd(self) -> list[float]:
+    def mtd(self) -> npt.NDArray[np.float64]:
         """Month-to-date returns per ticker."""
 
     @property
-    def qtd(self) -> list[float]:
+    def qtd(self) -> npt.NDArray[np.float64]:
         """Quarter-to-date returns per ticker."""
 
     @property
-    def ytd(self) -> list[float]:
+    def ytd(self) -> npt.NDArray[np.float64]:
         """Year-to-date returns per ticker."""
 
     @property
-    def fytd(self) -> list[float] | None:
+    def fytd(self) -> npt.NDArray[np.float64] | None:
         """Fiscal-year-to-date returns when a fiscal config is provided."""
 
     def to_dataframe(self, ticker_names: list[str]) -> pd.DataFrame:
@@ -249,9 +255,10 @@ class DatedSeries:
     """
 
     @property
-    def values(self) -> list[float]:
+    def values(self) -> npt.NDArray[np.float64]:
         """Rolling values, one per window."""
 
+    @property
     def dates(self) -> list[datetime.date]:
         """Window-end dates aligned 1:1 with :attr:`values`."""
 
@@ -350,7 +357,10 @@ class Performance:
         """Observation frequency as the canonical lowercase token."""
 
     def dates(self) -> list[datetime.date]:
-        """Active observation dates after any window filter."""
+        """Full return-aligned date grid (independent of any active window)."""
+
+    def active_dates(self) -> list[datetime.date]:
+        """Observation dates of the currently active analysis window."""
 
     # -- Scalar-per-ticker methods --
 
@@ -406,6 +416,15 @@ class Performance:
 
     def geometric_mean(self) -> list[float]:
         """Geometric mean for each ticker."""
+
+    def skew_kurt(self) -> tuple[list[float], list[float]]:
+        """Per-ticker ``(skewness, kurtosis)`` from one moments pass."""
+
+    def value_at_risk_and_es(
+        self,
+        confidence: float = 0.95,
+    ) -> tuple[list[float], list[float]]:
+        """Per-ticker ``(value_at_risk, expected_shortfall)`` from one tail pass."""
 
     def downside_deviation(self, mar: float = 0.0) -> list[float]:
         """Downside deviation for each ticker."""
@@ -562,13 +581,19 @@ class Performance:
         self,
         ref_date: object,
         fiscal_year_start_month: int | None = None,
+        fiscal_year_start_day: int | None = None,
+        calendar: str = "nyse",
     ) -> LookbackReturns:
         """Period-to-date lookback returns.
 
-        Uses ``1`` (January) as the default fiscal-year start month.
+        Defaults to a January-1 fiscal-year start. The FYTD window start is
+        adjusted to the next business day on *calendar* (default ``"nyse"``);
+        pass the calendar id matching your market for non-US panels.
 
         Raises:
-            ValueError: If *fiscal_year_start_month* is not in ``1..=12``.
+            ValueError: If *fiscal_year_start_month* is not in ``1..=12``,
+                *fiscal_year_start_day* is not in ``1..=31``, or *calendar*
+                is not a registered calendar id.
         """
 
     def period_stats(
@@ -576,11 +601,13 @@ class Performance:
         ticker_idx: int,
         agg_freq: str = "monthly",
         fiscal_year_start_month: int | None = None,
+        fiscal_year_start_day: int | None = None,
     ) -> PeriodStats:
         """Period statistics for one ticker at a given aggregation frequency.
 
         Raises:
-            ValueError: If *fiscal_year_start_month* is not in ``1..=12``.
+            ValueError: If *fiscal_year_start_month* is not in ``1..=12`` or
+                *fiscal_year_start_day* is not in ``1..=31``.
         """
 
     # -- DataFrame export methods --
@@ -590,7 +617,13 @@ class Performance:
         risk_free_rate: float = 0.0,
         confidence: float = 0.95,
     ) -> pd.DataFrame:
-        """Summary statistics for all tickers as a pandas DataFrame."""
+        """Summary statistics for all tickers as a pandas DataFrame.
+
+        *risk_free_rate* affects only the ``sharpe`` column; the MAR-based
+        metrics (``sortino``, ``downside_deviation``) and the ``omega_ratio``
+        threshold are fixed at ``0.0``. *confidence* applies to
+        ``value_at_risk``, ``expected_shortfall``, and ``tail_ratio``.
+        """
         ...
 
     def cumulative_returns_to_dataframe(self) -> pd.DataFrame:
@@ -621,13 +654,18 @@ class Performance:
         self,
         ref_date: object,
         fiscal_year_start_month: int | None = None,
+        fiscal_year_start_day: int | None = None,
+        calendar: str = "nyse",
     ) -> pd.DataFrame:
         """Period-to-date lookback returns as a pandas DataFrame.
 
         Indexed by ticker name with columns ``mtd``, ``qtd``, ``ytd``,
-        and ``fytd``.
+        and ``fytd``. See :meth:`lookback_returns` for the FYTD fiscal-start
+        and *calendar* semantics (default ``"nyse"``).
 
         Raises:
-            ValueError: If *fiscal_year_start_month* is not in ``1..=12``.
+            ValueError: If *fiscal_year_start_month* is not in ``1..=12``,
+                *fiscal_year_start_day* is not in ``1..=31``, or *calendar*
+                is not a registered calendar id.
         """
         ...

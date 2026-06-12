@@ -189,7 +189,7 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Returns [`crate::error::InputError::Invalid`] when:
+    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when:
     ///
     /// * `prices` or `dates` is empty.
     /// * `ticker_names.len() != prices.len()`.

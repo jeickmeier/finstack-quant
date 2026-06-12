@@ -180,8 +180,13 @@ def test_contract_symbols_match_live_surface(crate_name: str, crate: dict[str, A
     a contract entry that no longer exists in Python.
     """
     expected = set(crate["symbols"]["public"])
+    # Only count module entries that live inside this crate's own package;
+    # cross-package homes (e.g. analytics' correlation module surfacing under
+    # finstack.valuations.correlation) are not part of this surface.
     expected_all = expected | {
-        spec["python"].rsplit(".", 1)[-1] for spec in crate.get("modules", {}).values() if spec["status"] == "exists"
+        spec["python"].rsplit(".", 1)[-1]
+        for spec in crate.get("modules", {}).values()
+        if spec["status"] == "exists" and spec["python"].startswith(crate["python_package"] + ".")
     }
     module = importlib.import_module(crate["python_package"])
     module_all = set(getattr(module, "__all__", []))

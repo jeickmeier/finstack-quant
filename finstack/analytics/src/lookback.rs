@@ -168,8 +168,15 @@ fn fiscal_year_start_date(ref_date: Date, fiscal_config: FiscalConfig) -> Date {
     } else {
         fy - 1
     };
-    crate::dates::create_date(calendar_year, fy_start_month, fiscal_config.start_day)
-        .unwrap_or(ref_date)
+    // `FiscalConfig` accepts start_day 1..=31 regardless of month length;
+    // clamp to the last valid day of the start month (matching the overflow
+    // semantics of `DateExt::fiscal_year`, where "Feb 30" means the last day
+    // of February) so the construction below cannot fail and silently fall
+    // back to `ref_date`.
+    let start_day = fiscal_config
+        .start_day
+        .min(fy_start_month.length(calendar_year));
+    crate::dates::create_date(calendar_year, fy_start_month, start_day).unwrap_or(ref_date)
 }
 
 #[cfg(test)]
@@ -219,6 +226,21 @@ mod tests {
         let range = fytd_select(&dates, d(2025, 1, 15), config, nyse())
             .expect("calendar-adjusted FYTD range");
         assert_eq!(range.start, 0);
+    }
+
+    #[test]
+    fn fiscal_start_day_exceeding_month_length_clamps_to_month_end() {
+        // "Feb 30" fiscal start means "last day of February" (matching
+        // `DateExt::fiscal_year` overflow semantics). Before the clamp this
+        // silently degenerated to a single-observation FYTD window anchored
+        // at `ref_date`.
+        let config = FiscalConfig::new(2, 30).expect("config accepts day 30");
+        let start = fiscal_year_start_date(d(2025, 6, 15), config);
+        assert_eq!(start, d(2025, 2, 28));
+
+        // Leap year: clamps to Feb 29.
+        let start_leap = fiscal_year_start_date(d(2024, 6, 15), config);
+        assert_eq!(start_leap, d(2024, 2, 29));
     }
 
     #[test]

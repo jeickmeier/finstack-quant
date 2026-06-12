@@ -188,6 +188,7 @@ pub struct PyRollingGreeks {
 #[pymethods]
 impl PyRollingGreeks {
     /// Date labels for each rolling window.
+    #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         self.inner
             .dates
@@ -280,14 +281,17 @@ pub struct PyDrawdownEpisode {
 #[pymethods]
 impl PyDrawdownEpisode {
     /// Start date of the drawdown.
+    #[getter]
     fn start<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.start)
     }
     /// Date of the maximum drawdown within this episode.
+    #[getter]
     fn valley<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.valley)
     }
     /// Recovery date (``None`` if still in drawdown).
+    #[getter]
     fn end<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
         match self.inner.end {
             Some(d) => date_to_py(py, d).map(Some),
@@ -417,6 +421,7 @@ impl PyDatedSeries {
         slice_to_pyarray(py, &self.inner.values)
     }
     /// Window-end dates aligned 1:1 with [`values`](Self::values).
+    #[getter]
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         self.inner
             .dates

@@ -202,6 +202,8 @@ pub(crate) fn information_ratio(
 /// # Returns
 ///
 /// R-squared in `[0, 1]`. Returns `0.0` for empty or zero-variance series.
+/// Mismatched lengths are truncated to the shorter series, matching the
+/// convention of [`tracking_error`], [`beta`], and [`greeks`].
 ///
 /// # Examples
 ///
@@ -215,7 +217,8 @@ pub(crate) fn information_ratio(
 /// ```
 #[must_use]
 pub(crate) fn r_squared(returns: &[f64], benchmark: &[f64]) -> f64 {
-    let c = correlation(returns, benchmark);
+    let n = returns.len().min(benchmark.len());
+    let c = correlation(&returns[..n], &benchmark[..n]);
     c * c
 }
 
@@ -275,7 +278,10 @@ fn beta_ci_critical_value(sample_size: usize) -> f64 {
         35 => 2.030_107_928_250_343,
         36 => 2.028_094_000_980_451,
         37 => 2.026_192_463_029_109_3,
-        38..=59 => 2.021_075_390_306_273_3,
+        // Anchor at df = 38 (not 40) so the whole bucket is conservative:
+        // t is decreasing in df, so the bucket's smallest df needs the
+        // largest critical value.
+        38..=59 => 2.024_394_164_575_136,
         60..=119 => 2.000_297_821_058_262,
         120..=239 => 1.979_930_405_052_777,
         _ => 1.959_963_984_540_054,
@@ -302,14 +308,15 @@ fn beta_ci_critical_value(sample_size: usize) -> f64 {
 /// | `n − 2`     | Critical value                                |
 /// |-------------|-----------------------------------------------|
 /// | `1..=37`    | exact Student's t at that df                  |
-/// | `38..=59`   | `2.021` (t at df = 40, used as a step-down)   |
+/// | `38..=59`   | `2.024` (t at df = 38, used as a step-down)   |
 /// | `60..=119`  | `2.000` (t at df = 60)                        |
 /// | `120..=239` | `1.980` (t at df = 120)                       |
 /// | `≥ 240`     | `1.96`  (asymptotic normal)                   |
 ///
-/// This is conservative for `38 ≤ n − 2 < 240` (intervals are slightly wider
-/// than the exact t critical), and converges to the normal approximation only
-/// for very large samples.
+/// Each bucket is anchored at its *smallest* df (the largest t value in the
+/// bucket), so intervals are conservative — never narrower than the exact t
+/// critical — for `38 ≤ n − 2 < 240`. The `≥ 240` regime uses the asymptotic
+/// normal value, which is up to ~0.5% narrower than the exact t at df = 240.
 ///
 /// Requires at least 3 observations; returns `NaN` for standard error and
 /// CI bounds when `n < 3`.
@@ -322,7 +329,8 @@ fn beta_ci_critical_value(sample_size: usize) -> f64 {
 /// # Returns
 ///
 /// A [`BetaResult`] with `beta`, `std_err`, `ci_lower`, and `ci_upper`.
-/// All fields are `NAN` when the series are too short (`n < 3`).
+/// All fields are `NAN` when the series are too short (`n < 3`) or the
+/// benchmark has zero variance (the slope is unidentifiable).
 ///
 /// # Examples
 ///
@@ -351,7 +359,14 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
     for i in 0..n {
         oc.update(portfolio[i], benchmark[i]);
     }
-    let beta = oc.optimal_beta();
+    // A zero-variance benchmark cannot identify a slope: surface NaN
+    // (matching `beta_only` / `greeks` / `rolling_greeks`) rather than the
+    // plausible-looking 0.0 the raw estimator would report.
+    let beta = if oc.variance_y() == 0.0 {
+        f64::NAN
+    } else {
+        oc.optimal_beta()
+    };
 
     // oc.mean_x() = mean(portfolio), oc.mean_y() = mean(benchmark)
     let mean_port = oc.mean_x();
@@ -387,8 +402,11 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
 /// correlation, and adjusted-R² arithmetic. Used by callers (e.g. Treynor)
 /// that need only the slope and otherwise pay for unused outputs.
 ///
-/// Returns `0.0` for empty inputs (matching the [`greeks`] sentinel) and the
-/// running `OnlineCovariance::optimal_beta()` value otherwise.
+/// Returns `0.0` for empty inputs (matching the [`greeks`] sentinel) and
+/// [`f64::NAN`] for a zero-variance benchmark, where the regression cannot
+/// identify a slope — matching the [`rolling_greeks`] degenerate-window
+/// sentinel. A `NaN` beta propagates through downstream ratios (e.g.
+/// Treynor) instead of producing a plausible-looking `0.0` or `±∞`.
 #[must_use]
 pub(crate) fn beta_only(returns: &[f64], benchmark: &[f64]) -> f64 {
     let n = returns.len().min(benchmark.len());
@@ -398,6 +416,9 @@ pub(crate) fn beta_only(returns: &[f64], benchmark: &[f64]) -> f64 {
     let mut oc = OnlineCovariance::new();
     for i in 0..n {
         oc.update(returns[i], benchmark[i]);
+    }
+    if oc.variance_y() == 0.0 {
+        return f64::NAN;
     }
     oc.optimal_beta()
 }
@@ -433,8 +454,10 @@ pub struct GreeksResult {
 /// # Returns
 ///
 /// A [`GreeksResult`] with `alpha` (annualized), `beta`, `r_squared`, and
-/// `adjusted_r_squared`. Returns zeros for empty or zero-variance benchmark
-/// series.
+/// `adjusted_r_squared`. Returns zeros for empty inputs. For a zero-variance
+/// benchmark the regression cannot identify a slope, so `alpha` and `beta`
+/// are [`f64::NAN`] (matching the [`rolling_greeks`] degenerate-window
+/// sentinel) while `r_squared` / `adjusted_r_squared` remain `0.0`.
 ///
 /// # Examples
 ///
@@ -461,7 +484,11 @@ pub(crate) fn greeks(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> Gre
     for i in 0..n {
         oc.update(returns[i], benchmark[i]);
     }
-    let beta = oc.optimal_beta();
+    let beta = if oc.variance_y() == 0.0 {
+        f64::NAN
+    } else {
+        oc.optimal_beta()
+    };
     let alpha = (oc.mean_x() - beta * oc.mean_y()) * ann_factor;
     let c = oc.correlation();
     let r_squared = c * c;
@@ -508,9 +535,11 @@ pub struct RollingGreeks {
 ///
 /// A [`RollingGreeks`] with `dates`, `alphas`, and `betas` of equal length.
 /// Returns empty vectors if `window` is zero or exceeds the series length.
-/// Non-finite input values are propagated through the output as sentinel
-/// `NaN` values; use [`multi_factor_greeks`] when strict regression input
-/// validation is required.
+/// Windows containing a non-finite input emit sentinel `NaN` values; windows
+/// consisting only of finite data are unaffected (the kernel recomputes its
+/// running sums as soon as a non-finite value exits the window). Use
+/// [`multi_factor_greeks`] when strict regression input validation is
+/// required.
 ///
 /// # Examples
 ///
@@ -594,7 +623,15 @@ pub(crate) fn rolling_greeks(
             compensated_add(&mut srb, &mut csrb, new_r * new_b - old_r * old_b);
             compensated_add(&mut sb2, &mut csb2, new_b * new_b - old_b * old_b);
             steps_since_recompute += 1;
-            if steps_since_recompute >= ROLLING_GREEKS_RECOMPUTE_INTERVAL {
+            // A non-finite value entering or leaving the window poisons the
+            // running sums permanently (`x − NaN = NaN`), so recompute
+            // immediately whenever any sum is non-finite. Windows that still
+            // contain the non-finite value recompute to NaN (and emit NaN);
+            // the first all-finite window after it exits recovers exact sums
+            // instead of staying NaN until the next scheduled recompute.
+            let sums_non_finite =
+                !(sr.is_finite() && sb.is_finite() && srb.is_finite() && sb2.is_finite());
+            if sums_non_finite || steps_since_recompute >= ROLLING_GREEKS_RECOMPUTE_INTERVAL {
                 let start = i + 1 - window;
                 (sr, sb, srb, sb2) =
                     recompute_rolling_greeks_sums(&returns[start..=i], &benchmark[start..=i]);
@@ -1136,11 +1173,13 @@ mod tests {
             .map(|(i, &b)| 1.4 * b + if i % 2 == 0 { 0.002 } else { -0.0015 })
             .collect();
         let result = beta(&y, &x);
-        let expected_t_critical_df40 = 2.021_075_390_306_273_3_f64;
+        // n = 42 → df = 40; bucket is anchored at its smallest df (38) so the
+        // interval is conservative for every df in 38..=59.
+        let expected_t_critical_df38 = 2.024_394_164_575_136_f64;
         let actual_half_width = result.ci_upper - result.beta;
 
         assert!(
-            (actual_half_width - expected_t_critical_df40 * result.std_err).abs() < 1e-12,
+            (actual_half_width - expected_t_critical_df38 * result.std_err).abs() < 1e-12,
             "beta CI should continue using Student-t beyond df=37"
         );
     }
@@ -1193,6 +1232,48 @@ mod tests {
             rg.betas.iter().all(|b| b.is_nan()),
             "constant benchmark window must surface as NaN beta rather than a plausible 0"
         );
+    }
+
+    #[test]
+    fn rolling_greeks_recovers_immediately_after_nan_exits_window() {
+        let window = 5;
+        let mut r: Vec<f64> = (0..30).map(|i| (i as f64 + 1.0) * 0.001).collect();
+        let b: Vec<f64> = (0..30).map(|i| i as f64 * 0.0005 + 0.001).collect();
+        r[7] = f64::NAN;
+        let dates: Vec<Date> = (1..=30).map(jan).collect();
+        let rg = rolling_greeks(&r, &b, &dates, window, 252.0);
+
+        for (k, beta) in rg.betas.iter().enumerate() {
+            // Window k covers return indices [k, k + window).
+            let contains_nan = k <= 7 && 7 < k + window;
+            if contains_nan {
+                assert!(beta.is_nan(), "window {k} contains the NaN: beta={beta}");
+            } else {
+                assert!(
+                    beta.is_finite(),
+                    "all-finite window {k} must not stay poisoned: beta={beta}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn batch_beta_functions_report_nan_for_zero_variance_benchmark() {
+        let r: Vec<f64> = (0..10).map(|i| (i as f64 + 1.0) * 0.001).collect();
+        let b = vec![0.5_f64; 10];
+
+        assert!(beta_only(&r, &b).is_nan());
+
+        let g = greeks(&r, &b, 252.0);
+        assert!(g.beta.is_nan());
+        assert!(g.alpha.is_nan());
+
+        let result = beta(&r, &b);
+        assert!(result.beta.is_nan());
+        assert!(result.std_err.is_nan());
+
+        // Treynor on an unidentifiable beta propagates NaN instead of ±∞.
+        assert!(treynor(0.10, 0.02, beta_only(&r, &b)).is_nan());
     }
 
     #[test]

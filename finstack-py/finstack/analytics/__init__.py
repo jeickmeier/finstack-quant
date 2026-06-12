@@ -5,8 +5,6 @@ Bindings for the ``finstack-analytics`` Rust crate. The sole entry point is
 inputs surfaced by `Performance` methods.
 """
 
-from __future__ import annotations
-
 from finstack.finstack import analytics as _analytics
 
 AnalyticsError = _analytics.AnalyticsError

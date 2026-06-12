@@ -37,7 +37,10 @@ pub struct PeriodStats {
     /// `0.0` when there are no wins; `+∞` when wins exist but there are no
     /// losses.
     pub profit_factor: f64,
-    /// CPC index (Common Sense Ratio): `profit_factor × win_rate × payoff_ratio`.
+    /// CPC index: `profit_factor × win_rate × payoff_ratio`.
+    ///
+    /// Not to be confused with the Common Sense Ratio
+    /// (`profit_factor × tail_ratio`), which is a different metric.
     pub cpc_ratio: f64,
     /// Kelly criterion: `win_rate − (loss_rate / payoff_ratio)`. The division
     /// binds tighter than the subtraction.

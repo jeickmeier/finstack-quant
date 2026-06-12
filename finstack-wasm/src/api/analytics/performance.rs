@@ -15,6 +15,8 @@ use super::support::{parse_f64_matrix, parse_f64_vec, parse_iso_date, parse_iso_
 
 const DEFAULT_FISCAL_START_MONTH: u8 = 1;
 const DEFAULT_FISCAL_START_DAY: u8 = 1;
+/// Default holiday calendar for FYTD fiscal-year-start alignment. Callers
+/// with non-US panels should pass an explicit calendar id instead.
 const DEFAULT_FISCAL_CALENDAR_ID: &str = "nyse";
 const DEFAULT_FREQ: &str = "daily";
 const DEFAULT_ROLLING_WINDOW: usize = 63;
@@ -36,18 +38,18 @@ fn parse_freq(freq: &str) -> Result<PeriodKind, JsValue> {
     })
 }
 
-fn make_fiscal_config(month: Option<u8>) -> Result<FiscalConfig, JsValue> {
+fn make_fiscal_config(month: Option<u8>, day: Option<u8>) -> Result<FiscalConfig, JsValue> {
     FiscalConfig::new(
         month.unwrap_or(DEFAULT_FISCAL_START_MONTH),
-        DEFAULT_FISCAL_START_DAY,
+        day.unwrap_or(DEFAULT_FISCAL_START_DAY),
     )
     .map_err(to_js_err)
 }
 
-fn resolve_fiscal_calendar() -> Result<&'static dyn HolidayCalendar, JsValue> {
+fn resolve_fiscal_calendar(calendar_id: &str) -> Result<&'static dyn HolidayCalendar, JsValue> {
     CalendarRegistry::global()
-        .resolve_str(DEFAULT_FISCAL_CALENDAR_ID)
-        .ok_or_else(|| to_js_err(format!("calendar {DEFAULT_FISCAL_CALENDAR_ID:?} not found")))
+        .resolve_str(calendar_id)
+        .ok_or_else(|| to_js_err(format!("calendar {calendar_id:?} not found")))
 }
 
 fn parse_dates(dates: JsValue) -> Result<Vec<time::Date>, JsValue> {
@@ -222,9 +224,17 @@ impl WasmPerformance {
         self.inner.freq().to_string()
     }
 
-    /// Active date grid as ISO date strings (`"YYYY-MM-DD"`).
+    /// Full return-aligned date grid as ISO date strings (`"YYYY-MM-DD"`),
+    /// independent of any active window — matches Rust `Performance::dates`.
     #[wasm_bindgen(js_name = dates)]
     pub fn dates(&self) -> Vec<String> {
+        self.inner.dates().iter().map(|&d| date_to_iso(d)).collect()
+    }
+
+    /// Date grid of the currently active analysis window as ISO date strings.
+    /// Equal to `dates()` until `resetDateRange` narrows the window.
+    #[wasm_bindgen(js_name = activeDates)]
+    pub fn active_dates(&self) -> Vec<String> {
         self.inner
             .active_dates()
             .iter()
@@ -323,6 +333,30 @@ impl WasmPerformance {
     /// Geometric mean return per asset.
     pub fn geometric_mean(&self) -> JsValue {
         vec_f64_to_js(&self.inner.geometric_mean())
+    }
+
+    #[wasm_bindgen(js_name = skewKurt)]
+    /// Per-asset skewness and kurtosis from one moments pass, as
+    /// `{ skewness: Float64Array, kurtosis: Float64Array }`.
+    pub fn skew_kurt(&self) -> Result<JsValue, JsValue> {
+        let (skew, kurt) = self.inner.skew_kurt();
+        obj_from_pairs(&[
+            ("skewness", vec_f64_to_js(&skew)),
+            ("kurtosis", vec_f64_to_js(&kurt)),
+        ])
+    }
+
+    #[wasm_bindgen(js_name = valueAtRiskAndEs)]
+    /// Per-asset historical VaR and expected shortfall from one tail pass, as
+    /// `{ value_at_risk: Float64Array, expected_shortfall: Float64Array }`.
+    pub fn value_at_risk_and_es(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+        let (var, es) = self
+            .inner
+            .value_at_risk_and_es(confidence.unwrap_or(DEFAULT_CONFIDENCE));
+        obj_from_pairs(&[
+            ("value_at_risk", vec_f64_to_js(&var)),
+            ("expected_shortfall", vec_f64_to_js(&es)),
+        ])
     }
 
     #[wasm_bindgen(js_name = downsideDeviation)]
@@ -532,7 +566,7 @@ impl WasmPerformance {
 
     // ── Benchmark ──
 
-    /// SABR `beta` (backbone exponent).
+    /// OLS beta versus the benchmark per asset, with standard error and 95% CI.
     pub fn beta(&self) -> Result<JsValue, JsValue> {
         to_js(&self.inner.beta())
     }
@@ -654,14 +688,22 @@ impl WasmPerformance {
 
     #[wasm_bindgen(js_name = lookbackReturns)]
     /// Standard lookback-window returns (MTD, QTD, YTD, ...) per asset.
+    ///
+    /// The FYTD window starts at the fiscal-year start
+    /// (`fiscalYearStartMonth` / `fiscalYearStartDay`) adjusted to the next
+    /// business day on `calendar` (default `"nyse"`); pass the calendar id
+    /// matching your market for non-US panels.
     pub fn lookback_returns(
         &self,
         ref_date: &str,
         fiscal_year_start_month: Option<u8>,
+        fiscal_year_start_day: Option<u8>,
+        calendar: Option<String>,
     ) -> Result<JsValue, JsValue> {
         let d = parse_iso_date(ref_date)?;
-        let fc = make_fiscal_config(fiscal_year_start_month)?;
-        let cal = resolve_fiscal_calendar()?;
+        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let cal =
+            resolve_fiscal_calendar(calendar.as_deref().unwrap_or(DEFAULT_FISCAL_CALENDAR_ID))?;
         to_js(&self.inner.lookback_returns(d, fc, cal).map_err(to_js_err)?)
     }
 
@@ -672,9 +714,10 @@ impl WasmPerformance {
         ticker_idx: usize,
         agg_freq: Option<String>,
         fiscal_year_start_month: Option<u8>,
+        fiscal_year_start_day: Option<u8>,
     ) -> Result<JsValue, JsValue> {
         let pk = parse_freq(agg_freq.as_deref().unwrap_or("monthly"))?;
-        let fc = make_fiscal_config(fiscal_year_start_month)?;
+        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
         to_js(
             &self
                 .inner

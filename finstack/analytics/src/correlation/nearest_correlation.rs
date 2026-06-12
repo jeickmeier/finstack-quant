@@ -12,21 +12,23 @@
 //! Higham's alternating-projections algorithm iteratively projects onto the
 //! PSD cone and the "unit diagonal" hyperplane until convergence. This
 //! implementation carries a Dykstra correction term only for the PSD-cone
-//! projection; the unit-diagonal projection step has no correction term.
-//! As a result the algorithm converges to a valid correlation matrix that is
-//! close (in Frobenius norm) to the input, but is **not** guaranteed to be
-//! the Frobenius-nearest valid correlation matrix (Borsdorf & Higham 2010
-//! prove that Dykstra increments on both projections are required for strict
-//! nearest-matrix optimality). This is the standard remedy for real-world
-//! correlation matrices that fail Cholesky by a small margin.
+//! projection; the unit-diagonal projection step needs no correction term
+//! because the unit-diagonal set is *affine*, and Dykstra increments are
+//! provably unnecessary for affine sets (Boyle & Dykstra 1986). This is
+//! exactly Higham (2002) Algorithm 3.3, which converges to the
+//! Frobenius-nearest valid correlation matrix (up to the configured
+//! tolerance). It is the standard remedy for real-world correlation matrices
+//! that fail Cholesky by a small margin.
 //!
 //! # References
 //!
 //! - Higham, N. J. (2002). "Computing the nearest correlation matrix — A
 //!   problem from finance." *IMA Journal of Numerical Analysis*, 22(3), 329–343.
-//! - Borsdorf, R., & Higham, N. J. (2010). "A preconditioned Newton algorithm
-//!   for the nearest correlation matrix." *IMA Journal of Numerical Analysis*,
-//!   30(1), 94–107.
+//!   Algorithm 3.3.
+//! - Boyle, J. P., & Dykstra, R. L. (1986). "A method for finding projections
+//!   onto the intersection of convex sets in Hilbert spaces." *Advances in
+//!   Order Restricted Statistical Inference*, Lecture Notes in Statistics 37,
+//!   28–47.
 //!
 //! # When to use
 //!
@@ -62,14 +64,14 @@ impl Default for NearestCorrelationOpts {
     }
 }
 
-/// Compute a nearby valid correlation matrix to `input` using Higham's
-/// alternating-projection algorithm with a partial Dykstra correction.
+/// Compute the nearest valid correlation matrix to `input` using Higham's
+/// alternating-projection algorithm (Higham 2002, Algorithm 3.3).
 ///
 /// The returned matrix is symmetric, has unit diagonal, and is positive
-/// semidefinite. It is close to the input in Frobenius norm, but is **not**
-/// guaranteed to be the Frobenius-nearest valid correlation matrix; achieving
-/// strict nearest-matrix optimality would require Dykstra corrections on both
-/// the PSD-cone and unit-diagonal projections (Borsdorf & Higham 2010).
+/// semidefinite. The iteration converges to the Frobenius-nearest valid
+/// correlation matrix up to the configured tolerance: the Dykstra correction
+/// is carried on the PSD-cone projection only, which suffices because the
+/// unit-diagonal set is affine (Boyle & Dykstra 1986).
 ///
 /// The input is expected to be nearly symmetric with a diagonal close to 1.
 /// Gross violations (asymmetry beyond 1e-6, diagonal entries far from 1, etc.)
@@ -94,8 +96,8 @@ impl Default for NearestCorrelationOpts {
 ///   `1e-6` at any off-diagonal entry.
 /// * [`Error::DiagonalNotOne`] if any diagonal entry is further than `1e-3`
 ///   from `1.0`.
-/// * [`Error::NotPositiveSemiDefinite`] if the algorithm fails to converge
-///   within `opts.max_iter` iterations.
+/// * [`Error::DidNotConverge`] if the algorithm fails to converge within
+///   `opts.max_iter` iterations.
 pub fn nearest_correlation_matrix(
     input: &[f64],
     n: usize,
@@ -134,14 +136,19 @@ pub fn nearest_correlation_matrix(
     }
 
     // Symmetrize to machine precision before starting the projection so that
-    // the Jacobi eigensolver gets a perfectly symmetric iterate.
-    let y = symmetrize(input, n);
+    // the eigensolver gets a perfectly symmetric iterate, then rescale to an
+    // exact unit diagonal (x_ij / sqrt(d_i * d_j)). The diagonal gate above
+    // only bounds the defect to 1e-3; the rescale repairs it so every return
+    // path — including the early exit below — satisfies the unit-diagonal
+    // postcondition and the strict 1e-10 tolerance used by
+    // `validate_correlation_matrix`.
+    let mut y = symmetrize(input, n);
+    rescale_to_unit_diagonal(&mut y, n);
 
-    // Early-exit on already-PSD inputs. After symmetrization the input has
-    // unit diagonal (gated by DIAGONAL_GATE above) and is symmetric to
-    // machine precision; if Cholesky also succeeds it is positive definite,
-    // so it is its own nearest-correlation projection. Common in daily
-    // recalibration where the input only drifts within tolerance.
+    // Early-exit on already-PSD inputs: a symmetric, unit-diagonal matrix
+    // that passes Cholesky is positive definite, so it is its own
+    // nearest-correlation projection. Common in daily recalibration where
+    // the input only drifts within tolerance.
     if finstack_core::math::linalg::cholesky_correlation(&y, n).is_ok() {
         return Ok(y);
     }
@@ -172,12 +179,42 @@ pub fn nearest_correlation_matrix(
         }
 
         if frobenius_diff(&next, &prev) < opts.tol {
-            return Ok(next);
+            // The converged iterate is the *diagonal*-projected matrix, whose
+            // smallest eigenvalue is only bounded by ≈ `opts.tol` from below.
+            // One final PSD projection followed by a unit-diagonal rescale
+            // (a congruence transform, which preserves PSD exactly) makes the
+            // postcondition unconditional even for loose user tolerances.
+            let mut out = project_psd(&next, n);
+            rescale_to_unit_diagonal(&mut out, n);
+            return Ok(out);
         }
         std::mem::swap(&mut prev, &mut next);
     }
 
-    Err(Error::NotPositiveSemiDefinite { row: 0 })
+    Err(Error::DidNotConverge {
+        max_iter: opts.max_iter,
+        tol: opts.tol,
+    })
+}
+
+/// Rescale a symmetric matrix to an exact unit diagonal in place:
+/// `x_ij ← x_ij / sqrt(d_i · d_j)` with the diagonal set to exactly `1.0`.
+///
+/// For a PSD input this is a congruence transform `D^{-1/2} X D^{-1/2}`, so
+/// positive semidefiniteness is preserved. Diagonal entries are clamped to a
+/// small positive floor before the square root as a defensive guard; inputs
+/// reaching this helper always have diagonals near 1.
+fn rescale_to_unit_diagonal(matrix: &mut [f64], n: usize) {
+    const MIN_DIAGONAL: f64 = 1e-12;
+    let inv_sqrt: Vec<f64> = (0..n)
+        .map(|i| 1.0 / matrix[i * n + i].max(MIN_DIAGONAL).sqrt())
+        .collect();
+    for i in 0..n {
+        for j in 0..n {
+            matrix[i * n + j] *= inv_sqrt[i] * inv_sqrt[j];
+        }
+        matrix[i * n + i] = 1.0;
+    }
 }
 
 /// Project a symmetric matrix onto the PSD cone by zeroing negative
@@ -321,20 +358,18 @@ mod tests {
         assert!(matches!(err, Error::NotSymmetric { .. }));
     }
 
-    /// W-47: The algorithm carries a Dykstra correction only for the PSD-cone
-    /// projection; the unit-diagonal step has no correction term.  This means
-    /// the result is a *valid* correlation matrix (PSD, unit diagonal, symmetric)
-    /// that is close but not guaranteed to be Frobenius-nearest.
+    /// The algorithm is Higham (2002) Algorithm 3.3: the Dykstra correction is
+    /// carried on the PSD-cone projection only, which suffices for optimality
+    /// because the unit-diagonal set is affine (Boyle & Dykstra 1986). It
+    /// therefore converges to the Frobenius-nearest valid correlation matrix.
     ///
-    /// For the Higham (2002) 3×3 canonical counter-example, the analytic
-    /// Frobenius-nearest solution has all off-diagonals = −1/3 ≈ −0.333.
-    /// The one-sided Dykstra instead returns −0.5, which is a valid correlation
-    /// matrix but further from the input in Frobenius norm.  This test locks in
-    /// the actual behaviour ("valid, not necessarily nearest") so that future
-    /// changes either add the second Dykstra correction or explicitly widen the
-    /// contract documented here.
+    /// For the 3×3 equicorrelation counter-example at ρ = −0.55, positive
+    /// semidefiniteness requires ρ ≥ −1/2, and the unique nearest correlation
+    /// matrix (which inherits the input's permutation symmetry) has all
+    /// off-diagonals = −0.5 — Frobenius distance √(6·0.05²) ≈ 0.1225. This
+    /// test locks in convergence to that analytic optimum.
     #[test]
-    fn one_sided_dykstra_yields_valid_nearby_matrix() {
+    fn converges_to_frobenius_nearest_matrix() {
         // Higham (2002) canonical counter-example: symmetric, unit diagonal,
         // but not PSD (smallest eigenvalue ≈ −0.165).
         let input = vec![
@@ -357,22 +392,77 @@ mod tests {
             "Frobenius distance to repaired ({frob_dist:.6}) should be less than input norm ({frob_input:.6})"
         );
 
-        // Document the actual one-sided Dykstra result: all off-diagonals
-        // converge to −0.5, NOT the Frobenius-nearest analytic optimum of −1/3.
-        // This regression lock-in confirms the contract documented in the module
-        // docstring ("a nearby valid correlation matrix", not necessarily nearest).
-        let known_offdiag = -0.5_f64;
+        // All off-diagonals converge to the analytic Frobenius-nearest
+        // optimum of −0.5 (the PSD boundary for 3×3 equicorrelation).
+        let nearest_offdiag = -0.5_f64;
         for i in 0..3 {
             for j in 0..3 {
-                let expected = if i == j { 1.0 } else { known_offdiag };
+                let expected = if i == j { 1.0 } else { nearest_offdiag };
                 let diff = (repaired[i * 3 + j] - expected).abs();
                 assert!(
                     diff < 1e-6,
-                    "one_sided_dykstra regression: repaired[{i},{j}]={:.6} expected {expected:.6} (diff={diff:.2e})",
+                    "nearest-correlation regression: repaired[{i},{j}]={:.6} expected {expected:.6} (diff={diff:.2e})",
                     repaired[i * 3 + j]
                 );
             }
         }
+    }
+
+    /// The early-exit path must repair a within-gate diagonal defect: a PSD
+    /// input with diagonals up to 1e-3 off must still come back with an exact
+    /// unit diagonal that passes the strict validator.
+    #[test]
+    fn early_exit_repairs_within_gate_diagonal_defect() {
+        let input = vec![
+            1.0005, 0.2, 0.1, //
+            0.2, 0.9995, 0.3, //
+            0.1, 0.3, 1.0002,
+        ];
+        let repaired =
+            nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default()).expect("ok");
+        for i in 0..3 {
+            assert!(
+                (repaired[i * 3 + i] - 1.0).abs() < 1e-15,
+                "diag[{i}] = {}",
+                repaired[i * 3 + i]
+            );
+        }
+        validate_correlation_matrix(&repaired, 3).expect("repaired matrix passes strict validator");
+    }
+
+    /// Iteration-budget exhaustion must surface as `DidNotConverge`, not as a
+    /// (misleading) PSD-validation failure.
+    #[test]
+    fn iteration_exhaustion_reports_did_not_converge() {
+        let input = vec![
+            1.0, -0.55, -0.55, //
+            -0.55, 1.0, -0.55, //
+            -0.55, -0.55, 1.0,
+        ];
+        let opts = NearestCorrelationOpts {
+            max_iter: 1,
+            tol: 1e-16,
+        };
+        let err = nearest_correlation_matrix(&input, 3, opts).expect_err("must not converge");
+        assert!(matches!(err, Error::DidNotConverge { max_iter: 1, .. }));
+    }
+
+    /// With a loose user tolerance the converged iterate alone is only PSD up
+    /// to ~tol; the final projection + rescale must still produce a matrix
+    /// that passes the strict validator.
+    #[test]
+    fn loose_tolerance_output_still_passes_strict_validation() {
+        let input = vec![
+            1.0, -0.55, -0.55, //
+            -0.55, 1.0, -0.55, //
+            -0.55, -0.55, 1.0,
+        ];
+        let opts = NearestCorrelationOpts {
+            max_iter: 200,
+            tol: 1e-4,
+        };
+        let repaired = nearest_correlation_matrix(&input, 3, opts).expect("converges");
+        validate_correlation_matrix(&repaired, 3).expect("valid despite loose tolerance");
     }
 
     /// Smoke test for the `n > 40` regime: the divide-and-conquer

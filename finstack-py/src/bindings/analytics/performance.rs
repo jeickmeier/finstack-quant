@@ -31,24 +31,22 @@ fn py_dates_to_rust(dates: &[Bound<'_, PyAny>]) -> PyResult<Vec<time::Date>> {
 const DEFAULT_FISCAL_START_MONTH: u8 = 1;
 /// Default fiscal-year start day-of-month.
 const DEFAULT_FISCAL_START_DAY: u8 = 1;
-/// Default holiday calendar used by lookback fiscal-year alignment.
-const DEFAULT_FISCAL_CALENDAR_ID: &str = "nyse";
 
-/// Resolve an optional fiscal-year-start month into a [`FiscalConfig`].
-fn make_fiscal_config(month: Option<u8>) -> PyResult<FiscalConfig> {
+/// Resolve optional fiscal-year-start month/day into a [`FiscalConfig`].
+fn make_fiscal_config(month: Option<u8>, day: Option<u8>) -> PyResult<FiscalConfig> {
     FiscalConfig::new(
         month.unwrap_or(DEFAULT_FISCAL_START_MONTH),
-        DEFAULT_FISCAL_START_DAY,
+        day.unwrap_or(DEFAULT_FISCAL_START_DAY),
     )
     .map_err(core_to_py)
 }
 
-fn resolve_fiscal_calendar() -> PyResult<&'static dyn HolidayCalendar> {
+fn resolve_fiscal_calendar(calendar_id: &str) -> PyResult<&'static dyn HolidayCalendar> {
     CalendarRegistry::global()
-        .resolve_str(DEFAULT_FISCAL_CALENDAR_ID)
+        .resolve_str(calendar_id)
         .ok_or_else(|| {
             core_to_py(finstack_core::Error::calendar_not_found_with_suggestions(
-                DEFAULT_FISCAL_CALENDAR_ID.to_string(),
+                calendar_id.to_string(),
                 finstack_core::dates::available_calendars(),
             ))
         })
@@ -213,9 +211,11 @@ impl PyPerformance {
         &self,
         ref_date: time::Date,
         fiscal_year_start_month: Option<u8>,
+        fiscal_year_start_day: Option<u8>,
+        calendar: &str,
     ) -> PyResult<fa::LookbackReturns> {
-        let fc = make_fiscal_config(fiscal_year_start_month)?;
-        let calendar = resolve_fiscal_calendar()?;
+        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let calendar = resolve_fiscal_calendar(calendar)?;
         self.inner
             .lookback_returns(ref_date, fc, calendar)
             .map_err(core_to_py)
@@ -334,8 +334,23 @@ impl PyPerformance {
         self.inner.freq().to_string()
     }
 
-    /// Active date grid.
+    /// Full return-aligned date grid (independent of any active window).
+    ///
+    /// Matches Rust ``Performance::dates``. For the dates inside the
+    /// currently selected analysis window, use :meth:`active_dates`.
     fn dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
+        self.inner
+            .dates()
+            .iter()
+            .map(|&d| date_to_py(py, d))
+            .collect()
+    }
+
+    /// Date grid of the currently active analysis window.
+    ///
+    /// Matches Rust ``Performance::active_dates``. Equal to :meth:`dates`
+    /// until :meth:`reset_date_range` narrows the window.
+    fn active_dates<'py>(&self, py: Python<'py>) -> PyResult<Vec<Bound<'py, PyAny>>> {
         self.inner
             .active_dates()
             .iter()
@@ -424,6 +439,24 @@ impl PyPerformance {
     /// Geometric mean for each ticker.
     fn geometric_mean(&self) -> Vec<f64> {
         self.inner.geometric_mean()
+    }
+
+    /// Per-ticker ``(skewness, kurtosis)`` from one moments pass per ticker.
+    ///
+    /// Returns two parallel lists, equivalent to calling :meth:`skewness`
+    /// and :meth:`kurtosis` but walking each ticker once.
+    fn skew_kurt(&self) -> (Vec<f64>, Vec<f64>) {
+        self.inner.skew_kurt()
+    }
+
+    /// Per-ticker ``(value_at_risk, expected_shortfall)`` from one tail pass.
+    ///
+    /// Returns two parallel lists, equivalent to calling
+    /// :meth:`value_at_risk` and :meth:`expected_shortfall` but sharing the
+    /// tail partition.
+    #[pyo3(signature = (confidence = 0.95))]
+    fn value_at_risk_and_es(&self, confidence: f64) -> (Vec<f64>, Vec<f64>) {
+        self.inner.value_at_risk_and_es(confidence)
     }
 
     /// Downside deviation for each ticker.
@@ -711,28 +744,42 @@ impl PyPerformance {
     }
 
     /// Period-to-date lookback returns.
-    #[pyo3(signature = (ref_date, fiscal_year_start_month = None))]
+    ///
+    /// The FYTD window starts at the fiscal-year start
+    /// (``fiscal_year_start_month`` / ``fiscal_year_start_day``) adjusted to
+    /// the next business day on ``calendar``. The default calendar is
+    /// ``"nyse"``; pass the calendar matching your market (any id registered
+    /// in the core ``CalendarRegistry``) for non-US panels.
+    #[pyo3(signature = (ref_date, fiscal_year_start_month = None, fiscal_year_start_day = None, calendar = "nyse"))]
     fn lookback_returns(
         &self,
         ref_date: Bound<'_, PyAny>,
         fiscal_year_start_month: Option<u8>,
+        fiscal_year_start_day: Option<u8>,
+        calendar: &str,
     ) -> PyResult<PyLookbackReturns> {
         let d = py_to_date(&ref_date)?;
         Ok(PyLookbackReturns {
-            inner: self.lookback_returns_inner(d, fiscal_year_start_month)?,
+            inner: self.lookback_returns_inner(
+                d,
+                fiscal_year_start_month,
+                fiscal_year_start_day,
+                calendar,
+            )?,
         })
     }
 
     /// Period statistics for a specific ticker at a given aggregation frequency.
-    #[pyo3(signature = (ticker_idx, agg_freq = "monthly", fiscal_year_start_month = None))]
+    #[pyo3(signature = (ticker_idx, agg_freq = "monthly", fiscal_year_start_month = None, fiscal_year_start_day = None))]
     fn period_stats(
         &self,
         ticker_idx: usize,
         agg_freq: &str,
         fiscal_year_start_month: Option<u8>,
+        fiscal_year_start_day: Option<u8>,
     ) -> PyResult<PyPeriodStats> {
         let pk = parse_freq(agg_freq)?;
-        let fc = make_fiscal_config(fiscal_year_start_month)?;
+        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
         Ok(PyPeriodStats {
             inner: self
                 .inner
@@ -747,6 +794,13 @@ impl PyPerformance {
     ///
     /// Returns a DataFrame with one row per ticker and columns for each
     /// scalar metric (CAGR, volatility, Sharpe, max drawdown, etc.).
+    ///
+    /// ``risk_free_rate`` affects only the ``sharpe`` column; the MAR-based
+    /// metrics (``sortino``, ``downside_deviation``) and the
+    /// ``omega_ratio`` threshold are fixed at ``0.0``. Call
+    /// :meth:`sortino`, :meth:`downside_deviation`, or :meth:`omega_ratio`
+    /// directly for non-zero thresholds. ``confidence`` applies to
+    /// ``value_at_risk``, ``expected_shortfall``, and ``tail_ratio``.
     #[pyo3(signature = (risk_free_rate = 0.0, confidence = 0.95))]
     fn summary_to_dataframe<'py>(
         &self,
@@ -837,7 +891,7 @@ impl PyPerformance {
     /// Top-N drawdown episodes for a ticker as a pandas ``DataFrame``.
     ///
     /// Columns: start, valley, end, duration_days, max_drawdown,
-    /// near_recovery_threshold.
+    /// near_recovery_threshold, truncated_at_start.
     #[pyo3(signature = (ticker_idx, n = 5))]
     fn drawdown_details_to_dataframe<'py>(
         &self,
@@ -891,16 +945,24 @@ impl PyPerformance {
     /// Period-to-date lookback returns as a pandas ``DataFrame``.
     ///
     /// Returns a DataFrame with ticker names as index and columns:
-    /// mtd, qtd, ytd, and fytd.
-    #[pyo3(signature = (ref_date, fiscal_year_start_month = None))]
+    /// mtd, qtd, ytd, and fytd. See :meth:`lookback_returns` for the FYTD
+    /// fiscal-start and ``calendar`` semantics (default ``"nyse"``).
+    #[pyo3(signature = (ref_date, fiscal_year_start_month = None, fiscal_year_start_day = None, calendar = "nyse"))]
     fn lookback_returns_to_dataframe<'py>(
         &self,
         py: Python<'py>,
         ref_date: Bound<'_, PyAny>,
         fiscal_year_start_month: Option<u8>,
+        fiscal_year_start_day: Option<u8>,
+        calendar: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
         let d = py_to_date(&ref_date)?;
-        let lb = self.lookback_returns_inner(d, fiscal_year_start_month)?;
+        let lb = self.lookback_returns_inner(
+            d,
+            fiscal_year_start_month,
+            fiscal_year_start_day,
+            calendar,
+        )?;
 
         let data = PyDict::new(py);
         data.set_item("mtd", slice_to_pyarray(py, &lb.mtd))?;

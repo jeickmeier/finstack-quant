@@ -213,7 +213,7 @@ class TestPeriodicReturns:
     def test_rolling_returns_matches_dated_series_shape(self, perf_prices: Performance) -> None:
         rr = perf_prices.rolling_returns(0, 5)
         assert isinstance(rr, DatedSeries)
-        assert len(rr.values) == len(rr.dates())
+        assert len(rr.values) == len(rr.dates)
         assert len(rr.values) > 0
 
 
@@ -237,7 +237,7 @@ class TestBenchmark:
         rg = perf_prices.rolling_greeks(0, window=10)
         assert isinstance(rg, RollingGreeks)
         assert len(rg.alphas) == len(rg.betas)
-        assert len(rg.dates()) == len(rg.alphas)
+        assert len(rg.dates) == len(rg.alphas)
 
     def test_rolling_window_metrics(self, perf_prices: Performance) -> None:
         rs = perf_prices.rolling_sharpe(0, window=10)
@@ -246,7 +246,7 @@ class TestBenchmark:
         assert isinstance(rs, DatedSeries)
         assert isinstance(rso, DatedSeries)
         assert isinstance(rv, DatedSeries)
-        assert len(rs.values) == len(rs.dates())
+        assert len(rs.values) == len(rs.dates)
 
     def test_information_and_tracking(self, perf_prices: Performance) -> None:
         te = perf_prices.tracking_error()
@@ -289,9 +289,11 @@ class TestMultiFactor:
 class TestDateRange:
     def test_reset_date_range_narrows_active_grid(self, perf_prices: Performance) -> None:
         perf_prices.reset_date_range(date(2024, 1, 10), date(2024, 1, 20))
-        active = perf_prices.dates()
+        active = perf_prices.active_dates()
         assert active[0] == date(2024, 1, 10)
         assert active[-1] == date(2024, 1, 20)
+        # `dates()` keeps Rust semantics: the full constructed grid.
+        assert len(perf_prices.dates()) == 59
 
 
 # ---------------------------------------------------------------------------

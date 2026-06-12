@@ -107,4 +107,19 @@ pub enum Error {
         /// The offending degrees-of-freedom value.
         value: f64,
     },
+    /// Iterative algorithm exhausted its iteration budget before converging.
+    ///
+    /// Returned by
+    /// [`crate::correlation::nearest_correlation::nearest_correlation_matrix`]
+    /// when the alternating-projection iteration does not reach the requested
+    /// tolerance within `max_iter` iterations. Distinct from
+    /// [`Error::NotPositiveSemiDefinite`], which reports a *validation*
+    /// failure on a supplied matrix.
+    #[error("Did not converge within {max_iter} iterations (tolerance {tol})")]
+    DidNotConverge {
+        /// Iteration budget that was exhausted.
+        max_iter: usize,
+        /// Frobenius-norm convergence tolerance that was not reached.
+        tol: f64,
+    },
 }
