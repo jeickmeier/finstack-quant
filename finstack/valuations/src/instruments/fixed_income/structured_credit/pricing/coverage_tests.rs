@@ -77,16 +77,14 @@ impl CoverageTest {
     /// Get the test ID.
     pub fn id(&self) -> &str {
         match self {
-            Self::OC { id, .. } => id.as_str(),
-            Self::IC { id, .. } => id.as_str(),
+            Self::OC { id, .. } | Self::IC { id, .. } => id.as_str(),
         }
     }
 
     /// Get the required ratio for this test.
     pub fn required_level(&self) -> f64 {
         match self {
-            Self::OC { required_ratio, .. } => *required_ratio,
-            Self::IC { required_ratio, .. } => *required_ratio,
+            Self::OC { required_ratio, .. } | Self::IC { required_ratio, .. } => *required_ratio,
         }
     }
 

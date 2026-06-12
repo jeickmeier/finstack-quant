@@ -417,7 +417,7 @@ impl AsianOptionMcPricer {
                 num_steps,
             )?,
         );
-        let process = process.with_drift_schedule(drift_schedule.clone());
+        let process = process.with_drift_schedule(std::sync::Arc::clone(&drift_schedule));
 
         // Effective future-fixing times on the MC grid. The seasoned geometric
         // control variate (W-07) is built on exactly these times, so its
@@ -456,7 +456,7 @@ impl AsianOptionMcPricer {
                 crate::instruments::OptionType::Call,
             ) => {
                 // Use path capture to get per-path discounted payoffs for covariance
-                let mut cfg_cap = config.clone();
+                let mut cfg_cap = config;
                 cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
                 let pricer_cap = PathDependentPricer::new(cfg_cap);
 
@@ -485,7 +485,7 @@ impl AsianOptionMcPricer {
                     inst.strike,
                     inst.notional.amount(),
                     finstack_monte_carlo::payoff::asian::AveragingMethod::Geometric,
-                    fixing_steps.clone(),
+                    fixing_steps,
                     hist_sum,
                     hist_prod_log,
                     hist_count,
@@ -579,7 +579,7 @@ impl AsianOptionMcPricer {
                 crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
                 crate::instruments::OptionType::Put,
             ) => {
-                let mut cfg_cap = config.clone();
+                let mut cfg_cap = config;
                 cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
                 let pricer_cap = PathDependentPricer::new(cfg_cap);
 
@@ -606,7 +606,7 @@ impl AsianOptionMcPricer {
                     inst.strike,
                     inst.notional.amount(),
                     finstack_monte_carlo::payoff::asian::AveragingMethod::Geometric,
-                    fixing_steps.clone(),
+                    fixing_steps,
                     hist_sum,
                     hist_prod_log,
                     hist_count,
@@ -2166,7 +2166,7 @@ mod tests {
             OptionType::Call,
             expiry,
             100.0,
-            fixing_dates.clone(),
+            fixing_dates,
         );
         // Season the option: the first fixing is already observed.
         option.past_fixings = vec![(date(2025, 4, 1), 103.0)];

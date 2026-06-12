@@ -554,7 +554,6 @@ mod tests {
         assert!((step_v - 3.0).abs() < 1e-12);
 
         let lin_v = s
-            .clone()
             .with_interpolation(SeriesInterpolation::Linear)
             .value_on(mid)
             .expect("Value lookup should succeed in test");

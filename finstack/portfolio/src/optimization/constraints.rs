@@ -75,9 +75,9 @@ impl Constraint {
     #[must_use]
     pub fn label(&self) -> Option<&str> {
         match self {
-            Self::MetricBound { label, .. } => label.as_deref(),
-            Self::WeightBounds { label, .. } => label.as_deref(),
-            Self::MaxTurnover { label, .. } => label.as_deref(),
+            Self::MetricBound { label, .. }
+            | Self::WeightBounds { label, .. }
+            | Self::MaxTurnover { label, .. } => label.as_deref(),
             Self::Budget { .. } => Some("budget"),
         }
     }

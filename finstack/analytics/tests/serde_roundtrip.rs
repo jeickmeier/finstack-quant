@@ -1,3 +1,4 @@
+//! Serde round-trip tests for analytics result types.
 use finstack_analytics::{
     AnnualizationConvention, BetaResult, DatedSeries, DrawdownEpisode, GreeksResult,
     LookbackReturns, MultiFactorResult, Performance, PeriodStats, RollingGreeks,

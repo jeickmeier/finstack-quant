@@ -386,7 +386,7 @@ fn test_bloomberg_usd_ois_calibration_accuracy() {
 
     let (ctx, report) = execute_step(&step, &quotes, &base_context, &settings)
         .expect("Discount curve calibration should succeed");
-    let curve = ctx.get_discount("USD-OIS").expect("curve inserted").clone();
+    let curve = ctx.get_discount("USD-OIS").expect("curve inserted");
 
     // Verify calibration succeeded
     assert!(
@@ -514,10 +514,7 @@ fn test_interpolation_method_comparison() {
         &settings,
     )
     .expect("MC failed");
-    let mc_curve = mc_ctx
-        .get_discount("USD-OIS-MC")
-        .expect("curve inserted")
-        .clone();
+    let mc_curve = mc_ctx.get_discount("USD-OIS-MC").expect("curve inserted");
 
     let ll_params = DiscountCurveParams {
         curve_id: "USD-OIS-LL".into(),
@@ -537,10 +534,7 @@ fn test_interpolation_method_comparison() {
         &settings,
     )
     .expect("LL failed");
-    let ll_curve = ll_ctx
-        .get_discount("USD-OIS-LL")
-        .expect("curve inserted")
-        .clone();
+    let ll_curve = ll_ctx.get_discount("USD-OIS-LL").expect("curve inserted");
 
     assert!(mc_report.success);
     assert!(ll_report.success);

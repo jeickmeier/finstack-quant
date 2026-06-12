@@ -355,13 +355,11 @@ impl MetricCalculator for CrossFactorCalculator {
         // per 1 pct-pt vol), which differs by a factor of S₀ / 10_000.  Returning
         // `Vanna` directly would silently mis-scale every cross-gamma attribution
         // that uses `CrossGammaSpotVol × avg_spot_shift_pct × avg_vol_shift_pct`.
-        let bumper_a = match (self.factory_a)(context)? {
-            Some(bumper) => bumper,
-            None => return Ok(0.0),
+        let Some(bumper_a) = (self.factory_a)(context)? else {
+            return Ok(0.0);
         };
-        let bumper_b = match (self.factory_b)(context)? {
-            Some(bumper) => bumper,
-            None => return Ok(0.0),
+        let Some(bumper_b) = (self.factory_b)(context)? else {
+            return Ok(0.0);
         };
 
         let market = context.curves.as_ref();

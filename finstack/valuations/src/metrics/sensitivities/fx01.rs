@@ -46,7 +46,7 @@ impl MetricCalculator for GenericFx01Calculator {
         }
 
         let as_of = context.as_of;
-        let market = context.curves.clone();
+        let market = std::sync::Arc::clone(&context.curves);
 
         let make_bumps = |direction: f64| -> Vec<MarketBump> {
             pairs

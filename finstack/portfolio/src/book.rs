@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(book.position_ids.len(), 1);
 
         // Adding again should not duplicate
-        book.add_position(pos_id.clone());
+        book.add_position(pos_id);
         assert_eq!(book.position_ids.len(), 1);
     }
 
@@ -240,7 +240,7 @@ mod tests {
         assert_eq!(book.child_book_ids.len(), 1);
 
         // Adding again should not duplicate
-        book.add_child(child_id.clone());
+        book.add_child(child_id);
         assert_eq!(book.child_book_ids.len(), 1);
     }
 

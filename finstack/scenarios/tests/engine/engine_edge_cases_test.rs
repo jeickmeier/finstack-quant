@@ -90,7 +90,7 @@ fn test_multiple_operations_same_target_last_wins() {
             let expected = 100.0 * 0.9 * 1.2; // 108
             assert!((money.amount() - expected).abs() < 1e-6);
         }
-        _ => panic!("Expected Price scalar"),
+        MarketScalar::Unitless(_) => panic!("Expected Price scalar"),
     }
 }
 
@@ -474,6 +474,6 @@ fn test_time_roll_with_apply_shocks_true() {
         MarketScalar::Price(money) => {
             assert!((money.amount() - 90.0).abs() < 1e-6);
         }
-        _ => panic!("Expected Price scalar"),
+        MarketScalar::Unitless(_) => panic!("Expected Price scalar"),
     }
 }

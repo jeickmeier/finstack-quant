@@ -198,7 +198,7 @@ pub fn check_surface(
 
     if config.check_calendar_spread && !forwards.is_empty() {
         let checker = CalendarSpreadCheck {
-            forwards: forwards.clone(),
+            forwards,
             tolerance: config.tolerance,
         };
         all_violations.extend(checker.check(surface));

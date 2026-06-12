@@ -798,9 +798,8 @@ impl CDSTranchePricer {
         })?;
 
         // Get credit index data for loss calculations
-        let index_data = match market_ctx.get_credit_index(&tranche.credit_index_id) {
-            Ok(data) => data,
-            Err(_) => return Ok(0.0), // No credit data, no accrued
+        let Ok(index_data) = market_ctx.get_credit_index(&tranche.credit_index_id) else {
+            return Ok(0.0); // No credit data, no accrued
         };
 
         // Generate the payment schedule
@@ -818,9 +817,8 @@ impl CDSTranchePricer {
         let next_payment = payment_dates.iter().filter(|&&d| d > as_of).min().copied();
 
         // If no next payment, we're past maturity
-        let _next_payment = match next_payment {
-            Some(d) => d,
-            None => return Ok(0.0),
+        let Some(_next_payment) = next_payment else {
+            return Ok(0.0);
         };
 
         // Calculate the accrual fraction from last payment to as_of

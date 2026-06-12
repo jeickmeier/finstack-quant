@@ -249,11 +249,10 @@ impl StochasticProcess for RevolvingCreditProcess {
 
         // Short rate: κ_r [θ_r(t) - r_t] for floating, or 0 for fixed
         out[1] = match &self.params.interest_rate {
-            InterestRateSpec::Fixed { .. } => 0.0,
             InterestRateSpec::Floating { params, .. } => {
                 params.kappa * (params.theta_at_time(t) - x[1])
             }
-            InterestRateSpec::DeterministicForward { .. } => 0.0,
+            InterestRateSpec::Fixed { .. } | InterestRateSpec::DeterministicForward { .. } => 0.0,
         };
 
         // Credit spread: κ_λ (θ_λ - λ_t)
@@ -269,13 +268,12 @@ impl StochasticProcess for RevolvingCreditProcess {
 
         // Short rate: σ_r (constant) for floating, or 0 for fixed
         out[1] = match &self.params.interest_rate {
-            InterestRateSpec::Fixed { .. } => 0.0,
             InterestRateSpec::Floating { params, .. } => {
                 // Avoid unused variable warning
                 let _ = t;
                 params.sigma
             }
-            InterestRateSpec::DeterministicForward { .. } => 0.0,
+            InterestRateSpec::Fixed { .. } | InterestRateSpec::DeterministicForward { .. } => 0.0,
         };
 
         // Credit spread: σ_λ √λ_t (square-root diffusion)

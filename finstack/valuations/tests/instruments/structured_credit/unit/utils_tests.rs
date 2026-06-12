@@ -203,7 +203,7 @@ fn test_reinvestment_manager_selects_cheapest_first() {
     };
     let asset_102 = PoolAsset {
         purchase_price: Some(Money::new(102.0, Currency::USD)), // Most expensive
-        ..base_asset.clone()
+        ..base_asset
     };
 
     let cash = Money::new(195.0, Currency::USD);
@@ -211,7 +211,7 @@ fn test_reinvestment_manager_selects_cheapest_first() {
     // Act
     let selected = manager.select_assets(
         cash,
-        vec![asset_102.clone(), asset_98.clone(), asset_95.clone()], // Unordered
+        vec![asset_102, asset_98, asset_95], // Unordered
         &pool,
         &MarketContext::default(),
         Date::from_calendar_date(2025, Month::January, 1).unwrap(),
@@ -245,7 +245,7 @@ fn test_reinvestment_manager_respects_budget() {
         finstack_core::dates::DayCount::Act360,
     );
 
-    let opportunities = vec![asset.clone(), asset.clone(), asset.clone()];
+    let opportunities = vec![asset.clone(), asset.clone(), asset];
     let cash = Money::new(2_500_000.0, Currency::USD); // Only enough for 2.5 assets
 
     // Act

@@ -40,7 +40,7 @@ fn test_statement_forecast_percent() {
         .values()
         .map(|v| match v {
             AmountOrScalar::Scalar(s) => *s,
-            _ => 0.0,
+            AmountOrScalar::Amount(_) => 0.0,
         })
         .collect();
     assert_eq!(initial_values, vec![100.0, 200.0, 300.0, 400.0]);
@@ -82,7 +82,7 @@ fn test_statement_forecast_percent() {
         .values()
         .map(|v| match v {
             AmountOrScalar::Scalar(s) => *s,
-            _ => 0.0,
+            AmountOrScalar::Amount(_) => 0.0,
         })
         .collect();
 
@@ -147,7 +147,7 @@ fn test_statement_forecast_assign() {
         .values()
         .map(|v| match v {
             AmountOrScalar::Scalar(s) => *s,
-            _ => 0.0,
+            AmountOrScalar::Amount(_) => 0.0,
         })
         .collect();
 

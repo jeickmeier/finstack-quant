@@ -337,8 +337,8 @@ fn test_rates_credit_default_lowers_price() {
 
     let valuator_low = BondValuator::new(bond.clone(), &ctx_low, as_of, time_to_maturity, steps)
         .expect("valuator");
-    let valuator_high = BondValuator::new(bond.clone(), &ctx_high, as_of, time_to_maturity, steps)
-        .expect("valuator");
+    let valuator_high =
+        BondValuator::new(bond, &ctx_high, as_of, time_to_maturity, steps).expect("valuator");
 
     use crate::models::TreeModel;
     let disc_low = ctx_low

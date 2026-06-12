@@ -207,3 +207,151 @@ fn test_market_context_stats_includes_vol_cubes() {
     let ctx = MarketContext::new().insert_vol_cube(cube);
     assert_eq!(ctx.stats().vol_cube_count, 1);
 }
+
+// ---------------------------------------------------------------------------
+// Normal (Bachelier) vol quoting tests
+// ---------------------------------------------------------------------------
+
+use finstack_core::market_data::surfaces::VolQuoteType;
+use finstack_core::math::volatility::{black_call, black_shifted_call, implied_vol_bachelier};
+
+/// Positive-rates consistency: the Hagan normal vol from the cube must agree
+/// with the exact Bachelier vol implied from the Black price computed with the
+/// cube's lognormal quote. Both Hagan expansions are O(T) asymptotic
+/// approximations of the same SABR dynamics truncated differently, so the two
+/// quotes are price-equivalent only up to the expansion error — a 1% relative
+/// tolerance comfortably covers it for moderate vols/expiries.
+#[test]
+fn test_vol_cube_vol_normal_price_consistency_positive_rates() {
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let fwd = 0.03;
+    let cube = VolCube::from_grid("TEST", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
+    let t = 1.0;
+
+    for strike in [0.02, 0.025, 0.03, 0.035, 0.045] {
+        let sigma_ln = cube.vol(1.0, 5.0, strike).unwrap();
+        let sigma_n = cube.vol_normal(1.0, 5.0, strike).unwrap();
+        assert!(sigma_n.is_finite() && sigma_n > 0.0);
+
+        // Exact conversion through price space
+        let price = black_call(fwd, strike, sigma_ln, t);
+        let sigma_n_exact = implied_vol_bachelier(price, fwd, strike, t, true).unwrap();
+
+        let rel = (sigma_n - sigma_n_exact).abs() / sigma_n_exact;
+        assert!(
+            rel < 0.01,
+            "strike {strike}: Hagan normal {sigma_n} vs price-implied {sigma_n_exact} (rel {rel})"
+        );
+    }
+}
+
+/// Negative-rate point with shifted SABR: the normal vol is finite/positive
+/// and price-consistent with the lognormal quote evaluated on the shifted
+/// forward/strike (shifted-Black price -> exact Bachelier implied vol).
+/// Tolerance as above: the two Hagan expansions differ at their truncation
+/// order, ~1% relative for these inputs.
+#[test]
+fn test_vol_cube_vol_normal_negative_rates_with_shift() {
+    let shift = 0.02;
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4)
+        .unwrap()
+        .with_shift(shift);
+    let fwd = -0.005;
+    let cube = VolCube::from_grid("EUR-SWPT", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
+    let t = 1.0;
+    let strike = -0.002;
+
+    let sigma_n = cube.vol_normal(1.0, 5.0, strike).unwrap();
+    assert!(sigma_n.is_finite() && sigma_n > 0.0);
+
+    // Lognormal quote applies to the shifted model: price with shifted Black.
+    let sigma_ln = cube.vol(1.0, 5.0, strike).unwrap();
+    let price = black_shifted_call(fwd, strike, sigma_ln, t, shift);
+    let sigma_n_exact = implied_vol_bachelier(price, fwd, strike, t, true).unwrap();
+
+    let rel = (sigma_n - sigma_n_exact).abs() / sigma_n_exact;
+    assert!(
+        rel < 0.01,
+        "Hagan normal {sigma_n} vs shifted-Black price-implied {sigma_n_exact} (rel {rel})"
+    );
+}
+
+/// ATM: sigma_N ~= sigma_LN * F (standard first-order ATM approximation; the
+/// exact relation carries a 1 - sigma_LN^2 T / 24 correction, ~0.2% here, so
+/// a 1% relative tolerance is ample).
+#[test]
+fn test_vol_cube_vol_normal_atm_approximation() {
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let fwd = 0.03;
+    let cube = VolCube::from_grid("TEST", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
+
+    let sigma_ln = cube.vol(1.0, 5.0, fwd).unwrap();
+    let sigma_n = cube.vol_normal(1.0, 5.0, fwd).unwrap();
+
+    let approx = sigma_ln * fwd;
+    let rel = (sigma_n - approx).abs() / approx;
+    assert!(
+        rel < 0.01,
+        "ATM normal {sigma_n} vs lognormal*F {approx} (rel {rel})"
+    );
+}
+
+/// Degenerate point: beta > 0 with a cross-zero (negative forward, positive
+/// strike) quote and no shift is refused by the checked path and floored by
+/// the clamped path. The normal floor is in absolute rate units:
+/// 1e-8 * max(|F|, 1) = 1e-8 here.
+#[test]
+fn test_vol_cube_vol_normal_floor_on_degenerate_point() {
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let fwd = -0.01; // cross-zero vs positive strike, beta = 0.5, no shift
+    let cube = VolCube::from_grid("BAD", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
+
+    assert!(cube.vol_normal(1.0, 5.0, 0.02).is_err());
+
+    let floored = cube.vol_normal_clamped(1.0, 5.0, 0.02);
+    assert!(
+        (floored - 1e-8).abs() < 1e-20,
+        "expected normal-vol floor 1e-8, got {floored}"
+    );
+}
+
+#[test]
+fn test_vol_cube_materialize_tenor_slice_normal() {
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let cube = VolCube::from_grid(
+        "TEST",
+        &[1.0, 5.0],
+        &[5.0, 10.0],
+        &[p; 4],
+        &[0.03, 0.035, 0.04, 0.045],
+    )
+    .unwrap();
+    let strikes = vec![0.02, 0.03, 0.04];
+    let surface = cube.materialize_tenor_slice_normal(5.0, &strikes).unwrap();
+    assert_eq!(surface.quote_type(), VolQuoteType::Normal);
+    assert_eq!(surface.expiries(), &[1.0, 5.0]);
+
+    let cube_vol = cube.vol_normal(1.0, 5.0, 0.03).unwrap();
+    let surf_vol = surface.value_checked(1.0, 0.03).unwrap();
+    assert!(
+        (cube_vol - surf_vol).abs() < 1e-14,
+        "materialized normal surface vol {surf_vol} != cube normal vol {cube_vol}"
+    );
+}
+
+#[test]
+fn test_vol_cube_materialize_expiry_slice_normal() {
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let cube = VolCube::from_grid(
+        "TEST",
+        &[1.0, 5.0],
+        &[5.0, 10.0],
+        &[p; 4],
+        &[0.03, 0.035, 0.04, 0.045],
+    )
+    .unwrap();
+    let strikes = vec![0.02, 0.03, 0.04];
+    let surface = cube.materialize_expiry_slice_normal(1.0, &strikes).unwrap();
+    assert_eq!(surface.quote_type(), VolQuoteType::Normal);
+    assert_eq!(surface.expiries(), &[5.0, 10.0]);
+}

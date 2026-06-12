@@ -598,7 +598,7 @@ mod tests {
         let mbs = AgencyMbsPassthrough::example().expect("AgencyMbsPassthrough example is valid");
         assert_eq!(mbs.effective_payment_delay(), 55);
 
-        let mut mbs_custom = mbs.clone();
+        let mut mbs_custom = mbs;
         mbs_custom.payment_lag_days = Some(45);
         assert_eq!(mbs_custom.effective_payment_delay(), 45);
     }
@@ -647,7 +647,7 @@ mod tests {
         let mbs = AgencyMbsPassthrough::example().expect("AgencyMbsPassthrough example is valid");
         assert!(mbs.validate_coupon_consistency().is_ok());
 
-        let mut bad_mbs = mbs.clone();
+        let mut bad_mbs = mbs;
         bad_mbs.pass_through_rate = 0.05;
         assert!(bad_mbs.validate_coupon_consistency().is_err());
     }

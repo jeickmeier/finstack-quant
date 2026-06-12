@@ -541,7 +541,7 @@ mod tests {
                 values[i * ny + j] = grid.x().points()[i].exp();
             }
         }
-        let solution = solution2d_from_values(grid.clone(), values);
+        let solution = solution2d_from_values(grid, values);
 
         // Query in the upper part of [x_2 = 2.0, x_3 = 3.2]: nearest node x_3.
         let x = 3.1_f64;
@@ -564,7 +564,7 @@ mod tests {
         // the analytic exp(x); a left-node-centred stencil would not.
         let gx_fine = Grid1D::uniform(0.0, 5.0, 401).expect("valid fine x-grid");
         let gy2 = Grid1D::uniform(0.0, 1.0, 3).expect("valid y-grid");
-        let grid_fine = Grid2D::new(gx_fine.clone(), gy2);
+        let grid_fine = Grid2D::new(gx_fine, gy2);
         let nxf = grid_fine.nx();
         let nyf = grid_fine.ny();
         let mut vals_fine = vec![0.0; nxf * nyf];

@@ -77,7 +77,7 @@ fn call_friction_raises_callable_price_toward_straight() {
     let mut straight = callable_bond(as_of);
     straight.call_put = None;
     let valuator_straight =
-        BondValuator::new(straight.clone(), &market, as_of, time_to_maturity, steps).unwrap();
+        BondValuator::new(straight, &market, as_of, time_to_maturity, steps).unwrap();
     let price_straight = tree
         .price(vars.clone(), time_to_maturity, &market, &valuator_straight)
         .unwrap();

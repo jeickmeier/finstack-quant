@@ -37,11 +37,11 @@ impl FxTouchOptionCalculator {
                 )
             })?;
             let pv = match (inst.touch_type, observed_touch, inst.payout_timing) {
-                (TouchType::OneTouch, true, PayoutTiming::AtExpiry) => inst.payout_amount.amount(),
-                (TouchType::OneTouch, true, PayoutTiming::AtHit) => 0.0,
-                (TouchType::OneTouch, false, _) => 0.0,
-                (TouchType::NoTouch, true, _) => 0.0,
-                (TouchType::NoTouch, false, _) => inst.payout_amount.amount(),
+                (TouchType::OneTouch, true, PayoutTiming::AtHit)
+                | (TouchType::OneTouch, false, _)
+                | (TouchType::NoTouch, true, _) => 0.0,
+                (TouchType::OneTouch, true, PayoutTiming::AtExpiry)
+                | (TouchType::NoTouch, false, _) => inst.payout_amount.amount(),
             };
             return Ok(Money::new(pv, inst.quote_currency));
         }
@@ -168,8 +168,7 @@ fn price_touch(
     // `payout_timing`. Only an at-hit one-touch folds hit-time discounting into
     // the touch probability (the extra 2·r_d/σ² term in λ).
     let lambda_r = match (touch_type, payout_timing) {
-        (TouchType::NoTouch, _) => 0.0,
-        (TouchType::OneTouch, PayoutTiming::AtExpiry) => 0.0,
+        (TouchType::NoTouch, _) | (TouchType::OneTouch, PayoutTiming::AtExpiry) => 0.0,
         (TouchType::OneTouch, PayoutTiming::AtHit) => r_d,
     };
     let lambda_sq = mu * mu + 2.0 * lambda_r / sigma2;

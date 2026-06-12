@@ -390,9 +390,7 @@ fn test_equity_trs_sensitivity_to_spot_price() {
     // Act
     let npv_base = trs.value(&market, as_of).unwrap();
 
-    let market_bumped = market
-        .clone()
-        .insert_price("SPX-SPOT", MarketScalar::Unitless(spot_bumped));
+    let market_bumped = market.insert_price("SPX-SPOT", MarketScalar::Unitless(spot_bumped));
     let npv_bumped = trs.value(&market_bumped, as_of).unwrap();
 
     // Assert - With locked initial level, spot changes affect forward prices
@@ -416,9 +414,7 @@ fn test_equity_trs_sensitivity_to_dividend_yield() {
     // Act
     let npv_base = trs.value(&market, as_of).unwrap();
 
-    let market_bumped = market
-        .clone()
-        .insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(div_higher));
+    let market_bumped = market.insert_price("SPX-DIV-YIELD", MarketScalar::Unitless(div_higher));
     let npv_bumped = trs.value(&market_bumped, as_of).unwrap();
 
     // Assert - Higher div yield reduces forward price, lowering TR leg PV

@@ -53,11 +53,22 @@
 //! - **Expiry interpolation is linear in vol** on the resulting
 //!   [`VolSurface`] grid, not linear in total variance, so calendar
 //!   interpolation between pillars is only approximate.
-//! - **Merged strike grid limitation**: strikes from all expiries are merged
-//!   into one global grid and each expiry row is flat-extrapolated beyond its
-//!   own quoted wings. Short-expiry smiles therefore appear flattened at
-//!   strikes that are only relevant for long expiries. A per-expiry smile
-//!   representation is deferred.
+//! - **Per-expiry smiles** (merged-grid limitation resolved 2026-06-11, core
+//!   quant review): each expiry's smile is built independently from its own
+//!   3/5 pillar strikes (via the crate-internal `fx_smile_pillars` helper),
+//!   derived from *that expiry's* forward and vol scale.
+//!   The rectangular [`VolSurface`] materialization samples each expiry's own
+//!   smile on the union of all pillar strikes; because every expiry's knots
+//!   are grid points, queries at pillar expiries reproduce the per-expiry
+//!   smile exactly (piecewise-linear interpolation is invariant under grid
+//!   refinement). Beyond an expiry's own quoted wings the smile is flat.
+//!   **Off-pillar expiry queries** on the materialized surface blend rows
+//!   linearly in vol at fixed strike, which flattens intermediate smiles when
+//!   forwards differ across pillars; for smile-faithful off-pillar lookups
+//!   use [`FxDeltaVolSurface::implied_vol`](super::FxDeltaVolSurface::implied_vol),
+//!   which interpolates the
+//!   delta-space quotes to the query expiry and rebuilds the smile at that
+//!   expiry's forward.
 //!
 //! # References
 //!
@@ -69,10 +80,7 @@
 
 use crate::{error::InputError, types::CurveId};
 
-use super::{
-    fx_atm_dns_strike, fx_forward, fx_put_call_25d_strikes, fx_put_call_delta_strikes,
-    interp_linear_clamp, recover_fx_wing_vols, VolSurface,
-};
+use super::{fx_atm_dns_strike, fx_forward, fx_smile_pillars, interp_linear_clamp, VolSurface};
 
 /// Builder that converts FX delta-quoted vols to a standard strike-based [`VolSurface`].
 ///
@@ -308,72 +316,54 @@ impl FxDeltaVolSurfaceBuilder {
 
         if has_wings {
             // 3 or 5 strikes per expiry depending on whether 10d wings are available.
-            let (rr, bf) = match (self.rr_25d.as_ref(), self.bf_25d.as_ref()) {
-                (Some(r), Some(b)) => (r, b),
-                _ => return Err(InputError::Invalid.into()),
+            let (Some(rr), Some(bf)) = (self.rr_25d.as_ref(), self.bf_25d.as_ref()) else {
+                return Err(InputError::Invalid.into());
             };
-            let rr_10d = self.rr_10d.as_ref();
-            let bf_10d = self.bf_10d.as_ref();
+            let wings_10d = match (self.rr_10d.as_ref(), self.bf_10d.as_ref()) {
+                (Some(rr10), Some(bf10)) => Some((rr10, bf10)),
+                _ => None,
+            };
 
-            // Compute a common strike grid across all expiries.
-            // Collect all strikes, then sort and deduplicate.
+            // Build each expiry's smile independently from its own pillar
+            // strikes (derived from that expiry's forward and vol scale).
             let mut all_strikes: Vec<f64> =
                 Vec::with_capacity(if has_10d_wings { 5 } else { 3 } * n_expiries);
-            let mut per_expiry_data: Vec<(Vec<f64>, Vec<f64>)> = Vec::with_capacity(n_expiries);
+            let mut per_expiry_smiles: Vec<(Vec<f64>, Vec<f64>)> = Vec::with_capacity(n_expiries);
 
             for i in 0..n_expiries {
                 let t = self.expiries[i];
-                let atm = self.atm_vols[i];
-
-                // Recover wing vols from RR/BF
-                let (sigma_put, sigma_call) = recover_fx_wing_vols(atm, rr[i], bf[i]);
-
-                // Validate wing vols
-                if sigma_call <= 0.0 || sigma_put <= 0.0 {
-                    return Err(InputError::NegativeValue.into());
-                }
-
-                // Forward rate
                 let fwd = fx_forward(self.spot, self.domestic_rate, self.foreign_rate, t);
-                let k_atm = fx_atm_dns_strike(fwd, atm, t);
-                let (k_put, k_call) = fx_put_call_25d_strikes(fwd, sigma_put, sigma_call, t);
-                let mut known_strikes = vec![k_put, k_atm, k_call];
-                let mut known_vols = vec![sigma_put, atm, sigma_call];
-
-                if has_10d_wings {
-                    let (rr10, bf10) = match (rr_10d, bf_10d) {
-                        (Some(rr10), Some(bf10)) => (rr10, bf10),
-                        _ => return Err(InputError::Invalid.into()),
-                    };
-                    let (sigma_put_10d, sigma_call_10d) =
-                        recover_fx_wing_vols(atm, rr10[i], bf10[i]);
-                    if sigma_call_10d <= 0.0 || sigma_put_10d <= 0.0 {
-                        return Err(InputError::NegativeValue.into());
-                    }
-                    let (k_put_10d, k_call_10d) =
-                        fx_put_call_delta_strikes(fwd, sigma_put_10d, sigma_call_10d, t, 0.10);
-                    known_strikes = vec![k_put_10d, k_put, k_atm, k_call, k_call_10d];
-                    known_vols = vec![sigma_put_10d, sigma_put, atm, sigma_call, sigma_call_10d];
-                }
-
+                let (known_strikes, known_vols) = fx_smile_pillars(
+                    fwd,
+                    t,
+                    self.atm_vols[i],
+                    rr[i],
+                    bf[i],
+                    wings_10d.map(|(rr10, bf10)| (rr10[i], bf10[i])),
+                )?;
                 all_strikes.extend(known_strikes.iter().copied());
-                per_expiry_data.push((known_strikes, known_vols));
+                per_expiry_smiles.push((known_strikes, known_vols));
             }
 
-            // Build a sorted, deduplicated strike grid
+            // Strike axis: union of all expiries' pillar strikes (sorted,
+            // deduplicated). Every expiry's own knots are grid points, so
+            // sampling the per-expiry smiles on this axis is lossless at the
+            // pillar expiries: piecewise-linear interpolation is invariant
+            // under grid refinement.
             all_strikes.sort_by(|a, b| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal));
             all_strikes.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
 
             let strikes = &all_strikes;
             let n_strikes = strikes.len();
 
-            // For each expiry, interpolate vols onto the common strike grid.
-            // We use simple linear interpolation on the 3 known points.
             let mut builder = VolSurface::builder(self.id)
                 .expiries(&self.expiries)
                 .strikes(strikes);
 
-            for (known_strikes, known_vols) in &per_expiry_data {
+            // Each row samples that expiry's OWN smile only: linear within
+            // its own 3/5 pillars, flat beyond its own quoted wings. Strikes
+            // contributed by other expiries never alter the smile shape.
+            for (known_strikes, known_vols) in &per_expiry_smiles {
                 let mut row = Vec::with_capacity(n_strikes);
                 for &k in strikes {
                     let vol = interp_linear_clamp(known_strikes, known_vols, k);
@@ -408,12 +398,7 @@ impl FxDeltaVolSurfaceBuilder {
                 .strikes(strikes);
 
             for i in 0..n_expiries {
-                let t = self.expiries[i];
                 let atm = self.atm_vols[i];
-                let fwd = fx_forward(self.spot, self.domestic_rate, self.foreign_rate, t);
-                // k_atm computed for reference; flat surface uses atm vol for all strikes
-                let _k_atm = fx_atm_dns_strike(fwd, atm, t);
-
                 let mut row = Vec::with_capacity(n_strikes);
                 for _ in strikes {
                     // Flat extrapolation from ATM: all strikes use the single known vol

@@ -151,8 +151,8 @@ fn test_hull_white_1f_params_time_dependent_serialization() {
     let params = HullWhite1FParams::with_time_dependent_theta(
         0.1,  // κ
         0.01, // σ
-        theta_curve.clone(),
-        theta_times.clone(),
+        theta_curve,
+        theta_times,
     );
 
     let restored = roundtrip_json(&params);
@@ -199,7 +199,7 @@ fn test_multi_ou_params_with_correlation_serialization() {
         vec![2.0, 1.0],  // kappas
         vec![1.0, -1.0], // thetas
         vec![0.3, 0.4],  // sigmas
-        Some(corr.clone()),
+        Some(corr),
     );
 
     let restored = roundtrip_json(&params);

@@ -88,7 +88,7 @@ fn resolve_fixings<'a>(
             finstack_core::market_data::fixings::get_fixing_series(market, spec.index_id.as_ref())
                 .ok()
         }
-        _ => None,
+        BaseRateSpec::Fixed { .. } => None,
     }
 }
 
@@ -395,7 +395,7 @@ impl RevolvingCreditPricer {
     ) -> Result<EnhancedMonteCarloResult> {
         match &facility.draw_repay_spec {
             DrawRepaySpec::Stochastic(_) => Self::price_monte_carlo(facility, market, as_of),
-            _ => Err(finstack_core::Error::Validation(
+            DrawRepaySpec::Deterministic(_) => Err(finstack_core::Error::Validation(
                 "Path capture requires stochastic spec".into(),
             )),
         }
@@ -416,7 +416,7 @@ impl RevolvingCreditPricer {
         // Extract stochastic spec
         let stoch_spec = match &facility.draw_repay_spec {
             DrawRepaySpec::Stochastic(spec) => spec.as_ref(),
-            _ => {
+            DrawRepaySpec::Deterministic(_) => {
                 return Err(finstack_core::Error::Validation(
                     "Stochastic spec required for MC pricing".to_string(),
                 ))

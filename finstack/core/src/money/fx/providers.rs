@@ -419,7 +419,7 @@ mod tests {
             .expect("valid test quote");
 
         // Create bumped provider that bumps EUR/USD by 1% (relative).
-        let bumped = BumpedFxProvider::new(original.clone(), Currency::EUR, Currency::USD, 0.01)
+        let bumped = BumpedFxProvider::new(original, Currency::EUR, Currency::USD, 0.01)
             .expect("valid bump");
 
         // Bumped pair returns the delegated rate scaled by (1 + bump_pct).
@@ -513,7 +513,8 @@ mod tests {
         let original: Arc<dyn FxProvider> = Arc::new(SimpleFxProvider::new());
         for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, -1.5] {
             assert!(
-                BumpedFxProvider::new(original.clone(), Currency::EUR, Currency::USD, bad).is_err(),
+                BumpedFxProvider::new(Arc::clone(&original), Currency::EUR, Currency::USD, bad)
+                    .is_err(),
                 "bump_pct {bad} must be rejected"
             );
         }

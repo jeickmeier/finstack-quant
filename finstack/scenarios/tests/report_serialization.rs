@@ -1,3 +1,5 @@
+//! Report serialization tests for scenarios.
+
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
 use finstack_scenarios::{ArbitrageViolation, InterpolationResult, RollForwardReport};

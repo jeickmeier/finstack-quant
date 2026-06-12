@@ -1197,11 +1197,9 @@ impl<'a> EquityWaterfallEngine<'a> {
         ledger_rows: &mut Vec<AllocationRow>,
         clawback_spec: &ClawbackSpec,
     ) -> finstack_core::Result<()> {
-        let last_event_date = match events.iter().map(|e| e.date).max() {
-            Some(date) => date,
-            None => return Ok(()),
+        let Some(last_event_date) = events.iter().map(|e| e.date).max() else {
+            return Ok(());
         };
-
         let paid_gp_as_of = |rows: &[AllocationRow], as_of: Date| -> f64 {
             rows.iter()
                 .filter(|r| r.date <= as_of)

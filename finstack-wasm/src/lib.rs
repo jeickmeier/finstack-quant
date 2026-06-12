@@ -4,7 +4,6 @@
 //! that groups raw `wasm-bindgen` exports into crate-level namespaces mirroring
 //! the Rust umbrella crate structure.
 
-#![deny(unsafe_code)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]
@@ -25,6 +24,7 @@ pub mod api;
 pub mod utils;
 
 #[wasm_bindgen(start)]
+/// Module initializer: installs the panic hook (called automatically).
 pub fn start() {
     console_error_panic_hook::set_once();
 }

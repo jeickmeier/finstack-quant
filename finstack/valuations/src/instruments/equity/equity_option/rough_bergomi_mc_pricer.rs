@@ -396,7 +396,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
                     ccy,
                     &fbm_gen,
                     self.num_steps,
-                    err_ctx.clone(),
+                    err_ctx,
                 )?
             }
             OptionType::Put => {

@@ -27,3 +27,6 @@ finstack-test-utils = { path = "../test-utils" }
 [[bench]]
 name = "scenarios"
 harness = false
+
+[lints]
+workspace = true

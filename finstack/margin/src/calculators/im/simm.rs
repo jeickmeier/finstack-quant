@@ -1363,8 +1363,7 @@ mod tests {
     fn validate_rejects_missing_corporates_weight() {
         let mut params = SimmCalculator::new(SimmVersion::V2_6)
             .expect("registry should load")
-            .params
-            .clone();
+            .params;
         params.cq_delta_weights.remove("corporates");
         let err = validate_simm_params(&params).expect_err("should reject missing corporates");
         let msg = err.to_string();
@@ -1378,8 +1377,7 @@ mod tests {
     fn validate_rejects_missing_ir_tenor_pair() {
         let mut params = SimmCalculator::new(SimmVersion::V2_6)
             .expect("registry should load")
-            .params
-            .clone();
+            .params;
         let mut tenors = params.ir_delta_weights.keys();
         let a = tenors
             .next()

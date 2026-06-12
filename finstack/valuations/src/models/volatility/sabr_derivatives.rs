@@ -197,9 +197,8 @@ impl SABRCalibrationDerivatives {
             Some(shift) => SABRParameters::new_with_shift(alpha, beta, nu, rho, shift),
             None => SABRParameters::new(alpha, beta, nu, rho),
         };
-        let params = match params_result {
-            Ok(p) => p,
-            Err(_) => return 0.0, // Invalid parameter triple — large residual.
+        let Ok(params) = params_result else {
+            return 0.0; // Invalid parameter triple — large residual.
         };
 
         SABRModel::new(params)
@@ -527,8 +526,7 @@ mod tests {
         // over the same sub-shift-scale forward/strikes prices a different
         // smile, so dropping the shift would be observable.
         let unshifted = SABRCalibrationDerivatives::new(
-            SABRMarketData::new(forward, t, strikes.clone(), market_vols, beta)
-                .expect("valid market data"),
+            SABRMarketData::new(forward, t, strikes, market_vols, beta).expect("valid market data"),
         );
         let shifted_atm = provider.sabr_vol_and_derivatives(forward, alpha, nu, rho).0;
         let unshifted_atm = unshifted

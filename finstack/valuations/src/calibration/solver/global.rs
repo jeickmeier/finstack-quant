@@ -291,18 +291,14 @@ impl GlobalFitOptimizer {
 
         // If the primary solve failed and no restart rescued it, propagate the original
         // error rather than feeding a sentinel into the final-curve build.
-        let (best_result, _best_weighted_l2) = match best {
-            Some(b) => b,
-            None => {
-                return Err(
-                    primary_error.unwrap_or_else(|| finstack_core::Error::Calibration {
-                        message: "GlobalFitOptimizer: every solve attempt failed".to_string(),
-                        category: "global_solve".to_string(),
-                    }),
-                );
-            }
+        let Some((best_result, _best_weighted_l2)) = best else {
+            return Err(
+                primary_error.unwrap_or_else(|| finstack_core::Error::Calibration {
+                    message: "GlobalFitOptimizer: every solve attempt failed".to_string(),
+                    category: "global_solve".to_string(),
+                }),
+            );
         };
-
         let (solved_params, stats, eval_counter_val, eval_diagnostics_val) = best_result;
 
         // Build final curve
@@ -520,7 +516,7 @@ where
         crate::calibration::config::CalibrationMethod::GlobalSolve {
             use_analytical_jacobian,
         } => use_analytical_jacobian && target.supports_efficient_jacobian(),
-        _ => false,
+        crate::calibration::config::CalibrationMethod::Bootstrap => false,
     };
 
     let solver = config.create_lm_solver();
@@ -1134,11 +1130,9 @@ fn compute_condition_number(
     // A^{-1} application uses Cholesky factorisation of J^T W J. If the matrix is
     // singular, Cholesky fails and we report `cond = N/A` rather than a misleading
     // huge number.
-    let chol = match cholesky_decomposition(&jtj, n_params) {
-        Ok(c) => c,
-        Err(_) => return None,
+    let Ok(chol) = cholesky_decomposition(&jtj, n_params) else {
+        return None;
     };
-
     let mut v_min = vec![1.0 / (n_params as f64).sqrt(); n_params];
     let mut x_solve = vec![0.0_f64; n_params];
     let mut lambda_min = lambda_max;

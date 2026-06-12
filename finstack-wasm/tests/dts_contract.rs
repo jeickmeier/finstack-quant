@@ -1,3 +1,5 @@
+//! Contract test: generated TypeScript declarations match the facade surface.
+
 use std::fs;
 use std::path::PathBuf;
 
@@ -398,6 +400,29 @@ fn factor_model_dts_exposes_credit_namespace() {
     assert!(!factor_model.contains("CreditFactorModel"));
     assert!(!factor_model.contains("decomposeLevels"));
     assert!(dts.contains("export declare const factor_model: FactorModelNamespace;"));
+}
+
+#[test]
+fn core_market_data_dts_exposes_vol_cube_normal_vol_queries() {
+    let dts = index_dts();
+
+    let cube = interface_block(&dts, "VolCube ");
+    assert!(contains_signature(
+        cube,
+        "vol(expiry: number, tenor: number, strike: number): number;"
+    ));
+    assert!(contains_signature(
+        cube,
+        "volClamped(expiry: number, tenor: number, strike: number): number;"
+    ));
+    assert!(contains_signature(
+        cube,
+        "volNormal(expiry: number, tenor: number, strike: number): number;"
+    ));
+    assert!(contains_signature(
+        cube,
+        "volNormalClamped(expiry: number, tenor: number, strike: number): number;"
+    ));
 }
 
 #[test]

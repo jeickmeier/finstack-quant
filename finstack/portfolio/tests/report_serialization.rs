@@ -1,3 +1,5 @@
+//! Report serialization tests for portfolio.
+
 use finstack_cashflows::builder::CashflowRepresentation;
 use finstack_core::cashflow::CFKind;
 use finstack_core::currency::Currency;

@@ -848,11 +848,9 @@ pub fn validate_correlation_matrix(matrix: &[f64], n: usize) -> Result<()> {
     // threshold.
     match cholesky_correlation(matrix, n) {
         Ok(_) => Ok(()),
-        Err(CholeskyError::NotPositiveDefinite { .. }) => Err(error::InputError::Invalid.into()),
         Err(CholeskyError::DimensionMismatch { .. }) => {
             Err(error::InputError::DimensionMismatch.into())
         }
-        // cholesky_correlation only produces NotPositiveDefinite and DimensionMismatch.
         Err(_) => Err(error::InputError::Invalid.into()),
     }
 }

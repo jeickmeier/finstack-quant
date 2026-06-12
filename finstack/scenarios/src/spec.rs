@@ -1030,11 +1030,8 @@ impl OperationSpec {
                 check_id(curve_id.as_str(), "curve_id")?;
                 check_nodes(nodes)?;
             }
-            OperationSpec::BaseCorrParallelPts { surface_id, points } => {
-                check_id(surface_id.as_str(), "surface_id")?;
-                check_corr_delta(*points, "points")?;
-            }
-            OperationSpec::BaseCorrBucketPts {
+            OperationSpec::BaseCorrParallelPts { surface_id, points }
+            | OperationSpec::BaseCorrBucketPts {
                 surface_id, points, ..
             } => {
                 check_id(surface_id.as_str(), "surface_id")?;
@@ -1042,11 +1039,8 @@ impl OperationSpec {
             }
             OperationSpec::VolSurfaceParallelPct {
                 surface_id, pct, ..
-            } => {
-                check_id(surface_id.as_str(), "surface_id")?;
-                check_finite(*pct, "pct")?;
             }
-            OperationSpec::VolSurfaceBucketPct {
+            | OperationSpec::VolSurfaceBucketPct {
                 surface_id, pct, ..
             } => {
                 check_id(surface_id.as_str(), "surface_id")?;
@@ -1086,10 +1080,8 @@ impl OperationSpec {
             OperationSpec::InstrumentSpreadBpByType { bp, .. } => {
                 check_finite(*bp, "bp")?;
             }
-            OperationSpec::AssetCorrelationPts { delta_pts } => {
-                check_corr_delta(*delta_pts, "delta_pts")?;
-            }
-            OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => {
+            OperationSpec::AssetCorrelationPts { delta_pts }
+            | OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => {
                 check_corr_delta(*delta_pts, "delta_pts")?;
             }
             OperationSpec::HierarchyCurveParallelBp {
@@ -1108,15 +1100,8 @@ impl OperationSpec {
                     check_id(dcid.as_str(), "discount_curve_id")?;
                 }
             }
-            OperationSpec::HierarchyVolSurfaceParallelPct { target, pct, .. } => {
-                if target.path.is_empty() {
-                    return Err(crate::error::Error::Validation(
-                        "Hierarchy target path cannot be empty".into(),
-                    ));
-                }
-                check_finite(*pct, "pct")?;
-            }
-            OperationSpec::HierarchyEquityPricePct { target, pct } => {
+            OperationSpec::HierarchyVolSurfaceParallelPct { target, pct, .. }
+            | OperationSpec::HierarchyEquityPricePct { target, pct } => {
                 if target.path.is_empty() {
                     return Err(crate::error::Error::Validation(
                         "Hierarchy target path cannot be empty".into(),

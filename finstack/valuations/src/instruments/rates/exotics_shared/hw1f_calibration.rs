@@ -191,9 +191,8 @@ fn resolve_capfloor_surface_params(
     points: &[Hw1fCapletSurfacePoint],
     kappa: f64,
 ) -> Result<Option<HullWhiteParams>> {
-    let surface = match market.get_surface(surface_id) {
-        Ok(surface) => surface,
-        Err(_) => return Ok(None),
+    let Ok(surface) = market.get_surface(surface_id) else {
+        return Ok(None);
     };
     let mut weighted_sigma = 0.0;
     let mut total_weight = 0.0;
@@ -221,9 +220,8 @@ fn resolve_swaption_surface_params(
     max_expiry: Option<f64>,
     frequency: SwapFrequency,
 ) -> Result<Option<HullWhiteParams>> {
-    let surface = match market.get_surface(surface_id) {
-        Ok(surface) => surface,
-        Err(_) => return Ok(None),
+    let Ok(surface) = market.get_surface(surface_id) else {
+        return Ok(None);
     };
     // The swaption calibration interprets the grid as expiry × swap-tenor with
     // NORMAL (Bachelier) vols (`is_normal_vol: true` below). A surface tagged
@@ -231,9 +229,8 @@ fn resolve_swaption_surface_params(
     // contract instead of guessing.
     surface.require_secondary_axis(finstack_core::market_data::surfaces::VolSurfaceAxis::Tenor)?;
     surface.require_quote_type(finstack_core::market_data::surfaces::VolQuoteType::Normal)?;
-    let discount = match market.get_discount(curve_id) {
-        Ok(discount) => discount,
-        Err(_) => return Ok(None),
+    let Ok(discount) = market.get_discount(curve_id) else {
+        return Ok(None);
     };
     let mut quotes = Vec::new();
     for &expiry in surface.expiries() {

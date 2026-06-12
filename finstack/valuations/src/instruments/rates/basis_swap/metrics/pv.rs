@@ -27,12 +27,12 @@ impl PvCalculator {
 
 impl MetricCalculator for PvCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        let instrument = context.instrument.clone();
+        let instrument = std::sync::Arc::clone(&context.instrument);
         let swap = instrument
             .as_any()
             .downcast_ref::<BasisSwap>()
             .ok_or(Error::Input(finstack_core::InputError::Invalid))?;
-        let curves = context.curves.clone();
+        let curves = std::sync::Arc::clone(&context.curves);
         let as_of = context.as_of;
 
         let leg = if self.is_primary {

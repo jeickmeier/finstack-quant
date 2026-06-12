@@ -247,7 +247,6 @@ impl InflationCurveTarget {
         lag: InflationLag,
     ) -> finstack_core::dates::Date {
         match lag {
-            InflationLag::None => date,
             InflationLag::Months(m) => date.add_months(-(m as i32)),
             InflationLag::Days(d) => date - time::Duration::days(d as i64),
             _ => date,
@@ -324,7 +323,7 @@ impl InflationCurveTarget {
             }
         };
 
-        report.update_solver_config(config.solver.clone());
+        report.update_solver_config(config.solver);
         report.metadata.insert(
             "calibration_type".to_string(),
             "inflation_curve".to_string(),
@@ -435,8 +434,8 @@ impl BootstrapTarget for InflationCurveTarget {
         // We know it's Inflation variant
         let rate = match quote {
             CalibrationQuote::Inflation(pq) => match pq.quote.as_ref() {
-                InflationQuote::InflationSwap { rate, .. } => *rate,
-                InflationQuote::YoYInflationSwap { rate, .. } => *rate,
+                InflationQuote::InflationSwap { rate, .. }
+                | InflationQuote::YoYInflationSwap { rate, .. } => *rate,
             },
             _ => 0.02, // Fallback if mismatched type (shouldn't happen)
         };
@@ -470,8 +469,8 @@ impl GlobalSolveTarget for InflationCurveTarget {
             // Extract inflation rate from quote for initial guess
             let rate = match quote {
                 CalibrationQuote::Inflation(pq) => match pq.quote.as_ref() {
-                    InflationQuote::InflationSwap { rate, .. } => *rate,
-                    InflationQuote::YoYInflationSwap { rate, .. } => *rate,
+                    InflationQuote::InflationSwap { rate, .. }
+                    | InflationQuote::YoYInflationSwap { rate, .. } => *rate,
                 },
                 _ => 0.02, // Fallback
             };

@@ -457,7 +457,7 @@ Global solve requires strictly increasing times.",
         if matches!(params.method, CalibrationMethod::GlobalSolve { .. })
             && config.discount_curve.bootstrap_seed_global_solve
         {
-            let seed_quotes = prepared_quotes.clone();
+            let seed_quotes = Clone::clone(&prepared_quotes);
 
             match SequentialBootstrapper::bootstrap(
                 &target,
@@ -499,7 +499,7 @@ Global solve requires strictly increasing times.",
                 && seed_rep.max_residual <= config.discount_curve.validation_tolerance
                 && seed_rep.max_residual <= report.max_residual
             {
-                if let Some(seed_curve) = target.initial_curve.clone() {
+                if let Some(seed_curve) = target.initial_curve {
                     curve = seed_curve;
                     report = seed_rep.clone();
                     report
@@ -521,7 +521,7 @@ Global solve requires strictly increasing times.",
         let new_context = context.clone().insert(curve);
 
         // Track solver configuration used and any seed diagnostics for transparency.
-        report.update_solver_config(config.solver.clone());
+        report.update_solver_config(config.solver);
         if let Some(seed) = seed_report {
             report.metadata.insert(
                 "bootstrap_seed_max_residual".to_string(),
@@ -1460,7 +1460,7 @@ mod tests {
             discount_curve_id: CurveId::new("USD-OIS"),
             solve_interp: InterpStyle::Linear,
             extrapolation: ExtrapolationPolicy::FlatZero,
-            config: config.clone(),
+            config,
             curve_day_count: DayCount::Act365F,
             spot_knot: None,
             residual_notional: 1.0,

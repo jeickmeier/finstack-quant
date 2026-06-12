@@ -22,11 +22,9 @@ impl Evaluator {
         use crate::capital_structure::integration;
         use finstack_cashflows::CashflowProvider;
 
-        let cs_spec = match &model.capital_structure {
-            Some(cs) => cs,
-            None => return Ok(None),
+        let Some(cs_spec) = &model.capital_structure else {
+            return Ok(None);
         };
-
         let mut instruments: IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =
             IndexMap::new();
 

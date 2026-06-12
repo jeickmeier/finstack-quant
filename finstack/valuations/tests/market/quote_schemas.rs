@@ -53,7 +53,7 @@ fn cds_quote_id_and_bump_semantics() {
                 "spread bump mismatch: expected 101.0, got {spread_bp}"
             );
         }
-        other => panic!("expected CdsParSpread, got {:?}", other),
+        other @ CdsQuote::CdsUpfront { .. } => panic!("expected CdsParSpread, got {:?}", other),
     }
 
     let q2 = CdsQuote::CdsUpfront {
@@ -84,7 +84,7 @@ fn cds_quote_id_and_bump_semantics() {
                 "upfront pct should be unchanged: expected 0.02, got {upfront_pct}"
             );
         }
-        other => panic!("expected CdsUpfront, got {:?}", other),
+        other @ CdsQuote::CdsParSpread { .. } => panic!("expected CdsUpfront, got {:?}", other),
     }
 }
 
@@ -202,7 +202,9 @@ fn inflation_quote_maturity_and_bump() {
                 "inflation rate bump mismatch: expected 0.0251, got {rate}"
             );
         }
-        other => panic!("expected InflationSwap, got {:?}", other),
+        other @ InflationQuote::YoYInflationSwap { .. } => {
+            panic!("expected InflationSwap, got {:?}", other)
+        }
     }
 
     let yoy = InflationQuote::YoYInflationSwap {
@@ -228,7 +230,9 @@ fn inflation_quote_maturity_and_bump() {
                 Tenor::new(1, finstack_core::dates::TenorUnit::Years)
             );
         }
-        other => panic!("expected YoYInflationSwap, got {:?}", other),
+        other @ InflationQuote::InflationSwap { .. } => {
+            panic!("expected YoYInflationSwap, got {:?}", other)
+        }
     }
 }
 
@@ -315,7 +319,7 @@ fn quote_serialization_roundtrip() {
                 "cds roundtrip spread mismatch: expected 100.0, got {spread_bp}"
             );
         }
-        other => panic!("expected CdsParSpread, got {:?}", other),
+        other @ CdsQuote::CdsUpfront { .. } => panic!("expected CdsParSpread, got {:?}", other),
     }
 
     let tranche = CDSTrancheQuote::CDSTranche {
@@ -365,7 +369,9 @@ fn quote_serialization_roundtrip() {
                 "inflation roundtrip rate mismatch: expected 0.025, got {rate}"
             );
         }
-        other => panic!("expected InflationSwap, got {:?}", other),
+        other @ InflationQuote::YoYInflationSwap { .. } => {
+            panic!("expected InflationSwap, got {:?}", other)
+        }
     }
 
     let vol = VolQuote::OptionVol {

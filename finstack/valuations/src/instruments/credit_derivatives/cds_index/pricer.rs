@@ -513,10 +513,11 @@ impl CDSIndexPricer {
                 for position in positions {
                     let disc_id = &position.cds.premium.discount_curve_id;
                     let disc = match &cached_discount {
-                        Some((id, handle)) if id == disc_id => handle.clone(),
+                        Some((id, handle)) if id == disc_id => std::sync::Arc::clone(handle),
                         _ => {
                             let handle = curves.get_discount(disc_id)?;
-                            cached_discount = Some((disc_id.clone(), handle.clone()));
+                            cached_discount =
+                                Some((disc_id.clone(), std::sync::Arc::clone(&handle)));
                             handle
                         }
                     };
@@ -577,10 +578,11 @@ impl CDSIndexPricer {
                 for position in positions {
                     let disc_id = &position.cds.premium.discount_curve_id;
                     let disc = match &cached_discount {
-                        Some((id, handle)) if id == disc_id => handle.clone(),
+                        Some((id, handle)) if id == disc_id => std::sync::Arc::clone(handle),
                         _ => {
                             let handle = curves.get_discount(disc_id)?;
-                            cached_discount = Some((disc_id.clone(), handle.clone()));
+                            cached_discount =
+                                Some((disc_id.clone(), std::sync::Arc::clone(&handle)));
                             handle
                         }
                     };

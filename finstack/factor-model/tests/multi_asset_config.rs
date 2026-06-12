@@ -1,3 +1,5 @@
+//! Regression coverage for multi-asset factor model configuration.
+
 use finstack_core::currency::Currency;
 use finstack_core::market_data::bumps::BumpUnits;
 use finstack_core::types::CurveId;

@@ -276,7 +276,7 @@ fn fx_vanna_and_volga_match_reference_fd() -> finstack_core::Result<()> {
     };
     let curves_dn = {
         let bumped = surf.bump_point(t, opt.strike, -vol_bump_pct)?;
-        market.clone().insert_surface(bumped)
+        market.insert_surface(bumped)
     };
 
     let metrics = [MetricId::Delta, MetricId::Vega];

@@ -935,7 +935,7 @@ mod tests {
         let primary_inv = BasisSwapLeg {
             start: date(2025, 1, 3),
             end: date(2024, 1, 3),
-            ..base_leg.clone()
+            ..base_leg
         };
         let reference_inv = BasisSwapLeg {
             forward_curve_id: CurveId::new("6M-SOFR"),

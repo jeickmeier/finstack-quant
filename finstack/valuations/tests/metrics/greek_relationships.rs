@@ -166,8 +166,8 @@ fn test_charm_equals_delta_decay() {
     // Try to get Charm from registry if available
     let pv = option.value(&market, as_of).unwrap();
     let mut context_charm = MetricContext::new(
-        Arc::new(option.clone()),
-        Arc::new(market.clone()),
+        Arc::new(option),
+        Arc::new(market),
         as_of,
         pv,
         MetricContext::default_config(),
@@ -229,8 +229,8 @@ fn test_color_equals_gamma_decay() {
     // Try to get Color from registry if available
     let pv = option.value(&market, as_of).unwrap();
     let mut context_color = MetricContext::new(
-        Arc::new(option.clone()),
-        Arc::new(market.clone()),
+        Arc::new(option),
+        Arc::new(market),
         as_of,
         pv,
         MetricContext::default_config(),
@@ -302,7 +302,7 @@ fn test_speed_equals_gamma_convexity() {
     let pv_up = option.value(&market_up, as_of).unwrap();
     let mut context_up = MetricContext::new(
         Arc::new(option.clone()),
-        Arc::new(market_up.clone()),
+        Arc::new(market_up),
         as_of,
         pv_up,
         MetricContext::default_config(),
@@ -321,7 +321,7 @@ fn test_speed_equals_gamma_convexity() {
     let pv_down = option.value(&market_down, as_of).unwrap();
     let mut context_down = MetricContext::new(
         Arc::new(option.clone()),
-        Arc::new(market_down.clone()),
+        Arc::new(market_down),
         as_of,
         pv_down,
         MetricContext::default_config(),
@@ -337,8 +337,8 @@ fn test_speed_equals_gamma_convexity() {
 
     // Try to get Speed from registry if available
     let mut context_speed = MetricContext::new(
-        Arc::new(option.clone()),
-        Arc::new(market.clone()),
+        Arc::new(option),
+        Arc::new(market),
         as_of,
         pv,
         MetricContext::default_config(),

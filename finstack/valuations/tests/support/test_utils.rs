@@ -190,7 +190,7 @@ pub fn equity_option_european_call(
     contract_size: f64,
 ) -> finstack_core::Result<EquityOption> {
     let ticker = ticker.into();
-    let underlying = EquityUnderlyingParams::new(ticker.clone(), "EQUITY-SPOT", Currency::USD)
+    let underlying = EquityUnderlyingParams::new(ticker, "EQUITY-SPOT", Currency::USD)
         .with_dividend_yield("EQUITY-DIVYIELD");
 
     EquityOption::builder()
@@ -221,7 +221,7 @@ pub fn equity_option_european_put(
     contract_size: f64,
 ) -> finstack_core::Result<EquityOption> {
     let ticker = ticker.into();
-    let underlying = EquityUnderlyingParams::new(ticker.clone(), "EQUITY-SPOT", Currency::USD)
+    let underlying = EquityUnderlyingParams::new(ticker, "EQUITY-SPOT", Currency::USD)
         .with_dividend_yield("EQUITY-DIVYIELD");
 
     EquityOption::builder()
@@ -252,7 +252,7 @@ pub fn equity_option_american_call(
     contract_size: f64,
 ) -> finstack_core::Result<EquityOption> {
     let ticker = ticker.into();
-    let underlying = EquityUnderlyingParams::new(ticker.clone(), "EQUITY-SPOT", Currency::USD)
+    let underlying = EquityUnderlyingParams::new(ticker, "EQUITY-SPOT", Currency::USD)
         .with_dividend_yield("EQUITY-DIVYIELD");
 
     EquityOption::builder()

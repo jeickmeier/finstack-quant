@@ -32,14 +32,12 @@ fn test_extreme_low_correlation_pricing() {
     let test_index = finstack_core::market_data::term_structures::CreditIndexData::builder()
         .num_constituents(125)
         .recovery_rate(0.40)
-        .index_credit_curve(index_data.index_credit_curve.clone())
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
         .base_correlation_curve(std::sync::Arc::new(low_corr_curve))
         .build()
         .unwrap();
 
-    let market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", test_index);
+    let market = base_market.insert_credit_index("CDX.NA.IG.42", test_index);
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -72,14 +70,12 @@ fn test_extreme_high_correlation_pricing() {
     let test_index = finstack_core::market_data::term_structures::CreditIndexData::builder()
         .num_constituents(125)
         .recovery_rate(0.40)
-        .index_credit_curve(index_data.index_credit_curve.clone())
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
         .base_correlation_curve(std::sync::Arc::new(high_corr_curve))
         .build()
         .unwrap();
 
-    let market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", test_index);
+    let market = base_market.insert_credit_index("CDX.NA.IG.42", test_index);
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -107,14 +103,12 @@ fn test_pricing_with_zero_recovery_rate() {
         finstack_core::market_data::term_structures::CreditIndexData::builder()
             .num_constituents(125)
             .recovery_rate(0.0)
-            .index_credit_curve(index_data.index_credit_curve.clone())
-            .base_correlation_curve(index_data.base_correlation_curve.clone())
+            .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+            .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
             .build()
             .unwrap();
 
-    let market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", zero_recovery_index);
+    let market = base_market.insert_credit_index("CDX.NA.IG.42", zero_recovery_index);
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -143,14 +137,12 @@ fn test_pricing_with_high_recovery_rate() {
         finstack_core::market_data::term_structures::CreditIndexData::builder()
             .num_constituents(125)
             .recovery_rate(0.90)
-            .index_credit_curve(index_data.index_credit_curve.clone())
-            .base_correlation_curve(index_data.base_correlation_curve.clone())
+            .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+            .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
             .build()
             .unwrap();
 
-    let market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", high_recovery_index);
+    let market = base_market.insert_credit_index("CDX.NA.IG.42", high_recovery_index);
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -189,13 +181,11 @@ fn test_pricing_with_near_zero_default_probability() {
         .num_constituents(125)
         .recovery_rate(0.40)
         .index_credit_curve(std::sync::Arc::new(low_hazard_curve))
-        .base_correlation_curve(index_data.base_correlation_curve.clone())
+        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
         .build()
         .unwrap();
 
-    let market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", low_hazard_index);
+    let market = base_market.insert_credit_index("CDX.NA.IG.42", low_hazard_index);
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -228,14 +218,12 @@ fn test_very_small_portfolio() {
     let small_index = finstack_core::market_data::term_structures::CreditIndexData::builder()
         .num_constituents(5)
         .recovery_rate(0.40)
-        .index_credit_curve(index_data.index_credit_curve.clone())
-        .base_correlation_curve(index_data.base_correlation_curve.clone())
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
         .build()
         .unwrap();
 
-    let market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", small_index);
+    let market = base_market.insert_credit_index("CDX.NA.IG.42", small_index);
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();
@@ -260,14 +248,12 @@ fn test_very_large_portfolio() {
     let large_index = finstack_core::market_data::term_structures::CreditIndexData::builder()
         .num_constituents(500)
         .recovery_rate(0.40)
-        .index_credit_curve(index_data.index_credit_curve.clone())
-        .base_correlation_curve(index_data.base_correlation_curve.clone())
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
         .build()
         .unwrap();
 
-    let market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", large_index);
+    let market = base_market.insert_credit_index("CDX.NA.IG.42", large_index);
 
     let tranche = mezzanine_tranche();
     let as_of = base_date();

@@ -313,7 +313,7 @@ fn test_asw_market_falls_back_to_bond_forward_curve_id() {
         .build()
         .unwrap();
     let market = finstack_core::market_data::context::MarketContext::new()
-        .insert(discount_curve.clone())
+        .insert(discount_curve)
         .insert(low_forward_curve)
         .insert(high_forward_curve);
 
@@ -1128,7 +1128,7 @@ fn test_ytm_roundtrip_settlement_lag_two_days() {
     let clean_pct = quotes.clean_price_pct;
 
     // Feed the clean price back and re-solve YTM.
-    let mut bond_with_price = bond.clone();
+    let mut bond_with_price = bond;
     bond_with_price.pricing_overrides =
         PricingOverrides::default().with_quoted_clean_price(clean_pct);
     let res = bond_with_price

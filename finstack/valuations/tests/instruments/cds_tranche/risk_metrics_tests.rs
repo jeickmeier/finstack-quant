@@ -670,7 +670,7 @@ fn test_par_spread_positive_and_side_invariant() {
     let notional = tranche_sell.notional.amount();
     let npv_tol = notional * 0.001; // 0.1% of notional
 
-    let mut at_par_sell = tranche_sell.clone();
+    let mut at_par_sell = tranche_sell;
     at_par_sell.running_coupon_bp = par_sell;
     let npv_sell = pricer
         .price_tranche(&at_par_sell, &market, as_of)
@@ -683,7 +683,7 @@ fn test_par_spread_positive_and_side_invariant() {
         "SellProtection: NPV at par spread should be ~0",
     );
 
-    let mut at_par_buy = tranche_buy.clone();
+    let mut at_par_buy = tranche_buy;
     at_par_buy.running_coupon_bp = par_buy;
     let npv_buy = pricer
         .price_tranche(&at_par_buy, &market, as_of)

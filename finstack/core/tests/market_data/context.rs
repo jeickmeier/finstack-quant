@@ -197,7 +197,7 @@ fn market_context_manages_fx_and_scalars() {
         MarketScalar::Unitless(v) => {
             assert!((v - 0.05).abs() < 1e-12);
         }
-        other => panic!("unexpected scalar variant: {:?}", other),
+        MarketScalar::Price(other) => panic!("unexpected scalar variant: {other:?}"),
     }
 
     assert_eq!(
@@ -269,15 +269,15 @@ fn market_context_bumps_surfaces_and_scalars() {
 
     let ctx = MarketContext::new()
         .insert_surface(surface.clone())
-        .insert_price("EQ-SPOT", price.clone())
-        .insert_series(series.clone());
+        .insert_price("EQ-SPOT", price)
+        .insert_series(series);
 
     let original_vol = surface
         .value_checked(0.5, 1.0)
         .expect("vol lookup should succeed in test");
     let original_price = match ctx.get_price("EQ-SPOT").unwrap() {
         MarketScalar::Price(m) => m.amount(),
-        _ => panic!("unexpected scalar variant"),
+        MarketScalar::Unitless(_) => panic!("unexpected scalar variant"),
     };
     let original_series = ctx
         .get_series("TS")
@@ -321,7 +321,7 @@ fn market_context_bumps_surfaces_and_scalars() {
 
     let bumped_price = match bumped.get_price("EQ-SPOT").unwrap() {
         MarketScalar::Price(m) => m.amount(),
-        _ => panic!("unexpected scalar variant"),
+        MarketScalar::Unitless(_) => panic!("unexpected scalar variant"),
     };
     assert!((bumped_price - original_price * 1.05).abs() < 1e-9);
 
@@ -537,8 +537,8 @@ fn market_context_update_and_bump_failures() {
     let hazard = Arc::new(sample_hazard_curve("CDX"));
     let credit_index = CreditIndexData::builder()
         .num_constituents(1)
-        .index_credit_curve(hazard.clone())
-        .base_correlation_curve(base_corr.clone())
+        .index_credit_curve(Arc::clone(&hazard))
+        .base_correlation_curve(Arc::clone(&base_corr))
         .build()
         .unwrap();
 
@@ -547,7 +547,7 @@ fn market_context_update_and_bump_failures() {
         .insert(base_corr.as_ref().clone())
         .insert_credit_index("CDX", credit_index);
     let new_curve = Arc::new(sample_base_correlation_curve("CDX-NEW"));
-    assert!(ctx.update_base_correlation_curve("CDX", new_curve.clone()));
+    assert!(ctx.update_base_correlation_curve("CDX", Arc::clone(&new_curve)));
     assert_eq!(
         ctx.get_credit_index("CDX")
             .unwrap()
@@ -652,7 +652,7 @@ fn market_context_roll_forward_preserves_ids_and_clones_non_curves() {
         .insert(sample_hazard_curve("CDX"))
         .insert(sample_inflation_curve("USD-CPI"))
         .insert(sample_base_correlation_curve("CDX-BC"))
-        .insert_surface(surface.clone())
+        .insert_surface(surface)
         .insert_price("EQ-SPOT", MarketScalar::Unitless(1.0))
         .map_collateral("USD-CSA", CurveId::from("USD-OIS"))
         .insert_fx(sample_fx_matrix());
@@ -1062,23 +1062,23 @@ fn curve_storage_arc_from_impls_and_curve_type_coverage() {
     let inf = Arc::new(sample_inflation_curve("USD-CPI"));
     let bc = Arc::new(sample_base_correlation_curve("CDX-BC"));
 
-    let s_disc: CurveStorage = disc.clone().into();
+    let s_disc: CurveStorage = Arc::clone(&disc).into();
     assert!(Arc::ptr_eq(s_disc.discount().unwrap(), &disc));
     assert_eq!(s_disc.curve_type(), "Discount");
 
-    let s_fwd: CurveStorage = fwd.clone().into();
+    let s_fwd: CurveStorage = Arc::clone(&fwd).into();
     assert!(Arc::ptr_eq(s_fwd.forward().unwrap(), &fwd));
     assert_eq!(s_fwd.curve_type(), "Forward");
 
-    let s_haz: CurveStorage = haz.clone().into();
+    let s_haz: CurveStorage = Arc::clone(&haz).into();
     assert!(Arc::ptr_eq(s_haz.hazard().unwrap(), &haz));
     assert_eq!(s_haz.curve_type(), "Hazard");
 
-    let s_inf: CurveStorage = inf.clone().into();
+    let s_inf: CurveStorage = Arc::clone(&inf).into();
     assert!(Arc::ptr_eq(s_inf.inflation().unwrap(), &inf));
     assert_eq!(s_inf.curve_type(), "Inflation");
 
-    let s_bc: CurveStorage = bc.clone().into();
+    let s_bc: CurveStorage = Arc::clone(&bc).into();
     assert!(Arc::ptr_eq(s_bc.base_correlation().unwrap(), &bc));
     assert_eq!(s_bc.curve_type(), "BaseCorrelation");
 }
@@ -1162,7 +1162,7 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
 fn market_context_clone_thread_safe_smoke() {
     // MarketContext is cheap to clone and safe to use across threads when wrapped in Arc.
     let ctx = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
-    let cloned = ctx.clone();
+    let cloned = ctx;
 
     let handle = std::thread::spawn(move || {
         // basic lookup on another thread

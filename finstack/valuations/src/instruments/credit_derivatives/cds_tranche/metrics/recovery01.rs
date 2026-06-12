@@ -52,8 +52,8 @@ fn rebuild_with_recovery(original: &CreditIndexData, new_recovery: f64) -> Resul
     let mut builder = CreditIndexData::builder()
         .num_constituents(original.num_constituents)
         .recovery_rate(new_recovery)
-        .index_credit_curve(original.index_credit_curve.clone())
-        .base_correlation_curve(original.base_correlation_curve.clone());
+        .index_credit_curve(std::sync::Arc::clone(&original.index_credit_curve))
+        .base_correlation_curve(std::sync::Arc::clone(&original.base_correlation_curve));
 
     if let Some(curves) = &original.issuer_credit_curves {
         builder = builder.issuer_curves(curves.clone());

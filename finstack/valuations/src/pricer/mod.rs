@@ -162,9 +162,7 @@ pub fn standard_registry() -> &'static PricerRegistry {
 /// The registry is initialized once and then cloned via `Arc` for cheap reuse
 /// across instrument-side pricing calls.
 pub(crate) fn shared_standard_registry() -> Arc<PricerRegistry> {
-    STANDARD_PRICER_REGISTRY
-        .get_or_init(|| Arc::new(build_standard_registry()))
-        .clone()
+    Arc::clone(STANDARD_PRICER_REGISTRY.get_or_init(|| Arc::new(build_standard_registry())))
 }
 
 #[cfg(test)]

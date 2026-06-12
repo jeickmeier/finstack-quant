@@ -17,3 +17,6 @@ serde_json = { workspace = true }
 schemars = { workspace = true }
 time = { workspace = true, features = ["macros"] }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+
+[lints]
+workspace = true

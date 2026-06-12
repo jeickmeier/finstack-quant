@@ -28,11 +28,11 @@ impl MetricCalculator for DividendRiskCalculator {
         let convertible: &ConvertibleBond = context.instrument_as()?;
         let as_of = context.as_of;
 
-        let div_yield_id =
-            match resolve_dividend_yield_market_value_id(&context.curves, convertible)? {
-                Some(id) => id,
-                None => return Ok(0.0), // No dividend yield available, risk is zero
-            };
+        let Some(div_yield_id) =
+            resolve_dividend_yield_market_value_id(&context.curves, convertible)?
+        else {
+            return Ok(0.0); // No dividend yield available, risk is zero
+        };
 
         // Get current dividend yield
         let current_scalar = context.curves.get_price(&div_yield_id)?;

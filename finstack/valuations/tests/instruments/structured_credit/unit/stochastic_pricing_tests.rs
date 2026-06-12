@@ -495,7 +495,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         .price_stochastic_with_mode(&market, close, mode_4.clone())
         .expect("first stochastic run");
     let run2 = sc
-        .price_stochastic_with_mode(&market, close, mode_4.clone())
+        .price_stochastic_with_mode(&market, close, mode_4)
         .expect("second stochastic run");
 
     assert_eq!(
@@ -530,7 +530,7 @@ fn philox_rng_discipline_determinism_and_stream_identity() {
         .price_stochastic_with_mode(&market, close, mode_1.clone())
         .expect("single-path run A");
     let single_run_b = sc
-        .price_stochastic_with_mode(&market, close, mode_1.clone())
+        .price_stochastic_with_mode(&market, close, mode_1)
         .expect("single-path run B");
 
     assert_eq!(

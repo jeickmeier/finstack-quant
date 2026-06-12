@@ -206,7 +206,6 @@ fn test_par_rate_discount_ratio_rejects_seasoned_swap() {
     swap.fixed.par_method = Some(ParRateMethod::DiscountRatio);
 
     let par_forward = swap
-        .clone()
         .price_with_metrics(
             &market,
             as_of,
@@ -1459,7 +1458,7 @@ fn test_ois_identity_with_eom() {
         })
         .float(FloatLegSpec {
             discount_curve_id: disc_id.clone(),
-            forward_curve_id: disc_id.clone(),
+            forward_curve_id: disc_id,
             spread_bp: Decimal::ZERO,
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,

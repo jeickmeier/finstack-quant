@@ -119,6 +119,7 @@ pub fn market_with_eur_and_fx(rate: f64) -> MarketContext {
 
 /// Simple FX provider that returns a static rate for any currency pair.
 pub struct StaticFx {
+    /// Static exchange rate returned for every requested currency pair.
     pub rate: f64,
 }
 

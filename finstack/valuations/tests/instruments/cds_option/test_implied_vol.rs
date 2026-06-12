@@ -72,7 +72,7 @@ fn test_implied_vol_call_vs_put() {
     let put_pv = put.value(&market, as_of).unwrap().amount();
 
     // Solve for IV
-    let mut call_solve = call.clone();
+    let mut call_solve = call;
     call_solve
         .pricing_overrides
         .market_quotes
@@ -81,7 +81,7 @@ fn test_implied_vol_call_vs_put() {
         .implied_vol(&market, as_of, call_pv, None)
         .unwrap();
 
-    let mut put_solve = put.clone();
+    let mut put_solve = put;
     put_solve.pricing_overrides.market_quotes.implied_volatility = None;
     let put_iv = put_solve.implied_vol(&market, as_of, put_pv, None).unwrap();
 
@@ -136,7 +136,7 @@ fn test_implied_vol_positive() {
 
     let pv = option.value(&market, as_of).unwrap().amount();
 
-    let mut option_solve = option.clone();
+    let mut option_solve = option;
     option_solve
         .pricing_overrides
         .market_quotes
@@ -156,7 +156,7 @@ fn test_implied_vol_with_initial_guess() {
     let option = CDSOptionBuilder::new().implied_vol(true_vol).build(as_of);
     let pv = option.value(&market, as_of).unwrap().amount();
 
-    let mut option_solve = option.clone();
+    let mut option_solve = option;
     option_solve
         .pricing_overrides
         .market_quotes
@@ -179,7 +179,7 @@ fn test_implied_vol_distressed_credit() {
     let true_vol = 1.50;
     let option = CDSOptionBuilder::new().implied_vol(true_vol).build(as_of);
     let pv = option.value(&market, as_of).unwrap().amount();
-    let mut option_solve = option.clone();
+    let mut option_solve = option;
     option_solve
         .pricing_overrides
         .market_quotes
@@ -222,7 +222,7 @@ fn test_implied_vol_convergence_atm() {
 
     let pv = option.value(&market, as_of).unwrap().amount();
 
-    let mut option_solve = option.clone();
+    let mut option_solve = option;
     option_solve
         .pricing_overrides
         .market_quotes
@@ -247,7 +247,7 @@ fn test_implied_vol_convergence_itm() {
 
     let pv = option.value(&market, as_of).unwrap().amount();
 
-    let mut option_solve = option.clone();
+    let mut option_solve = option;
     option_solve
         .pricing_overrides
         .market_quotes
@@ -272,7 +272,7 @@ fn test_implied_vol_convergence_otm() {
 
     let pv = option.value(&market, as_of).unwrap().amount();
 
-    let mut option_solve = option.clone();
+    let mut option_solve = option;
     option_solve
         .pricing_overrides
         .market_quotes

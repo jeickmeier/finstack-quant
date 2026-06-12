@@ -45,9 +45,8 @@ impl MetricCalculator for VegaCalculator {
         let strike = option.strike_f64()?;
 
         // Use consolidated helper to get pre-computed inputs
-        let inputs = match option.greek_inputs(&context.curves, context.as_of)? {
-            Some(inputs) => inputs,
-            None => return Ok(0.0), // Option expired
+        let Some(inputs) = option.greek_inputs(&context.curves, context.as_of)? else {
+            return Ok(0.0); // Option expired
         };
 
         // Near-expiry guard: vega approaches zero as T -> 0, but d1 calculation

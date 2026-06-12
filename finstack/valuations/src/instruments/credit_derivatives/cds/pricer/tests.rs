@@ -135,7 +135,7 @@ fn test_par_spread_calculation() {
         .par_spread(&cds, &disc, &credit, as_of)
         .expect("should succeed");
     assert!(par_spread > 0.0 && par_spread < 2000.0);
-    let mut cds_at_par = cds.clone();
+    let mut cds_at_par = cds;
     cds_at_par.premium.spread_bp = Decimal::try_from(par_spread).expect("valid par_spread");
     let npv = pricer
         .npv_full(&cds_at_par, &disc, &credit, as_of)
@@ -370,7 +370,7 @@ fn test_schedule_generation_respects_isda_flag_and_calendar_availability() {
         .generate_isda_schedule(&cds)
         .expect("adjusted ISDA schedule");
 
-    let mut cds_no_calendar = cds.clone();
+    let mut cds_no_calendar = cds;
     cds_no_calendar.premium.calendar_id = None;
     let unadjusted_schedule = isda
         .generate_isda_schedule(&cds_no_calendar)
@@ -495,9 +495,7 @@ fn test_npv_full_combines_dated_and_market_quote_upfronts() {
         "dated upfront and direct PV adjustment should combine additively"
     );
 
-    let market = MarketContext::new()
-        .insert(disc.clone())
-        .insert(credit.clone());
+    let market = MarketContext::new().insert(disc).insert(credit);
     let npv_via_value_raw = cds.value_raw(&market, as_of).expect("value_raw npv");
     assert!(
         (npv_via_value_raw - npv_with_upfront).abs() < 1e-12,
@@ -530,10 +528,8 @@ fn test_time_and_settlement_helpers_match_curve_and_calendar_conventions() {
         "negative hazard times should clamp to the curve base date"
     );
     let days_per_year: f64 = match credit.day_count() {
-        DayCount::Act360 => 360.0,
         DayCount::Act365F => 365.0,
-        DayCount::Act365L | DayCount::ActAct | DayCount::ActActIsma => 365.25,
-        DayCount::Thirty360 | DayCount::ThirtyE360 => 360.0,
+        DayCount::Act360 | DayCount::Thirty360 | DayCount::ThirtyE360 => 360.0,
         DayCount::Bus252 => 252.0,
         _ => 365.25,
     };
@@ -767,7 +763,7 @@ fn test_protection_start_helper() {
     let spot = create_test_cds("CDS-SPOT", as_of, end, 100.0, 0.40);
     assert_eq!(spot.protection_start(), as_of);
 
-    let mut fwd = spot.clone();
+    let mut fwd = spot;
     fwd.protection_effective_date = Some(fwd_date);
     assert_eq!(fwd.protection_start(), fwd_date);
 }

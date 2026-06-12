@@ -161,7 +161,7 @@ fn test_builder_with_callability() {
         .discount_curve_id(CurveId::from("USD-OIS"))
         .amortization(AmortizationSpec::None)
         .coupon_type(CouponType::Cash)
-        .call_schedule_opt(Some(call_schedule.clone()))
+        .call_schedule_opt(Some(call_schedule))
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)

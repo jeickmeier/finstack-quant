@@ -181,8 +181,8 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_core::
         },
     };
 
-    let market_up = market.bump([bump_up.clone()])?;
-    let market_down = market.bump([bump_down.clone()])?;
+    let market_up = market.bump([bump_up])?;
+    let market_down = market.bump([bump_down])?;
 
     let pv_base = option.value(&market, as_of)?.amount();
     let pv_up = option.value(&market_up, as_of)?.amount();

@@ -266,10 +266,7 @@ impl From<PricingError> for finstack_core::Error {
                 finstack_core::Error::Validation(format!("{message}{}", format_context(&context)))
             }
             PricingError::MissingMarketData { missing_id, .. } => {
-                finstack_core::InputError::NotFound {
-                    id: missing_id.clone(),
-                }
-                .into()
+                finstack_core::InputError::NotFound { id: missing_id }.into()
             }
             PricingError::ModelFailure { message, context } => finstack_core::Error::Calibration {
                 message: format!("{message}{}", format_context(&context)),

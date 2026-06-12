@@ -377,7 +377,7 @@ fn test_quantlib_parity_vega() {
     swaption_up.pricing_overrides = PricingOverrides::default().with_implied_vol(0.21);
     let pv_up = swaption_up.value(&market, as_of).unwrap().amount();
 
-    let mut swaption_down = swaption.clone();
+    let mut swaption_down = swaption;
     swaption_down.pricing_overrides = PricingOverrides::default().with_implied_vol(0.19);
     let pv_down = swaption_down.value(&market, as_of).unwrap().amount();
 

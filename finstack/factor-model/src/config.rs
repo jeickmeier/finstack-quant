@@ -294,6 +294,9 @@ impl FactorBumpUnit {
     /// capture a multiplicative shock; callers that want that branch
     /// should match on the variant explicitly.
     #[must_use]
+    // Multiplier passthrough is semantically distinct from Absolute/Fraction
+    // even though the arm bodies coincide; keep the arms explicit.
+    #[allow(clippy::match_same_arms)]
     pub fn to_fraction(self, value: f64) -> f64 {
         match self {
             FactorBumpUnit::Absolute | FactorBumpUnit::Fraction => value,

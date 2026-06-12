@@ -387,7 +387,7 @@ fn test_long_short_net_zero_invariant() {
     let config = FinstackConfig::default();
     let long: Arc<dyn Instrument> = Arc::new(bond);
     let short: Arc<dyn Instrument> =
-        Arc::new(ScaledInstrument::new("SHORT-BOND", long.clone(), -1.0));
+        Arc::new(ScaledInstrument::new("SHORT-BOND", Arc::clone(&long), -1.0));
 
     let long_attr = attribute_pnl_parallel(
         &long,
@@ -471,8 +471,8 @@ fn test_portfolio_additivity_invariant() {
     let inst_b: Arc<dyn Instrument> = Arc::new(bond_b);
     let portfolio: Arc<dyn Instrument> = Arc::new(CompositeInstrument::new(
         "PORTFOLIO-AB",
-        inst_a.clone(),
-        inst_b.clone(),
+        Arc::clone(&inst_a),
+        Arc::clone(&inst_b),
     ));
 
     let attr_a = attribute_pnl_parallel(

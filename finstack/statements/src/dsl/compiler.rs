@@ -185,8 +185,9 @@ fn divide_dimensions(left: Dimension, right: Dimension) -> Result<Dimension> {
 
 fn require_scalar_operands(context: &str, left: Dimension, right: Dimension) -> Result<Dimension> {
     match (left, right) {
-        (Dimension::Unknown, _) | (_, Dimension::Unknown) => Ok(Dimension::Scalar),
-        (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
+        (Dimension::Unknown, _)
+        | (_, Dimension::Unknown)
+        | (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
         _ => Err(crate::error::Error::build(format!(
             "Dimensional mismatch in {context}: operands must be scalar"
         ))),
@@ -397,23 +398,9 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
                     ));
                 }
             }
-            Function::Lag | Function::Shift => {
-                if compiled_args.len() != 2 {
-                    return Err(crate::error::Error::eval(format!(
-                        "{}() requires exactly 2 arguments",
-                        func_name
-                    )));
-                }
-            }
-            Function::Diff | Function::PctChange => {
-                if compiled_args.is_empty() || compiled_args.len() > 2 {
-                    return Err(crate::error::Error::eval(format!(
-                        "{}() requires 1 or 2 arguments",
-                        func_name
-                    )));
-                }
-            }
-            Function::RollingMean
+            Function::Lag
+            | Function::Shift
+            | Function::RollingMean
             | Function::RollingSum
             | Function::RollingStd
             | Function::RollingVar
@@ -426,6 +413,14 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
                 if compiled_args.len() != 2 {
                     return Err(crate::error::Error::eval(format!(
                         "{}() requires exactly 2 arguments",
+                        func_name
+                    )));
+                }
+            }
+            Function::Diff | Function::PctChange => {
+                if compiled_args.is_empty() || compiled_args.len() > 2 {
+                    return Err(crate::error::Error::eval(format!(
+                        "{}() requires 1 or 2 arguments",
                         func_name
                     )));
                 }

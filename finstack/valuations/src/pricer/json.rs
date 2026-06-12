@@ -509,12 +509,10 @@ mod tests {
 
     #[test]
     fn parse_boxed_instrument_json_rejects_invalid_pricing_overrides() {
-        let err = match parse_boxed_instrument_json(
-            &equity_option_json_with_negative_vol_override(),
-            None,
-        ) {
-            Ok(_) => panic!("negative implied volatility override must be rejected"),
-            Err(err) => err,
+        let Err(err) =
+            parse_boxed_instrument_json(&equity_option_json_with_negative_vol_override(), None)
+        else {
+            panic!("negative implied volatility override must be rejected")
         };
         assert!(
             err.to_string().contains("NegativeValue") || err.to_string().contains("negative"),

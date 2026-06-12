@@ -905,7 +905,7 @@ impl crate::cashflow::traits::CashflowProvider for RevolvingCredit {
                 spec.index_id.as_ref(),
             )
             .ok(),
-            _ => None,
+            BaseRateSpec::Fixed { .. } => None,
         };
         let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
         let path_schedule = engine.generate_deterministic()?;

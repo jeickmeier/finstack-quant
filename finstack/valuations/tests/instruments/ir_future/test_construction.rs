@@ -31,7 +31,7 @@ fn test_with_contract_specs() {
         convexity_adjustment: Some(0.0001),
     };
 
-    let future = create_standard_future(start, end).with_contract_specs(custom_specs.clone());
+    let future = create_standard_future(start, end).with_contract_specs(custom_specs);
 
     assert_eq!(future.contract_specs.face_value, 2_000_000.0);
     assert_eq!(future.contract_specs.tick_size, 0.01);

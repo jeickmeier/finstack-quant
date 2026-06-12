@@ -80,11 +80,11 @@ fn test_ytm_uses_bond_daycount() {
     let market = MarketContext::new().insert(disc);
 
     // Price both bonds at par (same price)
-    let mut bond_act365_quoted = bond_act365.clone();
+    let mut bond_act365_quoted = bond_act365;
     bond_act365_quoted.pricing_overrides =
         PricingOverrides::default().with_quoted_clean_price(100.0);
 
-    let mut bond_30360_quoted = bond_30360.clone();
+    let mut bond_30360_quoted = bond_30360;
     bond_30360_quoted.pricing_overrides =
         PricingOverrides::default().with_quoted_clean_price(100.0);
 
@@ -186,7 +186,7 @@ fn test_duration_consistent_with_ytm() {
     let disc = build_flat_discount_curve(0.05, as_of, "USD-OIS");
     let market = MarketContext::new().insert(disc);
 
-    let mut bond_quoted = bond.clone();
+    let mut bond_quoted = bond;
     bond_quoted.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
 
     let result = bond_quoted

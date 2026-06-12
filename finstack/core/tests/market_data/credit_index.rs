@@ -12,8 +12,8 @@ fn credit_index_builder_validates_inputs() {
     let data = CreditIndexData::builder()
         .num_constituents(125)
         .recovery_rate(0.4)
-        .index_credit_curve(hazard.clone())
-        .base_correlation_curve(base_corr.clone())
+        .index_credit_curve(Arc::clone(&hazard))
+        .base_correlation_curve(Arc::clone(&base_corr))
         .build()
         .expect("valid credit index");
 
@@ -37,8 +37,8 @@ fn credit_index_builder_supports_issuer_curves() {
     let data = CreditIndexDataBuilder::default()
         .num_constituents(1)
         .recovery_rate(0.35)
-        .index_credit_curve(hazard.clone())
-        .base_correlation_curve(base_corr.clone())
+        .index_credit_curve(hazard)
+        .base_correlation_curve(base_corr)
         .issuer_curves(issuers.clone())
         .build()
         .expect("builder with issuer curves");
@@ -85,8 +85,8 @@ fn test_credit_index_recovery_rate_scenarios() {
         let data = CreditIndexData::builder()
             .num_constituents(125)
             .recovery_rate(rr)
-            .index_credit_curve(hazard.clone())
-            .base_correlation_curve(base_corr.clone())
+            .index_credit_curve(Arc::clone(&hazard))
+            .base_correlation_curve(Arc::clone(&base_corr))
             .build()
             .expect("valid recovery rate");
 

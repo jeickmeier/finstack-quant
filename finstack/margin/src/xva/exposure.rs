@@ -220,25 +220,22 @@ pub fn compute_exposure_profile(
         let future_date = as_of + time::Duration::days(days);
 
         // Roll market data forward (constant-curves assumption).
-        let rolled_market = match market.roll_forward(days) {
-            Ok(m) => m,
-            Err(_) => {
-                // Market data can't be rolled this far; record zero exposure
-                // but track the failure for the quality check below.
-                market_roll_failures += 1;
-                if market_roll_failures > max_market_roll_failures {
-                    return Err(finstack_core::Error::Validation(format!(
-                        "Exposure simulation aborted: market data roll failed for \
+        let Ok(rolled_market) = market.roll_forward(days) else {
+            // Market data can't be rolled this far; record zero exposure
+            // but track the failure for the quality check below.
+            market_roll_failures += 1;
+            if market_roll_failures > max_market_roll_failures {
+                return Err(finstack_core::Error::Validation(format!(
+                    "Exposure simulation aborted: market data roll failed for \
                          {market_roll_failures} of {n} time points (>50%); check \
                          market data coverage for the requested horizon"
-                    )));
-                }
-                times.push(t);
-                mtm_values.push(0.0);
-                epe.push(0.0);
-                ene.push(0.0);
-                continue;
+                )));
             }
+            times.push(t);
+            mtm_values.push(0.0);
+            epe.push(0.0);
+            ene.push(0.0);
+            continue;
         };
 
         // Value each instrument at the future date
@@ -836,7 +833,7 @@ mod tests {
         let profile = ExposureProfile {
             times: times.clone(),
             mtm_values: epe.clone(),
-            epe: epe.clone(),
+            epe,
             ene: vec![0.0; times.len()],
             diagnostics: None,
         };
@@ -862,7 +859,7 @@ mod tests {
     fn exposure_profile_validates_after_construction() {
         let times = vec![0.25, 0.5, 1.0, 2.0, 5.0];
         let profile = ExposureProfile {
-            times: times.clone(),
+            times,
             mtm_values: vec![100.0, -50.0, 25.0, 75.0, -10.0],
             epe: vec![100.0, 0.0, 25.0, 75.0, 0.0],
             ene: vec![0.0, 50.0, 0.0, 0.0, 10.0],

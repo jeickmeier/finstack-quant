@@ -75,7 +75,6 @@ fn make_range_accrual(
 
     // Use relative bounds [90%–110%] or absolute [4230–5170] for SPX at 4700
     let (lower, upper) = match bounds_type {
-        BoundsType::RelativeToInitialSpot => (0.90, 1.10),
         BoundsType::Absolute => (4230.0, 5170.0),
         _ => (0.90, 1.10),
     };

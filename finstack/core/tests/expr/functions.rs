@@ -1035,7 +1035,7 @@ mod ewm_operations {
         );
         let var_expr = Expr::call(
             Function::EwmVar,
-            vec![Expr::column("x"), alpha.clone(), adjust_true.clone()],
+            vec![Expr::column("x"), alpha, adjust_true],
         );
 
         let std_vals = CompiledExpr::new(std_expr)

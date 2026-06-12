@@ -103,12 +103,9 @@ fn test_zero_coupon_bond_ytm() {
         .build();
 
     // Skip test if bond construction fails due to validation
-    let mut bond = match bond_result {
-        Ok(bond) => bond,
-        Err(_) => {
-            println!("Skipping test_zero_coupon_bond_ytm: bond construction failed validation");
-            return;
-        }
+    let Ok(mut bond) = bond_result else {
+        println!("Skipping test_zero_coupon_bond_ytm: bond construction failed validation");
+        return;
     };
 
     let market = create_test_market(issue);
@@ -170,12 +167,9 @@ fn test_odd_first_coupon_ytm() {
         .build();
 
     // Skip test if bond construction fails due to validation
-    let mut bond = match bond_result {
-        Ok(bond) => bond,
-        Err(_) => {
-            println!("Skipping test_odd_first_coupon_ytm: bond construction failed validation");
-            return;
-        }
+    let Ok(mut bond) = bond_result else {
+        println!("Skipping test_odd_first_coupon_ytm: bond construction failed validation");
+        return;
     };
 
     let market = create_test_market(issue);
@@ -224,14 +218,9 @@ fn test_eom_february_maturity_ytm() {
         .build();
 
     // Skip test if bond construction fails due to validation
-    let mut bond = match bond_result {
-        Ok(bond) => bond,
-        Err(_) => {
-            println!(
-                "Skipping test_eom_february_maturity_ytm: bond construction failed validation"
-            );
-            return;
-        }
+    let Ok(mut bond) = bond_result else {
+        println!("Skipping test_eom_february_maturity_ytm: bond construction failed validation");
+        return;
     };
 
     let market = create_test_market(issue);
@@ -289,12 +278,9 @@ fn test_long_first_coupon_ytm() {
         .build();
 
     // Skip test if bond construction fails due to validation
-    let mut bond = match bond_result {
-        Ok(bond) => bond,
-        Err(_) => {
-            println!("Skipping test_long_first_coupon_ytm: bond construction failed validation");
-            return;
-        }
+    let Ok(mut bond) = bond_result else {
+        println!("Skipping test_long_first_coupon_ytm: bond construction failed validation");
+        return;
     };
 
     let market = create_test_market(issue);

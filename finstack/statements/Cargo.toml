@@ -45,3 +45,6 @@ harness = false
 [[bench]]
 name = "statements_scale"
 harness = false
+
+[lints]
+workspace = true

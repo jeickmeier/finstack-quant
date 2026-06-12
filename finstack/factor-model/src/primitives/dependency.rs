@@ -166,11 +166,11 @@ impl MarketDependency {
             (Self::Curve { curve_type, .. }, DependencyType::Credit) => {
                 *curve_type == CurveType::Hazard
             }
-            (Self::CreditCurve { .. }, DependencyType::Credit) => true,
-            (Self::Spot { .. }, DependencyType::Spot) => true,
-            (Self::VolSurface { .. }, DependencyType::Vol) => true,
-            (Self::FxPair { .. }, DependencyType::Fx) => true,
-            (Self::Series { .. }, DependencyType::Series) => true,
+            (Self::CreditCurve { .. }, DependencyType::Credit)
+            | (Self::Spot { .. }, DependencyType::Spot)
+            | (Self::VolSurface { .. }, DependencyType::Vol)
+            | (Self::FxPair { .. }, DependencyType::Fx)
+            | (Self::Series { .. }, DependencyType::Series) => true,
             _ => false,
         }
     }

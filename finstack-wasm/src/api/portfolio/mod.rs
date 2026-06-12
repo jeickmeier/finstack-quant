@@ -767,7 +767,7 @@ mod tests {
         let market_val: serde_json::Value =
             serde_json::from_str(&empty_market_json()).expect("parse market");
         let snapshots_json = serde_json::json!([
-            {"date": "2024-01-15", "market": market_val.clone()},
+            {"date": "2024-01-15", "market": market_val},
             {"date": "2024-01-16", "market": market_val}
         ])
         .to_string();

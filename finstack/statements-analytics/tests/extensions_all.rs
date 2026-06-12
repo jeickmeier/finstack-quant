@@ -1,3 +1,5 @@
+//! Extensions all tests for statements-analytics.
+
 // Extension tests.
 //
 // Note: Cargo only discovers integration tests that are direct children of `tests/`.

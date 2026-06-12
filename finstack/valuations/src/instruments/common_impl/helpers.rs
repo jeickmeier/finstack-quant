@@ -322,7 +322,7 @@ pub fn get_unitless_scalar(market: &MarketContext, key: &str, default: f64) -> f
         .ok()
         .and_then(|s| match s {
             MarketScalar::Unitless(v) => Some(*v),
-            _ => None,
+            MarketScalar::Price(_) => None,
         })
         .unwrap_or(default)
 }
@@ -410,7 +410,7 @@ pub(crate) fn build_with_metrics_dyn(
     } = options;
     let finstack_config = cfg.unwrap_or_else(MetricContext::default_config);
     let mut context = MetricContext::new(
-        instrument.clone(),
+        Arc::clone(&instrument),
         curves,
         as_of,
         instrument
@@ -440,7 +440,7 @@ pub(crate) fn build_with_metrics_dyn(
 
     // Allow instruments to pre-seed the metric context with cached data (e.g., pre-computed
     // cashflows) to avoid redundant computation during metric calculation.
-    let market_ref: Arc<MarketContext> = context.curves.clone();
+    let market_ref: Arc<MarketContext> = Arc::clone(&context.curves);
     instrument.seed_metric_context(&mut context, market_ref.as_ref(), as_of);
 
     let registry = standard_registry();
@@ -706,7 +706,7 @@ mod tests {
             base_value,
             &[],
             MetricBuildOptions {
-                cfg: Some(cfg.clone()),
+                cfg: Some(cfg),
                 ..MetricBuildOptions::default()
             },
         )?;

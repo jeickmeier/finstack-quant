@@ -233,9 +233,9 @@ impl StochasticPrepaySpec {
     pub fn factor_loading(&self) -> Option<f64> {
         match self {
             StochasticPrepaySpec::Deterministic(_) => None,
-            StochasticPrepaySpec::FactorCorrelated { factor_loading, .. } => Some(*factor_loading),
-            StochasticPrepaySpec::RichardRoll { factor_loading, .. } => Some(*factor_loading),
-            StochasticPrepaySpec::RegimeSwitching { factor_loading, .. } => Some(*factor_loading),
+            StochasticPrepaySpec::FactorCorrelated { factor_loading, .. }
+            | StochasticPrepaySpec::RichardRoll { factor_loading, .. }
+            | StochasticPrepaySpec::RegimeSwitching { factor_loading, .. } => Some(*factor_loading),
         }
     }
 

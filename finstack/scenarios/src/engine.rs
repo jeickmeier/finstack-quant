@@ -1132,7 +1132,6 @@ fn flush_pending_bumps(
 /// target as an already-queued one.
 fn would_conflict_with_pending(pending: &[MarketBump], incoming: &MarketBump) -> bool {
     pending.iter().any(|p| match (p, incoming) {
-        (MarketBump::Curve { id: a, .. }, MarketBump::Curve { id: b, .. }) => a == b,
         (
             MarketBump::FxPct {
                 base: ba,
@@ -1145,11 +1144,12 @@ fn would_conflict_with_pending(pending: &[MarketBump], incoming: &MarketBump) ->
                 ..
             },
         ) => ba == bb && qa == qb,
-        (
+        (MarketBump::Curve { id: a, .. }, MarketBump::Curve { id: b, .. })
+        | (
             MarketBump::VolBucketPct { surface_id: a, .. },
             MarketBump::VolBucketPct { surface_id: b, .. },
-        ) => a == b,
-        (
+        )
+        | (
             MarketBump::BaseCorrBucketPts { surface_id: a, .. },
             MarketBump::BaseCorrBucketPts { surface_id: b, .. },
         ) => a == b,
@@ -1238,9 +1238,8 @@ fn apply_correlation_effect(
 ) -> (usize, Vec<Warning>) {
     use finstack_valuations::instruments::fixed_income::structured_credit::StructuredCredit;
 
-    let instruments = match ctx.instruments.as_mut() {
-        Some(insts) => insts,
-        None => return (0, vec![Warning::CorrelationShockNoPortfolio]),
+    let Some(instruments) = ctx.instruments.as_mut() else {
+        return (0, vec![Warning::CorrelationShockNoPortfolio]);
     };
 
     let mut count = 0usize;

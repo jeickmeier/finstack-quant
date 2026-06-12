@@ -234,42 +234,51 @@ impl WasmPerformance {
 
     // ── Scalar metrics ──
 
+    /// Compound annual growth rate per asset.
     pub fn cagr(&self) -> Result<JsValue, JsValue> {
         result_vec_f64_to_js(self.inner.cagr())
     }
 
     #[wasm_bindgen(js_name = meanReturn)]
+    /// Mean periodic return per asset (annualized by default).
     pub fn mean_return(&self, annualize: Option<bool>) -> JsValue {
         vec_f64_to_js(&self.inner.mean_return(annualize.unwrap_or(true)))
     }
 
+    /// Return volatility per asset (annualized by default).
     pub fn volatility(&self, annualize: Option<bool>) -> JsValue {
         vec_f64_to_js(&self.inner.volatility(annualize.unwrap_or(true)))
     }
 
+    /// Sharpe ratio per asset for the given risk-free rate.
     pub fn sharpe(&self, risk_free_rate: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.sharpe(risk_free_rate.unwrap_or(0.0)))
     }
 
+    /// Sortino ratio per asset for the given minimum acceptable return.
     pub fn sortino(&self, mar: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.sortino(mar.unwrap_or(0.0)))
     }
 
+    /// Calmar ratio (CAGR over max drawdown) per asset.
     pub fn calmar(&self) -> Result<JsValue, JsValue> {
         result_vec_f64_to_js(self.inner.calmar())
     }
 
     #[wasm_bindgen(js_name = meanDrawdown)]
+    /// Mean drawdown per asset.
     pub fn mean_drawdown(&self) -> JsValue {
         vec_f64_to_js(&self.inner.mean_drawdown())
     }
 
     #[wasm_bindgen(js_name = maxDrawdown)]
+    /// Maximum drawdown per asset.
     pub fn max_drawdown(&self) -> JsValue {
         vec_f64_to_js(&self.inner.max_drawdown())
     }
 
     #[wasm_bindgen(js_name = valueAtRisk)]
+    /// Historical value-at-risk per asset at the given confidence level.
     pub fn value_at_risk(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -279,6 +288,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = expectedShortfall)]
+    /// Expected shortfall (CVaR) per asset at the given confidence level.
     pub fn expected_shortfall(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -288,94 +298,113 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = trackingError)]
+    /// Tracking error versus the benchmark per asset.
     pub fn tracking_error(&self) -> JsValue {
         vec_f64_to_js(&self.inner.tracking_error())
     }
 
     #[wasm_bindgen(js_name = informationRatio)]
+    /// Information ratio versus the benchmark per asset.
     pub fn information_ratio(&self) -> JsValue {
         vec_f64_to_js(&self.inner.information_ratio())
     }
 
+    /// Return skewness per asset.
     pub fn skewness(&self) -> JsValue {
         vec_f64_to_js(&self.inner.skewness())
     }
 
+    /// Excess kurtosis of returns per asset.
     pub fn kurtosis(&self) -> JsValue {
         vec_f64_to_js(&self.inner.kurtosis())
     }
 
     #[wasm_bindgen(js_name = geometricMean)]
+    /// Geometric mean return per asset.
     pub fn geometric_mean(&self) -> JsValue {
         vec_f64_to_js(&self.inner.geometric_mean())
     }
 
     #[wasm_bindgen(js_name = downsideDeviation)]
+    /// Downside deviation per asset below the minimum acceptable return.
     pub fn downside_deviation(&self, mar: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.downside_deviation(mar.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = maxDrawdownDuration)]
+    /// Longest drawdown duration (in periods) per asset.
     pub fn max_drawdown_duration(&self) -> Result<JsValue, JsValue> {
         // `usize` does not fit a typed array; keep the serde path.
         to_js(&self.inner.max_drawdown_duration())
     }
 
     #[wasm_bindgen(js_name = upCapture)]
+    /// Upside capture ratio versus the benchmark per asset.
     pub fn up_capture(&self) -> JsValue {
         vec_f64_to_js(&self.inner.up_capture())
     }
 
     #[wasm_bindgen(js_name = downCapture)]
+    /// Downside capture ratio versus the benchmark per asset.
     pub fn down_capture(&self) -> JsValue {
         vec_f64_to_js(&self.inner.down_capture())
     }
 
     #[wasm_bindgen(js_name = captureRatio)]
+    /// Up/down capture ratio versus the benchmark per asset.
     pub fn capture_ratio(&self) -> JsValue {
         vec_f64_to_js(&self.inner.capture_ratio())
     }
 
     #[wasm_bindgen(js_name = omegaRatio)]
+    /// Omega ratio per asset for the given threshold return.
     pub fn omega_ratio(&self, threshold: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.omega_ratio(threshold.unwrap_or(0.0)))
     }
 
+    /// Treynor ratio per asset for the given risk-free rate.
     pub fn treynor(&self, risk_free_rate: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.treynor(risk_free_rate.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = gainToPain)]
+    /// Gain-to-pain ratio per asset.
     pub fn gain_to_pain(&self) -> JsValue {
         vec_f64_to_js(&self.inner.gain_to_pain())
     }
 
     #[wasm_bindgen(js_name = ulcerIndex)]
+    /// Ulcer index per asset.
     pub fn ulcer_index(&self) -> JsValue {
         vec_f64_to_js(&self.inner.ulcer_index())
     }
 
     #[wasm_bindgen(js_name = martinRatio)]
+    /// Martin ratio (excess return over ulcer index) per asset.
     pub fn martin_ratio(&self) -> Result<JsValue, JsValue> {
         result_vec_f64_to_js(self.inner.martin_ratio())
     }
 
     #[wasm_bindgen(js_name = recoveryFactor)]
+    /// Recovery factor (total return over max drawdown) per asset.
     pub fn recovery_factor(&self) -> JsValue {
         vec_f64_to_js(&self.inner.recovery_factor())
     }
 
     #[wasm_bindgen(js_name = painIndex)]
+    /// Pain index (mean drawdown magnitude) per asset.
     pub fn pain_index(&self) -> JsValue {
         vec_f64_to_js(&self.inner.pain_index())
     }
 
     #[wasm_bindgen(js_name = painRatio)]
+    /// Pain ratio (excess return over pain index) per asset.
     pub fn pain_ratio(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
         result_vec_f64_to_js(self.inner.pain_ratio(risk_free_rate.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = tailRatio)]
+    /// Tail ratio of upper to lower return quantiles per asset.
     pub fn tail_ratio(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -385,16 +414,19 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = rSquared)]
+    /// R-squared of returns against the benchmark per asset.
     pub fn r_squared(&self) -> JsValue {
         vec_f64_to_js(&self.inner.r_squared())
     }
 
     #[wasm_bindgen(js_name = battingAverage)]
+    /// Share of periods beating the benchmark per asset.
     pub fn batting_average(&self) -> JsValue {
         vec_f64_to_js(&self.inner.batting_average())
     }
 
     #[wasm_bindgen(js_name = parametricVar)]
+    /// Parametric (Gaussian) value-at-risk per asset.
     pub fn parametric_var(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -404,6 +436,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = cornishFisherVar)]
+    /// Cornish-Fisher adjusted value-at-risk per asset.
     pub fn cornish_fisher_var(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(
             &self
@@ -412,16 +445,19 @@ impl WasmPerformance {
         )
     }
 
+    /// Conditional drawdown-at-risk per asset at the given confidence level.
     pub fn cdar(&self, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.cdar(confidence.unwrap_or(DEFAULT_CONFIDENCE)))
     }
 
     #[wasm_bindgen(js_name = mSquared)]
+    /// M-squared (Modigliani) risk-adjusted return per asset.
     pub fn m_squared(&self, risk_free_rate: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.m_squared(risk_free_rate.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = modifiedSharpe)]
+    /// Modified Sharpe ratio using Cornish-Fisher VaR per asset.
     pub fn modified_sharpe(&self, risk_free_rate: Option<f64>, confidence: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.modified_sharpe(
             risk_free_rate.unwrap_or(0.0),
@@ -430,6 +466,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = sterlingRatio)]
+    /// Sterling ratio over the `n` largest drawdowns per asset.
     pub fn sterling_ratio(
         &self,
         risk_free_rate: Option<f64>,
@@ -442,6 +479,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = burkeRatio)]
+    /// Burke ratio over the `n` largest drawdowns per asset.
     pub fn burke_ratio(
         &self,
         risk_free_rate: Option<f64>,
@@ -456,31 +494,37 @@ impl WasmPerformance {
     // ── Vector outputs ──
 
     #[wasm_bindgen(js_name = cumulativeReturns)]
+    /// Cumulative return series per asset.
     pub fn cumulative_returns(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.cumulative_returns())
     }
 
     #[wasm_bindgen(js_name = drawdownSeries)]
+    /// Drawdown series per asset.
     pub fn drawdown_series(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.drawdown_series())
     }
 
     #[wasm_bindgen(js_name = correlationMatrix)]
+    /// Pairwise return correlation matrix across assets.
     pub fn correlation_matrix(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.correlation_matrix())
     }
 
     #[wasm_bindgen(js_name = cumulativeReturnsOutperformance)]
+    /// Cumulative outperformance versus the benchmark per asset.
     pub fn cumulative_returns_outperformance(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.cumulative_returns_outperformance())
     }
 
     #[wasm_bindgen(js_name = drawdownDifference)]
+    /// Difference between asset and benchmark drawdown series.
     pub fn drawdown_difference(&self) -> JsValue {
         matrix_f64_to_js(&self.inner.drawdown_difference())
     }
 
     #[wasm_bindgen(js_name = excessReturns)]
+    /// Excess returns over the supplied risk-free series per asset.
     pub fn excess_returns(&self, rf: JsValue, nperiods: Option<f64>) -> Result<JsValue, JsValue> {
         let rf = parse_f64_vec(rf)?;
         Ok(matrix_f64_to_js(&self.inner.excess_returns(&rf, nperiods)))
@@ -488,15 +532,18 @@ impl WasmPerformance {
 
     // ── Benchmark ──
 
+    /// SABR `beta` (backbone exponent).
     pub fn beta(&self) -> Result<JsValue, JsValue> {
         to_js(&self.inner.beta())
     }
 
+    /// Benchmark regression alpha/beta statistics per asset.
     pub fn greeks(&self) -> Result<JsValue, JsValue> {
         to_js(&self.inner.greeks())
     }
 
     #[wasm_bindgen(js_name = rollingGreeks)]
+    /// Rolling benchmark alpha/beta for one asset over a window.
     pub fn rolling_greeks(
         &self,
         ticker_idx: usize,
@@ -510,6 +557,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = rollingVolatility)]
+    /// Rolling volatility series for one asset over a window.
     pub fn rolling_volatility(
         &self,
         ticker_idx: usize,
@@ -523,6 +571,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = rollingSortino)]
+    /// Rolling Sortino ratio series for one asset over a window.
     pub fn rolling_sortino(
         &self,
         ticker_idx: usize,
@@ -541,6 +590,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = rollingSharpe)]
+    /// Rolling Sharpe ratio series for one asset over a window.
     pub fn rolling_sharpe(
         &self,
         ticker_idx: usize,
@@ -559,6 +609,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = rollingReturns)]
+    /// Rolling compounded return series for one asset over a window.
     pub fn rolling_returns(&self, ticker_idx: usize, window: usize) -> Result<JsValue, JsValue> {
         let series = self
             .inner
@@ -568,6 +619,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = drawdownDetails)]
+    /// Details of the `n` largest drawdown episodes for one asset.
     pub fn drawdown_details(
         &self,
         ticker_idx: usize,
@@ -582,6 +634,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = multiFactorGreeks)]
+    /// Multi-factor regression statistics for one asset.
     pub fn multi_factor_greeks(
         &self,
         ticker_idx: usize,
@@ -600,6 +653,7 @@ impl WasmPerformance {
     // ── Lookback & aggregation ──
 
     #[wasm_bindgen(js_name = lookbackReturns)]
+    /// Standard lookback-window returns (MTD, QTD, YTD, ...) per asset.
     pub fn lookback_returns(
         &self,
         ref_date: &str,
@@ -612,6 +666,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = periodStats)]
+    /// Aggregated period statistics for one asset at the given frequency.
     pub fn period_stats(
         &self,
         ticker_idx: usize,

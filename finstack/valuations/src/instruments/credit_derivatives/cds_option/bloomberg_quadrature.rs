@@ -1015,7 +1015,7 @@ mod tests {
             Some(&option.discount_curve_id),
         )
         .expect("bumped hazard");
-        let bumped_market = market.clone().insert(bumped_hazard);
+        let bumped_market = market.insert(bumped_hazard);
         let bumped_ctx = context_for(&option, &bumped_market, as_of, 0.30);
 
         assert!(

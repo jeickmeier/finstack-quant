@@ -532,8 +532,7 @@ mod tests {
             0.5, 1.0, 0.4,
             0.3, 0.4, 1.0,
         ];
-        let out =
-            nearest_correlation(good.clone(), 3, None, None).expect("good matrix should project");
+        let out = nearest_correlation(good, 3, None, None).expect("good matrix should project");
         assert_eq!(out.len(), 9);
         for i in 0..3 {
             assert!((out[i * 3 + i] - 1.0).abs() < 1e-9);

@@ -41,9 +41,8 @@ impl MetricCalculator for DeltaCalculator {
         let strike = option.strike_f64()?;
 
         // Use consolidated helper to get pre-computed inputs
-        let inputs = match option.greek_inputs(&context.curves, context.as_of)? {
-            Some(inputs) => inputs,
-            None => return Ok(0.0), // Option expired
+        let Some(inputs) = option.greek_inputs(&context.curves, context.as_of)? else {
+            return Ok(0.0); // Option expired
         };
 
         // Near-expiry guard: return intrinsic delta when within ~1 business day of expiry.

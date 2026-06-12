@@ -133,7 +133,7 @@ pub(crate) fn execute_params(
         StepParams::Discount(p) => {
             let (ctx, report) = DiscountCurveTarget::solve(p, quotes, context, global_config)?;
             let curve = ctx.get_discount(&p.curve_id)?;
-            let output = StepOutput::Curve(curve.clone().into());
+            let output = StepOutput::Curve(Arc::clone(&curve).into());
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
@@ -148,7 +148,7 @@ pub(crate) fn execute_params(
         StepParams::Forward(p) => {
             let (ctx, report) = ForwardCurveTarget::solve(p, quotes, context, global_config)?;
             let curve = ctx.get_forward(&p.curve_id)?;
-            let output = StepOutput::Curve(curve.clone().into());
+            let output = StepOutput::Curve(Arc::clone(&curve).into());
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
@@ -163,7 +163,7 @@ pub(crate) fn execute_params(
         StepParams::Hazard(p) => {
             let (ctx, report) = HazardCurveTarget::solve(p, quotes, context, global_config)?;
             let curve = ctx.get_hazard(&p.curve_id)?;
-            let output = StepOutput::Curve(curve.clone().into());
+            let output = StepOutput::Curve(Arc::clone(&curve).into());
             let mut validation_cfg = global_config.validation.clone();
             if quotes.iter().any(|quote| match quote {
                 MarketQuote::Cds(crate::market::quotes::cds::CdsQuote::CdsParSpread {
@@ -189,7 +189,7 @@ pub(crate) fn execute_params(
         StepParams::Inflation(p) => {
             let (ctx, report) = InflationCurveTarget::solve(p, quotes, context, global_config)?;
             let curve = ctx.get_inflation_curve(&p.curve_id)?;
-            let output = StepOutput::Curve(curve.clone().into());
+            let output = StepOutput::Curve(Arc::clone(&curve).into());
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
@@ -205,7 +205,7 @@ pub(crate) fn execute_params(
             let (ctx, report) = BaseCorrelationTarget::solve(p, quotes, context, global_config)?;
             let curve_id = CurveId::from(format!("{}_CORR", p.index_id));
             let curve = ctx.get_base_correlation(curve_id.as_str())?;
-            let output = StepOutput::Curve(curve.clone().into());
+            let output = StepOutput::Curve(Arc::clone(&curve).into());
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
@@ -224,7 +224,7 @@ pub(crate) fn execute_params(
         StepParams::VolSurface(p) => {
             let (surface, report) = VolSurfaceTarget::solve(p, quotes, context, global_config)?;
             // Preserve context insertion behavior
-            let mut new_report = report.clone();
+            let mut new_report = report;
             new_report
                 .explanation
                 .get_or_insert_with(|| finstack_core::explain::ExplanationTrace::new("vol_surface"))
@@ -467,9 +467,9 @@ pub(crate) fn execute_params(
             let output = match &p.basis_spread_curve_id {
                 Some(spread_id) if ctx.get_basis_spread(spread_id).is_ok() => {
                     let spread = ctx.get_basis_spread(spread_id)?;
-                    StepOutput::Curves(vec![curve.clone().into(), (*spread).clone().into()])
+                    StepOutput::Curves(vec![curve.into(), (*spread).clone().into()])
                 }
-                _ => StepOutput::Curve(curve.clone().into()),
+                _ => StepOutput::Curve(curve.into()),
             };
             Ok(StepOutcome {
                 output,
@@ -480,7 +480,7 @@ pub(crate) fn execute_params(
         StepParams::Parametric(p) => {
             let (ctx, report) = ParametricCurveTarget::solve(p, quotes, context, global_config)?;
             let curve = ctx.get_parametric(&p.curve_id)?;
-            let output = StepOutput::Curve(curve.clone().into());
+            let output = StepOutput::Curve(curve.into());
             Ok(StepOutcome {
                 output,
                 credit_index_update: None,

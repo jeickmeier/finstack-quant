@@ -1,3 +1,5 @@
+//! Replay tests for portfolio.
+
 mod replay_tests {
     use finstack_attribution::AttributionMethod;
     use finstack_core::config::FinstackConfig;

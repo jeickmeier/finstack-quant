@@ -371,7 +371,7 @@ fn test_vanna_changes_with_moneyness() {
     // Deep OTM cap (high strike, ~6%)
     let otm_cap = CmsOption {
         strike: Decimal::try_from(0.06).expect("valid decimal"), // 6% strike when forward is ~3.5%
-        ..base.clone()
+        ..base
     };
 
     let result_itm = itm_cap

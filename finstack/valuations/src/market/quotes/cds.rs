@@ -153,8 +153,7 @@ impl CdsQuote {
     /// ```
     pub fn id(&self) -> &QuoteId {
         match self {
-            CdsQuote::CdsParSpread { id, .. } => id,
-            CdsQuote::CdsUpfront { id, .. } => id,
+            CdsQuote::CdsParSpread { id, .. } | CdsQuote::CdsUpfront { id, .. } => id,
         }
     }
 

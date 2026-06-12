@@ -930,15 +930,14 @@ impl Ord for PeriodId {
         let self_bounds = greg.bounds(self.year, self.kind, self.index);
         let other_bounds = greg.bounds(other.year, other.kind, other.index);
 
-        let (self_start, self_end, other_start, other_end) = match (self_bounds, other_bounds) {
-            (Ok((ss, se)), Ok((os, oe))) => (ss, se, os, oe),
-            // Defensive fallback: bounds should be infallible for valid PeriodId values,
-            // but if a malformed PeriodId slips through, we still need a total ordering.
-            _ => {
-                return self_kind
-                    .cmp(&other_kind)
-                    .then(self.index.cmp(&other.index))
-            }
+        // Defensive fallback: bounds should be infallible for valid PeriodId values,
+        // but if a malformed PeriodId slips through, we still need a total ordering.
+        let (Ok((self_start, self_end)), Ok((other_start, other_end))) =
+            (self_bounds, other_bounds)
+        else {
+            return self_kind
+                .cmp(&other_kind)
+                .then(self.index.cmp(&other.index));
         };
 
         let by_start = self_start.cmp(&other_start);

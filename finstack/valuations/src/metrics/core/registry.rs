@@ -498,6 +498,8 @@ mod tests {
             Box::new(self.clone())
         }
 
+        // Mock: this path is never exercised by the registry tests.
+        #[allow(clippy::unimplemented)]
         fn price_with_metrics(
             &self,
             _market: &MarketContext,
@@ -662,7 +664,7 @@ mod tests {
             &[],
         );
         registry.register_metric(
-            metric_b.clone(),
+            metric_b,
             Arc::new(CircularCalculator {
                 deps: vec![metric_a.clone()],
             }),
@@ -706,14 +708,14 @@ mod tests {
             &[],
         );
         registry.register_metric(
-            metric_b.clone(),
+            metric_b,
             Arc::new(CircularCalculator {
                 deps: vec![metric_c.clone()],
             }),
             &[],
         );
         registry.register_metric(
-            metric_c.clone(),
+            metric_c,
             Arc::new(CircularCalculator {
                 deps: vec![metric_a.clone()],
             }),
@@ -761,14 +763,14 @@ mod tests {
             &[],
         );
         registry.register_metric(
-            metric_b.clone(),
+            metric_b,
             Arc::new(CircularCalculator {
                 deps: vec![metric_c.clone()],
             }),
             &[],
         );
         registry.register_metric(
-            metric_c.clone(),
+            metric_c,
             Arc::new(SuccessCalculator {
                 value: 1.0,
                 deps: Vec::new(),

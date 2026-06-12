@@ -176,12 +176,9 @@ impl DependencyIndex {
         let mut unresolved = Vec::new();
 
         for (idx, position) in positions.iter().enumerate() {
-            let deps = match position.instrument.market_dependencies() {
-                Ok(d) => d,
-                Err(_) => {
-                    unresolved.push(idx);
-                    continue;
-                }
+            let Ok(deps) = position.instrument.market_dependencies() else {
+                unresolved.push(idx);
+                continue;
             };
 
             for key in flatten_dependencies(&deps) {
@@ -216,12 +213,9 @@ impl DependencyIndex {
         );
         self.indexed_positions = self.indexed_positions.max(idx + 1);
 
-        let deps = match position.instrument.market_dependencies() {
-            Ok(d) => d,
-            Err(_) => {
-                self.unresolved.push(idx);
-                return;
-            }
+        let Ok(deps) = position.instrument.market_dependencies() else {
+            self.unresolved.push(idx);
+            return;
         };
 
         for key in flatten_dependencies(&deps) {

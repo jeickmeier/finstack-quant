@@ -503,7 +503,7 @@ fn triangulation_missing_leg_only_queries_provider_once_per_leg() {
         calls: AtomicUsize::new(0),
     });
     let matrix = FxMatrix::try_with_config(
-        provider.clone(),
+        Arc::<CountingMissingFx>::clone(&provider),
         FxConfig {
             enable_triangulation: true,
             pivot_currency: Currency::USD,

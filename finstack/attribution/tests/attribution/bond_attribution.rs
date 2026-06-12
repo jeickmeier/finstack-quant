@@ -233,7 +233,7 @@ fn test_metrics_based_bond_attribution_populates_carry_decomposition() {
     )
     .unwrap();
 
-    let detail = attribution.carry_detail.clone().expect("carry detail");
+    let detail = attribution.carry_detail.expect("carry detail");
     assert!(detail.coupon_income.is_some());
     assert!(detail.pull_to_par.is_some());
     assert!(detail.roll_down.is_some());
@@ -305,7 +305,7 @@ fn test_metrics_based_bond_attribution_without_carry_metrics_keeps_legacy_shape(
     assert!(detail.funding_cost.is_none());
     assert!(detail.theta.is_some());
 
-    let mut scaled = attribution.clone();
+    let mut scaled = attribution;
     scaled.scale(0.5);
     let scaled_detail = scaled.carry_detail.expect("scaled carry detail");
     assert!((scaled_detail.total.amount() * 2.0 - detail.total.amount()).abs() < 1e-6);

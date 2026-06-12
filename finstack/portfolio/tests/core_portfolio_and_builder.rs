@@ -1,3 +1,5 @@
+//! Core portfolio and builder tests for portfolio.
+
 mod common;
 
 use common::*;

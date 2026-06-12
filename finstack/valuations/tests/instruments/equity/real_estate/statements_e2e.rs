@@ -59,8 +59,8 @@ fn e2e_statements_to_real_estate_asset_cashflows_prices() {
         .currency(Currency::USD)
         .valuation_date(as_of)
         .valuation_method(RealEstateValuationMethod::Dcf)
-        .noi_schedule(noi_sched.clone())
-        .capex_schedule_opt(Some(capex_sched.clone()))
+        .noi_schedule(noi_sched)
+        .capex_schedule_opt(Some(capex_sched))
         .discount_rate_opt(Some(0.0)) // PV = sum flows
         .terminal_cap_rate_opt(None) // no terminal value
         .day_count(DayCount::Act365F)

@@ -275,7 +275,7 @@ fn test_equity_with_attributes() {
         .ticker("AAPL".into())
         .currency(Currency::USD)
         .discount_curve_id("USD".into())
-        .attributes(attrs.clone())
+        .attributes(attrs)
         .build()
         .unwrap();
 

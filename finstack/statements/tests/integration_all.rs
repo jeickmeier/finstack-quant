@@ -1,7 +1,7 @@
-// Integration tests for statements components.
-//
-// Note: Cargo only discovers integration tests that are direct children of `tests/`.
-// This file wires in the nested integration test modules so they run in CI.
+//! Integration tests for statements components.
+//!
+//! Note: Cargo only discovers integration tests that are direct children of `tests/`.
+//! This file wires in the nested integration test modules so they run in CI.
 
 #[path = "integration/dated_cashflow_export_tests.rs"]
 mod dated_cashflow_export_tests;

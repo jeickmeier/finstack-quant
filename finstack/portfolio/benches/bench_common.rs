@@ -73,18 +73,22 @@ mod finstack_test_utils {
 // Date helpers
 // ---------------------------------------------------------------------------
 
+/// Returns the shared valuation base date used by portfolio benchmarks.
 pub fn base_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 1).unwrap()
 }
 
+/// Returns the first business-day fixture after the shared base date.
 pub fn t1_date() -> Date {
     Date::from_calendar_date(2025, Month::January, 2).unwrap()
 }
 
+/// Returns the shared two-year maturity fixture for portfolio benchmarks.
 pub fn maturity_2y() -> Date {
     Date::from_calendar_date(2027, Month::January, 1).unwrap()
 }
 
+/// Returns the shared five-year maturity fixture for portfolio benchmarks.
 pub fn maturity_5y() -> Date {
     Date::from_calendar_date(2030, Month::January, 1).unwrap()
 }
@@ -111,14 +115,12 @@ impl FxProvider for SimpleFxProvider {
             return Ok(1.0);
         }
         let from_to_usd = match from {
-            Currency::USD => 1.0,
             Currency::EUR => self.eur_usd,
             Currency::GBP => self.gbp_usd,
             Currency::JPY => self.jpy_usd,
             _ => 1.0,
         };
         let to_from_usd = match to {
-            Currency::USD => 1.0,
             Currency::EUR => 1.0 / self.eur_usd,
             Currency::GBP => 1.0 / self.gbp_usd,
             Currency::JPY => 1.0 / self.jpy_usd,

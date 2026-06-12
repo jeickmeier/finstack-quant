@@ -307,7 +307,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
     .expect("price_from_dm with target DM should succeed");
     let clean_px = dirty / notional.amount() * 100.0;
 
-    let mut priced_bond = bond.clone();
+    let mut priced_bond = bond;
     priced_bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_px);
 
     let result = priced_bond

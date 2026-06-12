@@ -1,3 +1,5 @@
+//! Public surface tests for valuations.
+
 use finstack_valuations::prelude::{
     BarrierOption, BasisSwap, CDSIndex, CDSTranche, ConvertibleBond, ExerciseStyle,
     InflationLinkedBond, OptionType, PayReceive, RevolvingCredit, SettlementType, StructuredCredit,

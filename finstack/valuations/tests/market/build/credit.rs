@@ -27,7 +27,7 @@ fn test_build_cds_par_spread() {
     let quote = CdsQuote::CdsParSpread {
         id: "CDS-TEST-1".into(),
         entity: "XYZ-CORP-SNR".to_string(),
-        convention: key.clone(),
+        convention: key,
         pillar: Pillar::Tenor(Tenor::parse("5Y").unwrap()),
         spread_bp: 120.0,
         recovery_rate: 0.40,

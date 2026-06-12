@@ -139,9 +139,10 @@ pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
         .map(|call| {
             let kind = match call.call_type {
                 super::MarginCallType::InitialMargin => CFKind::InitialMarginPost,
-                super::MarginCallType::VariationMarginDelivery => CFKind::VariationMarginPay,
+                super::MarginCallType::VariationMarginDelivery | super::MarginCallType::TopUp => {
+                    CFKind::VariationMarginPay
+                }
                 super::MarginCallType::VariationMarginReturn => CFKind::VariationMarginReceive,
-                super::MarginCallType::TopUp => CFKind::VariationMarginPay,
                 super::MarginCallType::Substitution => CFKind::CollateralSubstitutionOut,
             };
 

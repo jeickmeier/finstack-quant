@@ -1614,16 +1614,15 @@ mod tests {
     fn taylor_sensitivity_build_preserves_calculator_error() {
         let as_of = sample_as_of();
         let bond = standard_bond("MISSING-CURVE-BOND", as_of, date!(2029 - 01 - 01));
-        let err = match compute_taylor_sensitivities(
+        let Err(err) = compute_taylor_sensitivities(
             &bond,
             &MarketContext::new(),
             as_of,
             Money::new(100.0, Currency::USD),
             None,
             None,
-        ) {
-            Ok(_) => panic!("Taylor sensitivity build should fail on missing market inputs"),
-            Err(err) => err,
+        ) else {
+            panic!("Taylor sensitivity build should fail on missing market inputs")
         };
 
         let msg = err.to_string();

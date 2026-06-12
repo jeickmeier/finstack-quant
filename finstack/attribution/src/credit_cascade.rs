@@ -239,16 +239,13 @@ pub(crate) fn plan_credit_cascade(
     let issuer_id = IssuerId::new(issuer_id_str.as_str());
 
     // Find issuer in model.
-    let issuer_row = match model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id) {
-        Some(row) => row,
-        None => {
-            tracing::warn!(
-                instrument_id = %instrument.id(),
-                issuer_id = %issuer_id_str,
-                "Credit cascade skipped: issuer is not mapped in the credit factor model"
-            );
-            return Ok(None);
-        }
+    let Some(issuer_row) = model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id) else {
+        tracing::warn!(
+            instrument_id = %instrument.id(),
+            issuer_id = %issuer_id_str,
+            "Credit cascade skipped: issuer is not mapped in the credit factor model"
+        );
+        return Ok(None);
     };
     let tags = issuer_row.tags.clone();
 
@@ -480,9 +477,8 @@ pub(crate) fn shift_credit_curves_par_spread(
     }
     let req = BumpRequest::Parallel(delta_bp);
     for curve_id in curve_ids {
-        let cur = match base_market.get_hazard(curve_id.as_str()) {
-            Ok(c) => c,
-            Err(_) => continue,
+        let Ok(cur) = base_market.get_hazard(curve_id.as_str()) else {
+            continue;
         };
         let bumped = if discount_id.is_some() && cur.par_spread_points().next().is_some() {
             match bump_hazard_spreads(cur.as_ref(), base_market, &req, discount_id) {

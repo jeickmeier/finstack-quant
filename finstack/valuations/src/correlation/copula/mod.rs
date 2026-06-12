@@ -457,7 +457,7 @@ fn get_cached_quadrature(order: u8) -> std::sync::Arc<GaussHermiteQuadrature> {
         Err(poisoned) => poisoned.into_inner(),
     };
     if let Some(q) = map.get(&order) {
-        return q.clone();
+        return std::sync::Arc::clone(q);
     }
     // Resolve the order BEFORE caching: an unsupported order falls back to
     // the default, and the result must be cached under the *substituted*
@@ -467,14 +467,15 @@ fn get_cached_quadrature(order: u8) -> std::sync::Arc<GaussHermiteQuadrature> {
     match GaussHermiteQuadrature::new(order as usize) {
         Ok(q) => {
             let q = std::sync::Arc::new(q);
-            map.insert(order, q.clone());
+            map.insert(order, std::sync::Arc::clone(&q));
             q
         }
         Err(_) => {
             warn_unsupported_quadrature_order(order);
-            map.entry(DEFAULT_QUADRATURE_ORDER)
-                .or_insert_with(|| std::sync::Arc::new(default_quadrature()))
-                .clone()
+            std::sync::Arc::clone(
+                map.entry(DEFAULT_QUADRATURE_ORDER)
+                    .or_insert_with(|| std::sync::Arc::new(default_quadrature())),
+            )
         }
     }
 }

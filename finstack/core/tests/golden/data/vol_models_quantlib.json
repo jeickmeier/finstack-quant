@@ -1,0 +1,1960 @@
+{
+  "meta": {
+    "suite_id": "vol_models_quantlib_parity",
+    "description": "External golden parity fixtures for volatility models: Black-76, Black-Scholes-Merton, Bachelier, implied-vol inversion, SABR (Hagan lognormal + normal, incl. shifted), Heston (Gatheral/little-trap), SVI total variance, and the rough-Heston classical limit (H -> 0.5).",
+    "reference_source": {
+      "name": "QuantLib (Python)",
+      "version": "1.42.1",
+      "vendor": "QuantLib Project",
+      "url": "https://www.quantlib.org/",
+      "extra": {
+        "svi_reference": "SVI section only: raw SVI total variance evaluated with mpmath at 50-digit precision (Gatheral 2004 raw parameterisation); QuantLib has no analytic SVI."
+      }
+    },
+    "generated": {
+      "at": "2026-06-11T00:00:00Z",
+      "by": "gen_vol_golden.py",
+      "command": "uv run --with QuantLib --with mpmath python gen_vol_golden.py",
+      "environment": {
+        "quantlib": "1.42.1",
+        "mpmath": "1.4.1"
+      }
+    },
+    "status": "certified",
+    "schema_version": 1,
+    "extra": {
+      "conventions": {
+        "rates": "continuously compounded",
+        "time": "year fractions passed directly; Heston dates chosen so Act/365F year fraction is exactly T",
+        "black76_bachelier_prices": "undiscounted (unit annuity, QuantLib discount=1.0); discount_factor recorded separately for Black-76",
+        "bsm_prices": "discounted spot-based prices via blackFormula(forward=S*exp((r-q)T), discount=exp(-rT))",
+        "sabr": "QuantLib sabrVolatility(strike, forward, T, alpha, beta, nu, rho[, type]); Hagan et al. (2002)",
+        "heston": "AnalyticHestonEngine, Gatheral formulation (little Heston trap), adaptive Gauss-Lobatto relTol 1e-12",
+        "rough_heston": "expected values are classical Heston prices; Rust prices at Hurst H=0.499 (classical limit)"
+      }
+    }
+  },
+  "cases": [
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.1_t0.25",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.1,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 39.99999999999999,
+        "put": 3.1111699734844147e-25,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.1_t0.25",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.1,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 20.000003719833185,
+        "put": 3.719833178150722e-06,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.1_t0.25",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.1,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 1.9945036390476072,
+        "put": 1.9945036390476072,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.1_t0.25",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.1,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 0.00017712558646798549,
+        "put": 20.000177125586475,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.1_t0.25",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.1,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 1.867255191337256e-16,
+        "put": 50.00000000000001,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.2_t0.25",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.2,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 40.00000023021228,
+        "put": 2.3021227479880224e-07,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.2_t0.25",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.2,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 20.039914343421852,
+        "put": 0.03991434342184519,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.2_t0.25",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.2,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 3.9877611676744946,
+        "put": 3.9877611676744946,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.2_t0.25",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.2,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 0.14733226325696736,
+        "put": 20.147332263256978,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.2_t0.25",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.2,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 6.851253473438845e-05,
+        "put": 50.00006851253474,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.5_t0.25",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.5,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 40.14539605105062,
+        "put": 0.1453960510506247,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.5_t0.25",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.5,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 22.26559013053183,
+        "put": 2.2655901305318302,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.5_t0.25",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.5,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 9.947644966022581,
+        "put": 9.947644966022581,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.5_t0.25",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.5,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 3.7058830858938645,
+        "put": 23.70588308589387,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.5_t0.25",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.5,
+      "t": 0.25,
+      "rate": 0.03,
+      "discount_factor": 0.9925280548191384,
+      "expected": {
+        "call": 0.6718625762008159,
+        "put": 50.67186257620082,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.1_t1",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.1,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 40.00000023021228,
+        "put": 2.3021227479880224e-07,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.1_t1",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.1,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 20.039914343421852,
+        "put": 0.03991434342184519,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.1_t1",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.1,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 3.9877611676744946,
+        "put": 3.9877611676744946,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.1_t1",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.1,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 0.14733226325696736,
+        "put": 20.147332263256978,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.1_t1",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.1,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 6.851253473438845e-05,
+        "put": 50.00006851253474,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.2_t1",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 40.026111811907235,
+        "put": 0.02611181190724121,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.2_t1",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 21.185929513210425,
+        "put": 1.185929513210422,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.2_t1",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 7.9655674554058,
+        "put": 7.9655674554058,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.2_t1",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 2.147298810578146,
+        "put": 22.14729881057815,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.2_t1",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 0.19247532329705064,
+        "put": 50.19247532329705,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.5_t1",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.5,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 43.034777401783614,
+        "put": 3.0347774017836207,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.5_t1",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.5,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 29.462965797650575,
+        "put": 9.462965797650575,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.5_t1",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.5,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 19.741265136584744,
+        "put": 19.741265136584744,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.5_t1",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.5,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 13.108974138557588,
+        "put": 33.1089741385576,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.5_t1",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.5,
+      "t": 1.0,
+      "rate": 0.03,
+      "discount_factor": 0.9704455335485082,
+      "expected": {
+        "call": 7.088134312870487,
+        "put": 57.088134312870494,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.1_t5",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.1,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 40.066026024076336,
+        "put": 0.06602602407633551,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.1_t5",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.1,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 21.6662760892735,
+        "put": 1.666276089273501,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.1_t5",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.1,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 8.902070748936609,
+        "put": 8.902070748936609,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.1_t5",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.1,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 2.854945127936279,
+        "put": 22.85494512793628,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.1_t5",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.1,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 0.37625698793550777,
+        "put": 50.3762569879355,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.2_t5",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.2,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 42.149271062099075,
+        "put": 2.149271062099081,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.2_t5",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.2,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 27.82449211661521,
+        "put": 7.824492116615218,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.2_t5",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.2,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 17.693672624187858,
+        "put": 17.693672624187858,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.2_t5",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.2,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 11.02662037742383,
+        "put": 31.026620377423825,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.2_t5",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.2,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 5.351374710857094,
+        "put": 55.35137471085708,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k60_v0.5_t5",
+      "forward": 100.0,
+      "strike": 60.0,
+      "sigma": 0.5,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 56.95663987033653,
+        "put": 16.956639870336527,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k80_v0.5_t5",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma": 0.5,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 48.82458828984167,
+        "put": 28.824588289841678,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k100_v0.5_t5",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma": 0.5,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 42.384987796942106,
+        "put": 42.38498779694211,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k120_v0.5_t5",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma": 0.5,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 37.17833379587614,
+        "put": 57.17833379587614,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "black76",
+      "id": "black76_f100_k150_v0.5_t5",
+      "forward": 100.0,
+      "strike": 150.0,
+      "sigma": 0.5,
+      "t": 5.0,
+      "rate": 0.03,
+      "discount_factor": 0.8607079764250578,
+      "expected": {
+        "call": 31.031180975333776,
+        "put": 81.03118097533378,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bsm",
+      "id": "bsm_atm",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.05,
+      "dividend_yield": 0.02,
+      "sigma": 0.2,
+      "t": 1.0,
+      "expected": {
+        "call": 9.227005508154061,
+        "put": 6.330080627549913,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bsm",
+      "id": "bsm_deep_itm_call",
+      "spot": 100.0,
+      "strike": 50.0,
+      "rate": 0.05,
+      "dividend_yield": 0.02,
+      "sigma": 0.2,
+      "t": 1.0,
+      "expected": {
+        "call": 50.45889478151492,
+        "put": 0.0004986758750858423,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bsm",
+      "id": "bsm_deep_otm_call",
+      "spot": 100.0,
+      "strike": 200.0,
+      "rate": 0.05,
+      "dividend_yield": 0.02,
+      "sigma": 0.2,
+      "t": 1.0,
+      "expected": {
+        "call": 0.0032594597326087577,
+        "put": 92.22927702919988,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bsm",
+      "id": "bsm_near_atm_short",
+      "spot": 100.0,
+      "strike": 95.0,
+      "rate": 0.04,
+      "dividend_yield": 0.01,
+      "sigma": 0.25,
+      "t": 0.5,
+      "expected": {
+        "call": 10.444521954562667,
+        "put": 4.062147999436197,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bsm",
+      "id": "bsm_neg_carry",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.03,
+      "dividend_yield": 0.06,
+      "sigma": 0.3,
+      "t": 2.0,
+      "expected": {
+        "call": 7.417462882983115,
+        "put": 31.737163241377218,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bsm",
+      "id": "bsm_long_dated_zero_rate",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.0,
+      "dividend_yield": 0.03,
+      "sigma": 0.15,
+      "t": 10.0,
+      "expected": {
+        "call": 6.430517863976002,
+        "put": 32.34869579580422,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_rates_atm",
+      "forward": 0.02,
+      "strike": 0.02,
+      "sigma_n": 0.005,
+      "t": 1.0,
+      "expected": {
+        "call": 0.0019947114020071634,
+        "put": 0.0019947114020071634,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_rates_otm_call",
+      "forward": 0.02,
+      "strike": 0.025,
+      "sigma_n": 0.005,
+      "t": 1.0,
+      "expected": {
+        "call": 0.00041657735293843136,
+        "put": 0.0054165773529384325,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_rates_itm_call",
+      "forward": 0.02,
+      "strike": 0.01,
+      "sigma_n": 0.005,
+      "t": 5.0,
+      "expected": {
+        "call": 0.011134368551568562,
+        "put": 0.001134368551568562,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_negative_rates_itm_call",
+      "forward": -0.005,
+      "strike": -0.01,
+      "sigma_n": 0.005,
+      "t": 1.0,
+      "expected": {
+        "call": 0.005416577352938432,
+        "put": 0.00041657735293843174,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_negative_fwd_zero_strike",
+      "forward": -0.005,
+      "strike": 0.0,
+      "sigma_n": 0.005,
+      "t": 2.0,
+      "expected": {
+        "call": 0.0009982061418712287,
+        "put": 0.005998206141871229,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_equity_scale_atm",
+      "forward": 100.0,
+      "strike": 100.0,
+      "sigma_n": 20.0,
+      "t": 1.0,
+      "expected": {
+        "call": 7.978845608028654,
+        "put": 7.978845608028654,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_equity_scale_otm",
+      "forward": 100.0,
+      "strike": 120.0,
+      "sigma_n": 20.0,
+      "t": 0.25,
+      "expected": {
+        "call": 0.08490702616829646,
+        "put": 20.084907026168295,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "bachelier",
+      "id": "bachelier_equity_scale_itm_long",
+      "forward": 100.0,
+      "strike": 80.0,
+      "sigma_n": 20.0,
+      "t": 5.0,
+      "expected": {
+        "call": 29.59621412696785,
+        "put": 9.596214126967851,
+        "tolerance_rel": 5e-09
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta0_k0.02",
+      "forward": 0.03,
+      "strike": 0.02,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 0.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 53.51000030015336,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta0_k0.028",
+      "forward": 0.03,
+      "strike": 0.028,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 0.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 34.457291425909055,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta0_k0.03",
+      "forward": 0.03,
+      "strike": 0.03,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 0.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 31.51180246913581,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta0_k0.032",
+      "forward": 0.03,
+      "strike": 0.032,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 0.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 28.994592561292276,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta0_k0.05",
+      "forward": 0.03,
+      "strike": 0.05,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 0.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 16.483173053932216,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta05_k0.02",
+      "forward": 0.03,
+      "strike": 0.02,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.42123152202711306,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta05_k0.028",
+      "forward": 0.03,
+      "strike": 0.028,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.36224262396405116,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta05_k0.03",
+      "forward": 0.03,
+      "strike": 0.03,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.3516667146431443,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta05_k0.032",
+      "forward": 0.03,
+      "strike": 0.032,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.3424158969419383,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta05_k0.05",
+      "forward": 0.03,
+      "strike": 0.05,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.3006814380605428,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta1_k0.02",
+      "forward": 0.03,
+      "strike": 0.02,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 1.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.23988772712620912,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta1_k0.028",
+      "forward": 0.03,
+      "strike": 0.028,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 1.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.2069230280772373,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta1_k0.03",
+      "forward": 0.03,
+      "strike": 0.03,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 1.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.20221333333333336,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta1_k0.032",
+      "forward": 0.03,
+      "strike": 0.032,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 1.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.19880677612599837,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_beta1_k0.05",
+      "forward": 0.03,
+      "strike": 0.05,
+      "t": 2.0,
+      "alpha": 0.2,
+      "beta": 1.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.2049812672237404,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_short_pos_rho_k0.03",
+      "forward": 0.05,
+      "strike": 0.03,
+      "t": 0.5,
+      "alpha": 0.04,
+      "beta": 0.5,
+      "rho": 0.2,
+      "nu": 0.6,
+      "expected": {
+        "vol": 0.23842912474379982,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_short_pos_rho_k0.05",
+      "forward": 0.05,
+      "strike": 0.05,
+      "t": 0.5,
+      "alpha": 0.04,
+      "beta": 0.5,
+      "rho": 0.2,
+      "nu": 0.6,
+      "expected": {
+        "vol": 0.18167753711830295,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_short_pos_rho_k0.08",
+      "forward": 0.05,
+      "strike": 0.08,
+      "t": 0.5,
+      "alpha": 0.04,
+      "beta": 0.5,
+      "rho": 0.2,
+      "nu": 0.6,
+      "expected": {
+        "vol": 0.22910443130765848,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_long_neg_rho_k0.03",
+      "forward": 0.05,
+      "strike": 0.03,
+      "t": 10.0,
+      "alpha": 0.04,
+      "beta": 0.5,
+      "rho": -0.6,
+      "nu": 0.3,
+      "expected": {
+        "vol": 0.2513429714037274,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_long_neg_rho_k0.05",
+      "forward": 0.05,
+      "strike": 0.05,
+      "t": 10.0,
+      "alpha": 0.04,
+      "beta": 0.5,
+      "rho": -0.6,
+      "nu": 0.3,
+      "expected": {
+        "vol": 0.17845327061188254,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_long_neg_rho_k0.08",
+      "forward": 0.05,
+      "strike": 0.08,
+      "t": 10.0,
+      "alpha": 0.04,
+      "beta": 0.5,
+      "rho": -0.6,
+      "nu": 0.3,
+      "expected": {
+        "vol": 0.134926679093204,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_shifted_neg_fwd_k0",
+      "forward": -0.002,
+      "strike": 0.0,
+      "t": 1.0,
+      "alpha": 0.025,
+      "beta": 0.5,
+      "rho": -0.2,
+      "nu": 0.35,
+      "shift": 0.03,
+      "expected": {
+        "vol": 0.14630890518445688,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_shifted_neg_fwd_neg_k",
+      "forward": -0.002,
+      "strike": -0.005,
+      "t": 1.0,
+      "alpha": 0.025,
+      "beta": 0.5,
+      "rho": -0.2,
+      "nu": 0.35,
+      "shift": 0.03,
+      "expected": {
+        "vol": 0.16047468339260754,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_lognormal",
+      "id": "sabr_lognormal_shifted_neg_fwd_pos_k_long",
+      "forward": -0.002,
+      "strike": 0.005,
+      "t": 5.0,
+      "alpha": 0.025,
+      "beta": 0.5,
+      "rho": -0.2,
+      "nu": 0.35,
+      "shift": 0.03,
+      "expected": {
+        "vol": 0.1465706099557057,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_normal",
+      "id": "sabr_normal_beta05_low_k",
+      "forward": 0.03,
+      "strike": 0.02,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.01026344492592822,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_normal",
+      "id": "sabr_normal_beta05_atm",
+      "forward": 0.03,
+      "strike": 0.03,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.010446078390840196,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_normal",
+      "id": "sabr_normal_beta05_high_k",
+      "forward": 0.03,
+      "strike": 0.05,
+      "t": 2.0,
+      "alpha": 0.06,
+      "beta": 0.5,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.011682605355963436,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_normal",
+      "id": "sabr_normal_beta0_low_k",
+      "forward": 0.03,
+      "strike": 0.02,
+      "t": 2.0,
+      "alpha": 0.005,
+      "beta": 0.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.006045137029275855,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_normal",
+      "id": "sabr_normal_beta0_high_k",
+      "forward": 0.03,
+      "strike": 0.045,
+      "t": 2.0,
+      "alpha": 0.005,
+      "beta": 0.0,
+      "rho": -0.3,
+      "nu": 0.4,
+      "expected": {
+        "vol": 0.005328738570836563,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "sabr_normal",
+      "id": "sabr_normal_beta1",
+      "forward": 0.05,
+      "strike": 0.04,
+      "t": 1.0,
+      "alpha": 0.2,
+      "beta": 1.0,
+      "rho": 0.2,
+      "nu": 0.5,
+      "expected": {
+        "vol": 0.00912825684610586,
+        "tolerance_rel": 1e-10
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k80_t1",
+      "skip": false,
+      "comment": "passes after Kahl-Jaeckel truncation fix (put rel err ~2.2e-8)",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 23.278335681579282,
+        "put": 1.3031286438458904,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k100_t1",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 8.918119273719443,
+        "put": 6.449110476552702,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k120_t1",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 1.913039618491868,
+        "put": 18.95022906189178,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k80_t5",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 5.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 34.377927591915956,
+        "put": 4.97767979868358,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k100_t5",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 5.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 22.90454090799567,
+        "put": 11.154231166455201,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k120_t5",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 5.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 14.452894674835008,
+        "put": 20.352522984986447,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k80_t10",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 10.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 44.357666940189034,
+        "put": 6.661729585901421,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k100_t10",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 10.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 34.6289045376548,
+        "put": 12.508982844795284,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.3_rho-0.5_k120_t10",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 10.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.5,
+      "expected": {
+        "call": 26.762574915484105,
+        "put": 20.218668884052686,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k80_t1",
+      "skip": false,
+      "comment": "passes after Kahl-Jaeckel truncation fix (put rel err ~1.6e-8)",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 23.720636674361163,
+        "put": 1.7454296366277717,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k100_t1",
+      "skip": false,
+      "comment": "passes after Kahl-Jaeckel truncation fix (rel err ~2e-9)",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 8.430078838193642,
+        "put": 5.961070041026901,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k120_t1",
+      "skip": false,
+      "comment": "passes after Kahl-Jaeckel truncation fix (call rel err ~4.6e-8)",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 0.4684614440558814,
+        "put": 17.505650887455793,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k80_t5",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 5.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 34.667930665966324,
+        "put": 5.2676828727339515,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k100_t5",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 5.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 22.297491501299202,
+        "put": 10.547181759758733,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k120_t5",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 5.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 12.62824253676802,
+        "put": 18.52787084691946,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k80_t10",
+      "spot": 100.0,
+      "strike": 80.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 10.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 44.59467161190785,
+        "put": 6.898734257620235,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k100_t10",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 10.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 34.22039205143288,
+        "put": 12.10047035857337,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "heston",
+      "id": "heston_vov0.5_rho-0.9_k120_t10",
+      "spot": 100.0,
+      "strike": 120.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 10.0,
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.5,
+      "rho": -0.9,
+      "expected": {
+        "call": 25.49961456890081,
+        "put": 18.955708537469395,
+        "tolerance_rel": 1e-06
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_gatheral_style_k-0.5",
+      "a": 0.04,
+      "b": 0.4,
+      "rho": -0.4,
+      "m": 0.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "k": -0.5,
+      "expected": {
+        "total_variance": 0.33540659228538017,
+        "implied_vol": 0.5791429808651575,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_gatheral_style_k-0.2",
+      "a": 0.04,
+      "b": 0.4,
+      "rho": -0.4,
+      "m": 0.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "k": -0.2,
+      "expected": {
+        "total_variance": 0.1851370849898476,
+        "implied_vol": 0.43027559190575476,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_gatheral_style_k0",
+      "a": 0.04,
+      "b": 0.4,
+      "rho": -0.4,
+      "m": 0.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "k": 0.0,
+      "expected": {
+        "total_variance": 0.12,
+        "implied_vol": 0.34641016151377546,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_gatheral_style_k0.1",
+      "a": 0.04,
+      "b": 0.4,
+      "rho": -0.4,
+      "m": 0.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "k": 0.1,
+      "expected": {
+        "total_variance": 0.11344271909999158,
+        "implied_vol": 0.3368125875022957,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_gatheral_style_k0.3",
+      "a": 0.04,
+      "b": 0.4,
+      "rho": -0.4,
+      "m": 0.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "k": 0.3,
+      "expected": {
+        "total_variance": 0.13622205101855958,
+        "implied_vol": 0.36908271568655115,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_gatheral_style_k0.8",
+      "a": 0.04,
+      "b": 0.4,
+      "rho": -0.4,
+      "m": 0.0,
+      "sigma": 0.2,
+      "t": 1.0,
+      "k": 0.8,
+      "expected": {
+        "total_variance": 0.24184845004941286,
+        "implied_vol": 0.49178089638518174,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_pos_rho_short_k-0.5",
+      "a": 0.02,
+      "b": 0.8,
+      "rho": 0.3,
+      "m": -0.1,
+      "sigma": 0.1,
+      "t": 0.5,
+      "k": -0.5,
+      "expected": {
+        "total_variance": 0.25384845004941287,
+        "implied_vol": 0.7125285258141077,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_pos_rho_short_k-0.2",
+      "a": 0.02,
+      "b": 0.8,
+      "rho": 0.3,
+      "m": -0.1,
+      "sigma": 0.1,
+      "t": 0.5,
+      "k": -0.2,
+      "expected": {
+        "total_variance": 0.1091370849898476,
+        "implied_vol": 0.4671982127317004,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_pos_rho_short_k0",
+      "a": 0.02,
+      "b": 0.8,
+      "rho": 0.3,
+      "m": -0.1,
+      "sigma": 0.1,
+      "t": 0.5,
+      "k": 0.0,
+      "expected": {
+        "total_variance": 0.1571370849898476,
+        "implied_vol": 0.5606016143213425,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_pos_rho_short_k0.1",
+      "a": 0.02,
+      "b": 0.8,
+      "rho": 0.3,
+      "m": -0.1,
+      "sigma": 0.1,
+      "t": 0.5,
+      "k": 0.1,
+      "expected": {
+        "total_variance": 0.24688543819998318,
+        "implied_vol": 0.7026883209503103,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_pos_rho_short_k0.3",
+      "a": 0.02,
+      "b": 0.8,
+      "rho": 0.3,
+      "m": -0.1,
+      "sigma": 0.1,
+      "t": 0.5,
+      "k": 0.3,
+      "expected": {
+        "total_variance": 0.44584845004941287,
+        "implied_vol": 0.944297040183239,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "svi",
+      "id": "svi_pos_rho_short_k0.8",
+      "a": 0.02,
+      "b": 0.8,
+      "rho": 0.3,
+      "m": -0.1,
+      "sigma": 0.1,
+      "t": 0.5,
+      "k": 0.8,
+      "expected": {
+        "total_variance": 0.9604308110509934,
+        "implied_vol": 1.3859515222770191,
+        "tolerance_rel": 1e-12
+      }
+    },
+    {
+      "model": "rough_heston_classical",
+      "id": "rough_heston_classical_k90",
+      "spot": 100.0,
+      "strike": 90.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "hurst": 0.499,
+      "expected": {
+        "call": 15.443066788294704,
+        "tolerance_rel": 0.005
+      },
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.7
+    },
+    {
+      "model": "rough_heston_classical",
+      "id": "rough_heston_classical_k100",
+      "spot": 100.0,
+      "strike": 100.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "hurst": 0.499,
+      "expected": {
+        "call": 8.909031814710357,
+        "tolerance_rel": 0.005
+      },
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.7
+    },
+    {
+      "model": "rough_heston_classical",
+      "id": "rough_heston_classical_k110",
+      "spot": 100.0,
+      "strike": 110.0,
+      "rate": 0.025,
+      "dividend_yield": 0.0,
+      "t": 1.0,
+      "hurst": 0.499,
+      "expected": {
+        "call": 4.2565455707116,
+        "tolerance_rel": 0.005
+      },
+      "v0": 0.04,
+      "kappa": 1.5,
+      "theta": 0.04,
+      "sigma": 0.3,
+      "rho": -0.7
+    }
+  ]
+}

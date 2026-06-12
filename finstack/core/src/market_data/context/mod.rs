@@ -1857,9 +1857,8 @@ mod tests {
     fn fx_required_errors_when_matrix_absent() {
         let ctx = MarketContext::new();
         // `FxMatrix` does not impl Debug, so we can't use `unwrap_err` directly.
-        let err = match ctx.fx_required() {
-            Ok(_) => panic!("expected fx_required to error on empty context"),
-            Err(e) => e,
+        let Err(err) = ctx.fx_required() else {
+            panic!("expected fx_required to error on empty context");
         };
         assert!(
             matches!(

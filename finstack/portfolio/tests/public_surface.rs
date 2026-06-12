@@ -1,3 +1,5 @@
+//! Public surface tests for portfolio.
+
 use finstack_portfolio::factor_model::{
     FactorAssignmentReport, FactorModel, FactorModelBuilder, PositionChange, RiskDecomposition,
     UnmatchedEntry,

@@ -607,7 +607,7 @@ mod bond_market_edge {
         let registry = standard_registry();
         let pv = bond.value(&market, as_of).unwrap();
         let mut context = MetricContext::new(
-            Arc::new(bond.clone()),
+            Arc::new(bond),
             Arc::new(market),
             as_of,
             pv,

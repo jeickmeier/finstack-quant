@@ -798,7 +798,7 @@ mod tests {
         let discount = flat_discount_curve(0.03);
         let times = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let profile = ExposureProfile {
-            times: times.clone(),
+            times,
             mtm_values: vec![100.0, 200.0, 50.0, 150.0, 80.0],
             epe: vec![100.0, 200.0, 50.0, 150.0, 80.0],
             ene: vec![0.0; 5],

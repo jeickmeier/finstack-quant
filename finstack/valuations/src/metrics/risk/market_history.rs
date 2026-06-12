@@ -72,18 +72,12 @@ impl MarketScenario {
                 RiskFactorType::DiscountRate {
                     curve_id,
                     tenor_years,
-                } => {
-                    let (id, spec) = key_rate_bp_bump(curve_id, *tenor_years, shift.shift);
-                    MarketBump::Curve { id, spec }
                 }
-                RiskFactorType::ForwardRate {
+                | RiskFactorType::ForwardRate {
                     curve_id,
                     tenor_years,
-                } => {
-                    let (id, spec) = key_rate_bp_bump(curve_id, *tenor_years, shift.shift);
-                    MarketBump::Curve { id, spec }
                 }
-                RiskFactorType::CreditSpread {
+                | RiskFactorType::CreditSpread {
                     curve_id,
                     tenor_years,
                 } => {
@@ -432,7 +426,7 @@ mod tests {
         let bumped = scenario.apply(&base_market)?;
         match bumped.get_price("AAPL")? {
             MarketScalar::Unitless(v) => assert!((v - 110.0).abs() < 1e-9),
-            other => panic!("unexpected scalar variant: {:?}", other),
+            other @ MarketScalar::Price(_) => panic!("unexpected scalar variant: {:?}", other),
         }
 
         Ok(())
@@ -482,7 +476,7 @@ mod tests {
             .row(&[0.21, 0.23])
             .build()?;
 
-        let base_market = MarketContext::new().insert_surface(surface.clone());
+        let base_market = MarketContext::new().insert_surface(surface);
 
         let scenario = MarketScenario::new(
             date!(2024 - 01 - 02),

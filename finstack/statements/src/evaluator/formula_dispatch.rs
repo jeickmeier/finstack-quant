@@ -160,9 +160,7 @@ fn eval_rank(args: &[Expr], context: &mut EvaluationContext, node_id: Option<&st
 
     let current_value = evaluate_expr(&args[0], context, node_id)?;
 
-    let node_name = if let ExprNode::Column(name) = &args[0].node {
-        name
-    } else {
+    let ExprNode::Column(node_name) = &args[0].node else {
         return Err(eval_error(
             node_id,
             "rank() requires a column reference as its argument",
@@ -199,9 +197,7 @@ fn eval_quantile(
         return Err(eval_error(node_id, "quantile must be between 0 and 1"));
     }
 
-    let node_name = if let ExprNode::Column(name) = &args[0].node {
-        name
-    } else {
+    let ExprNode::Column(node_name) = &args[0].node else {
         return Err(eval_error(
             node_id,
             "quantile() requires a column reference",

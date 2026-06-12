@@ -165,7 +165,7 @@ fn test_time_to_maturity_metric() {
     let repo = create_test_repo();
     let context = create_standard_market_context();
     let as_of = date(2025, 1, 10);
-    let mut mctx = create_metric_context(repo.clone(), context, as_of);
+    let mut mctx = create_metric_context(repo, context, as_of);
 
     let registry = standard_registry();
     let results = registry

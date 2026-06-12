@@ -326,7 +326,7 @@ fn test_rfr_cap_dv01_reports_raw_model_curve_risk_without_quote_scalar() {
     up.revert_scratch_bump(up_discount)
         .expect("revert discount");
 
-    let mut down = market.clone();
+    let mut down = market;
     let down_discount = down
         .apply_curve_bump_in_place(&discount_id, BumpSpec::parallel_bp(-1.0))
         .expect("discount bump");

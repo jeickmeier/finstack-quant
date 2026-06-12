@@ -1811,7 +1811,7 @@ mod calibration_estimator_tests {
         );
         returns.insert(b.clone(), vec![None, None, Some(1.0), Some(2.0)]);
 
-        let order = vec![a.clone(), b.clone()];
+        let order = vec![a, b];
         let rho = sample_correlation_flat(&order, &returns);
 
         // 2x2 flat row-major: [aa, ab, ba, bb].

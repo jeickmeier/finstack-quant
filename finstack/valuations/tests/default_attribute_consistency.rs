@@ -1,3 +1,5 @@
+//! Default attribute consistency tests for valuations.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

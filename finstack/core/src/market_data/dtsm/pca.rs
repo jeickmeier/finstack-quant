@@ -93,7 +93,7 @@ impl YieldPca {
         }
 
         // De-mean the changes
-        let mut centered = changes.clone();
+        let mut centered = changes;
         for i in 0..m {
             for j in 0..n {
                 centered[(i, j)] -= mean_change[j];

@@ -7,10 +7,12 @@
 //! # Surface Types
 //!
 //! - `VolSurface`: Implied volatility by strike and maturity (bilinear interpolation)
-//! - `FxDeltaVolSurface`: FX smile representation quoted in delta space and
-//!   converted to strikes for interpolation and pricing
+//! - `FxDeltaVolSurface`: FX smile representation quoted in delta space; each
+//!   expiry's smile is built independently from its own pillar strikes
+//!   (derived from that expiry's forward) and queried via `implied_vol`
 //! - `FxDeltaVolSurfaceBuilder`: Builder for market-standard FX ATM / risk-reversal
-//!   / butterfly inputs
+//!   / butterfly inputs, materializing a strike-based `VolSurface` that samples
+//!   each expiry's own smile on the union of all pillar strikes
 //!
 //! # When to use which surface
 //!
@@ -137,6 +139,53 @@ pub(crate) fn fx_put_call_25d_strikes(
     expiry: f64,
 ) -> (f64, f64) {
     fx_put_call_delta_strikes(forward, sigma_put, sigma_call, expiry, 0.25)
+}
+
+/// Per-expiry FX smile pillars: the (strikes, vols) of one expiry's own
+/// 3-point (25Δ put, ATM DNS, 25Δ call) or 5-point (plus 10Δ wings) smile.
+///
+/// This is the canonical per-expiry smile representation shared by
+/// [`FxDeltaVolSurface::implied_vol`](fx_delta_vol_surface::FxDeltaVolSurface::implied_vol)
+/// (the query path) and [`FxDeltaVolSurfaceBuilder`] (the rectangular
+/// materialization). Each expiry's strikes are derived from *that expiry's*
+/// forward and vol scale; no strikes from other expiries are involved.
+///
+/// `wings_10d` carries `(rr_10d, bf_10d)` when 10-delta quotes are available.
+///
+/// # Errors
+///
+/// Returns [`InputError::NegativeValue`](crate::error::InputError) if any
+/// recovered wing vol is non-positive.
+pub(crate) fn fx_smile_pillars(
+    forward: f64,
+    expiry: f64,
+    atm: f64,
+    rr_25d: f64,
+    bf_25d: f64,
+    wings_10d: Option<(f64, f64)>,
+) -> crate::Result<(Vec<f64>, Vec<f64>)> {
+    let (sigma_put, sigma_call) = recover_fx_wing_vols(atm, rr_25d, bf_25d);
+    if sigma_call <= 0.0 || sigma_put <= 0.0 {
+        return Err(crate::error::InputError::NegativeValue.into());
+    }
+
+    let k_atm = fx_atm_dns_strike(forward, atm, expiry);
+    let (k_put, k_call) = fx_put_call_25d_strikes(forward, sigma_put, sigma_call, expiry);
+
+    if let Some((rr_10d, bf_10d)) = wings_10d {
+        let (sigma_put_10d, sigma_call_10d) = recover_fx_wing_vols(atm, rr_10d, bf_10d);
+        if sigma_call_10d <= 0.0 || sigma_put_10d <= 0.0 {
+            return Err(crate::error::InputError::NegativeValue.into());
+        }
+        let (k_put_10d, k_call_10d) =
+            fx_put_call_delta_strikes(forward, sigma_put_10d, sigma_call_10d, expiry, 0.10);
+        Ok((
+            vec![k_put_10d, k_put, k_atm, k_call, k_call_10d],
+            vec![sigma_put_10d, sigma_put, atm, sigma_call, sigma_call_10d],
+        ))
+    } else {
+        Ok((vec![k_put, k_atm, k_call], vec![sigma_put, atm, sigma_call]))
+    }
 }
 
 /// Piecewise-linear interpolation on sorted knots with flat extrapolation.

@@ -102,8 +102,6 @@ impl MbsFeeSpec {
     /// Fee amount for the period
     pub fn calculate_fee(&self, balance: f64, accrual_days: u32) -> f64 {
         let day_count_divisor = match self.day_count {
-            DayCount::Thirty360 => 360.0,
-            DayCount::Act360 => 360.0,
             DayCount::Act365F => 365.0,
             _ => 360.0,
         };

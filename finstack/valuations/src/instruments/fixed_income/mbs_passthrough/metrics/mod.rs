@@ -172,8 +172,8 @@ mod tests {
 
         // The registered metric.
         let ctx = MetricContext::new(
-            Arc::new(mbs.clone()),
-            Arc::new(market.clone()),
+            Arc::new(mbs),
+            Arc::new(market),
             as_of,
             Money::new(0.0, Currency::USD),
             MetricContext::default_config(),

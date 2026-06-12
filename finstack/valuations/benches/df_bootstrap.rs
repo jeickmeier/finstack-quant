@@ -1,3 +1,5 @@
+//! Df bootstrap benchmarks for valuations.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;

@@ -153,7 +153,7 @@ fn test_corkscrew_set_config() {
         fail_on_error: false,
     };
 
-    extension.set_config(config.clone());
+    extension.set_config(config);
     assert!(extension.config().is_some());
     assert_eq!(extension.config().unwrap().tolerance, 0.01);
 }
@@ -293,7 +293,7 @@ fn test_scorecard_set_config() {
         period: None,
     };
 
-    extension.set_config(config.clone());
+    extension.set_config(config);
     assert!(extension.config().is_some());
     assert_eq!(extension.config().unwrap().rating_scale, "Moody's");
 }

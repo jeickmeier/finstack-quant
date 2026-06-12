@@ -108,7 +108,9 @@ impl PoolAsset {
                         crate::instruments::fixed_income::bond::CashflowSpec::StepUp(spec) => {
                             spec.dc
                         }
-                        _ => DayCount::Act360, // Fallback if not clear, though bond should have one
+                        crate::instruments::fixed_income::bond::CashflowSpec::Amortizing {
+                            ..
+                        } => DayCount::Act360, // Fallback if not clear, though bond should have one
                     }
                 }
             },

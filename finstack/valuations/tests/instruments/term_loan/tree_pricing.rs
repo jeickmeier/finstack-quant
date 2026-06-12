@@ -73,7 +73,7 @@ fn callable_loan_tree_pv_is_below_straight() {
         .unwrap()
         .amount();
 
-    let mut straight = loan.clone();
+    let mut straight = loan;
     straight.call_schedule = None;
     let pv_straight = pricer
         .price_callable(&straight, &market, as_of)
@@ -144,7 +144,7 @@ fn huge_friction_matches_straight_loan() {
         .unwrap()
         .amount();
 
-    let mut straight = callable.clone();
+    let mut straight = callable;
     straight.call_schedule = None;
     let pv_straight = pricer
         .price_callable(&straight, &market, as_of)

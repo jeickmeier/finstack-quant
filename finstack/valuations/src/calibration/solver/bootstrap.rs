@@ -591,12 +591,9 @@ where
     let mut per_quote = Vec::with_capacity(n);
 
     // Sort quotes by time for consistent ordering (matching the bootstrap solve order).
-    let sorted_quotes = match sort_quotes_by_time(target, quotes) {
-        Ok(sq) => sq,
-        Err(_) => {
-            // Fall back to basic diagnostics if sorting fails.
-            return CalibrationDiagnostics::from_residuals(resid_values);
-        }
+    let Ok(sorted_quotes) = sort_quotes_by_time(target, quotes) else {
+        // Fall back to basic diagnostics if sorting fails.
+        return CalibrationDiagnostics::from_residuals(resid_values);
     };
 
     // For each sorted quote, compute a finite-difference sensitivity.
@@ -1455,10 +1452,7 @@ mod solver_tests {
             unsorted_scan: false,
             infeasible_below: None,
         };
-        let q2 = DummyQuote {
-            t: 1.0,
-            ..q1.clone()
-        };
+        let q2 = DummyQuote { t: 1.0, ..q1 };
         let cfg = CalibrationConfig::default();
         let err = SequentialBootstrapper::bootstrap(
             &target,

@@ -1,3 +1,5 @@
+//! Factor model serialization tests for portfolio.
+
 use finstack_core::types::CurveId;
 use finstack_factor_model::{CurveType, FactorId, MarketDependency, RiskMeasure};
 use finstack_portfolio::factor_model::RiskDecomposition;
@@ -56,7 +58,7 @@ fn test_factor_model_report_types_roundtrip() {
     assert_roundtrip_value(&FactorAssignmentReport {
         assignments: vec![PositionAssignment {
             position_id: PositionId::new("POS_1"),
-            mappings: vec![(dependency.clone(), FactorId::new("Rates"))],
+            mappings: vec![(dependency, FactorId::new("Rates"))],
         }],
         unmatched: vec![UnmatchedEntry {
             position_id: PositionId::new("POS_2"),

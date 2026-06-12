@@ -33,6 +33,7 @@ pub struct AttributionParams {
 impl AttributionParams {
     #[wasm_bindgen(constructor)]
     #[allow(clippy::too_many_arguments)]
+    /// Create the instrument from a JS spec object.
     pub fn new(
         instrument_json: String,
         market_t0_json: String,

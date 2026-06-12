@@ -86,8 +86,7 @@ fn test_cds_par_spread_roundtrip_1y() {
     let (ctx, _report) = execute_step(&step, &market_quotes, &market_calib, &settings).unwrap();
     let hazard_curve = ctx
         .get_hazard(params.curve_id.as_str())
-        .expect("hazard inserted")
-        .clone();
+        .expect("hazard inserted");
 
     // Create CDS at the quoted spread
     // Hazard curve ID is "{entity}-{seniority}" per HazardCurveCalibrator
@@ -183,8 +182,7 @@ fn test_cds_par_spread_roundtrip_multi_tenor() {
     let (ctx, _report) = execute_step(&step, &market_quotes, &market_calib, &settings).unwrap();
     let hazard_curve = ctx
         .get_hazard(params.curve_id.as_str())
-        .expect("hazard inserted")
-        .clone();
+        .expect("hazard inserted");
 
     // Reprice each CDS at its quoted spread
     let market_price = MarketContext::new()
@@ -264,8 +262,7 @@ fn test_cds_par_spread_calculation_consistency() {
     let (ctx, _report) = execute_step(&step, &market_quotes, &market_calib, &settings).unwrap();
     let hazard_curve = ctx
         .get_hazard(params.curve_id.as_str())
-        .expect("hazard inserted")
-        .clone();
+        .expect("hazard inserted");
 
     // Create market with calibrated hazard curve
     let market_price = MarketContext::new()

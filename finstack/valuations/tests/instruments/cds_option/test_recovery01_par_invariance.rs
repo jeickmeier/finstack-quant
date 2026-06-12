@@ -30,7 +30,7 @@ fn test_recovery01_recalibrates_hazard_curve_with_par_spreads() {
     let mut option_up_frozen = option.clone();
     option_up_frozen.recovery_rate += 0.01;
     let market_up = frozen_market_with_recovery(&market, "HZ-SN", base_recovery + 0.01);
-    let mut option_down_frozen = option.clone();
+    let mut option_down_frozen = option;
     option_down_frozen.recovery_rate -= 0.01;
     let market_down = frozen_market_with_recovery(&market, "HZ-SN", base_recovery - 0.01);
     let frozen = (option_up_frozen.value(&market_up, as_of).unwrap().amount()

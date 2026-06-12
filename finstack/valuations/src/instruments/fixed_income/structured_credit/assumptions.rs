@@ -260,7 +260,6 @@ impl StructuredCreditAssumptionRegistry {
         match deal_type {
             DealType::CLO => "clo_standard",
             DealType::RMBS => "rmbs_standard",
-            DealType::ABS | DealType::Auto => "abs_auto_standard",
             DealType::CMBS => "cmbs_standard",
             _ => "abs_auto_standard",
         }

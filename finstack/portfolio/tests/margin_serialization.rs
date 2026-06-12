@@ -1,3 +1,5 @@
+//! Margin serialization tests for portfolio.
+
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
 use finstack_margin::{ImMethodology, NettingSetId, SimmRiskClass, SimmSensitivities};

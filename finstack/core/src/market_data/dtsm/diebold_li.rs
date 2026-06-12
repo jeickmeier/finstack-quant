@@ -327,11 +327,7 @@ impl DieboldLi {
         // Compute unconditional mean: mu = (I - Phi)^{-1} c
         let eye3 = DMatrix::identity(3, 3);
         let i_minus_phi = &eye3 - &phi;
-        let mu = i_minus_phi
-            .clone()
-            .try_inverse()
-            .map(|inv| &inv * &c)
-            .unwrap_or(c.clone()); // fallback to c if non-invertible (unit root)
+        let mu = i_minus_phi.try_inverse().map(|inv| &inv * &c).unwrap_or(c); // fallback to c if non-invertible (unit root)
 
         // Residual covariance Q
         let mut residuals = DMatrix::zeros(n_obs, 3);
@@ -596,7 +592,7 @@ mod tests {
             }
         }
 
-        let panel = YieldPanel::new(data, tenors.clone(), None).unwrap();
+        let panel = YieldPanel::new(data, tenors, None).unwrap();
         let model = DieboldLi::builder()
             .lambda(lambda)
             .build()

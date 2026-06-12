@@ -39,3 +39,6 @@ harness = false
 [[bench]]
 name = "parallel_thresholds"
 harness = false
+
+[lints]
+workspace = true

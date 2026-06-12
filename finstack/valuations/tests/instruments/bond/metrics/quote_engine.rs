@@ -82,7 +82,7 @@ fn test_quote_engine_roundtrip_ytm_and_zspread_fixed_bond() {
         compute_quotes(&bond, &market, as_of, BondQuoteInput::ZSpread(target_z)).unwrap();
     let clean_pct_z = quotes_from_z.clean_price_pct;
 
-    let mut bond_with_price_z = bond.clone();
+    let mut bond_with_price_z = bond;
     bond_with_price_z
         .pricing_overrides
         .market_quotes
@@ -153,7 +153,7 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
     .unwrap();
     let clean_pct = quotes.clean_price_pct;
 
-    let mut frn_with_price = frn.clone();
+    let mut frn_with_price = frn;
     frn_with_price.pricing_overrides =
         PricingOverrides::default().with_quoted_clean_price(clean_pct);
 
@@ -245,7 +245,7 @@ fn test_quote_engine_roundtrip_oas_and_asw_market_fixed_bond() {
     .unwrap();
     let clean_pct_asw = quotes_asw.clean_price_pct;
 
-    let mut bond_with_asw_price = bond.clone();
+    let mut bond_with_asw_price = bond;
     bond_with_asw_price.pricing_overrides =
         PricingOverrides::default().with_quoted_clean_price(clean_pct_asw);
     let res_asw = bond_with_asw_price
@@ -290,7 +290,7 @@ fn test_quote_engine_roundtrip_i_spread_fixed_bond() {
         compute_quotes(&bond, &market, as_of, BondQuoteInput::ISpread(target_ispr)).unwrap();
     let clean_pct = quotes.clean_price_pct;
 
-    let mut bond_with_price = bond.clone();
+    let mut bond_with_price = bond;
     bond_with_price.pricing_overrides =
         PricingOverrides::default().with_quoted_clean_price(clean_pct);
     let res = bond_with_price

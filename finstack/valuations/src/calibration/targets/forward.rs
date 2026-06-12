@@ -138,7 +138,7 @@ impl ForwardCurveTarget {
             }
         };
 
-        report.update_solver_config(config.solver.clone());
+        report.update_solver_config(config.solver);
 
         let new_context = context.clone().insert(curve);
         Ok((new_context, report))
@@ -227,7 +227,9 @@ impl BootstrapTarget for ForwardCurveTarget {
         };
         let q = pq.quote.as_ref();
         match q {
-            RateQuote::Deposit { rate, .. } | RateQuote::Fra { rate, .. } => Ok(*rate),
+            RateQuote::Deposit { rate, .. }
+            | RateQuote::Fra { rate, .. }
+            | RateQuote::Swap { rate, .. } => Ok(*rate),
             RateQuote::Futures {
                 price,
                 convexity_adjustment,
@@ -248,7 +250,6 @@ impl BootstrapTarget for ForwardCurveTarget {
                     Ok(implied_rate)
                 }
             }
-            RateQuote::Swap { rate, .. } => Ok(*rate),
         }
     }
 

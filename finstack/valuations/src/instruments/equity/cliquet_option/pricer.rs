@@ -447,8 +447,7 @@ mod tests {
     fn cliquet_rejects_missing_dividend_yield_when_id_is_configured() {
         let as_of = date(2024, 1, 1);
         let option = live_option();
-        let err =
-            compute_pv(&option, &market(as_of).clone(), as_of).expect("base case should succeed");
+        let err = compute_pv(&option, &market(as_of), as_of).expect("base case should succeed");
         assert!(err.amount().is_finite());
 
         let missing_div_market = MarketContext::new()

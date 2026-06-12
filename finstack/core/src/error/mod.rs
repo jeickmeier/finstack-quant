@@ -449,7 +449,7 @@ mod tests {
             "duration_mod".to_string(),
             "ytm".to_string(),
         ];
-        let err = Error::unknown_metric("dv1", available.clone());
+        let err = Error::unknown_metric("dv1", available);
 
         let msg = format!("{}", err);
         assert!(msg.contains("Unknown metric 'dv1'"));

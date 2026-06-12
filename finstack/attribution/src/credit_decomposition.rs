@@ -203,9 +203,8 @@ impl AttributionSpec {
         use finstack_core::money::Money;
 
         // 0. Need a populated carry_detail to split.
-        let carry_detail = match attribution.carry_detail.as_mut() {
-            Some(d) => d,
-            None => return Ok(()),
+        let Some(carry_detail) = attribution.carry_detail.as_mut() else {
+            return Ok(());
         };
         let ccy = carry_detail.total.currency();
 
@@ -218,9 +217,8 @@ impl AttributionSpec {
             None => return Ok(()),
         };
         let issuer_id = finstack_core::types::IssuerId::new(issuer_id_str);
-        let issuer_row = match model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id) {
-            Some(r) => r,
-            None => return Ok(()),
+        let Some(issuer_row) = model.issuer_betas.iter().find(|r| r.issuer_id == issuer_id) else {
+            return Ok(());
         };
 
         // 2. Find a credit (hazard) curve and discount curve on the instrument.

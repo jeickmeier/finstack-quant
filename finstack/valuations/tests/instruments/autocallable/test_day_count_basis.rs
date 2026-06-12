@@ -60,11 +60,8 @@ fn test_autocallable_mismatched_day_count_bases() {
     let div_yield = 0.02; // 2% div yield
 
     // Create autocallable with ACT/365F day count (standard vol surface basis)
-    let autocall = create_quarterly_autocallable(
-        observation_dates.clone(),
-        DayCount::Act365F,
-        Some("test_dc"),
-    );
+    let autocall =
+        create_quarterly_autocallable(observation_dates, DayCount::Act365F, Some("test_dc"));
 
     // Create market with ACT/360 discount curve (money market convention)
     // This tests the mismatched basis scenario that was previously buggy
@@ -150,7 +147,7 @@ fn test_autocallable_deterministic_seeding() {
 
     // Different seed should produce different result
     let autocall3 =
-        create_quarterly_autocallable(observation_dates.clone(), DayCount::Act365F, Some("seed_b"));
+        create_quarterly_autocallable(observation_dates, DayCount::Act365F, Some("seed_b"));
     let pv3 = autocall3.value(&market, as_of).unwrap();
 
     // Should be different (though statistically could be same, very unlikely)
@@ -206,11 +203,8 @@ fn test_autocallable_same_day_count_basis() {
 
     // Now compare with ACT/360 market
     let market_360 = build_market_with_dc(as_of, spot, vol, rate, div_yield, DayCount::Act360);
-    let autocall_360 = create_quarterly_autocallable(
-        observation_dates.clone(),
-        DayCount::Act365F,
-        Some("same_dc"),
-    );
+    let autocall_360 =
+        create_quarterly_autocallable(observation_dates, DayCount::Act365F, Some("same_dc"));
     let pv_360 = autocall_360.value(&market_360, as_of).unwrap();
 
     // The prices should differ slightly due to different discount factor calculation
@@ -250,7 +244,7 @@ fn test_observation_times_consistent_with_df_ratios() {
     // Create autocallable with ACT/365F day count (instrument setting)
     // but use ACT/360 discount curve (market convention)
     let autocall =
-        create_quarterly_autocallable(observation_dates.clone(), DayCount::Act365F, Some("obs_df"));
+        create_quarterly_autocallable(observation_dates, DayCount::Act365F, Some("obs_df"));
 
     let market = build_market_with_dc(as_of, spot, vol, rate, div_yield, DayCount::Act360);
 

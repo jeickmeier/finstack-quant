@@ -174,7 +174,7 @@ fn test_zero_volatility_option_limits() {
 
     let pv = atm_option.value(&market, as_of).unwrap();
     let mut context = MetricContext::new(
-        Arc::new(atm_option.clone()),
+        Arc::new(atm_option),
         Arc::new(market.clone()),
         as_of,
         pv,

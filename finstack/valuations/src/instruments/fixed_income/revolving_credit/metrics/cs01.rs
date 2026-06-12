@@ -59,7 +59,7 @@ impl ZSpreadCs01 for RevolvingCredit {
                         )
                         .ok()
                     }
-                    _ => None,
+                    BaseRateSpec::Fixed { .. } => None,
                 };
                 let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
                 let schedule = engine.generate_deterministic()?;

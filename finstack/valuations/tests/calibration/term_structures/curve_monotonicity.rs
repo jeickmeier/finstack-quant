@@ -80,7 +80,7 @@ proptest! {
         let base_date = Date::from_calendar_date(2025, Month::January, 15).unwrap();
 
         // Create invalid curve by making one DF increase
-        let mut invalid_knots = valid_knots.clone();
+        let mut invalid_knots = valid_knots;
         let len = invalid_knots.len();
         let idx = 1 + (bad_index % (len - 1));
         // Make DF at idx larger than the previous DF.

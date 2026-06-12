@@ -127,11 +127,11 @@ mod serde_tests {
                 (Rule::EasterOffset(o1), Rule::EasterOffset(o2)) => {
                     assert_eq!(o1, o2);
                 }
-                (Rule::ChineseNewYear, Rule::ChineseNewYear) => {}
-                (Rule::QingMing, Rule::QingMing) => {}
-                (Rule::BuddhasBirthday, Rule::BuddhasBirthday) => {}
-                (Rule::VernalEquinoxJP, Rule::VernalEquinoxJP) => {}
-                (Rule::AutumnalEquinoxJP, Rule::AutumnalEquinoxJP) => {}
+                (Rule::ChineseNewYear, Rule::ChineseNewYear)
+                | (Rule::QingMing, Rule::QingMing)
+                | (Rule::BuddhasBirthday, Rule::BuddhasBirthday)
+                | (Rule::VernalEquinoxJP, Rule::VernalEquinoxJP)
+                | (Rule::AutumnalEquinoxJP, Rule::AutumnalEquinoxJP) => {}
                 _ => panic!("Rule variant mismatch"),
             }
         }

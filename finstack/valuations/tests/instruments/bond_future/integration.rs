@@ -903,7 +903,7 @@ fn test_bond_future_dv01_calculation() {
             ctd_bond_id: "US912828XG33",
             discount_curve_id: "USD-TREASURY",
         },
-        ctd_bond.clone(),
+        ctd_bond,
     );
 
     // Calculate NPV
@@ -915,8 +915,8 @@ fn test_bond_future_dv01_calculation() {
 
     // Create metric context
     let mut context = MetricContext::new(
-        Arc::new(future.clone()),
-        Arc::new(market.clone()),
+        Arc::new(future),
+        Arc::new(market),
         as_of,
         pv,
         MetricContext::default_config(),
@@ -1095,7 +1095,7 @@ fn test_bond_future_dv01_sign_convention() {
     let pv_short = future_short.value(&market, as_of).unwrap();
     let mut context_short = MetricContext::new(
         Arc::new(future_short),
-        Arc::new(market.clone()),
+        Arc::new(market),
         as_of,
         pv_short,
         MetricContext::default_config(),

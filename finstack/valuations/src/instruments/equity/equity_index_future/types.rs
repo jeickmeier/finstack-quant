@@ -608,7 +608,7 @@ mod tests {
         // Long 10 ES contracts: delta = 50 × 10 × 1 = 500
         assert_eq!(future.delta(), 500.0);
 
-        let mut short_future = future.clone();
+        let mut short_future = future;
         short_future.position = Position::Short;
         // Short 10 ES contracts: delta = 50 × 10 × (-1) = -500
         assert_eq!(short_future.delta(), -500.0);

@@ -568,7 +568,7 @@ mod tests {
             "USD-OIS",
         )
         .expect("bond");
-        bond.credit_curve_id = Some(curve_id.clone());
+        bond.credit_curve_id = Some(curve_id);
         bond.attributes = Attributes::new().with_meta(ISSUER_ID_META_KEY, "ISSUER-B");
         let position = Position::new(
             "pos-credit",

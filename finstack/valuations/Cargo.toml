@@ -175,3 +175,6 @@ harness = false
 [[bin]]
 name = "gen_schemas"
 path = "src/bin/gen_schemas.rs"
+
+[lints]
+workspace = true

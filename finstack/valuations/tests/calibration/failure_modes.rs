@@ -239,8 +239,8 @@ fn base_correlation_preflight_rejects_invalid_attachment_detachment() {
     let index_data = CreditIndexData::builder()
         .num_constituents(125)
         .recovery_rate(0.40)
-        .index_credit_curve(hazard.clone())
-        .base_correlation_curve(base_corr.clone())
+        .index_credit_curve(std::sync::Arc::clone(&hazard))
+        .base_correlation_curve(std::sync::Arc::clone(&base_corr))
         .build()
         .expect("credit index data");
 

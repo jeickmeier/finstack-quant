@@ -289,13 +289,11 @@ impl VolSurface {
     /// pricing scenarios where out-of-bounds coordinates should use edge values.
     pub fn value_clamped(&self, expiry: f64, strike: f64) -> f64 {
         // Get bounds safely using first/last with defensive fallbacks
-        let (exp_min, exp_max) = match (self.expiries.first(), self.expiries.last()) {
-            (Some(&min), Some(&max)) => (min, max),
-            _ => return f64::NAN,
+        let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
+            return f64::NAN;
         };
-        let (str_min, str_max) = match (self.strikes.first(), self.strikes.last()) {
-            (Some(&min), Some(&max)) => (min, max),
-            _ => return f64::NAN,
+        let (Some(&str_min), Some(&str_max)) = (self.strikes.first(), self.strikes.last()) else {
+            return f64::NAN;
         };
 
         let expiry = expiry.clamp(exp_min, exp_max);
@@ -508,13 +506,11 @@ impl VolSurface {
     /// ```
     pub fn bump_point(&self, expiry: f64, strike: f64, bump_pct: f64) -> crate::Result<Self> {
         // Get bounds safely using first/last
-        let (exp_min, exp_max) = match (self.expiries.first(), self.expiries.last()) {
-            (Some(&min), Some(&max)) => (min, max),
-            _ => return Err(crate::error::InputError::TooFewPoints.into()),
+        let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
+            return Err(crate::error::InputError::TooFewPoints.into());
         };
-        let (str_min, str_max) = match (self.strikes.first(), self.strikes.last()) {
-            (Some(&min), Some(&max)) => (min, max),
-            _ => return Err(crate::error::InputError::TooFewPoints.into()),
+        let (Some(&str_min), Some(&str_max)) = (self.strikes.first(), self.strikes.last()) else {
+            return Err(crate::error::InputError::TooFewPoints.into());
         };
 
         // Clamp to grid bounds
@@ -560,13 +556,11 @@ impl VolSurface {
         strike: f64,
         bump_pct: f64,
     ) -> crate::Result<f64> {
-        let (exp_min, exp_max) = match (self.expiries.first(), self.expiries.last()) {
-            (Some(&min), Some(&max)) => (min, max),
-            _ => return Err(crate::error::InputError::TooFewPoints.into()),
+        let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
+            return Err(crate::error::InputError::TooFewPoints.into());
         };
-        let (str_min, str_max) = match (self.strikes.first(), self.strikes.last()) {
-            (Some(&min), Some(&max)) => (min, max),
-            _ => return Err(crate::error::InputError::TooFewPoints.into()),
+        let (Some(&str_min), Some(&str_max)) = (self.strikes.first(), self.strikes.last()) else {
+            return Err(crate::error::InputError::TooFewPoints.into());
         };
 
         let clamped_expiry = expiry.clamp(exp_min, exp_max);
@@ -802,26 +796,22 @@ impl VolSurface {
         }
 
         // Determine the expiry slice to use
-        let exp_min = match self.expiries.first() {
-            Some(&e) => e,
-            None => return f64::NAN,
+        let Some(&exp_min) = self.expiries.first() else {
+            return f64::NAN;
         };
-        let exp_max = match self.expiries.last() {
-            Some(&e) => e,
-            None => return f64::NAN,
+        let Some(&exp_max) = self.expiries.last() else {
+            return f64::NAN;
         };
 
         // Clamp expiry to grid range
         let clamped_expiry = expiry.clamp(exp_min, exp_max);
 
         // If the strike is in bounds, the issue is only expiry — clamp works fine
-        let str_min = match self.strikes.first() {
-            Some(&s) => s,
-            None => return f64::NAN,
+        let Some(&str_min) = self.strikes.first() else {
+            return f64::NAN;
         };
-        let str_max = match self.strikes.last() {
-            Some(&s) => s,
-            None => return f64::NAN,
+        let Some(&str_max) = self.strikes.last() else {
+            return f64::NAN;
         };
 
         if strike >= str_min && strike <= str_max {

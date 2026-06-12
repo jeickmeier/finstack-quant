@@ -165,23 +165,20 @@ impl HazardBondEngine {
         // Resolve hazard curve. Explicit hazard-rate pricing must fail loudly
         // when credit market data is missing; risk-free pricing belongs on the
         // discounting model path.
-        let hazard = match Self::resolve_hazard_curve(bond, market) {
-            Some(h) => h,
-            None => {
-                let expected = bond.credit_curve_id.as_ref().map_or_else(
-                    || {
-                        "an explicit credit_curve_id on the bond (implicit hazard-curve \
-                        discovery by naming convention is not supported)"
-                            .to_string()
-                    },
-                    |id| format!("hazard curve '{}' in the market context", id.as_str()),
-                );
-                return Err(finstack_core::Error::Validation(format!(
-                    "hazard_rate pricing for bond '{}' requires a hazard curve; expected {}",
-                    bond.id.as_str(),
-                    expected
-                )));
-            }
+        let Some(hazard) = Self::resolve_hazard_curve(bond, market) else {
+            let expected = bond.credit_curve_id.as_ref().map_or_else(
+                || {
+                    "an explicit credit_curve_id on the bond (implicit hazard-curve \
+                    discovery by naming convention is not supported)"
+                        .to_string()
+                },
+                |id| format!("hazard curve '{}' in the market context", id.as_str()),
+            );
+            return Err(finstack_core::Error::Validation(format!(
+                "hazard_rate pricing for bond '{}' requires a hazard curve; expected {}",
+                bond.id.as_str(),
+                expected
+            )));
         };
         let recovery = hazard.recovery_rate().clamp(0.0, 1.0);
 
@@ -642,8 +639,8 @@ mod tests {
             .value(&market, issue)
             .expect("Base bond valuation should succeed in CS01 test");
 
-        let instrument_arc: Arc<dyn Instrument> = Arc::new(bond.clone());
-        let curves_arc = Arc::new(market.clone());
+        let instrument_arc: Arc<dyn Instrument> = Arc::new(bond);
+        let curves_arc = Arc::new(market);
         let mut ctx = MetricContext::new(
             instrument_arc,
             curves_arc,

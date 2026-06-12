@@ -300,7 +300,7 @@ fn test_dataframe_export_metric_keys() {
     // Compute PV and metrics
     let pv = bond.value(&market, as_of).expect("Should price");
     let mut context = MetricContext::new(
-        Arc::new(bond.clone()),
+        Arc::new(bond),
         Arc::clone(&market),
         as_of,
         pv,

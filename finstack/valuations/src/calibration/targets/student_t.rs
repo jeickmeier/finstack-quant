@@ -210,7 +210,7 @@ impl StudentTTarget {
             .day_count(DayCount::Act360)
             .bdc(BusinessDayConvention::Following)
             .calendar_id_opt(None)
-            .discount_curve_id(discount_curve_id.clone())
+            .discount_curve_id(discount_curve_id)
             .credit_index_id(CurveId::from(index_id.as_str()))
             .side(TrancheSide::SellProtection)
             .effective_date_opt(None)

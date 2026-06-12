@@ -44,9 +44,7 @@ fn test_compounding_lookback_sensitivity() {
         .build()
         .unwrap();
 
-    let ctx = MarketContext::new()
-        .insert(disc.clone())
-        .insert(fwd.clone());
+    let ctx = MarketContext::new().insert(disc).insert(fwd);
 
     // If lookback pushes observations before `as_of`, provide minimal fixings so the test
     // remains focused on the lookback sensitivity (not fixing-data availability).

@@ -752,12 +752,11 @@ impl StructuredCredit {
                 // DF = exp(-(r + s) * t)
                 // We assume continuous compounding for the spread application
 
-                let t =
-                    match DayCount::Act365F.year_fraction(as_of, *date, DayCountContext::default())
-                    {
-                        Ok(t) => t,
-                        Err(_) => return f64::NAN, // Solver handles NAN/Inf usually by erroring, but Brent might need finite
-                    };
+                let Ok(t) =
+                    DayCount::Act365F.year_fraction(as_of, *date, DayCountContext::default())
+                else {
+                    return f64::NAN; // Solver handles NAN/Inf usually by erroring, but Brent might need finite
+                };
 
                 if t <= 0.0 {
                     // Flow is today or past, assume full value or ignore?
@@ -767,9 +766,8 @@ impl StructuredCredit {
                     continue;
                 }
 
-                let df_base = match discount_curve.df_on_date_curve(*date) {
-                    Ok(df) => df,
-                    Err(_) => return f64::NAN,
+                let Ok(df_base) = discount_curve.df_on_date_curve(*date) else {
+                    return f64::NAN;
                 };
 
                 // Adjustment: df_spread = exp(-spread * t)

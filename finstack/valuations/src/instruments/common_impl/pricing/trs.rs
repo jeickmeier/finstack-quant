@@ -887,7 +887,7 @@ mod tests {
         let ctx = MarketContext::new()
             .insert(disc)
             .insert(fwd.clone())
-            .insert_series(fixing_series.clone());
+            .insert_series(fixing_series);
 
         // TRS with a single monthly period (period_start → period_end).
         // Use StubKind::Short so ScheduleBuilder does not require an exact integer

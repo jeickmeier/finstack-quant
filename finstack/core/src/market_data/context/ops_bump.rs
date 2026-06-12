@@ -348,14 +348,14 @@ mod tests {
         let bumped = ctx.get_price("SPOT").expect("bumped spot");
         match bumped {
             MarketScalar::Unitless(v) => assert!((*v - 101.0).abs() < 1e-12),
-            _ => panic!("expected unitless price"),
+            MarketScalar::Price(_) => panic!("expected unitless price"),
         }
 
         ctx.revert_scratch_bump(token).expect("revert");
         let restored = ctx.get_price("SPOT").expect("restored spot");
         match restored {
             MarketScalar::Unitless(v) => assert!((*v - 100.0).abs() < 1e-12),
-            _ => panic!("expected unitless price"),
+            MarketScalar::Price(_) => panic!("expected unitless price"),
         }
     }
 

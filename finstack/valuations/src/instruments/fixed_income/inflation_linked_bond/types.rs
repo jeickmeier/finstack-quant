@@ -89,10 +89,11 @@ impl IndexationMethod {
     /// - Use [`new_uk_linker_modern`](InflationLinkedBond::new_uk_linker_modern) for modern (3-month lag)
     pub fn standard_lag(&self) -> InflationLag {
         match self {
-            IndexationMethod::Canadian | IndexationMethod::TIPS => InflationLag::Months(3),
             IndexationMethod::UK => InflationLag::Months(8), // Legacy UK Gilts (pre-Sep 2005)
-            IndexationMethod::French => InflationLag::Months(3),
-            IndexationMethod::Japanese => InflationLag::Months(3),
+            IndexationMethod::Canadian
+            | IndexationMethod::TIPS
+            | IndexationMethod::French
+            | IndexationMethod::Japanese => InflationLag::Months(3),
         }
     }
 

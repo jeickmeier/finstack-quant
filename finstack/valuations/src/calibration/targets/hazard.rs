@@ -279,7 +279,7 @@ impl HazardCurveTarget {
             .with_metadata("curve_id", params.curve_id.as_str())
             .with_metadata("entity", &params.entity);
         let mut report = report;
-        report.update_solver_config(config.solver.clone());
+        report.update_solver_config(config.solver);
 
         // Attach par spread points from the calibration quotes to the bootstrapped
         // curve so that downstream quote-bump CS01 metrics can re-bootstrap from
@@ -305,9 +305,8 @@ impl HazardCurveTarget {
             let bumped_ctx = context.clone().insert(curve.clone());
             let mut points: Vec<(f64, f64)> = Vec::with_capacity(prepared_quotes.len());
             for q in prepared_quotes.iter() {
-                let pq = match q {
-                    CalibrationQuote::Cds(pq) => pq,
-                    _ => continue,
+                let CalibrationQuote::Cds(pq) = q else {
+                    continue;
                 };
                 let spread_bp = match pq.quote.as_ref() {
                     crate::market::quotes::cds::CdsQuote::CdsParSpread { spread_bp, .. } => {
@@ -396,9 +395,8 @@ impl HazardCurveTarget {
     }
 
     fn quote_hazard_guess(&self, quote: &CalibrationQuote) -> Option<f64> {
-        let pq = match quote {
-            CalibrationQuote::Cds(pq) => pq,
-            _ => return None,
+        let CalibrationQuote::Cds(pq) = quote else {
+            return None;
         };
 
         // W6: prefer the *curve's* recovery (`params.recovery_rate`) for the
@@ -500,13 +498,10 @@ impl BootstrapTarget for HazardCurveTarget {
     }
 
     fn calculate_residual(&self, curve: &Self::Curve, quote: &Self::Quote) -> Result<f64> {
-        let pq = match quote {
-            crate::calibration::prepared::CalibrationQuote::Cds(pq) => pq,
-            _ => {
-                return Err(finstack_core::Error::Input(
-                    finstack_core::InputError::Invalid,
-                ))
-            }
+        let crate::calibration::prepared::CalibrationQuote::Cds(pq) = quote else {
+            return Err(finstack_core::Error::Input(
+                finstack_core::InputError::Invalid,
+            ));
         };
         let base_date = self.params.base_date;
         self.with_temp_context(curve, |ctx| {
@@ -713,13 +708,10 @@ Global solve requires strictly increasing times.",
 
         self.with_temp_context(curve, |ctx| {
             for (i, quote) in quotes.iter().enumerate() {
-                let pq = match quote {
-                    CalibrationQuote::Cds(pq) => pq,
-                    _ => {
-                        return Err(finstack_core::Error::Input(
-                            finstack_core::InputError::Invalid,
-                        ))
-                    }
+                let CalibrationQuote::Cds(pq) = quote else {
+                    return Err(finstack_core::Error::Input(
+                        finstack_core::InputError::Invalid,
+                    ));
                 };
                 let npv = pq.instrument.value_raw(ctx, self.params.base_date)?;
                 residuals[i] = npv / self.params.notional;

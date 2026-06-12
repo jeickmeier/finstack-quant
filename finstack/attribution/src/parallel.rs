@@ -644,7 +644,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
                         val_with_t0_scalars = Some(res.reprice_val);
                         attribution.market_scalars_pnl = res.pnl;
                     }
-                    _ => unreachable!(),
+                    ParallelRestoredFactor::Rates => unreachable!(),
                 },
                 ParallelLatentFactorSpec::ModelParams { .. } => {
                     val_with_t0_params = Some(res.reprice_val);

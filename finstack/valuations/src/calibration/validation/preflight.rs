@@ -58,10 +58,11 @@ pub(crate) fn preflight_step(
             validate_base_correlation_step(p, quotes, context, global_config)
         }
         StepParams::StudentT(p) => validate_student_t_step(p, quotes, context),
-        StepParams::HullWhite(_) | StepParams::CapFloorHullWhite(_) => Ok(()), // HW1F calibration validates quotes at execution time
+        StepParams::HullWhite(_) | StepParams::CapFloorHullWhite(_) | StepParams::Parametric(_) => {
+            Ok(())
+        } // These validate at execution time
         StepParams::SviSurface(p) => validate_svi_surface_step(p, context),
         StepParams::XccyBasis(p) => validate_xccy_basis_step(p, context),
-        StepParams::Parametric(_) => Ok(()), // Parametric curves validate at execution time
     }
 }
 

@@ -129,7 +129,7 @@ fn payment_lag_affects_pv() {
 
     let swap_no_lag = XccySwap::new(
         "XCCY-NO-LAG",
-        leg_no_lag.clone(),
+        leg_no_lag,
         leg_eur_pay(base, maturity),
         Currency::USD,
     )

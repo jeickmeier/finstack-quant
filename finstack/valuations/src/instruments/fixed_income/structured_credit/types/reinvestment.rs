@@ -131,7 +131,7 @@ mod tests {
         let cash = Money::new(195.0, Currency::USD);
         let selected = mgr.select_assets(
             cash,
-            vec![b.clone(), a.clone(), c.clone()],
+            vec![b, a, c],
             &pool,
             &MarketContext::default(),
             Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date"),

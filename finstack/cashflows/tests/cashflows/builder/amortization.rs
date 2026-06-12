@@ -485,12 +485,11 @@ mod computation {
             if window[1] > window[0] + 1000.0 {
                 // Only fail if significant increase without PIK
                 let has_pik = schedule.flows.iter().any(|cf| cf.kind == CFKind::PIK);
-                if !has_pik {
-                    panic!(
-                        "Outstanding should decrease: ${:.2} -> ${:.2}",
-                        window[0], window[1]
-                    );
-                }
+                assert!(
+                    has_pik,
+                    "Outstanding should decrease: ${:.2} -> ${:.2}",
+                    window[0], window[1]
+                )
             }
         }
     }
@@ -709,7 +708,7 @@ mod computation {
         let _ = builder
             .principal(init, issue, maturity)
             .amortization(AmortizationSpec::StepRemaining {
-                schedule: schedule_pairs.clone(),
+                schedule: schedule_pairs,
             })
             .fixed_cf(standard_fixed_spec());
 

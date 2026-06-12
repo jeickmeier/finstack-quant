@@ -1,3 +1,5 @@
+//! Par cds bump tests for scenarios.
+
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
@@ -134,7 +136,7 @@ fn test_par_cds_bump_reprices_credit_bond() {
         resolution_mode: Default::default(),
     };
 
-    let mut market_after = market.clone();
+    let mut market_after = market;
     let mut model = FinancialModelSpec::new("test", vec![]);
     let engine = ScenarioEngine::new();
     let mut ctx = ExecutionContext {

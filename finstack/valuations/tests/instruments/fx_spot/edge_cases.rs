@@ -168,9 +168,9 @@ fn test_special_characters_in_id() {
 fn test_multiple_clones() {
     let fx = eurusd_with_notional(1_000_000.0, 1.20);
 
-    let clone1 = fx.clone();
-    let clone2 = clone1.clone();
-    let clone3 = clone2.clone();
+    let clone1 = fx;
+    let clone2 = clone1;
+    let clone3 = clone2;
 
     assert_eq!(clone3.effective_notional().amount(), 1_000_000.0);
 }

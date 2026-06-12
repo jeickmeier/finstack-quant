@@ -787,11 +787,11 @@ fn most_specific_wins_deduplicates_per_operation_family_not_raw_identifier() {
 
     let hierarchy_spot = match hierarchy_market.get_price("SPX").unwrap() {
         MarketScalar::Price(price) => price.amount(),
-        other => panic!("expected SPX price, got {other:?}"),
+        other @ MarketScalar::Unitless(_) => panic!("expected SPX price, got {other:?}"),
     };
     let direct_spot = match direct_market.get_price("SPX").unwrap() {
         MarketScalar::Price(price) => price.amount(),
-        other => panic!("expected SPX price, got {other:?}"),
+        other @ MarketScalar::Unitless(_) => panic!("expected SPX price, got {other:?}"),
     };
 
     let hierarchy_vol = hierarchy_market

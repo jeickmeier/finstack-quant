@@ -639,17 +639,13 @@ where
         })?;
 
         // Verify the vol surface exists in the market context
-        let surface = match context.curves.get_surface(vol_surface_id.as_str()) {
-            Ok(surface) => surface,
-            Err(_) => {
-                return Err(finstack_core::Error::from(
-                    finstack_core::InputError::NotFound {
-                        id: format!("vol_surface:{}", vol_surface_id),
-                    },
-                ))
-            }
+        let Ok(surface) = context.curves.get_surface(vol_surface_id.as_str()) else {
+            return Err(finstack_core::Error::from(
+                finstack_core::InputError::NotFound {
+                    id: format!("vol_surface:{}", vol_surface_id),
+                },
+            ));
         };
-
         // Fixed bump size from `FinstackConfig` (user-facing, reproducible).
         // Interpreted as an **absolute** implied vol bump in decimal units (e.g., 0.01 = +1 vol point).
         let bump_abs = defaults.vol_bump_pct;

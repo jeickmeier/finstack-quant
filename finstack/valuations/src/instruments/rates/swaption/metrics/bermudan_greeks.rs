@@ -651,7 +651,7 @@ mod tests {
         let exercise_times = swaption
             .exercise_times(as_of)
             .expect("Valid exercise times");
-        let profile = ExerciseProbabilityProfile::from_valuator(&valuator, exercise_times.clone());
+        let profile = ExerciseProbabilityProfile::from_valuator(&valuator, exercise_times);
 
         // Expected exercise time should be reasonable.
         assert!(profile.expected_exercise_time >= 0.0);

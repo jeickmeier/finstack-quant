@@ -214,6 +214,6 @@ fn test_rate_binding() {
                 s
             );
         }
-        _ => panic!("Expected scalar value"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar value"),
     }
 }

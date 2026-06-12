@@ -54,7 +54,7 @@ fn test_periods_with_actuals_cutoff() {
 fn test_periods_explicit() {
     let periods = build_periods("2025Q1..Q2", None).unwrap().periods;
     let model = ModelBuilder::new("test")
-        .periods_explicit(periods.clone())
+        .periods_explicit(periods)
         .unwrap()
         .build()
         .unwrap();

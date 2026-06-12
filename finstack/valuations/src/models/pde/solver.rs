@@ -525,7 +525,7 @@ mod tests {
 
         // Pure implicit solver (reference)
         let implicit_solver = Solver1D::builder()
-            .grid(grid.clone())
+            .grid(grid)
             .implicit(n_time)
             .american(payoff)
             .build()

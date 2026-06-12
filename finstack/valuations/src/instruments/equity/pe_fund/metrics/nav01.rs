@@ -45,7 +45,7 @@ impl MetricCalculator for Nav01Calculator {
                         event.amount.currency(),
                     );
                 }
-                _ => {
+                FundEventKind::Contribution => {
                     // Contributions and other events unchanged
                 }
             }
@@ -63,7 +63,7 @@ impl MetricCalculator for Nav01Calculator {
                         event.amount.currency(),
                     );
                 }
-                _ => {
+                FundEventKind::Contribution => {
                     // Contributions and other events unchanged
                 }
             }

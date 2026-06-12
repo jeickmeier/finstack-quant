@@ -62,3 +62,6 @@ wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "
 
 [package.metadata.wasm-pack.profile.dev]
 wasm-opt = ["-O", "--enable-bulk-memory", "--enable-nontrapping-float-to-int", "--enable-sign-ext", "--enable-mutable-globals", "--enable-simd"]
+
+[lints]
+workspace = true

@@ -194,7 +194,6 @@ fn test_annuity_dispatch_matches_selected_settlement_method() {
     assert_approx_eq(isda_annuity, expected_physical, 1e-12, "isda cash annuity");
 
     let zero_coupon = base
-        .clone()
         .with_settlement(SwaptionSettlement::Cash)
         .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon);
     let zero_coupon_annuity = zero_coupon.annuity(disc.as_ref(), as_of, forward).unwrap();

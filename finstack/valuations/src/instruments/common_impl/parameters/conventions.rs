@@ -373,8 +373,7 @@ impl IRSConvention {
             IRSConvention::USDStandard
             | IRSConvention::EURStandard
             | IRSConvention::JPYStandard => 2,
-            IRSConvention::GBPStandard => 0, // Uses payment delay instead
-            IRSConvention::EURIborStandard => 0, // Not applicable
+            IRSConvention::GBPStandard | IRSConvention::EURIborStandard => 0, // Uses payment delay instead or is not applicable
         }
     }
 
@@ -608,8 +607,9 @@ impl CommodityConvention {
             | CommodityConvention::Gold
             | CommodityConvention::Silver
             | CommodityConvention::Agricultural
-            | CommodityConvention::Power => Currency::USD,
-            CommodityConvention::BrentCrude | CommodityConvention::Copper => Currency::USD, // LME quotes in USD
+            | CommodityConvention::Power
+            | CommodityConvention::BrentCrude
+            | CommodityConvention::Copper => Currency::USD,
         }
     }
 }

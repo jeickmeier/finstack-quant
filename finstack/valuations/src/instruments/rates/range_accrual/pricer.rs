@@ -593,7 +593,7 @@ mod tests {
 
         let pv_missing = npv_analytic(&inst, &no_div_market, as_of).expect("missing div pv");
         let pv_price = npv_analytic(&inst, &price_div_market, as_of).expect("price div pv");
-        let mut no_div_inst = inst.clone();
+        let mut no_div_inst = inst;
         no_div_inst.div_yield_id = None;
         let pv_explicit_none =
             npv_analytic(&no_div_inst, &base_market, as_of).expect("none div pv");

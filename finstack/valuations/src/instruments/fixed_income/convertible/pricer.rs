@@ -1031,8 +1031,7 @@ fn price_convertible_bond_with_inputs(
     }
 
     let steps = match tree_type {
-        ConvertibleTreeType::Binomial(n) => n,
-        ConvertibleTreeType::Trinomial(n) => n,
+        ConvertibleTreeType::Binomial(n) | ConvertibleTreeType::Trinomial(n) => n,
     };
 
     let valuator = ConvertibleBondValuator::new(
@@ -1237,9 +1236,8 @@ pub(crate) fn build_convertible_schedule(bond: &ConvertibleBond) -> Result<CashF
 
 /// Calculate convertible bond parity
 pub fn calculate_parity(bond: &ConvertibleBond, current_spot: f64) -> f64 {
-    let conversion_ratio = match bond.effective_conversion_ratio() {
-        Some(r) => r,
-        None => return 0.0,
+    let Some(conversion_ratio) = bond.effective_conversion_ratio() else {
+        return 0.0;
     };
 
     (current_spot * conversion_ratio) / bond.notional.amount()

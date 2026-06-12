@@ -136,7 +136,7 @@ fn diebold_li_forecast<'py>(
         "forecast_factors",
         vec![fc.factors[0], fc.factors[1], fc.factors[2]],
     )?;
-    d.set_item("forecast_yields", fc.yields.clone())?;
+    d.set_item("forecast_yields", fc.yields)?;
     d.set_item("confidence_bands", bands)?;
     Ok(d)
 }

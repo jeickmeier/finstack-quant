@@ -375,6 +375,9 @@ impl GaussHermiteQuadrature {
     /// | 10 | 10 → 15 → 20 |
     /// | 15 | 15 → 20 |
     /// | 20 | 20 (no refinement) |
+    // Refinement table: order 20 is listed explicitly (terminal, no refinement)
+    // even though it matches the fallback arm.
+    #[allow(clippy::match_same_arms)]
     pub fn integrate_adaptive<F2>(&self, f: F2, tolerance: f64) -> f64
     where
         F2: Fn(f64) -> f64 + Copy,

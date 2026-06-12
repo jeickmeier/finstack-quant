@@ -304,7 +304,7 @@ impl<'a> CashflowEngine<'a> {
                     )));
                 }
             }
-            _ => None,
+            BaseRateSpec::Fixed { .. } => None,
         };
 
         for i in 0..(self.payment_dates.len() - 1) {

@@ -26,9 +26,8 @@ pub(crate) fn compute_upfront_fee_pv(
     as_of: Date,
     disc_curve: &dyn Discounting,
 ) -> Result<f64> {
-    let upfront_fee = match upfront_fee_opt {
-        Some(fee) => fee,
-        None => return Ok(0.0),
+    let Some(upfront_fee) = upfront_fee_opt else {
+        return Ok(0.0);
     };
 
     if commitment_date > as_of {

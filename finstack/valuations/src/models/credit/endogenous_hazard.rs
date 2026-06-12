@@ -227,14 +227,14 @@ fn tabular_interpolate(xs: &[f64], ys: &[f64], x: f64) -> f64 {
 
     // Flat extrapolation below the first point / above the last point.
     // `get` keeps this panic-free even though `n >= 1` is established above.
-    let (first_x, first_y) = match (xs.first(), ys.first()) {
-        (Some(&fx), Some(&fy)) => (fx, fy),
-        _ => return 0.0,
+    let (Some(&fx), Some(&fy)) = (xs.first(), ys.first()) else {
+        return 0.0;
     };
-    let (last_x, last_y) = match (xs.get(n - 1), ys.get(n - 1)) {
-        (Some(&lx), Some(&ly)) => (lx, ly),
-        _ => return 0.0,
+    let (first_x, first_y) = (fx, fy);
+    let (Some(&lx), Some(&ly)) = (xs.get(n - 1), ys.get(n - 1)) else {
+        return 0.0;
     };
+    let (last_x, last_y) = (lx, ly);
     if x <= first_x {
         return first_y;
     }

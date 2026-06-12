@@ -23,3 +23,6 @@ serde_json = { workspace = true }
 [[bench]]
 name = "analytics_hot_paths"
 harness = false
+
+[lints]
+workspace = true

@@ -80,7 +80,7 @@ fn test_recovery01_at_lower_boundary() {
     .unwrap();
 
     // Override recovery rate
-    let mut cds_test = cds.clone();
+    let mut cds_test = cds;
     cds_test.protection.recovery_rate = recovery;
 
     let market = MarketContext::new()
@@ -132,7 +132,7 @@ fn test_recovery01_at_upper_boundary() {
     .unwrap();
 
     // Override recovery rate
-    let mut cds_test = cds.clone();
+    let mut cds_test = cds;
     cds_test.protection.recovery_rate = recovery;
 
     let market = MarketContext::new()
@@ -177,7 +177,7 @@ fn test_recovery01_symmetry() {
     )
     .unwrap();
 
-    let mut cds_test = cds.clone();
+    let mut cds_test = cds;
     cds_test.protection.recovery_rate = recovery;
 
     let market = MarketContext::new()
@@ -223,7 +223,7 @@ fn test_expected_loss_distressed_credit() {
     )
     .unwrap();
 
-    let mut cds_test = cds.clone();
+    let mut cds_test = cds;
     cds_test.protection.recovery_rate = recovery;
 
     let market = MarketContext::new()
@@ -285,7 +285,7 @@ fn test_par_spread_npv_consistency() {
     )
     .unwrap();
 
-    let mut cds_test = cds.clone();
+    let mut cds_test = cds;
     cds_test.protection.recovery_rate = recovery;
 
     let disc = create_discount_curve(base);
@@ -306,7 +306,7 @@ fn test_par_spread_npv_consistency() {
     let par_spread = protection_pv / premium_pv * initial_spread;
 
     // Clone the CDS and update only the spread (preserving schedule)
-    let mut cds_at_par = cds_test.clone();
+    let mut cds_at_par = cds_test;
     cds_at_par.premium.spread_bp = Decimal::try_from(par_spread).expect("valid par_spread");
 
     // NPV at par spread should be approximately zero
@@ -423,7 +423,7 @@ fn test_recovery01_recalibrates_hazard_curve_with_par_spreads() {
         "CDS-CAL-CREDIT",
     )
     .unwrap();
-    let mut cds_test = cds.clone();
+    let mut cds_test = cds;
     cds_test.protection.recovery_rate = recovery;
 
     let market = MarketContext::new()
@@ -453,7 +453,7 @@ fn test_recovery01_recalibrates_hazard_curve_with_par_spreads() {
     let market_up = MarketContext::new()
         .insert(create_discount_curve(base))
         .insert(make_hazard(recovery + bump));
-    let mut cds_down = cds_test.clone();
+    let mut cds_down = cds_test;
     cds_down.protection.recovery_rate = recovery - bump;
     let market_down = MarketContext::new()
         .insert(create_discount_curve(base))

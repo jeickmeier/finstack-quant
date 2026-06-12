@@ -220,18 +220,12 @@ mod tests {
     fn dag_builder_prefers_caching_expensive_shared_nodes() {
         let mut builder = DagBuilder::new();
         let col_x = Expr::column("x");
-        let rolling_std = Expr::call(
-            Function::RollingStd,
-            vec![col_x.clone(), Expr::literal(10.0)],
-        );
+        let rolling_std = Expr::call(Function::RollingStd, vec![col_x, Expr::literal(10.0)]);
         let expr1 = Expr::call(
             Function::RollingMean,
             vec![rolling_std.clone(), Expr::literal(5.0)],
         );
-        let expr2 = Expr::call(
-            Function::RollingSum,
-            vec![rolling_std.clone(), Expr::literal(3.0)],
-        );
+        let expr2 = Expr::call(Function::RollingSum, vec![rolling_std, Expr::literal(3.0)]);
 
         let plan = builder
             .build_plan(vec![expr1, expr2], explicit_meta())
@@ -278,7 +272,7 @@ mod tests {
     fn dag_builder_keeps_dependency_chain_in_topological_order() {
         let mut builder = DagBuilder::new();
         let col_x = Expr::column("x");
-        let lag_x = Expr::call(Function::Lag, vec![col_x.clone(), Expr::literal(1.0)]);
+        let lag_x = Expr::call(Function::Lag, vec![col_x, Expr::literal(1.0)]);
         let diff_lag = Expr::call(Function::Diff, vec![lag_x, Expr::literal(1.0)]);
 
         let plan = builder
@@ -524,38 +518,42 @@ impl DagBuilder {
     /// Estimate the computational cost of an expression.
     fn estimate_cost(&self, expr: &Expr) -> usize {
         match &expr.node {
-            ExprNode::Column(_) | ExprNode::CSRef { .. } => 1,
-            ExprNode::Literal(_) => 1,
-            ExprNode::BinOp { .. } => 2, // Basic arithmetic/comparison/logical operations
-            ExprNode::UnaryOp { .. } => 2,
-            ExprNode::IfThenElse { .. } => 3, // Conditional evaluation
+            ExprNode::Column(_) | ExprNode::CSRef { .. } | ExprNode::Literal(_) => 1,
+            ExprNode::BinOp { .. } | ExprNode::UnaryOp { .. } => 2, // Basic arithmetic/comparison/logical operations
+            ExprNode::IfThenElse { .. } => 3,                       // Conditional evaluation
             ExprNode::Call(func, args) => {
                 let base_cost = match func {
-                    Function::Lag | Function::Lead => 5,
+                    Function::Lag
+                    | Function::Lead
+                    | Function::Shift
+                    | Function::Sum
+                    | Function::Mean => 5,
                     Function::Diff | Function::PctChange => 10,
-                    Function::CumSum | Function::CumProd | Function::CumMin | Function::CumMax => {
-                        20
-                    }
-                    Function::RollingMean | Function::RollingSum => 30,
+                    Function::CumSum
+                    | Function::CumProd
+                    | Function::CumMin
+                    | Function::CumMax
+                    | Function::RollingCount => 20,
+                    Function::RollingMean
+                    | Function::RollingSum
+                    | Function::RollingMin
+                    | Function::RollingMax
+                    | Function::Ttm
+                    | Function::Ytd
+                    | Function::Qtd
+                    | Function::FiscalYtd => 30,
                     Function::RollingStd | Function::RollingVar | Function::RollingMedian => 50,
                     Function::EwmMean => 25,
                     Function::Std | Function::Var => 40,
                     Function::Median => 60,
 
                     // New functions
-                    Function::Shift => 5,
                     Function::Rank => 80,
                     Function::Quantile => 90,
-                    Function::RollingMin | Function::RollingMax => 30,
-                    Function::RollingCount => 20,
                     Function::EwmStd | Function::EwmVar => 45,
                     // Custom financial functions
-                    Function::Sum | Function::Mean => 5,
-                    Function::Annualize => 2,
-                    Function::AnnualizeRate => 3, // Slightly more expensive due to powf
-                    Function::Ttm | Function::Ytd | Function::Qtd | Function::FiscalYtd => 30, // Similar cost to rolling functions
-                    Function::Coalesce => 3,
-                    Function::Abs | Function::Sign => 2,
+                    Function::Annualize | Function::Abs | Function::Sign => 2,
+                    Function::AnnualizeRate | Function::Coalesce => 3, // Slightly more expensive due to powf
                     Function::GrowthRate => 35,
                 };
                 base_cost + args.len() * 5

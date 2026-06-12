@@ -262,7 +262,7 @@ pub(crate) fn annualization_factor_with_policy(
         .ok()
         .and_then(|s| match s {
             finstack_core::market_data::scalars::MarketScalar::Unitless(v) => Some(*v),
-            _ => None,
+            finstack_core::market_data::scalars::MarketScalar::Price(_) => None,
         })
         .or_else(|| {
             context
@@ -270,7 +270,7 @@ pub(crate) fn annualization_factor_with_policy(
                 .ok()
                 .and_then(|s| match s {
                     finstack_core::market_data::scalars::MarketScalar::Unitless(v) => Some(*v),
-                    _ => None,
+                    finstack_core::market_data::scalars::MarketScalar::Price(_) => None,
                 })
         })
         .unwrap_or(252.0);
@@ -565,7 +565,7 @@ pub(crate) fn remaining_forward_variance(
                             finstack_core::market_data::scalars::MarketScalar::Unitless(v) => {
                                 Some(*v)
                             }
-                            _ => None,
+                            finstack_core::market_data::scalars::MarketScalar::Price(_) => None,
                         })
                         .unwrap_or(0.0);
                     let fwd = spot * ((r - q) * t).exp();

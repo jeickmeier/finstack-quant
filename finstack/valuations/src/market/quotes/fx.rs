@@ -73,9 +73,9 @@ impl FxQuote {
     /// Get the unique identifier of the quote.
     pub fn id(&self) -> &QuoteId {
         match self {
-            FxQuote::ForwardOutright { id, .. } => id,
-            FxQuote::SwapOutright { id, .. } => id,
-            FxQuote::OptionVanilla { id, .. } => id,
+            FxQuote::ForwardOutright { id, .. }
+            | FxQuote::SwapOutright { id, .. }
+            | FxQuote::OptionVanilla { id, .. } => id,
         }
     }
 

@@ -189,9 +189,8 @@ impl NdfFixingSource {
     /// represented as CNY in most currency enums.
     pub fn typical_currency(&self) -> Option<Currency> {
         match self {
-            NdfFixingSource::Pboc => Some(Currency::CNY),
             // CNHFIX is for offshore CNY, typically mapped to CNY
-            NdfFixingSource::Cnhfix => Some(Currency::CNY),
+            NdfFixingSource::Pboc | NdfFixingSource::Cnhfix => Some(Currency::CNY),
             NdfFixingSource::Rbi => Some(Currency::INR),
             NdfFixingSource::Kftc => Some(Currency::KRW),
             NdfFixingSource::Ptax => Some(Currency::BRL),
@@ -207,9 +206,8 @@ impl NdfFixingSource {
     /// Most NDFs fix T-2, but some (KRW, PHP) fix T-1.
     pub fn typical_fixing_offset(&self) -> i64 {
         match self {
-            NdfFixingSource::Kftc => 1,    // KRW fixes T-1
-            NdfFixingSource::PhpBval => 1, // PHP fixes T-1
-            _ => 2,                        // Most currencies fix T-2
+            NdfFixingSource::Kftc | NdfFixingSource::PhpBval => 1, // KRW/PHP fix T-1
+            _ => 2,                                                // Most currencies fix T-2
         }
     }
 }

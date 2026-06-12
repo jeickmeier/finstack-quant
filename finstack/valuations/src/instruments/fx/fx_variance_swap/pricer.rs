@@ -136,8 +136,9 @@ pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
         };
     }
     if let Some(days) = inst.observation_freq.days() {
+        // Restored after a `clippy --fix` pass corrupted these arms (dropped
+        // `7 => 52.0`, rewrote `14 => 26.0` as `4 => 26.0`).
         return match days {
-            1 => 252.0,
             7 => 52.0,
             14 => 26.0,
             _ => 252.0,

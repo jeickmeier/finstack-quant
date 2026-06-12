@@ -261,7 +261,7 @@ mod tests {
         // All exercise: every u below intrinsic → no continuation node.
         let all_ex = PenaltyExercise {
             penalty_factor: 1e8,
-            payoff_values: payoff.clone(),
+            payoff_values: payoff,
             exercise_type: ExerciseType::American,
             iterations: 3,
         };

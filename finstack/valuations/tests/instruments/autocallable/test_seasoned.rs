@@ -221,7 +221,7 @@ fn all_past_observations_give_deterministic_payoff() {
 
     // Knocked-in variant: barrier at 90% catches the 85 fixing; final 92
     // against strike 100 => put loss 8% of initial.
-    let mut ki_hit = inst.clone();
+    let mut ki_hit = inst;
     ki_hit.final_barrier = 0.9;
     ki_hit.final_payoff_type = FinalPayoffType::KnockInPut { strike: 100.0 };
     let pv_hit = ki_hit.value(&market, as_of).expect("ki hit pv");

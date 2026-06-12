@@ -207,6 +207,18 @@ export interface VolCube {
   readonly id: string;
   vol(expiry: number, tenor: number, strike: number): number;
   volClamped(expiry: number, tenor: number, strike: number): number;
+  /**
+   * Normal (Bachelier) implied vol in absolute rate units
+   * (e.g. 0.008 = 80 bp/yr). Throws if expiry/tenor falls outside the
+   * grid or for cross-zero quotes ((F+s)(K+s) <= 0) with beta > 0,
+   * which require an explicit shift.
+   */
+  volNormal(expiry: number, tenor: number, strike: number): number;
+  /**
+   * Normal (Bachelier) implied vol with clamped extrapolation; never
+   * throws and never returns a non-finite or non-positive value.
+   */
+  volNormalClamped(expiry: number, tenor: number, strike: number): number;
 }
 
 export interface VolCubeConstructor {

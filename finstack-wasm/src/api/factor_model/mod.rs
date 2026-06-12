@@ -40,6 +40,7 @@ fn parse_vol_horizon(s: &str) -> Result<finstack_portfolio::factor_model::VolHor
 #[wasm_bindgen(js_name = CreditFactorModel)]
 pub struct WasmCreditFactorModel {
     #[wasm_bindgen(skip)]
+    /// Underlying Rust value (not exposed to JS).
     pub inner: finstack_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
@@ -118,6 +119,7 @@ impl WasmCreditCalibrator {
 #[wasm_bindgen(js_name = LevelsAtDate)]
 pub struct WasmLevelsAtDate {
     #[wasm_bindgen(skip)]
+    /// Underlying Rust value (not exposed to JS).
     pub inner: finstack_factor_model::LevelsAtDate,
 }
 
@@ -140,6 +142,7 @@ impl WasmLevelsAtDate {
 #[wasm_bindgen(js_name = PeriodDecomposition)]
 pub struct WasmPeriodDecomposition {
     #[wasm_bindgen(skip)]
+    /// Underlying Rust value (not exposed to JS).
     pub inner: finstack_factor_model::PeriodDecomposition,
 }
 

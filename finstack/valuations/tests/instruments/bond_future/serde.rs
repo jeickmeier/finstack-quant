@@ -355,7 +355,7 @@ fn test_bond_future_with_attributes_roundtrip() {
         .deliverable_basket(vec![create_test_deliverable_bond()])
         .ctd_bond_id(InstrumentId::new("US912828XG33"))
         .discount_curve_id(CurveId::new("USD-TREASURY"))
-        .attributes(attrs.clone())
+        .attributes(attrs)
         .build()
         .expect("Valid bond future");
 

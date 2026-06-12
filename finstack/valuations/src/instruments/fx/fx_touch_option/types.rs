@@ -371,7 +371,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         // unaffected by the bumps. (Bumping must NOT go through
         // `SimpleFxProvider::set_quote`, which would mutate shared state.)
         let up_fx = {
-            let fx_up = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider().clone());
+            let fx_up = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider());
             fx_up.set_quote(
                 self.base_currency,
                 self.quote_currency,
@@ -380,7 +380,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             market.clone().insert_fx(fx_up)
         };
         let dn_fx = {
-            let fx_dn = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider().clone());
+            let fx_dn = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider());
             fx_dn.set_quote(
                 self.base_currency,
                 self.quote_currency,
@@ -433,7 +433,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         // See `option_delta` for why reusing the provider `Arc` is safe:
         // `FxMatrix::set_quote` is matrix-local and never mutates the provider.
         let up_fx = {
-            let fx_up = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider().clone());
+            let fx_up = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider());
             fx_up.set_quote(
                 self.base_currency,
                 self.quote_currency,
@@ -442,7 +442,7 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             market.clone().insert_fx(fx_up)
         };
         let dn_fx = {
-            let fx_dn = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider().clone());
+            let fx_dn = finstack_core::money::fx::FxMatrix::new(fx_matrix.provider());
             fx_dn.set_quote(
                 self.base_currency,
                 self.quote_currency,

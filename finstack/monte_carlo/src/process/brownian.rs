@@ -206,7 +206,7 @@ mod tests {
         let mu = vec![0.1, -0.2];
         let sig = vec![0.3, 0.5];
         let corr = vec![1.0, 0.2, 0.2, 1.0];
-        let proc = MultiBrownianProcess::new(mu.clone(), sig.clone(), Some(corr.clone()));
+        let proc = MultiBrownianProcess::new(mu, sig, Some(corr));
         assert_eq!(proc.dim(), 2);
         let md = proc.metadata();
         assert_eq!(md.process_type, "MultiBrownian");

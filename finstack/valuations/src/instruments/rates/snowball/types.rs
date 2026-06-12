@@ -257,7 +257,6 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
     fn default_model(&self) -> crate::pricer::ModelKey {
         match self.variant {
             // Snowball is path-dependent, needs MC.
-            SnowballVariant::Snowball => crate::pricer::ModelKey::MonteCarloHullWhite1F,
             // An inverse-floater coupon `max(fixed − leverage·float, floor)`
             // (optionally capped) is an option on the floating rate: the floor
             // is a floorlet, the cap a caplet. The `Discounting` pricer applies
@@ -266,7 +265,9 @@ impl crate::instruments::common_impl::traits::Instrument for Snowball {
             // leveraged convexity). Default to the HW1F MC pricer, which prices
             // the embedded optionality correctly; `Discounting` remains an
             // explicit, fast, intrinsic-only approximation for callers who opt in.
-            SnowballVariant::InverseFloater => crate::pricer::ModelKey::MonteCarloHullWhite1F,
+            SnowballVariant::Snowball | SnowballVariant::InverseFloater => {
+                crate::pricer::ModelKey::MonteCarloHullWhite1F
+            }
         }
     }
 

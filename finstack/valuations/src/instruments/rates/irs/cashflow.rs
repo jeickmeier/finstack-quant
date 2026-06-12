@@ -80,8 +80,8 @@ fn compounded_total_shift_days(compounding: FloatingLegCompounding) -> Result<i3
             }
         }
         FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => Ok(-shift_days),
-        FloatingLegCompounding::CompoundedWithRateCutoff { .. } => Ok(0),
-        FloatingLegCompounding::Simple => Ok(0),
+        FloatingLegCompounding::CompoundedWithRateCutoff { .. }
+        | FloatingLegCompounding::Simple => Ok(0),
     }
 }
 

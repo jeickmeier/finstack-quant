@@ -301,7 +301,7 @@ fn test_bucketed_cs01_reconciles_with_parallel_under_cds_convention() {
     cds.doc_clause = Some(CdsDocClause::IsdaNa);
 
     let discount = build_test_discount(0.035, as_of, discount_id.as_str());
-    let hazard = HazardCurve::builder(hazard_id.clone())
+    let hazard = HazardCurve::builder(hazard_id)
         .base_date(as_of)
         .day_count(DayCount::Act365F)
         .recovery_rate(0.4)
@@ -904,7 +904,7 @@ fn test_cdsw_clean_value_uses_first_class_valuation_convention() {
         .insert(build_test_discount(0.035, as_of, "USD_OIS"))
         .insert(build_test_hazard(0.010, 0.40, as_of, "CORP"));
 
-    let mut direct_clean_cds = dirty_cds.clone();
+    let mut direct_clean_cds = dirty_cds;
     direct_clean_cds.valuation_convention =
         finstack_valuations::instruments::credit_derivatives::cds::CdsValuationConvention::BloombergCdswClean;
 

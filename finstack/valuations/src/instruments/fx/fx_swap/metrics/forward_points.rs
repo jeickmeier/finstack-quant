@@ -19,7 +19,7 @@ pub(crate) struct ForwardPoints;
 impl MetricCalculator for ForwardPoints {
     fn calculate(&self, context: &mut MetricContext) -> finstack_core::Result<f64> {
         let fx_swap: &FxSwap = context.instrument_as()?;
-        let curves = context.curves.clone();
+        let curves = std::sync::Arc::clone(&context.curves);
         let as_of = context.as_of;
 
         // Use shared pricing context for consistent calculations

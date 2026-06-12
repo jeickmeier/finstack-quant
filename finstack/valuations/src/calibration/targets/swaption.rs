@@ -42,8 +42,9 @@ impl SwaptionVolTarget {
 
         let normalized = match convention {
             SwaptionVolConvention::Normal => quoted / 10_000.0, // bp -> decimal
-            SwaptionVolConvention::Lognormal => quoted / 100.0, // percent -> decimal
-            SwaptionVolConvention::ShiftedLognormal { .. } => quoted / 100.0, // percent -> decimal
+            SwaptionVolConvention::Lognormal | SwaptionVolConvention::ShiftedLognormal { .. } => {
+                quoted / 100.0
+            } // percent -> decimal
         };
 
         if !normalized.is_finite() {
@@ -533,13 +534,14 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         params: &'a SwaptionVolParams,
         quote: &'a VolQuote,
     ) -> Result<SwaptionLegConventions<'a>> {
-        let swaption_conv_id = match quote {
-            VolQuote::SwaptionVol { convention, .. } => convention,
-            _ => {
-                return Err(finstack_core::Error::Validation(
-                    "Expected SwaptionVol quote".into(),
-                ))
-            }
+        let VolQuote::SwaptionVol {
+            convention: swaption_conv_id,
+            ..
+        } = quote
+        else {
+            return Err(finstack_core::Error::Validation(
+                "Expected SwaptionVol quote".into(),
+            ));
         };
         let swaption_conv = ConventionRegistry::try_global()?.require_swaption(swaption_conv_id)?;
 

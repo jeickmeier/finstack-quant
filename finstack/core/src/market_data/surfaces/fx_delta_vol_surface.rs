@@ -36,8 +36,8 @@ use crate::{
 };
 
 use super::{
-    fx_atm_dns_strike, fx_put_call_25d_strikes, fx_put_call_delta_strikes, interp_linear_clamp,
-    recover_fx_wing_vols, FxDeltaVolSurfaceBuilder, VolSurface,
+    fx_smile_pillars, interp_linear_clamp, recover_fx_wing_vols, FxDeltaVolSurfaceBuilder,
+    VolSurface,
 };
 
 // ---------------------------------------------------------------------------
@@ -276,15 +276,23 @@ impl FxDeltaVolSurface {
     /// Steps:
     /// 1. Interpolate delta-space quotes to the requested `expiry` (linear).
     /// 2. Recover 25D (and optionally 10D) put/call wing vols from ATM, RR, BF.
-    /// 3. Convert those deltas to strikes using Garman-Kohlhagen.
+    /// 3. Convert those deltas to strikes using Garman-Kohlhagen at the
+    ///    supplied `forward`, building the smile for the query expiry only.
     /// 4. Interpolate linearly in strike space (flat extrapolation at wings).
     ///
     /// When 10-delta quotes are available, interpolation uses all 5 strikes
     /// (10D put, 25D put, ATM, 25D call, 10D call) for better wing accuracy.
     ///
+    /// This is the smile-faithful query path: the smile is rebuilt per query
+    /// expiry from interpolated quotes and that expiry's forward, so
+    /// short-expiry smiles are never affected by strikes that are only
+    /// relevant for long expiries (unlike fixed-strike blending on a
+    /// rectangular grid; see [`to_vol_surface`](Self::to_vol_surface)).
+    ///
     /// # Errors
     ///
-    /// Returns an error if the expiry is non-positive.
+    /// Returns an error if the expiry is non-positive or a recovered wing vol
+    /// is non-positive.
     pub fn implied_vol(
         &self,
         expiry: f64,
@@ -302,36 +310,21 @@ impl FxDeltaVolSurface {
         let rr = interp_linear_clamp(&self.expiries, &self.rr_25d, expiry);
         let bf = interp_linear_clamp(&self.expiries, &self.bf_25d, expiry);
 
-        // Step 2: Recover wing vols.
-        let (sigma_put_25, sigma_call_25) = recover_fx_wing_vols(atm, rr, bf);
+        let wings_10d = match (&self.rr_10d, &self.bf_10d) {
+            (Some(rr_10d), Some(bf_10d)) => Some((
+                interp_linear_clamp(&self.expiries, rr_10d, expiry),
+                interp_linear_clamp(&self.expiries, bf_10d, expiry),
+            )),
+            _ => None,
+        };
 
-        // Step 3: Convert to strikes.
-        let k_atm = fx_atm_dns_strike(forward, atm, expiry);
-        let (k_put_25, k_call_25) =
-            fx_put_call_25d_strikes(forward, sigma_put_25, sigma_call_25, expiry);
+        // Steps 2-3: Recover wing vols and convert deltas to strikes for the
+        // query expiry's own smile.
+        let (known_strikes, known_vols) =
+            fx_smile_pillars(forward, expiry, atm, rr, bf, wings_10d)?;
 
-        // Step 4: Build strike/vol arrays. Use 5-point smile when 10D quotes are available.
-        if let (Some(rr_10d), Some(bf_10d)) = (&self.rr_10d, &self.bf_10d) {
-            let rr10 = interp_linear_clamp(&self.expiries, rr_10d, expiry);
-            let bf10 = interp_linear_clamp(&self.expiries, bf_10d, expiry);
-            let (sigma_put_10, sigma_call_10) = recover_fx_wing_vols(atm, rr10, bf10);
-            let (k_put_10, k_call_10) =
-                fx_put_call_delta_strikes(forward, sigma_put_10, sigma_call_10, expiry, 0.10);
-
-            let known_strikes = [k_put_10, k_put_25, k_atm, k_call_25, k_call_10];
-            let known_vols = [
-                sigma_put_10,
-                sigma_put_25,
-                atm,
-                sigma_call_25,
-                sigma_call_10,
-            ];
-            Ok(interp_linear_clamp(&known_strikes, &known_vols, strike))
-        } else {
-            let known_strikes = [k_put_25, k_atm, k_call_25];
-            let known_vols = [sigma_put_25, atm, sigma_call_25];
-            Ok(interp_linear_clamp(&known_strikes, &known_vols, strike))
-        }
+        // Step 4: Linear in strike, flat wings.
+        Ok(interp_linear_clamp(&known_strikes, &known_vols, strike))
     }
 
     // -----------------------------------------------------------------------
@@ -340,9 +333,14 @@ impl FxDeltaVolSurface {
 
     /// Convert this delta-quoted surface to a strike-based [`VolSurface`].
     ///
-    /// Uses the existing [`FxDeltaVolSurfaceBuilder`] approach to produce a
-    /// standard `VolSurface` that can be used with the rest of the pricing
-    /// infrastructure.
+    /// Uses [`FxDeltaVolSurfaceBuilder`] to produce a standard `VolSurface`
+    /// that can be used with the rest of the pricing infrastructure. Each
+    /// expiry row samples that expiry's *own* smile on the union strike axis,
+    /// so queries at pillar expiries reproduce the per-expiry smile exactly;
+    /// off-pillar expiry queries blend rows linearly in vol at fixed strike,
+    /// which flattens intermediate smiles when forwards differ across
+    /// pillars — prefer [`implied_vol`](Self::implied_vol) for smile-faithful
+    /// off-pillar lookups.
     ///
     /// # Arguments
     ///

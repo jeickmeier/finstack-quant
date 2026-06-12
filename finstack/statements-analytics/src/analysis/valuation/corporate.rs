@@ -511,7 +511,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     let wacc_down_clamped = (wacc_down - wacc_down_raw).abs() > 1e-12;
 
     let ev_wacc_up = {
-        let mut dcf_up = dcf.clone();
+        let mut dcf_up = Clone::clone(&dcf);
         dcf_up.wacc = wacc_up;
         let pv_exp = dcf_up.calculate_pv_explicit_flows();
         let tv_up = dcf_up
@@ -524,7 +524,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     };
 
     let ev_wacc_down = {
-        let mut dcf_down = dcf.clone();
+        let mut dcf_down = Clone::clone(&dcf);
         dcf_down.wacc = wacc_down;
         let pv_exp = dcf_down.calculate_pv_explicit_flows();
         let tv_down = dcf_down
@@ -588,7 +588,7 @@ pub(crate) fn evaluate_dcf_from_results_impl(
             pv_explicit_up + pv_tv_up
         };
 
-        let mut dcf_down = dcf.clone();
+        let mut dcf_down = Clone::clone(&dcf);
         dcf_down.terminal_value = TerminalValueSpec::ExitMultiple {
             terminal_metric,
             multiple: multiple_down,

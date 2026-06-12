@@ -9,7 +9,7 @@ fn test_model_spec_creation() {
     let periods = build_periods("2025Q1..Q4", None)
         .expect("valid period range")
         .periods;
-    let model = FinancialModelSpec::new("test_model", periods.clone());
+    let model = FinancialModelSpec::new("test_model", periods);
 
     assert_eq!(model.id, "test_model");
     assert_eq!(model.periods.len(), 4);

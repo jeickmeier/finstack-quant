@@ -140,9 +140,9 @@ impl VolQuote {
     /// Get the unique identifier of the quote.
     pub fn id(&self) -> &QuoteId {
         match self {
-            VolQuote::OptionVol { id, .. } => id,
-            VolQuote::SwaptionVol { id, .. } => id,
-            VolQuote::CapFloorVol { id, .. } => id,
+            VolQuote::OptionVol { id, .. }
+            | VolQuote::SwaptionVol { id, .. }
+            | VolQuote::CapFloorVol { id, .. } => id,
         }
     }
 

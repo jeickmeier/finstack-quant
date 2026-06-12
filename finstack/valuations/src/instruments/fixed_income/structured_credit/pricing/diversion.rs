@@ -224,8 +224,7 @@ impl DiversionEngine {
                                 )));
                             }
                         }
-                        Some(Color::Black) => {}
-                        None => {}
+                        Some(Color::Black) | None => {}
                     }
                 }
             }

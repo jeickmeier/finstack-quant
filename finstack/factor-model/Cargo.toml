@@ -23,3 +23,6 @@ time = { workspace = true, features = ["macros"] }
 [[bench]]
 name = "factor_model"
 harness = false
+
+[lints]
+workspace = true

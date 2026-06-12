@@ -1,3 +1,4 @@
+//! Regression tests pinning analytics metric values.
 use finstack_analytics::Performance;
 use finstack_core::dates::{Date, Month, PeriodKind};
 

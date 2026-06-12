@@ -140,15 +140,13 @@ pub(crate) fn tranche_all_in_rate(
                 // Fall through to forward projection if fixings unavailable
             }
 
-            let fwd = match market.get_forward(spec.index_id.as_str()) {
-                Ok(c) => c,
-                Err(_) => return fallback_rate,
+            let Ok(fwd) = market.get_forward(spec.index_id.as_str()) else {
+                return fallback_rate;
             };
 
             let tenor = fwd.tenor();
-            let period_end = match try_tenor_to_period_end(date, tenor, fwd.day_count()) {
-                Ok(d) => d,
-                Err(_) => return fallback_rate,
+            let Ok(period_end) = try_tenor_to_period_end(date, tenor, fwd.day_count()) else {
+                return fallback_rate;
             };
 
             crate::cashflow::builder::project_floating_rate_from_market(

@@ -197,9 +197,8 @@ impl Discountable for CashFlowSchedule {
             break;
         }
 
-        let ccy = match ccy {
-            Some(c) => c,
-            None => return Err(finstack_core::error::InputError::TooFewPoints.into()),
+        let Some(ccy) = ccy else {
+            return Err(finstack_core::error::InputError::TooFewPoints.into());
         };
         let day_count = dc.unwrap_or_else(|| disc.day_count());
         let curve_base = disc.base_date();

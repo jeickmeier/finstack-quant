@@ -458,7 +458,7 @@ impl BinomialTree {
         let base_price = match exercise_style {
             ExerciseStyle::American => self.price_american(market_params)?,
             ExerciseStyle::European => self.price_european(market_params)?,
-            _ => {
+            ExerciseStyle::Bermudan => {
                 return Err(Error::internal(
                     "binomial greeks only support American and European exercise styles",
                 ))
@@ -472,7 +472,7 @@ impl BinomialTree {
         let price_up = match exercise_style {
             ExerciseStyle::American => self.price_american(&params_up)?,
             ExerciseStyle::European => self.price_european(&params_up)?,
-            _ => {
+            ExerciseStyle::Bermudan => {
                 return Err(Error::internal(
                     "binomial greeks only support American and European exercise styles",
                 ))
@@ -484,7 +484,7 @@ impl BinomialTree {
         let price_down = match exercise_style {
             ExerciseStyle::American => self.price_american(&params_down)?,
             ExerciseStyle::European => self.price_european(&params_down)?,
-            _ => {
+            ExerciseStyle::Bermudan => {
                 return Err(Error::internal(
                     "binomial greeks only support American and European exercise styles",
                 ))
@@ -502,7 +502,7 @@ impl BinomialTree {
             let price_later = match exercise_style {
                 ExerciseStyle::American => self.price_american(&params_later)?,
                 ExerciseStyle::European => self.price_european(&params_later)?,
-                _ => {
+                ExerciseStyle::Bermudan => {
                     return Err(Error::internal(
                         "binomial greeks only support American and European exercise styles",
                     ))

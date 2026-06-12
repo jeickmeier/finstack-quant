@@ -280,11 +280,9 @@ impl TermLoanDiscountingPricer {
         };
 
         // Build outstanding path for notional lookup at each flow date.
-        let outstanding_path = match schedule.outstanding_by_date() {
-            Ok(path) => path,
-            Err(_) => return,
+        let Ok(outstanding_path) = schedule.outstanding_by_date() else {
+            return;
         };
-
         // Helper: find outstanding notional at a given date using the path.
         let notional_at = |target: finstack_core::dates::Date| -> f64 {
             let mut last = 0.0_f64;
@@ -309,17 +307,14 @@ impl TermLoanDiscountingPricer {
             };
 
             // Try exact-date fixing lookup; gracefully skip if unavailable.
-            let raw_fixing = match finstack_core::market_data::fixings::require_fixing_value_exact(
+            let Ok(raw_fixing) = finstack_core::market_data::fixings::require_fixing_value_exact(
                 fixing_series,
                 float_spec.index_id.as_str(),
                 reset_date,
                 as_of,
-            ) {
-                Ok(v) => v,
-                Err(_) => continue, // Keep forward-projected rate
+            ) else {
+                continue;
             };
-
-            // Compute all-in rate from the historical fixing.
             let all_in_rate = crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                 raw_fixing, &params,
             );

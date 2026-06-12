@@ -205,7 +205,7 @@ impl PortfolioMarginResult {
         let ns_currency = result.initial_margin.currency();
         if ns_currency != self.base_currency {
             return Err(CurrencyMismatchError {
-                netting_set_id: result.netting_set_id.clone(),
+                netting_set_id: result.netting_set_id,
                 netting_set_currency: ns_currency,
                 base_currency: self.base_currency,
             });

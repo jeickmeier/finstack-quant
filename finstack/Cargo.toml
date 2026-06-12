@@ -25,3 +25,6 @@ finstack_monte_carlo = { package = "finstack-monte-carlo", path = "monte_carlo" 
 [dev-dependencies]
 time = { workspace = true, features = ["macros"] }
 rust_decimal = { workspace = true }
+
+[lints]
+workspace = true

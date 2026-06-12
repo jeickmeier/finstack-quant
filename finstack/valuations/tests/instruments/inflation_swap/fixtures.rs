@@ -32,7 +32,7 @@ pub fn flat_discount(id: &str, base: Date, rate: f64) -> finstack_core::Result<D
     let mut builder = DiscountCurve::builder(id)
         .base_date(base)
         .day_count(DayCount::Act365F)
-        .knots(knots.clone());
+        .knots(knots);
 
     // For zero or negative rates, DFs may be flat or increasing
     // Use Linear interpolation since MonotoneConvex expects decreasing values

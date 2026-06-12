@@ -1034,7 +1034,7 @@ fn scale_source_line_opt(opt: &mut Option<SourceLine>, factor: f64) {
 fn add_factor(sum: Money, value: Money, label: &str, notes: &mut Vec<String>) -> Result<Money> {
     sum.checked_add(value).map_err(|e| {
         let note = format!("Failed to add {}: {}", label, e);
-        notes.push(note.clone());
+        notes.push(note);
         e
     })
 }

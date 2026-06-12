@@ -278,7 +278,7 @@ mod tests {
 
         // Create netting sets
         manager.get_or_create(bilateral_id.clone());
-        manager.get_or_create(cleared_id.clone());
+        manager.get_or_create(cleared_id);
 
         assert_eq!(manager.count(), 2);
 

@@ -160,9 +160,8 @@ fn test_asw_par_tracks_coupon_minus_par_rate() {
         .expect("ASW par result");
 
     // Market-standard approximation: ASW_par ≈ coupon - par swap rate (same conventions).
-    let spec = match &bond.cashflow_spec {
-        CashflowSpec::Fixed(spec) => spec,
-        _ => panic!("expected fixed bond"),
+    let CashflowSpec::Fixed(spec) = &bond.cashflow_spec else {
+        panic!("expected fixed bond")
     };
     let periods = finstack_cashflows::builder::periods::build_periods(
         finstack_cashflows::builder::periods::BuildPeriodsParams {

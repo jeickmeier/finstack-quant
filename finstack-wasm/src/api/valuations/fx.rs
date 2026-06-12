@@ -93,6 +93,7 @@ fn metric_value(
 
 macro_rules! fx_class {
     ($rust_name:ident, $js_name:literal, $type_tag:literal) => {
+        #[doc = concat!("FX instrument `", $js_name, "`: holds a validated JSON spec.")]
         #[wasm_bindgen(js_name = $js_name)]
         pub struct $rust_name {
             json: String,
@@ -101,6 +102,7 @@ macro_rules! fx_class {
         #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
             #[wasm_bindgen(constructor)]
+            /// Create the instrument from a JS spec object.
             pub fn new(spec: JsValue) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     json: from_spec($type_tag, spec)?,
@@ -108,6 +110,7 @@ macro_rules! fx_class {
             }
 
             #[wasm_bindgen(js_name = fromJson)]
+            /// Deserialize the instrument from a JSON spec string.
             pub fn from_json(json: &str) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     json: from_json_payload($type_tag, json)?,
@@ -115,10 +118,12 @@ macro_rules! fx_class {
             }
 
             #[wasm_bindgen(js_name = toJson)]
+            /// Serialize the instrument spec to pretty JSON.
             pub fn to_json(&self) -> Result<String, JsValue> {
                 pretty_json(&self.json)
             }
 
+            /// Price the instrument against a market JSON snapshot.
             pub fn price(
                 &self,
                 market_json: &str,
@@ -129,6 +134,7 @@ macro_rules! fx_class {
             }
 
             #[wasm_bindgen(js_name = priceWithMetrics)]
+            /// Price the instrument and compute the requested metrics.
             pub fn price_with_metrics(
                 &self,
                 market_json: &str,
@@ -158,6 +164,7 @@ macro_rules! fx_option_class {
 
         #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
+            /// Spot delta of the option.
             pub fn delta(
                 &self,
                 market_json: &str,
@@ -167,6 +174,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "delta")
             }
 
+            /// Spot gamma of the option.
             pub fn gamma(
                 &self,
                 market_json: &str,
@@ -176,6 +184,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "gamma")
             }
 
+            /// Vega of the option.
             pub fn vega(
                 &self,
                 market_json: &str,
@@ -185,6 +194,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "vega")
             }
 
+            /// Theta of the option.
             pub fn theta(
                 &self,
                 market_json: &str,
@@ -194,6 +204,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "theta")
             }
 
+            /// Domestic rate rho of the option.
             pub fn rho(
                 &self,
                 market_json: &str,
@@ -204,6 +215,7 @@ macro_rules! fx_option_class {
             }
 
             #[wasm_bindgen(js_name = foreignRho)]
+            /// Foreign rate rho of the option.
             pub fn foreign_rho(
                 &self,
                 market_json: &str,
@@ -213,6 +225,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "foreign_rho")
             }
 
+            /// Vanna of the option.
             pub fn vanna(
                 &self,
                 market_json: &str,
@@ -222,6 +235,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "vanna")
             }
 
+            /// Volga of the option.
             pub fn volga(
                 &self,
                 market_json: &str,
@@ -231,6 +245,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "volga")
             }
 
+            /// Benchmark regression alpha/beta statistics per asset.
             pub fn greeks(
                 &self,
                 market_json: &str,

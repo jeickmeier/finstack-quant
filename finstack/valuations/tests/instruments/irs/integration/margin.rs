@@ -145,7 +145,7 @@ fn test_vm_calculation_for_irs() {
     let _swap = create_test_swap();
     let margin_spec = create_bilateral_margin_spec();
 
-    let vm_calc = VmCalculator::new(margin_spec.csa.clone());
+    let vm_calc = VmCalculator::new(margin_spec.csa);
 
     // Simulate MTM exposure
     let exposure = Money::new(2_000_000.0, Currency::USD);

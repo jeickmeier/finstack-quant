@@ -30,6 +30,14 @@
 //! - nu > 1e-8
 //! - rho in (-0.9999, 0.9999)
 //! - beta in [0, 1]
+//!
+//! # Quoting Conventions
+//!
+//! The cube quotes both conventions from the same SABR parameters:
+//! lognormal (Black) vol via [`VolCube::vol`] / [`VolCube::vol_clamped`] and
+//! normal (Bachelier) vol — the swaption market standard — via
+//! [`VolCube::vol_normal`] / [`VolCube::vol_normal_clamped`]. Shifted SABR
+//! nodes evaluate both expansions on the shifted forward/strike.
 
 use crate::{
     error::InputError,
@@ -38,8 +46,49 @@ use crate::{
     types::CurveId,
 };
 
-use super::vol_surface::{VolInterpolationMode, VolSurface};
+use super::vol_surface::{VolInterpolationMode, VolQuoteType, VolSurface};
 use super::{floor_sabr_vol, warn_sabr_vol_floored};
+
+// ---------------------------------------------------------------------------
+// Normal-vol floor helpers
+// ---------------------------------------------------------------------------
+
+/// Relative floor applied when the SABR **normal** expansion yields a
+/// non-finite or non-positive value.
+///
+/// Normal (Bachelier) vols are quoted in absolute rate units, so a fixed floor
+/// like the lognormal [`super::SABR_VOL_FLOOR`] (0.001 = 0.1% lognormal) would
+/// be ~10 bp/yr of absolute vol — far too large in normal units. Instead the
+/// floor scales with the forward level: `1e-8 * max(|F|, 1)`, i.e. a
+/// negligible-but-positive vol that keeps Bachelier pricing well defined.
+const SABR_NORMAL_VOL_FLOOR_REL: f64 = 1e-8;
+
+/// Floor a SABR normal-vol expansion result, counting replacements so callers
+/// can emit one aggregated warning via [`warn_sabr_vol_normal_floored`].
+#[inline]
+fn floor_sabr_vol_normal(v: f64, forward: f64, floored: &mut usize) -> f64 {
+    if v.is_finite() && v > 0.0 {
+        v
+    } else {
+        *floored += 1;
+        SABR_NORMAL_VOL_FLOOR_REL * forward.abs().max(1.0)
+    }
+}
+
+/// Emit a single aggregated warning when SABR normal-expansion vols were floored.
+#[inline]
+fn warn_sabr_vol_normal_floored(context: &str, id: &CurveId, floored: usize) {
+    if floored > 0 {
+        tracing::warn!(
+            surface_id = %id,
+            count = floored,
+            floor_rel = SABR_NORMAL_VOL_FLOOR_REL,
+            context = context,
+            "SABR normal expansion produced non-finite or non-positive vols; \
+             floored to 1e-8 * max(|forward|, 1)"
+        );
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Core struct
@@ -379,6 +428,47 @@ impl VolCube {
         warn_sabr_vol_floored("VolCube::vol_clamped", &self.id, floored);
         v
     }
+
+    /// Normal (Bachelier) implied volatility with bounds checking.
+    ///
+    /// Mirrors [`vol`](Self::vol) but evaluates Hagan's **normal-vol**
+    /// expansion (eq. 2.17b) on the same interpolated SABR parameters, since
+    /// the swaption market quotes normal vol as the standard convention.
+    /// For shifted SABR the expansion is evaluated on the shifted
+    /// forward/strike (`F+s`, `K+s`) — the shift is applied inside
+    /// [`SabrParams::try_implied_vol_normal`](crate::math::volatility::sabr::SabrParams::try_implied_vol_normal),
+    /// identical to the lognormal path's shift semantics. The returned vol is
+    /// in absolute rate units (e.g. `0.008` = 80 bp/yr normal vol).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Err` if `expiry` or `tenor` falls outside the grid, if the
+    /// expansion yields a non-finite volatility, or for cross-zero quotes
+    /// (`(F+s)(K+s) <= 0`) with `beta > 0`, which require an explicit shift.
+    pub fn vol_normal(&self, expiry: f64, tenor: f64, strike: f64) -> crate::Result<f64> {
+        // Validate coordinates are within grid bounds
+        locate_segment(&self.expiries, expiry)?;
+        locate_segment(&self.tenors, tenor)?;
+
+        let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
+        params.try_implied_vol_normal(fwd, strike, exp_c)
+    }
+
+    /// Normal (Bachelier) implied volatility with clamped extrapolation.
+    ///
+    /// Mirrors [`vol_clamped`](Self::vol_clamped): expiry and tenor are
+    /// clamped to the grid edges, and a degenerate expansion is floored to a
+    /// small positive **normal** vol of `1e-8 * max(|forward|, 1)` (absolute
+    /// rate units, scaling with the forward level) with an aggregated warning.
+    /// Never panics and never returns a non-finite or non-positive value.
+    pub fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
+        let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
+        let v = params.implied_vol_normal(fwd, strike, exp_c);
+        let mut floored = 0usize;
+        let v = floor_sabr_vol_normal(v, fwd, &mut floored);
+        warn_sabr_vol_normal_floored("VolCube::vol_normal_clamped", &self.id, floored);
+        v
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -414,6 +504,37 @@ impl VolCube {
         VolSurface::from_grid(self.id.as_str(), &self.expiries, strikes, &vols)
     }
 
+    /// Materialize a tenor slice as a **normal-vol** [`VolSurface`].
+    ///
+    /// Same construction as [`materialize_tenor_slice`](Self::materialize_tenor_slice)
+    /// but each vol comes from Hagan's normal expansion, degenerate values are
+    /// floored in normal-vol units (`1e-8 * max(|forward|, 1)`), and the
+    /// resulting surface is tagged [`VolQuoteType::Normal`] so consumers can
+    /// enforce the quoting convention.
+    pub fn materialize_tenor_slice_normal(
+        &self,
+        tenor: f64,
+        strikes: &[f64],
+    ) -> crate::Result<VolSurface> {
+        if strikes.is_empty() {
+            return Err(InputError::TooFewPoints.into());
+        }
+
+        let mut vols = Vec::with_capacity(self.expiries.len() * strikes.len());
+        let mut floored = 0usize;
+        for &exp in self.expiries.iter() {
+            let (params, fwd, exp_c) = self.interpolate_params_clamped(exp, tenor);
+            for &k in strikes {
+                let v = params.implied_vol_normal(fwd, k, exp_c);
+                vols.push(floor_sabr_vol_normal(v, fwd, &mut floored));
+            }
+        }
+        warn_sabr_vol_normal_floored("VolCube::materialize_tenor_slice_normal", &self.id, floored);
+
+        VolSurface::from_grid(self.id.as_str(), &self.expiries, strikes, &vols)
+            .map(|s| s.with_quote_type(VolQuoteType::Normal))
+    }
+
     /// Materialize an expiry slice as a [`VolSurface`].
     ///
     /// The resulting surface uses the cube's tenor axis as its "expiry" axis
@@ -440,6 +561,40 @@ impl VolCube {
         warn_sabr_vol_floored("VolCube::materialize_expiry_slice", &self.id, floored);
 
         VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols)
+    }
+
+    /// Materialize an expiry slice as a **normal-vol** [`VolSurface`].
+    ///
+    /// Same construction as [`materialize_expiry_slice`](Self::materialize_expiry_slice)
+    /// but each vol comes from Hagan's normal expansion, degenerate values are
+    /// floored in normal-vol units (`1e-8 * max(|forward|, 1)`), and the
+    /// resulting surface is tagged [`VolQuoteType::Normal`].
+    pub fn materialize_expiry_slice_normal(
+        &self,
+        expiry: f64,
+        strikes: &[f64],
+    ) -> crate::Result<VolSurface> {
+        if strikes.is_empty() {
+            return Err(InputError::TooFewPoints.into());
+        }
+
+        let mut vols = Vec::with_capacity(self.tenors.len() * strikes.len());
+        let mut floored = 0usize;
+        for &tnr in self.tenors.iter() {
+            let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tnr);
+            for &k in strikes {
+                let v = params.implied_vol_normal(fwd, k, exp_c);
+                vols.push(floor_sabr_vol_normal(v, fwd, &mut floored));
+            }
+        }
+        warn_sabr_vol_normal_floored(
+            "VolCube::materialize_expiry_slice_normal",
+            &self.id,
+            floored,
+        );
+
+        VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols)
+            .map(|s| s.with_quote_type(VolQuoteType::Normal))
     }
 
     /// Materialize the full grid as a flat vector in `(expiry, tenor, strike)` order.

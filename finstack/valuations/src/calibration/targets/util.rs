@@ -16,9 +16,9 @@ pub(crate) fn curve_day_count_from_quotes(quotes: &[RateQuote]) -> Result<DayCou
 
     for q in quotes {
         let index_id = match q {
-            RateQuote::Deposit { index, .. } => index.clone(),
-            RateQuote::Fra { index, .. } => index.clone(),
-            RateQuote::Swap { index, .. } => index.clone(),
+            RateQuote::Deposit { index, .. }
+            | RateQuote::Fra { index, .. }
+            | RateQuote::Swap { index, .. } => index.clone(),
             RateQuote::Futures { contract, .. } => {
                 registry.require_ir_future(contract)?.index_id.clone()
             }

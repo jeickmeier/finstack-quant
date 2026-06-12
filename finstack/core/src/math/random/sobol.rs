@@ -532,12 +532,12 @@ mod tests {
 
     #[test]
     fn test_owen_scrambling() {
-        let sobol_no_scramble = SobolRng::try_new(2, 0).expect("valid dimension");
-        let sobol_scrambled = SobolRng::try_new(2, 12345).expect("valid dimension");
+        let mut sobol_no_scramble = SobolRng::try_new(2, 0).expect("valid dimension");
+        let mut sobol_scrambled = SobolRng::try_new(2, 12345).expect("valid dimension");
 
         // Different scrambling should give different sequences
-        let p1 = sobol_no_scramble.clone().next_point();
-        let p2 = sobol_scrambled.clone().next_point();
+        let p1 = sobol_no_scramble.next_point();
+        let p2 = sobol_scrambled.next_point();
 
         assert_ne!(p1[0], p2[0]);
     }

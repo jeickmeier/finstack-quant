@@ -163,6 +163,9 @@ fn intra_girr_correlation(
     scenario: CorrelationScenario,
 ) -> f64 {
     use GirrFactor::{Inflation, Tenor, XccyBasis};
+    // FRTB correlation table: each factor pair is listed explicitly per the
+    // regulatory text even where values coincide.
+    #[allow(clippy::match_same_arms)]
     let base_rho = match (fac_i, fac_j) {
         (Tenor(t_i), Tenor(t_j)) => girr::girr_tenor_correlation(t_i, t_j),
         (Inflation, Inflation) | (XccyBasis, XccyBasis) => 1.0,

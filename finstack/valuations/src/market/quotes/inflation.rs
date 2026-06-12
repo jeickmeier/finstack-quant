@@ -104,8 +104,8 @@ impl InflationQuote {
     /// Get the unique identifier of the quote.
     pub fn id(&self) -> &QuoteId {
         match self {
-            InflationQuote::InflationSwap { id, .. } => id,
-            InflationQuote::YoYInflationSwap { id, .. } => id,
+            InflationQuote::InflationSwap { id, .. }
+            | InflationQuote::YoYInflationSwap { id, .. } => id,
         }
     }
 
@@ -135,8 +135,8 @@ impl InflationQuote {
     /// ```
     pub fn maturity_date(&self) -> Option<Date> {
         match self {
-            InflationQuote::InflationSwap { maturity, .. } => Some(*maturity),
-            InflationQuote::YoYInflationSwap { maturity, .. } => Some(*maturity),
+            InflationQuote::InflationSwap { maturity, .. }
+            | InflationQuote::YoYInflationSwap { maturity, .. } => Some(*maturity),
         }
     }
 

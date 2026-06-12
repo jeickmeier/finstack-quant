@@ -49,7 +49,7 @@ fn resolve_market(market: &Market) -> Result<MarketContext, String> {
                     }
                 }
             })?;
-            let plan_id = env.plan.id.clone();
+            let plan_id = env.plan.id;
             MarketContext::try_from(result.result.final_market)
                 .map_err(|err| format!("rehydrate calibrated market for plan '{plan_id}': {err}"))
         }

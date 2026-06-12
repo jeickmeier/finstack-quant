@@ -285,7 +285,7 @@ fn antithetic_variates_improve_estimate_stability() {
         .num_paths(10_000)
         .seed(42)
         .antithetic(false);
-    let config_anti = MertonMcConfig::new(merton.clone())
+    let config_anti = MertonMcConfig::new(merton)
         .num_paths(10_000)
         .seed(42)
         .antithetic(true);

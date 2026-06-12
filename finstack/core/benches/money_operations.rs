@@ -34,7 +34,6 @@ impl FxProvider for SimpleFxProvider {
         }
 
         let from_to_usd = match from {
-            Currency::USD => 1.0,
             Currency::EUR => self.eur_usd,
             Currency::GBP => self.gbp_usd,
             Currency::JPY => self.jpy_usd,
@@ -42,7 +41,6 @@ impl FxProvider for SimpleFxProvider {
         };
 
         let to_from_usd = match to {
-            Currency::USD => 1.0,
             Currency::EUR => 1.0 / self.eur_usd,
             Currency::GBP => 1.0 / self.gbp_usd,
             Currency::JPY => 1.0 / self.jpy_usd,

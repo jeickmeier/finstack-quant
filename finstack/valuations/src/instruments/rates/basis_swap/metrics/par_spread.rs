@@ -115,7 +115,7 @@ impl MetricCalculator for ParSpreadCalculator {
             )));
         }
 
-        let instrument = context.instrument.clone();
+        let instrument = std::sync::Arc::clone(&context.instrument);
         let swap = instrument
             .as_any()
             .downcast_ref::<BasisSwap>()
@@ -131,7 +131,7 @@ impl MetricCalculator for ParSpreadCalculator {
             )));
         }
 
-        let curves = context.curves.clone();
+        let curves = std::sync::Arc::clone(&context.curves);
         let as_of = context.as_of;
 
         // PV of reference leg
@@ -184,7 +184,7 @@ impl MetricCalculator for IncrementalParSpreadCalculator {
                 )
             })?;
 
-        let instrument = context.instrument.clone();
+        let instrument = std::sync::Arc::clone(&context.instrument);
         let swap = instrument
             .as_any()
             .downcast_ref::<BasisSwap>()

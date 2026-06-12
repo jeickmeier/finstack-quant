@@ -1,3 +1,5 @@
+//! Aggregation metrics tests for portfolio.
+
 mod common;
 
 use common::*;
@@ -155,7 +157,7 @@ fn summable_metrics_scale_with_quantity_and_short_sign() {
     measures.insert(MetricId::Dv01, 2.5);
     measures.insert(MetricId::Ytm, 0.05);
 
-    let instrument = Arc::new(FixedMetricInstrument::new(
+    let instrument: Arc<dyn Instrument> = Arc::new(FixedMetricInstrument::new(
         "RISKY",
         Money::new(100.0, Currency::USD),
         measures,
@@ -165,7 +167,7 @@ fn summable_metrics_scale_with_quantity_and_short_sign() {
         "LONG",
         "E1",
         "RISKY",
-        instrument.clone(),
+        Arc::clone(&instrument),
         2.0,
         PositionUnit::Units,
     )

@@ -562,7 +562,7 @@ impl FxMatrix {
         use super::providers::BumpedFxProvider;
         use std::sync::Arc;
         let bumped_provider = Arc::new(BumpedFxProvider::new(
-            self.provider.clone(),
+            Arc::clone(&self.provider),
             from,
             to,
             bump_pct,
@@ -707,31 +707,25 @@ impl FxMatrix {
         let pivot = self.config.pivot_currency;
 
         // Try to get first leg: from -> pivot
-        let a = match self.get_or_fetch(from, pivot, on, policy) {
-            Ok(rate) => rate,
-            Err(_) => {
-                return Err(InputError::FxTriangulationFailed {
-                    from,
-                    to,
-                    pivot,
-                    missing_leg: format!("{from}->{pivot} rate not found"),
-                }
-                .into());
+        let Ok(a) = self.get_or_fetch(from, pivot, on, policy) else {
+            return Err(InputError::FxTriangulationFailed {
+                from,
+                to,
+                pivot,
+                missing_leg: format!("{from}->{pivot} rate not found"),
             }
+            .into());
         };
 
         // Try to get second leg: pivot -> to
-        let b = match self.get_or_fetch(pivot, to, on, policy) {
-            Ok(rate) => rate,
-            Err(_) => {
-                return Err(InputError::FxTriangulationFailed {
-                    from,
-                    to,
-                    pivot,
-                    missing_leg: format!("{pivot}->{to} rate not found"),
-                }
-                .into());
+        let Ok(b) = self.get_or_fetch(pivot, to, on, policy) else {
+            return Err(InputError::FxTriangulationFailed {
+                from,
+                to,
+                pivot,
+                missing_leg: format!("{pivot}->{to} rate not found"),
             }
+            .into());
         };
 
         let rate = a * b;

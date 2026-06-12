@@ -1626,7 +1626,7 @@ impl TreeModel for ShortRateTree {
 
         // Create custom state generator that uses pre-calibrated rates
         // Clone rates (cheap Arc clone) to avoid lifetime issues with closures
-        let rates_clone = self.rates.clone();
+        let rates_clone = std::sync::Arc::clone(&self.rates);
         let state_gen: Box<dyn Fn(usize, usize) -> f64> =
             Box::new(move |step: usize, node: usize| -> f64 {
                 if step < rates_clone.len() && node < rates_clone[step].len() {
@@ -1636,7 +1636,7 @@ impl TreeModel for ShortRateTree {
                 }
             });
 
-        let rates_clone2 = self.rates.clone();
+        let rates_clone2 = std::sync::Arc::clone(&self.rates);
         let compounding = self.config.compounding;
         let dt_pricing = time_to_maturity / self.config.steps as f64;
         let rate_gen: Box<dyn Fn(usize, usize) -> f64> =

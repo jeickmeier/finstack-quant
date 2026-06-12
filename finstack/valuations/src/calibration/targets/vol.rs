@@ -415,8 +415,7 @@ Set params.expiry_extrapolation='clamp' to allow flat extrapolation.",
                     shift: p1.shift,
                 })
             }
-            (Some((_, p)), _) => Ok(p.clone()),
-            (_, Some((_, p))) => Ok(p.clone()),
+            (Some((_, p)), _) | (_, Some((_, p))) => Ok(p.clone()),
             _ => unreachable!(),
         }
     }

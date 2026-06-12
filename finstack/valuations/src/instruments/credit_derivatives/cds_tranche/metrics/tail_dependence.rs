@@ -56,12 +56,9 @@ impl MetricCalculator for TailDependenceCalculator {
             ))?;
 
         // Get the credit index data to determine correlation
-        let index_data = match context.curves.get_credit_index(&tranche.credit_index_id) {
-            Ok(data) => data,
-            Err(_) => return Ok(f64::NAN),
+        let Ok(index_data) = context.curves.get_credit_index(&tranche.credit_index_id) else {
+            return Ok(f64::NAN);
         };
-
-        // Get correlation for the detachment point
         let correlation = index_data
             .base_correlation_curve
             .correlation(tranche.detach_pct);

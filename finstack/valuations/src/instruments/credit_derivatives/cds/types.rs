@@ -319,8 +319,6 @@ impl CDSConvention {
     #[must_use]
     pub fn detect_from_currency(currency: Currency) -> Self {
         match currency {
-            // North American currencies
-            Currency::USD | Currency::CAD => Self::IsdaNa,
             // European currencies
             Currency::EUR | Currency::GBP | Currency::CHF => Self::IsdaEu,
             // Asian/Pacific currencies
@@ -516,11 +514,11 @@ pub use crate::instruments::common_impl::parameters::legs::{PremiumLegSpec, Prot
 /// concrete restructuring variant. Concrete clauses pass through unchanged.
 fn resolve_doc_clause(clause: CdsDocClause) -> CdsDocClause {
     match clause {
-        CdsDocClause::IsdaNa => CdsDocClause::Xr14,
+        CdsDocClause::IsdaNa
+        | CdsDocClause::IsdaAs
+        | CdsDocClause::IsdaAu
+        | CdsDocClause::IsdaNz => CdsDocClause::Xr14,
         CdsDocClause::IsdaEu => CdsDocClause::Mm14,
-        CdsDocClause::IsdaAs => CdsDocClause::Xr14,
-        CdsDocClause::IsdaAu => CdsDocClause::Xr14,
-        CdsDocClause::IsdaNz => CdsDocClause::Xr14,
         // Concrete clauses pass through
         other => other,
     }
@@ -909,10 +907,10 @@ impl CreditDefaultSwap {
         match self.doc_clause {
             Some(clause) => resolve_doc_clause(clause),
             None => match self.convention {
-                CDSConvention::IsdaNa => CdsDocClause::Xr14,
+                CDSConvention::IsdaNa | CDSConvention::IsdaAs | CDSConvention::Custom => {
+                    CdsDocClause::Xr14
+                }
                 CDSConvention::IsdaEu => CdsDocClause::Mm14,
-                CDSConvention::IsdaAs => CdsDocClause::Xr14,
-                CDSConvention::Custom => CdsDocClause::Xr14,
             },
         }
     }

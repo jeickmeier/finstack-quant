@@ -167,10 +167,10 @@ impl RateQuote {
     /// ```
     pub fn id(&self) -> &QuoteId {
         match self {
-            RateQuote::Deposit { id, .. } => id,
-            RateQuote::Fra { id, .. } => id,
-            RateQuote::Futures { id, .. } => id,
-            RateQuote::Swap { id, .. } => id,
+            RateQuote::Deposit { id, .. }
+            | RateQuote::Fra { id, .. }
+            | RateQuote::Futures { id, .. }
+            | RateQuote::Swap { id, .. } => id,
         }
     }
 
@@ -202,10 +202,10 @@ impl RateQuote {
     /// ```
     pub fn value(&self) -> f64 {
         match self {
-            RateQuote::Deposit { rate, .. } => *rate,
-            RateQuote::Fra { rate, .. } => *rate,
+            RateQuote::Deposit { rate, .. }
+            | RateQuote::Fra { rate, .. }
+            | RateQuote::Swap { rate, .. } => *rate,
             RateQuote::Futures { price, .. } => *price,
-            RateQuote::Swap { rate, .. } => *rate,
         }
     }
 

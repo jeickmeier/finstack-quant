@@ -1,3 +1,5 @@
+//! Aggregation grouping and df tests for portfolio.
+
 mod common;
 
 use common::*;

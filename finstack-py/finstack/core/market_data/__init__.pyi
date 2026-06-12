@@ -833,6 +833,42 @@ class VolCube:
         """Implied volatility with clamped extrapolation at the grid edges."""
         ...
 
+    def vol_normal(self, expiry: float, tenor: float, strike: float) -> float:
+        """Normal (Bachelier) implied volatility with bounds checking.
+
+        Parameters
+        ----------
+        expiry : float
+            Option expiry in years.
+        tenor : float
+            Underlying swap tenor in years.
+        strike : float
+            Strike rate.
+
+        Returns
+        -------
+        float
+            Normal (Bachelier) implied volatility in absolute rate units
+            (e.g. ``0.008`` = 80 bp/yr).
+
+        Raises
+        ------
+        ValueError
+            If expiry or tenor falls outside the grid, if the expansion
+            yields a non-finite volatility, or for cross-zero quotes
+            (``(F+s)(K+s) <= 0``) with ``beta > 0``, which require an
+            explicit shift.
+        """
+        ...
+
+    def vol_normal_clamped(self, expiry: float, tenor: float, strike: float) -> float:
+        """Normal (Bachelier) implied volatility with clamped extrapolation.
+
+        Never raises and never returns a non-finite or non-positive value;
+        degenerate expansions are floored to a small positive normal vol.
+        """
+        ...
+
     def materialize_tenor_slice(self, tenor: float, strikes: list[float]) -> VolSurface:
         """Materialize a tenor slice as a :class:`VolSurface`.
 
@@ -849,8 +885,46 @@ class VolCube:
         """
         ...
 
+    def materialize_tenor_slice_normal(self, tenor: float, strikes: list[float]) -> VolSurface:
+        """Materialize a tenor slice as a normal-vol (Bachelier) :class:`VolSurface`.
+
+        Vols are in absolute rate units and the resulting surface is tagged
+        with the normal quote type.
+
+        Parameters
+        ----------
+        tenor : float
+            Tenor to slice at (years).
+        strikes : list[float]
+            Strike axis for the resulting surface.
+
+        Returns
+        -------
+        VolSurface
+        """
+        ...
+
     def materialize_expiry_slice(self, expiry: float, strikes: list[float]) -> VolSurface:
         """Materialize an expiry slice as a :class:`VolSurface`.
+
+        Parameters
+        ----------
+        expiry : float
+            Expiry to slice at (years).
+        strikes : list[float]
+            Strike axis for the resulting surface.
+
+        Returns
+        -------
+        VolSurface
+        """
+        ...
+
+    def materialize_expiry_slice_normal(self, expiry: float, strikes: list[float]) -> VolSurface:
+        """Materialize an expiry slice as a normal-vol (Bachelier) :class:`VolSurface`.
+
+        Vols are in absolute rate units and the resulting surface is tagged
+        with the normal quote type.
 
         Parameters
         ----------

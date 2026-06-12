@@ -173,7 +173,7 @@ fn bench_pe_waterfall_complexity(c: &mut Criterion) {
 
     let simple = make_fund(events.clone(), simple_waterfall(), false);
     let standard = make_fund(events.clone(), standard_waterfall(), false);
-    let full = make_fund(events.clone(), full_waterfall_with_clawback(), false);
+    let full = make_fund(events, full_waterfall_with_clawback(), false);
 
     for (label, fund) in [
         ("simple", &simple),
@@ -197,7 +197,7 @@ fn bench_pe_waterfall_style(c: &mut Criterion) {
     let events = make_events(30);
 
     let european = make_fund(events.clone(), standard_waterfall(), false);
-    let american = make_fund(events.clone(), american_waterfall(), false);
+    let american = make_fund(events, american_waterfall(), false);
 
     group.bench_function("european", |b| {
         b.iter(|| black_box(&european).run_waterfall().unwrap());

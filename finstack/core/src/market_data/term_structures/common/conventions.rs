@@ -38,6 +38,8 @@ fn has_explicit_term_marker(normalized_id: &str) -> bool {
 }
 
 #[inline]
+// The explicit Act/365F currency list is kept distinct from the fallback for documentation.
+#[allow(clippy::match_same_arms)]
 fn inferred_currency_day_count(currency: &str) -> DayCount {
     match currency {
         "USD" | "EUR" | "CHF" | "SEK" | "NOK" => DayCount::Act360,

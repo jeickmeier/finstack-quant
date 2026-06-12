@@ -519,7 +519,7 @@ mod tests {
         let market = create_test_market(as_of);
 
         // Change reference to IO
-        let mut io_cmo = cmo.clone();
+        let mut io_cmo = cmo;
         io_cmo.reference_tranche_id = "IO".to_string();
 
         let pv = price_cmo(&io_cmo, &market, as_of).expect("should price");
@@ -580,7 +580,7 @@ mod tests {
         let cmo = AgencyCmo::example_io_po().expect("AgencyCmo IO/PO example is valid");
         let as_of = Date::from_calendar_date(2024, Month::January, 15).expect("valid");
 
-        let mut io_cmo = cmo.clone();
+        let mut io_cmo = cmo;
         io_cmo.reference_tranche_id = "IO".to_string();
         let cfs = generate_tranche_cashflows(&io_cmo, as_of, Some(60)).expect("IO cashflows");
         assert!(cfs.len() > 12);
@@ -617,7 +617,7 @@ mod tests {
         let market = create_test_market(as_of);
 
         // Change reference to PO
-        let mut po_cmo = cmo.clone();
+        let mut po_cmo = cmo;
         po_cmo.reference_tranche_id = "PO".to_string();
 
         let pv = price_cmo(&po_cmo, &market, as_of).expect("should price");

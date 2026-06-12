@@ -192,7 +192,7 @@ impl CsaSpec {
                     VmParameters::from_finstack_config(cfg, currency)?,
                     ImParameters::from_finstack_config(cfg, ImMethodology::Simm, currency)?,
                     EligibleCollateralSchedule::from_finstack_config(cfg, "bcbs_standard")?,
-                    registry.defaults.timing.regulatory_vm.clone(),
+                    registry.defaults.timing.regulatory_vm,
                 )
             }
             None => (

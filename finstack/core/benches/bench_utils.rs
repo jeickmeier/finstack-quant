@@ -1,3 +1,5 @@
+//! Shared helpers for finstack-core Criterion benchmarks.
+
 use criterion::{measurement::WallTime, BenchmarkGroup, Criterion};
 
 /// Simple helper to reduce repetitive `bench_function` + `iter` boilerplate.

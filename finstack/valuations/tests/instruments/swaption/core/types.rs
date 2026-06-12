@@ -136,7 +136,7 @@ fn test_resolve_volatility_priority_and_greek_inputs_expired() {
     assert_approx_eq(override_vol, 0.35, 1e-12, "override vol");
 
     let sabr_params = SABRParameters::rates_standard(0.2, 0.5, -0.25).unwrap();
-    swaption = swaption.with_sabr(sabr_params.clone());
+    swaption = swaption.with_sabr(sabr_params);
     let sabr_vol = swaption.resolve_volatility(&market, forward, t).unwrap();
     assert!(sabr_vol.is_finite(), "sabr vol should be finite");
     assert!(
@@ -183,7 +183,6 @@ fn test_swaption_example_and_builder_helpers() {
     );
 
     let updated = example
-        .clone()
         .with_settlement(SwaptionSettlement::Cash)
         .with_option_type(finstack_valuations::instruments::OptionType::Put)
         .with_cash_settlement_method(CashSettlementMethod::ZeroCoupon)

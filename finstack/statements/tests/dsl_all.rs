@@ -1,7 +1,7 @@
-// DSL parser and compiler tests.
-//
-// Note: Cargo only discovers integration tests that are direct children of `tests/`.
-// This file wires in the nested DSL test modules so they run.
+//! DSL parser and compiler tests.
+//!
+//! Note: Cargo only discovers integration tests that are direct children of `tests/`.
+//! This file wires in the nested DSL test modules so they run.
 
 #[path = "dsl/dsl_tests.rs"]
 mod dsl_tests;

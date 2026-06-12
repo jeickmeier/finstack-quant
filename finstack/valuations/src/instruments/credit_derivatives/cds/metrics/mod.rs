@@ -41,11 +41,11 @@ pub(crate) fn market_doc_clause(
         InstrumentClause::Cr14 | InstrumentClause::Mr14 | InstrumentClause::Xr14 => {
             MarketClause::IsdaNa
         }
-        InstrumentClause::Mm14 => MarketClause::IsdaEu,
+        InstrumentClause::Mm14 | InstrumentClause::IsdaEu => MarketClause::IsdaEu,
         InstrumentClause::IsdaNa => MarketClause::IsdaNa,
-        InstrumentClause::IsdaEu => MarketClause::IsdaEu,
-        InstrumentClause::IsdaAs => MarketClause::IsdaAs,
-        InstrumentClause::IsdaAu | InstrumentClause::IsdaNz => MarketClause::IsdaAs,
+        InstrumentClause::IsdaAs | InstrumentClause::IsdaAu | InstrumentClause::IsdaNz => {
+            MarketClause::IsdaAs
+        }
         InstrumentClause::Custom => MarketClause::Custom,
     }
 }

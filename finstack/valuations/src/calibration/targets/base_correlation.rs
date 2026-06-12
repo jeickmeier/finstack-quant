@@ -193,7 +193,7 @@ pub(crate) struct BaseCorrelationTarget {
 impl BaseCorrelationTarget {
     /// Create a new base correlation bootstrapper.
     pub(crate) fn new(params: BaseCorrelationParams, base_context: MarketContext) -> Self {
-        let reuse_context = RefCell::new(base_context.clone());
+        let reuse_context = RefCell::new(base_context);
         Self {
             params,
             reuse_context,
@@ -385,7 +385,7 @@ impl BaseCorrelationTarget {
         let mut new_context = context.clone().insert(curve.clone());
         if let Ok(idx) = new_context.get_credit_index(params.index_id.as_str()) {
             let mut updated = idx.as_ref().clone();
-            updated.base_correlation_curve = Arc::new(curve.clone());
+            updated.base_correlation_curve = Arc::new(curve);
             new_context = new_context.insert_credit_index(params.index_id.as_str(), updated);
         }
 

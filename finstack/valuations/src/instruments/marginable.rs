@@ -203,7 +203,6 @@ fn is_credit_qualifying(name: &str, spread_bp: f64) -> bool {
 fn netting_set_id_from_spec(spec: &OtcMarginSpec) -> NettingSetId {
     match &spec.clearing_status {
         ClearingStatus::Cleared { ccp } => NettingSetId::cleared(ccp),
-        ClearingStatus::Bilateral => NettingSetId::bilateral(&spec.csa.id, &spec.csa.id),
         _ => NettingSetId::bilateral(&spec.csa.id, &spec.csa.id),
     }
 }

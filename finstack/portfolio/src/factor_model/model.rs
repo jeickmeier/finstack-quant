@@ -734,8 +734,8 @@ fn uses_assignment_driven_credit_shock(factor: &FactorDefinition) -> bool {
 
 fn credit_curve_id(dependency: &MarketDependency) -> Option<&finstack_core::types::CurveId> {
     match dependency {
-        MarketDependency::CreditCurve { id } => Some(id),
-        MarketDependency::Curve {
+        MarketDependency::CreditCurve { id }
+        | MarketDependency::Curve {
             id,
             curve_type: CurveType::Hazard,
         } => Some(id),

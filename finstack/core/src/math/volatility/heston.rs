@@ -49,12 +49,39 @@
 //!   "The Little Heston Trap." *Wilmott Magazine*, January 2007.
 //! - Gatheral, J. (2006). *The Volatility Surface: A Practitioner's Guide*.
 //!   Wiley Finance.
+//! - Kahl, C., & Jäckel, P. (2005). "Not-so-complex logarithms in the Heston
+//!   model." *Wilmott Magazine*, September 2005. (Characteristic-function
+//!   tail decay rate used for the quadrature truncation bound.)
 
 use num_complex::Complex64;
 use std::f64::consts::PI;
 
 const HESTON_G_DENOM_EPS: f64 = 1e-8;
 const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
+
+/// Target log-magnitude decay of the characteristic function at the
+/// truncation point of the Gil-Pelaez integrals: `ln(1e12) ≈ 27.63`,
+/// i.e. truncate where `|ψ(φ)|` has decayed below ~1e-12.
+const HESTON_TAIL_LOG_TARGET: f64 = 27.631_021_115_928_547;
+
+/// Width (in φ-space) of each composite Gauss-Legendre panel used for the
+/// Gil-Pelaez inversion. With 16-node panels this keeps the node density at
+/// the level historically used for the `[0, 50]` strip (128 nodes), which
+/// resolves integrand oscillation `e^{-iφ ln(S/K)}` out to deep wings
+/// (|ln(S/K)| ≈ 2 gives ~2 oscillation periods per panel).
+const HESTON_QUAD_PANEL_WIDTH: f64 = 6.25;
+
+/// Bounds on the number of composite quadrature panels per integral.
+const HESTON_QUAD_MIN_PANELS: usize = 8;
+const HESTON_QUAD_MAX_PANELS: usize = 320;
+
+/// Number of composite Gauss-Legendre panels for a Gil-Pelaez integral over
+/// `[lower, upper]`, keeping panel width at most [`HESTON_QUAD_PANEL_WIDTH`].
+fn quadrature_panels(lower: f64, upper: f64) -> usize {
+    let span = (upper - lower).max(0.0);
+    let panels = (span / HESTON_QUAD_PANEL_WIDTH).ceil() as usize;
+    panels.clamp(HESTON_QUAD_MIN_PANELS, HESTON_QUAD_MAX_PANELS)
+}
 
 /// Heston stochastic volatility model parameters.
 ///
@@ -128,7 +155,6 @@ struct HestonPjCoords {
 }
 
 struct HestonStripCache {
-    upper_limit: f64,
     panel_half_width: f64,
     order: usize,
     grid: Vec<(f64, f64)>,
@@ -139,7 +165,12 @@ struct HestonStripCache {
 impl HestonStripCache {
     fn new(params: &HestonParams, coords: HestonPjCoords, upper_limit: f64) -> Option<Self> {
         let order = 16;
-        let (grid, panel_half_width) = composite_gauss_legendre_grid(1e-8, upper_limit, order, 8)?;
+        let (grid, panel_half_width) = composite_gauss_legendre_grid(
+            1e-8,
+            upper_limit,
+            order,
+            quadrature_panels(1e-8, upper_limit),
+        )?;
         let i = Complex64::i();
         let mut psi1_over_iphi = Vec::with_capacity(grid.len());
         let mut psi2_over_iphi = Vec::with_capacity(grid.len());
@@ -161,7 +192,6 @@ impl HestonStripCache {
         }
 
         Some(Self {
-            upper_limit,
             panel_half_width,
             order,
             grid,
@@ -581,55 +611,17 @@ impl HestonParams {
         };
 
         let upper_limit = self.integration_upper_limit(t);
-        let coarse_cache = match HestonStripCache::new(self, coords, upper_limit) {
-            Some(cache) => cache,
-            None => {
-                return strikes
-                    .iter()
-                    .map(|&strike| self.price_european(spot, strike, r, q, t, is_call))
-                    .collect();
-            }
+        let Some(cache) = HestonStripCache::new(self, coords, upper_limit) else {
+            return strikes
+                .iter()
+                .map(|&strike| self.price_european(spot, strike, r, q, t, is_call))
+                .collect();
         };
-
-        let refined_upper = (2.0 * coarse_cache.upper_limit).min(2_000.0);
-        let mut refined_cache: Option<HestonStripCache> = None;
 
         strikes
             .iter()
             .map(|&strike| {
                 let log_strike = strike.ln();
-                let strike_coords = HestonPjCoords {
-                    ln_k: log_strike,
-                    ..coords
-                };
-                let tail_p1 = self
-                    .compute_pj_interval_integral(
-                        1,
-                        strike_coords,
-                        0.5 * coarse_cache.upper_limit,
-                        coarse_cache.upper_limit,
-                    )
-                    .map(|tail| (tail / PI).abs())
-                    .unwrap_or(0.0);
-                let tail_p2 = self
-                    .compute_pj_interval_integral(
-                        2,
-                        strike_coords,
-                        0.5 * coarse_cache.upper_limit,
-                        coarse_cache.upper_limit,
-                    )
-                    .map(|tail| (tail / PI).abs())
-                    .unwrap_or(0.0);
-
-                let cache = if tail_p1.max(tail_p2) > 1.0e-4 {
-                    if refined_cache.is_none() {
-                        refined_cache = HestonStripCache::new(self, coords, refined_upper);
-                    }
-                    refined_cache.as_ref().unwrap_or(&coarse_cache)
-                } else {
-                    &coarse_cache
-                };
-
                 let p1 = cache.probability(log_strike, &cache.psi1_over_iphi);
                 let p2 = cache.probability(log_strike, &cache.psi2_over_iphi);
                 // Parity is applied to the unclamped call; clamp once at the end.
@@ -659,25 +651,7 @@ impl HestonParams {
         };
 
         let upper_limit = self.integration_upper_limit(t);
-        let (coarse1, coarse2) = self.compute_p1_p2_with_upper_limit(coords, upper_limit);
-        if !coarse1.is_finite() || !coarse2.is_finite() {
-            return (coarse1, coarse2);
-        }
-
-        let (tail1, tail2) = self
-            .compute_p1_p2_interval_integral(coords, 0.5 * upper_limit, upper_limit)
-            .map(|(t1, t2)| ((t1 / PI).abs(), (t2 / PI).abs()))
-            .unwrap_or((0.0, 0.0));
-
-        if tail1.max(tail2) > 1.0e-4 {
-            let refined_upper = (2.0 * upper_limit).min(2_000.0);
-            let (refined1, refined2) = self.compute_p1_p2_with_upper_limit(coords, refined_upper);
-            if refined1.is_finite() && refined2.is_finite() {
-                return (refined1, refined2);
-            }
-        }
-
-        (coarse1, coarse2)
+        self.compute_p1_p2_with_upper_limit(coords, upper_limit)
     }
 
     fn compute_p1_p2_with_upper_limit(
@@ -722,7 +696,7 @@ impl HestonParams {
             )
         };
 
-        let panels = 8_usize;
+        let panels = quadrature_panels(lower, upper);
         let order = 16_usize;
         let (xs, ws) = gl_nodes_weights(order)?;
         let h = (upper - lower) / panels as f64;
@@ -746,8 +720,7 @@ impl HestonParams {
         Some((sum1, sum2))
     }
 
-    /// Compute probability P_j via Fourier inversion (single-j variant for tests
-    /// and strip tail checks).
+    /// Compute probability P_j via Fourier inversion (single-j variant for tests).
     ///
     /// P_j = 1/2 + (1/π) ∫₀^∞ Re[exp(-iφ ln K) ψ_j(φ) / (iφ)] dφ
     #[cfg(test)]
@@ -761,24 +734,7 @@ impl HestonParams {
         };
 
         let upper_limit = self.integration_upper_limit(t);
-        let coarse = self.compute_pj_with_upper_limit(j, coords, upper_limit);
-        if !coarse.is_finite() {
-            return coarse;
-        }
-
-        let tail_probability_mass = self
-            .compute_pj_interval_integral(j, coords, 0.5 * upper_limit, upper_limit)
-            .map(|tail| (tail / PI).abs())
-            .unwrap_or(0.0);
-        if tail_probability_mass > 1.0e-4 {
-            let refined_upper = (2.0 * upper_limit).min(2_000.0);
-            let refined = self.compute_pj_with_upper_limit(j, coords, refined_upper);
-            if refined.is_finite() {
-                return refined;
-            }
-        }
-
-        coarse
+        self.compute_pj_with_upper_limit(j, coords, upper_limit)
     }
 
     #[cfg(test)]
@@ -794,6 +750,7 @@ impl HestonParams {
         (0.5 + integral / PI).clamp(0.0, 1.0)
     }
 
+    #[cfg(test)]
     fn compute_pj_interval_integral(
         &self,
         j: u8,
@@ -807,8 +764,14 @@ impl HestonParams {
 
         let integrand = |phi: f64| -> f64 { self.fourier_integrand(j, phi, coords) };
 
-        crate::math::integration::gauss_legendre_integrate_composite(integrand, lower, upper, 16, 8)
-            .ok()
+        crate::math::integration::gauss_legendre_integrate_composite(
+            integrand,
+            lower,
+            upper,
+            16,
+            quadrature_panels(lower, upper),
+        )
+        .ok()
     }
 
     fn fourier_integrand(&self, j: u8, phi: f64, coords: HestonPjCoords) -> f64 {
@@ -847,21 +810,42 @@ impl HestonParams {
         }
     }
 
-    /// Heuristic upper integration limit for the Gil-Pelaez inversion.
+    /// Upper integration limit for the Gil-Pelaez inversion.
     ///
-    /// Estimates where the characteristic function decays below ~1e-12,
-    /// assuming Gaussian-like tail decay of the CF driven by `σ²t`. Two
-    /// caveats: (1) the heuristic relies on that tail-decay assumption, which
-    /// can be optimistic for low-vol/short-dated parameter sets (the tail
-    /// check in `compute_p1_p2` refines the bound when residual mass remains);
-    /// (2) deep wings (|ln(F/K)| ≳ 2) make the integrand increasingly
-    /// oscillatory, so the fixed 128-node grid approaches under-resolution
-    /// there even with an adequate upper limit.
+    /// Chooses the truncation point `φ_max` so the characteristic function
+    /// magnitude has decayed below ~1e-12, covering both tail regimes:
+    ///
+    /// 1. **Asymptotic (large `φ·t`)**: `|ψ(φ)| ≈ exp(−C∞ φ)` with
+    ///    `C∞ = √(1−ρ²) (v₀ + κθT) / σ` (Kahl & Jäckel 2005, "Not-so-complex
+    ///    logarithms in the Heston model", *Wilmott*, Sec. 5). This dominates
+    ///    for long maturities and high vol-of-vol, where decay is far slower
+    ///    than Gaussian.
+    /// 2. **Pre-asymptotic (short-dated, `d·t ≲ 1`)**: the CF behaves
+    ///    Black-Scholes-like, `|ψ(φ)| ≈ exp(−½ v̄ t φ²)`; using
+    ///    `v̄ = min(v₀, θ)` is conservative.
+    ///
+    /// `φ_max` is the larger of the two bounds, clamped to `[50, 2000]`. The
+    /// composite quadrature scales its panel count with the interval (see
+    /// [`quadrature_panels`]) so node density — and therefore resolution of
+    /// the `e^{-iφ ln K}` oscillation, including deep wings — is preserved
+    /// regardless of the truncation point.
     fn integration_upper_limit(&self, t: f64) -> f64 {
         if self.sigma > 0.0 && t > 0.0 {
-            (2.0 * 28.0_f64.ln() / (self.sigma.powi(2) * t))
-                .sqrt()
-                .clamp(50.0, 500.0)
+            let c_inf = (1.0 - self.rho * self.rho).sqrt()
+                * (self.v0 + self.kappa * self.theta * t)
+                / self.sigma;
+            let exp_bound = if c_inf > 0.0 {
+                HESTON_TAIL_LOG_TARGET / c_inf
+            } else {
+                f64::INFINITY
+            };
+            let v_min = self.v0.min(self.theta);
+            let gauss_bound = if v_min > 0.0 {
+                (2.0 * HESTON_TAIL_LOG_TARGET / (v_min * t)).sqrt()
+            } else {
+                f64::INFINITY
+            };
+            exp_bound.max(gauss_bound).clamp(50.0, 2_000.0)
         } else {
             100.0
         }
@@ -1430,7 +1414,10 @@ mod tests {
     }
 
     #[test]
-    fn heston_refines_upper_bound_when_tail_remains_material() {
+    fn heston_upper_bound_captures_short_dated_tail() {
+        // Short-dated/low-variance parameters where the CF decays
+        // Black-Scholes-like (exp(-v t phi^2 / 2)); the pre-fix sigma-based
+        // heuristic truncated at phi=500 and left material tail mass.
         let p = HestonParams::new(0.01, 3.0, 0.01, 0.02, -0.5).expect("valid");
         let spot: f64 = 100.0;
         let strike: f64 = 100.0;
@@ -1446,17 +1433,17 @@ mod tests {
         };
         let upper = p.integration_upper_limit(t);
 
-        let coarse = p.compute_pj_with_upper_limit(1, coords, upper);
-        let refined = p.compute_pj(1, spot, strike, r, q, t);
+        let at_heuristic = p.compute_pj(1, spot, strike, r, q, t);
         let extended = p.compute_pj_with_upper_limit(1, coords, 2.0 * upper);
+        let truncated = p.compute_pj_with_upper_limit(1, coords, 0.5 * upper);
 
         assert!(
-            (coarse - extended).abs() > 1e-6,
-            "test case should exercise a materially non-zero tail: upper={upper}, coarse={coarse}, extended={extended}"
+            (truncated - extended).abs() > 1e-6,
+            "test case should exercise a materially non-zero tail: upper={upper}, truncated={truncated}, extended={extended}"
         );
         assert!(
-            (refined - extended).abs() < 1e-8,
-            "refined Heston probability should match the wider-bound integration"
+            (at_heuristic - extended).abs() < 1e-8,
+            "heuristic upper limit should capture the integrand tail: upper={upper}, at_heuristic={at_heuristic}, extended={extended}"
         );
     }
 
@@ -1663,7 +1650,7 @@ mod tests {
     }
 
     #[test]
-    fn price_european_strip_matches_single_strike_when_refinement_is_active() {
+    fn price_european_strip_matches_single_strike_for_short_dated_params() {
         let params = HestonParams::new(0.01, 3.0, 0.01, 0.02, -0.5).expect("valid");
         let spot = 100.0;
         let r = 0.01;

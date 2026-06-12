@@ -401,10 +401,11 @@ fn resolve_maturity(q: &RateQuote, base_date: Date) -> Option<Date> {
     // Basic resolution using base_date + pillar
     // This ignores spot lag or BDC, but is sufficient for "closest quote" heuristics.
     match q {
-        RateQuote::Deposit { pillar, .. } => resolve_pillar(pillar, base_date),
+        RateQuote::Deposit { pillar, .. } | RateQuote::Swap { pillar, .. } => {
+            resolve_pillar(pillar, base_date)
+        }
         RateQuote::Fra { end, .. } => resolve_pillar(end, base_date),
         RateQuote::Futures { expiry, .. } => Some(*expiry),
-        RateQuote::Swap { pillar, .. } => resolve_pillar(pillar, base_date),
     }
 }
 
@@ -474,7 +475,6 @@ pub fn bump_discount_curve_synthetic(
     // Choose synthetic indices. Deposits use a short-dated money-market index,
     // while swaps must use the corresponding OIS index conventions.
     let deposit_index_id = match currency {
-        Currency::USD => "USD-SOFR-1M",
         // Align with `rate_index_conventions.json` (there is no `EUR-ESTR-1M` alias today).
         Currency::EUR => "EUR-ESTR-OIS",
         Currency::GBP => "GBP-SONIA-1M",

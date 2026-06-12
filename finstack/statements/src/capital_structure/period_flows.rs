@@ -176,10 +176,7 @@ pub fn calculate_period_flows(
                 CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => {
                     breakdown.interest_expense_cash += scaled_abs_value;
                 }
-                CFKind::Amortization => {
-                    breakdown.principal_payment += scaled_abs_value;
-                }
-                CFKind::PrePayment | CFKind::RevolvingRepayment => {
+                CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment => {
                     breakdown.principal_payment += scaled_abs_value;
                 }
                 CFKind::Notional if cf.amount.amount() > 0.0 => {

@@ -233,7 +233,7 @@ mod tests {
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc.clone(),
-                    forward_curve_id: fwd.clone(), // multi-curve
+                    forward_curve_id: fwd, // multi-curve
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: Tenor::quarterly(),
                     day_count: DayCount::Act360,
@@ -264,7 +264,7 @@ mod tests {
         irs2.float.spread_bp = rust_decimal::Decimal::try_from(5.0).expect("valid");
         assert!(!discount_ratio_allowed(&irs2, as_of), "spread disallowed");
 
-        let mut irs3 = irs2.clone();
+        let mut irs3 = irs2;
         irs3.float.spread_bp = rust_decimal::Decimal::ZERO;
         irs3.float.payment_lag_days = 2;
         assert!(
@@ -273,8 +273,8 @@ mod tests {
         );
 
         let seasoned_as_of = date(2024, 2, 1);
-        let mut irs4 = irs.clone();
-        irs4.float.forward_curve_id = disc.clone();
+        let mut irs4 = irs;
+        irs4.float.forward_curve_id = disc;
         assert!(
             !discount_ratio_allowed(&irs4, seasoned_as_of),
             "seasoned disallowed"

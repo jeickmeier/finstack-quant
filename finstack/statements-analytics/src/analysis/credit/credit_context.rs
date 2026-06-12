@@ -145,9 +145,8 @@ pub fn compute_credit_context(
     periods: &[Period],
     reference_value: Option<f64>,
 ) -> CreditContextMetrics {
-    let inst_data = match cs_cashflows.by_instrument.get(instrument_id) {
-        Some(data) => data,
-        None => return CreditContextMetrics::default(),
+    let Some(inst_data) = cs_cashflows.by_instrument.get(instrument_id) else {
+        return CreditContextMetrics::default();
     };
 
     let mut dscr = Vec::new();

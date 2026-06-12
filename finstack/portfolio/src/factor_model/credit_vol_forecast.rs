@@ -650,8 +650,8 @@ mod tests {
         )
         .unwrap();
         let mut vol_factors = BTreeMap::new();
-        vol_factors.insert(rates.clone(), FactorVolModel::Sample { variance: 0.04 });
-        vol_factors.insert(credit.clone(), FactorVolModel::Sample { variance: 0.04 });
+        vol_factors.insert(rates, FactorVolModel::Sample { variance: 0.04 });
+        vol_factors.insert(credit, FactorVolModel::Sample { variance: 0.04 });
 
         CreditFactorModel {
             schema_version: CreditFactorModel::SCHEMA_VERSION.to_owned(),

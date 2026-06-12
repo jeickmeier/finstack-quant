@@ -81,7 +81,6 @@ fn multi_currency_market_context() -> MarketContext {
             _policy: FxConversionPolicy,
         ) -> finstack_core::Result<f64> {
             let rate_value = match (from, to) {
-                (Currency::USD, Currency::USD) => 1.0,
                 (Currency::EUR, Currency::USD) => 1.1,
                 (Currency::USD, Currency::EUR) => 1.0 / 1.1,
                 (Currency::GBP, Currency::USD) => 1.25,
@@ -330,7 +329,7 @@ fn test_custom_pricing_config() {
         }])
         .build()
         .unwrap()
-        .with_pricing_config(config.clone());
+        .with_pricing_config(config);
 
     // Assert
     assert_eq!(basket.pricing_config.days_in_year, 360.0);
@@ -867,7 +866,7 @@ fn test_constituent_count_metric() {
     // Arrange
     let basket = simple_equity_basket();
     let context = equity_market_context();
-    let instrument: Arc<dyn Instrument> = Arc::new(basket.clone());
+    let instrument: Arc<dyn Instrument> = Arc::new(basket);
     let mut metric_context = MetricContext::new(
         instrument,
         Arc::new(context),
@@ -889,7 +888,7 @@ fn test_expense_ratio_metric() {
     // Arrange
     let basket = simple_equity_basket();
     let context = equity_market_context();
-    let instrument: Arc<dyn Instrument> = Arc::new(basket.clone());
+    let instrument: Arc<dyn Instrument> = Arc::new(basket);
     let mut metric_context = MetricContext::new(
         instrument,
         Arc::new(context),
@@ -953,7 +952,7 @@ fn test_asset_exposure_metric_equity() {
         pricing_config: BasketPricingConfig::default(),
     };
     let context = equity_market_context();
-    let instrument: Arc<dyn Instrument> = Arc::new(basket.clone());
+    let instrument: Arc<dyn Instrument> = Arc::new(basket);
     let mut metric_context = MetricContext::new(
         instrument,
         Arc::new(context),
@@ -1020,7 +1019,7 @@ fn test_asset_exposure_metric_bond() {
     let context = equity_market_context()
         .insert_price("BOND_AAA", MarketScalar::Unitless(98.5))
         .insert_price("BOND_AA", MarketScalar::Unitless(101.2));
-    let instrument: Arc<dyn Instrument> = Arc::new(basket.clone());
+    let instrument: Arc<dyn Instrument> = Arc::new(basket);
     let mut metric_context = MetricContext::new(
         instrument,
         Arc::new(context),
@@ -1439,7 +1438,7 @@ fn test_basket_with_mixed_constituents_serialization() {
         ConstituentReference::MarketData { price_id, .. } => {
             assert_eq!(price_id.as_str(), "AAPL");
         }
-        _ => panic!("Expected MarketData constituent"),
+        ConstituentReference::Instrument(_) => panic!("Expected MarketData constituent"),
     }
 
     // Verify second constituent is Instrument
@@ -1450,7 +1449,7 @@ fn test_basket_with_mixed_constituents_serialization() {
             }
             _ => panic!("Expected Bond instrument"),
         },
-        _ => panic!("Expected Instrument constituent"),
+        ConstituentReference::MarketData { .. } => panic!("Expected Instrument constituent"),
     }
 }
 
@@ -1471,7 +1470,7 @@ fn test_constituent_reference_market_data_roundtrip() {
         ConstituentReference::MarketData { price_id, .. } => {
             assert_eq!(price_id.as_str(), "AAPL-SPOT");
         }
-        _ => panic!("Expected MarketData variant"),
+        ConstituentReference::Instrument(_) => panic!("Expected MarketData variant"),
     }
 }
 
@@ -1503,7 +1502,7 @@ fn test_constituent_reference_instrument_roundtrip() {
             }
             _ => panic!("Expected Bond instrument"),
         },
-        _ => panic!("Expected Instrument variant"),
+        ConstituentReference::MarketData { .. } => panic!("Expected Instrument variant"),
     }
 }
 

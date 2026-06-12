@@ -1,3 +1,5 @@
+//! Spec validation test tests for scenarios.
+
 use finstack_core::currency::Currency;
 use finstack_core::market_data::hierarchy::ResolutionMode;
 use finstack_scenarios::{

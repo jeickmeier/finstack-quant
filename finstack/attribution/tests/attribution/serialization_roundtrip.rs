@@ -491,9 +491,7 @@ fn test_model_params_snapshot_convertible_roundtrip() {
         dilution_events: Vec::new(),
     };
 
-    let snapshot = ModelParamsSnapshot::Convertible {
-        conversion_spec: conversion_spec.clone(),
-    };
+    let snapshot = ModelParamsSnapshot::Convertible { conversion_spec };
 
     let json = serde_json::to_string(&snapshot).unwrap();
     let deserialized: ModelParamsSnapshot = serde_json::from_str(&json).unwrap();

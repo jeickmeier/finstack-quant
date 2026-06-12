@@ -95,7 +95,7 @@ fn test_fx_equity_curve_combo() {
                 "Equity should be shocked"
             );
         }
-        _ => panic!("Expected Price"),
+        MarketScalar::Unitless(_) => panic!("Expected Price"),
     }
 
     let curve = market.get_discount("USD_SOFR").unwrap();
@@ -179,7 +179,7 @@ fn test_statements_rate_bindings_curve() {
         AmountOrScalar::Scalar(s) => {
             assert!((s - 1100.0).abs() < 1e-6);
         }
-        _ => panic!("Expected scalar"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
 
     // Verify rate was updated from curve
@@ -189,7 +189,7 @@ fn test_statements_rate_bindings_curve() {
         AmountOrScalar::Scalar(s) => {
             assert!(*s > 0.02, "Rate should be updated from shocked curve");
         }
-        _ => panic!("Expected scalar"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
 }
 
@@ -243,7 +243,7 @@ fn test_time_roll_with_market_shocks() {
         MarketScalar::Price(money) => {
             assert!((money.amount() - 360.0).abs() < 1e-6);
         }
-        _ => panic!("Expected Price"),
+        MarketScalar::Unitless(_) => panic!("Expected Price"),
     }
 }
 
@@ -428,7 +428,7 @@ fn test_multiple_statement_operations() {
         AmountOrScalar::Scalar(s) => {
             assert!((s - 1150.0).abs() < 1e-6);
         }
-        _ => panic!("Expected scalar"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
 
     let cost = model.get_node("Cost").unwrap();
@@ -437,6 +437,6 @@ fn test_multiple_statement_operations() {
         AmountOrScalar::Scalar(s) => {
             assert!((s - 648.0).abs() < 1e-6);
         }
-        _ => panic!("Expected scalar"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
 }

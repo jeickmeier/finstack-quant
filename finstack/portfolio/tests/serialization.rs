@@ -1,3 +1,5 @@
+//! Serialization tests for portfolio.
+
 mod common;
 
 use common::*;

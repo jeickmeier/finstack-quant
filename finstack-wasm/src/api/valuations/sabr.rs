@@ -19,12 +19,14 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(js_name = SabrParameters)]
 pub struct WasmSabrParameters {
     #[wasm_bindgen(skip)]
+    /// Underlying Rust value (not exposed to JS).
     pub inner: SABRParameters,
 }
 
 #[wasm_bindgen(js_class = SabrParameters)]
 impl WasmSabrParameters {
     #[wasm_bindgen(constructor)]
+    /// Create the object from its inputs.
     pub fn new(
         alpha: f64,
         beta: f64,
@@ -41,6 +43,7 @@ impl WasmSabrParameters {
     }
 
     #[wasm_bindgen(js_name = equityDefault)]
+    /// Default SABR parameters for equity underlyings.
     pub fn equity_default() -> WasmSabrParameters {
         Self {
             inner: SABRParameters::equity_default(),
@@ -48,6 +51,7 @@ impl WasmSabrParameters {
     }
 
     #[wasm_bindgen(js_name = ratesDefault)]
+    /// Default SABR parameters for rates underlyings.
     pub fn rates_default() -> WasmSabrParameters {
         Self {
             inner: SABRParameters::rates_default(),
@@ -55,31 +59,37 @@ impl WasmSabrParameters {
     }
 
     #[wasm_bindgen(getter)]
+    /// SABR `alpha` (ATM volatility level).
     pub fn alpha(&self) -> f64 {
         self.inner.alpha
     }
 
     #[wasm_bindgen(getter)]
+    /// SABR `beta` (backbone exponent).
     pub fn beta(&self) -> f64 {
         self.inner.beta
     }
 
     #[wasm_bindgen(getter)]
+    /// SABR `nu` (vol-of-vol).
     pub fn nu(&self) -> f64 {
         self.inner.nu
     }
 
     #[wasm_bindgen(getter)]
+    /// SABR `rho` (spot/vol correlation).
     pub fn rho(&self) -> f64 {
         self.inner.rho
     }
 
     #[wasm_bindgen(getter)]
+    /// Displacement applied for shifted SABR, if any.
     pub fn shift(&self) -> Option<f64> {
         self.inner.shift
     }
 
     #[wasm_bindgen(js_name = isShifted)]
+    /// Whether a displacement (shift) is configured.
     pub fn is_shifted(&self) -> bool {
         self.inner.is_shifted()
     }
@@ -104,6 +114,7 @@ pub struct WasmSabrModel {
 #[wasm_bindgen(js_class = SabrModel)]
 impl WasmSabrModel {
     #[wasm_bindgen(constructor)]
+    /// Create the object from its inputs.
     pub fn new(params: &WasmSabrParameters) -> WasmSabrModel {
         Self {
             inner: SABRModel::new(params.clone_inner()),
@@ -111,6 +122,7 @@ impl WasmSabrModel {
     }
 
     #[wasm_bindgen(js_name = impliedVol)]
+    /// Black implied volatility for the given strike.
     pub fn implied_vol(&self, forward: f64, strike: f64, t: f64) -> Result<f64, JsValue> {
         self.inner
             .implied_volatility(forward, strike, t)
@@ -126,6 +138,7 @@ impl WasmSabrModel {
     }
 
     #[wasm_bindgen(js_name = supportsNegativeRates)]
+    /// Whether the parameterization admits negative forwards.
     pub fn supports_negative_rates(&self) -> bool {
         self.inner.supports_negative_rates()
     }
@@ -144,6 +157,7 @@ pub struct WasmSabrSmile {
 #[wasm_bindgen(js_class = SabrSmile)]
 impl WasmSabrSmile {
     #[wasm_bindgen(constructor)]
+    /// Create the object from its inputs.
     pub fn new(params: &WasmSabrParameters, forward: f64, t: f64) -> WasmSabrSmile {
         let model = SABRModel::new(params.clone_inner());
         Self {
@@ -152,11 +166,13 @@ impl WasmSabrSmile {
     }
 
     #[wasm_bindgen(js_name = atmVol)]
+    /// At-the-money implied volatility.
     pub fn atm_vol(&self) -> Result<f64, JsValue> {
         self.inner.atm_vol().map_err(to_js_err)
     }
 
     #[wasm_bindgen(js_name = impliedVol)]
+    /// Black implied volatility for the given strike.
     pub fn implied_vol(&self, strike: f64) -> Result<f64, JsValue> {
         self.inner
             .generate_smile(&[strike])
@@ -165,6 +181,7 @@ impl WasmSabrSmile {
     }
 
     #[wasm_bindgen(js_name = generateSmile)]
+    /// Implied volatilities for a strike grid.
     pub fn generate_smile(&self, strikes: Vec<f64>) -> Result<Vec<f64>, JsValue> {
         self.inner.generate_smile(&strikes).map_err(to_js_err)
     }
@@ -232,6 +249,7 @@ pub struct WasmSabrCalibrator {
 #[wasm_bindgen(js_class = SabrCalibrator)]
 impl WasmSabrCalibrator {
     #[wasm_bindgen(constructor)]
+    /// Create the object from its inputs.
     pub fn new() -> WasmSabrCalibrator {
         Self {
             inner: SABRCalibrator::new(),
@@ -239,6 +257,7 @@ impl WasmSabrCalibrator {
     }
 
     #[wasm_bindgen(js_name = highPrecision)]
+    /// Calibrator preset with tighter convergence tolerances.
     pub fn high_precision() -> WasmSabrCalibrator {
         Self {
             inner: SABRCalibrator::high_precision(),

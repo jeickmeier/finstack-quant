@@ -330,7 +330,7 @@ fn threshold_test_maximum() {
     let test = ThresholdTest::Maximum(5.0);
     match test {
         ThresholdTest::Maximum(v) => assert_eq!(v, 5.0),
-        _ => panic!("Expected Maximum variant"),
+        ThresholdTest::Minimum(_) => panic!("Expected Maximum variant"),
     }
 }
 
@@ -339,6 +339,6 @@ fn threshold_test_minimum() {
     let test = ThresholdTest::Minimum(1.5);
     match test {
         ThresholdTest::Minimum(v) => assert_eq!(v, 1.5),
-        _ => panic!("Expected Minimum variant"),
+        ThresholdTest::Maximum(_) => panic!("Expected Minimum variant"),
     }
 }

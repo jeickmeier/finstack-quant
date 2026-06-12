@@ -248,9 +248,8 @@ fn test_model_params_mismatch_errors_through_instrument_hook() {
         },
     };
 
-    let err = match with_model_params(&structured_credit, &convertible_params) {
-        Ok(_) => panic!("mismatched model parameter snapshot should fail"),
-        Err(err) => err,
+    let Err(err) = with_model_params(&structured_credit, &convertible_params) else {
+        panic!("mismatched model parameter snapshot should fail")
     };
     let message = err.to_string();
 

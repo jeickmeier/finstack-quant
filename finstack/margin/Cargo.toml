@@ -19,3 +19,6 @@ tracing = { version = "0.1", default-features = false, features = ["attributes"]
 
 [dev-dependencies]
 time = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

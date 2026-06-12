@@ -361,10 +361,10 @@ impl StochasticDefaultSpec {
     pub fn correlation(&self) -> Option<f64> {
         match self {
             StochasticDefaultSpec::Deterministic(_) => None,
-            StochasticDefaultSpec::Copula { correlation, .. } => Some(*correlation),
-            StochasticDefaultSpec::IntensityProcess { correlation, .. } => Some(*correlation),
+            StochasticDefaultSpec::Copula { correlation, .. }
+            | StochasticDefaultSpec::IntensityProcess { correlation, .. }
+            | StochasticDefaultSpec::HazardCurveBased { correlation, .. } => Some(*correlation),
             StochasticDefaultSpec::FactorCorrelated { factor_loading, .. } => Some(*factor_loading),
-            StochasticDefaultSpec::HazardCurveBased { correlation, .. } => Some(*correlation),
         }
     }
 

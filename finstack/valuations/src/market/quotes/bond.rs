@@ -117,10 +117,10 @@ impl BondQuote {
     /// Get the unique identifier of the quote.
     pub fn id(&self) -> &QuoteId {
         match self {
-            BondQuote::FixedRateBulletCleanPrice { id, .. } => id,
-            BondQuote::FixedRateBulletZSpread { id, .. } => id,
-            BondQuote::FixedRateBulletOas { id, .. } => id,
-            BondQuote::FixedRateBulletYtm { id, .. } => id,
+            BondQuote::FixedRateBulletCleanPrice { id, .. }
+            | BondQuote::FixedRateBulletZSpread { id, .. }
+            | BondQuote::FixedRateBulletOas { id, .. }
+            | BondQuote::FixedRateBulletYtm { id, .. } => id,
         }
     }
 

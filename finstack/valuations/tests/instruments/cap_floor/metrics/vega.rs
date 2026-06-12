@@ -311,7 +311,7 @@ fn test_hull_white_1f_vega_is_nonzero_and_sigma_sensitive() {
         .get("vega")
         .unwrap();
 
-    let mut otm_cap_high = otm_cap.clone();
+    let mut otm_cap_high = otm_cap;
     otm_cap_high.pricing_overrides.model_config.hw1f_sigma = Some(0.02);
     let high_sigma_vega = *otm_cap_high
         .price_with_metrics(&market, as_of, &[MetricId::Vega], opts)

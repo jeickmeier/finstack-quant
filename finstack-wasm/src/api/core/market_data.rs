@@ -476,6 +476,30 @@ impl VolCube {
         self.inner.vol_clamped(expiry, tenor, strike)
     }
 
+    /// Normal (Bachelier) implied volatility at `(expiry, tenor, strike)`.
+    ///
+    /// The returned vol is in absolute rate units (e.g. `0.008` = 80 bp/yr
+    /// normal vol), the swaption market quoting convention.
+    ///
+    /// Returns `Err` if `expiry` or `tenor` falls outside the grid, if the
+    /// expansion yields a non-finite volatility, or for cross-zero quotes
+    /// (`(F+s)(K+s) <= 0`) with `beta > 0`, which require an explicit shift.
+    pub fn vol_normal(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64, JsValue> {
+        self.inner
+            .vol_normal(expiry, tenor, strike)
+            .map_err(to_js_err)
+    }
+
+    /// Normal (Bachelier) implied volatility with clamped extrapolation.
+    ///
+    /// Clamps `expiry` and `tenor` to the grid edges; a degenerate expansion
+    /// is floored to a small positive normal vol (absolute rate units).
+    /// Never returns `Err` and never returns a non-finite or non-positive
+    /// value.
+    pub fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
+        self.inner.vol_normal_clamped(expiry, tenor, strike)
+    }
+
     /// Cube identifier.
     #[wasm_bindgen(getter, js_name = id)]
     pub fn id(&self) -> String {

@@ -38,17 +38,10 @@ impl MetricCalculator for GammaCalculator {
         let strike = option.strike_f64()?;
 
         // Use consolidated helper to get pre-computed inputs
-        let inputs = match option.greek_inputs(&context.curves, context.as_of)? {
-            Some(inputs) => inputs,
-            None => return Ok(0.0), // Option expired
-        };
-
-        if inputs.sigma <= 0.0 {
+        let Some(inputs) = option.greek_inputs(&context.curves, context.as_of)? else {
             return Ok(0.0);
-        }
-
-        // Near-expiry guard: gamma is undefined/infinite as T -> 0.
-        // For vanilla options, return 0 when within ~1 business day of expiry.
+        }; // Near-expiry guard: gamma is undefined/infinite as T -> 0.
+           // For vanilla options, return 0 when within ~1 business day of expiry.
         if inputs.time_to_expiry < EXPIRY_THRESHOLD {
             return Ok(0.0);
         }

@@ -47,9 +47,8 @@ impl MetricCalculator for Cs01Calculator {
 
         let bump_bp = 1.0;
 
-        let curve_to_bump = match &bond.credit_curve_id {
-            Some(id) => id,
-            None => return Ok(0.0),
+        let Some(curve_to_bump) = &bond.credit_curve_id else {
+            return Ok(0.0);
         };
 
         let curves_up = bump_discount_curve_parallel(&context.curves, curve_to_bump, bump_bp)?;
@@ -104,9 +103,8 @@ impl MetricCalculator for BucketedCs01Calculator {
         if as_of >= maturity {
             return Ok(0.0);
         }
-        let curve_id = match credit_curve_id {
-            Some(id) => id,
-            None => return Ok(0.0),
+        let Some(curve_id) = credit_curve_id else {
+            return Ok(0.0);
         };
 
         let bump_bp = 1.0;

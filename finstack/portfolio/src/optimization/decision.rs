@@ -188,7 +188,7 @@ pub(crate) fn build_decision_space(
                 candidate.id.clone(),
                 "CANDIDATE_POOL",
                 candidate.instrument.id(),
-                candidate.instrument.clone(),
+                std::sync::Arc::clone(&candidate.instrument),
                 1.0, // Quantity 1.0 for unit pricing
                 candidate.unit,
             )

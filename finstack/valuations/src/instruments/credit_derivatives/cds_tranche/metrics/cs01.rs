@@ -86,7 +86,7 @@ impl MetricCalculator for CdsTrancheCs01Calculator {
                 .credit_spread_bump_bp;
 
         let index_data = context.curves.get_credit_index(&tranche.credit_index_id)?;
-        let credit_index_id = tranche.credit_index_id.clone();
+        let credit_index_id = tranche.credit_index_id;
         let hazard_id_for_reval = hazard_id.clone();
         let inst_arc = Arc::clone(&context.instrument);
         let (model, registry) = context.clone_pricer_dispatch();
@@ -173,7 +173,7 @@ impl MetricCalculator for CdsTrancheBucketedCs01Calculator {
         let bump_bp = defaults.credit_spread_bump_bp;
 
         let index_data = context.curves.get_credit_index(&tranche.credit_index_id)?;
-        let credit_index_id = tranche.credit_index_id.clone();
+        let credit_index_id = tranche.credit_index_id;
         let hazard_id_for_reval = hazard_id.clone();
         let inst_arc = Arc::clone(&context.instrument);
         let (model, registry) = context.clone_pricer_dispatch();

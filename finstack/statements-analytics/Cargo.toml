@@ -26,3 +26,6 @@ rayon = "1.11"
 
 [dev-dependencies]
 time = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

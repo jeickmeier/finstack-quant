@@ -420,6 +420,36 @@ impl PyVolCube {
         self.inner.vol_clamped(expiry, tenor, strike)
     }
 
+    /// Normal (Bachelier) implied volatility with bounds checking.
+    ///
+    /// The returned vol is in absolute rate units (e.g. ``0.008`` = 80 bp/yr
+    /// normal vol), the swaption market quoting convention. For shifted SABR
+    /// the expansion is evaluated on the shifted forward/strike.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``expiry`` or ``tenor`` falls outside the grid, if the expansion
+    ///     yields a non-finite volatility, or for cross-zero quotes
+    ///     (``(F+s)(K+s) <= 0``) with ``beta > 0``, which require an explicit
+    ///     shift.
+    #[pyo3(text_signature = "(self, expiry, tenor, strike)")]
+    fn vol_normal(&self, expiry: f64, tenor: f64, strike: f64) -> PyResult<f64> {
+        self.inner
+            .vol_normal(expiry, tenor, strike)
+            .map_err(core_to_py)
+    }
+
+    /// Normal (Bachelier) implied volatility with clamped extrapolation.
+    ///
+    /// Expiry and tenor are clamped to the grid edges; a degenerate expansion
+    /// is floored to a small positive normal vol (absolute rate units). Never
+    /// raises and never returns a non-finite or non-positive value.
+    #[pyo3(text_signature = "(self, expiry, tenor, strike)")]
+    fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
+        self.inner.vol_normal_clamped(expiry, tenor, strike)
+    }
+
     /// Materialize a tenor slice as a [`VolSurface`].
     #[pyo3(text_signature = "(self, tenor, strikes)")]
     fn materialize_tenor_slice(&self, tenor: f64, strikes: Vec<f64>) -> PyResult<PyVolSurface> {
@@ -430,12 +460,46 @@ impl PyVolCube {
         Ok(PyVolSurface::from_inner(Arc::new(surface)))
     }
 
+    /// Materialize a tenor slice as a normal-vol (Bachelier) [`VolSurface`].
+    ///
+    /// Vols are in absolute rate units and the resulting surface is tagged
+    /// with the normal quote type.
+    #[pyo3(text_signature = "(self, tenor, strikes)")]
+    fn materialize_tenor_slice_normal(
+        &self,
+        tenor: f64,
+        strikes: Vec<f64>,
+    ) -> PyResult<PyVolSurface> {
+        let surface = self
+            .inner
+            .materialize_tenor_slice_normal(tenor, &strikes)
+            .map_err(core_to_py)?;
+        Ok(PyVolSurface::from_inner(Arc::new(surface)))
+    }
+
     /// Materialize an expiry slice as a [`VolSurface`].
     #[pyo3(text_signature = "(self, expiry, strikes)")]
     fn materialize_expiry_slice(&self, expiry: f64, strikes: Vec<f64>) -> PyResult<PyVolSurface> {
         let surface = self
             .inner
             .materialize_expiry_slice(expiry, &strikes)
+            .map_err(core_to_py)?;
+        Ok(PyVolSurface::from_inner(Arc::new(surface)))
+    }
+
+    /// Materialize an expiry slice as a normal-vol (Bachelier) [`VolSurface`].
+    ///
+    /// Vols are in absolute rate units and the resulting surface is tagged
+    /// with the normal quote type.
+    #[pyo3(text_signature = "(self, expiry, strikes)")]
+    fn materialize_expiry_slice_normal(
+        &self,
+        expiry: f64,
+        strikes: Vec<f64>,
+    ) -> PyResult<PyVolSurface> {
+        let surface = self
+            .inner
+            .materialize_expiry_slice_normal(expiry, &strikes)
             .map_err(core_to_py)?;
         Ok(PyVolSurface::from_inner(Arc::new(surface)))
     }

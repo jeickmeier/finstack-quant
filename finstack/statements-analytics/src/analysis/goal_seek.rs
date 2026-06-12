@@ -180,9 +180,8 @@ pub fn goal_seek(
         .unwrap_or(1.0); // Default initial guess (see rationale above)
 
     let mut evaluator = Evaluator::new();
-    let prepared = match evaluator.prepare(model) {
-        Ok(p) => p,
-        Err(_) => return Err(Error::eval("Goal seek: failed to prepare evaluator")),
+    let Ok(prepared) = evaluator.prepare(model) else {
+        return Err(Error::eval("Goal seek: failed to prepare evaluator"));
     };
     let eval_cell = RefCell::new((evaluator, model.clone()));
 

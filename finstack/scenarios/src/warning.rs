@@ -215,7 +215,9 @@ impl fmt::Display for Warning {
                 target = if *node { "at the targeted pillars" } else { "at each pillar" },
             ),
             Warning::DiscountCurveHeuristic { reason, .. } => f.write_str(reason),
-            Warning::CommodityShockOutsideRange { detail, .. } => f.write_str(detail),
+            Warning::CommodityShockOutsideRange { detail, .. }
+            | Warning::FxTriangulationInconsistent { detail }
+            | Warning::TenorExtrapolated { detail, .. } => f.write_str(detail),
             Warning::EquityNotFound { id } => write!(f, "Equity {id}: not found in market data"),
             Warning::RateBindingNoForecastValues { node_id, curve_id } => write!(
                 f,
@@ -239,7 +241,6 @@ impl fmt::Display for Warning {
             Warning::ModelReevaluationFailed { reason } => {
                 write!(f, "Model re-evaluation: {reason}")
             }
-            Warning::FxTriangulationInconsistent { detail } => f.write_str(detail),
             Warning::InstrumentShockFallback {
                 shock_kind,
                 inst_type,
@@ -268,7 +269,6 @@ impl fmt::Display for Warning {
                 instrument_id,
                 detail,
             } => write!(f, "Correlation bump for '{instrument_id}': {detail}"),
-            Warning::TenorExtrapolated { detail, .. } => f.write_str(detail),
             Warning::BaseCorrBucketNoMatch { surface_id } => {
                 write!(f, "BaseCorrBucketPts on {surface_id} matched no detachment buckets")
             }

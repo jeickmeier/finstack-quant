@@ -75,7 +75,7 @@ fn test_goal_seek_with_update() {
         AmountOrScalar::Scalar(s) => {
             assert!((*s - 125_000.0).abs() < 1.0);
         }
-        _ => panic!("Expected scalar value"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar value"),
     }
 }
 

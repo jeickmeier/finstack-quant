@@ -182,7 +182,7 @@ fn test_time_to_maturity_and_implied_collateral_return() {
     let ctx = create_test_context();
     let pv = repo.value(&ctx, as_of).expect("should succeed");
     let mut mctx = crate::metrics::MetricContext::new(
-        std::sync::Arc::new(repo.clone()),
+        std::sync::Arc::new(repo),
         std::sync::Arc::new(ctx),
         as_of,
         pv,

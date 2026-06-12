@@ -194,7 +194,7 @@ impl ParametricCurveTarget {
                 base_date: schema_params.base_date,
                 curve_id: schema_params.curve_id.clone(),
                 variant: schema_params.model,
-                initial_params: initial_params.clone(),
+                initial_params,
                 base_context: context.clone(),
                 residual_notional,
             },

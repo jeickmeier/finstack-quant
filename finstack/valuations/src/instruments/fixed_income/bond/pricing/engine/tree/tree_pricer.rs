@@ -674,16 +674,13 @@ impl TreePricer {
             calibrate_hull_white_to_swaptions, SwapFrequency, SwaptionQuote,
         };
 
-        let surface = match market_context.get_surface(swaption_vol_surface_id) {
-            Ok(s) => s,
-            Err(_) => {
-                tracing::warn!(
-                    surface_id = swaption_vol_surface_id,
-                    "Swaption vol surface not found in market context; \
-                     falling back to HoLee tree model"
-                );
-                return TreeModelChoice::HoLee;
-            }
+        let Ok(surface) = market_context.get_surface(swaption_vol_surface_id) else {
+            tracing::warn!(
+                surface_id = swaption_vol_surface_id,
+                "Swaption vol surface not found in market context; \
+                 falling back to HoLee tree model"
+            );
+            return TreeModelChoice::HoLee;
         };
 
         // Build SwaptionQuote list from the surface grid.
@@ -724,7 +721,7 @@ impl TreePricer {
             return TreeModelChoice::HoLee;
         }
 
-        let dc = discount_curve.clone();
+        let dc = std::sync::Arc::clone(discount_curve);
         let df_fn = move |t: f64| dc.df(t);
 
         match calibrate_hull_white_to_swaptions(&df_fn, &quotes, SwapFrequency::SemiAnnual, None) {

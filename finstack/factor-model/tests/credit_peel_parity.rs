@@ -1,3 +1,5 @@
+//! Regression coverage for credit peel calibration and decomposition parity.
+
 use std::collections::BTreeMap;
 
 use finstack_core::dates::create_date;
@@ -32,7 +34,7 @@ fn calibrated_anchor_matches_decompose_levels_for_single_level_case() {
     let mut spreads = BTreeMap::new();
     spreads.insert(issuer.clone(), vec![Some(100.0), Some(110.0), Some(120.0)]);
     let mut asof_spreads = BTreeMap::new();
-    asof_spreads.insert(issuer.clone(), 120.0);
+    asof_spreads.insert(issuer, 120.0);
     let config = CreditCalibrationConfig {
         policy: IssuerBetaPolicy::GloballyOff,
         hierarchy,

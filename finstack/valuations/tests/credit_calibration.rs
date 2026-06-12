@@ -162,7 +162,7 @@ fn calibration_is_bit_identical_for_same_inputs() {
         min_bucket_size_per_level: BucketSizeThresholds {
             per_level: vec![1, 1],
         },
-        ..cfg.clone()
+        ..cfg
     };
     let cfg_b = cfg_a.clone();
 
@@ -516,7 +516,7 @@ fn sparse_bucket_emits_none_for_empty_dates() {
     spreads.insert(ig_id.clone(), ig_series);
     let mut ig_tags_map = BTreeMap::new();
     ig_tags_map.insert("rating".to_owned(), "IG".to_owned());
-    issuer_tags_map.insert(ig_id.clone(), IssuerTags(ig_tags_map));
+    issuer_tags_map.insert(ig_id, IssuerTags(ig_tags_map));
 
     // HY series: fully observed.
     let hy_series: Vec<Option<f64>> = (0..n)
@@ -526,7 +526,7 @@ fn sparse_bucket_emits_none_for_empty_dates() {
     spreads.insert(hy_id.clone(), hy_series);
     let mut hy_tags_map = BTreeMap::new();
     hy_tags_map.insert("rating".to_owned(), "HY".to_owned());
-    issuer_tags_map.insert(hy_id.clone(), IssuerTags(hy_tags_map));
+    issuer_tags_map.insert(hy_id, IssuerTags(hy_tags_map));
 
     let inputs = CreditCalibrationInputs {
         history_panel: HistoryPanel { dates, spreads },
@@ -880,7 +880,7 @@ fn bucket_only_uses_peer_proxy_at_deepest_level() {
     let mut overrides = BTreeMap::new();
     overrides.insert(IssuerId::new("PEER-1"), IssuerBetaOverride::ForceIssuerBeta);
     overrides.insert(IssuerId::new("PEER-2"), IssuerBetaOverride::ForceIssuerBeta);
-    overrides.insert(x_id.clone(), IssuerBetaOverride::ForceBucketOnly);
+    overrides.insert(x_id, IssuerBetaOverride::ForceBucketOnly);
 
     let policy = IssuerBetaPolicy::Dynamic {
         min_history: 12,
@@ -1016,7 +1016,7 @@ fn bucket_peer_proxy_falls_back_to_parent() {
         IssuerId::new("PEER-EU-2"),
         IssuerBetaOverride::ForceIssuerBeta,
     );
-    overrides.insert(x_id.clone(), IssuerBetaOverride::ForceBucketOnly);
+    overrides.insert(x_id, IssuerBetaOverride::ForceBucketOnly);
 
     let policy = IssuerBetaPolicy::Dynamic {
         min_history: 12,
@@ -1147,7 +1147,7 @@ fn peer_proxy_cascade_falls_back_to_global() {
         IssuerId::new("IG-PEER-2"),
         IssuerBetaOverride::ForceIssuerBeta,
     );
-    overrides.insert(x_id.clone(), IssuerBetaOverride::ForceBucketOnly);
+    overrides.insert(x_id, IssuerBetaOverride::ForceBucketOnly);
 
     let policy = IssuerBetaPolicy::Dynamic {
         min_history: 12,

@@ -90,7 +90,7 @@ fn linear_vs_step_parity() {
     let _ = b2
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::StepRemaining { schedule: pairs })
-        .fixed_cf(fixed.clone());
+        .fixed_cf(fixed);
     let s2 = b2.build_with_curves(None).unwrap();
 
     assert_eq!(s1.flows.len(), s2.flows.len());
@@ -125,7 +125,7 @@ fn pik_capitalization_increases_outstanding() {
     };
 
     let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
+    let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let s = b.build_with_curves(None).unwrap();
     let path = s.outstanding_path_per_flow().unwrap();
     // Find last outstanding before redemption
@@ -241,7 +241,7 @@ fn ordering_invariants_within_date() {
     let _ = b
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 })
-        .fixed_cf(fixed.clone());
+        .fixed_cf(fixed);
     let s = b.build_with_curves(None).unwrap();
 
     // On coupon dates where multiple flows exist, enforce order: Fixed/Stub -> Amortization -> PIK -> Notional
@@ -288,7 +288,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
     let init = Money::new(1_000_000.0, Currency::USD);
 
     let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
+    let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build_with_curves(None).unwrap();
 
     // Use a flat DF=1.0 curve for this test (testing NPV = sum when no discounting)
@@ -347,7 +347,7 @@ fn detects_stub_periods() {
     let init = Money::new(1_000_000.0, Currency::USD);
 
     let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
+    let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build_with_curves(None).unwrap();
 
     // Find coupon flows (not notional)
@@ -395,7 +395,7 @@ fn outstanding_by_date_dedup_and_values() {
     let _ = b
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 })
-        .fixed_cf(fixed.clone());
+        .fixed_cf(fixed);
     let s = b.build_with_curves(None).unwrap();
 
     let end_by_date = s.outstanding_by_date().unwrap();
@@ -756,7 +756,7 @@ fn npv_golden_value_with_realistic_discount_curve() {
     let init = Money::new(1_000_000.0, Currency::USD);
 
     let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
+    let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build_with_curves(None).unwrap();
 
     // Count positive and negative flows to understand structure
@@ -878,7 +878,7 @@ fn coupon_amount_golden_values() {
     let init = Money::new(1_000_000.0, Currency::USD);
 
     let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
+    let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build_with_curves(None).unwrap();
 
     // Find coupon flows
@@ -1090,7 +1090,7 @@ fn npv_decreases_with_higher_discount_rate() {
     let init = Money::new(1_000_000.0, Currency::USD);
 
     let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
+    let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let schedule = b.build_with_curves(None).unwrap();
 
     // Build curves at different rates

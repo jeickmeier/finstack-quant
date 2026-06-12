@@ -94,7 +94,7 @@ fn test_accrued_interest_semi_annual_bond() -> Result<(), Box<dyn std::error::Er
 
     let mut instruments: IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =
         IndexMap::new();
-    instruments.insert("BOND-AUDIT".to_string(), Arc::new(bond.clone()));
+    instruments.insert("BOND-AUDIT".to_string(), Arc::new(bond));
 
     // 4. Run Aggregation
     let spec = CapitalStructureSpec {

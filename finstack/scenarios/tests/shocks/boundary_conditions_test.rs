@@ -51,7 +51,7 @@ fn test_zero_percent_shock() {
         MarketScalar::Price(money) => {
             assert!((money.amount() - 400.0).abs() < 1e-6);
         }
-        _ => panic!("Expected Price"),
+        MarketScalar::Unitless(_) => panic!("Expected Price"),
     }
 }
 
@@ -92,7 +92,7 @@ fn test_negative_shock() {
         MarketScalar::Price(money) => {
             assert!((money.amount() - 50.0).abs() < 1e-6);
         }
-        _ => panic!("Expected Price"),
+        MarketScalar::Unitless(_) => panic!("Expected Price"),
     }
 }
 
@@ -133,7 +133,7 @@ fn test_very_large_shock() {
         MarketScalar::Price(money) => {
             assert!((money.amount() - 600.0).abs() < 1e-6);
         }
-        _ => panic!("Expected Price"),
+        MarketScalar::Unitless(_) => panic!("Expected Price"),
     }
 }
 
@@ -413,7 +413,7 @@ fn test_statement_shock_negative_percent() {
         AmountOrScalar::Scalar(s) => {
             assert!((s - 70.0).abs() < 1e-6);
         }
-        _ => panic!("Expected scalar"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
 }
 
@@ -498,6 +498,6 @@ fn test_statement_assign_extreme_value() {
         AmountOrScalar::Scalar(s) => {
             assert!((s - 1_000_000_000.0).abs() < 1e-6);
         }
-        _ => panic!("Expected scalar"),
+        AmountOrScalar::Amount(_) => panic!("Expected scalar"),
     }
 }

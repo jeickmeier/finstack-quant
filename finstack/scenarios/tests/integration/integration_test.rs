@@ -125,7 +125,7 @@ fn test_equity_price_shock() {
             let expected = 450.0 * 0.9; // -10%
             assert!((money.amount() - expected).abs() < 1e-6);
         }
-        _ => panic!("Expected Price scalar"),
+        MarketScalar::Unitless(_) => panic!("Expected Price scalar"),
     }
 }
 

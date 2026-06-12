@@ -218,9 +218,8 @@ pub fn compute_credit_factor_attribution(
         // doesn't contain that bucket (e.g. one-sided in decompose_period) the
         // contribution falls into the adder via the period's d_adder.
         for k in 0..num_levels {
-            let bucket = match model.hierarchy.bucket_path(&row.tags, k) {
-                Some(p) => p,
-                None => continue,
+            let Some(bucket) = model.hierarchy.bucket_path(&row.tags, k) else {
+                continue;
             };
             let d_level = match period.by_level[k].deltas.get(&bucket) {
                 Some(v) => *v,

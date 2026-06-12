@@ -146,13 +146,12 @@ fn test_daycount_quantlib_parity() {
         }
     }
 
-    if !failures.is_empty() {
-        panic!(
-            "QuantLib parity test failures ({}):\n{}",
-            failures.len(),
-            failures.join("\n")
-        );
-    }
+    assert!(
+        failures.is_empty(),
+        "QuantLib parity test failures ({}):\n{}",
+        failures.len(),
+        failures.join("\n")
+    )
 }
 
 /// Test a single day count convention.

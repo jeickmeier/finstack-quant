@@ -131,8 +131,7 @@ impl DefaultLpOptimizer {
 
         match (val, missing_policy) {
             (Some(v), _) => Ok(v),
-            (None, MissingMetricPolicy::Zero) => Ok(0.0),
-            (None, MissingMetricPolicy::Exclude) => Ok(0.0),
+            (None, MissingMetricPolicy::Zero | MissingMetricPolicy::Exclude) => Ok(0.0),
             (None, MissingMetricPolicy::Strict) => {
                 Err(Error::invalid_input("required metric missing for position"))
             }
@@ -410,9 +409,8 @@ impl DefaultLpOptimizer {
             .find(|c| matches!(c, Constraint::MaxTurnover { .. }))
         {
             for (idx, w_var) in w_vars.iter().enumerate() {
-                let t_var = match t_vars[idx] {
-                    Some(v) => v,
-                    None => continue,
+                let Some(t_var) = t_vars[idx] else {
+                    continue;
                 };
                 let w0 = current_weights
                     .get(&decision_items[idx].position_id)

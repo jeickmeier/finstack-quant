@@ -249,7 +249,6 @@ pub(crate) fn collect_expression_values_sorted(
 ) -> Result<Rc<BTreeMap<PeriodId, f64>>> {
     match &expr.node {
         ExprNode::Column(name) => return collect_historical_values_sorted(name, context),
-        ExprNode::CSRef { .. } => {}
         ExprNode::Literal(value) => {
             let mut values = BTreeMap::new();
             for period in context.historical_results.keys() {
@@ -348,7 +347,6 @@ pub(crate) fn collect_expression_window_values(
         ExprNode::Column(name) => {
             return collect_rolling_window_values(name, context, window_size);
         }
-        ExprNode::CSRef { .. } => {}
         ExprNode::Literal(value) => {
             let total = context.historical_results.len() + 1;
             return Ok(vec![*value; window_size.min(total)]);
@@ -565,7 +563,7 @@ mod tests {
             accrued_interest: Money::new(0.0, Currency::USD),
         };
         let mut totals = IndexMap::new();
-        totals.insert(period, breakdown.clone());
+        totals.insert(period, breakdown);
         snapshot.totals = totals.clone();
         snapshot.totals_by_currency.insert(Currency::USD, totals);
         snapshot.reporting_currency = Some(Currency::USD);

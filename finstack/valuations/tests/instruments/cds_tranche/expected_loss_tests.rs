@@ -185,21 +185,19 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_identical() {
     let mut issuer_curves = finstack_core::HashMap::default();
     for i in 0..10 {
         let id = format!("ISSUER-{:03}", i + 1);
-        issuer_curves.insert(id, index_data.index_credit_curve.clone());
+        issuer_curves.insert(id, std::sync::Arc::clone(&index_data.index_credit_curve));
     }
 
     let hetero_index = finstack_core::market_data::term_structures::CreditIndexData::builder()
         .num_constituents(10)
         .recovery_rate(index_data.recovery_rate)
-        .index_credit_curve(index_data.index_credit_curve.clone())
-        .base_correlation_curve(index_data.base_correlation_curve.clone())
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
         .issuer_curves(issuer_curves)
         .build()
         .unwrap();
 
-    let hetero_market = base_market
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", hetero_index);
+    let hetero_market = base_market.insert_credit_index("CDX.NA.IG.42", hetero_index);
 
     let mut homo_config = CDSTranchePricerConfig::default();
     homo_config.use_issuer_curves = false;

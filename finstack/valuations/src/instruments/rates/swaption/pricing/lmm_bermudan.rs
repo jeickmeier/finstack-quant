@@ -760,7 +760,7 @@ mod tests {
         };
         let oos = LmmBermudanConfig {
             oos_lsmc: true,
-            ..base.clone()
+            ..base
         };
 
         let in_sample = price_bermudan_lmm(

@@ -395,7 +395,7 @@ fn test_node_id_clone_and_hash() {
     assert_eq!(id1, id2);
 
     let mut set = HashSet::new();
-    set.insert(id1.clone());
+    set.insert(id1);
     assert!(set.contains(&id2));
 }
 

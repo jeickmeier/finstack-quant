@@ -27,3 +27,6 @@ rust_decimal_macros = { workspace = true }
 [[bench]]
 name = "cashflow_hot_paths"
 harness = false
+
+[lints]
+workspace = true

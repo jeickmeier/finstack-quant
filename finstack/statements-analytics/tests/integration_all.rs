@@ -1,3 +1,5 @@
+//! Integration all tests for statements-analytics.
+
 // Integration tests for analytics components.
 //
 // Note: Cargo only discovers integration tests that are direct children of `tests/`.

@@ -75,7 +75,7 @@ fn explain_uses_stamped_rounding_context() {
         as_of_t1,
         AttributionMethod::Parallel,
     );
-    attr.meta.rounding = rounding.clone();
+    attr.meta.rounding = rounding;
 
     // Set non-zero components to exercise formatting paths
     attr.carry = Money::new(10.0, Currency::USD);

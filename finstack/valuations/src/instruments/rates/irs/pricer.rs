@@ -339,7 +339,7 @@ mod tests {
     use crate::instruments::common_impl::pricing::swap_legs::add_payment_delay;
     use crate::instruments::common_impl::traits::Instrument;
     use crate::instruments::rates::irs::cashflow::full_signed_schedule_with_curves;
-    use finstack_core::cashflow::CFKind;
+
     use finstack_core::currency::Currency;
     use finstack_core::dates::DayCountContext;
     use finstack_core::market_data::context::MarketContext;
@@ -385,11 +385,7 @@ mod tests {
         let disc = ctx.get_discount(swap.fixed.discount_curve_id.as_ref())?;
         let schedule = full_signed_schedule_with_curves(swap, Some(ctx))?;
         schedule.flows.iter().try_fold(0.0, |acc, flow| {
-            let payment_date = match flow.kind {
-                CFKind::Fixed | CFKind::Stub => flow.date,
-                CFKind::FloatReset => flow.date,
-                _ => flow.date,
-            };
+            let payment_date = flow.date;
             let df = disc.df_between_dates(as_of, payment_date)?;
             Ok(acc + flow.amount.amount() * df)
         })
@@ -463,8 +459,8 @@ mod tests {
             )
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
-                    discount_curve_id: disc_id.clone(),
-                    forward_curve_id: fwd_id.clone(),
+                    discount_curve_id: disc_id,
+                    forward_curve_id: fwd_id,
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: Tenor::monthly(),
                     day_count: DayCount::Act360,
@@ -552,7 +548,7 @@ mod tests {
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
-                    forward_curve_id: disc_id.clone(), // single-curve: same id as discount
+                    forward_curve_id: disc_id, // single-curve: same id as discount
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: finstack_core::dates::Tenor::quarterly(),
                     day_count: finstack_core::dates::DayCount::Act360,
@@ -640,7 +636,7 @@ mod tests {
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
-                    forward_curve_id: disc_id.clone(),
+                    forward_curve_id: disc_id,
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: finstack_core::dates::Tenor::quarterly(),
                     day_count: finstack_core::dates::DayCount::Act360,
@@ -721,7 +717,7 @@ mod tests {
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
-                    forward_curve_id: disc_id.clone(),
+                    forward_curve_id: disc_id,
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: finstack_core::dates::Tenor::quarterly(),
                     day_count: finstack_core::dates::DayCount::Act360,
@@ -807,7 +803,7 @@ mod tests {
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
-                    forward_curve_id: disc_id.clone(),
+                    forward_curve_id: disc_id,
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: Tenor::quarterly(),
                     day_count: DayCount::Act360,
@@ -880,7 +876,7 @@ mod tests {
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
-                    forward_curve_id: disc_id.clone(),
+                    forward_curve_id: disc_id,
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: Tenor::quarterly(),
                     day_count: DayCount::Act360,
@@ -972,8 +968,8 @@ mod tests {
             )
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
-                    discount_curve_id: disc_id.clone(),
-                    forward_curve_id: fwd_id.clone(),
+                    discount_curve_id: disc_id,
+                    forward_curve_id: fwd_id,
                     spread_bp: rust_decimal::Decimal::ZERO,
                     frequency: Tenor::monthly(),
                     day_count: DayCount::Act360,
@@ -1062,7 +1058,7 @@ mod tests {
             .float(
                 crate::instruments::common_impl::parameters::legs::FloatLegSpec {
                     discount_curve_id: disc_id.clone(),
-                    forward_curve_id: disc_id.clone(), // Single-curve: forward = discount
+                    forward_curve_id: disc_id, // Single-curve: forward = discount
                     spread_bp: rust_decimal::Decimal::ZERO, // No spread
                     frequency: Tenor::quarterly(),
                     day_count: DayCount::Act360,

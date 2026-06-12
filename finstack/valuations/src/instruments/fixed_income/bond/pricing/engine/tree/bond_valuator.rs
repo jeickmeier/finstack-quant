@@ -857,8 +857,7 @@ mod tests {
         assert!(has_off_grid, "test premise: an off-grid coupon must exist");
 
         let valuator =
-            BondValuator::new(bond.clone(), &market, as_of, time_to_maturity, tree_steps)
-                .expect("tree");
+            BondValuator::new(bond, &market, as_of, time_to_maturity, tree_steps).expect("tree");
 
         // PV of every step's mapped cashflow, discounted at its step time.
         let mut pv_mapped = 0.0;

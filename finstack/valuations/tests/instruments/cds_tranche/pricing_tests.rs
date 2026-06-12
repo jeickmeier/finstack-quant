@@ -125,7 +125,7 @@ fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
         .expect("explicit accrued premium");
     assert!(accrued_explicit > 0.0);
 
-    let mut missing_effective = explicit.clone();
+    let mut missing_effective = explicit;
     missing_effective.effective_date = None;
 
     let err = missing_effective

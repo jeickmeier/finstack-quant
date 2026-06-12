@@ -504,14 +504,11 @@ pub fn asw_market_with_forward_config(
         ));
     }
     let notional = bond.notional.amount();
-    let dirty = match dirty_price_ccy {
-        Some(v) => v,
-        None => {
-            return Err(finstack_core::InputError::NotFound {
-                id: "dirty_price_ccy".to_string(),
-            }
-            .into());
+    let Some(dirty) = dirty_price_ccy else {
+        return Err(finstack_core::InputError::NotFound {
+            id: "dirty_price_ccy".to_string(),
         }
+        .into());
     };
     let price_pct = dirty / notional;
     let eq_coupon = if let Some(custom) = &bond.custom_cashflows {
@@ -520,7 +517,11 @@ pub fn asw_market_with_forward_config(
     } else {
         match &bond.cashflow_spec {
             CashflowSpec::Fixed(spec) => spec.rate.to_f64().unwrap_or(0.0),
-            _ => return Err(finstack_core::InputError::Invalid.into()),
+            CashflowSpec::Floating(_)
+            | CashflowSpec::StepUp(_)
+            | CashflowSpec::Amortizing { .. } => {
+                return Err(finstack_core::InputError::Invalid.into())
+            }
         }
     };
     let par_asw = (eq_coupon * fixed_ann - float_pv) / float_ann;
@@ -599,7 +600,9 @@ impl MetricCalculator for AssetSwapParCalculator {
                     Some(spec.calendar_id.as_str()),
                     spec.stub,
                 ),
-                _ => return Err(finstack_core::InputError::Invalid.into()),
+                CashflowSpec::Amortizing { .. } => {
+                    return Err(finstack_core::InputError::Invalid.into())
+                }
             },
         };
 
@@ -817,7 +820,9 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                     spec.bdc,
                     Some(spec.calendar_id.as_str()),
                 ),
-                _ => return Err(finstack_core::InputError::Invalid.into()),
+                CashflowSpec::Amortizing { .. } => {
+                    return Err(finstack_core::InputError::Invalid.into())
+                }
             },
         };
         let freq = self.config.fixed_leg_frequency.unwrap_or(bond_freq);

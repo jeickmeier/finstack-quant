@@ -754,9 +754,7 @@ mod cs_gamma_consistency {
 
         // CS-Gamma at base spreads.
         let (disc, hazard_base) = build_curves_with_par_spreads(0.0);
-        let market_base = MarketContext::new()
-            .insert(disc.clone())
-            .insert(hazard_base);
+        let market_base = MarketContext::new().insert(disc).insert(hazard_base);
         let cs_gamma = compute_metric(&cds, &market_base, as_of, MetricId::CsGamma);
 
         // CS01 at spreads shifted +5bp / −5bp.

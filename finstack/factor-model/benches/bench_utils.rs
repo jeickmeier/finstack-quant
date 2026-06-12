@@ -1,3 +1,5 @@
+//! Shared Criterion helpers for factor-model benchmarks.
+
 use criterion::{measurement::WallTime, BenchmarkGroup};
 
 /// Simple helper to reduce repetitive `bench_function` + `iter` boilerplate.

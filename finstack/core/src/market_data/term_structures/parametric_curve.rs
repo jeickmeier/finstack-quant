@@ -98,8 +98,7 @@ impl NelsonSiegelModel {
     pub fn zero_rate(&self, t: f64) -> f64 {
         if t <= 0.0 {
             return match self {
-                Self::Ns { beta0, beta1, .. } => beta0 + beta1,
-                Self::Nss { beta0, beta1, .. } => beta0 + beta1,
+                Self::Ns { beta0, beta1, .. } | Self::Nss { beta0, beta1, .. } => beta0 + beta1,
             };
         }
 

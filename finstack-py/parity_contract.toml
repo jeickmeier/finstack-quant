@@ -791,6 +791,10 @@ python_only_market_data = [
 # Method-level gaps on types that *are* partially exposed in WASM.
 [wasm_core_subset.method_gaps]
 "FxDeltaVolSurface.to_vol_surface" = "VolSurface is not on the WASM core facade; use impliedVol or calibrate JSON."
+"VolCube.materialize_tenor_slice" = "VolSurface is not on the WASM core facade; use vol/volClamped point queries."
+"VolCube.materialize_tenor_slice_normal" = "VolSurface is not on the WASM core facade; use volNormal/volNormalClamped point queries."
+"VolCube.materialize_expiry_slice" = "VolSurface is not on the WASM core facade; use vol/volClamped point queries."
+"VolCube.materialize_expiry_slice_normal" = "VolSurface is not on the WASM core facade; use volNormal/volNormalClamped point queries."
 "MarketContext.get_fx_delta_vol_surface" = "MarketContext is Python-only; read fx_delta_vol_surfaces from MarketContextState JSON."
 "MarketContext.insert" = "MarketContext is Python-only; use calibrate JSON to materialize market state."
 

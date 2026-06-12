@@ -559,7 +559,7 @@ fn test_capital_structure_cashflows_accessors() {
 
     cs.by_instrument
         .insert("INST-001".to_string(), instrument_map);
-    cs.totals.insert(period, breakdown.clone());
+    cs.totals.insert(period, breakdown);
 
     // Test accessors
     assert_eq!(

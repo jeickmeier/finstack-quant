@@ -115,8 +115,8 @@ fn test_standard_portfolio_size() {
             finstack_core::market_data::term_structures::CreditIndexData::builder()
                 .num_constituents(size as u16)
                 .recovery_rate(index_data.recovery_rate)
-                .index_credit_curve(index_data.index_credit_curve.clone())
-                .base_correlation_curve(index_data.base_correlation_curve.clone())
+                .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+                .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
                 .build()
                 .unwrap();
 

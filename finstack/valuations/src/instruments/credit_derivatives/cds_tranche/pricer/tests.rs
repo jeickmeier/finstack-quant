@@ -345,19 +345,17 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
     let mut issuer_curves = finstack_core::HashMap::default();
     for i in 0..10 {
         let id = format!("ISSUER-{:03}", i + 1);
-        issuer_curves.insert(id, index_data.index_credit_curve.clone());
+        issuer_curves.insert(id, std::sync::Arc::clone(&index_data.index_credit_curve));
     }
     let hetero_index = CreditIndexData::builder()
         .num_constituents(10)
         .recovery_rate(index_data.recovery_rate)
-        .index_credit_curve(index_data.index_credit_curve.clone())
-        .base_correlation_curve(index_data.base_correlation_curve.clone())
+        .index_credit_curve(std::sync::Arc::clone(&index_data.index_credit_curve))
+        .base_correlation_curve(std::sync::Arc::clone(&index_data.base_correlation_curve))
         .issuer_curves(issuer_curves)
         .build()
         .expect("Curve builder should succeed with valid test data");
-    let ctx = ctx_base
-        .clone()
-        .insert_credit_index("CDX.NA.IG.42", hetero_index);
+    let ctx = ctx_base.insert_credit_index("CDX.NA.IG.42", hetero_index);
 
     let mut homo = CDSTranchePricer::new();
     homo.params.use_issuer_curves = false;
@@ -874,7 +872,7 @@ fn test_extreme_correlation_numerical_stability() {
         let extreme_index_data = CreditIndexData::builder()
             .num_constituents(125)
             .recovery_rate(0.40)
-            .index_credit_curve(index_data_arc.index_credit_curve.clone())
+            .index_credit_curve(std::sync::Arc::clone(&index_data_arc.index_credit_curve))
             .base_correlation_curve(std::sync::Arc::new(extreme_corr_curve))
             .build()
             .expect("BaseCorrelationCurve builder should succeed with valid test data");
@@ -1346,7 +1344,7 @@ fn test_par_spread_solver_convergence() {
     assert!(spread.is_finite(), "Par spread should be finite");
 
     // Verify: pricing at par spread should give near-zero NPV
-    let mut test_tranche = tranche.clone();
+    let mut test_tranche = tranche;
     test_tranche.running_coupon_bp = spread;
     let npv = model.price_tranche(&test_tranche, &market_ctx, as_of);
     assert!(npv.is_ok());
@@ -1892,6 +1890,8 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
         p.calculate_equity_tranche_loss(7.0, 0.30, &index_data, maturity)
     }));
 
+    // `Err` here is a `catch_unwind` panic payload, not a domain error.
+    #[allow(clippy::match_wild_err_arm)]
     match result {
         Err(_) => panic!(
             "homogeneous Gaussian path panicked for default_prob=0.0 (sp at t=0); \
@@ -2271,7 +2271,7 @@ fn zero_recovery_has_no_senior_writedown() {
     }
 
     // Realized state: X = L when R = 0.
-    let mut seasoned = tranche.clone();
+    let mut seasoned = tranche;
     seasoned.accumulated_loss = 0.05;
     let (defaulted, recovered) = pricer.realized_default_state(&seasoned, 0.0);
     assert!((defaulted - 0.05).abs() < 1e-12, "X must equal L at R=0");

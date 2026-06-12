@@ -123,7 +123,9 @@ pub enum BracketHint {
 
 impl BracketHint {
     /// Convert hint to initial bracket size.
+    // Semantic table: Rate and Ytm are distinct hints that happen to share a size.
     #[inline]
+    #[allow(clippy::match_same_arms)]
     pub fn to_bracket_size(self) -> f64 {
         match self {
             BracketHint::ImpliedVol => 0.2,

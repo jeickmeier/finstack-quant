@@ -366,8 +366,8 @@ impl PricerRegistry {
                 base_result.value,
                 metrics,
                 crate::instruments::common_impl::helpers::MetricBuildOptions {
-                    cfg: cfg.clone(),
-                    market_history: market_history.clone(),
+                    cfg,
+                    market_history,
                     pricing_model: Some(model),
                     pricer_registry: Some(Arc::clone(&pricer_registry)),
                 },
@@ -873,7 +873,7 @@ mod tests {
         let bond = fixed_test_bond();
         let disc = flat_discount_curve("USD-TREASURY", as_of);
         let hazard = flat_hazard_curve("USD-CREDIT", as_of);
-        let mut bond_with_credit = bond.clone();
+        let mut bond_with_credit = bond;
         bond_with_credit.credit_curve_id =
             Some(finstack_core::types::CurveId::new("USD-CREDIT".to_string()));
         let market = MarketContext::new().insert(disc).insert(hazard);
@@ -922,7 +922,7 @@ mod tests {
         let bond = fixed_test_bond();
         let disc = flat_discount_curve("USD-TREASURY", as_of);
         let hazard = flat_hazard_curve("USD-CREDIT", as_of);
-        let mut bond_with_credit = bond.clone();
+        let mut bond_with_credit = bond;
         bond_with_credit.credit_curve_id =
             Some(finstack_core::types::CurveId::new("USD-CREDIT".to_string()));
         let market = MarketContext::new().insert(disc).insert(hazard);
@@ -1113,7 +1113,7 @@ mod tests {
 
         let as_of = date!(2025 - 01 - 15);
         let bond = fixed_test_bond();
-        let mut bond_with_credit = bond.clone();
+        let mut bond_with_credit = bond;
         bond_with_credit.credit_curve_id =
             Some(finstack_core::types::CurveId::new("USD-CREDIT".to_string()));
 

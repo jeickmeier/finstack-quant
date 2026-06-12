@@ -43,7 +43,7 @@ pub(crate) fn settlement_date(bond: &Bond, as_of: Date) -> Result<Date> {
                 spec.rate_spec.bdc,
             ),
             CashflowSpec::StepUp(spec) => (Some(spec.calendar_id.as_str()), spec.bdc),
-            _ => (None, BusinessDayConvention::Following),
+            CashflowSpec::Amortizing { .. } => (None, BusinessDayConvention::Following),
         },
     };
 

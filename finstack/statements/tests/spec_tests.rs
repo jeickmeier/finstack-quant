@@ -1,7 +1,7 @@
-// Spec tests (NodeId, FinancialModelSpec, registry, serialization).
-//
-// Note: Cargo only discovers integration tests that are direct children of `tests/`.
-// This file wires in the nested spec test modules so they run.
+//! Spec tests (NodeId, FinancialModelSpec, registry, serialization).
+//!
+//! Note: Cargo only discovers integration tests that are direct children of `tests/`.
+//! This file wires in the nested spec test modules so they run.
 
 #[path = "spec/model_spec_tests.rs"]
 mod model_spec_tests;
