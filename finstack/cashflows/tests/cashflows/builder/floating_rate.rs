@@ -32,6 +32,7 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
             all_in_floor_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::Following,
@@ -89,6 +90,10 @@ fn test_payment_frequency_can_differ_from_reset_tenor() {
         .get_forward("USD-SOFR-3M")
         .expect("curve should exist");
 
+    // Convention: the forward is projected over the index's underlying
+    // deposit period [accrual_start, accrual_start + index_tenor]; the reset
+    // date is flow metadata only. With reset_lag_days = 0 here the reset date
+    // equals the accrual start, so the expectation is anchored on it.
     let expected_quarterly = finstack_cashflows::builder::project_floating_rate(
         reset_date,
         reset_date.add_months(3),
@@ -960,6 +965,7 @@ fn make_overnight_float_spec(
             all_in_floor_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::Following,
@@ -1495,10 +1501,14 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     use finstack_core::market_data::term_structures::ForwardCurve;
     use finstack_core::math::interp::InterpStyle;
 
-    // Jan 4 2025 = Saturday, Jan 6 2025 = Monday
+    // Jan 4 2025 = Saturday, Jan 6 2025 = Monday.
+    // Maturity is a Tuesday so the Monday-start schedule's quarterly anchor
+    // (Sun Apr 6, rolled to Mon Apr 7 by Following) does not collide with the
+    // stub period's payment date — duplicate adjusted payment dates are now a
+    // hard validation error instead of silently dropping a period.
     let saturday = Date::from_calendar_date(2025, Month::January, 4).unwrap();
     let monday = Date::from_calendar_date(2025, Month::January, 6).unwrap();
-    let maturity = Date::from_calendar_date(2025, Month::April, 7).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::April, 8).unwrap();
     let init = Money::new(1_000_000.0, Currency::USD);
 
     let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
@@ -1521,6 +1531,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
             all_in_floor_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc,
@@ -1593,5 +1604,744 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
          lost weekend days would cause a shortfall",
         sat_total,
         mon_total,
+    );
+}
+
+// =============================================================================
+// M5: Empty overnight observation window must fail loudly
+// =============================================================================
+
+/// An accrual period containing no business-day fixings (Unadjusted BDC, stub
+/// entirely on a weekend) must be a validation error, not a silent 0% index
+/// with spread-only accrual.
+#[test]
+fn test_overnight_empty_fixing_window_errors() {
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::ForwardCurve;
+
+    // [Sat 2025-01-04, Sun 2025-01-05): single stub period with no business days.
+    let issue = Date::from_calendar_date(2025, Month::January, 4).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::January, 5).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
+        .base_date(issue)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.05), (1.0, 0.05)])
+        .build()
+        .unwrap();
+    let market = MarketContext::new().insert(fwd);
+
+    let spec = FloatingCouponSpec {
+        rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-ON".into(),
+            spread_bp: dec!(100),
+            gearing: Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            all_in_cap_bp: None,
+            all_in_floor_bp: None,
+            index_cap_bp: None,
+            reset_freq: Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 0,
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::Unadjusted,
+            calendar_id: "weekends_only".to_string(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
+            overnight_basis: None,
+            fallback: FloatingRateFallback::Error,
+        },
+        coupon_type: CouponType::Cash,
+        freq: Tenor::quarterly(),
+        stub: StubKind::ShortFront,
+    };
+
+    let mut b = CashFlowSchedule::builder();
+    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+    let err = b
+        .build_with_curves(Some(&market))
+        .expect_err("empty fixing window must not silently accrue at 0% index");
+    assert!(
+        err.to_string().contains("no business-day fixings"),
+        "error should describe the empty fixing window: {err}"
+    );
+}
+
+// =============================================================================
+// M3: Strictly-past observations route through the fallback policy
+// =============================================================================
+
+/// With the default `Error` fallback, a coupon whose projection start is
+/// strictly before the curve base date fails with a descriptive error naming
+/// the date and index (historical fixings are not supported).
+#[test]
+fn test_seasoned_coupon_before_curve_base_errors_by_default() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    // Curve based mid-life: the first accrual periods start strictly before it.
+    let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
+    let market = make_flat_forward_market(curve_base, 0.03);
+
+    let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
+    let mut b = CashFlowSchedule::builder();
+    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+
+    let err = b
+        .build_with_curves(Some(&market))
+        .expect_err("strictly-past observation with Error fallback must fail");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("USD-SOFR-3M") && msg.contains("before"),
+        "error should name the index and the pre-base date: {msg}"
+    );
+    assert!(
+        msg.contains("historical fixings"),
+        "error should explain the historical-fixings limitation: {msg}"
+    );
+}
+
+/// With `FixedRate(r)`, coupons whose observations are strictly before the
+/// curve base use `r` as the index rate; later coupons still project from the
+/// curve.
+#[test]
+fn test_seasoned_coupon_before_curve_base_uses_fixed_rate_fallback() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
+    let market = make_flat_forward_market(curve_base, 0.03);
+
+    let spec = make_float_spec(FloatingRateFallback::FixedRate(dec!(0.045)), dec!(0.0));
+    let mut b = CashFlowSchedule::builder();
+    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+    let schedule = b
+        .build_with_curves(Some(&market))
+        .expect("FixedRate fallback should cover pre-base coupons");
+
+    let rates: Vec<(Date, f64)> = schedule
+        .flows
+        .iter()
+        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .map(|cf| (cf.date, cf.rate.expect("rate")))
+        .collect();
+    assert_eq!(rates.len(), 4, "quarterly coupons over one year");
+
+    // Coupons accruing from Jan-15 and Apr-15 (strictly before the Jun-15
+    // curve base) take the fixed fallback rate; later coupons project the
+    // flat 3% curve.
+    assert!(
+        (rates[0].1 - 0.045).abs() < 1e-10,
+        "pre-base coupon should use the FixedRate fallback: {:?}",
+        rates[0]
+    );
+    assert!(
+        (rates[1].1 - 0.045).abs() < 1e-10,
+        "pre-base coupon should use the FixedRate fallback: {:?}",
+        rates[1]
+    );
+    assert!(
+        (rates[3].1 - 0.03).abs() < 1e-6,
+        "post-base coupon should project from the curve: {:?}",
+        rates[3]
+    );
+}
+
+// =============================================================================
+// Fixing calendar is used for overnight sampling
+// =============================================================================
+
+/// Overnight fixings must be sampled on the index's fixing calendar, not the
+/// accrual calendar. With a rising curve, skipping the 2025-07-04 US holiday
+/// (usny fixing calendar) produces a different compounded rate than treating
+/// it as a fixing day (weekends_only).
+#[test]
+fn test_overnight_sampling_uses_fixing_calendar() {
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::term_structures::ForwardCurve;
+
+    let base = Date::from_calendar_date(2024, Month::January, 15).unwrap();
+    let issue = Date::from_calendar_date(2025, Month::April, 15).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::October, 15).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.03), (2.0, 0.13)])
+        .build()
+        .expect("rising forward curve builds");
+    let market = MarketContext::new().insert(fwd);
+
+    let build_with_fixing_cal = |fixing_calendar_id: Option<String>| {
+        let mut spec = make_overnight_float_spec(
+            OvernightCompoundingMethod::CompoundedInArrears,
+            FloatingRateFallback::Error,
+            dec!(0.0),
+        );
+        spec.rate_spec.fixing_calendar_id = fixing_calendar_id;
+        let mut b = CashFlowSchedule::builder();
+        let _ = b.principal(init, issue, maturity).floating_cf(spec);
+        b.build_with_curves(Some(&market)).expect("schedule builds")
+    };
+
+    let weekends_only = build_with_fixing_cal(None);
+    let usny = build_with_fixing_cal(Some("usny".to_string()));
+
+    let first_rate = |s: &CashFlowSchedule| {
+        s.flows
+            .iter()
+            .find(|cf| cf.kind == CFKind::FloatReset)
+            .and_then(|cf| cf.rate)
+            .expect("first floating coupon rate")
+    };
+
+    // The first accrual period [Apr-15, Jul-15) contains 2025-07-04 (a usny
+    // holiday but a weekends_only business day); the holiday's weight folds
+    // into the preceding fixing under usny, changing the compounded rate on a
+    // non-flat curve.
+    let r_weekends = first_rate(&weekends_only);
+    let r_usny = first_rate(&usny);
+    assert!(
+        (r_weekends - r_usny).abs() > 1e-9,
+        "fixing calendar must affect overnight sampling: weekends_only {r_weekends:.9} vs \
+         usny {r_usny:.9}"
+    );
+}
+
+// =============================================================================
+// M3: Historical fixings for seasoned instruments (FIXING:{index} series)
+// =============================================================================
+
+use finstack_core::market_data::scalars::ScalarTimeSeries;
+
+/// Helper: flat "USD-SOFR-3M" forward market plus an optional
+/// `FIXING:USD-SOFR-3M` historical fixing series.
+fn make_market_with_fixings(
+    curve_base: Date,
+    flat_rate: f64,
+    fixings: &[(Date, f64)],
+) -> finstack_core::market_data::context::MarketContext {
+    let mut market = make_flat_forward_market(curve_base, flat_rate);
+    if !fixings.is_empty() {
+        let series = ScalarTimeSeries::new("FIXING:USD-SOFR-3M", fixings.to_vec(), None)
+            .expect("fixing series builds");
+        market = market.insert_series(series);
+    }
+    market
+}
+
+/// Helper: ISDA 2021 compounded-in-arrears expectation over `(rate, days)`
+/// pairs with an Act/360 compounding basis.
+fn expected_compounded(rates_weights: &[(f64, u32)], total_days: u32) -> f64 {
+    let mut product = 1.0;
+    for &(rate, days) in rates_weights {
+        product *= 1.0 + rate * f64::from(days) / 360.0;
+    }
+    (product - 1.0) * 360.0 / f64::from(total_days)
+}
+
+/// Helper: single-period overnight schedule [issue, maturity) and the emitted
+/// FloatReset rate.
+fn build_single_overnight_coupon(
+    method: OvernightCompoundingMethod,
+    issue: Date,
+    maturity: Date,
+    market: &finstack_core::market_data::context::MarketContext,
+) -> finstack_core::Result<f64> {
+    let mut spec = make_overnight_float_spec(method, FloatingRateFallback::Error, dec!(0.0));
+    spec.stub = StubKind::ShortFront;
+
+    let mut b = CashFlowSchedule::builder();
+    let _ = b
+        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .floating_cf(spec);
+    let schedule = b.build_with_curves(Some(market))?;
+    Ok(schedule
+        .flows
+        .iter()
+        .find(|cf| cf.kind == CFKind::FloatReset)
+        .and_then(|cf| cf.rate)
+        .expect("single overnight FloatReset coupon with a rate"))
+}
+
+/// Partially seasoned compounded-in-arrears coupon: the curve is based
+/// mid-accrual-period and the realized stretch resolves from the
+/// `FIXING:USD-SOFR-3M` series. Golden value mixes hand-compounded realized
+/// fixings (distinct from the curve rate so mixing errors are detectable)
+/// with curve-projected forwards under identical `(rate, days)` weighting.
+#[test]
+fn test_seasoned_overnight_coupon_mixes_fixings_and_curve() {
+    // Accrual [Mon 2025-06-02, Mon 2025-06-16); curve based Mon 2025-06-09.
+    let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
+    let curve_base = Date::from_calendar_date(2025, Month::June, 9).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+
+    let fixings = [
+        (
+            Date::from_calendar_date(2025, Month::June, 2).unwrap(),
+            0.020,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 3).unwrap(),
+            0.021,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 4).unwrap(),
+            0.022,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 5).unwrap(),
+            0.023,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 6).unwrap(),
+            0.024,
+        ),
+    ];
+    let market = make_market_with_fixings(curve_base, 0.05, &fixings);
+
+    let rate = build_single_overnight_coupon(
+        OvernightCompoundingMethod::CompoundedInArrears,
+        issue,
+        maturity,
+        &market,
+    )
+    .expect("partially seasoned compounded coupon builds from fixings + curve");
+
+    // Realized: Mon-Thu weight 1, Fri weight 3 (weekend). Projected: curve
+    // base Mon 06-09 onwards at the flat 5% (06-09 has no published fixing,
+    // so t = 0 projection applies).
+    let expected = expected_compounded(
+        &[
+            (0.020, 1),
+            (0.021, 1),
+            (0.022, 1),
+            (0.023, 1),
+            (0.024, 3),
+            (0.05, 1),
+            (0.05, 1),
+            (0.05, 1),
+            (0.05, 1),
+            (0.05, 3),
+        ],
+        14,
+    );
+    assert!(
+        (rate - expected).abs() < RATE_TOLERANCE,
+        "seasoned compounded rate should mix realized fixings with projected forwards: \
+         got {rate:.12}, expected {expected:.12}"
+    );
+}
+
+/// Fully seasoned coupon: every observation precedes the curve base, so the
+/// entire compounding window resolves from the fixing series.
+#[test]
+fn test_fully_seasoned_overnight_coupon_from_fixings_only() {
+    let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+    // Curve based on maturity: all observations are realized history.
+    let curve_base = maturity;
+
+    let fixings = [
+        (
+            Date::from_calendar_date(2025, Month::June, 2).unwrap(),
+            0.020,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 3).unwrap(),
+            0.021,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 4).unwrap(),
+            0.022,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 5).unwrap(),
+            0.023,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 6).unwrap(),
+            0.024,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 9).unwrap(),
+            0.025,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 10).unwrap(),
+            0.026,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 11).unwrap(),
+            0.027,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 12).unwrap(),
+            0.028,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 13).unwrap(),
+            0.029,
+        ),
+    ];
+    // Curve flat at 9% — far from every fixing, so any curve leakage is loud.
+    let market = make_market_with_fixings(curve_base, 0.09, &fixings);
+
+    let rate = build_single_overnight_coupon(
+        OvernightCompoundingMethod::CompoundedInArrears,
+        issue,
+        maturity,
+        &market,
+    )
+    .expect("fully seasoned compounded coupon builds from fixings only");
+
+    let expected = expected_compounded(
+        &[
+            (0.020, 1),
+            (0.021, 1),
+            (0.022, 1),
+            (0.023, 1),
+            (0.024, 3),
+            (0.025, 1),
+            (0.026, 1),
+            (0.027, 1),
+            (0.028, 1),
+            (0.029, 3),
+        ],
+        14,
+    );
+    assert!(
+        (rate - expected).abs() < RATE_TOLERANCE,
+        "fully seasoned compounded rate should come from fixings only: \
+         got {rate:.12}, expected {expected:.12}"
+    );
+}
+
+/// LOCF: a missing mid-window business-day fixing resolves from the prior
+/// observation (step interpolation), per overnight RFR publication
+/// conventions.
+#[test]
+fn test_seasoned_overnight_coupon_locf_fills_missing_fixing() {
+    let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+    let curve_base = maturity;
+
+    // 2025-06-11 is intentionally absent: LOCF must carry 06-10's 0.026.
+    let fixings = [
+        (
+            Date::from_calendar_date(2025, Month::June, 2).unwrap(),
+            0.020,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 3).unwrap(),
+            0.021,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 4).unwrap(),
+            0.022,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 5).unwrap(),
+            0.023,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 6).unwrap(),
+            0.024,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 9).unwrap(),
+            0.025,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 10).unwrap(),
+            0.026,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 12).unwrap(),
+            0.028,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 13).unwrap(),
+            0.029,
+        ),
+    ];
+    let market = make_market_with_fixings(curve_base, 0.09, &fixings);
+
+    let rate = build_single_overnight_coupon(
+        OvernightCompoundingMethod::CompoundedInArrears,
+        issue,
+        maturity,
+        &market,
+    )
+    .expect("missing mid-window fixing resolves via LOCF");
+
+    let expected = expected_compounded(
+        &[
+            (0.020, 1),
+            (0.021, 1),
+            (0.022, 1),
+            (0.023, 1),
+            (0.024, 3),
+            (0.025, 1),
+            (0.026, 1),
+            (0.026, 1), // 06-11 carried forward from 06-10
+            (0.028, 1),
+            (0.029, 3),
+        ],
+        14,
+    );
+    assert!(
+        (rate - expected).abs() < RATE_TOLERANCE,
+        "LOCF should carry the prior fixing onto the missing business day: \
+         got {rate:.12}, expected {expected:.12}"
+    );
+}
+
+/// An observation exactly on the curve base date prefers a published fixing
+/// over the curve's t = 0 projection.
+#[test]
+fn test_seasoned_overnight_coupon_prefers_fixing_on_curve_base_date() {
+    let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
+    let curve_base = Date::from_calendar_date(2025, Month::June, 9).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+
+    // The 06-09 fixing (3%) is published and differs from the curve (5%).
+    let fixings = [
+        (
+            Date::from_calendar_date(2025, Month::June, 2).unwrap(),
+            0.020,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 3).unwrap(),
+            0.021,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 4).unwrap(),
+            0.022,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 5).unwrap(),
+            0.023,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 6).unwrap(),
+            0.024,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 9).unwrap(),
+            0.030,
+        ),
+    ];
+    let market = make_market_with_fixings(curve_base, 0.05, &fixings);
+
+    let rate = build_single_overnight_coupon(
+        OvernightCompoundingMethod::CompoundedInArrears,
+        issue,
+        maturity,
+        &market,
+    )
+    .expect("published same-day fixing is preferred over the curve");
+
+    let expected = expected_compounded(
+        &[
+            (0.020, 1),
+            (0.021, 1),
+            (0.022, 1),
+            (0.023, 1),
+            (0.024, 3),
+            (0.030, 1), // published fixing on the curve base date
+            (0.05, 1),
+            (0.05, 1),
+            (0.05, 1),
+            (0.05, 3),
+        ],
+        14,
+    );
+    assert!(
+        (rate - expected).abs() < RATE_TOLERANCE,
+        "the published base-date fixing should beat the t=0 projection: \
+         got {rate:.12}, expected {expected:.12}"
+    );
+}
+
+/// Lockout (ISDA 2021 rate cut-off) over a fully seasoned window: the cut-off
+/// observation dates resolve from fixings. With constant fixings equal to a
+/// flat curve, the seasoned build must match an unseasoned build of the same
+/// instrument.
+#[test]
+fn test_seasoned_overnight_lockout_resolves_from_fixings() {
+    let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+    let method = OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 2 };
+
+    // All ten business-day fixings at the constant 4%.
+    let fixings: Vec<(Date, f64)> = [2, 3, 4, 5, 6, 9, 10, 11, 12, 13]
+        .into_iter()
+        .map(|day| {
+            (
+                Date::from_calendar_date(2025, Month::June, day).unwrap(),
+                0.04,
+            )
+        })
+        .collect();
+
+    // Seasoned: curve based on maturity, whole window realized from fixings.
+    let seasoned_market = make_market_with_fixings(maturity, 0.04, &fixings);
+    let seasoned = build_single_overnight_coupon(method, issue, maturity, &seasoned_market)
+        .expect("seasoned lockout coupon resolves from fixings");
+
+    // Unseasoned reference: same flat 4% curve based at issue, no fixings.
+    let reference_market = make_flat_forward_market(issue, 0.04);
+    let reference = build_single_overnight_coupon(method, issue, maturity, &reference_market)
+        .expect("unseasoned lockout coupon projects from the curve");
+
+    assert!(
+        (seasoned - reference).abs() < RATE_TOLERANCE,
+        "seasoned lockout rate {seasoned:.12} should equal the unseasoned reference \
+         {reference:.12} when fixings equal the flat curve"
+    );
+}
+
+/// Lookback (ARRC 2020 §2) with a seasoned window: shifted observation dates
+/// before the curve base resolve from fixings. With constant fixings equal to
+/// a flat curve, the seasoned build must match an unseasoned build whose
+/// curve covers the full shifted window.
+#[test]
+fn test_seasoned_overnight_lookback_resolves_from_fixings() {
+    let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
+    let curve_base = Date::from_calendar_date(2025, Month::June, 9).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+    let method = OvernightCompoundingMethod::CompoundedWithLookback { lookback_days: 2 };
+
+    // 2 BD lookback shifts observations back to [Thu 2025-05-29, Wed 2025-06-11];
+    // pre-base dates (05-29 .. 06-06) must resolve from fixings.
+    let fixings: Vec<(Date, f64)> = [
+        Date::from_calendar_date(2025, Month::May, 29).unwrap(),
+        Date::from_calendar_date(2025, Month::May, 30).unwrap(),
+        Date::from_calendar_date(2025, Month::June, 2).unwrap(),
+        Date::from_calendar_date(2025, Month::June, 3).unwrap(),
+        Date::from_calendar_date(2025, Month::June, 4).unwrap(),
+        Date::from_calendar_date(2025, Month::June, 5).unwrap(),
+        Date::from_calendar_date(2025, Month::June, 6).unwrap(),
+    ]
+    .into_iter()
+    .map(|d| (d, 0.04))
+    .collect();
+
+    let seasoned_market = make_market_with_fixings(curve_base, 0.04, &fixings);
+    let seasoned = build_single_overnight_coupon(method, issue, maturity, &seasoned_market)
+        .expect("seasoned lookback coupon resolves shifted observations from fixings");
+
+    // Unseasoned reference: flat 4% curve based before the first shifted
+    // observation, no fixings required.
+    let reference_market = make_flat_forward_market(
+        Date::from_calendar_date(2025, Month::May, 29).unwrap(),
+        0.04,
+    );
+    let reference = build_single_overnight_coupon(method, issue, maturity, &reference_market)
+        .expect("unseasoned lookback coupon projects from the curve");
+
+    assert!(
+        (seasoned - reference).abs() < RATE_TOLERANCE,
+        "seasoned lookback rate {seasoned:.12} should equal the unseasoned reference \
+         {reference:.12} when fixings equal the flat curve"
+    );
+}
+
+/// A seasoned term-rate reset resolves from the exact-date fixing, and
+/// gearing/spread are applied on top of the historical index rate exactly as
+/// for projected rates.
+#[test]
+fn test_seasoned_term_reset_resolves_from_exact_fixing_with_spread_and_gearing() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    // Curve based mid-life: the Jan-15 and Apr-15 resets are realized history.
+    let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
+    let fixings = [
+        (
+            Date::from_calendar_date(2025, Month::January, 15).unwrap(),
+            0.040,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::April, 15).unwrap(),
+            0.042,
+        ),
+    ];
+    let market = make_market_with_fixings(curve_base, 0.03, &fixings);
+
+    // SOFR + 100 bps, 2x gearing including spread: rate = (index + 1%) * 2.
+    let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(100.0));
+    spec.rate_spec.gearing = dec!(2.0);
+
+    let mut b = CashFlowSchedule::builder();
+    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+    let schedule = b
+        .build_with_curves(Some(&market))
+        .expect("seasoned term resets should resolve from exact-date fixings");
+
+    let rates: Vec<f64> = schedule
+        .flows
+        .iter()
+        .filter(|cf| cf.kind == CFKind::FloatReset)
+        .map(|cf| cf.rate.expect("rate"))
+        .collect();
+    assert_eq!(rates.len(), 4, "quarterly coupons over one year");
+
+    // Historical resets: (fixing + spread) * gearing.
+    assert!(
+        (rates[0] - (0.040 + 0.01) * 2.0).abs() < RATE_TOLERANCE,
+        "Jan-15 reset should be (4.0% fixing + 100bp) * 2: {}",
+        rates[0]
+    );
+    assert!(
+        (rates[1] - (0.042 + 0.01) * 2.0).abs() < RATE_TOLERANCE,
+        "Apr-15 reset should be (4.2% fixing + 100bp) * 2: {}",
+        rates[1]
+    );
+    // Post-base resets: projected from the flat 3% curve with the same
+    // spread/gearing treatment.
+    assert!(
+        (rates[3] - (0.03 + 0.01) * 2.0).abs() < 1e-6,
+        "post-base reset should project from the curve: {}",
+        rates[3]
+    );
+}
+
+/// A seasoned term-rate reset with a fixing series that lacks the exact reset
+/// date fails with a descriptive error (term resets do not carry forward).
+#[test]
+fn test_seasoned_term_reset_missing_exact_fixing_errors() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let curve_base = Date::from_calendar_date(2025, Month::June, 15).unwrap();
+    // Only the Jan-15 fixing is present; the Apr-15 reset has no observation.
+    let fixings = [(
+        Date::from_calendar_date(2025, Month::January, 15).unwrap(),
+        0.040,
+    )];
+    let market = make_market_with_fixings(curve_base, 0.03, &fixings);
+
+    let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
+    let mut b = CashFlowSchedule::builder();
+    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+
+    let err = b
+        .build_with_curves(Some(&market))
+        .expect_err("missing exact-date term fixing must fail");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("USD-SOFR-3M") && msg.contains("2025-04-15"),
+        "error should name the index and the missing fixing date: {msg}"
     );
 }

@@ -156,6 +156,7 @@ fn linear_amortization_uses_first_coupon_leg_cadence() {
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
+            adjust_accrual_dates: false,
         },
     };
     let quarterly_float = FloatingCouponSpec {
@@ -170,6 +171,7 @@ fn linear_amortization_uses_first_coupon_leg_cadence() {
             all_in_floor_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::Following,
@@ -362,6 +364,110 @@ fn detects_stub_periods() {
     assert!(
         has_stub,
         "Should detect stub period with irregular start date"
+    );
+
+    // Only the genuinely irregular short-front period is labeled Stub; the
+    // remaining regular periods (including the last) stay Fixed.
+    let stub_count = coupon_flows
+        .iter()
+        .filter(|cf| cf.kind == CFKind::Stub)
+        .count();
+    assert_eq!(stub_count, 1, "exactly one genuine stub period expected");
+    let earliest = coupon_flows
+        .iter()
+        .min_by_key(|cf| cf.date)
+        .expect("coupons present");
+    assert_eq!(
+        earliest.kind,
+        CFKind::Stub,
+        "the short-front stub coupon must be labeled Stub"
+    );
+}
+
+/// Negative-rate fixed coupons must emit (negative cash amounts), not be
+/// silently dropped — matching the floating path's behavior.
+#[test]
+fn negative_rate_fixed_coupons_are_emitted() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+
+    let fixed = FixedCouponSpec {
+        coupon_type: CouponType::Cash,
+        rate: Decimal::try_from(-0.005).expect("valid"), // -0.5% (negative-rate regime)
+        freq: Tenor::semi_annual(),
+        dc: DayCount::Act365F,
+        bdc: BusinessDayConvention::Following,
+        calendar_id: "weekends_only".to_string(),
+        stub: StubKind::None,
+        end_of_month: false,
+        payment_lag_days: 0,
+    };
+
+    let mut b = CashFlowSchedule::builder();
+    let _ = b
+        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .fixed_cf(fixed);
+    let schedule = b.build_with_curves(None).unwrap();
+
+    let coupons: Vec<&CashFlow> = schedule
+        .flows
+        .iter()
+        .filter(|cf| cf.kind == CFKind::Fixed)
+        .collect();
+    assert_eq!(coupons.len(), 2, "negative-rate coupons must be emitted");
+    for cf in &coupons {
+        assert!(
+            cf.amount.amount() < 0.0,
+            "negative-rate coupon should carry a negative amount, got {}",
+            cf.amount.amount()
+        );
+        assert_eq!(cf.rate, Some(-0.005));
+    }
+}
+
+// =============================================================================
+// Strict serde on builder specs
+// =============================================================================
+
+/// Unknown (typo'd) fields in nested specs must be rejected, not silently
+/// defaulted.
+#[test]
+fn floating_rate_spec_rejects_unknown_fields() {
+    let json = r#"{
+        "index_id": "USD-SOFR-3M",
+        "spred_bp": "200",
+        "reset_freq": {"count": 3, "unit": "months"},
+        "dc": "Act360",
+        "calendar_id": "weekends_only",
+        "spread_bp": "200"
+    }"#;
+
+    let err =
+        serde_json::from_str::<FloatingRateSpec>(json).expect_err("typo'd field must be rejected");
+    assert!(
+        err.to_string().contains("spred_bp"),
+        "error should name the unknown field: {err}"
+    );
+}
+
+/// Serde aliases (`floor_bp` -> `index_floor_bp`) keep working alongside
+/// `deny_unknown_fields`.
+#[test]
+fn floating_rate_spec_accepts_floor_bp_alias() {
+    let json = r#"{
+        "index_id": "USD-SOFR-3M",
+        "spread_bp": "200",
+        "floor_bp": "0",
+        "reset_freq": {"count": 3, "unit": "months"},
+        "dc": "Act360",
+        "calendar_id": "weekends_only"
+    }"#;
+
+    let spec: FloatingRateSpec = serde_json::from_str(json).expect("alias field must deserialize");
+    assert_eq!(
+        spec.index_floor_bp,
+        Some(Decimal::ZERO),
+        "floor_bp alias should populate index_floor_bp"
     );
 }
 
@@ -841,6 +947,19 @@ fn npv_golden_value_with_realistic_discount_curve() {
         .filter(|cf| cf.kind == CFKind::Fixed)
         .collect();
 
+    // A regular semi-annual one-year bullet emits exactly two Fixed coupons —
+    // none mislabeled as Stub (the golden loop below must not be vacuous).
+    assert_eq!(
+        coupons.len(),
+        2,
+        "expected 2 regular Fixed coupons, got {}",
+        coupons.len()
+    );
+    assert!(
+        !schedule.flows.iter().any(|cf| cf.kind == CFKind::Stub),
+        "regular bullet schedule must not contain Stub coupons"
+    );
+
     for coupon in &coupons {
         let expected_coupon = 25_000.0; // 1M * 5% / 2
         assert!(
@@ -887,6 +1006,19 @@ fn coupon_amount_golden_values() {
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed)
         .collect();
+
+    // A regular semi-annual one-year bullet emits exactly two Fixed coupons —
+    // none mislabeled as Stub (otherwise the golden loop below is vacuous).
+    assert_eq!(
+        coupons.len(),
+        2,
+        "expected 2 regular Fixed coupons, got {}",
+        coupons.len()
+    );
+    assert!(
+        !schedule.flows.iter().any(|cf| cf.kind == CFKind::Stub),
+        "regular bullet schedule must not contain Stub coupons"
+    );
 
     // Expected coupon: $1M * 5% * 0.5 = $25,000
     let expected_coupon = 25_000.0;

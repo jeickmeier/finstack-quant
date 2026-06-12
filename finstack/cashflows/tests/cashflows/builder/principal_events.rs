@@ -11,13 +11,16 @@
 //! - Draw vs repay semantics
 //! - Outstanding balance constraints
 
-use finstack_cashflows::builder::{CashFlowSchedule, PrincipalEvent};
+use finstack_cashflows::builder::{
+    CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, PrincipalEvent,
+};
 use finstack_core::cashflow::CFKind;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
+use rust_decimal::Decimal;
 use time::Month;
 
-use finstack_core::dates::Date;
+use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 
 // =============================================================================
 // Principal Event Date Validation
@@ -37,8 +40,8 @@ fn principal_events_after_maturity_rejected() {
     // Event after maturity should cause build to fail
     let event = PrincipalEvent {
         date: post_maturity,
-        delta: Money::new(-100_000.0, Currency::USD), // Draw
-        cash: Money::new(-100_000.0, Currency::USD),
+        delta: Money::new(100_000.0, Currency::USD), // Draw
+        cash: Money::new(100_000.0, Currency::USD),
         kind: CFKind::Notional,
     };
 
@@ -156,8 +159,8 @@ fn principal_events_at_issue_accepted() {
     // Additional draw at issue (delayed draw term loan pattern)
     let event = PrincipalEvent {
         date: issue,
-        delta: Money::new(-500_000.0, Currency::USD), // Additional draw
-        cash: Money::new(-500_000.0, Currency::USD),
+        delta: Money::new(500_000.0, Currency::USD), // Additional draw
+        cash: Money::new(500_000.0, Currency::USD),
         kind: CFKind::Notional,
     };
 
@@ -262,8 +265,8 @@ fn multiple_principal_events_same_date_accepted() {
         PrincipalEvent {
             date: mid_date,
             delta: Money::new(-100_000.0, Currency::USD), // Repay
-            cash: Money::new(-100_000.0, Currency::USD),
-            kind: CFKind::Notional,
+            cash: Money::new(100_000.0, Currency::USD),
+            kind: CFKind::Amortization,
         },
     ];
 
@@ -289,18 +292,20 @@ fn multiple_principal_events_same_date_accepted() {
         "Build should succeed with multiple events on same date"
     );
 
-    // Verify net effect: -200k + 100k = -100k net draw
+    // Verify net effect: draw 200k, repay 100k => +100k outstanding
     let schedule = result.unwrap();
-    let notional_flows_on_mid: Vec<_> = schedule
+    let principal_flows_on_mid: Vec<_> = schedule
         .flows
         .iter()
-        .filter(|cf| cf.date == mid_date && cf.kind == CFKind::Notional)
+        .filter(|cf| {
+            cf.date == mid_date && (cf.kind == CFKind::Notional || cf.kind == CFKind::Amortization)
+        })
         .collect();
 
     // Should have both events as separate flows
     assert!(
-        notional_flows_on_mid.len() >= 2,
-        "Should have at least 2 notional flows on mid_date"
+        principal_flows_on_mid.len() >= 2,
+        "Should have at least 2 principal flows on mid_date"
     );
 
     // Net outstanding change should be +100k (draw 200k, repay 100k)
@@ -380,18 +385,18 @@ fn principal_event_repay_effect_on_outstanding() {
 
     let init = Money::new(1_000_000.0, Currency::USD);
 
-    // Add a principal event
+    // Add a repayment event (Amortization kind; cash defaults to -delta)
     let event = PrincipalEvent {
         date: mid_date,
         delta: Money::new(-300_000.0, Currency::USD),
-        cash: Money::new(-300_000.0, Currency::USD),
-        kind: CFKind::Notional,
+        cash: Money::new(300_000.0, Currency::USD),
+        kind: CFKind::Amortization,
     };
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
         .principal(init, issue, maturity)
-        .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
+        .add_principal_event(event.date, event.delta, None, event.kind);
 
     let schedule = builder.build_with_curves(None).unwrap();
 
@@ -409,16 +414,21 @@ fn principal_event_repay_effect_on_outstanding() {
         notional_flows.len()
     );
 
-    // Verify a flow exists at mid_date
+    // Verify a repayment flow exists at mid_date with positive cash (defaulted to -delta)
     let mid_flows: Vec<_> = schedule
         .flows
         .iter()
-        .filter(|cf| cf.date == mid_date && cf.kind == CFKind::Notional)
+        .filter(|cf| cf.date == mid_date && cf.kind == CFKind::Amortization)
         .collect();
 
     assert!(
         !mid_flows.is_empty(),
-        "Should have a notional flow at mid_date"
+        "Should have an amortization flow at mid_date"
+    );
+    assert_eq!(
+        mid_flows[0].amount.amount(),
+        300_000.0,
+        "cash: None should default to -delta for Amortization events"
     );
 
     // Outstanding should decrease by 300k
@@ -505,5 +515,310 @@ fn empty_principal_events_accepted() {
     assert!(
         result.is_ok(),
         "Build should succeed with empty events list"
+    );
+}
+
+// =============================================================================
+// Pre-Issue / At-Issue Emission Exclusivity (M2)
+// =============================================================================
+
+/// Count flows matching a date and kind.
+fn count_flows(schedule: &CashFlowSchedule, date: Date, kind: CFKind) -> usize {
+    schedule
+        .flows
+        .iter()
+        .filter(|cf| cf.date == date && cf.kind == kind)
+        .count()
+}
+
+#[test]
+fn pre_issue_and_at_issue_events_emit_once_each() {
+    // With a pre-issue event present, the issue date enters the date loop's
+    // input set; issue-dated events and funding must still be emitted exactly
+    // once and outstanding must absorb each delta exactly once.
+
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let pre_issue = Date::from_calendar_date(2024, Month::December, 15).unwrap();
+
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(init, issue, maturity)
+        .add_principal_event(
+            pre_issue,
+            Money::new(100_000.0, Currency::USD),
+            None,
+            CFKind::Notional,
+        )
+        .add_principal_event(
+            issue,
+            Money::new(200_000.0, Currency::USD),
+            None,
+            CFKind::Notional,
+        );
+
+    let schedule = builder.build_with_curves(None).unwrap();
+
+    assert_eq!(
+        count_flows(&schedule, pre_issue, CFKind::Notional),
+        1,
+        "pre-issue event must be emitted exactly once"
+    );
+    // Issue date carries the initial funding flow plus the at-issue event.
+    assert_eq!(
+        count_flows(&schedule, issue, CFKind::Notional),
+        2,
+        "issue date must carry funding + at-issue event exactly once each"
+    );
+
+    // Outstanding at issue: 1,000,000 + 100,000 + 200,000 (each delta once).
+    let outstanding = schedule.outstanding_by_date().unwrap();
+    let issue_outstanding = outstanding
+        .iter()
+        .find(|(d, _)| *d == issue)
+        .map(|(_, m)| m.amount())
+        .unwrap();
+    assert!(
+        (issue_outstanding - 1_300_000.0).abs() < 0.01,
+        "outstanding at issue must absorb each delta exactly once: got {issue_outstanding}"
+    );
+
+    // Redemption at maturity repays the full outstanding exactly once.
+    let redemption: f64 = schedule
+        .flows
+        .iter()
+        .filter(|cf| cf.date >= maturity && cf.kind == CFKind::Notional)
+        .map(|cf| cf.amount.amount())
+        .sum();
+    assert!(
+        (redemption - 1_300_000.0).abs() < 0.01,
+        "redemption must repay outstanding once: got {redemption}"
+    );
+}
+
+#[test]
+fn two_pre_issue_events_on_different_dates_emit_once_each() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let pre_a = Date::from_calendar_date(2024, Month::November, 15).unwrap();
+    let pre_b = Date::from_calendar_date(2024, Month::December, 15).unwrap();
+
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(init, issue, maturity)
+        .add_principal_event(
+            pre_a,
+            Money::new(50_000.0, Currency::USD),
+            None,
+            CFKind::Notional,
+        )
+        .add_principal_event(
+            pre_b,
+            Money::new(75_000.0, Currency::USD),
+            None,
+            CFKind::Notional,
+        );
+
+    let schedule = builder.build_with_curves(None).unwrap();
+
+    assert_eq!(count_flows(&schedule, pre_a, CFKind::Notional), 1);
+    assert_eq!(count_flows(&schedule, pre_b, CFKind::Notional), 1);
+
+    let outstanding = schedule.outstanding_by_date().unwrap();
+    let issue_outstanding = outstanding
+        .iter()
+        .find(|(d, _)| *d == issue)
+        .map(|(_, m)| m.amount())
+        .unwrap();
+    assert!(
+        (issue_outstanding - 1_125_000.0).abs() < 0.01,
+        "outstanding at issue must include both pre-issue draws once: got {issue_outstanding}"
+    );
+}
+
+#[test]
+fn pre_issue_event_with_issue_dated_fixed_fee_emits_fee_once() {
+    // Regression for M2: a pre-issue event used to push the issue date into
+    // the loop, double-emitting issue-dated fixed fees.
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let pre_issue = Date::from_calendar_date(2024, Month::December, 15).unwrap();
+
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(init, issue, maturity)
+        .add_principal_event(
+            pre_issue,
+            Money::new(100_000.0, Currency::USD),
+            None,
+            CFKind::Notional,
+        )
+        .fee(FeeSpec::Fixed {
+            date: issue,
+            amount: Money::new(5_000.0, Currency::USD),
+        });
+
+    let schedule = builder.build_with_curves(None).unwrap();
+
+    assert_eq!(
+        count_flows(&schedule, issue, CFKind::Fee),
+        1,
+        "issue-dated fixed fee must be emitted exactly once"
+    );
+}
+
+#[test]
+fn fixed_fee_before_issue_emitted_once_at_its_date() {
+    // Policy: fixed fees dated strictly before issue are emitted during
+    // initialization on their stated date (delayed-funding upfront fees),
+    // not silently dropped.
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let fee_date = Date::from_calendar_date(2024, Month::December, 20).unwrap();
+
+    let init = Money::new(1_000_000.0, Currency::USD);
+
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(init, issue, maturity)
+        .fee(FeeSpec::Fixed {
+            date: fee_date,
+            amount: Money::new(2_500.0, Currency::USD),
+        });
+
+    let schedule = builder.build_with_curves(None).unwrap();
+
+    assert_eq!(
+        count_flows(&schedule, fee_date, CFKind::Fee),
+        1,
+        "pre-issue fixed fee must be emitted exactly once on its date"
+    );
+    let fee = schedule
+        .flows
+        .iter()
+        .find(|cf| cf.date == fee_date && cf.kind == CFKind::Fee)
+        .unwrap();
+    assert_eq!(fee.amount.amount(), 2_500.0);
+}
+
+// =============================================================================
+// Maturity Redemption Date Adjustment (M9)
+// =============================================================================
+
+#[test]
+fn weekend_maturity_redemption_matches_final_coupon_date() {
+    // Maturity 2026-01-17 is a Saturday. With ModifiedFollowing on a
+    // weekends-only calendar, the final coupon pays Monday 2026-01-19; the
+    // principal redemption must land on the same adjusted date.
+    let issue = Date::from_calendar_date(2025, Month::January, 17).unwrap(); // Friday
+    let maturity = Date::from_calendar_date(2026, Month::January, 17).unwrap(); // Saturday
+    let adjusted = Date::from_calendar_date(2026, Month::January, 19).unwrap(); // Monday
+
+    let fixed = FixedCouponSpec {
+        coupon_type: CouponType::Cash,
+        rate: Decimal::try_from(0.05).expect("valid"),
+        freq: Tenor::semi_annual(),
+        dc: DayCount::Act360,
+        bdc: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: "weekends_only".to_string(),
+        stub: StubKind::None,
+        end_of_month: false,
+        payment_lag_days: 0,
+    };
+
+    let init = Money::new(1_000_000.0, Currency::USD);
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder.principal(init, issue, maturity).fixed_cf(fixed);
+
+    let schedule = builder.build_with_curves(None).unwrap();
+
+    let redemption = schedule
+        .flows
+        .iter()
+        .find(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
+        .expect("redemption flow emitted");
+    assert_eq!(
+        redemption.date, adjusted,
+        "redemption must pay on the business-day-adjusted maturity"
+    );
+
+    let final_coupon_date = schedule
+        .flows
+        .iter()
+        .filter(|cf| cf.kind != CFKind::Notional && cf.amount.amount() > 0.0)
+        .map(|cf| cf.date)
+        .max()
+        .expect("coupon flows emitted");
+    assert_eq!(
+        redemption.date, final_coupon_date,
+        "redemption and final coupon must share the same payment date"
+    );
+
+    // No flow may remain on the raw (non-business-day) maturity date.
+    assert!(
+        schedule.flows.iter().all(|cf| cf.date != maturity),
+        "no flow may be dated on the unadjusted weekend maturity"
+    );
+}
+
+// =============================================================================
+// Principal Event Sign Conventions
+// =============================================================================
+
+#[test]
+fn amortization_event_with_positive_delta_rejected() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
+
+    let init = Money::new(1_000_000.0, Currency::USD);
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(init, issue, maturity)
+        .add_principal_event(
+            mid_date,
+            Money::new(100_000.0, Currency::USD), // wrong sign for a repayment
+            None,
+            CFKind::Amortization,
+        );
+
+    let result = builder.build_with_curves(None);
+    assert!(result.is_err(), "Amortization events require delta <= 0");
+    let msg = format!("{}", result.unwrap_err());
+    assert!(
+        msg.contains("delta <= 0"),
+        "error should describe the sign convention: {msg}"
+    );
+}
+
+#[test]
+fn notional_event_with_negative_delta_rejected() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let mid_date = Date::from_calendar_date(2025, Month::July, 15).unwrap();
+
+    let init = Money::new(1_000_000.0, Currency::USD);
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(init, issue, maturity)
+        .add_principal_event(
+            mid_date,
+            Money::new(-100_000.0, Currency::USD), // wrong sign for a draw
+            None,
+            CFKind::Notional,
+        );
+
+    let result = builder.build_with_curves(None);
+    assert!(result.is_err(), "Notional events require delta >= 0");
+    let msg = format!("{}", result.unwrap_err());
+    assert!(
+        msg.contains("delta >= 0"),
+        "error should describe the sign convention: {msg}"
     );
 }

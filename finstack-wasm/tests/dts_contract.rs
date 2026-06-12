@@ -196,12 +196,13 @@ fn cashflows_dts_matches_json_bridge_surface() {
     let dts = index_dts();
 
     assert!(dts.contains("export interface CashflowsNamespace"));
-    assert!(dts
-        .contains("buildCashflowSchedule(specJson: string, marketJson?: string | null): string;"));
-    assert!(dts.contains("validateCashflowSchedule(scheduleJson: string): string;"));
-    assert!(dts.contains("datedFlows(scheduleJson: string): string;"));
-    assert!(dts.contains("accruedInterest("));
-    assert!(dts.contains("bondFromCashflows("));
+    assert!(dts.contains(
+        "buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;"
+    ));
+    assert!(dts.contains("validateCashflowScheduleJson(scheduleJson: string): string;"));
+    assert!(dts.contains("datedFlowsJson(scheduleJson: string): string;"));
+    assert!(dts.contains("accruedInterestJson("));
+    assert!(dts.contains("bondFromCashflowsJson("));
     assert!(dts.contains("export declare const cashflows: CashflowsNamespace;"));
 }
 

@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 __all__ = [
-    "accrued_interest",
-    "bond_from_cashflows",
-    "build_cashflow_schedule",
-    "dated_flows",
-    "validate_cashflow_schedule",
+    "accrued_interest_json",
+    "bond_from_cashflows_json",
+    "build_cashflow_schedule_json",
+    "dated_flows_json",
+    "validate_cashflow_schedule_json",
 ]
 
-def build_cashflow_schedule(spec_json: str, market_json: str | None = None) -> str: ...
-def validate_cashflow_schedule(schedule_json: str) -> str: ...
-def dated_flows(schedule_json: str) -> str: ...
-def accrued_interest(schedule_json: str, as_of: str, config_json: str | None = None) -> float:
+def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None) -> str: ...
+def validate_cashflow_schedule_json(schedule_json: str) -> str: ...
+def dated_flows_json(schedule_json: str) -> str: ...
+def accrued_interest_json(schedule_json: str, as_of: str, config_json: str | None = None) -> float:
     """Return accrued interest as a host-language ``float``.
 
     The Rust engine computes from the canonical schedule and crosses the
@@ -22,7 +22,7 @@ def accrued_interest(schedule_json: str, as_of: str, config_json: str | None = N
     string equality.
     """
 
-def bond_from_cashflows(
+def bond_from_cashflows_json(
     instrument_id: str,
     schedule_json: str,
     discount_curve_id: str,

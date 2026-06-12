@@ -1,16 +1,28 @@
 //! Currency-preserving aggregation of cashflows into `Period`s.
 //!
-//! # Rounding Policy
+//! # Period Contract
 //!
-//! PV aggregation functions (including
-//! [`crate::builder::CashFlowSchedule::pv_by_period`]) apply per-flow rounding: each
-//! cashflow's PV is rounded at `Money::new` ingestion (using
-//! currency-specific ISO-4217 minor units and bankers rounding), then
-//! summed using exact currency-safe arithmetic. This ensures determinism
-//! and prevents cross-currency arithmetic errors.
+//! All aggregation functions bucket flows into half-open intervals
+//! `[period.start, period.end)`: a flow dated exactly on `period.end` belongs
+//! to the *next* period. Periods must be sorted by start date and
+//! non-overlapping; the public entry points validate this and return
+//! [`finstack_core::Error::Validation`] otherwise.
 //!
-//! For reconciliation workflows requiring sum-then-round semantics, compute
-//! PVs in f64, sum, then construct `Money` from the final result.
+//! # Summation Policy
+//!
+//! Per-currency totals (nominal and PV) are accumulated as Neumaier-compensated
+//! `f64` sums over `Money::amount()` values. No per-flow ISO-4217 rounding is
+//! applied during accumulation; the final total is constructed via `Money` from
+//! the compensated sum. Results are deterministic given sorted inputs (the
+//! public wrappers sort unsorted inputs by date before accumulating).
+//!
+//! # Historical-Flow PV Convention
+//!
+//! PV aggregation functions assign **zero PV** to flows dated on or before the
+//! valuation base date (`DateContext::base`). Historical flows still appear in
+//! plain amount aggregation ([`aggregate_by_period`]). This matches the
+//! convention documented by
+//! [`CashFlowSchedule::to_period_dataframe`](crate::builder::CashFlowSchedule::to_period_dataframe).
 
 use finstack_core::cashflow::{CFKind, CashFlow};
 use finstack_core::currency::Currency;
@@ -89,10 +101,50 @@ fn iter_by_period<'a, T: HasDate>(
     })
 }
 
+/// Validate the aggregation period contract: sorted by start, non-overlapping,
+/// and free of duplicate `PeriodId`s.
+///
+/// The flow-bucketing cursor in [`iter_by_period`] never rewinds, so unsorted
+/// or overlapping periods would silently drop flows; duplicate ids would
+/// silently overwrite earlier results. Both are rejected loudly instead.
+///
+/// # Errors
+///
+/// Returns [`finstack_core::Error::Validation`] if periods are not sorted by
+/// start date, overlap (a period starts before the previous period ends), or
+/// share a `PeriodId`.
+fn validate_periods(periods: &[Period]) -> finstack_core::Result<()> {
+    for w in periods.windows(2) {
+        if w[1].start < w[0].start {
+            return Err(finstack_core::Error::Validation(format!(
+                "aggregation periods must be sorted by start date: period '{}' (start {}) follows period '{}' (start {})",
+                w[1].id, w[1].start, w[0].id, w[0].start
+            )));
+        }
+        if w[1].start < w[0].end {
+            return Err(finstack_core::Error::Validation(format!(
+                "aggregation periods must be non-overlapping (half-open [start, end)): period '{}' starts {} before period '{}' ends {}",
+                w[1].id, w[1].start, w[0].id, w[0].end
+            )));
+        }
+    }
+    let mut seen: std::collections::HashSet<PeriodId> = std::collections::HashSet::new();
+    for p in periods {
+        if !seen.insert(p.id) {
+            return Err(finstack_core::Error::Validation(format!(
+                "aggregation periods contain duplicate PeriodId '{}'",
+                p.id
+            )));
+        }
+    }
+    Ok(())
+}
+
 /// Currency-preserving aggregation of cashflows into `Period`s.
 ///
 /// Groups cashflows by time period while preserving currency separation.
-/// Returns a map: `PeriodId -> (Currency -> Money)` using Decimal-safe `Money`.
+/// Returns a map: `PeriodId -> (Currency -> Money)`. Per-currency sums use
+/// Neumaier-compensated f64 accumulation (see module docs).
 ///
 /// See unit tests and `examples/` for usage.
 fn aggregate_by_period_sorted(
@@ -126,16 +178,26 @@ fn aggregate_by_period_sorted(
 /// Public wrapper that sorts flows before aggregation. For pre-sorted inputs,
 /// this performs O(n log n) sort + O(n+m) aggregation.
 ///
+/// Flows are bucketed into half-open intervals `[period.start, period.end)`:
+/// a flow dated exactly on `period.end` belongs to the next period. Periods
+/// must be sorted by start date, non-overlapping, and have unique ids.
+///
 /// # Arguments
 ///
 /// * `flows` - Dated cashflows to aggregate. Inputs do not need to be pre-sorted.
-/// * `periods` - Reporting periods using half-open intervals
+/// * `periods` - Sorted, disjoint reporting periods using half-open intervals
 ///   `[period.start, period.end)`.
 ///
 /// # Returns
 ///
 /// Map from `PeriodId` to currency-indexed nominal cashflow sums. Periods with
-/// no cashflows are omitted from the result.
+/// no cashflows are omitted from the result. Per-currency sums use
+/// Neumaier-compensated f64 accumulation (no per-flow ISO-4217 rounding).
+///
+/// # Errors
+///
+/// Returns [`finstack_core::Error::Validation`] if periods are unsorted,
+/// overlapping, or contain duplicate `PeriodId`s.
 ///
 /// # Performance
 ///
@@ -163,23 +225,25 @@ fn aggregate_by_period_sorted(
 ///     is_actual: true,
 /// }];
 ///
-/// let aggregated = aggregate_by_period(&flows, &periods);
+/// let aggregated = aggregate_by_period(&flows, &periods)?;
 /// assert!(aggregated.contains_key(&PeriodId::quarter(2025, 1)));
+/// # Ok::<(), finstack_core::Error>(())
 /// ```
 pub fn aggregate_by_period(
     flows: &[crate::DatedFlow],
     periods: &[Period],
-) -> IndexMap<PeriodId, IndexMap<Currency, Money>> {
+) -> finstack_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
+    validate_periods(periods)?;
     if flows.is_empty() || periods.is_empty() {
-        return IndexMap::new();
+        return Ok(IndexMap::new());
     }
     let is_sorted = flows.windows(2).all(|w| w[0].0 <= w[1].0);
     if is_sorted {
-        return aggregate_by_period_sorted(flows, periods);
+        return Ok(aggregate_by_period_sorted(flows, periods));
     }
     let mut sorted: Vec<crate::DatedFlow> = flows.to_vec();
     sorted.sort_unstable_by_key(|(d, _)| *d);
-    aggregate_by_period_sorted(&sorted, periods)
+    Ok(aggregate_by_period_sorted(&sorted, periods))
 }
 
 // =============================================================================
@@ -188,11 +252,12 @@ pub fn aggregate_by_period(
 
 use finstack_core::market_data::traits::{Discounting, Survival};
 
-/// Decimal-safe single-currency aggregation with explicit target currency.
+/// Currency-checked single-currency aggregation with explicit target currency.
 ///
 /// - Empty input returns `Ok(0 target)`.
 /// - All flows must match `target` currency; otherwise returns `Error::CurrencyMismatch`.
-/// - Sums using `Money::checked_add` to preserve Decimal arithmetic.
+/// - Sums `Money::amount()` values with a Neumaier-compensated f64 accumulator;
+///   no per-flow ISO-4217 rounding is applied during accumulation.
 ///
 /// # Arguments
 ///
@@ -247,6 +312,9 @@ pub fn aggregate_cashflows_checked(
 // =============================================================================
 
 /// Shared implementation for PV aggregation across plain and credit-adjusted variants.
+///
+/// Buckets flows into half-open intervals `[period.start, period.end)` and
+/// validates the sorted/disjoint period contract before accumulating.
 fn pv_by_period_generic<T, F>(
     sorted: &[T],
     periods: &[Period],
@@ -259,6 +327,7 @@ where
     T: HasDate,
     F: FnMut(&T, f64, f64) -> Money,
 {
+    validate_periods(periods)?;
     // Pre-size the outer map to avoid reallocations during insertion.
     let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
         IndexMap::with_capacity(periods.len());
@@ -288,7 +357,7 @@ where
         // Build result from accumulated per-currency values, reusing the buffer.
         result_buf.clear();
         for (&ccy, acc) in &per_ccy {
-            result_buf.insert(ccy, Money::new(acc.total(), ccy));
+            result_buf.insert(ccy, Money::try_new(acc.total(), ccy)?);
         }
         out.insert(p.id, result_buf.clone());
     }
@@ -300,12 +369,9 @@ fn pv_by_period_precomputed(
     sorted: &[CashFlow],
     pv_per_flow: &[Money],
     periods: &[Period],
-) -> IndexMap<PeriodId, IndexMap<Currency, Money>> {
+) -> finstack_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
     debug_assert_eq!(sorted.len(), pv_per_flow.len());
-    debug_assert!(
-        periods.windows(2).all(|w| w[0].start <= w[1].start),
-        "pv_by_period_precomputed requires periods sorted by start date"
-    );
+    validate_periods(periods)?;
     // Pre-size the outer map to avoid reallocations.
     let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
         IndexMap::with_capacity(periods.len());
@@ -330,19 +396,23 @@ fn pv_by_period_precomputed(
         if !per_ccy.is_empty() {
             result_buf.clear();
             for (&ccy, acc) in &per_ccy {
-                result_buf.insert(ccy, Money::new(acc.total(), ccy));
+                result_buf.insert(ccy, Money::try_new(acc.total(), ccy)?);
             }
             out.insert(p.id, result_buf.clone());
         }
     }
 
-    out
+    Ok(out)
 }
 
 /// Checked variant that works directly on `CashFlow` slices without intermediate allocation.
 ///
 /// Filters out `DefaultedNotional` flows during PV computation. Requires flows
 /// to be pre-sorted by date (as guaranteed by `CashFlowSchedule`).
+///
+/// Flows dated on or before the valuation `base` contribute **zero PV**
+/// (historical-flow convention, matching the DataFrame export); they still
+/// occupy their period bucket so totals reconcile with plain aggregation.
 pub(crate) fn pv_by_period_cashflows_sorted_checked(
     sorted: &[CashFlow],
     periods: &[Period],
@@ -354,7 +424,8 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
 ) -> finstack_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
     let date_ctx = DateContext::new(base, dc, dc_ctx);
     pv_by_period_generic(sorted, periods, disc, hazard, &date_ctx, |cf, df, sp| {
-        if cf.kind == CFKind::DefaultedNotional {
+        // Historical flows (date <= base) carry zero PV by convention.
+        if cf.kind == CFKind::DefaultedNotional || cf.date <= base {
             return Money::new(0.0, cf.amount.currency());
         }
         let pv_amount = cf.amount.amount() * df * sp;
@@ -427,8 +498,16 @@ impl<'a> DateContext<'a> {
 /// on liquid credit. For integrated / default-midpoint semantics use
 /// [`RecoveryTiming::AtDefaultIntegrated`] (see
 /// [`pv_by_period_credit_adjusted_detailed_with_timing`]).
-fn credit_adjusted_period_pv(cf: &CashFlow, df: f64, sp: f64, recovery_rate: Option<f64>) -> Money {
-    if cf.kind == CFKind::DefaultedNotional {
+fn credit_adjusted_period_pv(
+    cf: &CashFlow,
+    df: f64,
+    sp: f64,
+    recovery_rate: Option<f64>,
+    base: Date,
+) -> Money {
+    // Historical flows (date <= valuation base) carry zero PV by convention,
+    // matching the DataFrame export and the plain PV path.
+    if cf.kind == CFKind::DefaultedNotional || cf.date <= base {
         return Money::new(0.0, cf.amount.currency());
     }
 
@@ -483,6 +562,12 @@ pub enum RecoveryTiming {
 
 /// Compute signed year fraction, discount factor, and survival probability
 /// for a given cashflow date.
+///
+/// # Errors
+///
+/// Returns [`finstack_core::Error::Validation`] if the discount curve or
+/// survival curve produces a non-finite value at the computed time point;
+/// PV aggregation errors loudly instead of panicking inside `Money::new`.
 fn time_discount_survival(
     d: Date,
     disc: &dyn Discounting,
@@ -500,9 +585,19 @@ fn time_discount_survival(
 
     // Get discount factor
     let df = disc.df(t);
+    if !df.is_finite() {
+        return Err(finstack_core::Error::Validation(format!(
+            "discount curve returned non-finite df ({df}) at t={t} (date {d})"
+        )));
+    }
 
     // Get survival probability if hazard curve provided
     let sp = hazard.map(|h| h.sp(t)).unwrap_or(1.0);
+    if !sp.is_finite() {
+        return Err(finstack_core::Error::Validation(format!(
+            "survival curve returned non-finite sp ({sp}) at t={t} (date {d})"
+        )));
+    }
 
     Ok((t, df, sp))
 }
@@ -538,11 +633,20 @@ fn time_discount_survival(
 /// from the surviving pool before the `R * (1 - SP)` credit adjustment is
 /// applied to remaining principal.
 ///
+/// # Historical Flows and Period Contract
+///
+/// Flows dated on or before `date_ctx.base` contribute **zero PV** by
+/// convention (matching the DataFrame export and the plain PV path). Periods
+/// must be sorted by start, non-overlapping (half-open `[start, end)`), and
+/// have unique ids.
+///
 /// # Errors
 ///
 /// Returns an error if:
 /// - `hazard` curve is `None`
 /// - `recovery_rate` is outside the valid range `[0.0, 1.0]`
+/// - periods are unsorted, overlapping, or contain duplicate ids
+/// - a curve returns a non-finite value at a required time point
 ///
 /// # Arguments
 ///
@@ -612,8 +716,9 @@ pub(crate) fn pv_by_period_credit_adjusted_detailed_with_timing(
 
     match timing {
         RecoveryTiming::AtPaymentDate => {
+            let base = date_ctx.base;
             let pv_fn = |cf: &CashFlow, df: f64, sp: f64| {
-                credit_adjusted_period_pv(cf, df, sp, recovery_rate)
+                credit_adjusted_period_pv(cf, df, sp, recovery_rate, base)
             };
             if is_sorted {
                 return pv_by_period_generic(flows, periods, disc, Some(hazard), &date_ctx, pv_fn);
@@ -638,7 +743,7 @@ pub(crate) fn pv_by_period_credit_adjusted_detailed_with_timing(
             };
             let pv_per_flow =
                 precompute_integrated_pv(sorted, disc, hazard, recovery_rate, &date_ctx)?;
-            Ok(pv_by_period_precomputed(sorted, &pv_per_flow, periods))
+            pv_by_period_precomputed(sorted, &pv_per_flow, periods)
         }
     }
 }
@@ -656,9 +761,23 @@ fn precompute_integrated_pv(
     date_ctx: &DateContext<'_>,
 ) -> finstack_core::Result<Vec<Money>> {
     let mut out: Vec<Money> = Vec::with_capacity(sorted.len());
+    // Boundary T_prev for the principal date group currently being processed.
     let mut prev_principal: Date = date_ctx.base;
+    // Date of the principal group currently being processed. Principal flows
+    // sharing a date all receive the same (T_prev, T] default mass; T_prev
+    // advances once per distinct principal date, never within a date group
+    // (a same-date second principal flow must not see a zero-width interval).
+    let mut current_principal_date: Option<Date> = None;
     for cf in sorted {
         let ccy = cf.amount.currency();
+
+        // Historical flows (date <= valuation base) carry zero PV by
+        // convention, matching the DataFrame export and the plain PV path.
+        if cf.date <= date_ctx.base {
+            out.push(Money::new(0.0, ccy));
+            continue;
+        }
+
         let (t_next, df_t, sp_t) = time_discount_survival(cf.date, disc, Some(hazard), date_ctx)?;
 
         // DefaultedNotional: zeroed (identical to AtPaymentDate path)
@@ -668,7 +787,7 @@ fn precompute_integrated_pv(
         }
         // Realised post-default: discounted at scheduled date, no SP
         if matches!(cf.kind, CFKind::Recovery | CFKind::AccruedOnDefault) {
-            out.push(Money::new(cf.amount.amount() * df_t, ccy));
+            out.push(Money::try_new(cf.amount.amount() * df_t, ccy)?);
             continue;
         }
 
@@ -676,6 +795,15 @@ fn precompute_integrated_pv(
             cf.kind,
             CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
         );
+
+        if is_principal && current_principal_date != Some(cf.date) {
+            // Entering a new principal date group: the boundary becomes the
+            // previous group's date (or the valuation base for the first group).
+            if let Some(d) = current_principal_date {
+                prev_principal = d;
+            }
+            current_principal_date = Some(cf.date);
+        }
 
         let mut pv = cf.amount.amount() * df_t * sp_t;
 
@@ -686,6 +814,11 @@ fn precompute_integrated_pv(
                     time_discount_survival(prev_principal, disc, Some(hazard), date_ctx)?;
                 let t_mid = 0.5 * (t_prev + t_next);
                 let df_mid = disc.df(t_mid);
+                if !df_mid.is_finite() {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "discount curve returned non-finite df ({df_mid}) at midpoint t={t_mid}"
+                    )));
+                }
                 let d_sp = sp_prev - sp_t;
                 // d_sp can go slightly negative from curve noise; clamp to avoid
                 // sign inversion (recovery is a non-negative cashflow expectation).
@@ -694,10 +827,7 @@ fn precompute_integrated_pv(
             }
         }
 
-        if is_principal {
-            prev_principal = cf.date;
-        }
-        out.push(Money::new(pv, ccy));
+        out.push(Money::try_new(pv, ccy)?);
     }
     Ok(out)
 }
@@ -755,6 +885,232 @@ mod compensated_sum_tests {
             neumaier_error,
             naive_error
         );
+    }
+}
+
+#[cfg(test)]
+mod period_contract_tests {
+    use super::*;
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::{Date, DayCount, DayCountContext, Period, PeriodId};
+    use finstack_core::market_data::traits::TermStructure;
+    use finstack_core::money::Money;
+    use finstack_core::types::CurveId;
+    use time::Month;
+
+    fn d(y: i32, m: u8, day: u8) -> Date {
+        Date::from_calendar_date(y, Month::try_from(m).expect("valid month"), day)
+            .expect("valid date")
+    }
+
+    fn period(id: PeriodId, start: Date, end: Date) -> Period {
+        Period {
+            id,
+            start,
+            end,
+            is_actual: true,
+        }
+    }
+
+    struct UnitDiscount {
+        base: Date,
+    }
+
+    impl TermStructure for UnitDiscount {
+        fn id(&self) -> &CurveId {
+            static ID: std::sync::LazyLock<CurveId> = std::sync::LazyLock::new(|| "unit".into());
+            &ID
+        }
+    }
+
+    impl Discounting for UnitDiscount {
+        fn base_date(&self) -> Date {
+            self.base
+        }
+        fn df(&self, _t: f64) -> f64 {
+            1.0
+        }
+    }
+
+    /// Discount curve that returns NaN for any positive time point.
+    struct NanDiscount {
+        base: Date,
+    }
+
+    impl TermStructure for NanDiscount {
+        fn id(&self) -> &CurveId {
+            static ID: std::sync::LazyLock<CurveId> = std::sync::LazyLock::new(|| "nan".into());
+            &ID
+        }
+    }
+
+    impl Discounting for NanDiscount {
+        fn base_date(&self) -> Date {
+            self.base
+        }
+        fn df(&self, t: f64) -> f64 {
+            if t > 0.0 {
+                f64::NAN
+            } else {
+                1.0
+            }
+        }
+    }
+
+    #[test]
+    fn aggregate_by_period_rejects_unsorted_periods() {
+        let flows = vec![(d(2025, 3, 15), Money::new(100.0, Currency::USD))];
+        let periods = vec![
+            period(PeriodId::quarter(2025, 2), d(2025, 4, 1), d(2025, 7, 1)),
+            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 4, 1)),
+        ];
+        let err = aggregate_by_period(&flows, &periods).expect_err("unsorted periods rejected");
+        assert!(format!("{err}").contains("sorted"), "got: {err}");
+    }
+
+    #[test]
+    fn aggregate_by_period_rejects_overlapping_periods() {
+        let flows = vec![(d(2025, 3, 15), Money::new(100.0, Currency::USD))];
+        let periods = vec![
+            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 5, 1)),
+            period(PeriodId::quarter(2025, 2), d(2025, 4, 1), d(2025, 7, 1)),
+        ];
+        let err = aggregate_by_period(&flows, &periods).expect_err("overlapping periods rejected");
+        assert!(format!("{err}").contains("non-overlapping"), "got: {err}");
+    }
+
+    #[test]
+    fn aggregate_by_period_rejects_duplicate_period_ids() {
+        let flows = vec![(d(2025, 3, 15), Money::new(100.0, Currency::USD))];
+        let periods = vec![
+            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 4, 1)),
+            period(PeriodId::quarter(2025, 1), d(2025, 4, 1), d(2025, 7, 1)),
+        ];
+        let err = aggregate_by_period(&flows, &periods).expect_err("duplicate ids rejected");
+        assert!(format!("{err}").contains("duplicate"), "got: {err}");
+    }
+
+    #[test]
+    fn aggregate_by_period_preserves_currency_separation() {
+        // Two currencies through aggregate_by_period: per-currency map outputs
+        // are separate and no cross-currency summation occurs.
+        let flows = vec![
+            (d(2025, 2, 1), Money::new(100.0, Currency::USD)),
+            (d(2025, 2, 15), Money::new(70.0, Currency::EUR)),
+            (d(2025, 3, 1), Money::new(50.0, Currency::USD)),
+        ];
+        let periods = vec![period(
+            PeriodId::quarter(2025, 1),
+            d(2025, 1, 1),
+            d(2025, 4, 1),
+        )];
+
+        let out = aggregate_by_period(&flows, &periods).expect("aggregation succeeds");
+        let q1 = out.get(&PeriodId::quarter(2025, 1)).expect("Q1 present");
+        assert_eq!(q1.len(), 2, "one entry per currency");
+        assert!((q1[&Currency::USD].amount() - 150.0).abs() < 1e-12);
+        assert!((q1[&Currency::EUR].amount() - 70.0).abs() < 1e-12);
+        assert_eq!(q1[&Currency::USD].currency(), Currency::USD);
+        assert_eq!(q1[&Currency::EUR].currency(), Currency::EUR);
+    }
+
+    #[test]
+    fn boundary_flow_buckets_into_next_period_half_open() {
+        // A flow exactly on a period boundary belongs to the NEXT period
+        // (half-open [start, end) convention).
+        let boundary = d(2025, 4, 1);
+        let flows = vec![(boundary, Money::new(100.0, Currency::USD))];
+        let periods = vec![
+            period(PeriodId::quarter(2025, 1), d(2025, 1, 1), d(2025, 4, 1)),
+            period(PeriodId::quarter(2025, 2), d(2025, 4, 1), d(2025, 7, 1)),
+        ];
+
+        let out = aggregate_by_period(&flows, &periods).expect("aggregation succeeds");
+        assert!(!out.contains_key(&PeriodId::quarter(2025, 1)));
+        assert!((out[&PeriodId::quarter(2025, 2)][&Currency::USD].amount() - 100.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn pv_by_period_errors_on_nan_discount_curve() {
+        let base = d(2025, 1, 1);
+        let flows = vec![CashFlow {
+            date: d(2025, 6, 1),
+            reset_date: None,
+            amount: Money::new(100.0, Currency::USD),
+            kind: CFKind::Fixed,
+            accrual_factor: 0.5,
+            rate: None,
+        }];
+        let periods = vec![period(PeriodId::annual(2025), base, d(2026, 1, 1))];
+        let disc = NanDiscount { base };
+
+        let result = pv_by_period_cashflows_sorted_checked(
+            &flows,
+            &periods,
+            &disc,
+            base,
+            DayCount::Act365F,
+            DayCountContext::default(),
+            None,
+        );
+        let err = result.expect_err("NaN df must error, not panic");
+        assert!(format!("{err}").contains("non-finite"), "got: {err}");
+    }
+
+    #[test]
+    fn pv_by_period_zeroes_historical_flows() {
+        // Flows dated on or before the valuation base get zero PV (matching
+        // the DataFrame convention); they still appear in nominal aggregation.
+        let base = d(2025, 4, 1);
+        let flows = vec![
+            CashFlow {
+                date: d(2025, 2, 1), // historical
+                reset_date: None,
+                amount: Money::new(100.0, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: None,
+            },
+            CashFlow {
+                date: base, // exactly on base: also historical by convention
+                reset_date: None,
+                amount: Money::new(50.0, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: None,
+            },
+            CashFlow {
+                date: d(2025, 6, 1), // future
+                reset_date: None,
+                amount: Money::new(200.0, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: None,
+            },
+        ];
+        let periods = vec![period(PeriodId::annual(2025), d(2025, 1, 1), d(2026, 1, 1))];
+        let disc = UnitDiscount { base };
+
+        let out = pv_by_period_cashflows_sorted_checked(
+            &flows,
+            &periods,
+            &disc,
+            base,
+            DayCount::Act365F,
+            DayCountContext::default(),
+            None,
+        )
+        .expect("pv aggregation succeeds");
+
+        // With df = 1.0 only the future flow contributes PV.
+        let pv = out[&PeriodId::annual(2025)][&Currency::USD].amount();
+        assert!((pv - 200.0).abs() < 1e-12, "expected 200, got {pv}");
+
+        // Nominal aggregation still includes the historical flows.
+        let dated: Vec<crate::DatedFlow> = flows.iter().map(|cf| (cf.date, cf.amount)).collect();
+        let nominal = aggregate_by_period(&dated, &periods).expect("nominal aggregation");
+        let total = nominal[&PeriodId::annual(2025)][&Currency::USD].amount();
+        assert!((total - 350.0).abs() < 1e-12, "expected 350, got {total}");
     }
 }
 
@@ -1110,6 +1466,81 @@ mod credit_pv_tests {
         let expected = 1_000_000.0 * 0.8 + 0.40 * 1_000_000.0 * 0.2;
         assert!((v_integrated - expected).abs() < 1e-6);
         assert!((v_at_pay - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn recovery_timing_integrated_handles_same_date_principal_flows() {
+        // Two principal flows (Amortization + PrePayment) on the SAME date
+        // must each receive the full (T_prev, T] default mass. Previously the
+        // second flow saw a zero-width interval (T, T] and its recovery leg
+        // vanished. Under flat df = 1, AtDefaultIntegrated must agree with
+        // AtPaymentDate exactly.
+        struct LinearSurvival;
+        impl TermStructure for LinearSurvival {
+            fn id(&self) -> &CurveId {
+                static ID: std::sync::LazyLock<CurveId> = std::sync::LazyLock::new(|| "lin".into());
+                &ID
+            }
+        }
+        impl Survival for LinearSurvival {
+            fn sp(&self, t: f64) -> f64 {
+                (1.0 - 0.2 * t).clamp(0.0, 1.0)
+            }
+        }
+
+        let base = d(2025, 1, 1);
+        let periods = vec![make_period(base, d(2026, 1, 2))];
+        let disc = FlatDiscount { base };
+        let hazard = LinearSurvival;
+        let same_date = d(2026, 1, 1); // exactly one year out: sp(T) = 0.8
+        let flows = vec![
+            flow(same_date, 600_000.0, CFKind::Amortization),
+            flow(same_date, 400_000.0, CFKind::PrePayment),
+        ];
+
+        let integrated = pv_by_period_credit_adjusted_detailed_with_timing(
+            &flows,
+            &periods,
+            &disc,
+            Some(&hazard),
+            Some(0.40),
+            RecoveryTiming::AtDefaultIntegrated,
+            DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
+        )
+        .expect("integrated pricing");
+        let at_pay = pv_by_period_credit_adjusted_detailed_with_timing(
+            &flows,
+            &periods,
+            &disc,
+            Some(&hazard),
+            Some(0.40),
+            RecoveryTiming::AtPaymentDate,
+            DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
+        )
+        .expect("at-payment-date pricing");
+
+        let v_integrated = integrated
+            .get(&periods[0].id)
+            .and_then(|m| m.get(&Currency::USD))
+            .map(finstack_core::money::Money::amount)
+            .expect("integrated pv");
+        let v_at_pay = at_pay
+            .get(&periods[0].id)
+            .and_then(|m| m.get(&Currency::USD))
+            .map(finstack_core::money::Money::amount)
+            .expect("at-pay pv");
+
+        // Hand computation (df = 1, sp(T) = 0.8, recovery mass 0.2 each):
+        //   PV = 1_000_000 · 0.8 + 0.40 · 1_000_000 · 0.2 = 880_000
+        let expected = 1_000_000.0 * 0.8 + 0.40 * 1_000_000.0 * 0.2;
+        assert!(
+            (v_integrated - expected).abs() < 1e-6,
+            "integrated: expected {expected}, got {v_integrated}"
+        );
+        assert!(
+            (v_integrated - v_at_pay).abs() < 1e-6,
+            "integrated ({v_integrated}) must match at-payment-date ({v_at_pay}) under flat df"
+        );
     }
 
     #[test]

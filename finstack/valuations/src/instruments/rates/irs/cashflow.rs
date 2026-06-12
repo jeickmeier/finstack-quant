@@ -713,6 +713,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 all_in_floor_bp: None,
                 index_cap_bp: None,
                 reset_freq: float.frequency,
+                index_tenor: None,
                 reset_lag_days: float.reset_lag_days,
                 dc: float.day_count,
                 bdc: float.bdc,

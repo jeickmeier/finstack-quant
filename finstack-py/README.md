@@ -143,7 +143,7 @@ Behavioral parity (e.g. `tests/test_core_parity.py`) compares Rust-backed result
 | Config | `finstack.core.config` | `FinstackConfig`, `RoundingMode`, `ToleranceConfig` |
 | Curves / context | `finstack.core.market_data` | `DiscountCurve`, `ForwardCurve`, `MarketContext` |
 | Credit scoring | `finstack.core.credit.scoring` | `altman_z_score`, `ohlson_o_score`, … (tuple results) |
-| Cashflow schedules | `finstack.cashflows` | `build_cashflow_schedule`, `validate_cashflow_schedule` |
+| Cashflow schedules | `finstack.cashflows` | `build_cashflow_schedule_json`, `validate_cashflow_schedule_json` |
 | Pricing | `finstack.valuations` | `price_instrument`, instrument types under `valuations.instruments` |
 | Performance / risk | `finstack.analytics` | `Performance` (methods: `value_at_risk`, drawdowns, rolling metrics, …) |
 

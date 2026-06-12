@@ -18,7 +18,11 @@ pub enum DefaultCurve {
 /// Default model specification.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct DefaultModelSpec {
-    /// CDR: Constant Default Rate (annual, e.g., 0.02 for 2%)
+    /// CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
+    ///
+    /// This field is **ignored** when [`DefaultCurve::Sda`] is active: the
+    /// annual CDR is then derived entirely from the SDA seasoning curve and
+    /// its `speed_multiplier`.
     pub cdr: f64,
     /// Optional curve shape (default: constant)
     #[serde(default)]
@@ -58,7 +62,12 @@ impl DefaultModelSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the derived annual CDR is negative.
+    /// Returns `Error::Validation` if:
+    /// - the SDA `speed_multiplier` is non-finite (NaN/∞) or negative
+    /// - the scaled annual CDR exceeds 1.0 (e.g. an over-unity multiplier)
+    ///
+    /// Returns `InputError::NegativeValue`/`InputError::Invalid` if the
+    /// constant `cdr` is negative or non-finite.
     ///
     /// # References
     ///
@@ -68,6 +77,11 @@ impl DefaultModelSpec {
         let cdr = match &self.curve {
             None | Some(DefaultCurve::Constant) => self.cdr,
             Some(DefaultCurve::Sda { speed_multiplier }) => {
+                if !speed_multiplier.is_finite() || *speed_multiplier < 0.0 {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "SDA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
+                    )));
+                }
                 // PSA/BMA 100 SDA: 0.02%/month ramp to 0.60% CDR at month 30,
                 // flat plateau through month 60, linear decline to 0.03% by
                 // month 120, flat thereafter.
@@ -91,6 +105,13 @@ impl DefaultModelSpec {
                 base * speed_multiplier
             }
         };
+
+        if cdr > 1.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "annual CDR ({cdr}) derived from the default curve exceeds 1.0; \
+                 check the curve speed_multiplier"
+            )));
+        }
 
         use super::super::credit_rates::cpr_to_smm;
         cpr_to_smm(cdr)
@@ -125,6 +146,12 @@ impl DefaultModelSpec {
     /// 0.02%/month to a 0.60% peak at month 30, stays flat through month 60,
     /// declines linearly to a 0.03% terminal annual CDR at month 120, and is
     /// flat thereafter.
+    ///
+    /// While the SDA curve is active, the `cdr` field is ignored by
+    /// [`Self::mdr`]; the stored value (the 100 SDA terminal CDR) is only a
+    /// serde placeholder. The multiplier is validated at evaluation time:
+    /// [`Self::mdr`] rejects non-finite or negative multipliers and any
+    /// multiplier large enough to push the scaled annual CDR above 1.0.
     ///
     /// # Arguments
     ///
@@ -207,6 +234,14 @@ pub struct DefaultEvent {
     /// When `Some(amt)` and `amt > 0.0`, an additional `AccruedOnDefault`
     /// cashflow is emitted on the default date. The accrued amount should
     /// be computed by the caller using `accrued_interest_amount()`.
+    ///
+    /// The amount is paid **in full** (at face), following the ISDA CDS
+    /// premium-leg convention where the protection buyer owes accrued
+    /// premium from the last payment date to the default date (2014 ISDA
+    /// Credit Derivatives Definitions; ISDA CDS Standard Model). For a
+    /// bond-claim accrued amount — which recovers at the recovery rate `R`
+    /// rather than at face — the caller must pre-multiply the accrued by
+    /// the recovery rate before populating this field.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accrued_on_default: Option<f64>,
 }
@@ -217,16 +252,33 @@ impl DefaultEvent {
     /// # Errors
     ///
     /// Returns `InputError::Invalid` if:
-    /// - `recovery_rate` is not in `[0.0, 1.0]`
+    /// - `recovery_rate` is not in `[0.0, 1.0]` (NaN also fails this check)
     /// - `defaulted_amount` is negative
+    ///
+    /// Returns `Error::Validation` if:
+    /// - `defaulted_amount` is non-finite (NaN/∞)
+    /// - `accrued_on_default` is `Some` and non-finite (NaN/∞)
     pub fn validate(&self) -> finstack_core::Result<()> {
         use finstack_core::InputError;
 
         if !(0.0..=1.0).contains(&self.recovery_rate) {
             return Err(finstack_core::Error::Input(InputError::Invalid));
         }
+        if !self.defaulted_amount.is_finite() {
+            return Err(finstack_core::Error::Validation(format!(
+                "DefaultEvent defaulted_amount ({}) must be finite",
+                self.defaulted_amount
+            )));
+        }
         if self.defaulted_amount < 0.0 {
             return Err(finstack_core::Error::Input(InputError::Invalid));
+        }
+        if let Some(accrued) = self.accrued_on_default {
+            if !accrued.is_finite() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "DefaultEvent accrued_on_default ({accrued}) must be finite"
+                )));
+            }
         }
         Ok(())
     }

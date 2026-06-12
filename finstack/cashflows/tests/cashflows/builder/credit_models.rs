@@ -10,7 +10,9 @@
 //!
 //! # SDA (Standard Default Assumption) Model
 //!
-//! - Ramp to 6% CDR at month 30, decline to 3% CDR terminal by month 60
+//! - 100 SDA (PSA/BMA standard): 0.02%/month linear ramp to 0.60% annual CDR
+//!   at month 30, flat plateau months 30-60, linear decline to 0.03% annual
+//!   CDR by month 120, constant thereafter
 //! - MDR (Monthly Default Rate) follows similar conversion to SMM
 
 use crate::helpers::{FACTOR_TOLERANCE, RATE_TOLERANCE};
@@ -428,8 +430,272 @@ fn sda_multiplier_scales_correctly() {
 }
 
 // =============================================================================
-// Property-Based Tests
+// CMBS Lockout Boundary Tests
 // =============================================================================
+
+#[test]
+fn cmbs_lockout_boundary_months() {
+    // The lockout boundary is inclusive: seasoning == lockout_months is still
+    // locked out (SMM = 0); lockout_months + 1 prepays at the configured CPR.
+    use finstack_cashflows::builder::{smm_to_cpr, PrepaymentModelSpec};
+
+    let spec = PrepaymentModelSpec::cmbs_with_lockout(60, 0.10);
+
+    let smm_at_lockout = spec.smm(60).unwrap();
+    assert!(
+        smm_at_lockout.abs() < RATE_TOLERANCE,
+        "seasoning == lockout_months should be locked out (0 SMM), got {}",
+        smm_at_lockout
+    );
+
+    let smm_after_lockout = spec.smm(61).unwrap();
+    assert!(
+        smm_after_lockout > 0.0,
+        "seasoning == lockout_months + 1 should prepay, got {}",
+        smm_after_lockout
+    );
+    let cpr_after = smm_to_cpr(smm_after_lockout).expect("valid SMM");
+    assert!(
+        (cpr_after - 0.10).abs() < RATE_TOLERANCE,
+        "post-lockout CPR should be 10%, got {}",
+        cpr_after
+    );
+}
+
+// =============================================================================
+// Over-Unity Multiplier Validation Tests
+// =============================================================================
+
+#[test]
+fn psa_over_unity_multiplier_gives_descriptive_error() {
+    // 6% terminal CPR * 20x multiplier = 120% CPR > 100% — should produce a
+    // descriptive Validation error, not an opaque InputError.
+    use finstack_cashflows::builder::PrepaymentModelSpec;
+
+    let spec = PrepaymentModelSpec::psa(20.0);
+    let err = spec.smm(30).expect_err("CPR above 1.0 should be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("CPR") && msg.contains("exceeds 1.0"),
+        "error should describe the over-unity CPR, got: {msg}"
+    );
+}
+
+#[test]
+fn sda_over_unity_multiplier_gives_descriptive_error() {
+    // 0.60% peak CDR * 200x multiplier = 120% CDR > 100%.
+    use finstack_cashflows::builder::DefaultModelSpec;
+
+    let spec = DefaultModelSpec::sda(200.0);
+    let err = spec.mdr(30).expect_err("CDR above 1.0 should be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("CDR") && msg.contains("exceeds 1.0"),
+        "error should describe the over-unity CDR, got: {msg}"
+    );
+}
+
+#[test]
+fn non_finite_speed_multiplier_rejected() {
+    use finstack_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec};
+
+    for mult in [f64::NAN, f64::INFINITY, -1.0] {
+        assert!(
+            PrepaymentModelSpec::psa(mult).smm(15).is_err(),
+            "PSA multiplier {mult} should be rejected"
+        );
+        assert!(
+            DefaultModelSpec::sda(mult).mdr(15).is_err(),
+            "SDA multiplier {mult} should be rejected"
+        );
+    }
+}
+
+// =============================================================================
+// Non-Finite Default/Prepayment Amount Tests
+// =============================================================================
+
+#[test]
+fn non_finite_defaulted_amount_rejected_without_mutation() {
+    // NaN/∞ defaulted_amount previously slipped past the `< 0.0` check and
+    // `nan.min(outstanding)` returned `outstanding`, silently liquidating the
+    // full balance. Must now be a Validation error with no partial mutation.
+    use finstack_cashflows::builder::{emit_default_on, DefaultEvent};
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::Date;
+    use time::Month;
+
+    let d = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+    for bad in [f64::NAN, f64::INFINITY] {
+        let event = DefaultEvent {
+            default_date: d,
+            defaulted_amount: bad,
+            recovery_rate: 0.40,
+            recovery_lag: 6,
+            recovery_bdc: None,
+            recovery_calendar_id: None,
+            accrued_on_default: None,
+        };
+        let mut outstanding = 1_000_000.0;
+        let mut flows = Vec::new();
+        let err = emit_default_on(d, &[event], &mut outstanding, Currency::USD, &mut flows)
+            .expect_err("non-finite defaulted_amount should be rejected");
+        assert!(
+            err.to_string().contains("finite"),
+            "error should mention finiteness, got: {err}"
+        );
+        assert_eq!(outstanding, 1_000_000.0, "no mutation on rejection");
+        assert!(flows.is_empty(), "no flows on rejection");
+    }
+}
+
+#[test]
+fn non_finite_accrued_on_default_rejected() {
+    use finstack_cashflows::builder::{emit_default_on, DefaultEvent};
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::Date;
+    use time::Month;
+
+    let d = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+    for bad in [f64::NAN, f64::INFINITY] {
+        let event = DefaultEvent {
+            default_date: d,
+            defaulted_amount: 100_000.0,
+            recovery_rate: 0.40,
+            recovery_lag: 6,
+            recovery_bdc: None,
+            recovery_calendar_id: None,
+            accrued_on_default: Some(bad),
+        };
+        let mut outstanding = 1_000_000.0;
+        let mut flows = Vec::new();
+        let result = emit_default_on(d, &[event], &mut outstanding, Currency::USD, &mut flows);
+        assert!(
+            result.is_err(),
+            "non-finite accrued_on_default should be rejected"
+        );
+        assert_eq!(outstanding, 1_000_000.0, "no mutation on rejection");
+        assert!(flows.is_empty(), "no flows on rejection");
+    }
+}
+
+#[test]
+fn non_finite_prepayment_amount_rejected_without_mutation() {
+    use finstack_cashflows::builder::emit_prepayment_on;
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::Date;
+    use time::Month;
+
+    let d = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+    for bad in [f64::NAN, f64::INFINITY] {
+        let mut outstanding = 1_000_000.0;
+        let mut flows = Vec::new();
+        let err = emit_prepayment_on(d, bad, &mut outstanding, Currency::USD, &mut flows)
+            .expect_err("non-finite prepayment amount should be rejected");
+        assert!(
+            err.to_string().contains("finite"),
+            "error should mention finiteness, got: {err}"
+        );
+        assert_eq!(outstanding, 1_000_000.0, "no mutation on rejection");
+        assert!(flows.is_empty(), "no flows on rejection");
+    }
+}
+
+// =============================================================================
+// Multi-Event Atomicity Tests
+// =============================================================================
+
+#[test]
+fn multi_event_default_emission_is_atomic() {
+    // A validation failure on the second event must leave the first event
+    // unapplied: no flows emitted, outstanding unchanged.
+    use finstack_cashflows::builder::{emit_default_on, DefaultEvent};
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::Date;
+    use time::Month;
+
+    let d = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
+    let valid = DefaultEvent {
+        default_date: d,
+        defaulted_amount: 100_000.0,
+        recovery_rate: 0.40,
+        recovery_lag: 6,
+        recovery_bdc: None,
+        recovery_calendar_id: None,
+        accrued_on_default: None,
+    };
+    let invalid = DefaultEvent {
+        default_date: d,
+        defaulted_amount: 50_000.0,
+        recovery_rate: 1.5, // out of [0, 1]
+        recovery_lag: 6,
+        recovery_bdc: None,
+        recovery_calendar_id: None,
+        accrued_on_default: None,
+    };
+
+    let mut outstanding = 1_000_000.0;
+    let mut flows = Vec::new();
+    let result = emit_default_on(
+        d,
+        &[valid, invalid],
+        &mut outstanding,
+        Currency::USD,
+        &mut flows,
+    );
+
+    assert!(
+        result.is_err(),
+        "second invalid event should fail the batch"
+    );
+    assert_eq!(
+        outstanding, 1_000_000.0,
+        "first event must not be applied when a later event fails"
+    );
+    assert!(flows.is_empty(), "no flows may be emitted on failure");
+}
+
+// =============================================================================
+// Recovery Date Adjustment Tests
+// =============================================================================
+
+#[test]
+fn recovery_bdc_adjusts_recovery_flow_date() {
+    // 2025-03-01 + 3 months = 2025-06-01, a Sunday; Following on the
+    // weekends calendar shifts the Recovery flow to Monday 2025-06-02.
+    use finstack_cashflows::builder::{emit_default_on, DefaultEvent};
+    use finstack_core::cashflow::CFKind;
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::{BusinessDayConvention, Date};
+    use time::Month;
+
+    let d = Date::from_calendar_date(2025, Month::March, 1).expect("valid date");
+    let event = DefaultEvent {
+        default_date: d,
+        defaulted_amount: 100_000.0,
+        recovery_rate: 0.40,
+        recovery_lag: 3,
+        recovery_bdc: Some(BusinessDayConvention::Following),
+        recovery_calendar_id: Some("weekends".to_string()),
+        accrued_on_default: None,
+    };
+
+    let mut outstanding = 1_000_000.0;
+    let mut flows = Vec::new();
+    emit_default_on(d, &[event], &mut outstanding, Currency::USD, &mut flows)
+        .expect("should succeed");
+
+    let recovery = flows
+        .iter()
+        .find(|cf| cf.kind == CFKind::Recovery)
+        .expect("recovery flow expected");
+    let expected = Date::from_calendar_date(2025, Month::June, 2).expect("valid date");
+    assert_eq!(
+        recovery.date, expected,
+        "Recovery flow should be adjusted from Sunday 2025-06-01 to Monday 2025-06-02"
+    );
+    assert_eq!(outstanding, 900_000.0);
+}
 
 // =============================================================================
 // AccruedOnDefault Emission Tests

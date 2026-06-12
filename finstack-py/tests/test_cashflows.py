@@ -3,16 +3,17 @@
 from __future__ import annotations
 
 import json
+import math
 
 from finstack.valuations.instruments import price_instrument
 import pytest
 
 from finstack.cashflows import (
-    accrued_interest,
-    bond_from_cashflows,
-    build_cashflow_schedule,
-    dated_flows,
-    validate_cashflow_schedule,
+    accrued_interest_json,
+    bond_from_cashflows_json,
+    build_cashflow_schedule_json,
+    dated_flows_json,
+    validate_cashflow_schedule_json,
 )
 
 
@@ -125,16 +126,16 @@ def _floating_market_json() -> str:
 
 
 def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
-    schedule_json = build_cashflow_schedule(_cashflow_spec())
+    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
     schedule = json.loads(schedule_json)
     assert schedule["meta"]["issue_date"] == "2024-08-31"
 
-    assert json.loads(validate_cashflow_schedule(schedule_json)) == schedule
-    flows = json.loads(dated_flows(schedule_json))
+    assert json.loads(validate_cashflow_schedule_json(schedule_json)) == schedule
+    flows = json.loads(dated_flows_json(schedule_json))
     assert len(flows) == len(schedule["flows"])
-    assert accrued_interest(schedule_json, "2025-02-28") > 0.0
+    assert accrued_interest_json(schedule_json, "2025-02-28") > 0.0
 
-    instrument_json = bond_from_cashflows("CUSTOM-CF", schedule_json, "USD-OIS", 99.0)
+    instrument_json = bond_from_cashflows_json("CUSTOM-CF", schedule_json, "USD-OIS", 99.0)
     instrument = json.loads(instrument_json)
     assert instrument["type"] == "bond"
 
@@ -144,7 +145,7 @@ def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
 
 
 def test_cashflows_builds_floating_schedule_with_market_json() -> None:
-    schedule_json = build_cashflow_schedule(_floating_cashflow_spec(), _floating_market_json())
+    schedule_json = build_cashflow_schedule_json(_floating_cashflow_spec(), _floating_market_json())
     schedule = json.loads(schedule_json)
 
     float_flows = [flow for flow in schedule["flows"] if flow["kind"] == "FloatReset"]
@@ -153,7 +154,7 @@ def test_cashflows_builds_floating_schedule_with_market_json() -> None:
 
 
 def test_cashflows_accrued_interest_accepts_config_json() -> None:
-    schedule_json = build_cashflow_schedule(_cashflow_spec())
+    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
 
     config_json = json.dumps({
         "method": "Linear",
@@ -162,12 +163,12 @@ def test_cashflows_accrued_interest_accepts_config_json() -> None:
         "strict_issue_date": True,
     })
 
-    assert accrued_interest(schedule_json, "2025-02-28", config_json) > 0.0
+    assert accrued_interest_json(schedule_json, "2025-02-28", config_json) > 0.0
 
 
 def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean() -> None:
-    schedule_json = build_cashflow_schedule(_cashflow_spec())
-    instrument_json = bond_from_cashflows("CUSTOM-CF-NO-QUOTE", schedule_json, "USD-OIS")
+    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
+    instrument_json = bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", schedule_json, "USD-OIS")
     instrument = json.loads(instrument_json)
 
     assert instrument["type"] == "bond"
@@ -175,17 +176,43 @@ def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean() -> None:
 
 
 def test_cashflows_reject_malformed_json_and_invalid_dates() -> None:
-    schedule_json = build_cashflow_schedule(_cashflow_spec())
+    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
 
-    with pytest.raises(Exception, match="invalid cashflow schedule JSON"):
-        validate_cashflow_schedule("{not json")
+    # Validation/parse failures map to ValueError per the binding error contract
+    # (finstack-py/src/errors.rs `core_to_py`).
+    with pytest.raises(ValueError, match="invalid cashflow schedule JSON"):
+        validate_cashflow_schedule_json("{not json")
 
-    with pytest.raises(Exception, match="invalid ISO date"):
-        accrued_interest(schedule_json, "2025-02-30")
+    with pytest.raises(ValueError, match="invalid ISO date"):
+        accrued_interest_json(schedule_json, "2025-02-30")
+
+
+def test_cashflows_reject_malformed_market_json() -> None:
+    with pytest.raises(ValueError, match="invalid market context JSON"):
+        build_cashflow_schedule_json(_floating_cashflow_spec(), "{not json")
+
+
+def test_cashflows_missing_forward_curve_raises_key_error() -> None:
+    # Missing-id lookups (forward curve not in market) map to KeyError per
+    # the binding error contract (finstack-py/src/errors.rs `core_to_py`).
+    with pytest.raises(KeyError, match="USD-SOFR-3M"):
+        build_cashflow_schedule_json(_floating_cashflow_spec(), _market_json())
+
+
+def test_cashflows_build_is_deterministic_and_accrual_is_finite() -> None:
+    # Cross-language determinism fixture: the same spec is exercised in
+    # finstack-wasm/tests/facade/cashflows.test.mjs so the surfaces are comparable.
+    first = build_cashflow_schedule_json(_cashflow_spec())
+    second = build_cashflow_schedule_json(_cashflow_spec())
+    assert first == second  # byte-identical canonical JSON
+
+    accrued = accrued_interest_json(first, "2025-02-28")
+    assert isinstance(accrued, float)
+    assert math.isfinite(accrued)
 
 
 def test_cashflows_reject_amortization_over_notional() -> None:
-    schedule = json.loads(build_cashflow_schedule(_cashflow_spec()))
+    schedule = json.loads(build_cashflow_schedule_json(_cashflow_spec()))
     schedule["flows"].append({
         "date": "2025-03-31",
         "reset_date": None,
@@ -195,5 +222,5 @@ def test_cashflows_reject_amortization_over_notional() -> None:
         "rate": None,
     })
 
-    with pytest.raises(Exception, match="total amortization"):
-        validate_cashflow_schedule(json.dumps(schedule))
+    with pytest.raises(ValueError, match="total amortization"):
+        validate_cashflow_schedule_json(json.dumps(schedule))

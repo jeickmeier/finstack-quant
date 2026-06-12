@@ -140,7 +140,41 @@ status = "exists"
 note = "First binding slice is JSON-only: schedule build/validate/flows/accrual and custom-cashflow bond JSON creation."
 
 [crates.cashflows.modules]
-json = { python = "finstack.cashflows", status = "exists", note = "build_cashflow_schedule, validate_cashflow_schedule, dated_flows, accrued_interest, bond_from_cashflows exposed flat on finstack.cashflows" }
+json        = { python = "finstack.cashflows",             status = "exists", note = "build_cashflow_schedule_json, validate_cashflow_schedule_json, dated_flows_json, accrued_interest_json, bond_from_cashflows_json exposed flat on finstack.cashflows" }
+accrual     = { python = "finstack.cashflows.accrual",     status = "missing", note = "Accrual engine reachable only via accrued_interest_json on the JSON bridge" }
+aggregation = { python = "finstack.cashflows.aggregation", status = "missing", note = "Period aggregation not yet bound; use the JSON bridge schedule output" }
+builder     = { python = "finstack.cashflows.builder",     status = "missing", note = "Builder/spec types travel as JSON via build_cashflow_schedule_json; no typed Python surface yet" }
+primitives  = { python = "finstack.cashflows.primitives",  status = "missing", note = "CashFlow/CFKind primitives travel as JSON; no typed Python surface yet" }
+traits      = { python = "finstack.cashflows.traits",      status = "missing", note = "Rust-side trait surface; not meaningful as a Python module" }
+
+# Cross-crate symbols surfaced under finstack.cashflows whose canonical Rust
+# home is a different crate. Parity audits must resolve these against the
+# listed crate, not finstack-cashflows.
+[crates.cashflows.cross_crate]
+bond_from_cashflows_json = { rust_crate = "finstack-valuations", rust_lib = "finstack/valuations/src/lib.rs", note = "Canonical finstack_valuations::bond_from_cashflows_json, exposed under finstack.cashflows (Python) and cashflows.bondFromCashflowsJson (WASM) as a convenience bridge" }
+
+# ---------------------------------------------------------------------------
+# WASM cashflows facade subset + symbol-level triplet pinning.
+# Python names are identical to the canonical Rust function names; the map
+# below pins python_snake_case -> js camelCase for every root export.
+# ---------------------------------------------------------------------------
+[wasm_cashflows_subset]
+rust_module_root = "../finstack-wasm/src/api/cashflows/"
+js_export_file   = "../finstack-wasm/exports/cashflows.js"
+root_exports = [
+    "accruedInterestJson",
+    "bondFromCashflowsJson",
+    "buildCashflowScheduleJson",
+    "datedFlowsJson",
+    "validateCashflowScheduleJson",
+]
+
+[wasm_cashflows_subset.python_js_map]
+accrued_interest_json = "accruedInterestJson"
+bond_from_cashflows_json = "bondFromCashflowsJson"
+build_cashflow_schedule_json = "buildCashflowScheduleJson"
+dated_flows_json = "datedFlowsJson"
+validate_cashflow_schedule_json = "validateCashflowScheduleJson"
 
 # ---------------------------------------------------------------------------
 # finstack-covenants  →  finstack.covenants

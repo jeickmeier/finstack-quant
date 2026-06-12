@@ -27,7 +27,12 @@ pub enum PrepaymentCurve {
 /// Prepayment model specification.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct PrepaymentModelSpec {
-    /// CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%)
+    /// CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
+    ///
+    /// This field is **ignored** when [`PrepaymentCurve::Psa`] is active: the
+    /// annual CPR is then derived entirely from the PSA seasoning ramp and
+    /// its `speed_multiplier`. It IS used by [`PrepaymentCurve::CmbsLockout`]
+    /// as the post-lockout CPR.
     pub cpr: f64,
     /// Optional curve shape (default: constant)
     #[serde(default)]
@@ -64,7 +69,12 @@ impl PrepaymentModelSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the derived annual CPR is negative.
+    /// Returns `Error::Validation` if:
+    /// - the PSA `speed_multiplier` is non-finite (NaN/∞) or negative
+    /// - the scaled annual CPR exceeds 1.0 (e.g. an over-unity multiplier)
+    ///
+    /// Returns `InputError::NegativeValue`/`InputError::Invalid` if the
+    /// constant `cpr` is negative or non-finite.
     ///
     /// # References
     ///
@@ -73,6 +83,11 @@ impl PrepaymentModelSpec {
         let cpr = match &self.curve {
             None | Some(PrepaymentCurve::Constant) => self.cpr,
             Some(PrepaymentCurve::Psa { speed_multiplier }) => {
+                if !speed_multiplier.is_finite() || *speed_multiplier < 0.0 {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "PSA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
+                    )));
+                }
                 // PSA: ramp to 6% CPR over 30 months, then flat
                 const RAMP_MONTHS: u32 = 30;
                 const TERMINAL_CPR: f64 = 0.06;
@@ -93,6 +108,13 @@ impl PrepaymentModelSpec {
                 }
             }
         };
+
+        if cpr > 1.0 {
+            return Err(finstack_core::Error::Validation(format!(
+                "annual CPR ({cpr}) derived from the prepayment curve exceeds 1.0; \
+                 check the curve speed_multiplier"
+            )));
+        }
 
         use super::super::credit_rates::cpr_to_smm;
         cpr_to_smm(cpr)
@@ -151,6 +173,12 @@ impl PrepaymentModelSpec {
     ///
     /// The implementation uses the standard PSA ramp to a 6% annual CPR over
     /// 30 months, then holds that terminal CPR flat.
+    ///
+    /// While the PSA curve is active, the `cpr` field is ignored by
+    /// [`Self::smm`]; the stored value (the 100 PSA terminal CPR) is only a
+    /// serde placeholder. The multiplier is validated at evaluation time:
+    /// [`Self::smm`] rejects non-finite or negative multipliers and any
+    /// multiplier large enough to push the scaled annual CPR above 1.0.
     ///
     /// # Arguments
     ///

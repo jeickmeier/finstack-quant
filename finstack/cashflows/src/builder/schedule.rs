@@ -137,6 +137,7 @@ pub enum CashflowRepresentation {
 /// Tracks referenced calendar IDs, optional facility limits, and the instrument's
 /// issue date for use by downstream engines (e.g., accrual calculation).
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CashFlowMeta {
     /// Meaning of the schedule relative to waterfall policy.
     #[serde(default)]
@@ -160,6 +161,7 @@ pub struct CashFlowMeta {
 /// Contains ordered cashflows plus notional and a representative `DayCount`.
 /// Methods provide convenient accessors commonly used by pricing and analysis.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CashFlowSchedule {
     /// Ordered cashflows (coupons, principal payments, fees)
     pub flows: Vec<CashFlow>,
@@ -349,11 +351,17 @@ impl CashFlowSchedule {
     /// (the builder internally manages the reduction of outstanding balance).
     /// PIK amounts are positive and increase outstanding.
     ///
+    /// # Negative Balances
+    ///
+    /// Replayed balances are permitted to go negative (e.g. amortization
+    /// exceeding the tracked outstanding); a `tracing::warn!` is emitted when
+    /// the balance drops below a small negative tolerance, but no error is
+    /// raised. The builder validates over-repayment at construction time.
+    ///
     /// # Errors
     ///
-    /// Returns error if:
-    /// - Amortization exceeds current outstanding (would result in negative balance)
-    /// - Currency mismatch between flows and notional
+    /// Returns error if there is a currency mismatch between flows and the
+    /// notional.
     ///
     /// # Example
     ///
@@ -514,11 +522,17 @@ impl CashFlowSchedule {
     /// Note: The initial notional flow (funding at issue) is skipped as it's already
     /// accounted for in `notional.initial`. Only subsequent draws/repays are tracked.
     ///
+    /// # Negative Balances
+    ///
+    /// Replayed balances are permitted to go negative (e.g. a repayment
+    /// exceeding the tracked outstanding); a `tracing::warn!` is emitted when
+    /// the balance drops below a small negative tolerance, but no error is
+    /// raised. The builder validates over-repayment at construction time.
+    ///
     /// # Errors
     ///
     /// Returns error if:
     /// - `meta.issue_date` is unset
-    /// - Amortization or repayment exceeds current outstanding
     /// - Currency mismatch between flows and notional
     pub fn outstanding_by_date(&self) -> finstack_core::Result<Vec<(Date, Money)>> {
         let mut result: Vec<(Date, Money)> = Vec::with_capacity(self.flows.len());
@@ -711,6 +725,9 @@ fn apply_flow_to_outstanding(
     is_initial_funding: bool,
     include_notional: bool,
 ) -> finstack_core::Result<()> {
+    /// Tolerance below zero before a replayed balance is considered negative.
+    const NEGATIVE_BALANCE_EPSILON: f64 = 1e-9;
+
     match cf.kind {
         CFKind::Amortization | CFKind::PrePayment | CFKind::DefaultedNotional => {
             // Amortization amounts are stored as positive in the builder
@@ -726,6 +743,16 @@ fn apply_flow_to_outstanding(
             *outstanding = outstanding.checked_sub(cf.amount)?;
         }
         _ => {}
+    }
+    // Negative replayed balances are permitted (warn-only); the builder
+    // validates over-repayment at construction time.
+    if outstanding.amount() < -NEGATIVE_BALANCE_EPSILON {
+        tracing::warn!(
+            date = %cf.date,
+            kind = ?cf.kind,
+            balance = outstanding.amount(),
+            "replayed outstanding balance went negative"
+        );
     }
     Ok(())
 }

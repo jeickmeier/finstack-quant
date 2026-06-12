@@ -108,6 +108,7 @@ impl FIIndexTotalReturnSwap {
                 stub: StubKind::None,
                 end_of_month: false,
                 payment_lag_days: 0,
+                adjust_accrual_dates: false,
             },
         );
         Self::builder()

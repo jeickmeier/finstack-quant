@@ -1114,7 +1114,7 @@ export declare const margin: MarginNamespace;
  * JSON bridge to the Rust `finstack-cashflows` crate.
  *
  * All methods accept and return JSON strings that mirror the canonical Rust
- * serde model. Refer to `api/cashflows.rs` for parameter and return-shape
+ * serde model. Refer to `src/api/cashflows/mod.rs` for parameter and return-shape
  * details; the docstrings there are kept in sync with the underlying Rust
  * implementation.
  */
@@ -1127,7 +1127,7 @@ export interface CashflowsNamespace {
    * @returns           JSON-encoded `CashFlowSchedule`.
    * @throws            If the spec or market JSON is malformed, or schedule construction fails.
    */
-  buildCashflowSchedule(specJson: string, marketJson?: string | null): string;
+  buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;
 
   /**
    * Validate a cashflow schedule JSON string and return it canonicalized.
@@ -1136,7 +1136,7 @@ export interface CashflowsNamespace {
    * @returns            Canonicalized JSON-encoded `CashFlowSchedule`.
    * @throws             If the schedule JSON is malformed or fails validation.
    */
-  validateCashflowSchedule(scheduleJson: string): string;
+  validateCashflowScheduleJson(scheduleJson: string): string;
 
   /**
    * Extract dated flows from a cashflow schedule.
@@ -1147,7 +1147,7 @@ export interface CashflowsNamespace {
    *                     metadata are intentionally omitted.
    * @throws             If the schedule JSON is malformed.
    */
-  datedFlows(scheduleJson: string): string;
+  datedFlowsJson(scheduleJson: string): string;
 
   /**
    * Compute accrued interest for a schedule as of a given date.
@@ -1161,7 +1161,7 @@ export interface CashflowsNamespace {
    *                     expecting decimal-string equality.
    * @throws             If any JSON input is malformed or the accrual computation fails.
    */
-  accruedInterest(scheduleJson: string, asOf: string, configJson?: string | null): number;
+  accruedInterestJson(scheduleJson: string, asOf: string, configJson?: string | null): number;
 
   /**
    * Construct a tagged Bond instrument JSON from a cashflow schedule.
@@ -1177,7 +1177,7 @@ export interface CashflowsNamespace {
    * @returns               JSON-encoded tagged `InstrumentJson::Bond`.
    * @throws                If the schedule JSON is malformed or bond construction fails.
    */
-  bondFromCashflows(
+  bondFromCashflowsJson(
     instrumentId: string,
     scheduleJson: string,
     discountCurveId: string,

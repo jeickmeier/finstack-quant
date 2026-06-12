@@ -192,6 +192,7 @@ fn test_floating_vs_margin_only() {
                 all_in_cap_bp: None,
                 index_cap_bp: None,
                 reset_freq: Tenor::quarterly(),
+                index_tenor: None,
                 reset_lag_days: 2,
                 dc: DayCount::Act360,
                 bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,
@@ -272,6 +273,7 @@ fn test_reset_frequency_mismatch() {
                 all_in_cap_bp: None,
                 index_cap_bp: None,
                 reset_freq: Tenor::monthly(), // Monthly resets
+                index_tenor: None,
                 reset_lag_days: 2,
                 dc: DayCount::Act360,
                 bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,

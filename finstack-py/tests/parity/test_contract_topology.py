@@ -345,6 +345,59 @@ def test_wasm_attribution_root_exports_are_triplet_accounted_for() -> None:
     assert not overlap, f"attribution wasm_only overlaps python_js_map values: {sorted(overlap)}"
 
 
+def test_wasm_cashflows_exports_match_contract() -> None:
+    """`exports/cashflows.js` root keys must match [wasm_cashflows_subset]."""
+    block = CONTRACT["wasm_cashflows_subset"]
+    js_path = (CONTRACT_PATH.parent / block["js_export_file"]).resolve()
+    expected = set(block["root_exports"])
+    actual = _parse_exported_const_object_keys(js_path, "cashflows")
+    assert actual == expected, (
+        f"cashflows.js exports diverged from contract.\n"
+        f"  missing from JS: {sorted(expected - actual)}\n"
+        f"  unlisted in contract: {sorted(actual - expected)}"
+    )
+
+
+def test_wasm_cashflows_root_exports_are_triplet_accounted_for() -> None:
+    """Every cashflows WASM root export is pinned in python_js_map."""
+    block = CONTRACT["wasm_cashflows_subset"]
+    root_exports = set(block["root_exports"])
+    mapped_js = set(block["python_js_map"].values())
+    assert mapped_js == root_exports, (
+        f"cashflows python_js_map must cover all root exports exactly.\n"
+        f"  unmapped root exports: {sorted(root_exports - mapped_js)}\n"
+        f"  mapped but not exported: {sorted(mapped_js - root_exports)}"
+    )
+
+
+def test_python_cashflows_surface_matches_contract() -> None:
+    """`finstack.cashflows` __all__ must equal the pinned python triplet names."""
+    block = CONTRACT["wasm_cashflows_subset"]
+    module = importlib.import_module("finstack.cashflows")
+    expected = set(block["python_js_map"])
+    actual = set(module.__all__)
+    assert actual == expected, (
+        f"finstack.cashflows __all__ diverged from contract python_js_map keys.\n"
+        f"  missing from Python: {sorted(expected - actual)}\n"
+        f"  unlisted in contract: {sorted(actual - expected)}"
+    )
+    missing = [name for name in expected if not callable(getattr(module, name, None))]
+    assert not missing, f"finstack.cashflows symbols not callable: {missing}"
+
+
+def test_cashflows_cross_crate_symbols_recorded() -> None:
+    """Cross-crate cashflows symbols must be pinned with their canonical crate."""
+    cross = CONTRACT["crates"]["cashflows"]["cross_crate"]
+    assert set(cross) == {"bond_from_cashflows_json"}
+    entry = cross["bond_from_cashflows_json"]
+    assert entry["rust_crate"] == "finstack-valuations"
+    rust_lib = (CONTRACT_PATH.parent / ".." / entry["rust_lib"]).resolve()
+    assert rust_lib.exists(), f"cross_crate rust_lib path missing: {rust_lib}"
+    assert "bond_from_cashflows_json" in rust_lib.read_text(), (
+        "canonical bond_from_cashflows_json not found in declared rust_lib"
+    )
+
+
 WASM_NAMESPACE_SUBSETS = [
     ("wasm_statements_subset", "statements", "finstack.statements"),
     ("wasm_statements_analytics_subset", "statements_analytics", "finstack.statements_analytics"),

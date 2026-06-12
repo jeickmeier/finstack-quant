@@ -685,6 +685,134 @@ mod computation {
         );
     }
 
+    /// Maturity classification: StepRemaining emits only the scheduled
+    /// step-down as `Amortization` at maturity; the residual (final target)
+    /// is redeemed as `Notional`, consistent with `CustomPrincipal`.
+    ///
+    /// Previously the entire outstanding was emitted as `Amortization` at
+    /// maturity. Total principal cash is identical — only the KIND
+    /// classification of the residual changed (Amortization -> Notional).
+    #[test]
+    fn step_remaining_at_maturity_emits_scheduled_amortization_and_residual_notional() {
+        let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+        let q2 = Date::from_calendar_date(2025, Month::July, 15).unwrap();
+        let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+        let init = Money::new(1_000_000.0, Currency::USD);
+
+        // Step down to 800K mid-life, then a final 200K target at maturity.
+        let schedule_pairs = vec![
+            (q2, Money::new(800_000.0, Currency::USD)),
+            (maturity, Money::new(200_000.0, Currency::USD)),
+        ];
+
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(init, issue, maturity)
+            .amortization(AmortizationSpec::StepRemaining {
+                schedule: schedule_pairs,
+            })
+            .fixed_cf(standard_fixed_spec());
+
+        let schedule = builder.build_with_curves(None).unwrap();
+
+        // At maturity: scheduled step-down 800K -> 200K = 600K Amortization.
+        let maturity_amort: f64 = schedule
+            .flows
+            .iter()
+            .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
+            .map(|cf| cf.amount.amount())
+            .sum();
+        assert!(
+            (maturity_amort - 600_000.0).abs() < 1e-6,
+            "maturity amortization should be the scheduled step-down (600K), got {maturity_amort}"
+        );
+
+        // Residual 200K (the final target) is redeemed as Notional.
+        let maturity_notional: f64 = schedule
+            .flows
+            .iter()
+            .filter(|cf| {
+                cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
+            })
+            .map(|cf| cf.amount.amount())
+            .sum();
+        assert!(
+            (maturity_notional - 200_000.0).abs() < 1e-6,
+            "residual balance should be redeemed as Notional (200K), got {maturity_notional}"
+        );
+
+        // Economic invariant: total principal returned equals initial.
+        let total_amort: f64 = schedule
+            .flows
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Amortization)
+            .map(|cf| cf.amount.amount())
+            .sum();
+        assert!(
+            (total_amort + maturity_notional - init.amount()).abs() < 1e-6,
+            "total principal cash must equal initial notional"
+        );
+    }
+
+    /// Maturity classification: PercentOfOriginalPerPeriod emits only the
+    /// configured percentage as `Amortization` at maturity; the residual is
+    /// redeemed as `Notional`, consistent with `CustomPrincipal`.
+    ///
+    /// Previously the entire outstanding was emitted as `Amortization` at
+    /// maturity. Total principal cash is identical — only the KIND
+    /// classification of the residual changed (Amortization -> Notional).
+    #[test]
+    fn percent_per_period_at_maturity_emits_scheduled_amortization_and_residual_notional() {
+        let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+        let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+        let init = Money::new(1_000_000.0, Currency::USD);
+
+        // 10% of original per quarter: 100K on each of 4 quarterly dates,
+        // leaving 600K residual at maturity.
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(init, issue, maturity)
+            .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.10 })
+            .fixed_cf(standard_fixed_spec());
+
+        let schedule = builder.build_with_curves(None).unwrap();
+
+        let maturity_amort: f64 = schedule
+            .flows
+            .iter()
+            .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
+            .map(|cf| cf.amount.amount())
+            .sum();
+        assert!(
+            (maturity_amort - 100_000.0).abs() < 1e-6,
+            "maturity amortization should be the configured 10% (100K), got {maturity_amort}"
+        );
+
+        let maturity_notional: f64 = schedule
+            .flows
+            .iter()
+            .filter(|cf| {
+                cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
+            })
+            .map(|cf| cf.amount.amount())
+            .sum();
+        assert!(
+            (maturity_notional - 600_000.0).abs() < 1e-6,
+            "residual balance should be redeemed as Notional (600K), got {maturity_notional}"
+        );
+
+        let total_amort: f64 = schedule
+            .flows
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Amortization)
+            .map(|cf| cf.amount.amount())
+            .sum();
+        assert!(
+            (total_amort + maturity_notional - init.amount()).abs() < 1e-6,
+            "total principal cash must equal initial notional"
+        );
+    }
+
     /// Test step-remaining amortization produces correct outstanding path
     #[test]
     fn step_remaining_amortization_golden_values() {

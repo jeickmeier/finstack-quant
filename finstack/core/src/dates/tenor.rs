@@ -146,11 +146,41 @@ impl TenorUnit {
     serde::Deserialize,
     schemars::JsonSchema,
 )]
+#[serde(try_from = "TenorDe")]
 pub struct Tenor {
     /// Number of units.
     pub count: u32,
     /// Unit type (days, weeks, months, years).
     pub unit: TenorUnit,
+}
+
+/// Deserialization mirror of [`Tenor`] used to validate inbound values.
+///
+/// A zero-count tenor is a no-op period that makes schedule generation
+/// loop forever, so inbound payloads (e.g. JSON) with `"count": 0` must
+/// fail loudly instead of constructing a degenerate `Tenor`.
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+struct TenorDe {
+    count: u32,
+    unit: TenorUnit,
+}
+
+impl TryFrom<TenorDe> for Tenor {
+    type Error = crate::Error;
+
+    fn try_from(raw: TenorDe) -> Result<Self, Self::Error> {
+        if raw.count == 0 {
+            return Err(InputError::InvalidTenor {
+                tenor: "0".to_string(),
+                reason: "count must be positive".to_string(),
+            }
+            .into());
+        }
+        Ok(Self {
+            count: raw.count,
+            unit: raw.unit,
+        })
+    }
 }
 
 impl Tenor {

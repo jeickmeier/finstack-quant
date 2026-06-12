@@ -13,6 +13,7 @@ use finstack_core::money::Money;
 #[derive(
     Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub enum AmortizationSpec {
     /// No amortization – principal remains constant until final redemption.
     #[default]
@@ -52,6 +53,7 @@ pub enum AmortizationSpec {
 /// Combines initial principal with amortization behavior for complete
 /// notional lifecycle management.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct Notional {
     /// Initial principal amount outstanding at leg inception.
     pub initial: Money,

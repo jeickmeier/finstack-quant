@@ -890,7 +890,7 @@
       "oneOf": [
         {
           "const": "PointInTime",
-          "description": "Use outstanding at a single point in time (period start). Current behavior.",
+          "description": "Use the outstanding balance at the period's accrual start, matching the\ncoupon convention (same-date amortization/PIK on the payment date does\nnot affect the fee base).",
           "type": "string"
         },
         {
@@ -913,6 +913,7 @@
           "description": "Base on undrawn = max(limit - outstanding, 0).",
           "properties": {
             "Undrawn": {
+              "additionalProperties": false,
               "properties": {
                 "facility_limit": {
                   "$ref": "#/$defs/Money",
@@ -987,14 +988,12 @@
       "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months);\nassert_eq!(tenor.count, 3);\nassert_eq!(tenor.unit, TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count, 6);\nassert_eq!(parsed.unit, TenorUnit::Months);\n# Ok(())\n# }\n```",
       "properties": {
         "count": {
-          "description": "Number of units.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "unit": {
-          "$ref": "#/$defs/TenorUnit",
-          "description": "Unit type (days, weeks, months, years)."
+          "$ref": "#/$defs/TenorUnit"
         }
       },
       "required": [
@@ -1038,6 +1037,7 @@
       "description": "Fixed fee paid once on a specified date.",
       "properties": {
         "Fixed": {
+          "additionalProperties": false,
           "properties": {
             "amount": {
               "$ref": "#/$defs/Money",
@@ -1065,6 +1065,7 @@
       "description": "Periodic fee quoted in basis points and accrued over generated periods.",
       "properties": {
         "PeriodicBps": {
+          "additionalProperties": false,
           "properties": {
             "accrual_basis": {
               "$ref": "#/$defs/FeeAccrualBasis",

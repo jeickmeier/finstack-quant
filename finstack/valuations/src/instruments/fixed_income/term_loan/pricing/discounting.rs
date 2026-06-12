@@ -435,6 +435,7 @@ mod tests {
             all_in_cap_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::ModifiedFollowing,
@@ -482,8 +483,10 @@ mod tests {
             .build()
             .expect("discount curve");
 
+        // Base the (flat) forward curve at the loan issue date: seasoned resets
+        // strictly before the curve base now error under the default fallback.
         let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-            .base_date(base)
+            .base_date(date(2024, 1, 1))
             .day_count(DayCount::Act360)
             .knots([(0.0, 0.05), (0.25, 0.05), (5.0, 0.05)])
             .interp(InterpStyle::Linear)

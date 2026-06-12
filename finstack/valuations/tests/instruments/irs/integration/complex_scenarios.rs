@@ -336,8 +336,10 @@ fn test_swap_seasoned() {
         .build()
         .unwrap();
 
+    // Flat forward curve based at the trade date: seasoned resets strictly
+    // before the curve base now error under the default FloatingRateFallback.
     let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
+        .base_date(start)
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.06), (10.0, 0.06)])
         .build()

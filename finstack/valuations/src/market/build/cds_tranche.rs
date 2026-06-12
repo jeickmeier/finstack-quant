@@ -297,6 +297,7 @@ pub fn build_cds_tranche_instrument(
         stub: StubKind::ShortFront,
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
 
     // Side: Quote usually implies we are observing market price.

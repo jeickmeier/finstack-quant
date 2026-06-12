@@ -43,6 +43,15 @@ impl RecoveryQueue {
             })
     }
 
+    /// Remove and return every pending recovery, in FIFO (default-date) order.
+    ///
+    /// Used at simulation termination: recoveries from defaults within the
+    /// lag window of the final payment date never mature inside the period
+    /// loop and must be drained explicitly rather than silently dropped.
+    pub(crate) fn drain_pending(&mut self) -> Vec<(Date, Money)> {
+        self.pending.drain(..).collect()
+    }
+
     /// Release all recoveries that have matured based on the lag period.
     ///
     /// Returns the total amount of recoveries released this period.

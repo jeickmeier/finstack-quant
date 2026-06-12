@@ -172,3 +172,58 @@ fn contractual_accrual_boundaries_are_not_business_day_adjusted() {
     assert_eq!(period.payment_date, d(2025, 9, 1));
     assert_eq!(schedule.dates, vec![d(2025, 9, 1)]);
 }
+
+/// SOFR swap preset (ISDA 2006 §4.10 / ARRC conventions): accrual boundaries
+/// are business-day adjusted, so a weekend-spanning period end accrues to the
+/// rolled date and the day-count fraction reflects the adjusted boundaries.
+#[test]
+fn sofr_swap_preset_adjusts_accrual_boundaries() {
+    use finstack_cashflows::builder::{CashFlowSchedule, CouponType, ScheduleParams};
+    use finstack_core::cashflow::CFKind;
+    use rust_decimal_macros::dec;
+
+    // 2025-03-06 (Thu) -> 2025-09-06 (Sat): the second quarterly accrual end
+    // falls on a Saturday and rolls to Monday 2025-09-08 under MF/usny.
+    let issue = d(2025, 3, 6);
+    let maturity = d(2025, 9, 6);
+    let notional = Money::new(1_000_000.0, Currency::USD);
+
+    let build = |params: ScheduleParams| {
+        let mut b = CashFlowSchedule::builder();
+        let _ = b.principal(notional, issue, maturity).fixed_stepup_decimal(
+            &[(maturity, dec!(0.04))],
+            params,
+            CouponType::Cash,
+        );
+        b.build_with_curves(None).expect("schedule builds")
+    };
+
+    let swap = build(ScheduleParams::usd_sofr_swap());
+    let mut bond_style = ScheduleParams::usd_sofr_swap();
+    bond_style.adjust_accrual_dates = false;
+    let bond = build(bond_style);
+
+    let last_coupon_yf = |s: &CashFlowSchedule| {
+        s.flows
+            .iter()
+            .rfind(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+            .expect("coupon present")
+            .accrual_factor
+    };
+
+    // Adjusted accrual: [2025-06-06, 2025-09-08) = 94 days on Act/360.
+    let swap_yf = last_coupon_yf(&swap);
+    assert!(
+        (swap_yf - 94.0 / 360.0).abs() < 1e-12,
+        "swap preset must accrue to the adjusted boundary: got {swap_yf}, want {}",
+        94.0 / 360.0
+    );
+
+    // Unadjusted accrual: [2025-06-06, 2025-09-06) = 92 days on Act/360.
+    let bond_yf = last_coupon_yf(&bond);
+    assert!(
+        (bond_yf - 92.0 / 360.0).abs() < 1e-12,
+        "unadjusted accrual must use the raw boundary: got {bond_yf}, want {}",
+        92.0 / 360.0
+    );
+}

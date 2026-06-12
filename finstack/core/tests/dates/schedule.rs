@@ -770,3 +770,100 @@ fn test_schedule_error_policy_missing_calendar_warning() {
     assert!(schedule.has_warnings());
     assert!(!schedule.used_graceful_fallback());
 }
+
+#[test]
+fn test_no_roll_day_drift_backward_day30_anchor() {
+    // Backward semi-annual generation from an Aug-30 maturity must
+    // alternate Feb 28 / Aug 30 with the roll day (30th) preserved,
+    // instead of collapsing to the 28th after the first short February
+    // (B1, 2026-06-09 cashflows quant review).
+    let start = make_date(2025, 8, 30);
+    let end = make_date(2027, 8, 30);
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::semi_annual())
+        .stub_rule(StubKind::ShortFront)
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(
+        dates,
+        vec![
+            make_date(2025, 8, 30),
+            make_date(2026, 2, 28),
+            make_date(2026, 8, 30), // not Aug 28
+            make_date(2027, 2, 28),
+            make_date(2027, 8, 30), // not Aug 28
+        ]
+    );
+}
+
+#[test]
+fn test_stub_none_accepts_month_end_quarterly_schedule() {
+    // Aug 31 -> Aug 31 quarterly is an integer number of tenors when
+    // anchors are computed as single jumps from the seed (Nov 30, Feb 28,
+    // May 31, then exactly Aug 31 at k = 4). The drifted iterative scheme
+    // wrongly raised NonIntegerScheduleTenor here (B1).
+    let start = make_date(2025, 8, 31);
+    let end = make_date(2026, 8, 31);
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::quarterly())
+        .stub_rule(StubKind::None)
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(
+        dates,
+        vec![
+            make_date(2025, 8, 31),
+            make_date(2025, 11, 30),
+            make_date(2026, 2, 28),
+            make_date(2026, 5, 31),
+            make_date(2026, 8, 31),
+        ]
+    );
+}
+
+#[test]
+fn test_zero_count_tenor_rejected_at_generation() {
+    // A zero-count tenor makes every roll a no-op; generation must fail
+    // loudly instead of looping forever (M10, 2026-06-09 review).
+    use finstack_core::dates::TenorUnit;
+
+    let start = make_date(2025, 1, 1);
+    let end = make_date(2026, 1, 1);
+
+    let err = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .frequency(Tenor::new(0, TenorUnit::Months))
+        .build()
+        .expect_err("zero-count tenor must be rejected");
+
+    assert!(
+        err.to_string().contains("positive"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn test_zero_count_tenor_rejected_via_serde() {
+    // Inbound JSON with "count": 0 must fail at deserialization (M10);
+    // valid counts continue to round-trip.
+    let err = serde_json::from_str::<Tenor>(r#"{"count":0,"unit":"months"}"#)
+        .expect_err("zero-count tenor JSON must be rejected");
+    assert!(
+        err.to_string().contains("positive"),
+        "unexpected error: {err}"
+    );
+
+    let tenor: Tenor =
+        serde_json::from_str(r#"{"count":3,"unit":"months"}"#).expect("valid tenor deserializes");
+    assert_eq!(tenor, Tenor::quarterly());
+}

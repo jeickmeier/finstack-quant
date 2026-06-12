@@ -16,7 +16,7 @@ mod helpers;
 use finstack_core::decimal::{decimal_to_f64, f64_to_decimal};
 
 // Re-export coupon emission (internal to builder module)
-pub(crate) use coupons::{emit_fixed_coupons_on, emit_float_coupons_on};
+pub(crate) use coupons::{emit_fixed_coupons_on, emit_float_coupons_on, ResolvedFloatMarket};
 
 // Re-export amortization emission and types (internal to builder module)
 pub(super) use amortization::{emit_amortization_on, AmortizationParams};

@@ -770,6 +770,7 @@ impl Bond {
                 all_in_cap_bp: None,
                 index_cap_bp: None,
                 reset_freq: Tenor::quarterly(),
+                index_tenor: None,
                 reset_lag_days: 2,
                 dc: DayCount::Act360,
                 bdc: BusinessDayConvention::ModifiedFollowing,

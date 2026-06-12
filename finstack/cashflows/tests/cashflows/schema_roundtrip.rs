@@ -173,6 +173,57 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
 }
 
 #[test]
+fn test_json_bridge_validates_pre_issue_principal_and_fee_flows() {
+    // Delayed-funding structures legitimately carry principal-type flows and
+    // fees dated before the issue date; the validator must accept them while
+    // still rejecting interest-bearing flows before issue.
+    let spec_json = fixed_schedule_build_spec().to_string();
+    let schedule_json = finstack_cashflows::build_cashflow_schedule_json(&spec_json, None)
+        .expect("schedule should build from JSON");
+
+    let mut schedule_value: serde_json::Value =
+        serde_json::from_str(&schedule_json).expect("schedule JSON parses");
+    let template_flow = schedule_value["flows"][0].clone();
+
+    // Pre-issue principal event (Notional draw) and an up-front fee.
+    let mut pre_issue_notional = template_flow.clone();
+    pre_issue_notional["date"] = json!("2024-08-15");
+    pre_issue_notional["kind"] = json!("Notional");
+    pre_issue_notional["amount"] = json!({"amount": "-100000", "currency": "USD"});
+    let mut pre_issue_fee = template_flow.clone();
+    pre_issue_fee["date"] = json!("2024-08-15");
+    pre_issue_fee["kind"] = json!("Fee");
+    pre_issue_fee["amount"] = json!({"amount": "5000", "currency": "USD"});
+
+    let flows = schedule_value["flows"].as_array_mut().expect("flows array");
+    flows.insert(0, pre_issue_fee);
+    flows.insert(0, pre_issue_notional);
+
+    // Build -> validate round-trip succeeds with pre-issue principal/fee flows.
+    let validated =
+        finstack_cashflows::validate_cashflow_schedule_json(&schedule_value.to_string())
+            .expect("pre-issue principal and fee flows should validate");
+    assert!(validated.contains("\"2024-08-15\""));
+
+    // Interest-bearing flows before issue are still rejected.
+    let mut bad_schedule: serde_json::Value =
+        serde_json::from_str(&schedule_json).expect("schedule JSON parses");
+    let mut pre_issue_coupon = template_flow;
+    pre_issue_coupon["date"] = json!("2024-08-15");
+    pre_issue_coupon["kind"] = json!("Fixed");
+    bad_schedule["flows"]
+        .as_array_mut()
+        .expect("flows array")
+        .insert(0, pre_issue_coupon);
+    let err = finstack_cashflows::validate_cashflow_schedule_json(&bad_schedule.to_string())
+        .expect_err("pre-issue interest-bearing flow must be rejected");
+    assert!(
+        format!("{err}").contains("before issue date"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
 fn test_json_bridge_amortizing_schedule_build() {
     let mut spec = fixed_schedule_build_spec();
     spec["maturity"] = json!("2026-08-31");
@@ -461,4 +512,98 @@ fn test_schedule_params_usd_act360() {
     assert_eq!(spec.calendar_id, "USD", "Calendar should be USD");
 
     test_roundtrip::<CashflowEnvelope<ScheduleParamsPayload>>(json);
+}
+
+/// JSON bridge end-to-end with historical fixings: a `market_json` carrying a
+/// `FIXING:{index}` ScalarTimeSeries lets a seasoned floating schedule build,
+/// with the first (pre-curve-base) coupon priced off the realized fixing.
+#[test]
+fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
+    use finstack_core::currency::Currency;
+    use finstack_core::dates::DayCount as CoreDayCount;
+    use finstack_core::market_data::context::MarketContext;
+    use finstack_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_core::market_data::term_structures::ForwardCurve;
+    use time::macros::date;
+
+    // Curve based mid-life (2025-06-15); the Jan-15 and Apr-15 resets are
+    // realized history carried by the FIXING:USD-SOFR-3M series.
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(date!(2025 - 06 - 15))
+        .day_count(CoreDayCount::Act360)
+        .knots([(0.0, 0.03), (5.0, 0.03)])
+        .build()
+        .expect("flat forward curve builds");
+    let series = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR-3M",
+        vec![
+            (date!(2025 - 01 - 15), 0.040),
+            (date!(2025 - 04 - 15), 0.042),
+        ],
+        None,
+    )
+    .expect("fixing series builds");
+    let market = MarketContext::new().insert(fwd).insert_series(series);
+    let market_json = serde_json::to_string(&market).expect("market context serializes");
+    assert!(
+        market_json.contains("FIXING:USD-SOFR-3M"),
+        "market JSON must carry the fixing series with no schema change"
+    );
+
+    let spec = json!({
+        "notional": {
+            "initial": {"amount": "1000000", "currency": "USD"},
+            "amort": "None"
+        },
+        "issue": "2025-01-15",
+        "maturity": "2026-01-15",
+        "floating_coupons": [{
+            "coupon_type": "Cash",
+            "rate_spec": {
+                "index_id": "USD-SOFR-3M",
+                "spread_bp": "100",
+                "reset_freq": {"count": 3, "unit": "months"},
+                "reset_lag_days": 0,
+                "dc": "Act360",
+                "bdc": "following",
+                "calendar_id": "weekends_only",
+                "end_of_month": false,
+                "payment_lag_days": 0
+            },
+            "freq": {"count": 3, "unit": "months"},
+            "stub": "None"
+        }]
+    });
+
+    let schedule_json =
+        finstack_cashflows::build_cashflow_schedule_json(&spec.to_string(), Some(&market_json))
+            .expect("seasoned floating schedule builds from JSON with fixing series");
+    let schedule: finstack_cashflows::builder::CashFlowSchedule =
+        serde_json::from_str(&schedule_json).expect("schedule JSON deserializes");
+
+    let first_coupon = schedule
+        .flows
+        .iter()
+        .find(|flow| {
+            matches!(
+                flow.kind,
+                finstack_cashflows::primitives::CFKind::FloatReset
+            )
+        })
+        .expect("schedule has a floating coupon");
+
+    // First coupon (accrues 2025-01-15 -> 2025-04-15): 4.0% fixing + 100 bp
+    // spread = 5.0% on $1M, Act/360 over 90 days.
+    let rate = first_coupon.rate.expect("floating coupon carries a rate");
+    assert!(
+        (rate - 0.05).abs() < 1e-10,
+        "first coupon should price off the historical fixing + spread: {rate}"
+    );
+    let expected_amount = 1_000_000.0 * 0.05 * (90.0 / 360.0);
+    assert!(
+        (first_coupon.amount.amount() - expected_amount).abs() < 1e-6,
+        "first coupon amount should be {expected_amount}, got {}",
+        first_coupon.amount.amount()
+    );
+    assert_eq!(first_coupon.amount.currency(), Currency::USD);
 }

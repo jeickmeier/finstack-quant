@@ -177,11 +177,11 @@ class TestCashflowsNamespace:
     def test_cashflows_exports(self) -> None:
         """Cashflows should expose the JSON bridge functions."""
         from finstack.cashflows import (  # noqa: F401
-            accrued_interest,
-            bond_from_cashflows,
-            build_cashflow_schedule,
-            dated_flows,
-            validate_cashflow_schedule,
+            accrued_interest_json,
+            bond_from_cashflows_json,
+            build_cashflow_schedule_json,
+            dated_flows_json,
+            validate_cashflow_schedule_json,
         )
 
 

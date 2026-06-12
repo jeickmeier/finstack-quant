@@ -33,9 +33,11 @@ fn advance_business_days<C: HolidayCalendar + ?Sized>(cal: &C, mut date: Date, d
     // A standard week has 5 business days (Mon-Fri), so 7 calendar days ≈ 5 business days.
     // We jump by full weeks to minimize calendar lookups.
     //
-    // Note: This assumes a standard Monday-Friday business week. Markets with different
-    // conventions (e.g., Sunday-Thursday in Middle East) will see suboptimal performance
-    // but still produce correct results since we count actual business days after jumping.
+    // Note: The jump heuristic assumes at most 5 business days per calendar week.
+    // For calendars where a week could contain more business days than `remaining`
+    // (e.g., a hypothetical 6-business-day week), a full-week jump would overshoot;
+    // the guard below reverts such jumps and falls back to step-wise iteration so
+    // the result stays exact for any calendar.
     const BUSINESS_DAYS_PER_WEEK: u32 = 5;
     const CALENDAR_DAYS_PER_WEEK: i64 = 7;
 
@@ -66,9 +68,12 @@ fn advance_business_days<C: HolidayCalendar + ?Sized>(cal: &C, mut date: Date, d
             }
         }
 
-        // Guard: if no business days in the week (pathological calendar with 7+ consecutive
-        // holidays), revert the jump and fall through to step-by-step iteration.
-        if week_business_days == 0 {
+        // Guard: revert the jump and fall through to step-by-step iteration when
+        // - the week contains no business days (pathological calendar with 7+
+        //   consecutive holidays), or
+        // - the week contains more business days than `remaining` (non-standard
+        //   calendars with >5 business days per week), which would overshoot.
+        if week_business_days == 0 || week_business_days > remaining {
             date += time::Duration::days(-jump_days);
             break;
         }
@@ -77,7 +82,8 @@ fn advance_business_days<C: HolidayCalendar + ?Sized>(cal: &C, mut date: Date, d
         remaining = remaining.saturating_sub(week_business_days);
     }
 
-    // Handle remaining days with step-by-step iteration (at most 4 business days)
+    // Handle remaining days with step-by-step iteration (at most 4 business days
+    // for standard Mon-Fri calendars; more when a week-jump guard triggered above).
     let step = if forward { 1i64 } else { -1i64 };
     while remaining > 0 {
         date += time::Duration::days(step);
@@ -116,14 +122,36 @@ pub enum AccrualMethod {
     ///
     /// **Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond
     /// AI calculations. This variant uses true exponential compounding
-    /// and should not be cited as ICMA-style.
+    /// and should not be cited as ICMA-style. It is intended for
+    /// instruments that genuinely compound within a coupon period
+    /// (e.g. some leveraged loans).
+    ///
+    /// **Ex-coupon window convention:** inside an ex-coupon window the
+    /// accrued interest is the negative rebate of the *remaining* stub,
+    /// compounded on the same basis:
+    ///
+    /// `Accrued = −N × expm1((1 − f) × ln1p(r))`
+    ///
+    /// where `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO
+    /// gilt convention) prescribe a *linear* ex-coupon rebate
+    /// (`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets.
     Compounded,
 }
+
+/// Maximum accepted `days_before_coupon` for an [`ExCouponRule`].
+///
+/// Real-world ex-coupon periods are a handful of days (e.g. 7 business days
+/// for UK gilts); anything beyond a full year (366 days) is treated as a
+/// configuration error rather than silently producing an ex-date before the
+/// coupon period even starts.
+const MAX_EX_COUPON_DAYS: u32 = 366;
 
 /// Ex-coupon convention applied to coupon flows.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ExCouponRule {
     /// Number of days before coupon date that go ex.
+    ///
+    /// Values greater than 366 are rejected by [`ExCouponRule::ex_date`].
     pub days_before_coupon: u32,
     /// Optional calendar ID for business day calculation.
     ///
@@ -141,21 +169,33 @@ impl ExCouponRule {
     ///
     /// # Errors
     ///
-    /// Returns an error when `calendar_id` is set but cannot be resolved.
+    /// Returns an error when:
+    ///
+    /// - `days_before_coupon` exceeds 366 (a configuration error — see
+    ///   [`MAX_EX_COUPON_DAYS`])
+    /// - `calendar_id` is set but cannot be resolved
     pub fn ex_date(&self, payment_date: Date) -> finstack_core::Result<Date> {
+        if self.days_before_coupon > MAX_EX_COUPON_DAYS {
+            return Err(finstack_core::Error::Validation(format!(
+                "ExCouponRule: days_before_coupon {} exceeds the maximum of {} days",
+                self.days_before_coupon, MAX_EX_COUPON_DAYS
+            )));
+        }
+        let days = i32::try_from(self.days_before_coupon).map_err(|_| {
+            finstack_core::Error::Validation(format!(
+                "ExCouponRule: days_before_coupon {} does not fit in i32",
+                self.days_before_coupon
+            ))
+        })?;
         if let Some(cal_id) = &self.calendar_id {
             let cal = calendar_by_id(cal_id).ok_or_else(|| {
                 finstack_core::Error::Input(finstack_core::InputError::NotFound {
                     id: cal_id.clone(),
                 })
             })?;
-            Ok(advance_business_days(
-                cal,
-                payment_date,
-                -(self.days_before_coupon as i32),
-            ))
+            Ok(advance_business_days(cal, payment_date, -days))
         } else {
-            Ok(payment_date - time::Duration::days(self.days_before_coupon as i64))
+            Ok(payment_date - time::Duration::days(i64::from(days)))
         }
     }
 }
@@ -171,9 +211,10 @@ pub struct AccrualConfig {
     pub include_pik: bool,
     /// Coupon frequency — required for ACT/ACT ISMA day count.
     ///
-    /// When `None` and the schedule uses ACT/ACT ISMA, the year fraction
-    /// falls back to ACT/ACT ISDA semantics, which gives incorrect accrued
-    /// interest for most government bonds.
+    /// When `None` and the schedule uses ACT/ACT ISMA, year-fraction
+    /// calculations return
+    /// [`InputError::MissingFrequencyForActActIsma`](finstack_core::InputError::MissingFrequencyForActActIsma);
+    /// there is no fallback to ISDA semantics.
     pub frequency: Option<Tenor>,
 }
 
@@ -308,21 +349,18 @@ fn derive_horizon_start(
     schedule: &CashFlowSchedule,
     first_bucket: &CouponBucket,
 ) -> finstack_core::Result<Date> {
-    if let Some(issue) = schedule.meta.issue_date {
-        return Ok(issue);
-    }
-
-    if let Some(min_date) = schedule.dates().into_iter().min() {
-        if min_date < first_bucket.date {
-            return Ok(min_date);
-        }
-    }
-
-    Err(finstack_core::Error::Validation(format!(
-        "accrual: schedule.meta.issue_date is unset and no flow precedes the first coupon \
-         date {}; set meta.issue_date on the CashFlowSchedule.",
-        first_bucket.date
-    )))
+    // The issue date is required unconditionally. Falling back to the earliest
+    // flow date is unsafe: a pre-issue flow (e.g. an upfront fee) would
+    // silently become the accrual start and lengthen the first coupon period.
+    schedule.meta.issue_date.ok_or_else(|| {
+        finstack_core::Error::Validation(format!(
+            "accrual: schedule.meta.issue_date is unset; the start of the first coupon \
+             period (first coupon date {}) cannot be inferred from flow dates because \
+             pre-issue flows would silently shift the accrual start. Set meta.issue_date \
+             on the CashFlowSchedule.",
+            first_bucket.date
+        ))
+    })
 }
 
 /// Build coupon buckets grouped by date from the schedule.
@@ -401,14 +439,9 @@ fn build_coupon_periods(
 
     let dc = schedule.day_count;
 
-    // Derive the start of the first coupon period (issue date).
-    //
-    // Strategy (in priority order):
-    // 1. If `meta.issue_date` is set, use it directly (most accurate).
-    // 2. If schedule.dates().min() differs from the first coupon date, use that
-    //    (this handles cases where issue date flow exists in the schedule).
-    // 3. Otherwise, fail with an explicit issue-date error. The legacy inverse
-    //    day-count approximation is intentionally no longer used.
+    // Derive the start of the first coupon period: `meta.issue_date` is
+    // required. Inferring it from flow dates or via the legacy inverse
+    // day-count approximation is intentionally not supported.
     let first_bucket = &buckets[0];
     let horizon_start = derive_horizon_start(schedule, first_bucket)?;
 
@@ -467,6 +500,13 @@ fn build_period_inputs(
 
         let coupon_total = p.bucket.cash_amount + p.bucket.pik_amount;
 
+        if !coupon_total.is_finite() {
+            return Err(finstack_core::Error::Validation(format!(
+                "accrual: non-finite coupon total {coupon_total} for period ending {}",
+                p.end
+            )));
+        }
+
         if coupon_total == 0.0 {
             // No coupon in this period; skip.
             continue;
@@ -478,6 +518,11 @@ fn build_period_inputs(
             _ => {
                 let ctx = DayCountContext {
                     frequency,
+                    // ACT/ACT ICMA: pass the actual coupon period so irregular
+                    // (stub) periods use core's reference-period subdivision
+                    // instead of re-anchoring a quasi-coupon grid from `p.start`.
+                    // Other conventions ignore this field.
+                    coupon_period: Some((p.start, p.end)),
                     ..Default::default()
                 };
                 p.dc.year_fraction(p.start, p.end, ctx)?
@@ -502,14 +547,26 @@ fn build_period_inputs(
 
 /// Locate the active period for `as_of` and compute elapsed year fraction.
 ///
+/// # Year-Fraction Basis Consistency
+///
+/// `total_yf` may come from the builder's `accrual_factor`, which is computed
+/// over the *true accrual period*, while periods here are reconstructed from
+/// *payment dates*. With a payment lag or BDC-shifted period ends the two
+/// bases diverge and the raw day-count `elapsed` can exceed `total_yf` before
+/// the payment date (accrued exceeding the full coupon). To keep both numbers
+/// on the same basis, when `elapsed` exceeds `total_yf` it is rescaled by
+/// `total_yf × dc_elapsed / dc_total` (where `dc_total` is the day-count
+/// fraction over the same payment-date boundaries) and then clamped to
+/// `[0, total_yf]`, so accrued interest never exceeds the full coupon.
+///
 /// # Ex-Coupon Handling
 ///
 /// If an ex-coupon rule is configured and the `as_of` date falls within the
 /// ex-coupon window (between ex-date and payment date), the elapsed year
-/// fraction is returned as `elapsed - period` (negative). Market standard
-/// (e.g. UK gilts): the buyer does not receive the imminent coupon, so the
-/// seller compensates the buyer for the remaining stub via **negative
-/// accrued interest**.
+/// fraction is returned as `elapsed - period`, clamped to `≤ 0` (negative).
+/// Market standard (e.g. UK gilts): the buyer does not receive the imminent
+/// coupon, so the seller compensates the buyer for the remaining stub via
+/// **negative accrued interest**.
 fn find_active_period_and_elapsed<'a>(
     periods: &'a [PeriodInputs],
     as_of: Date,
@@ -520,16 +577,36 @@ fn find_active_period_and_elapsed<'a>(
         if inputs.start <= as_of && as_of < inputs.end {
             let dc_ctx = DayCountContext {
                 frequency: cfg.frequency,
+                // ACT/ACT ICMA: anchor on the actual coupon period (see
+                // `build_period_inputs`). Other conventions ignore this field.
+                coupon_period: Some((inputs.start, inputs.end)),
                 ..Default::default()
             };
-            let elapsed = dc.year_fraction(inputs.start, as_of, dc_ctx)?.max(0.0);
+            let dc_elapsed = dc.year_fraction(inputs.start, as_of, dc_ctx)?.max(0.0);
+
+            // Rescale onto the `total_yf` basis when the bases diverge (see
+            // the basis-consistency note in the function docs), then clamp so
+            // accrued never exceeds the full coupon.
+            let elapsed = if dc_elapsed > inputs.total_yf {
+                let dc_total = dc.year_fraction(inputs.start, inputs.end, dc_ctx)?;
+                if dc_total > 0.0 {
+                    inputs.total_yf * dc_elapsed / dc_total
+                } else {
+                    dc_elapsed
+                }
+            } else {
+                dc_elapsed
+            };
+            let elapsed = elapsed.clamp(0.0, inputs.total_yf);
 
             // Apply ex-coupon convention if present: inside the ex-window the
             // accrual flips to a negative stub from `as_of` to the period end.
+            // The clamp to `≤ 0` guarantees the stub can never flip positive
+            // even under residual basis mismatch.
             if let Some(ref ex) = cfg.ex_coupon {
                 let ex_date = ex.ex_date(inputs.end)?;
                 if as_of >= ex_date && as_of < inputs.end {
-                    return Ok(Some((inputs, elapsed - inputs.total_yf)));
+                    return Ok(Some((inputs, (elapsed - inputs.total_yf).min(0.0))));
                 }
             }
 
@@ -556,6 +633,18 @@ fn find_active_period_and_elapsed<'a>(
 /// `Accrued = Notional × [(1 + period_rate)^(elapsed/period) - 1]`
 ///
 /// where `period_rate = coupon_amount / notional` is the yield per coupon period.
+///
+/// # Ex-Coupon Window (negative `elapsed_yf`)
+///
+/// Inside an ex-coupon window the caller passes `elapsed_yf = elapsed − period`
+/// (negative). The compounded stub rebate is computed explicitly as
+///
+/// `Accrued = −Notional × expm1((1 − f) × ln1p(period_rate))`
+///
+/// where `f = elapsed/period`, i.e. the negative of the compounded value of
+/// the *remaining* stub. ICMA Rule 251.1 (and the UK DMO gilt convention)
+/// prescribe a linear rebate; this compounded variant is for instruments
+/// that genuinely compound within a period.
 ///
 /// Note: ICMA Rule 251.1 prescribes *linear* interpolation for accrued interest.
 /// This function's compounded variant is used for instruments that genuinely
@@ -584,6 +673,15 @@ fn accrue_in_period(
             }
 
             let fraction = elapsed_yf / inputs.total_yf;
+
+            if fraction < 0.0 {
+                // Ex-coupon window: `elapsed_yf = elapsed − period`, so
+                // `−fraction = 1 − f` where `f = elapsed/period`. The accrued
+                // is the negative rebate of the remaining stub, compounded:
+                // `−N × [(1 + r)^(1−f) − 1]` (see function docs).
+                let stub_growth = (-fraction * period_rate.ln_1p()).exp_m1();
+                return Ok(-(notional * stub_growth));
+            }
 
             // Numerically stable computation: (1+r)^f - 1 = expm1(f * ln1p(r))
             // This avoids precision loss for both small rates and small fractions.
@@ -632,12 +730,7 @@ mod tests {
     }
 
     // =========================================================================
-    // Issue date derivation tests
-    //
-    // Note: The inverse day count approximation may produce dates that differ
-    // by 1-2 days from the true issue date. This is acceptable for establishing
-    // coupon period boundaries for accrual calculations, as the error is small
-    // relative to the coupon period length.
+    // Issue date requirement tests
     // =========================================================================
 
     #[test]
@@ -654,19 +747,19 @@ mod tests {
     }
 
     #[test]
-    fn test_issue_date_from_schedule_when_present() {
-        // When schedule includes a flow before the first coupon (e.g., notional),
-        // that date should be used instead of derivation
+    fn test_pre_coupon_flow_does_not_substitute_for_issue_date() {
+        // A flow dated before the first coupon (e.g. a pre-issue fee or a
+        // funding leg) must NOT silently become the accrual start;
+        // meta.issue_date is required unconditionally.
         let mut schedule = make_test_schedule(
             &[(make_date(2025, 7, 1), 0.5), (make_date(2026, 1, 1), 0.5)],
             DayCount::Thirty360,
         );
 
-        // Add a notional flow on issue date
         schedule.flows.insert(
             0,
             CashFlow {
-                date: make_date(2025, 1, 15), // Issue date (different from derived Jan 1)
+                date: make_date(2025, 1, 15),
                 amount: Money::new(-1_000_000.0, Currency::USD),
                 kind: CFKind::Notional,
                 accrual_factor: 0.0,
@@ -676,16 +769,18 @@ mod tests {
         );
 
         let cfg = AccrualConfig::default();
+        let err = build_coupon_periods(&schedule, &cfg)
+            .expect_err("issue_date must be required even when a pre-coupon flow exists");
+        assert!(err.to_string().contains("issue_date"));
+
+        // With the explicit issue date set, the first period starts there.
+        schedule.meta.issue_date = Some(make_date(2025, 1, 15));
         let periods = build_coupon_periods(&schedule, &cfg).expect("periods");
-
         assert!(!periods.is_empty());
-        let first_period = &periods[0];
-
-        // Should use the explicit issue date from the schedule, not derived
         assert_eq!(
-            first_period.start,
+            periods[0].start,
             make_date(2025, 1, 15),
-            "Should use explicit issue date from schedule"
+            "Should use explicit meta.issue_date"
         );
     }
 
@@ -731,5 +826,279 @@ mod tests {
             "Accrued should be approximately $12,500, got {}",
             accrued
         );
+    }
+
+    // =========================================================================
+    // Ex-coupon window tests (negative accrued interest, UK gilt convention)
+    // =========================================================================
+
+    /// Semiannual 30/360 schedule: issue 2025-01-01, coupons 2025-07-01 and
+    /// 2026-01-01, $25k per coupon, builder accrual factor 0.5.
+    fn ex_coupon_test_schedule() -> CashFlowSchedule {
+        let mut schedule = make_test_schedule(
+            &[(make_date(2025, 7, 1), 0.5), (make_date(2026, 1, 1), 0.5)],
+            DayCount::Thirty360,
+        );
+        schedule.meta.issue_date = Some(make_date(2025, 1, 1));
+        schedule
+    }
+
+    fn ex_coupon_cfg(days: u32) -> AccrualConfig {
+        AccrualConfig {
+            ex_coupon: Some(ExCouponRule {
+                days_before_coupon: days,
+                calendar_id: None,
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn ex_coupon_negative_ai_linear_golden() {
+        // 7 calendar days before the 2025-07-01 coupon → ex-date 2025-06-24.
+        // On the ex-date (inclusive boundary) the bond trades ex-coupon:
+        // AI = −C × (total − elapsed) / total = −25_000 × 7/180 (30/360 days).
+        let schedule = ex_coupon_test_schedule();
+        let cfg = ex_coupon_cfg(7);
+
+        let accrued =
+            accrued_interest_amount(&schedule, make_date(2025, 6, 24), &cfg).expect("accrued");
+        let expected = -25_000.0 * 7.0 / 180.0;
+        assert!(
+            (accrued - expected).abs() < 1e-9,
+            "ex-coupon AI: expected {expected}, got {accrued}"
+        );
+    }
+
+    #[test]
+    fn ex_coupon_boundary_day_before_ex_date_accrues_positively() {
+        // 2025-06-23 is one day before the ex-date: normal positive accrual.
+        // elapsed = 172/360 (30/360), AI = 25_000 × 172/180.
+        let schedule = ex_coupon_test_schedule();
+        let cfg = ex_coupon_cfg(7);
+
+        let accrued =
+            accrued_interest_amount(&schedule, make_date(2025, 6, 23), &cfg).expect("accrued");
+        let expected = 25_000.0 * 172.0 / 180.0;
+        assert!(
+            (accrued - expected).abs() < 1e-9,
+            "cum-coupon AI: expected {expected}, got {accrued}"
+        );
+    }
+
+    #[test]
+    fn ex_coupon_boundary_day_before_period_end() {
+        // 2025-06-30 = period end − 1 day, deep in the ex window:
+        // AI = −25_000 × 1/180 (one 30/360 day of remaining stub).
+        let schedule = ex_coupon_test_schedule();
+        let cfg = ex_coupon_cfg(7);
+
+        let accrued =
+            accrued_interest_amount(&schedule, make_date(2025, 6, 30), &cfg).expect("accrued");
+        let expected = -25_000.0 / 180.0;
+        assert!(
+            (accrued - expected).abs() < 1e-9,
+            "ex-window stub AI: expected {expected}, got {accrued}"
+        );
+    }
+
+    // =========================================================================
+    // Year-fraction basis consistency (payment lag / BDC-shifted period ends)
+    // =========================================================================
+
+    /// Period reconstructed from payment dates (end = 2025-07-05, e.g. a
+    /// payment lag) while the builder accrual factor 0.5 covers the true
+    /// accrual period [2025-01-01, 2025-07-01).
+    fn lagged_period_inputs() -> PeriodInputs {
+        PeriodInputs {
+            start: make_date(2025, 1, 1),
+            end: make_date(2025, 7, 5),
+            notional_start: 1_000_000.0,
+            coupon_total: 25_000.0,
+            total_yf: 0.5,
+        }
+    }
+
+    #[test]
+    fn elapsed_rescaled_and_clamped_when_exceeding_builder_accrual_factor() {
+        let inputs = lagged_period_inputs();
+        let periods = [inputs.clone()];
+        let cfg = AccrualConfig::default();
+
+        // 2025-07-03: 30/360 elapsed = 182/360 > total_yf = 0.5.
+        // dc_total = 184/360, so elapsed is rescaled to 0.5 × 182/184.
+        let (active, elapsed) = find_active_period_and_elapsed(
+            &periods,
+            make_date(2025, 7, 3),
+            DayCount::Thirty360,
+            &cfg,
+        )
+        .expect("ok")
+        .expect("active period");
+
+        let expected = 0.5 * (182.0 / 360.0) / (184.0 / 360.0);
+        assert!(
+            (elapsed - expected).abs() < 1e-12,
+            "rescaled elapsed: expected {expected}, got {elapsed}"
+        );
+        assert!(
+            elapsed <= inputs.total_yf,
+            "elapsed must not exceed total_yf"
+        );
+
+        let accrued = accrue_in_period(active, elapsed, &AccrualMethod::Linear).expect("accrued");
+        assert!(
+            accrued <= inputs.coupon_total,
+            "accrued {accrued} must not exceed full coupon {}",
+            inputs.coupon_total
+        );
+    }
+
+    #[test]
+    fn ex_window_stub_never_positive_under_payment_lag() {
+        let inputs = lagged_period_inputs();
+        let periods = [inputs];
+        let cfg = ex_coupon_cfg(7); // ex-date 2025-06-28
+
+        let (active, elapsed_yf) = find_active_period_and_elapsed(
+            &periods,
+            make_date(2025, 7, 3),
+            DayCount::Thirty360,
+            &cfg,
+        )
+        .expect("ok")
+        .expect("active period");
+
+        assert!(
+            elapsed_yf <= 0.0,
+            "ex-window elapsed_yf must be ≤ 0, got {elapsed_yf}"
+        );
+        let accrued =
+            accrue_in_period(active, elapsed_yf, &AccrualMethod::Linear).expect("accrued");
+        assert!(accrued <= 0.0, "ex-window AI must be ≤ 0, got {accrued}");
+    }
+
+    // =========================================================================
+    // Compounded accrual method
+    // =========================================================================
+
+    fn compounded_inputs() -> PeriodInputs {
+        PeriodInputs {
+            start: make_date(2025, 1, 1),
+            end: make_date(2025, 7, 1),
+            notional_start: 1_000_000.0,
+            coupon_total: 25_000.0,
+            total_yf: 0.5,
+        }
+    }
+
+    #[test]
+    fn compounded_accrual_positive_golden() {
+        // Halfway through the period: f = 0.25/0.5 = 0.5, r = 0.025.
+        // AI = N × ((1 + r)^f − 1) = 1e6 × (1.025^0.5 − 1).
+        let inputs = compounded_inputs();
+        let accrued = accrue_in_period(&inputs, 0.25, &AccrualMethod::Compounded).expect("accrued");
+        let expected = 1_000_000.0 * (1.025f64.powf(0.5) - 1.0);
+        assert!(
+            (accrued - expected).abs() < 1e-6,
+            "compounded AI: expected {expected}, got {accrued}"
+        );
+    }
+
+    #[test]
+    fn compounded_accrual_near_zero_rate_falls_back_to_linear() {
+        // r = 1e-7 / 1e6 = 1e-13 < 1e-12 threshold → linear fallback.
+        let inputs = PeriodInputs {
+            coupon_total: 1e-7,
+            ..compounded_inputs()
+        };
+        let accrued = accrue_in_period(&inputs, 0.25, &AccrualMethod::Compounded).expect("accrued");
+        let expected = 1e-7 * (0.25 / 0.5);
+        assert!(
+            (accrued - expected).abs() < 1e-15,
+            "near-zero-rate fallback: expected {expected}, got {accrued}"
+        );
+    }
+
+    #[test]
+    fn compounded_accrual_ex_window_negative_golden() {
+        // elapsed_yf = elapsed − total = 0.4 − 0.5 = −0.1, so 1 − f = 0.2.
+        // AI = −N × ((1 + r)^(1−f) − 1) = −1e6 × (1.025^0.2 − 1).
+        let inputs = compounded_inputs();
+        let accrued = accrue_in_period(&inputs, -0.1, &AccrualMethod::Compounded).expect("accrued");
+        let expected = -1_000_000.0 * (1.025f64.powf(0.2) - 1.0);
+        assert!(
+            (accrued - expected).abs() < 1e-6,
+            "compounded ex-window AI: expected {expected}, got {accrued}"
+        );
+        assert!(accrued < 0.0);
+    }
+
+    // =========================================================================
+    // Validation tests
+    // =========================================================================
+
+    #[test]
+    fn act_act_isma_without_frequency_errors() {
+        let mut schedule = make_test_schedule(
+            &[(make_date(2025, 7, 1), 0.5), (make_date(2026, 1, 1), 0.5)],
+            DayCount::ActActIsma,
+        );
+        schedule.meta.issue_date = Some(make_date(2025, 1, 1));
+
+        // No frequency configured → core errors (no ISDA fallback).
+        let err =
+            accrued_interest_amount(&schedule, make_date(2025, 4, 1), &AccrualConfig::default())
+                .expect_err("ICMA without frequency must error");
+        assert!(err.to_string().to_lowercase().contains("frequency"));
+
+        // With the frequency set, the calculation succeeds.
+        let cfg = AccrualConfig {
+            frequency: Some(Tenor::semi_annual()),
+            ..Default::default()
+        };
+        let accrued = accrued_interest_amount(&schedule, make_date(2025, 4, 1), &cfg)
+            .expect("ICMA with frequency succeeds");
+        assert!(accrued > 0.0);
+    }
+
+    #[test]
+    fn nan_coupon_total_is_rejected() {
+        let schedule = make_test_schedule(&[(make_date(2025, 7, 1), 0.5)], DayCount::Thirty360);
+        let periods = [CouponPeriod {
+            start: make_date(2025, 1, 1),
+            end: make_date(2025, 7, 1),
+            dc: DayCount::Thirty360,
+            bucket: CouponBucket {
+                date: make_date(2025, 7, 1),
+                cash_amount: f64::NAN,
+                pik_amount: 0.0,
+                accrual_factor: Some(0.5),
+                rate: None,
+            },
+        }];
+
+        let err = build_period_inputs(&schedule, &periods, &[], None)
+            .expect_err("NaN coupon total must be rejected");
+        assert!(err.to_string().contains("non-finite"));
+    }
+
+    #[test]
+    fn ex_coupon_rule_rejects_days_above_366() {
+        let rule = ExCouponRule {
+            days_before_coupon: 367,
+            calendar_id: None,
+        };
+        let err = rule
+            .ex_date(make_date(2025, 7, 1))
+            .expect_err("days_before_coupon > 366 must be rejected");
+        assert!(err.to_string().contains("366"));
+
+        // 366 itself is accepted (one leap year).
+        let rule_ok = ExCouponRule {
+            days_before_coupon: 366,
+            calendar_id: None,
+        };
+        assert!(rule_ok.ex_date(make_date(2025, 7, 1)).is_ok());
     }
 }

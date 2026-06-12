@@ -59,6 +59,12 @@ fn emit_principal_repayment(
 /// - StepRemaining: Specific remaining balance targets
 /// - PercentOfOriginalPerPeriod: Percentage of original notional (capped by remaining)
 /// - CustomPrincipal: Explicit payment amounts by date
+///
+/// All variants emit only the scheduled/configured amount as
+/// `CFKind::Amortization` — including on the maturity date. Any residual
+/// outstanding at maturity is redeemed downstream by the pipeline's
+/// maturity handling as `CFKind::Notional`, so total principal cash is
+/// unchanged by classification.
 pub(in crate::builder) fn emit_amortization_on(
     d: Date,
     notional: &Notional,
@@ -85,12 +91,11 @@ pub(in crate::builder) fn emit_amortization_on(
             if let Some(map) = params.step_remaining_map {
                 if let Some(rem_after) = map.get(&d) {
                     let target = rem_after.amount();
-                    let pay = if is_maturity {
-                        // On final date, ignore target and fully clean up balance
-                        *outstanding
-                    } else {
-                        (*outstanding - target).max(0.0).min(*outstanding)
-                    };
+                    // Pay down to the scheduled target on every date,
+                    // including maturity. Any residual outstanding (a final
+                    // non-zero target) is redeemed by `handle_maturity` as
+                    // `CFKind::Notional`, consistent with the other variants.
+                    let pay = (*outstanding - target).max(0.0).min(*outstanding);
                     emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows);
                 }
             }
@@ -98,11 +103,11 @@ pub(in crate::builder) fn emit_amortization_on(
         AmortizationSpec::PercentOfOriginalPerPeriod { .. } => {
             if params.amort_dates.contains(&d) {
                 if let Some(per) = params.percent_per {
-                    let pay = if is_maturity {
-                        *outstanding
-                    } else {
-                        per.min(*outstanding)
-                    };
+                    // Pay the scheduled percentage on every date, including
+                    // maturity. Any residual outstanding at maturity is
+                    // redeemed by `handle_maturity` as `CFKind::Notional`,
+                    // consistent with the other variants.
+                    let pay = per.min(*outstanding);
                     emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows);
                 }
             }

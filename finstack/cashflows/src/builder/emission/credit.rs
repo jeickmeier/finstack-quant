@@ -31,6 +31,16 @@ use super::super::specs::DefaultEvent;
 ///
 /// Vector of cashflows (0, 1, or 2 per matching event)
 ///
+/// # Errors
+///
+/// Returns an error if any matching event fails validation (see
+/// [`DefaultEvent::validate`]), if `recovery_lag` exceeds `i32::MAX` months,
+/// or if recovery-date adjustment fails (unknown calendar, adjustment error).
+///
+/// Emission is atomic across all events on date `d`: every event is
+/// validated and its recovery date resolved before any cashflow is pushed
+/// or `outstanding` is mutated, so a failing event leaves no partial state.
+///
 /// # Examples
 ///
 /// ```
@@ -65,39 +75,25 @@ pub fn emit_default_on(
     ccy: Currency,
     out: &mut Vec<CashFlow>,
 ) -> finstack_core::Result<()> {
-    for event in default_events.iter().filter(|e| e.default_date == d) {
-        // Validate event parameters (recovery_rate in [0,1], defaulted_amount >= 0)
+    let matching: Vec<&DefaultEvent> = default_events
+        .iter()
+        .filter(|e| e.default_date == d)
+        .collect();
+
+    // Pass 1: validate every event and resolve every recovery date before
+    // any mutation, so a failure on event k cannot leave events 1..k-1
+    // partially applied (cross-event atomicity).
+    let mut recovery_dates: Vec<Option<Date>> = Vec::with_capacity(matching.len());
+    for event in &matching {
+        // Validate event parameters (recovery_rate in [0,1], finite defaulted_amount >= 0)
         event.validate()?;
 
-        if event.defaulted_amount <= 0.0 {
-            continue;
-        }
-
-        // Clamp defaulted amount to outstanding to prevent negative balances.
-        // Similar to how prepayments clamp to outstanding.
-        let defaulted = event.defaulted_amount.min(*outstanding).max(0.0);
-        if defaulted <= 0.0 {
-            continue;
-        }
-
-        let recovery_lag_months = if defaulted * event.recovery_rate > 0.0 {
-            Some(i32::try_from(event.recovery_lag).map_err(|_| {
+        let recovery_date = if event.defaulted_amount > 0.0 && event.recovery_rate > 0.0 {
+            let recovery_lag_months = i32::try_from(event.recovery_lag).map_err(|_| {
                 finstack_core::Error::Validation(format!(
                     "recovery_lag = {} exceeds i32::MAX months",
                     event.recovery_lag
                 ))
-            })?)
-        } else {
-            None
-        };
-
-        // Resolve recovery cashflow date before mutating outstanding or output.
-        let recovery_amt = defaulted * event.recovery_rate;
-        let recovery_date = if recovery_amt > 0.0 {
-            let recovery_lag_months = recovery_lag_months.ok_or_else(|| {
-                finstack_core::Error::Validation(
-                    "recovery_lag validation missing for positive recovery".into(),
-                )
             })?;
             let base_recovery_date = d.add_months(recovery_lag_months);
 
@@ -121,6 +117,19 @@ pub fn emit_default_on(
         } else {
             None
         };
+        recovery_dates.push(recovery_date);
+    }
+
+    // Pass 2: apply mutations; all fallible work happened in pass 1.
+    for (event, recovery_date) in matching.iter().zip(recovery_dates) {
+        // Clamp defaulted amount to outstanding to prevent negative balances.
+        // Similar to how prepayments clamp to outstanding.
+        let defaulted = event.defaulted_amount.min(*outstanding).max(0.0);
+        if defaulted <= 0.0 {
+            continue;
+        }
+
+        let recovery_amt = defaulted * event.recovery_rate;
 
         // Default cashflow
         out.push(CashFlow {
@@ -186,6 +195,12 @@ pub fn emit_default_on(
 ///
 /// Vector containing zero or one cashflow
 ///
+/// # Errors
+///
+/// Returns `Error::Validation` if `prepayment_amount` is non-finite
+/// (NaN/∞). A non-finite amount would otherwise silently clamp to the full
+/// outstanding balance via `min`, liquidating the position.
+///
 /// # Examples
 ///
 /// ```
@@ -197,7 +212,8 @@ pub fn emit_default_on(
 /// let d = Date::from_calendar_date(2025, Month::March, 1).expect("valid date");
 /// let mut outstanding = 1_000_000.0;
 /// let mut flows = Vec::new();
-/// emit_prepayment_on(d, 50_000.0, &mut outstanding, Currency::USD, &mut flows);
+/// emit_prepayment_on(d, 50_000.0, &mut outstanding, Currency::USD, &mut flows)
+///     .expect("finite prepayment");
 ///
 /// assert_eq!(outstanding, 950_000.0);
 /// assert_eq!(flows.len(), 1);
@@ -208,9 +224,14 @@ pub fn emit_prepayment_on(
     outstanding: &mut f64,
     ccy: Currency,
     out: &mut Vec<CashFlow>,
-) {
+) -> finstack_core::Result<()> {
+    if !prepayment_amount.is_finite() {
+        return Err(finstack_core::Error::Validation(format!(
+            "prepayment amount ({prepayment_amount}) must be finite"
+        )));
+    }
     if prepayment_amount <= 0.0 {
-        return;
+        return Ok(());
     }
 
     let amount = prepayment_amount.min(*outstanding);
@@ -225,6 +246,7 @@ pub fn emit_prepayment_on(
             rate: None,
         });
     }
+    Ok(())
 }
 
 #[cfg(test)]

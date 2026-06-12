@@ -811,6 +811,7 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_portfolio::P
             stub: StubKind::None,
             end_of_month: false,
             payment_lag_days: 0,
+            adjust_accrual_dates: false,
         };
 
         let tranche = CDSTranche::new(

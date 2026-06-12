@@ -51,6 +51,7 @@ fn test_schedule_discountable_simple() {
         stub: StubKind::None,
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
@@ -106,6 +107,7 @@ fn test_npv_zero_rate() {
         stub: StubKind::None,
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,

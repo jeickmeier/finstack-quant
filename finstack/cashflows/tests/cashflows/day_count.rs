@@ -128,7 +128,7 @@ fn act360_90_days_quarter() {
 }
 
 #[test]
-fn act360_180_days_half_year() {
+fn act360_181_days_jan_to_jul() {
     // 181 actual days from Jan 1 to Jul 1 (non-leap year)
     let dc = DayCount::Act360;
     let ctx = DayCountContext::default();
@@ -289,18 +289,17 @@ fn actact_isma_with_semi_annual_frequency() {
         bus_basis: None,
         coupon_period: None,
     };
-    let result = dc.year_fraction(d(2025, 1, 1), d(2025, 7, 1), ctx_with_freq);
+    let yf = dc
+        .year_fraction(d(2025, 1, 1), d(2025, 7, 1), ctx_with_freq)
+        .unwrap();
 
-    // ActActIsma requires frequency context and should succeed
+    // Jan 1 to Jul 1 is exactly one regular semi-annual quasi-coupon period
+    // (181 actual days): YF = 181 / (2 × 181) = 0.5 exactly (ISDA 2006 §4.16(c)).
     assert!(
-        result.is_ok(),
-        "ActActIsma with semi-annual frequency should succeed"
+        (yf - 0.5).abs() < FACTOR_TOLERANCE,
+        "Act/Act ISMA regular semi-annual period should be 0.5, got {}",
+        yf
     );
-
-    // Note: The exact value depends on the implementation details of ActActIsma.
-    // This test validates that the calculation runs without error.
-    let yf = result.unwrap();
-    assert!(yf > 0.0, "Year fraction should be positive, got {}", yf);
 }
 
 #[test]
@@ -314,18 +313,15 @@ fn actact_isma_with_quarterly_frequency() {
         coupon_period: None,
     };
 
-    let result = dc.year_fraction(d(2025, 1, 1), d(2025, 4, 1), ctx);
+    let yf = dc.year_fraction(d(2025, 1, 1), d(2025, 4, 1), ctx).unwrap();
 
-    // ActActIsma requires frequency context and should succeed
+    // Jan 1 to Apr 1 is exactly one regular quarterly quasi-coupon period
+    // (90 actual days): YF = 90 / (4 × 90) = 0.25 exactly (ISDA 2006 §4.16(c)).
     assert!(
-        result.is_ok(),
-        "ActActIsma with quarterly frequency should succeed"
+        (yf - 0.25).abs() < FACTOR_TOLERANCE,
+        "Act/Act ISMA regular quarterly period should be 0.25, got {}",
+        yf
     );
-
-    // Note: The exact value depends on the implementation details of ActActIsma.
-    // This test validates that the calculation runs without error.
-    let yf = result.unwrap();
-    assert!(yf > 0.0, "Year fraction should be positive, got {}", yf);
 }
 
 // =============================================================================

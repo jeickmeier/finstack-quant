@@ -576,6 +576,7 @@ impl XccySwap {
                     all_in_floor_bp: None,
                     index_cap_bp: None,
                     reset_freq: leg.frequency,
+                    index_tenor: None,
                     reset_lag_days: leg.reset_lag_days.unwrap_or_default(),
                     dc: leg.day_count,
                     bdc: leg.bdc,

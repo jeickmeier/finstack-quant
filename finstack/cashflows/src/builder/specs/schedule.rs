@@ -8,14 +8,20 @@ use rust_decimal::Decimal;
 /// The fields describe schedule construction conventions, not discounting or
 /// valuation conventions.
 #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct ScheduleParams {
     /// Accrual and payment frequency used to generate the schedule boundaries.
     pub freq: Tenor,
     /// Day-count convention used to convert each generated accrual period into a
     /// year fraction.
     pub dc: DayCount,
-    /// Business-day convention applied when rolling accrual-end and payment
-    /// dates onto valid business days.
+    /// Business-day convention applied when rolling **payment dates** onto
+    /// valid business days.
+    ///
+    /// Accrual boundaries are left unadjusted (bond/ICMA convention) unless
+    /// [`Self::adjust_accrual_dates`] is `true`, in which case the same
+    /// convention also rolls both accrual-period boundaries (swap/ISDA 2006
+    /// §4.10 convention).
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub bdc: BusinessDayConvention,
     /// Holiday calendar identifier used together with `bdc`.
@@ -31,6 +37,20 @@ pub struct ScheduleParams {
     pub end_of_month: bool,
     /// Payment lag in business days after the adjusted accrual end date.
     pub payment_lag_days: i32,
+    /// Whether accrual-period boundaries are business-day adjusted with `bdc`.
+    ///
+    /// - `false` (default, bond convention): accrual periods run between the
+    ///   unadjusted schedule anchors; only payment dates roll.
+    /// - `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):
+    ///   both accrual-period boundaries are rolled with `bdc` before year
+    ///   fractions and overnight observation windows are computed. The swap
+    ///   presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],
+    ///   [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to
+    ///   `true`.
+    ///
+    /// Serialized only when `true`, so existing wire payloads are unchanged.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub adjust_accrual_dates: bool,
 }
 
 const WK: &str = crate::builder::calendar::WEEKENDS_ONLY_ID;
@@ -45,10 +65,13 @@ impl ScheduleParams {
             stub: StubKind::ShortFront,
             end_of_month: false,
             payment_lag_days: 0,
+            adjust_accrual_dates: false,
         }
     }
 
-    fn preset_with_lag(
+    /// Swap-style preset: accrual periods are business-day adjusted
+    /// (ISDA 2006 §4.10; ARRC SOFR conventions).
+    fn swap_preset(
         freq: Tenor,
         dc: DayCount,
         bdc: BusinessDayConvention,
@@ -57,6 +80,7 @@ impl ScheduleParams {
     ) -> Self {
         Self {
             payment_lag_days,
+            adjust_accrual_dates: true,
             ..Self::preset(freq, dc, bdc, calendar_id)
         }
     }
@@ -196,6 +220,7 @@ impl ScheduleParams {
     /// assert_eq!(params.bdc, BusinessDayConvention::ModifiedFollowing);
     /// assert_eq!(params.calendar_id, "usny");
     /// assert_eq!(params.payment_lag_days, 2);
+    /// assert!(params.adjust_accrual_dates);
     /// ```
     ///
     /// # References
@@ -203,7 +228,7 @@ impl ScheduleParams {
     /// - `docs/REFERENCES.md#arrc-sofr-users-guide`
     /// - `docs/REFERENCES.md#isda-2006-definitions`
     pub fn usd_sofr_swap() -> Self {
-        Self::preset_with_lag(
+        Self::swap_preset(
             Tenor::quarterly(),
             DayCount::Act360,
             BusinessDayConvention::ModifiedFollowing,
@@ -318,7 +343,7 @@ impl ScheduleParams {
     /// - `docs/REFERENCES.md#ecb-estr-methodology`
     /// - `docs/REFERENCES.md#isda-2006-definitions`
     pub fn eur_estr_swap() -> Self {
-        Self::preset_with_lag(
+        Self::swap_preset(
             Tenor::annual(),
             DayCount::Act360,
             BusinessDayConvention::ModifiedFollowing,
@@ -397,11 +422,12 @@ impl ScheduleParams {
     /// - `docs/REFERENCES.md#boe-sonia-key-features`
     /// - `docs/REFERENCES.md#isda-2006-definitions`
     pub fn gbp_sonia_swap() -> Self {
-        Self::preset(
+        Self::swap_preset(
             Tenor::annual(),
             DayCount::Act365F,
             BusinessDayConvention::ModifiedFollowing,
             "gblo",
+            0,
         )
     }
 
@@ -439,7 +465,7 @@ impl ScheduleParams {
     /// - `docs/REFERENCES.md#boj-tona`
     /// - `docs/REFERENCES.md#isda-2006-definitions`
     pub fn jpy_tona_swap() -> Self {
-        Self::preset_with_lag(
+        Self::swap_preset(
             Tenor::annual(),
             DayCount::Act365F,
             BusinessDayConvention::ModifiedFollowing,

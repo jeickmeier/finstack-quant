@@ -167,6 +167,7 @@ fn test_trs_schedule_spec_period_schedule_semiannual() {
         calendar_id: "weekends_only".to_string(),
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
     let spec = TrsScheduleSpec::from_params(start, end, params);
 
@@ -197,6 +198,7 @@ fn test_trs_schedule_spec_period_schedule_monthly() {
         calendar_id: "weekends_only".to_string(),
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
     let spec = TrsScheduleSpec::from_params(start, end, params);
 
@@ -229,6 +231,7 @@ fn test_trs_schedule_spec_different_day_counts() {
         calendar_id: "weekends_only".to_string(),
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
 
     // Act

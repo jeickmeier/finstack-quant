@@ -10,7 +10,11 @@ use crate::metrics::{MetricCalculator, MetricContext};
 /// `dirty_price` on the same market convention basis.
 ///
 /// The calculation uses the bond's accrual method (linear, compounded, or indexed)
-/// and respects ex-coupon conventions where accrual drops to zero in the ex-coupon window.
+/// and respects ex-coupon conventions: inside the ex-coupon window accrued
+/// interest is **negative** (UK gilt / DMO convention:
+/// `AI = −C × days-to-coupon / days-in-period` for the linear method), since
+/// the seller retains the imminent coupon and compensates the buyer for the
+/// remaining stub.
 ///
 /// # Examples
 ///

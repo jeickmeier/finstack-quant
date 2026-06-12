@@ -825,7 +825,20 @@ pub(crate) fn solve_ytw_from_flows(
     }
     // At maturity, principal redemption is already present in the cashflow schedule,
     // so use a zero additional redemption here to avoid double-counting.
-    candidates.push((bond.maturity, Money::new(0.0, bond.notional.currency())));
+    //
+    // The redemption Notional flow is dated on the BDC-adjusted maturity, which can
+    // roll past the unadjusted `bond.maturity` (e.g. maturity falling on a holiday),
+    // so truncate the maturity candidate at the final projected flow date instead of
+    // dropping the redemption.
+    let maturity_candidate = flows
+        .iter()
+        .map(|(d, _)| *d)
+        .max()
+        .map_or(bond.maturity, |last| last.max(bond.maturity));
+    candidates.push((
+        maturity_candidate,
+        Money::new(0.0, bond.notional.currency()),
+    ));
 
     let mut best_yield = f64::INFINITY;
     let mut best_flows: Vec<(Date, Money)> = Vec::new();

@@ -34,7 +34,6 @@ use finstack_core::market_data::term_structures::ForwardCurve;
 use finstack_core::Result;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
-use tracing::warn;
 
 /// Parameters for floating rate projection.
 #[derive(Debug, Clone)]
@@ -195,21 +194,19 @@ impl FloatingRateParams {
 
 /// Convert an optional [`Decimal`] constraint (floor/cap in bp) to `f64`.
 ///
-/// Returns `None` both when the input is `None` and when the decimal fails
-/// conversion to `f64` (which requires a pathologically out-of-range value).
-/// A `warn!` is emitted for the latter case, matching the pre-existing soft
-/// degradation in coupon emission for optional floor/cap fields.
-fn optional_decimal_to_f64(value: Option<Decimal>, label: &str) -> Option<f64> {
-    value.and_then(|d| {
-        let v = d.to_f64();
-        if v.is_none() {
-            warn!(
-                value = %d,
-                "{label} Decimal-to-f64 conversion failed; constraint will be ignored"
-            );
-        }
-        v
-    })
+/// Returns `Ok(None)` when the input is `None`. A `Decimal` that fails
+/// conversion to `f64` (pathologically out of range) is a hard error: a
+/// silently dropped floor/cap would change coupon economics without notice.
+fn optional_decimal_to_f64(value: Option<Decimal>, label: &str) -> Result<Option<f64>> {
+    value
+        .map(|d| {
+            d.to_f64().ok_or_else(|| {
+                finstack_core::Error::Validation(format!(
+                    "{label} value {d} cannot be represented as f64"
+                ))
+            })
+        })
+        .transpose()
 }
 
 impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
@@ -218,9 +215,9 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
     /// Canonical conversion from the serde-level `FloatingRateSpec` (Decimal) to
     /// the projection-level `FloatingRateParams` (f64).
     ///
-    /// Required numeric fields (`spread_bp`, `gearing`) error on `Decimal → f64`
-    /// overflow; optional floor/cap fields warn and drop the constraint on
-    /// conversion failure, matching legacy coupon-emission semantics.
+    /// All numeric fields — including optional floor/cap constraints — error
+    /// on `Decimal → f64` conversion failure; a silently dropped constraint
+    /// would change coupon economics without notice.
     fn try_from(spec: &crate::builder::specs::FloatingRateSpec) -> Result<Self> {
         use finstack_core::InputError;
 
@@ -238,10 +235,10 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for FloatingRateParams {
             spread_bp,
             gearing,
             gearing_includes_spread: spec.gearing_includes_spread,
-            index_floor_bp: optional_decimal_to_f64(spec.index_floor_bp, "index_floor_bp"),
-            index_cap_bp: optional_decimal_to_f64(spec.index_cap_bp, "index_cap_bp"),
-            all_in_floor_bp: optional_decimal_to_f64(spec.all_in_floor_bp, "all_in_floor_bp"),
-            all_in_cap_bp: optional_decimal_to_f64(spec.all_in_cap_bp, "all_in_cap_bp"),
+            index_floor_bp: optional_decimal_to_f64(spec.index_floor_bp, "index_floor_bp")?,
+            index_cap_bp: optional_decimal_to_f64(spec.index_cap_bp, "index_cap_bp")?,
+            all_in_floor_bp: optional_decimal_to_f64(spec.all_in_floor_bp, "all_in_floor_bp")?,
+            all_in_cap_bp: optional_decimal_to_f64(spec.all_in_cap_bp, "all_in_cap_bp")?,
         };
         params.validate()?;
         Ok(params)
@@ -364,6 +361,15 @@ pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
 /// Returns an error if:
 ///
 /// - `params` fails validation
+/// - `reset_date` is strictly before the curve base date. A strictly-past
+///   observation is a realized historical fixing that the curve cannot
+///   supply; this function projects only. The emission layer resolves
+///   seasoned resets from a `MarketContext` `ScalarTimeSeries` with id
+///   `FIXING:{index_id}` *before* calling this function, and routes this
+///   error through the spec's
+///   [`crate::builder::specs::FloatingRateFallback`] policy when no series
+///   is provided. A reset exactly on the curve base date (T+0) is projected
+///   from `t = 0`.
 /// - day-count conversion from the curve base date to the reset or accrual end
 ///   date fails
 ///
@@ -406,12 +412,29 @@ pub fn project_floating_rate(
     let fwd_dc = fwd.day_count();
     let fwd_base = fwd.base_date();
 
-    // Compute time points for the accrual period
+    // Compute time points for the accrual period.
     //
-    // Curves are defined from their base date forward; when pricing instruments whose
-    // reset dates fall on/before the curve base date (e.g., seasoned swaps or T+0
-    // test fixtures), clamp to t=0 rather than erroring on an inverted date range.
-    let t0 = if reset_date <= fwd_base {
+    // Curves are defined from their base date forward. A reset exactly on the
+    // base date (T+0) is projected from t = 0; a reset strictly before the
+    // base date is a realized historical fixing that the curve cannot supply,
+    // so it errors instead of being silently clamped to today's short end
+    // (2026-06-09 cashflows quant review, M3). The emission layer resolves
+    // seasoned resets from the `FIXING:{index_id}` series before projecting;
+    // callers with a fallback policy (e.g. `FloatingRateFallback::FixedRate`)
+    // handle this error upstream.
+    if reset_date < fwd_base {
+        return Err(finstack_core::Error::Validation(format!(
+            "floating-rate observation date {} is before the '{}' curve base date {}; the \
+             realized historical fixings are missing — provide a MarketContext \
+             ScalarTimeSeries with id 'FIXING:{}', supply a curve based on/before the \
+             observation date, or configure a FloatingRateFallback",
+            reset_date,
+            fwd.id(),
+            fwd_base,
+            fwd.id(),
+        )));
+    }
+    let t0 = if reset_date == fwd_base {
         0.0
     } else {
         fwd_dc.year_fraction(fwd_base, reset_date, DayCountContext::default())?
@@ -540,6 +563,19 @@ pub(crate) fn compute_compounded_rate(
     (product - 1.0) * day_count_basis / (total_days as f64)
 }
 
+/// Compounded-in-arrears with an ISDA 2021 rate cut-off ("lockout").
+///
+/// Per ISDA 2021 Definitions §7 (Compounding/Averaging with a rate cut-off)
+/// and the ARRC SOFR FRN conventions, the rate cut-off date is the
+/// `lockout_days`-th business day preceding the period end. With fixings
+/// `b_1..b_n` (where `b_n` is one business day before the exclusive period
+/// end), the cut-off fixing is `b_{n-lockout+1}`, i.e. 0-based index
+/// `n - lockout`; that rate applies to itself and every later fixing in the
+/// period. With `lockout_days = 0` this reduces to plain
+/// compounded-in-arrears.
+///
+/// When `lockout_days >= n`, the first available fixing is used for the
+/// whole period (degenerate guard for very short periods).
 fn compute_compounded_rate_with_lockout(
     daily_rates: &[(f64, u32)],
     total_days: u32,
@@ -556,12 +592,11 @@ fn compute_compounded_rate_with_lockout(
 
     let n = daily_rates.len();
     let lockout = lockout_days as usize;
-    let lockout_rate = if n > lockout {
-        daily_rates[n - lockout - 1].0
-    } else {
-        daily_rates[0].0
-    };
+    // ISDA 2021 §7 rate cut-off: the Nth business day preceding the period
+    // end is fixing index `n - lockout` (0-based); see doc above. Guarded so
+    // `lockout >= n` falls back to the first available fixing.
     let lockout_start = n.saturating_sub(lockout);
+    let lockout_rate = daily_rates[lockout_start.min(n - 1)].0;
 
     let mut product = 1.0;
     for (i, &(rate, days)) in daily_rates.iter().enumerate() {
@@ -1156,15 +1191,27 @@ mod tests {
             7,
             360.0,
         );
-        // Lockout freezes last 2 fixings to rate of day 2 (0.05)
-        assert!((rate - 0.05).abs() < 0.001, "Lockout rate: {rate:.6}");
+        // ISDA 2021 §7 rate cut-off: with n=5 fixings and a 2-day lockout the
+        // cut-off fixing is index n-2 = 3 (0.06); it applies to itself and the
+        // final fixing, so the effective rates are [0.05, 0.05, 0.05, 0.06, 0.06].
+        let expected = compute_compounded_rate(
+            &[(0.05, 1u32), (0.05, 1), (0.05, 1), (0.06, 1), (0.06, 3)],
+            7,
+            360.0,
+        );
+        assert!(
+            (rate - expected).abs() < 1e-12,
+            "Lockout rate: {rate:.6}, expected {expected:.6}"
+        );
     }
 
     #[test]
     fn test_overnight_lockout_matches_explicit_locked_fixings() {
         use crate::builder::specs::OvernightCompoundingMethod;
+        // ISDA 2021 §7: the 2-day rate cut-off freezes the cut-off fixing
+        // (index n-2 = 3, rate 0.07) onto every later fixing in the period.
         let fixings = vec![(0.04, 1u32), (0.05, 1), (0.06, 1), (0.07, 1), (0.08, 3)];
-        let explicit_locked = vec![(0.04, 1u32), (0.05, 1), (0.06, 1), (0.06, 1), (0.06, 3)];
+        let explicit_locked = vec![(0.04, 1u32), (0.05, 1), (0.06, 1), (0.07, 1), (0.07, 3)];
 
         let rate = compute_overnight_rate(
             OvernightCompoundingMethod::CompoundedWithLockout { lockout_days: 2 },
@@ -1236,6 +1283,7 @@ mod tests {
             all_in_cap_bp: Some(dec!(1500.0)),
             index_cap_bp: Some(dec!(1200.0)),
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 2,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::ModifiedFollowing,
@@ -1275,6 +1323,7 @@ mod tests {
             all_in_cap_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 2,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::ModifiedFollowing,
@@ -1310,6 +1359,7 @@ mod tests {
             all_in_cap_bp: Some(dec!(500.0)),
             index_cap_bp: Some(dec!(100.0)),
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 2,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::ModifiedFollowing,

@@ -176,7 +176,9 @@ fn test_par_rate_discount_ratio_rejects_seasoned_swap() {
     let end = date!(2029 - 01 - 01);
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
+    // Flat forward curve based at the trade date: seasoned resets strictly
+    // before the curve base now error under the default FloatingRateFallback.
+    let fwd_curve = build_flat_forward_curve(0.05, start, "USD-SOFR-3M");
 
     // Provide fixings for past reset dates (quarterly from Jan 1 through Apr 1)
     let fixings = finstack_core::market_data::scalars::ScalarTimeSeries::new(

@@ -836,6 +836,7 @@
       "description": "Linear principal paydown towards a target final notional amount over all periods.",
       "properties": {
         "LinearTo": {
+          "additionalProperties": false,
           "properties": {
             "final_notional": {
               "$ref": "#/$defs/Money",
@@ -858,6 +859,7 @@
       "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
       "properties": {
         "StepRemaining": {
+          "additionalProperties": false,
           "properties": {
             "schedule": {
               "description": "Ordered list of `(date, remaining_principal_after_date)`.",
@@ -893,6 +895,7 @@
       "description": "Fixed percentage of **original** notional paid each period (capped by remaining outstanding).\n\nThis is a sinking-fund style amortization where the payment amount is constant\nacross periods: `initial_notional * pct`. It does **not** compound (i.e., it is\nNOT percentage-of-remaining / declining-balance / mortgage-style).",
       "properties": {
         "PercentOfOriginalPerPeriod": {
+          "additionalProperties": false,
           "properties": {
             "pct": {
               "description": "Fraction of original notional paid per period (e.g., 0.05 = 5%).",
@@ -916,6 +919,7 @@
       "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
       "properties": {
         "CustomPrincipal": {
+          "additionalProperties": false,
           "properties": {
             "items": {
               "description": "List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.",

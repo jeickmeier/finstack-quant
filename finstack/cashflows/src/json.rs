@@ -214,6 +214,14 @@ pub fn build_cashflow_schedule_json(spec_json: &str, market_json: Option<&str>) 
 /// serialization, but it does not rebuild or regenerate cashflows from an
 /// economic spec.
 ///
+/// # Pre-Issue Flows
+///
+/// When `meta.issue_date` is set, interest-bearing flows (coupons, PIK,
+/// stubs) dated before the issue date are rejected. Principal-type flows
+/// (notional exchanges, amortization, prepayments) and fees may predate the
+/// issue date: the builder produces such schedules for delayed-funding
+/// structures.
+///
 /// # Arguments
 ///
 /// * `schedule_json` - JSON-encoded [`CashFlowSchedule`].
@@ -408,10 +416,23 @@ fn validate_schedule_economic_invariants(schedule: &CashFlowSchedule) -> Result<
     if let Some(issue_date) = schedule.meta.issue_date {
         let long_horizon = issue_date.add_months(1200);
         for flow in &schedule.flows {
-            if flow.date < issue_date {
+            // Principal-type flows (Notional/Amortization/PrePayment and the
+            // revolver variants) and fees MAY predate the issue date: the
+            // builder itself emits them for delayed-funding structures.
+            // Interest-bearing kinds cannot accrue before issue, so they are
+            // still rejected.
+            let interest_bearing = matches!(
+                flow.kind,
+                CFKind::Fixed
+                    | CFKind::FloatReset
+                    | CFKind::InflationCoupon
+                    | CFKind::PIK
+                    | CFKind::Stub
+            );
+            if flow.date < issue_date && interest_bearing {
                 return Err(Error::Validation(format!(
-                    "cashflow date {} is before issue date {}",
-                    flow.date, issue_date
+                    "interest-bearing cashflow ({:?}) dated {} is before issue date {}",
+                    flow.kind, flow.date, issue_date
                 )));
             }
             if flow.date > long_horizon {

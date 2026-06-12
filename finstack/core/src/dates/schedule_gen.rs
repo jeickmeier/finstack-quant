@@ -177,6 +177,17 @@ pub(super) struct BuilderInternal {
 
 impl BuilderInternal {
     pub(super) fn generate(self) -> crate::Result<Vec<Date>> {
+        // A zero-count tenor makes every roll a no-op, so the generation
+        // loops below would never terminate. Reject it up front (the count
+        // is also validated at parse and deserialization time, but `Tenor`
+        // fields are public so a zero count remains constructible).
+        if self.freq.count == 0 {
+            return Err(crate::error::InputError::InvalidTenor {
+                tenor: self.freq.to_string(),
+                reason: "tenor count must be positive for schedule generation".to_string(),
+            }
+            .into());
+        }
         if self.start >= self.end {
             return Err(crate::error::InputError::InvalidScheduleRange {
                 start: self.start,

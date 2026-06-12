@@ -58,6 +58,7 @@ fn bridge_date_generation_build_dates_works() {
         stub: StubKind::ShortFront,
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
 
     let dates = finstack_cashflows::builder::date_generation::build_dates(

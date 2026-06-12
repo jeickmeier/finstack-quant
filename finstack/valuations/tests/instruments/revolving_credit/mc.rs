@@ -437,6 +437,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
             all_in_cap_bp: None,
             index_cap_bp: all_in_cap_bp,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 2,
             dc: DayCount::Act360,
             bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,

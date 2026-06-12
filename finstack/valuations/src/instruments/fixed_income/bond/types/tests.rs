@@ -31,6 +31,7 @@ fn test_bond_with_custom_cashflows() {
         stub: StubKind::None,
         end_of_month: false,
         payment_lag_days: 0,
+        adjust_accrual_dates: false,
     };
 
     let step1_date = Date::from_calendar_date(2026, Month::January, 15).expect("Valid test date");

@@ -206,6 +206,7 @@ impl EquityTotalReturnSwap {
                     stub: StubKind::None,
                     end_of_month: false,
                     payment_lag_days: 0,
+                    adjust_accrual_dates: false,
                 },
             ))
             .side(TrsSide::ReceiveTotalReturn)
@@ -498,6 +499,7 @@ impl CashflowProvider for EquityTotalReturnSwap {
                     all_in_floor_bp: None,
                     index_cap_bp: None,
                     reset_freq: self.schedule.params.freq,
+                    index_tenor: None,
                     reset_lag_days: 0,
                     dc: self.financing.day_count,
                     bdc: self.schedule.params.bdc,

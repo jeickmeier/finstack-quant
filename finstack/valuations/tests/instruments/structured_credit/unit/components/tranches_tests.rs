@@ -141,6 +141,7 @@ fn test_tranche_floating_coupon() {
             all_in_floor_bp: None,
             index_cap_bp: None,
             reset_freq: finstack_core::dates::Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 2,
             dc: finstack_core::dates::DayCount::Act360,
             bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,

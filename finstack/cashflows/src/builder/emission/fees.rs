@@ -19,8 +19,9 @@ use super::{decimal_to_f64, f64_to_decimal};
 
 /// Emit a single revolving-credit fee cashflow.
 ///
-/// Creates a single fee cashflow with the specified kind if the computed fee amount
-/// is positive, otherwise returns an empty vector.
+/// Creates a single fee cashflow with the specified kind if the computed fee
+/// amount is non-zero (negative quotes — rebates — emit negative cashflows);
+/// returns `None` for a zero amount.
 ///
 /// Uses `Decimal` arithmetic throughout for consistency with the periodic fee
 /// emission path, avoiding f64 precision differences for large notionals.
@@ -41,7 +42,7 @@ fn emit_revolving_fee_on(
     let fee_amt = decimal_to_f64(fee_amt_dec)?;
     let rate = decimal_to_f64(fee_bp_dec * BP_TO_RATE)?;
 
-    if fee_amt > 0.0 {
+    if fee_amt != 0.0 {
         Ok(Some(CashFlow {
             date: d,
             reset_date: None,
@@ -147,10 +148,15 @@ fn compute_time_weighted_average(
 /// For periodic fees, computes the fee amount as `base * bps * year_fraction`
 /// where base is either the drawn balance or the undrawn balance (facility_limit - outstanding).
 ///
-/// When a fee's `accrual_basis` is `TimeWeightedAverage`, the outstanding balance used
-/// for the base amount is computed as a time-weighted average over the accrual period,
-/// using the `outstanding_history` map. This is useful for commitment fees on revolving
-/// facilities where the outstanding changes within the fee accrual period.
+/// When a fee's `accrual_basis` is `PointInTime`, the outstanding balance is
+/// sampled at the period's accrual start from `outstanding_history` (falling
+/// back to the live `outstanding` only when no entry exists), matching the
+/// coupon convention. When it is `TimeWeightedAverage`, the balance is the
+/// time-weighted average over the accrual period — useful for commitment fees
+/// on revolving facilities where the outstanding changes within the period.
+///
+/// Any non-zero fee amount is emitted; negative fees (rebates) are preserved
+/// as negative cashflows for both periodic and fixed fees.
 pub(in crate::builder) fn emit_fees_on(
     d: Date,
     periodic_fees: &[PeriodicFee],
@@ -182,9 +188,16 @@ pub(in crate::builder) fn emit_fees_on(
                 },
             )?;
 
-            // Determine the outstanding to use based on accrual basis
+            // Determine the outstanding to use based on accrual basis.
+            // `PointInTime` samples the balance at the period's accrual start
+            // (matching the coupon convention and the `FeeAccrualBasis` docs),
+            // not the live post-amortization balance on the payment date. The
+            // live balance is only a fallback when no history entry exists for
+            // the accrual start (e.g., synthetic unit-test periods).
             let effective_outstanding = match pf.accrual_basis {
-                FeeAccrualBasis::PointInTime => outstanding,
+                FeeAccrualBasis::PointInTime => *outstanding_history
+                    .get(&period.accrual_start)
+                    .unwrap_or(&outstanding),
                 FeeAccrualBasis::TimeWeightedAverage => compute_time_weighted_average(
                     outstanding_history,
                     period.accrual_start,
@@ -218,7 +231,9 @@ pub(in crate::builder) fn emit_fees_on(
             let rate_dec = pf.bps * BP_TO_RATE;
             let rate = decimal_to_f64(rate_dec)?;
 
-            if fee_amt > 0.0 {
+            // Any non-zero fee amount is emitted: negative-bps fees (rebates)
+            // flow through as negative cashflows, matching fixed-fee behavior.
+            if fee_amt != 0.0 {
                 new_flows.push(CashFlow {
                     date: d,
                     reset_date: None,
@@ -572,6 +587,86 @@ mod tests {
         let mut buf = Vec::new();
         let result = compute_time_weighted_average(&history, start, end, dec!(0), &mut buf);
         assert_eq!(result, dec!(1000000), "Expected 1M, got {}", result);
+    }
+
+    #[test]
+    fn point_in_time_uses_period_start_balance_on_amortizing_schedule() {
+        // The balance amortizes from 1,000,000 (period start) to 800,000 (live
+        // balance on the payment date). PointInTime must price off the
+        // period-start balance, not the post-amortization payment-date balance.
+        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
+        let payment = end;
+
+        let mut history = finstack_core::HashMap::default();
+        history.insert(start, dec!(1000000));
+
+        let pf = make_periodic_fee(
+            start,
+            end,
+            payment,
+            dec!(50),
+            FeeAccrualBasis::PointInTime,
+            FeeBase::Drawn,
+        );
+
+        let mut flows = Vec::new();
+        emit_fees_on(
+            payment,
+            &[pf],
+            &[],
+            dec!(800000), // live balance after same-date amortization
+            &history,
+            Currency::USD,
+            &mut flows,
+        )
+        .expect("valid fee inputs");
+
+        assert_eq!(flows.len(), 1);
+        let fee = flows[0].amount.amount();
+        // 1,000,000 * 50bp * 90/360 = 1250.0 (golden, period-start base)
+        assert!(
+            (fee - 1250.0).abs() < 0.01,
+            "PointInTime fee must use period-start balance: expected 1250.0, got {fee}"
+        );
+    }
+
+    #[test]
+    fn negative_periodic_fee_emitted_as_rebate() {
+        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
+        let payment = end;
+
+        let mut history = finstack_core::HashMap::default();
+        history.insert(start, dec!(1000000));
+
+        let pf = make_periodic_fee(
+            start,
+            end,
+            payment,
+            dec!(-50), // negative bps: rebate
+            FeeAccrualBasis::PointInTime,
+            FeeBase::Drawn,
+        );
+
+        let mut flows = Vec::new();
+        emit_fees_on(
+            payment,
+            &[pf],
+            &[],
+            dec!(1000000),
+            &history,
+            Currency::USD,
+            &mut flows,
+        )
+        .expect("valid fee inputs");
+
+        assert_eq!(flows.len(), 1, "negative fee must not be dropped");
+        let fee = flows[0].amount.amount();
+        assert!(
+            (fee + 1250.0).abs() < 0.01,
+            "Expected -1250.0 rebate, got {fee}"
+        );
     }
 
     #[test]

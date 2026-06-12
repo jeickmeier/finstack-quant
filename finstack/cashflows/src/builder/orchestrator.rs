@@ -9,6 +9,8 @@ use crate::builder::{AmortizationSpec, Notional};
 use crate::primitives::{CFKind, CashFlow};
 use finstack_core::dates::Date;
 use finstack_core::decimal::{decimal_to_f64, f64_to_decimal};
+use finstack_core::market_data::fixings::fixing_series_id;
+use finstack_core::market_data::scalars::ScalarTimeSeries;
 use finstack_core::market_data::term_structures::ForwardCurve;
 use finstack_core::money::Money;
 use finstack_core::InputError;
@@ -426,8 +428,13 @@ impl CompiledCashFlowPlan {
             &self.principal_events,
         )?;
         let ccy = self.notional.initial.currency();
+        // Fixed fees dated at or before issue are emitted during initialization.
+        // The date loop below only processes dates strictly after issue, so this
+        // is the single emission point for such fees: at-issue fees are not
+        // duplicated and pre-issue fees (e.g., upfront/commitment fees on
+        // delayed-funding structures) are not dropped.
         for (fee_date, amount) in &self.fixed_fees {
-            if *fee_date == self.issue && amount.amount() != 0.0 {
+            if *fee_date <= self.issue && amount.amount() != 0.0 {
                 state.flows.push(CashFlow {
                     date: *fee_date,
                     reset_date: None,
@@ -438,9 +445,26 @@ impl CompiledCashFlowPlan {
                 });
             }
         }
+        // Principal redemption pays on the business-day-adjusted maturity using
+        // the calendar/BDC of the principal-paying leg (first fixed schedule,
+        // else first floating schedule). Without any coupon leg there is no
+        // resolved calendar, so the raw maturity date is kept.
+        let redemption_date = if let Some(schedule) = self.fixed_schedules.first() {
+            finstack_core::dates::adjust(self.maturity, schedule.spec.bdc, schedule.calendar)?
+        } else if let Some(schedule) = self.float_schedules.first() {
+            finstack_core::dates::adjust(
+                self.maturity,
+                schedule.spec.rate_spec.bdc,
+                schedule.calendar,
+            )?
+        } else {
+            self.maturity
+        };
+
         let ctx = BuildContext {
             ccy,
             maturity: self.maturity,
+            redemption_date,
             notional: &self.notional,
             fixed_schedules: &self.fixed_schedules,
             float_schedules: &self.float_schedules,
@@ -449,21 +473,40 @@ impl CompiledCashFlowPlan {
             principal_events: &self.principal_events,
         };
 
-        // Resolve curves upfront and reuse across all payment dates.
-        let resolved_curves: Vec<Option<Arc<ForwardCurve>>> = if let Some(mkt) = curves {
+        // Resolve curves and historical-fixing series upfront and reuse across
+        // all payment dates. Fixings follow the canonical core convention: a
+        // `ScalarTimeSeries` stored under `FIXING:{index_id}` carries realized
+        // index observations for dates before the curve base (seasoned
+        // instruments).
+        let (resolved_curves, resolved_fixings): (
+            Vec<Option<Arc<ForwardCurve>>>,
+            Vec<Option<ScalarTimeSeries>>,
+        ) = if let Some(mkt) = curves {
             self.float_schedules
                 .iter()
                 .map(|schedule| {
-                    mkt.get_forward(schedule.spec.rate_spec.index_id.as_str())
-                        .ok()
+                    let index_id = schedule.spec.rate_spec.index_id.as_str();
+                    (
+                        mkt.get_forward(index_id).ok(),
+                        mkt.get_series(fixing_series_id(index_id)).ok().cloned(),
+                    )
                 })
-                .collect()
+                .unzip()
         } else {
-            vec![None; self.float_schedules.len()]
+            (
+                vec![None; self.float_schedules.len()],
+                vec![None; self.float_schedules.len()],
+            )
         };
 
-        let processor = DateProcessor::new(&ctx, &self.amort_setup, &resolved_curves);
-        for &d in self.dates.iter().skip(1) {
+        // Initialization above consumes everything dated at or before issue
+        // (initial funding, pre-/at-issue principal events, pre-/at-issue fixed
+        // fees); the loop processes only dates strictly after issue. The two
+        // emission paths are mutually exclusive so pre-issue dates in
+        // `self.dates` can never cause issue-dated flows to be emitted twice.
+        let processor =
+            DateProcessor::new(&ctx, &self.amort_setup, &resolved_curves, &resolved_fixings);
+        for &d in self.dates.iter().filter(|&&d| d > self.issue) {
             state = processor.process(d, state)?;
         }
 

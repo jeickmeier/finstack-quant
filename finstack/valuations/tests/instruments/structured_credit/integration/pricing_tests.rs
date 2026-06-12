@@ -445,7 +445,19 @@ fn test_structured_credit_registry_wal_matches_cashflow_wal() {
     //   old: 2.2255397693750574   new: 2.226010097887204   (+0.00047 y, ~0.02%)
     // The benchmark is library-self-calculated (no external oracle), so the
     // golden-test policy permits a documented re-bless.
-    let expected = 2.226_010_097_887_204_f64;
+    //
+    // Re-blessed 2026-06-11 (cashflows quant review, valuations consumers):
+    // (1) default/prepay/scheduled ordering now follows the stated
+    //     Intex/Moody's & SIFMA convention — MDR applied to the
+    //     BEGINNING-of-period balance, scheduled principal on the survivor,
+    //     SMM last (previously scheduled → default → prepay); and
+    // (2) the level-pay annuity uses the NOMINAL periodic rate
+    //     (rate × months/12, US mortgage convention, matching
+    //     mbs_passthrough) instead of effective compounding.
+    // Both changes slightly front-load defaults/scheduled principal, so
+    // principal returns marginally earlier and the WAL shortens.
+    //   old: 2.226010097887204   new: 2.2250660687393284   (−0.00094 y, ~0.04%)
+    let expected = 2.225_066_068_739_328_4_f64;
     let actual = valuation.measures["wal"];
 
     assert!(

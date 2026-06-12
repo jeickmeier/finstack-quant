@@ -5,6 +5,7 @@ use std::sync::Arc;
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::decimal::{decimal_to_f64, f64_to_decimal};
+use finstack_core::market_data::scalars::ScalarTimeSeries;
 use finstack_core::market_data::term_structures::ForwardCurve;
 use finstack_core::money::Money;
 use rust_decimal::Decimal;
@@ -12,7 +13,7 @@ use rust_decimal::Decimal;
 use crate::builder::compiler::{FixedSchedule, FloatSchedule, PeriodicFee};
 use crate::builder::emission::{
     emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
-    AmortizationParams,
+    AmortizationParams, ResolvedFloatMarket,
 };
 use crate::builder::orchestrator::{AmortizationSetup, BuildState, PrincipalEvent};
 use crate::builder::Notional;
@@ -22,6 +23,11 @@ use crate::primitives::{CFKind, CashFlow};
 pub(super) struct BuildContext<'a> {
     pub(super) ccy: Currency,
     pub(super) maturity: Date,
+    /// Business-day-adjusted maturity on which the final principal redemption
+    /// is paid. Adjusted with the calendar/BDC of the principal-paying leg
+    /// (first fixed, else first floating coupon schedule); equals the raw
+    /// `maturity` when no coupon schedule exists.
+    pub(super) redemption_date: Date,
     pub(super) notional: &'a Notional,
     pub(super) fixed_schedules: &'a [FixedSchedule],
     pub(super) float_schedules: &'a [FloatSchedule],
@@ -35,6 +41,10 @@ pub(super) struct DateProcessor<'a> {
     ctx: &'a BuildContext<'a>,
     amort_setup: &'a AmortizationSetup,
     resolved_curves: &'a [Option<Arc<ForwardCurve>>],
+    /// Per-float-schedule historical fixing series (`FIXING:{index_id}`),
+    /// aligned with `resolved_curves`; used for seasoned coupons whose
+    /// observation dates precede the curve base date.
+    resolved_fixings: &'a [Option<ScalarTimeSeries>],
 }
 
 impl<'a> DateProcessor<'a> {
@@ -42,11 +52,13 @@ impl<'a> DateProcessor<'a> {
         ctx: &'a BuildContext<'a>,
         amort_setup: &'a AmortizationSetup,
         resolved_curves: &'a [Option<Arc<ForwardCurve>>],
+        resolved_fixings: &'a [Option<ScalarTimeSeries>],
     ) -> Self {
         Self {
             ctx,
             amort_setup,
             resolved_curves,
+            resolved_fixings,
         }
     }
 
@@ -66,7 +78,10 @@ impl<'a> DateProcessor<'a> {
             &state.outstanding_after,
             state.outstanding,
             self.ctx.ccy,
-            self.resolved_curves,
+            ResolvedFloatMarket {
+                curves: self.resolved_curves,
+                fixings: self.resolved_fixings,
+            },
             &mut state.flows,
         )?;
         Ok(pik_f + pik_fl)
@@ -142,11 +157,17 @@ impl<'a> DateProcessor<'a> {
     }
 
     /// Handle maturity redemption: emit final principal repayment if outstanding > 0.
+    ///
+    /// The loop still triggers on the raw (unadjusted) maturity date, but the
+    /// emitted cashflow is dated on `BuildContext::redemption_date` — the
+    /// business-day-adjusted maturity — so the redemption settles on the same
+    /// date as the final coupon. `finalize_flows` re-sorts flows by date, so
+    /// the shifted date keeps the schedule ordered.
     fn handle_maturity(&self, d: Date, state: &mut BuildState) -> finstack_core::Result<()> {
         if d == self.ctx.maturity && state.outstanding > Decimal::ZERO {
             let outstanding_f64 = decimal_to_f64(state.outstanding)?;
             state.flows.push(CashFlow {
-                date: d,
+                date: self.ctx.redemption_date,
                 reset_date: None,
                 amount: Money::new(outstanding_f64, self.ctx.ccy),
                 kind: CFKind::Notional,

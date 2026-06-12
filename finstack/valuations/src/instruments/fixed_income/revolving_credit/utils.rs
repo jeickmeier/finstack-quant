@@ -382,6 +382,7 @@ mod tests {
                 all_in_floor_bp: None,
                 index_cap_bp: None,
                 reset_freq: Tenor::quarterly(),
+                index_tenor: None,
                 reset_lag_days: 2,
                 dc: DayCount::Act360,
                 bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,

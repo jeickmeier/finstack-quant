@@ -105,7 +105,12 @@ test('SabrCalibrator surface: withTolerance, calibrate, calibrateAutoShift, para
   const smile = new wasm.SabrSmile(base, forward, t);
   const vols = smile.generateSmile(strikes);
 
-  const calibrator = new wasm.SabrCalibrator().withTolerance(1e-8);
+  // 1e-6 on the vega-weighted SSE objective is attainable within the default
+  // iteration budget; tighter tolerances fail loudly under the strict
+  // non-convergence semantics of core `minimize` because rho is weakly
+  // identified on this near-symmetric strike set (mirrors the Rust unit test
+  // in src/api/valuations/sabr.rs).
+  const calibrator = new wasm.SabrCalibrator().withTolerance(1e-6);
   const fitted = calibrator.calibrate(forward, strikes, vols, t, beta);
   assert.equal(fitted.beta, beta);
   assert.ok(fitted.alpha > 0);

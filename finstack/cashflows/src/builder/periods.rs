@@ -9,7 +9,9 @@ use finstack_core::dates::{
 use finstack_core::InputError;
 
 use super::calendar::resolve_calendar_strict;
-use super::date_generation::{build_dates, build_schedule_period, PeriodSchedule};
+use super::date_generation::{
+    adjust_period_accruals, build_dates, build_schedule_period, is_regular_period, PeriodSchedule,
+};
 use super::emission::compute_reset_date;
 
 pub use super::date_generation::SchedulePeriod;
@@ -43,28 +45,28 @@ pub struct BuildPeriodsParams<'a> {
     pub adjust_accrual_dates: bool,
 }
 
-fn build_day_count_ctx<'a>(
-    params: &BuildPeriodsParams<'a>,
-    cal: &'a dyn finstack_core::dates::HolidayCalendar,
-) -> DayCountContext<'a> {
-    DayCountContext {
-        calendar: Some(cal),
-        frequency: Some(params.frequency),
-        bus_basis: None,
-        coupon_period: None,
-    }
-}
-
 fn enrich_period(
     mut period: SchedulePeriod,
     params: &BuildPeriodsParams<'_>,
     cal: &dyn finstack_core::dates::HolidayCalendar,
-    dc_ctx: DayCountContext<'_>,
 ) -> finstack_core::Result<SchedulePeriod> {
+    // Regularity is assessed on the unadjusted boundaries (the schedule
+    // anchors) before any business-day adjustment.
+    let regular = is_regular_period(period.accrual_start, period.accrual_end, params.frequency);
     if params.adjust_accrual_dates {
-        period.accrual_start = finstack_core::dates::adjust(period.accrual_start, params.bdc, cal)?;
-        period.accrual_end = finstack_core::dates::adjust(period.accrual_end, params.bdc, cal)?;
+        adjust_period_accruals(&mut period, params.bdc, cal)?;
     }
+    // ACT/ACT ICMA reference period: for regular periods the coupon period is
+    // the accrual period itself (exact ISMA accrual). For stub periods the
+    // reference period is not cleanly derivable from a single period, so it
+    // is left unset and core falls back to the quasi-coupon grid anchored on
+    // the accrual start (frequency-based subdivision).
+    let dc_ctx = DayCountContext {
+        calendar: Some(cal),
+        frequency: Some(params.frequency),
+        bus_basis: None,
+        coupon_period: regular.then_some((period.accrual_start, period.accrual_end)),
+    };
     period.accrual_year_fraction =
         params
             .day_count
@@ -81,11 +83,10 @@ fn enrich_period_schedule(
     params: &BuildPeriodsParams<'_>,
 ) -> finstack_core::Result<PeriodSchedule> {
     let cal = resolve_calendar_strict(params.calendar_id)?;
-    let dc_ctx = build_day_count_ctx(params, cal);
     let periods = schedule
         .periods
         .into_iter()
-        .map(|period| enrich_period(period, params, cal, dc_ctx))
+        .map(|period| enrich_period(period, params, cal))
         .collect::<finstack_core::Result<Vec<_>>>()?;
     Ok(PeriodSchedule {
         periods,

@@ -482,6 +482,10 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                 // `pending_losses`), understating available cash, under-paying
                 // senior tranches, and leaving recovery value stranded.
                 let pending_recoveries = state.recovery_queue.pending_amount(state.base_ccy);
+                // The cleanup call realizes the pending recoveries immediately
+                // (they fund the redemption below); drain the queue so the
+                // end-of-simulation drain cannot release them a second time.
+                let _ = state.recovery_queue.drain_pending();
                 let mut available_for_redemption =
                     state.pool_outstanding.amount() + pending_recoveries.amount();
 
@@ -592,7 +596,136 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         )?;
     }
 
+    // M15: drain lagged recoveries still pending at simulation end. When the
+    // simulation terminates via pool exhaustion or the final scheduled date,
+    // recoveries from defaults within `recovery_lag` months of the end have
+    // not yet matured out of the queue; without this drain that recovery cash
+    // is silently dropped and losses are overstated for any deal with
+    // defaults near maturity. Mirrors the cleanup-call branch, which already
+    // realizes the pending queue when it terminates the deal. Each entry is
+    // released at the later of the final simulated date and its own
+    // default-date + recovery lag, business-day adjusted.
+    drain_pending_recoveries_at_end(&mut state, calendar, convention)?;
+
     Ok(state.finalize())
+}
+
+/// Drain and distribute recoveries still pending in the lag queue when the
+/// simulation terminates (pool exhaustion or final scheduled payment date).
+///
+/// Each pending entry is released on the later of the last simulated payment
+/// date and its natural maturity (`default_date + recovery_lag`), adjusted to
+/// a business day, and distributed through the same terminal path the
+/// cleanup-call branch uses: tranches in seniority order, each tranche's
+/// claim being its deferred interest (senior portion) plus its remaining
+/// principal balance. No new coupon accrues after the final simulated date,
+/// so unlike the mid-life cleanup call there is no stub accrued-interest leg.
+fn drain_pending_recoveries_at_end(
+    state: &mut SimulationState,
+    calendar: &dyn HolidayCalendar,
+    convention: BusinessDayConvention,
+) -> Result<()> {
+    let pending = state.recovery_queue.drain_pending();
+    if pending.is_empty() {
+        return Ok(());
+    }
+
+    let last_date = state.prev_date.unwrap_or(state.closing_date);
+    let lag_months = i32::try_from(state.recovery_lag_months).unwrap_or(i32::MAX);
+
+    // Seniority order: Senior=0 first, Equity=3 last (same as cleanup call).
+    let mut order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
+    order.sort_by_key(|&i| state.tranches.tranches[i].seniority);
+
+    for (default_date, amount) in pending {
+        let natural_release = default_date.add_months(lag_months);
+        let release_date = adjust(natural_release.max(last_date), convention, calendar)?;
+
+        let mut available = amount.amount();
+        for &idx in &order {
+            if available <= WRITEDOWN_DE_MINIMIS {
+                break;
+            }
+            let tranche_id_str = state.tranches.tranches[idx].id.as_str();
+            let balance = state
+                .tranche_balances
+                .get(tranche_id_str)
+                .map(|m| m.amount())
+                .unwrap_or(0.0);
+            let deferred = state
+                .deferred_interest
+                .get(tranche_id_str)
+                .map(|m| m.amount())
+                .unwrap_or(0.0);
+            let claim = balance + deferred;
+            if claim <= WRITEDOWN_DE_MINIMIS {
+                continue;
+            }
+
+            let paid = claim.min(available);
+            available -= paid;
+
+            // Deferred interest is the senior claim within the distribution;
+            // the remainder retires principal (same split as the cleanup
+            // call's terminal redemption).
+            let interest_paid = paid.min(deferred).max(0.0);
+            let principal_paid = (paid - interest_paid).max(0.0);
+
+            let payment = Money::new(paid, state.base_ccy);
+            let interest_money = Money::new(interest_paid, state.base_ccy);
+            let principal_money = Money::new(principal_paid, state.base_ccy);
+
+            if let Some(res) = state.results.get_mut(tranche_id_str) {
+                res.cashflows.push((release_date, payment));
+                if interest_paid > 0.0 {
+                    res.interest_flows.push((release_date, interest_money));
+                    res.total_interest = res.total_interest.checked_add(interest_money)?;
+                }
+                if principal_paid > 0.0 {
+                    res.principal_flows.push((release_date, principal_money));
+                    res.total_principal = res.total_principal.checked_add(principal_money)?;
+                }
+            }
+            if interest_paid > 0.0 {
+                if let Some(def) = state.deferred_interest.get_mut(tranche_id_str) {
+                    *def = def
+                        .checked_sub(interest_money)
+                        .unwrap_or(Money::new(0.0, state.base_ccy));
+                }
+            }
+            if principal_paid > 0.0 {
+                if let Some(bal) = state.tranche_balances.get_mut(tranche_id_str) {
+                    *bal = bal
+                        .checked_sub(principal_money)
+                        .unwrap_or(Money::new(0.0, state.base_ccy));
+                }
+            }
+        }
+
+        // Any remainder beyond all note claims is the equity holder's
+        // residual — book it to the equity tranche (mirroring the standard
+        // waterfall's Equity residual recipient and step-5's booking of
+        // residual cash as a principal flow), so recovery cash is never
+        // silently dropped.
+        if available > WRITEDOWN_DE_MINIMIS {
+            let equity_idx = order
+                .iter()
+                .rev()
+                .copied()
+                .find(|&i| state.tranches.tranches[i].seniority == TrancheSeniority::Equity);
+            if let Some(idx) = equity_idx {
+                let tranche_id_str = state.tranches.tranches[idx].id.as_str();
+                let residual = Money::new(available, state.base_ccy);
+                if let Some(res) = state.results.get_mut(tranche_id_str) {
+                    res.cashflows.push((release_date, residual));
+                    res.principal_flows.push((release_date, residual));
+                    res.total_principal = res.total_principal.checked_add(residual)?;
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Aggregate tranche-level cashflows into one dated cashflow vector.
@@ -1254,7 +1387,12 @@ mod tests {
         // Period-2 scheduled principal = frozen_LP − interest on the
         // (prepaid-down) balance. With the bug the level payment would be
         // recomputed off the halved balance, roughly halving it.
-        let period_rate = (1.0 + rate).powf(months_per_period / 12.0) - 1.0;
+        //
+        // Convention change (cashflows quant review, Moderate): the level-pay
+        // annuity uses the NOMINAL periodic rate `rate × months/12` (US
+        // mortgage convention, matching mbs_passthrough/pricer.rs), not the
+        // effective-compounding `(1+rate)^(months/12) − 1` previously pinned.
+        let period_rate = rate * months_per_period / 12.0;
         let expected_sched2 = level_payment - balance_after_prepay * period_rate;
         let sched2 = flows2.scheduled_principal.amount();
         assert!(
@@ -1549,6 +1687,139 @@ mod tests {
              {interest_no_default:.2})"
         );
     }
+
+    /// M15 — lagged recoveries still pending at simulation end must be
+    /// drained and distributed, not silently dropped by `finalize()`.
+    ///
+    /// With a 12-month recovery lag and defaults occurring in every period
+    /// (including the final year), the recovery queue is non-empty when the
+    /// final scheduled payment date is reached. Pre-fix, that pending
+    /// recovery cash was dropped — losses overstated for any deal with
+    /// defaults near maturity. The cleanup-call branch already realized the
+    /// pending queue; the two normal termination paths now do too.
+    #[test]
+    fn pending_recoveries_at_simulation_end_are_drained_not_dropped() {
+        let closing = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let maturity = Date::from_calendar_date(2027, Month::January, 1).expect("date");
+        let face_senior = 90_000_000.0_f64;
+
+        let build_deal = |lag_months: u32| {
+            let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+            pool.assets.push(PoolAsset::fixed_rate_bond(
+                "A1",
+                Money::new(100_000_000.0, Currency::USD),
+                0.06,
+                maturity,
+                DayCount::Thirty360,
+            ));
+            let tranches = TrancheStructure::new(vec![
+                Tranche::new(
+                    "A",
+                    0.0,
+                    90.0,
+                    TrancheSeniority::Senior,
+                    Money::new(face_senior, Currency::USD),
+                    TrancheCoupon::Fixed { rate: 0.05 },
+                    maturity,
+                )
+                .expect("senior"),
+                Tranche::new(
+                    "EQ",
+                    90.0,
+                    100.0,
+                    TrancheSeniority::Equity,
+                    Money::new(10_000_000.0, Currency::USD),
+                    TrancheCoupon::Fixed { rate: 0.0 },
+                    maturity,
+                )
+                .expect("equity"),
+            ])
+            .expect("structure");
+            let mut instrument = StructuredCredit::new_abs(
+                "ABS-TAIL-RECOVERY",
+                pool,
+                tranches,
+                closing,
+                maturity,
+                "USD-OIS",
+            )
+            .with_payment_calendar("nyse");
+            // CDR 20%: defaults occur in every period including the final
+            // year, so with a 12-month lag the queue is non-empty at the
+            // final scheduled date. No prepayments, 40% recovery.
+            instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.20);
+            instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+            instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, lag_months);
+            instrument
+        };
+
+        let market = MarketContext::new().insert(cc_discount_curve());
+        let run = |lag: u32| {
+            run_simulation_with_source(
+                &build_deal(lag),
+                &market,
+                closing,
+                &mut DeterministicPoolFlowSource,
+            )
+            .expect("simulation")
+        };
+        let lagged = run(12);
+        let immediate = run(0);
+
+        // (a) No dropped recovery cash on the senior note: its face must be
+        // fully consumed by principal repaid + net-loss write-downs, and its
+        // final balance must be zero. Pre-fix, the pending tail recoveries
+        // were dropped, leaving the senior under-repaid by exactly the
+        // pending queue (defaulted × recovery rate from the final lag
+        // window).
+        let senior = lagged.get("A").expect("senior tranche");
+        let retired = senior.total_principal.amount() + senior.total_writedown.amount();
+        assert!(
+            (retired - face_senior).abs() < 1.0,
+            "senior principal ({:.2}) + write-down ({:.2}) must equal face \
+             {face_senior:.0}; a shortfall means tail recoveries were dropped",
+            senior.total_principal.amount(),
+            senior.total_writedown.amount(),
+        );
+        assert!(
+            senior.final_balance.amount() < 1.0,
+            "senior tranche must be fully retired once pending recoveries \
+             are drained; final_balance={}",
+            senior.final_balance.amount()
+        );
+
+        // (b) Conservation against a lag-0 run: the recovery lag shifts cash
+        // TIMING only — pool interest, defaults, and recoveries are identical
+        // — so total cash distributed across the structure must match.
+        let total_cash = |res: &HashMap<String, TrancheCashflows>| -> f64 {
+            res.values()
+                .flat_map(|r| r.cashflows.iter())
+                .map(|(_, m)| m.amount())
+                .sum()
+        };
+        let cash_lagged = total_cash(&lagged);
+        let cash_immediate = total_cash(&immediate);
+        assert!(
+            (cash_lagged - cash_immediate).abs() < 1.0,
+            "total cash with a 12m recovery lag ({cash_lagged:.2}) must equal \
+             the lag-0 total ({cash_immediate:.2}); a shortfall is dropped \
+             tail-recovery cash"
+        );
+
+        // (c) The drained flows must land at-or-after the final scheduled
+        // date (released at the later of the final date and default + lag).
+        let last_flow = lagged
+            .values()
+            .flat_map(|r| r.cashflows.iter())
+            .map(|(d, _)| *d)
+            .max()
+            .expect("flows");
+        assert!(
+            last_flow >= maturity,
+            "drained recovery flows must release on/after the final date; \
+             last flow {last_flow}"
+        );
+    }
 }
 
 // ============================================================================
@@ -1615,6 +1886,12 @@ pub(crate) struct SimulationState<'a> {
     /// equity (first loss) → subordinated → mezzanine → senior.
     /// Computed once, reused every period.
     loss_alloc_order: Vec<usize>,
+    /// Balance-weighted average collateral age (WALA) in months at closing,
+    /// derived from each asset's `acquisition_date`. PSA/SDA seasoning ramps
+    /// are keyed off LOAN age, not deal age, so seasoned collateral must
+    /// start partway up the ramp. Assets without an `acquisition_date`
+    /// contribute zero age (collateral assumed new at closing).
+    pool_wala_months: u32,
     /// Current reserve account balance.
     reserve_balance: Money,
 }
@@ -1709,6 +1986,30 @@ impl<'a> SimulationState<'a> {
                 .cmp(&tranches.tranches[a].seniority)
         });
 
+        // Balance-weighted average collateral age (WALA) at closing. The
+        // `acquisition_date` carried by each pool asset (the origination /
+        // issue date for assets built from bonds) is the closest available
+        // proxy for loan origination; assets without one contribute zero age.
+        let mut weighted_age = 0.0_f64;
+        let mut total_weight = 0.0_f64;
+        for asset in &pool.assets {
+            let weight = asset.balance.amount().max(0.0);
+            if weight <= 0.0 {
+                continue;
+            }
+            total_weight += weight;
+            if let Some(acq_date) = asset.acquisition_date {
+                if closing_date > acq_date {
+                    weighted_age += f64::from(acq_date.months_until(closing_date)) * weight;
+                }
+            }
+        }
+        let pool_wala_months = if total_weight > 0.0 {
+            (weighted_age / total_weight).round() as u32
+        } else {
+            0
+        };
+
         Ok(Self {
             pool_state,
             pool_outstanding: total_pool_balance,
@@ -1730,6 +2031,7 @@ impl<'a> SimulationState<'a> {
             total_pool_balance,
             performing_pool_balance,
             loss_alloc_order,
+            pool_wala_months,
             reserve_balance: pool.reserve_account,
         })
     }
@@ -1823,7 +2125,12 @@ fn simulate_period(
     months_per_period: f64,
     source: &mut (impl PoolFlowSource + ?Sized),
 ) -> Result<()> {
-    let seasoning_months = state.closing_date.months_until(pay_date);
+    // Seasoning for PSA/SDA ramps = collateral age, not deal age: the
+    // pool's balance-weighted average loan age at closing (WALA, derived
+    // from asset acquisition dates) plus the months elapsed since closing.
+    // Seasoned collateral therefore enters the ramp partway up instead of
+    // restarting at month zero on the deal closing date.
+    let seasoning_months = state.pool_wala_months + state.closing_date.months_until(pay_date);
 
     // Capture period start before updating prev_date (for accrual calculations)
     let period_start = state.prev_date.unwrap_or(state.closing_date);
@@ -2379,7 +2686,9 @@ pub(crate) struct PoolFlows {
 /// Implements:
 /// - M1: Scheduled amortization for amortizing assets (mortgages, auto, etc.)
 /// - M3: Maturity/balloon payment when an asset reaches maturity
-/// - m2: Sequential default-then-prepay application (market convention)
+/// - m2: Sequential default → scheduled principal → prepay application
+///   (Intex/Moody's Analytics & SIFMA convention: MDR on the BOP balance,
+///   scheduled principal on the survivor, SMM on the remainder)
 #[derive(Debug, Clone, Copy)]
 struct PoolFlowRates {
     smm: f64,
@@ -2430,6 +2739,13 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     let mut total_default = Money::new(0.0, base_ccy);
     let mut total_recovery = Money::new(0.0, base_ccy);
 
+    // Period-rate approximation for non-monthly payment frequencies: the
+    // monthly SMM/MDR are sourced once per payment period at END-of-period
+    // seasoning and compounded across the whole period. During a seasoning
+    // ramp (PSA/SDA) the end-of-period rate is the highest within the period,
+    // so ramp-phase speeds are slightly overstated for quarterly/semi-annual
+    // deals (exact for monthly pay and for seasoning past the ramp).
+    // Averaging the monthly rates within the period would remove the bias.
     let global_period_smm = 1.0 - (1.0 - request.rates.smm).powf(request.months_per_period);
     let global_period_mdr = 1.0 - (1.0 - request.rates.mdr).powf(request.months_per_period);
 
@@ -2601,17 +2917,52 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         );
         total_interest = total_interest.checked_add(interest)?;
 
-        // M3: Check maturity -- if asset has matured, return remaining balance as
-        // a balloon payment and zero out the asset. Interest was already computed above
-        // (capped at maturity date).
+        // ── Default FIRST, on the beginning-of-period balance ────────────
+        //
+        // Market convention (Intex/Moody's Analytics; SIFMA standard MBS
+        // cashflow methodology): the period default rate (MDR) is applied to
+        // the BEGINNING-of-period balance, scheduled principal is then
+        // computed on the surviving (post-default) balance, and the SMM is
+        // applied to the survivor after scheduled principal. This also
+        // reconciles with the mid-period interest-accrual haircut above,
+        // which already assumes the defaulting fraction comes out of the
+        // pre-scheduled (BOP) balance.
+        let default_amt = balance * period_mdr;
+        let balance_after_default = balance - default_amt;
+
+        // Per-name defaults recover at their own idiosyncratically-dispersed
+        // rate; the LHP and legacy paths use the period systematic recovery.
+        let asset_recovery_rate = match per_name_claim {
+            Some((_, recovery)) => recovery,
+            None => request.rates.recovery_rate,
+        };
+        let recovery_amt = default_amt * asset_recovery_rate;
+        total_default = total_default.checked_add(Money::new(default_amt, base_ccy))?;
+        total_recovery = total_recovery.checked_add(Money::new(recovery_amt, base_ccy))?;
+
+        // Mark asset as fully defaulted if default consumed (nearly) all the
+        // BOP balance. Relative tolerance 1 - 1e-10 catches floating-point
+        // imprecision when the MDR is effectively 100% (e.g. a per-name
+        // copula full default) without false positives from small balances.
+        if default_amt >= balance * (1.0 - 1e-10) {
+            state.pool_state.is_defaulted[i] = true;
+            state.pool_state.balances[i] = 0.0;
+            continue;
+        }
+
+        // M3: Check maturity -- if asset has matured, return the surviving
+        // (post-default) balance as a balloon payment and zero out the asset.
+        // Interest was already computed above (capped at maturity date, with
+        // the default haircut applied).
         if request.pay_date >= state.pool_state.maturities[i] {
-            let balloon = Money::new(balance, base_ccy);
+            let balloon = Money::new(balance_after_default, base_ccy);
             total_scheduled = total_scheduled.checked_add(balloon)?;
             state.pool_state.balances[i] = 0.0;
             continue;
         }
 
-        // M1: Scheduled amortization for amortizing assets.
+        // M1: Scheduled amortization for amortizing assets, computed on the
+        // SURVIVING (post-default) balance.
         //
         // Item 6 — a level-pay loan's scheduled payment is FIXED at
         // origination. Prepayments shorten the loan; they do not reduce the
@@ -2619,7 +2970,9 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
         // every period from the current (post-prepayment) balance and
         // remaining term, so the payment — and hence scheduled principal —
         // shrank after every prepayment. The fix freezes the contractual
-        // level payment on first sight and reuses it.
+        // level payment on first sight and reuses it. Defaulted loans'
+        // contractual payments terminate, so the frozen aggregate payment IS
+        // scaled by each period's survival fraction `(1 − period_mdr)` below.
         let scheduled_principal = if state.pool_state.is_amortizing[i] && rate > 0.0 {
             if !rate.is_finite() || rate <= -1.0 {
                 return Err(finstack_core::Error::Validation(format!(
@@ -2627,8 +2980,14 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
                     state.pool_state.ids[i]
                 )));
             }
-            // period_rate = annual rate compounded over the payment period.
-            let period_rate = (1.0 + rate).powf(request.months_per_period / 12.0) - 1.0;
+            // period_rate = NOMINAL periodic rate: annual rate × months in the
+            // payment period / 12. This is the US mortgage market convention
+            // (e.g. a 6% 30-year mortgage pays 0.5% per month, not
+            // 1.06^(1/12) − 1 ≈ 0.487%); the effective-compounding formula
+            // previously used here understated the level payment by ~2.6%
+            // relative error at typical coupons. Matches the MBS passthrough
+            // pricer (mbs_passthrough/pricer.rs, `wac / 12.0`).
+            let period_rate = rate * request.months_per_period / 12.0;
             if !period_rate.is_finite() {
                 return Err(finstack_core::Error::Validation(format!(
                     "invalid amortization math for pool asset '{}': rate={rate}, period_rate={period_rate}",
@@ -2671,59 +3030,47 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
                 }
             };
 
-            // Scheduled principal = frozen level payment − this period's
-            // interest. As the balance amortizes the interest portion shrinks
-            // and the principal portion grows — the correct level-pay profile.
-            // Bounded by the current balance so the loan never over-amortizes.
-            (level_payment - balance * period_rate)
+            // Defaulted loans' contractual payments terminate. Defaults are
+            // applied pro-rata across the (rep-line) asset, so the surviving
+            // pool's aggregate level payment scales by this period's survival
+            // fraction. Persist the scaled payment so future periods amortize
+            // off the survivors' contractual payment.
+            let surviving_payment = level_payment * (1.0 - period_mdr);
+            state.pool_state.level_payments[i] = Some(surviving_payment);
+
+            // Scheduled principal = survivors' level payment − this period's
+            // interest on the surviving balance (interest + scheduled
+            // principal = level payment under the same nominal-rate
+            // convention). As the balance amortizes the interest portion
+            // shrinks and the principal portion grows — the correct level-pay
+            // profile. Bounded by the surviving balance so the loan never
+            // over-amortizes.
+            (surviving_payment - balance_after_default * period_rate)
                 .max(0.0)
-                .min(balance)
+                .min(balance_after_default)
         } else {
             0.0
         };
 
         total_scheduled = total_scheduled.checked_add(Money::new(scheduled_principal, base_ccy))?;
 
-        // Balance after scheduled amortization
-        let balance_after_sched = balance - scheduled_principal;
+        // Balance after default and scheduled amortization
+        let balance_after_sched = balance_after_default - scheduled_principal;
 
-        // m2 fix: Apply default first, then prepayment to post-default balance
-        // (market convention per Intex/Moody's Analytics). `period_mdr` was
-        // resolved up-front (above the interest computation) so the mid-period
-        // accrual haircut and the principal default share one rate.
-        let default_amt = balance_after_sched * period_mdr;
-        let balance_after_default = balance_after_sched - default_amt;
-
+        // Prepayment LAST: SMM applies to the survivor balance after
+        // scheduled principal (Intex/Moody's Analytics & SIFMA standard
+        // ordering: default on BOP balance → scheduled principal on the
+        // survivor → prepayment on the remainder).
         let period_smm = if let Some(smm) = state.pool_state.smm_overrides[i] {
             1.0 - (1.0 - smm).powf(request.months_per_period)
         } else {
             global_period_smm
         };
-
-        let prepay_amt = balance_after_default * period_smm;
-        // Per-name defaults recover at their own idiosyncratically-dispersed
-        // rate; the LHP and legacy paths use the period systematic recovery.
-        let asset_recovery_rate = match per_name_claim {
-            Some((_, recovery)) => recovery,
-            None => request.rates.recovery_rate,
-        };
-        let recovery_amt = default_amt * asset_recovery_rate;
-
+        let prepay_amt = balance_after_sched * period_smm;
         total_prepay = total_prepay.checked_add(Money::new(prepay_amt, base_ccy))?;
-        total_default = total_default.checked_add(Money::new(default_amt, base_ccy))?;
-        total_recovery = total_recovery.checked_add(Money::new(recovery_amt, base_ccy))?;
-
-        // Mark asset as fully defaulted if default consumed (nearly) all remaining balance.
-        // Uses relative tolerance: 1 - 1e-10 catches floating-point imprecision when
-        // the MDR is effectively 100%, without false positives from small balances.
-        // Guard on balance_after_sched > 0 prevents marking fully-amortized assets
-        // (where both sides are 0.0) as "defaulted" when they actually paid down normally.
-        if balance_after_sched > 0.0 && default_amt >= balance_after_sched * (1.0 - 1e-10) {
-            state.pool_state.is_defaulted[i] = true;
-        }
 
         // Update balance
-        let new_balance = balance_after_default - prepay_amt;
+        let new_balance = balance_after_sched - prepay_amt;
         state.pool_state.balances[i] = new_balance.max(0.0);
     }
 

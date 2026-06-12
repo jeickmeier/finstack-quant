@@ -206,10 +206,12 @@ fn test_payment_delay_sensitivity() {
         .build()
         .unwrap();
 
+    // Flat forward curve based at the swap start (2024-01-01): seasoned resets
+    // strictly before the curve base now error under the default fallback.
     let fwd = ForwardCurve::builder("FWD", OVERNIGHT_FORWARD_TENOR)
-        .base_date(base)
+        .base_date(Date::from_calendar_date(2024, Month::January, 1).unwrap())
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
+        .knots([(0.0, 0.05), (2.0, 0.05)])
         .interp(InterpStyle::Linear)
         .build()
         .unwrap();

@@ -203,7 +203,9 @@ fn test_swap_par_rate_determinism() {
 fn test_swap_multiple_metrics_determinism() {
     let swap = create_test_swap();
     let as_of = Date::from_calendar_date(2025, Month::February, 1).unwrap();
-    let market = create_test_market(as_of);
+    // Base the curves at the swap start (2025-01-15): seasoned resets strictly
+    // before the curve base now error under the default FloatingRateFallback.
+    let market = create_test_market(Date::from_calendar_date(2025, Month::January, 15).unwrap());
 
     let metrics = vec![
         MetricId::Dv01,

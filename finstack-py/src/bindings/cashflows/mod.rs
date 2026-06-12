@@ -21,7 +21,7 @@ use pyo3::types::{PyList, PyModule};
     signature = (spec_json, market_json = None),
     text_signature = "(spec_json, market_json=None)"
 )]
-fn build_cashflow_schedule(
+fn build_cashflow_schedule_json(
     py: Python<'_>,
     spec_json: &str,
     market_json: Option<&str>,
@@ -45,7 +45,7 @@ fn build_cashflow_schedule(
 ///     Canonicalized JSON-encoded `CashFlowSchedule`.
 #[pyfunction]
 #[pyo3(text_signature = "(schedule_json)")]
-fn validate_cashflow_schedule(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
+fn validate_cashflow_schedule_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
     py.detach(|| {
         finstack_cashflows::validate_cashflow_schedule_json(schedule_json)
             .map_err(crate::errors::core_to_py)
@@ -67,7 +67,7 @@ fn validate_cashflow_schedule(py: Python<'_>, schedule_json: &str) -> PyResult<S
 ///     omitted; parse the full schedule JSON if you need flow classification.
 #[pyfunction]
 #[pyo3(text_signature = "(schedule_json)")]
-fn dated_flows(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
+fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
     py.detach(|| {
         finstack_cashflows::dated_flows_json(schedule_json).map_err(crate::errors::core_to_py)
     })
@@ -97,7 +97,7 @@ fn dated_flows(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
     signature = (schedule_json, as_of, config_json = None),
     text_signature = "(schedule_json, as_of, config_json=None)"
 )]
-fn accrued_interest(
+fn accrued_interest_json(
     py: Python<'_>,
     schedule_json: &str,
     as_of: &str,
@@ -135,7 +135,7 @@ fn accrued_interest(
     signature = (instrument_id, schedule_json, discount_curve_id, quoted_clean = None),
     text_signature = "(instrument_id, schedule_json, discount_curve_id, quoted_clean=None)"
 )]
-fn bond_from_cashflows(
+fn bond_from_cashflows_json(
     py: Python<'_>,
     instrument_id: &str,
     schedule_json: &str,
@@ -161,20 +161,20 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Cashflow schedule JSON construction, validation, and bond conversion.",
     )?;
 
-    m.add_function(wrap_pyfunction!(build_cashflow_schedule, &m)?)?;
-    m.add_function(wrap_pyfunction!(validate_cashflow_schedule, &m)?)?;
-    m.add_function(wrap_pyfunction!(dated_flows, &m)?)?;
-    m.add_function(wrap_pyfunction!(accrued_interest, &m)?)?;
-    m.add_function(wrap_pyfunction!(bond_from_cashflows, &m)?)?;
+    m.add_function(wrap_pyfunction!(build_cashflow_schedule_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(dated_flows_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(accrued_interest_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
 
     let all = PyList::new(
         py,
         [
-            "build_cashflow_schedule",
-            "validate_cashflow_schedule",
-            "dated_flows",
-            "accrued_interest",
-            "bond_from_cashflows",
+            "build_cashflow_schedule_json",
+            "validate_cashflow_schedule_json",
+            "dated_flows_json",
+            "accrued_interest_json",
+            "bond_from_cashflows_json",
         ],
     )?;
     m.setattr("__all__", all)?;

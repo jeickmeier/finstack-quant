@@ -65,6 +65,7 @@ fn build_seasoned_floating_facility(
             all_in_cap_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,
@@ -100,7 +101,9 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
 
     // Forward curve: flat 4% (this is what would be used without fixings)
-    let fwd_curve = build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25);
+    // Flat curve based at commitment_date: seasoned resets strictly before
+    // the curve base now error under the default FloatingRateFallback.
+    let fwd_curve = build_flat_forward_curve(0.04, commitment_date, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
 
     // Fixings: provide historical rates significantly different from the forward curve
@@ -225,7 +228,9 @@ fn test_seasoned_facility_without_fixings_uses_forward_projection() {
 
     let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
 
-    let fwd_curve = build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25);
+    // Flat curve based at commitment_date: seasoned resets strictly before
+    // the curve base now error under the default FloatingRateFallback.
+    let fwd_curve = build_flat_forward_curve(0.04, commitment_date, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
@@ -282,6 +287,7 @@ fn test_fixings_respect_floor() {
             all_in_cap_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,
@@ -426,7 +432,9 @@ fn test_pricer_integration_with_fixings() {
 
     let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
 
-    let fwd_curve = build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25);
+    // Flat curve based at commitment_date: seasoned resets strictly before
+    // the curve base now error under the default FloatingRateFallback.
+    let fwd_curve = build_flat_forward_curve(0.04, commitment_date, "USD-SOFR-3M", 0.25);
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
 
     // Fixings with higher rates than the forward curve

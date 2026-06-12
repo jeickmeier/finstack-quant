@@ -152,6 +152,7 @@ impl RevolvingCredit {
             all_in_floor_bp: None,
             index_cap_bp: None,
             reset_freq: Tenor::quarterly(),
+            index_tenor: None,
             reset_lag_days: 2,
             dc: DayCount::Act360,
             bdc: finstack_core::dates::BusinessDayConvention::ModifiedFollowing,
@@ -344,7 +345,8 @@ impl RevolvingCreditFees {
         );
         let util = Decimal::try_from(utilization).unwrap_or(Decimal::ZERO);
         evaluate_fee_tiers(&self.commitment_fee_tiers, util)
-            .to_f64()
+            .ok()
+            .and_then(|bps| bps.to_f64())
             .unwrap_or(0.0)
     }
 
@@ -364,7 +366,8 @@ impl RevolvingCreditFees {
         );
         let util = Decimal::try_from(utilization).unwrap_or(Decimal::ZERO);
         evaluate_fee_tiers(&self.usage_fee_tiers, util)
-            .to_f64()
+            .ok()
+            .and_then(|bps| bps.to_f64())
             .unwrap_or(0.0)
     }
 }

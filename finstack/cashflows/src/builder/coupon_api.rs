@@ -89,6 +89,10 @@ impl CashFlowBuilder {
             stub: spec.stub,
             end_of_month: spec.rate_spec.end_of_month,
             payment_lag_days: spec.rate_spec.payment_lag_days,
+            // Bond/FRN convention by default: accrual boundaries unadjusted.
+            // Swap-style adjusted accrual is reachable via explicit
+            // `ScheduleParams` (e.g. the swap presets) on windowed APIs.
+            adjust_accrual_dates: false,
         }
     }
 
@@ -220,6 +224,7 @@ impl CashFlowBuilder {
     ///             all_in_cap_bp: None,
     ///             index_cap_bp: None,
     ///             reset_freq: Tenor::quarterly(),
+    ///             index_tenor: None,
     ///             reset_lag_days: 2,
     ///             dc: DayCount::Act360,
     ///             bdc: BusinessDayConvention::ModifiedFollowing,
@@ -446,6 +451,14 @@ impl CashFlowBuilder {
         else {
             return self;
         };
+        if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
+            self.pending_error = Some(finstack_core::Error::Validation(format!(
+                "payment_split_program steps must be strictly increasing by date; found {} \
+                 followed by {}",
+                w[0].0, w[1].0
+            )));
+            return self;
+        }
         let mut prev = issue;
         for &(end, split) in steps {
             if prev < end {
@@ -530,6 +543,11 @@ impl CashFlowBuilder {
     /// Creates consecutive fixed coupon windows whose rate changes at the
     /// supplied boundary dates.
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
+    ///
+    /// # Errors
+    ///
+    /// Records a deferred error (surfaced by the terminal build) when `steps`
+    /// is empty or its boundary dates are not strictly increasing.
     pub fn fixed_stepup_decimal(
         &mut self,
         steps: &[(Date, Decimal)],
@@ -540,6 +558,20 @@ impl CashFlowBuilder {
         else {
             return self;
         };
+        if steps.is_empty() {
+            self.pending_error = Some(finstack_core::Error::Validation(
+                "fixed_stepup_decimal requires at least one (date, rate) step".into(),
+            ));
+            return self;
+        }
+        if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
+            self.pending_error = Some(finstack_core::Error::Validation(format!(
+                "fixed_stepup_decimal steps must be strictly increasing by date; found {} \
+                 followed by {}",
+                w[0].0, w[1].0
+            )));
+            return self;
+        }
         let mut prev = issue;
         for &(end, rate) in steps {
             let _ = self.add_fixed_coupon_window(prev, end, rate, schedule.clone(), default_split);
@@ -639,6 +671,7 @@ impl CashFlowBuilder {
     ///         all_in_floor_bp: None,
     ///         index_cap_bp: None,
     ///         reset_freq: Tenor::quarterly(),
+    ///         index_tenor: None,
     ///         reset_lag_days: 2,
     ///         dc: DayCount::Act360,
     ///         bdc: BusinessDayConvention::ModifiedFollowing,

@@ -63,7 +63,7 @@
   "description": "Prepayment model specifications for credit instruments. Rust types: PrepaymentCurve, PrepaymentModelSpec from finstack_valuations::cashflow::builder::specs::prepayment",
   "properties": {
     "cpr": {
-      "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%)",
+      "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`] is active: the\nannual CPR is then derived entirely from the PSA seasoning ramp and\nits `speed_multiplier`. It IS used by [`PrepaymentCurve::CmbsLockout`]\nas the post-lockout CPR.",
       "format": "double",
       "type": "number"
     },

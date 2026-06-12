@@ -1996,12 +1996,17 @@
               "type": "object"
             },
             "ScheduleParams": {
+              "additionalProperties": false,
               "description": "Canonical schedule-generation parameters for coupons and periodic fees.\n\nThis type controls how accrual boundaries and payment dates are generated.\nThe fields describe schedule construction conventions, not discounting or\nvaluation conventions.",
               "properties": {
+                "adjust_accrual_dates": {
+                  "description": "Whether accrual-period boundaries are business-day adjusted with `bdc`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `bdc` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+                  "type": "boolean"
+                },
                 "bdc": {
                   "$ref": "#/$defs/BusinessDayConvention",
                   "default": "modified_following",
-                  "description": "Business-day convention applied when rolling accrual-end and payment\ndates onto valid business days."
+                  "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
                 },
                 "calendar_id": {
                   "description": "Holiday calendar identifier used together with `bdc`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
@@ -2073,14 +2078,12 @@
               "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months);\nassert_eq!(tenor.count, 3);\nassert_eq!(tenor.unit, TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count, 6);\nassert_eq!(parsed.unit, TenorUnit::Months);\n# Ok(())\n# }\n```",
               "properties": {
                 "count": {
-                  "description": "Number of units.",
                   "format": "uint32",
                   "minimum": 0,
                   "type": "integer"
                 },
                 "unit": {
-                  "$ref": "#/$defs/TenorUnit",
-                  "description": "Unit type (days, weeks, months, years)."
+                  "$ref": "#/$defs/TenorUnit"
                 }
               },
               "required": [

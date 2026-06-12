@@ -299,7 +299,7 @@
                 },
                 {
                   "const": "Compounded",
-                  "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style.",
+                  "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets.",
                   "type": "string"
                 }
               ]
@@ -317,6 +317,7 @@
                   "description": "Linear principal paydown towards a target final notional amount over all periods.",
                   "properties": {
                     "LinearTo": {
+                      "additionalProperties": false,
                       "properties": {
                         "final_notional": {
                           "$ref": "#/$defs/Money",
@@ -339,6 +340,7 @@
                   "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
                   "properties": {
                     "StepRemaining": {
+                      "additionalProperties": false,
                       "properties": {
                         "schedule": {
                           "description": "Ordered list of `(date, remaining_principal_after_date)`.",
@@ -374,6 +376,7 @@
                   "description": "Fixed percentage of **original** notional paid each period (capped by remaining outstanding).\n\nThis is a sinking-fund style amortization where the payment amount is constant\nacross periods: `initial_notional * pct`. It does **not** compound (i.e., it is\nNOT percentage-of-remaining / declining-balance / mortgage-style).",
                   "properties": {
                     "PercentOfOriginalPerPeriod": {
+                      "additionalProperties": false,
                       "properties": {
                         "pct": {
                           "description": "Fraction of original notional paid per period (e.g., 0.05 = 5%).",
@@ -397,6 +400,7 @@
                   "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
                   "properties": {
                     "CustomPrincipal": {
+                      "additionalProperties": false,
                       "properties": {
                         "items": {
                           "description": "List of `(date, principal_amount)` exchanges; amounts are absolute cashflows.",
@@ -788,6 +792,7 @@
               "type": "object"
             },
             "CashFlowMeta": {
+              "additionalProperties": false,
               "description": "Metadata for cashflow schedules (calendar IDs, facility limits, issue date).\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
               "properties": {
                 "calendar_ids": {
@@ -827,6 +832,7 @@
               "type": "object"
             },
             "CashFlowSchedule": {
+              "additionalProperties": false,
               "description": "Cashflow schedule output from the composable builder.\n\nContains ordered cashflows plus notional and a representative `DayCount`.\nMethods provide convenient accessors commonly used by pricing and analysis.",
               "properties": {
                 "day_count": {
@@ -971,6 +977,7 @@
                   "description": "Split variant.",
                   "properties": {
                     "Split": {
+                      "additionalProperties": false,
                       "properties": {
                         "cash_pct": {
                           "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
@@ -1859,6 +1866,7 @@
               ]
             },
             "FixedCouponSpec": {
+              "additionalProperties": false,
               "description": "Fixed-rate coupon specification.\n\nThis type combines the coupon quote, payment behavior, and schedule\nconventions required to emit a fixed-rate leg.",
               "properties": {
                 "bdc": {
@@ -1917,6 +1925,7 @@
               "type": "object"
             },
             "FloatingCouponSpec": {
+              "additionalProperties": false,
               "description": "Floating coupon specification (composes FloatingRateSpec).\n\nUsed by the cashflow builder for instruments with floating rate coupons.\nEmbeds the canonical `FloatingRateSpec` for rate projection and adds\ncoupon-specific settings like payment frequency and PIK behavior.",
               "properties": {
                 "coupon_type": {
@@ -1959,7 +1968,7 @@
                 },
                 {
                   "additionalProperties": false,
-                  "description": "Use a fixed rate as the index component. Emits `info!`.",
+                  "description": "Use a fixed rate as the index component. Emits `info!`.\n\nThe value is a **decimal annual rate**, not basis points: `0.045`\nmeans 4.5%. This differs from the bp-denominated spread/floor/cap\nfields on [`FloatingRateSpec`] because it substitutes directly for\nthe projected index rate.",
                   "properties": {
                     "FixedRate": {
                       "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
@@ -1977,7 +1986,8 @@
               ]
             },
             "FloatingRateSpec": {
-              "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Example\n\n```rust\nuse finstack_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_cashflows::builder::FloatingRateSpec;\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    reset_freq: Tenor::quarterly(),\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+              "additionalProperties": false,
+              "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings are **not yet supported**. Every observation date must\nfall on or after the forward curve base date: a reset or overnight\nobservation strictly before the curve base date cannot be projected from\nthe curve without silently replacing the realized fixing, so emission\nroutes it through [`FloatingRateFallback`] — `Error` (the default) fails\nthe build with a descriptive message naming the date and index;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only. To price a seasoned floating\ninstrument exactly, supply a curve based on/before the first unrealized\nobservation date.\n\n# Example\n\n```rust\nuse finstack_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_cashflows::builder::FloatingRateSpec;\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
               "properties": {
                 "all_in_cap_bp": {
                   "default": null,
@@ -2031,7 +2041,7 @@
                 },
                 "gearing": {
                   "default": "1",
-                  "description": "Gearing/leverage multiplier applied to the all-in rate (default: 1.0).\n\nExample: gearing = 2.0 means the rate is doubled.",
+                  "description": "Gearing/leverage multiplier applied to the all-in rate (default: 1.0).\n\nExample: gearing = 2.0 means the rate is doubled.\n\n**Restriction:** gearing must be strictly positive (`gearing > 0`);\nprojection rejects zero or negative gearing, so inverse floaters\n(negative gearing) are not currently expressible with this field.",
                   "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
                   "type": [
                     "string",
@@ -2067,6 +2077,17 @@
                   "$ref": "#/$defs/Id",
                   "description": "Forward curve identifier (e.g., \"USD-SOFR-3M\", \"EUR-EURIBOR-6M\")."
                 },
+                "index_tenor": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/Tenor"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Underlying index tenor used to project the forward rate (term rates).\n\nThe forward rate is projected over\n`[accrual_start, accrual_start + index_tenor]`. When `None` (the serde\ndefault), the index tenor falls back to [`Self::reset_freq`]. Set this\nexplicitly when the reset cadence differs from the index's underlying\ndeposit period (e.g. a monthly-paying leg referencing a 3M index).\nIgnored for overnight-compounded legs."
+                },
                 "overnight_basis": {
                   "anyOf": [
                     {
@@ -2097,7 +2118,7 @@
                 },
                 "reset_freq": {
                   "$ref": "#/$defs/Tenor",
-                  "description": "Reset frequency for rate fixings."
+                  "description": "Reset frequency for rate fixings.\n\nThis is the cadence at which the rate refixes; it also serves as the\ndefault index tenor when [`Self::index_tenor`] is `None`."
                 },
                 "reset_lag_days": {
                   "default": 2,
@@ -2168,6 +2189,7 @@
               "type": "object"
             },
             "Notional": {
+              "additionalProperties": false,
               "description": "Notional amount with an optional amortisation rule.\n\nCombines initial principal with amortization behavior for complete\nnotional lifecycle management.",
               "properties": {
                 "amort": {
@@ -2233,6 +2255,7 @@
                   "description": "Compounded in arrears with lookback (shift observation period).\n\nUses rates from `lookback_days` business days before each accrual date.",
                   "properties": {
                     "CompoundedWithLookback": {
+                      "additionalProperties": false,
                       "properties": {
                         "lookback_days": {
                           "description": "Number of business days to look back for rate observations.",
@@ -2254,9 +2277,10 @@
                 },
                 {
                   "additionalProperties": false,
-                  "description": "Compounded in arrears with lockout (freeze rate near end of period).\n\nUses the rate from `lockout_days` business days before period end for all\nremaining days in the period.",
+                  "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nUses the rate from `lockout_days` business days before period end for all\nremaining days in the period. With fixings `b_1..b_n` (where `b_n` is one\nbusiness day before the exclusive period end), the cut-off fixing is\n`b_{n-lockout+1}` per ISDA 2021 Definitions §7 (rate cut-off) and the\nARRC SOFR FRN conventions.",
                   "properties": {
                     "CompoundedWithLockout": {
+                      "additionalProperties": false,
                       "properties": {
                         "lockout_days": {
                           "description": "Number of business days before period end to freeze the rate.",
@@ -2281,6 +2305,7 @@
                   "description": "Compounded in arrears with observation shift.\n\nBoth observation dates AND weights are shifted back by `shift_days`\nbusiness days. This is the ISDA 2021 recommended convention for SOFR\nand the standard for GBP SONIA and EUR €STR.",
                   "properties": {
                     "CompoundedWithObservationShift": {
+                      "additionalProperties": false,
                       "properties": {
                         "shift_days": {
                           "description": "Number of business days to shift observations.",
@@ -2737,6 +2762,7 @@
               "type": "object"
             },
             "StepUpCouponSpec": {
+              "additionalProperties": false,
               "description": "Step-up/step-down coupon specification.\n\nDefines a coupon that changes rate at specified dates, commonly used\nin bank capital instruments (AT1/Tier 2) and some agency bonds.\n\nThe rate for each coupon period is determined by the last step date\nthat falls on or before the period start date. If no step has occurred,\nthe initial rate is used.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};\nuse finstack_cashflows::builder::StepUpCouponSpec;\nuse finstack_cashflows::builder::CouponType;\nuse rust_decimal_macros::dec;\nuse time::Month;\n\nlet spec = StepUpCouponSpec {\n    coupon_type: CouponType::Cash,\n    initial_rate: dec!(0.03),\n    step_schedule: vec![\n        (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),\n        (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),\n    ],\n    freq: Tenor::semi_annual(),\n    dc: DayCount::Thirty360,\n    bdc: BusinessDayConvention::Following,\n    calendar_id: \"weekends_only\".to_string(),\n    stub: StubKind::None,\n    end_of_month: false,\n    payment_lag_days: 0,\n};\n```",
               "properties": {
                 "bdc": {
@@ -2850,14 +2876,12 @@
               "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months);\nassert_eq!(tenor.count, 3);\nassert_eq!(tenor.unit, TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count, 6);\nassert_eq!(parsed.unit, TenorUnit::Months);\n# Ok(())\n# }\n```",
               "properties": {
                 "count": {
-                  "description": "Number of units.",
                   "format": "uint32",
                   "minimum": 0,
                   "type": "integer"
                 },
                 "unit": {
-                  "$ref": "#/$defs/TenorUnit",
-                  "description": "Unit type (days, weeks, months, years)."
+                  "$ref": "#/$defs/TenorUnit"
                 }
               },
               "required": [

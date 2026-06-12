@@ -142,8 +142,10 @@ fn compute_floating_decomposition(
     let reset_t = if let Some(reset_date) = cf.reset_date {
         compute_discount_time(reset_date, base, fwd.day_count(), dc_ctx)?
     } else {
-        // Fallback to period start if no explicit reset date
-        fwd.day_count().year_fraction(base, period_start, dc_ctx)?
+        // Fallback to period start if no explicit reset date. Use the signed
+        // helper so a historical period_start yields a negative time instead
+        // of a day-count error or mis-signed year fraction.
+        compute_discount_time(period_start, base, fwd.day_count(), dc_ctx)?
     };
 
     let base_rate = fwd.rate(reset_t);
@@ -350,7 +352,16 @@ impl CashFlowSchedule {
     /// across language bindings. Bindings should only perform type conversion.
     ///
     /// Historical cashflows (`date <= as_of/base`) are included in the table for
-    /// auditability but contribute zero PV by convention.
+    /// auditability but contribute zero PV by convention (matching
+    /// `pv_by_period` and the credit-adjusted PV paths).
+    ///
+    /// Cashflows are bucketed into half-open period intervals
+    /// `[period.start, period.end)`, matching
+    /// [`crate::aggregation::aggregate_by_period`]: a flow dated exactly on a
+    /// period boundary belongs to the next period. Flows outside all supplied
+    /// periods are omitted from the table, but they still update the
+    /// outstanding/undrawn balance replay so balances are correct under
+    /// partial period coverage.
     ///
     /// # Arguments
     ///
@@ -409,10 +420,14 @@ impl CashFlowSchedule {
         } else {
             None
         };
+        // Propagate forward-curve lookup failures: silently disabling the
+        // requested floating decomposition would emit None columns without
+        // any signal. `None` is only valid when no forward_curve_id was given.
         let forward_arc_opt = if options.include_floating_decomposition {
-            options
-                .forward_curve_id
-                .and_then(|fid| market.get_forward(fid).ok())
+            match options.forward_curve_id {
+                Some(fid) => Some(market.get_forward(fid)?),
+                None => None,
+            }
         } else {
             None
         };
@@ -450,8 +465,15 @@ impl CashFlowSchedule {
         // Track outstanding drawn balance for Notional column
         let mut outstanding = self.notional.initial;
 
-        // Identify the first date in the schedule (issue date) for initial funding detection
-        let first_date = self.flows.first().map(|cf| cf.date);
+        // Anchor initial-funding detection on the schedule's issue date when
+        // available (populated by `finalize_flows`); a pre-issue principal
+        // event would otherwise make the real issue-date funding flow read as
+        // a draw (~2x notional). Fall back to the first flow's date only when
+        // no issue date is recorded.
+        let funding_anchor = self
+            .meta
+            .issue_date
+            .or_else(|| self.flows.first().map(|cf| cf.date));
 
         // Sort periods by start date for cursor advance
         let mut sorted_period_indices: Vec<usize> = (0..periods.len()).collect();
@@ -478,35 +500,20 @@ impl CashFlowSchedule {
         };
 
         for cf in &self.flows {
-            // Advance cursor past periods that end before this cashflow
-            while period_cursor < sorted_period_indices.len()
-                && cf.date > periods[sorted_period_indices[period_cursor]].end
-            {
-                period_cursor += 1;
-            }
-            // Check if current cashflow falls in the current period
-            let period = if period_cursor < sorted_period_indices.len() {
-                let pi = sorted_period_indices[period_cursor];
-                let p = &periods[pi];
-                if cf.date >= p.start && cf.date <= p.end {
-                    p
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            };
-
             // Outstanding before this cashflow
             let outstanding_pre = outstanding;
 
-            // Detect initial funding notional flow (negative, equal to -notional.initial on first date)
-            // This is already accounted for in notional.initial, so we skip it to avoid double-counting.
+            // Detect initial funding notional flow (negative, equal to
+            // -notional.initial on the issue date). It is already accounted
+            // for in notional.initial, so we skip it to avoid double-counting.
             let is_initial_funding = cf.kind == CFKind::Notional
-                && first_date == Some(cf.date)
+                && funding_anchor == Some(cf.date)
                 && cf.amount.amount() < 0.0
                 && amounts_approx_equal(cf.amount.amount().abs(), self.notional.initial.amount());
 
+            // Balance replay must see every flow, including those outside the
+            // supplied reporting periods, so the update happens BEFORE the
+            // period-membership check below.
             match cf.kind {
                 CFKind::Amortization => {
                     outstanding = outstanding.checked_sub(cf.amount)?;
@@ -520,6 +527,28 @@ impl CashFlowSchedule {
                 }
                 _ => {}
             }
+
+            // Advance cursor past periods that end on or before this cashflow.
+            // Bucketing is half-open `[start, end)`, matching
+            // `aggregation::aggregate_by_period`: a flow dated exactly on a
+            // period boundary belongs to the NEXT period.
+            while period_cursor < sorted_period_indices.len()
+                && cf.date >= periods[sorted_period_indices[period_cursor]].end
+            {
+                period_cursor += 1;
+            }
+            // Check if current cashflow falls in the current period
+            let period = if period_cursor < sorted_period_indices.len() {
+                let pi = sorted_period_indices[period_cursor];
+                let p = &periods[pi];
+                if cf.date >= p.start && cf.date < p.end {
+                    p
+                } else {
+                    continue;
+                }
+            } else {
+                continue;
+            };
 
             // Basic columns
             out.start_dates.push(period.start);
@@ -549,11 +578,26 @@ impl CashFlowSchedule {
             let dc_for_discounting = options.discount_day_count.unwrap_or(dc);
             let t = compute_discount_time(cf.date, base, dc_for_discounting, disc_dc_ctx)?;
             let df = disc_arc.df(t);
+            // Fail loudly on non-finite curve output instead of silently
+            // pushing NaN PVs (consistent with `npv`'s validation).
+            if !df.is_finite() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "discount curve '{discount_curve_id}' returned non-finite df ({df}) at t={t} (date {})",
+                    cf.date
+                )));
+            }
             out.discount_factors.push(df);
 
             // Survival probability
             if let (Some(h), Some(spv)) = (hazard_arc_opt.as_ref(), out.survival_probs.as_mut()) {
-                spv.push(Some(h.sp(t)));
+                let sp = h.sp(t);
+                if !sp.is_finite() {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "hazard curve returned non-finite sp ({sp}) at t={t} (date {})",
+                        cf.date
+                    )));
+                }
+                spv.push(Some(sp));
             }
 
             // PV — PIK rows are notional accruals, not cash flows, so they
@@ -835,10 +879,373 @@ mod tests {
     }
 
     #[test]
-    fn dataframe_propagates_day_count_errors() {
+    fn dataframe_buckets_boundary_flow_half_open_matching_aggregation() {
+        // A flow exactly on a period boundary must bucket identically in
+        // `to_period_dataframe` and `aggregate_by_period`: half-open
+        // [start, end), so the boundary flow belongs to the NEXT period.
+        use crate::aggregation::aggregate_by_period;
+        use finstack_core::dates::PeriodId;
+
+        let base = d(2025, 1, 1);
+        let boundary = d(2025, 4, 1); // == Q1 end == Q2 start
+        let flows = vec![CashFlow {
+            date: boundary,
+            reset_date: None,
+            amount: Money::new(100.0, Currency::USD),
+            kind: CFKind::Fixed,
+            accrual_factor: 0.25,
+            rate: None,
+        }];
+        let schedule = CashFlowSchedule {
+            flows: flows.clone(),
+            notional: Notional::par(1_000.0, Currency::USD),
+            day_count: DayCount::Act365F,
+            meta: CashFlowMeta::default(),
+        };
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .knots([(0.0, 1.0), (30.0, 0.95)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("DiscountCurve builder should succeed");
+        let market = MarketContext::new().insert(curve);
+        let periods = quarters_2025();
+
+        let df = schedule
+            .to_period_dataframe(
+                &periods,
+                &market,
+                "USD-OIS",
+                PeriodDataFrameOptions {
+                    as_of: Some(base),
+                    day_count: Some(DayCount::Act365F),
+                    ..Default::default()
+                },
+            )
+            .expect("PeriodDataFrame creation should succeed");
+
+        assert_eq!(df.pay_dates.len(), 1);
+        // DataFrame assigns the boundary flow to Q2 [Apr 1, Jul 1).
+        assert_eq!(df.start_dates[0], d(2025, 4, 1));
+        assert_eq!(df.end_dates[0], d(2025, 7, 1));
+
+        // aggregate_by_period agrees: the flow lands in Q2, not Q1.
+        let dated: Vec<crate::DatedFlow> = flows.iter().map(|cf| (cf.date, cf.amount)).collect();
+        let agg = aggregate_by_period(&dated, &periods).expect("aggregation succeeds");
+        assert!(!agg.contains_key(&PeriodId::quarter(2025, 1)));
+        assert!(agg.contains_key(&PeriodId::quarter(2025, 2)));
+    }
+
+    #[test]
+    fn dataframe_balances_correct_under_partial_period_coverage() {
+        // Flows outside the supplied reporting periods must still update the
+        // outstanding balance replay: an early amortization excluded from the
+        // periods reduces the notional seen by a later in-period coupon.
+        let base = d(2025, 1, 1);
+        let initial = 1_000_000.0;
+        let flows = vec![
+            CashFlow {
+                date: d(2025, 2, 15), // outside the (Q2-only) reporting window
+                reset_date: None,
+                amount: Money::new(200_000.0, Currency::USD),
+                kind: CFKind::Amortization,
+                accrual_factor: 0.0,
+                rate: None,
+            },
+            CashFlow {
+                date: d(2025, 5, 15), // inside Q2
+                reset_date: None,
+                amount: Money::new(10_000.0, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: Some(0.05),
+            },
+        ];
+        let schedule = CashFlowSchedule {
+            flows,
+            notional: Notional::par(initial, Currency::USD),
+            day_count: DayCount::Act365F,
+            meta: CashFlowMeta::default(),
+        };
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .knots([(0.0, 1.0), (30.0, 0.95)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("DiscountCurve builder should succeed");
+        let market = MarketContext::new().insert(curve);
+
+        // Reporting window covers Q2 only; the amortization flow is excluded.
+        let periods = vec![Period {
+            id: PeriodId::quarter(2025, 2),
+            start: d(2025, 4, 1),
+            end: d(2025, 7, 1),
+            is_actual: false,
+        }];
+
+        let df = schedule
+            .to_period_dataframe(
+                &periods,
+                &market,
+                "USD-OIS",
+                PeriodDataFrameOptions {
+                    as_of: Some(base),
+                    day_count: Some(DayCount::Act365F),
+                    ..Default::default()
+                },
+            )
+            .expect("PeriodDataFrame creation should succeed");
+
+        // Only the coupon row is emitted, but its notional reflects the
+        // out-of-window amortization (1M - 200k = 800k).
+        assert_eq!(df.cf_types.len(), 1);
+        assert_eq!(df.cf_types[0], CFKind::Fixed);
+        let coupon_notional = df.notionals[0].expect("coupon should have notional");
+        assert!(
+            (coupon_notional - 800_000.0).abs() < 1e-6,
+            "expected 800000 (balance replays out-of-window amortization), got {coupon_notional}"
+        );
+    }
+
+    #[test]
+    fn dataframe_pre_issue_event_does_not_double_notional() {
+        // A pre-issue principal event must not make the real issue-date
+        // funding flow read as a draw (which would ~double the notional
+        // column). Initial-funding detection anchors on meta.issue_date.
+        let issue = d(2025, 1, 15);
+        let initial = 1_000_000.0;
+        let flows = vec![
+            // Pre-issue principal draw (delayed-funding structure)
+            CashFlow {
+                date: d(2025, 1, 5),
+                reset_date: None,
+                amount: Money::new(-100_000.0, Currency::USD),
+                kind: CFKind::Notional,
+                accrual_factor: 0.0,
+                rate: None,
+            },
+            // Real initial funding flow on the issue date
+            CashFlow {
+                date: issue,
+                reset_date: None,
+                amount: Money::new(-initial, Currency::USD),
+                kind: CFKind::Notional,
+                accrual_factor: 0.0,
+                rate: None,
+            },
+            // First coupon
+            CashFlow {
+                date: d(2025, 4, 15),
+                reset_date: None,
+                amount: Money::new(12_500.0, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: Some(0.05),
+            },
+        ];
+        let meta = CashFlowMeta {
+            issue_date: Some(issue),
+            ..Default::default()
+        };
+        let schedule = CashFlowSchedule {
+            flows,
+            notional: Notional::par(initial, Currency::USD),
+            day_count: DayCount::Act365F,
+            meta,
+        };
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(issue)
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("DiscountCurve builder should succeed");
+        let market = MarketContext::new().insert(curve);
+
+        let periods = vec![
+            Period {
+                id: PeriodId::quarter(2025, 1),
+                start: d(2025, 1, 1),
+                end: d(2025, 4, 1),
+                is_actual: true,
+            },
+            Period {
+                id: PeriodId::quarter(2025, 2),
+                start: d(2025, 4, 1),
+                end: d(2025, 7, 1),
+                is_actual: false,
+            },
+        ];
+
+        let df = schedule
+            .to_period_dataframe(
+                &periods,
+                &market,
+                "USD-OIS",
+                PeriodDataFrameOptions {
+                    as_of: Some(issue),
+                    day_count: Some(DayCount::Act365F),
+                    ..Default::default()
+                },
+            )
+            .expect("PeriodDataFrame creation should succeed");
+
+        assert_eq!(df.cf_types.len(), 3);
+        assert_eq!(df.cf_types[2], CFKind::Fixed);
+        // The issue-date funding flow is recognized via meta.issue_date and
+        // skipped, so the coupon notional is initial + pre-issue draw (1.1M),
+        // NOT ~2.1M (which would indicate the funding flow was replayed as a
+        // draw).
+        let coupon_notional = df.notionals[2].expect("coupon should have notional");
+        assert!(
+            (coupon_notional - 1_100_000.0).abs() < 1e-6,
+            "expected 1100000 but got {coupon_notional} (notional doubled if ~2.1M)"
+        );
+    }
+
+    #[test]
+    fn dataframe_errors_on_missing_forward_curve() {
+        // A requested-but-missing forward curve must error instead of
+        // silently disabling floating decomposition.
         let base = d(2025, 1, 1);
         let flows = vec![CashFlow {
             date: d(2025, 7, 1),
+            reset_date: Some(d(2025, 4, 1)),
+            amount: Money::new(100.0, Currency::USD),
+            kind: CFKind::FloatReset,
+            accrual_factor: 0.25,
+            rate: Some(0.05),
+        }];
+        let schedule = CashFlowSchedule {
+            flows,
+            notional: Notional::par(1_000.0, Currency::USD),
+            day_count: DayCount::Act365F,
+            meta: CashFlowMeta::default(),
+        };
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .knots([(0.0, 1.0), (30.0, 0.95)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("DiscountCurve builder should succeed");
+        let market = MarketContext::new().insert(curve);
+
+        let result = schedule.to_period_dataframe(
+            &quarters_2025(),
+            &market,
+            "USD-OIS",
+            PeriodDataFrameOptions {
+                as_of: Some(base),
+                day_count: Some(DayCount::Act365F),
+                include_floating_decomposition: true,
+                forward_curve_id: Some("MISSING-FWD"),
+                ..Default::default()
+            },
+        );
+        assert!(
+            result.is_err(),
+            "missing forward curve must not silently disable floating decomposition"
+        );
+    }
+
+    #[test]
+    fn dataframe_and_pv_by_period_agree_on_historical_flow_convention() {
+        // Parity: a flow dated on/before the valuation base gets zero PV in
+        // both the DataFrame export and pv_by_period.
+        use crate::aggregation::DateContext;
+        use crate::builder::schedule::PvDiscountSource;
+        use finstack_core::dates::PeriodId;
+
+        let base = d(2025, 4, 1);
+        let flows = vec![
+            CashFlow {
+                date: d(2025, 2, 15), // historical
+                reset_date: None,
+                amount: Money::new(100.0, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: None,
+            },
+            CashFlow {
+                date: d(2025, 5, 15), // future
+                reset_date: None,
+                amount: Money::new(200.0, Currency::USD),
+                kind: CFKind::Fixed,
+                accrual_factor: 0.25,
+                rate: None,
+            },
+        ];
+        let schedule = CashFlowSchedule {
+            flows,
+            notional: Notional::par(1_000.0, Currency::USD),
+            day_count: DayCount::Act365F,
+            meta: CashFlowMeta::default(),
+        };
+
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .knots([(0.0, 1.0), (30.0, 1.0)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("DiscountCurve builder should succeed");
+        let market = MarketContext::new().insert(curve.clone());
+        let periods = vec![Period {
+            id: PeriodId::annual(2025),
+            start: d(2025, 1, 1),
+            end: d(2026, 1, 1),
+            is_actual: false,
+        }];
+
+        let df = schedule
+            .to_period_dataframe(
+                &periods,
+                &market,
+                "USD-OIS",
+                PeriodDataFrameOptions {
+                    as_of: Some(base),
+                    day_count: Some(DayCount::Act365F),
+                    ..Default::default()
+                },
+            )
+            .expect("PeriodDataFrame creation should succeed");
+        let df_pv_total: f64 = df.pvs.iter().sum();
+
+        let pv_map = schedule
+            .pv_by_period(
+                &periods,
+                PvDiscountSource::Discount {
+                    disc: &curve,
+                    credit: None,
+                },
+                DateContext::new(
+                    base,
+                    DayCount::Act365F,
+                    finstack_core::dates::DayCountContext::default(),
+                ),
+            )
+            .expect("pv_by_period succeeds");
+        let agg_pv = pv_map[&PeriodId::annual(2025)][&Currency::USD].amount();
+
+        // Both conventions zero the historical flow; with df = 1 the total
+        // PV is just the future flow's amount.
+        assert!((df_pv_total - 200.0).abs() < 1e-9, "df pv {df_pv_total}");
+        assert!(
+            (df_pv_total - agg_pv).abs() < 1e-9,
+            "DataFrame PV total ({df_pv_total}) must match pv_by_period ({agg_pv})"
+        );
+    }
+
+    #[test]
+    fn dataframe_propagates_day_count_errors() {
+        let base = d(2025, 1, 1);
+        // Dated strictly inside Q2 [Apr 1, Jul 1): under half-open bucketing a
+        // flow on the final period end would fall outside all periods and skip
+        // the day-count path entirely.
+        let flows = vec![CashFlow {
+            date: d(2025, 5, 15),
             reset_date: None,
             amount: Money::new(100.0, Currency::USD),
             kind: CFKind::Fixed,

@@ -22,6 +22,7 @@ use super::schedule::ScheduleParams;
     serde::Deserialize,
     schemars::JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub enum CouponType {
     /// Cash variant.
     #[default]
@@ -76,6 +77,7 @@ impl CouponType {
 /// This type combines the coupon quote, payment behavior, and schedule
 /// conventions required to emit a fixed-rate leg.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct FixedCouponSpec {
     /// Coupon settlement behavior: cash, PIK, or an explicit split of the
     /// coupon amount.
@@ -147,6 +149,9 @@ impl FixedCouponSpec {
             stub: self.stub,
             end_of_month: self.end_of_month,
             payment_lag_days: self.payment_lag_days,
+            // Bond convention: accrual boundaries stay unadjusted; only
+            // payment dates roll (ICMA practice).
+            adjust_accrual_dates: false,
         }
     }
 }
@@ -183,6 +188,7 @@ impl FixedCouponSpec {
     serde::Deserialize,
     schemars::JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub enum OvernightCompoundingMethod {
     /// Arithmetic (non-compounded) average of daily overnight fixings,
     /// weighted by accrual days: `Rate = (Σ rᵢ·dᵢ) / D`.
@@ -210,10 +216,13 @@ pub enum OvernightCompoundingMethod {
         lookback_days: u32,
     },
 
-    /// Compounded in arrears with lockout (freeze rate near end of period).
+    /// Compounded in arrears with lockout (rate cut-off near end of period).
     ///
     /// Uses the rate from `lockout_days` business days before period end for all
-    /// remaining days in the period.
+    /// remaining days in the period. With fixings `b_1..b_n` (where `b_n` is one
+    /// business day before the exclusive period end), the cut-off fixing is
+    /// `b_{n-lockout+1}` per ISDA 2021 Definitions §7 (rate cut-off) and the
+    /// ARRC SOFR FRN conventions.
     CompoundedWithLockout {
         /// Number of business days before period end to freeze the rate.
         lockout_days: u32,
@@ -254,6 +263,7 @@ fn default_reset_lag() -> i32 {
 #[derive(
     Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub enum FloatingRateFallback {
     /// Return an error with curve ID and reset date (strictest, safest).
     #[default]
@@ -263,6 +273,11 @@ pub enum FloatingRateFallback {
     /// projection when no forward curve is available; emits `warn!`.
     SpreadOnly,
     /// Use a fixed rate as the index component. Emits `info!`.
+    ///
+    /// The value is a **decimal annual rate**, not basis points: `0.045`
+    /// means 4.5%. This differs from the bp-denominated spread/floor/cap
+    /// fields on [`FloatingRateSpec`] because it substitutes directly for
+    /// the projected index rate.
     FixedRate(rust_decimal::Decimal),
 }
 
@@ -305,6 +320,34 @@ impl FloatingRateFallback {
 /// The implementation does not reject negative rates; the policy is controlled
 /// by the floor configuration.
 ///
+/// # Seasoned Instruments (Historical Fixings)
+///
+/// Historical fixings **are supported** via the `MarketContext`: store a
+/// `ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see
+/// `finstack_core::market_data::fixings`) containing realized index
+/// observations. Observation dates strictly before the forward curve base
+/// date then resolve from that series instead of the curve:
+///
+/// - **Overnight observations** (compounded/averaged paths) use LOCF lookup
+///   (last observation carried forward), matching RFR publication
+///   conventions where a fixing carries over non-publication days
+///   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
+///   seasoned compounding window seamlessly mixes realized fixings and
+///   curve-projected forwards with identical `(rate, days)` weighting.
+/// - **Term-rate resets** use exact-date lookup on the (business-day
+///   adjusted) reset date — a term rate fixes on a specific published date.
+///   The fixing is the index rate only; gearing/spread/floors/caps apply on
+///   top exactly as for projected rates.
+///
+/// An observation exactly on the curve base date prefers a published
+/// same-day fixing when the series has one, otherwise projects from `t = 0`.
+///
+/// The [`FloatingRateFallback`] policy applies only when **no** fixing
+/// series is provided: `Error` (the default) fails the build with a
+/// descriptive message naming the date, index, and expected series id;
+/// `FixedRate(r)` uses `r` as the index rate for the affected coupon;
+/// `SpreadOnly` projects spread-only.
+///
 /// # Example
 ///
 /// ```rust
@@ -323,6 +366,7 @@ impl FloatingRateFallback {
 ///     all_in_cap_bp: None,
 ///     index_cap_bp: None,
 ///     reset_freq: Tenor::quarterly(),
+///     index_tenor: None,
 ///     reset_lag_days: 2,
 ///     dc: DayCount::Act360,
 ///     bdc: BusinessDayConvention::ModifiedFollowing,
@@ -336,6 +380,7 @@ impl FloatingRateFallback {
 /// };
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct FloatingRateSpec {
     /// Forward curve identifier (e.g., "USD-SOFR-3M", "EUR-EURIBOR-6M").
     pub index_id: CurveId,
@@ -346,6 +391,10 @@ pub struct FloatingRateSpec {
     /// Gearing/leverage multiplier applied to the all-in rate (default: 1.0).
     ///
     /// Example: gearing = 2.0 means the rate is doubled.
+    ///
+    /// **Restriction:** gearing must be strictly positive (`gearing > 0`);
+    /// projection rejects zero or negative gearing, so inverse floaters
+    /// (negative gearing) are not currently expressible with this field.
     #[serde(default = "default_gearing")]
     pub gearing: Decimal,
 
@@ -379,7 +428,21 @@ pub struct FloatingRateSpec {
     pub index_cap_bp: Option<Decimal>,
 
     /// Reset frequency for rate fixings.
+    ///
+    /// This is the cadence at which the rate refixes; it also serves as the
+    /// default index tenor when [`Self::index_tenor`] is `None`.
     pub reset_freq: Tenor,
+
+    /// Underlying index tenor used to project the forward rate (term rates).
+    ///
+    /// The forward rate is projected over
+    /// `[accrual_start, accrual_start + index_tenor]`. When `None` (the serde
+    /// default), the index tenor falls back to [`Self::reset_freq`]. Set this
+    /// explicitly when the reset cadence differs from the index's underlying
+    /// deposit period (e.g. a monthly-paying leg referencing a 3M index).
+    /// Ignored for overnight-compounded legs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub index_tenor: Option<Tenor>,
 
     /// Reset lag in business days (e.g., 2 for T-2 SOFR convention).
     #[serde(default = "default_reset_lag")]
@@ -487,6 +550,7 @@ fn default_gearing_includes_spread() -> bool {
 /// Embeds the canonical `FloatingRateSpec` for rate projection and adds
 /// coupon-specific settings like payment frequency and PIK behavior.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct FloatingCouponSpec {
     /// Floating rate specification (contains index, spread, floor, cap, etc).
     pub rate_spec: FloatingRateSpec,
@@ -538,6 +602,7 @@ pub struct FloatingCouponSpec {
 /// };
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct StepUpCouponSpec {
     /// Coupon type (Cash/PIK/Split).
     #[serde(default)]
@@ -588,6 +653,8 @@ impl StepUpCouponSpec {
             stub: self.stub,
             end_of_month: self.end_of_month,
             payment_lag_days: self.payment_lag_days,
+            // Bond convention: accrual boundaries stay unadjusted.
+            adjust_accrual_dates: false,
         }
     }
 }

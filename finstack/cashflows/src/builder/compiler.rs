@@ -28,7 +28,9 @@ use finstack_core::InputError;
 use rust_decimal::Decimal;
 
 use super::calendar::resolve_calendar_strict;
-use super::date_generation::{build_dates, index_period_schedule, SchedulePeriod};
+use super::date_generation::{
+    adjust_period_accruals, build_dates, index_period_schedule, SchedulePeriod,
+};
 use super::rate_helpers::ResolvedFloatingRateSpec;
 use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
@@ -73,7 +75,7 @@ fn build_dates_with_meta(
     window: DateWindow,
     params: &ScheduleParams,
 ) -> finstack_core::Result<ScheduleWithMeta> {
-    let schedule = build_dates(
+    let mut schedule = build_dates(
         window.start,
         window.end,
         params.freq,
@@ -83,7 +85,17 @@ fn build_dates_with_meta(
         params.payment_lag_days,
         &params.calendar_id,
     )?;
-    Ok(index_period_schedule(schedule))
+    // Swap convention (ISDA 2006 §4.10; ARRC SOFR conventions): roll both
+    // accrual boundaries with the schedule's BDC before year fractions and
+    // overnight observation windows are derived. Bond schedules keep
+    // unadjusted accrual (the default).
+    if params.adjust_accrual_dates {
+        let cal = resolve_calendar_strict(&params.calendar_id)?;
+        for period in &mut schedule.periods {
+            adjust_period_accruals(period, params.bdc, cal)?;
+        }
+    }
+    index_period_schedule(schedule)
 }
 
 /// Compiled fixed-coupon schedule produced by [`compute_coupon_schedules`].
@@ -105,6 +117,8 @@ pub(crate) struct FloatSchedule {
     pub(crate) runtime_spec: ResolvedFloatingRateSpec,
     pub(crate) dates: Vec<Date>,
     pub(crate) prev: PeriodMap,
+    /// Payment dates whose accrual period is a genuine stub (irregular span).
+    pub(crate) first_last: DateSet,
 }
 
 /// Periodic fee schedule prepared from fee specs.
@@ -155,7 +169,10 @@ pub(super) fn build_fee_schedules(
     //!   `FixedFees` contains explicit (`Date`, `Money`) pairs.
     //!
     //! Errors:
-    //! - `InputError::TooFewPoints` if any derived schedule contains no dates.
+    //! - `Error::Validation` if a fixed fee is dated after maturity (it could
+    //!   never be emitted) or a periodic fee produces an empty schedule (the
+    //!   message names the offending fee). Pre-issue fixed fees are allowed
+    //!   (delayed-funding structures).
     //!
     //! Example:
     //! ```rust
@@ -186,6 +203,17 @@ pub(super) fn build_fee_schedules(
     for fee in fees {
         match fee {
             FeeSpec::Fixed { date, amount } => {
+                // Pre-issue fixed fees are supported (delayed-funding /
+                // commitment structures emit them at their stated date), but a
+                // fee dated after maturity can never be reached by the
+                // emission loop and would be silently dropped.
+                if *date > maturity {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "fixed fee dated {} is after maturity {}; fees must be dated on or \
+                         before the instrument maturity",
+                        date, maturity
+                    )));
+                }
                 if amount.amount() != 0.0 {
                     fixed_fees.push((*date, *amount))
                 }
@@ -208,11 +236,15 @@ pub(super) fn build_fee_schedules(
                     stub: *stub,
                     end_of_month: false,
                     payment_lag_days: 0,
+                    adjust_accrual_dates: false,
                 };
                 let (dates, prev, _) =
                     build_dates_with_meta(DateWindow::new(issue, maturity), &schedule)?;
                 if dates.is_empty() {
-                    return Err(InputError::TooFewPoints.into());
+                    return Err(finstack_core::Error::Validation(format!(
+                        "periodic fee ({bps} bps, {freq} on '{calendar_id}') produced an empty \
+                         schedule over [{issue}, {maturity}]"
+                    )));
                 }
                 let calendar = resolve_calendar_strict(calendar_id)?;
                 periodic_fees.push(PeriodicFee {
@@ -450,12 +482,20 @@ fn select_coupon_piece(
     for piece in pieces {
         if piece.window.covers_range(start, end) {
             if chosen.is_some() {
-                return Err(InputError::Invalid.into());
+                return Err(finstack_core::Error::Validation(format!(
+                    "ambiguous coupon coverage: more than one coupon window covers \
+                     [{start}, {end})"
+                )));
             }
             chosen = Some(piece);
         }
     }
-    chosen.ok_or_else(|| InputError::Invalid.into())
+    chosen.ok_or_else(|| {
+        finstack_core::Error::Validation(format!(
+            "no coupon window covers [{start}, {end}); coupon program must cover the \
+             full [issue, maturity] horizon"
+        ))
+    })
 }
 
 fn select_payment_split(
@@ -476,7 +516,13 @@ fn select_payment_split(
                 chosen = Some(piece);
             }
             Some(current) if piece.window.contains_window(current.window) => {}
-            Some(_) => return Err(InputError::Invalid.into()),
+            Some(current) => {
+                return Err(finstack_core::Error::Validation(format!(
+                    "overlapping payment windows [{}, {}) and [{}, {}) cover [{start}, {end}) \
+                     without containment; nest payment windows or make them disjoint",
+                    current.window.start, current.window.end, piece.window.start, piece.window.end
+                )))
+            }
         }
     }
 
@@ -504,8 +550,9 @@ pub(super) fn compute_coupon_schedules(
     //!   and the exact specs used for each schedule.
     //!
     //! Errors:
-    //! - `InputError::Invalid` for out‑of‑range windows or overlapping windows
-    //!   without containment, or if coverage selection is ambiguous.
+    //! - `Error::Validation` (naming the offending window) for out‑of‑range
+    //!   windows, overlapping windows without containment, or ambiguous
+    //!   coverage selection.
     //! - `InputError::TooFewPoints` if any derived schedule has no dates.
     //!
     //! Example:
@@ -553,14 +600,22 @@ pub(super) fn compute_coupon_schedules(
     bounds.push(maturity);
     for p in coupon_pieces {
         if !p.window.is_within(issue, maturity) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_core::Error::Validation(format!(
+                "coupon window [{}, {}) is outside the instrument horizon [{issue}, {maturity}] \
+                 or empty",
+                p.window.start, p.window.end
+            )));
         }
         bounds.push(p.window.start);
         bounds.push(p.window.end);
     }
     for p in payment_pieces {
         if !p.window.is_within(issue, maturity) {
-            return Err(InputError::Invalid.into());
+            return Err(finstack_core::Error::Validation(format!(
+                "payment window [{}, {}) is outside the instrument horizon [{issue}, {maturity}] \
+                 or empty",
+                p.window.start, p.window.end
+            )));
         }
         bounds.push(p.window.start);
         bounds.push(p.window.end);
@@ -641,6 +696,7 @@ pub(super) fn compute_coupon_schedules(
                     runtime_spec,
                     dates,
                     prev,
+                    first_last: first_or_last,
                 });
             }
         }
@@ -659,7 +715,6 @@ mod tests {
     use crate::builder::specs::{CouponType, FixedCouponSpec};
     use finstack_core::currency::Currency;
     use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
-    use finstack_core::InputError;
     use time::Month;
 
     fn d(y: i32, m: u8, day: u8) -> Date {
@@ -745,13 +800,12 @@ mod tests {
         let _ = builder.add_payment_window(issue, d(2027, 1, 1), CouponType::PIK);
         let _ = builder.add_payment_window(d(2026, 1, 1), maturity, CouponType::Cash);
 
-        let result = compute_coupon_schedules(&builder, issue, maturity);
+        let Err(err) = compute_coupon_schedules(&builder, issue, maturity) else {
+            panic!("overlapping non-nested payment windows must be rejected");
+        };
         assert!(
-            matches!(
-                result,
-                Err(finstack_core::Error::Input(InputError::Invalid))
-            ),
-            "overlapping non-nested payment windows must be rejected"
+            err.to_string().contains("payment windows"),
+            "error should name the overlapping payment windows: {err}"
         );
     }
 
@@ -763,13 +817,12 @@ mod tests {
         // Window extends one year past maturity.
         let _ = builder.add_payment_window(issue, d(2030, 1, 1), CouponType::PIK);
 
-        let result = compute_coupon_schedules(&builder, issue, maturity);
+        let Err(err) = compute_coupon_schedules(&builder, issue, maturity) else {
+            panic!("payment window beyond maturity must be rejected");
+        };
         assert!(
-            matches!(
-                result,
-                Err(finstack_core::Error::Input(InputError::Invalid))
-            ),
-            "payment window beyond maturity must be rejected"
+            err.to_string().contains("horizon"),
+            "error should name the instrument horizon: {err}"
         );
     }
 }

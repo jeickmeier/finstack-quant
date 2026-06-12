@@ -61,10 +61,22 @@ impl CashFlowBuilder {
     /// positive repayment, while all other kinds emit `-cash` as a borrower
     /// draw/notional cashflow.
     ///
+    /// # Sign conventions
+    ///
+    /// * `CFKind::Amortization` (repayment): `delta` must be `<= 0` (the
+    ///   outstanding balance decreases). When `cash` is `None`, it defaults to
+    ///   `-delta` so the emitted flow is a positive cash repayment.
+    /// * `CFKind::Notional` (draw): `delta` must be `>= 0` (the outstanding
+    ///   balance increases). When `cash` is `None`, it defaults to `delta`,
+    ///   emitting a negative funding outflow.
+    /// * Other kinds: no sign requirement; `cash` defaults to `delta`.
+    ///
     /// # Errors
     ///
-    /// Records a pending error if `cash` is provided with a different currency
-    /// than `delta`. The error will be returned when `build_with_curves(...)` is called.
+    /// Records a pending error — returned by `build_with_curves(...)` — when:
+    /// * `cash` is provided with a different currency than `delta`, or
+    /// * `delta` violates the sign convention for `kind` (including NaN
+    ///   amounts, which never satisfy either sign requirement).
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn add_principal_event(
         &mut self,
@@ -76,7 +88,33 @@ impl CashFlowBuilder {
         if self.pending_error.is_some() {
             return self;
         }
-        let cash_leg = cash.unwrap_or(delta);
+        match kind {
+            CFKind::Amortization => {
+                if delta.amount() > 0.0 || delta.amount().is_nan() {
+                    self.pending_error = Some(finstack_core::Error::Validation(format!(
+                        "add_principal_event: CFKind::Amortization requires delta <= 0 \
+                         (repayments reduce outstanding), got {} on {date}",
+                        delta.amount()
+                    )));
+                    return self;
+                }
+            }
+            CFKind::Notional => {
+                if delta.amount() < 0.0 || delta.amount().is_nan() {
+                    self.pending_error = Some(finstack_core::Error::Validation(format!(
+                        "add_principal_event: CFKind::Notional requires delta >= 0 \
+                         (draws increase outstanding), got {} on {date}",
+                        delta.amount()
+                    )));
+                    return self;
+                }
+            }
+            _ => {}
+        }
+        let cash_leg = cash.unwrap_or(match kind {
+            CFKind::Amortization => delta * -1.0,
+            _ => delta,
+        });
         if cash_leg.currency() != delta.currency() {
             self.pending_error = Some(finstack_core::Error::CurrencyMismatch {
                 expected: delta.currency(),

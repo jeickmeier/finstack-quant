@@ -288,7 +288,9 @@ fn test_expired_swap_handling() {
     let as_of = date!(2024 - 01 - 01); // After end
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD-OIS");
-    let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD-SOFR-3M");
+    // Flat forward curve based at the swap start: seasoned resets strictly
+    // before the curve base now error under the default FloatingRateFallback.
+    let fwd_curve = build_flat_forward_curve(0.05, start, "USD-SOFR-3M");
 
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
