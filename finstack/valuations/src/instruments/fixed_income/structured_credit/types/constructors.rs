@@ -77,6 +77,14 @@ impl StructuredCredit {
         discount_curve_id: impl Into<String>,
     ) -> Self {
         match deal_type {
+            DealType::CLO => Self::new_clo(
+                id,
+                pool,
+                tranches,
+                closing_date,
+                maturity,
+                discount_curve_id,
+            ),
             DealType::CMBS => Self::new_cmbs(
                 id,
                 pool,
