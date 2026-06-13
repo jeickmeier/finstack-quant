@@ -436,6 +436,7 @@ fn test_mc_stochastic_floating_rate_index_cap() {
             all_in_floor_bp: None,
             all_in_cap_bp: None,
             index_cap_bp: all_in_cap_bp,
+            overnight_index_constraints: Default::default(),
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,

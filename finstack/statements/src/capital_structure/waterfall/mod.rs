@@ -273,12 +273,13 @@ pub fn execute_waterfall(
                     staged_breakdown.principal_payment.checked_add(shortfall)?;
             }
         }
+        let scheduled_principal = staged_breakdown.principal_payment;
         staged.push(StagedInstrumentFlow {
             instrument_id: instrument_id.clone(),
             breakdown: staged_breakdown,
             opening_balance,
             extra_principal: Money::new(0.0, currency),
-            scheduled_principal: staged_breakdown.principal_payment,
+            scheduled_principal,
             toggled_pik_moved: Money::new(0.0, currency),
         });
     }

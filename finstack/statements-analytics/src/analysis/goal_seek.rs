@@ -262,13 +262,13 @@ pub fn goal_seek(
         solver.bracket_max = 0.0;
     }
 
-    let solution = match solver.solve(&objective, initial_guess) {
+    let solution = match solver.solve(objective, initial_guess) {
         Ok(solution) => solution,
         Err(first_error) if initial_guess != 0.0 => {
             let mut widened = BrentSolver::new();
             widened.initial_bracket_size = Some(abs_guess);
             widened
-                .solve(&objective, initial_guess)
+                .solve(objective, initial_guess)
                 .map_err(|second_error| {
                     describe_failure(format!(
                         "Goal seek failed to find solution: target_node='{target_node}', \

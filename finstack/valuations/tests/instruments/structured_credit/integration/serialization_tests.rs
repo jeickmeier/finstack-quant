@@ -329,6 +329,7 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         all_in_floor_bp: Some(rust_decimal::Decimal::try_from(25.0).expect("valid")),
         all_in_cap_bp: Some(rust_decimal::Decimal::try_from(1200.0).expect("valid")),
         index_cap_bp: None,
+        overnight_index_constraints: Default::default(),
         reset_freq: Tenor::quarterly(),
         index_tenor: None,
         reset_lag_days: 2,

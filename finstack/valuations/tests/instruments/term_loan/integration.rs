@@ -162,6 +162,7 @@ fn test_floating_rate_term_loan_yield_and_dm() {
             all_in_floor_bp: None,
             all_in_cap_bp: None,
             index_cap_bp: None,
+            overnight_index_constraints: Default::default(),
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,
