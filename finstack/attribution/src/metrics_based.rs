@@ -50,8 +50,8 @@
 //! | Metric              | Unit            | Definition                                                |
 //! |---------------------|-----------------|-----------------------------------------------------------|
 //! | DV01                | $ / bp          | Dollar change per 1bp parallel rate shift                 |
-//! | Convexity           | dimensionless   | Percentage second derivative: (∂²P/∂r²) / P               |
-//! | IrConvexity         | dimensionless   | Same as Convexity (alias for swaps)                       |
+//! | Convexity           | per-100 (street)| Street convexity: (∂²P/∂y²) / P / 100 (Bloomberg YAS)     |
+//! | IrConvexity         | $ / decimal²    | Raw dollar second derivative ∂²PV/∂r² (swaps)             |
 //! | CS01                | $ / bp          | Dollar change per 1bp spread shift                        |
 //! | CsGamma             | $ / decimal²    | Dollar second derivative ∂²V/∂s² (spread in decimal)      |
 //! | Vega                | $ / vol point   | Dollar change per 1% absolute vol shift                   |
@@ -60,9 +60,13 @@
 //! | Inflation01         | $ / bp          | Dollar change per 1bp inflation-curve shift               |
 //! | InflationConvexity  | $ / decimal²    | Dollar second derivative ∂²V/∂i² (inflation in decimal)   |
 //!
-//! **Important**: `Convexity` and `IrConvexity` are dimensionless percentage metrics,
-//! NOT "modified convexity" in years² as quoted by some data vendors. The formula
-//! used is: `ΔP_convexity = ½ × P₀ × Convexity × (Δr_decimal)²`
+//! **Important**: `Convexity` and `IrConvexity` have DIFFERENT producer
+//! conventions and are consumed with different formulas (quant review B4):
+//! the bond producer emits *street convexity* (`d²P/dy² / P / 100`,
+//! Bloomberg YAS), so `ΔP_convexity = ½ × P₀ × Convexity × 100 × (Δr_decimal)²`;
+//! the IRS producer emits the raw dollar second derivative `d²PV/dr²`, so
+//! `ΔP_convexity = ½ × IrConvexity × (Δr_decimal)²` with no P₀ factor (a
+//! near-par swap has PV ≈ 0 but real gamma).
 //!
 //! `InflationConvexity` uses the `CsGamma`-style $/decimal² convention (no P₀
 //! multiplier): `ΔP_inflation_convexity = ½ × InflationConvexity × (Δi_decimal)²`.
@@ -94,7 +98,7 @@ use finstack_core::types::CurveId;
 use finstack_core::HashMap;
 use finstack_core::Result;
 use finstack_valuations::instruments::Instrument;
-use finstack_valuations::metrics::MetricId;
+use finstack_valuations::metrics::{collect_cashflows_in_period, MetricId};
 use finstack_valuations::results::ValuationResult;
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -267,6 +271,79 @@ fn measure_per_tenor_discount_shift(
     )
 }
 
+/// Per-tenor rate shift (bp) for a rates curve that may be a discount curve
+/// (zero rates) **or** a forward/projection curve (forward rates).
+///
+/// Quant review M1: the rates ladder must consume forward-curve DV01 too —
+/// `BucketedDv01` emits per-tenor series for projection curves, and a basis
+/// move (discount and forward moving differently) is mis-attributed when only
+/// discount curves are measured.
+fn measure_per_tenor_rate_shift(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+    tenors: &[f64],
+) -> Option<Vec<f64>> {
+    if let Some(shifts) = measure_per_tenor_discount_shift(curve_id, market_t0, market_t1, tenors) {
+        return Some(shifts);
+    }
+    let curve_t0 = market_t0.get_forward(curve_id).ok()?;
+    let curve_t1 = market_t1.get_forward(curve_id).ok()?;
+    Some(
+        tenors
+            .iter()
+            .map(|&t| (curve_t1.rate(t) - curve_t0.rate(t)) * 10_000.0)
+            .collect(),
+    )
+}
+
+/// Signed mean forward-rate shift (bp) over the standard tenor grid —
+/// forward-curve counterpart of `measure_discount_curve_shift`.
+fn measure_forward_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Option<f64> {
+    use finstack_core::market_data::diff::STANDARD_TENORS;
+    let curve_t0 = market_t0.get_forward(curve_id).ok()?;
+    let curve_t1 = market_t1.get_forward(curve_id).ok()?;
+    let mut total = 0.0;
+    let mut count = 0usize;
+    for &t in STANDARD_TENORS {
+        if t <= 0.0 {
+            continue;
+        }
+        let r0 = curve_t0.rate(t);
+        let r1 = curve_t1.rate(t);
+        if r0.is_finite() && r1.is_finite() {
+            total += (r1 - r0) * 10_000.0;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        None
+    } else {
+        Some(total / count as f64)
+    }
+}
+
+/// Signed mean rate shift (bp) for a curve that may be a discount or a
+/// forward/projection curve.
+fn measure_rate_curve_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Option<f64> {
+    measure_discount_curve_shift(
+        curve_id,
+        market_t0,
+        market_t1,
+        TenorSamplingMethod::Standard,
+    )
+    .ok()
+    .or_else(|| measure_forward_curve_shift_bp(curve_id, market_t0, market_t1))
+}
+
 /// Mean of the per-tenor *absolute* discount-curve zero-rate shift (bp) on
 /// the standard tenor grid.
 ///
@@ -299,6 +376,45 @@ fn discount_curve_abs_shift_bp(
         let z1 = c1.zero(t);
         if z0.is_finite() && z1.is_finite() {
             total_abs += (z1 - z0).abs() * 10_000.0;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        0.0
+    } else {
+        total_abs / count as f64
+    }
+}
+
+/// L1-mean rate shift (bp) for a curve that may be a discount or a
+/// forward/projection curve. Forward-aware counterpart of
+/// [`discount_curve_abs_shift_bp`] for the twist-guard block.
+fn rate_curve_abs_shift_bp(
+    curve_id: &str,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> f64 {
+    use finstack_core::market_data::diff::STANDARD_TENORS;
+    let v = discount_curve_abs_shift_bp(curve_id, market_t0, market_t1);
+    if v > 0.0 {
+        return v;
+    }
+    let (Ok(c0), Ok(c1)) = (
+        market_t0.get_forward(curve_id),
+        market_t1.get_forward(curve_id),
+    ) else {
+        return 0.0;
+    };
+    let mut total_abs = 0.0;
+    let mut count = 0usize;
+    for &t in STANDARD_TENORS {
+        if t <= 0.0 {
+            continue;
+        }
+        let r0 = c0.rate(t);
+        let r1 = c1.rate(t);
+        if r0.is_finite() && r1.is_finite() {
+            total_abs += (r1 - r0).abs() * 10_000.0;
             count += 1;
         }
     }
@@ -567,6 +683,36 @@ pub fn attribute_pnl_metrics_based(
     // `residual_within_tolerance` correctly refuses to report a clean result.
     let mut non_finite_detected = false;
 
+    // Total-return basis (quant review M2): `PnlAttribution::new` captured the
+    // raw MTM (`val_t1 − val_t0`) in `mark_to_market_pnl`; add cashflows paid
+    // inside [T₀, T₁) so `total_pnl` matches the total-return convention the
+    // carry metrics use (Theta / CarryTotal include period cashflows — see
+    // `valuations::metrics::sensitivities::theta`). Without this, a coupon
+    // payment date produced `residual ≈ −coupon` and a spurious tolerance
+    // breach. Mirrors `apply_total_return_carry` on the reprice-based paths;
+    // carry itself is NOT adjusted here because the metrics already carry the
+    // cashflow component.
+    match collect_cashflows_in_period(
+        instrument.as_ref(),
+        market_t0,
+        as_of_t0,
+        as_of_t1,
+        val_t1.value.currency(),
+    ) {
+        Ok(coupon_income) if coupon_income.abs() > 0.0 && coupon_income.is_finite() => {
+            attribution.total_pnl = attribution
+                .total_pnl
+                .checked_add(Money::new(coupon_income, val_t1.value.currency()))?;
+        }
+        Ok(_) => {}
+        Err(e) => {
+            attribution.meta.notes.push(format!(
+                "Total-return adjustment unavailable (cashflow collection failed: {e}); \
+                 total_pnl is MTM-only for this period"
+            ));
+        }
+    }
+
     // Extract time period in days
     let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
 
@@ -588,16 +734,27 @@ pub fn attribute_pnl_metrics_based(
     // matching the prior behavior.
     let market_deps = instrument.market_dependencies()?;
 
+    // All rates curves the instrument depends on: discount AND
+    // forward/projection (quant review M1 — multi-curve swaps carry a joint
+    // discount+forward DV01, and basis moves require measuring both
+    // families). Order: discount first, then forward — deterministic.
+    let rates_curve_ids: Vec<CurveId> = {
+        let curves = market_deps.curve_dependencies();
+        curves
+            .discount_curves
+            .iter()
+            .chain(curves.forward_curves.iter())
+            .cloned()
+            .collect()
+    };
+
     let (avg_rate_shift_bp, rate_curves_measured): (Option<f64>, usize) = {
         let mut total = 0.0;
         let mut count = 0usize;
-        for curve_id in &market_deps.curve_dependencies().discount_curves {
-            if let Ok(shift) = measure_discount_curve_shift(
-                curve_id.as_str(),
-                market_t0,
-                market_t1,
-                TenorSamplingMethod::Standard,
-            ) {
+        for curve_id in &rates_curve_ids {
+            if let Some(shift) =
+                measure_rate_curve_shift_bp(curve_id.as_str(), market_t0, market_t1)
+            {
                 total += shift;
                 count += 1;
             }
@@ -668,9 +825,34 @@ pub fn attribute_pnl_metrics_based(
     // - Formula: Theta × Δt (where Δt is time period in days)
     // - Carry decomposition metrics, when present, are scaled over the same horizon.
     let ccy = val_t1.value.currency();
+
+    // Theta / CarryTotal / CouponIncome / PullToPar / RollDown / FundingCost
+    // are PERIOD TOTALS over the producer's `theta_period` (default 1D),
+    // capped at expiry. When the producer stamped the realized horizon
+    // (`theta_period_days`), normalize by it before rescaling to the
+    // attribution window; otherwise assume the 1D default (quant review M3 —
+    // multiplying a 1M carry total by the window's day count double-scales).
+    let theta_horizon_days = val_t0
+        .measures
+        .get(MetricId::ThetaPeriodDays.as_str())
+        .copied()
+        .filter(|d| d.is_finite() && *d > 0.0);
+    let carry_scale = match theta_horizon_days {
+        Some(horizon) => time_period_days / horizon,
+        None => time_period_days,
+    };
+    if let Some(horizon) = theta_horizon_days {
+        if (horizon - 1.0).abs() > 1e-9 {
+            attribution.meta.notes.push(format!(
+                "Carry metrics normalized from a {horizon}-day producer horizon \
+                 (theta_period override) to the {time_period_days}-day attribution window"
+            ));
+        }
+    }
+
     let legacy_theta = val_t0.measures.get(MetricId::Theta.as_str()).map(|theta| {
         factor_money_or_invalid(
-            theta * time_period_days,
+            theta * carry_scale,
             ccy,
             "carry/theta",
             &mut attribution.meta.notes,
@@ -680,7 +862,7 @@ pub fn attribute_pnl_metrics_based(
 
     if let Some(carry_total) = val_t0.measures.get(MetricId::CarryTotal.as_str()) {
         attribution.carry = factor_money_or_invalid(
-            carry_total * time_period_days,
+            carry_total * carry_scale,
             ccy,
             "carry total",
             &mut attribution.meta.notes,
@@ -690,7 +872,7 @@ pub fn attribute_pnl_metrics_based(
         let get_scaled =
             |id: MetricId, notes: &mut Vec<String>, flag: &mut bool| -> Option<Money> {
                 val_t0.measures.get(id.as_str()).map(|value| {
-                    factor_money_or_invalid(value * time_period_days, ccy, id.as_str(), notes, flag)
+                    factor_money_or_invalid(value * carry_scale, ccy, id.as_str(), notes, flag)
                 })
             };
 
@@ -721,7 +903,7 @@ pub fn attribute_pnl_metrics_based(
             theta: legacy_theta,
         });
     } else if let Some(theta) = val_t0.measures.get(MetricId::Theta.as_str()) {
-        let carry_amount = theta * time_period_days;
+        let carry_amount = theta * carry_scale;
         attribution.carry = factor_money_or_invalid(
             carry_amount,
             ccy,
@@ -760,7 +942,7 @@ pub fn attribute_pnl_metrics_based(
     //       cross-curve basis but assumes each curve moved in parallel.
     //   (c) aggregate: DV01_total × avg(Δr). Coarsest.
 
-    let curve_ids = &market_deps.curve_dependencies().discount_curves;
+    let curve_ids = &rates_curve_ids;
     // (a) per-tenor (key-rate) DV01 — the most accurate input.
     let keyrate_dv01 = extract_keyrate_dv01_per_curve(&val_t0.measures, curve_ids);
     // (b) per-curve total DV01 — fallback when no per-tenor series exist.
@@ -771,7 +953,7 @@ pub fn attribute_pnl_metrics_based(
     let mut rates_pnl = 0.0;
     // Average rate shift used for the rates convexity / large-move blocks.
     // - Key-rate / bucketed branches: average only over curves with data.
-    // - Fallback branch: preamble average over all discount curves with a
+    // - Fallback branch: preamble average over all rates curves with a
     //   measurable shift.
     let mut convexity_avg_shift_bp: Option<f64> = None;
 
@@ -779,17 +961,34 @@ pub fn attribute_pnl_metrics_based(
         // KEY-RATE AWARE: pair per-tenor DV01 with the per-tenor curve shift.
         // A steepener (+bp short / −bp long) is now attributed correctly
         // instead of collapsing to an average-shift × parallel-DV01 product.
+        //
+        // MO-T1: curves WITHOUT per-tenor data fall down the ladder to their
+        // per-curve bucketed DV01 (when present) instead of being silently
+        // dropped — mixed-coverage books previously sent those curves' P&L to
+        // residual with no note.
         let mut rates_acc = NeumaierAccumulator::new();
         let mut shift_acc = NeumaierAccumulator::new();
         let mut shift_terms = 0usize;
         let mut curves_with_data = 0usize;
+        let mut curves_via_fallback: Vec<String> = Vec::new();
         for curve_id in curve_ids {
             let Some(buckets) = keyrate_dv01.get(curve_id) else {
+                // Per-curve fallback for mixed coverage.
+                if let Some(&dv01_for_curve) = bucketed_dv01.get(curve_id) {
+                    if let Some(shift) =
+                        measure_rate_curve_shift_bp(curve_id.as_str(), market_t0, market_t1)
+                    {
+                        rates_acc.add(dv01_for_curve * shift);
+                        shift_acc.add(shift);
+                        shift_terms += 1;
+                        curves_via_fallback.push(curve_id.as_str().to_string());
+                    }
+                }
                 continue;
             };
             let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
             let Some(shifts) =
-                measure_per_tenor_discount_shift(curve_id.as_str(), market_t0, market_t1, &tenors)
+                measure_per_tenor_rate_shift(curve_id.as_str(), market_t0, market_t1, &tenors)
             else {
                 continue;
             };
@@ -821,6 +1020,13 @@ pub fn attribute_pnl_metrics_based(
                 curves_with_data
             ));
         }
+        if !curves_via_fallback.is_empty() {
+            attribution.meta.notes.push(format!(
+                "Rates curves without per-tenor DV01 attributed via per-curve bucketed DV01 \
+                 (parallel-move assumption): {}",
+                curves_via_fallback.join(", ")
+            ));
+        }
     } else if has_bucketed {
         // PER-CURVE BUCKETED: sum per-curve contributions. Each curve is still
         // assumed to move in parallel (no per-tenor series available).
@@ -828,12 +1034,9 @@ pub fn attribute_pnl_metrics_based(
         let mut curves_with_data = 0usize;
         for curve_id in curve_ids {
             if let Some(&dv01_for_curve) = bucketed_dv01.get(curve_id) {
-                if let Ok(shift) = measure_discount_curve_shift(
-                    curve_id.as_str(),
-                    market_t0,
-                    market_t1,
-                    TenorSamplingMethod::Standard,
-                ) {
+                if let Some(shift) =
+                    measure_rate_curve_shift_bp(curve_id.as_str(), market_t0, market_t1)
+                {
                     rates_pnl += dv01_for_curve * shift;
                     total_shift += shift;
                     curves_with_data += 1;
@@ -890,6 +1093,17 @@ pub fn attribute_pnl_metrics_based(
                 rate_curves_measured
             ));
         }
+    } else if avg_rate_shift_bp.is_some_and(|s| s.abs() > 0.0) {
+        // No DV01 metric at all while the curves measurably moved: the rates
+        // P&L stays zero and the move lands in the residual. Note it for
+        // symmetric diagnosability with the carry block (quant review minor).
+        note_warning(
+            &mut attribution,
+            "Rates attribution skipped: no Dv01/BucketedDv01 metric in the T0 valuation \
+             while the rates curves moved; rates P&L set to zero (move flows to residual)",
+            instrument.id(),
+            "rates_curves",
+        );
     }
 
     // 2b. Rates curves convexity (second-order)
@@ -911,8 +1125,8 @@ pub fn attribute_pnl_metrics_based(
     let avg_rate_abs_shift_bp: Option<f64> = {
         let mut total = 0.0;
         let mut count = 0usize;
-        for curve_id in &market_deps.curve_dependencies().discount_curves {
-            let v = discount_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
+        for curve_id in &rates_curve_ids {
+            let v = rate_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
             if v > 0.0 {
                 total += v;
                 count += 1;
@@ -926,34 +1140,47 @@ pub fn attribute_pnl_metrics_based(
     };
     if let Some(avg_shift) = convexity_avg_shift_bp {
         let rc = RoundingContext::default();
-        let convexity_opt = val_t0
+        // The two convexity MetricIds have DIFFERENT producer units and must
+        // not be merged (quant review B4):
+        //
+        // - `Convexity` (bond producer) is *street convexity*:
+        //   `(1/P)·d²P/dy² / 100` (Bloomberg YAS convention, golden-verified
+        //   in valuations). P&L term: ½ × P₀ × Convexity × 100 × (Δy)².
+        // - `IrConvexity` (IRS producer) is the *raw dollar second
+        //   derivative* `d²PV/dr²` (no P normalization — a near-par swap has
+        //   PV ≈ 0 but real gamma). P&L term: ½ × IrConvexity × (Δy)².
+        let street_convexity = val_t0
             .measures
             .get(MetricId::Convexity.as_str())
-            .filter(|&&v| !rc.is_effectively_zero(v, ZeroKind::Generic))
-            .or_else(|| {
-                val_t0
-                    .measures
-                    .get(MetricId::IrConvexity.as_str())
-                    .filter(|&&v| !rc.is_effectively_zero(v, ZeroKind::Generic))
-            });
+            .filter(|&&v| !rc.is_effectively_zero(v, ZeroKind::Generic));
+        let dollar_convexity = val_t0
+            .measures
+            .get(MetricId::IrConvexity.as_str())
+            .filter(|&&v| !rc.is_effectively_zero(v, ZeroKind::Generic));
 
-        if let Some(&convexity) = convexity_opt {
-            // Convexity term: ½ × P × Convexity × (Δr)²
-            // where P is the instrument value/price.
-            //
-            // UNIT CONTRACT: `Convexity` / `IrConvexity` must be the
-            // dimensionless percentage second derivative. The debug assertion
-            // guards against a non-finite metric silently corrupting the
-            // attributed P&L (it cannot enforce units — that is a documented
-            // contract on `MetricId::Convexity`).
-            debug_assert!(
-                convexity.is_finite(),
-                "Convexity metric must be finite for P&L attribution, got {convexity}"
-            );
-            let shift_decimal = avg_shift / 10_000.0;
-            let p0 = val_t0.value.amount();
-            let convexity_pnl = 0.5 * p0 * convexity * shift_decimal * shift_decimal;
+        let shift_decimal = avg_shift / 10_000.0;
+        let convexity_pnl_opt = match (street_convexity, dollar_convexity) {
+            (Some(&convexity), _) => {
+                // Street convexity: ½ × P₀ × C × 100 × (Δy)².
+                debug_assert!(
+                    convexity.is_finite(),
+                    "Convexity metric must be finite for P&L attribution, got {convexity}"
+                );
+                let p0 = val_t0.value.amount();
+                Some(0.5 * p0 * convexity * 100.0 * shift_decimal * shift_decimal)
+            }
+            (None, Some(&ir_convexity)) => {
+                // Dollar convexity: ½ × d²PV/dr² × (Δy)² — no P₀ factor.
+                debug_assert!(
+                    ir_convexity.is_finite(),
+                    "IrConvexity metric must be finite for P&L attribution, got {ir_convexity}"
+                );
+                Some(0.5 * ir_convexity * shift_decimal * shift_decimal)
+            }
+            (None, None) => None,
+        };
 
+        if let Some(convexity_pnl) = convexity_pnl_opt {
             attribution.rates_curves_pnl = factor_money_or_invalid(
                 attribution.rates_curves_pnl.amount() + convexity_pnl,
                 val_t1.value.currency(),
@@ -1086,6 +1313,16 @@ pub fn attribute_pnl_metrics_based(
                 credit_curves_measured
             ));
         }
+    } else if avg_credit_shift_bp.is_some_and(|s| s.abs() > 0.0) {
+        // No CS01 metric at all while the credit curves measurably moved —
+        // note the silent zero (see the rates-ladder counterpart above).
+        note_warning(
+            &mut attribution,
+            "Credit attribution skipped: no Cs01/BucketedCs01 metric in the T0 valuation \
+             while the credit curves moved; credit P&L set to zero (move flows to residual)",
+            instrument.id(),
+            "credit_curves",
+        );
     }
 
     // 3b. Credit curves gamma (second-order).
@@ -1164,6 +1401,18 @@ pub fn attribute_pnl_metrics_based(
                 &mut attribution.meta.notes,
                 &mut non_finite_detected,
             );
+            // Fx01 is the JOINT sensitivity to a simultaneous move of all the
+            // instrument's FX pairs, but the shift above is measured on the
+            // single `fx_exposure()` pair — approximate when the instrument
+            // declares more than one pair (quant review minor).
+            if market_deps.fx_pairs.len() > 1 {
+                attribution.meta.notes.push(format!(
+                    "FX attribution pairs the joint Fx01 sensitivity with the primary \
+                     FX pair's move only; the instrument declares {} FX pairs, so \
+                     differential moves across pairs are approximated",
+                    market_deps.fx_pairs.len()
+                ));
+            }
         } else {
             note_warning(
                 &mut attribution,
@@ -1251,33 +1500,40 @@ pub fn attribute_pnl_metrics_based(
                 delta.is_finite(),
                 "Delta metric must be finite for P&L attribution, got {delta}"
             );
-            let mut total_spot_pnl = 0.0;
-            let mut total_spot_abs_shift = 0.0;
-            let mut spots_found = 0;
 
+            // MO-T3 (quant review): `Delta` / `Gamma` are sensitivities to the
+            // instrument's PRIMARY spot driver, not a per-spot vector. The old
+            // code multiplied the single Delta by EVERY spot's move and summed
+            // (~N× overstatement for multi-spot instruments) while applying
+            // Gamma once to the average. Both orders are now applied once, to
+            // the first declared spot with a measurable move; additional spot
+            // moves are unattributed (they flow to the residual) and noted.
+            let mut primary_shift: Option<f64> = None;
+            let mut extra_spots: Vec<&String> = Vec::new();
             for spot_id in spot_ids {
                 if let Ok(spot_abs_shift) =
                     measure_scalar_absolute_shift(spot_id, market_t0, market_t1)
                 {
-                    total_spot_pnl += delta * spot_abs_shift;
-                    total_spot_abs_shift += spot_abs_shift;
-                    spots_found += 1;
+                    if primary_shift.is_none() {
+                        primary_shift = Some(spot_abs_shift);
+                    } else {
+                        extra_spots.push(spot_id);
+                    }
                 }
             }
 
-            // Second-order: Gamma applied to the absolute spot move.
-            if let Some(&gamma) = gamma_opt {
-                debug_assert!(
-                    gamma.is_finite(),
-                    "Gamma metric must be finite for P&L attribution, got {gamma}"
-                );
-                if spots_found > 0 {
-                    let avg_shift = total_spot_abs_shift / spots_found as f64;
-                    total_spot_pnl += 0.5 * gamma * avg_shift * avg_shift;
-                }
-            }
+            if let Some(spot_shift) = primary_shift {
+                let mut total_spot_pnl = delta * spot_shift;
 
-            if spots_found > 0 {
+                // Second-order: Gamma applied to the same primary spot move.
+                if let Some(&gamma) = gamma_opt {
+                    debug_assert!(
+                        gamma.is_finite(),
+                        "Gamma metric must be finite for P&L attribution, got {gamma}"
+                    );
+                    total_spot_pnl += 0.5 * gamma * spot_shift * spot_shift;
+                }
+
                 attribution.market_scalars_pnl = factor_money_or_invalid(
                     total_spot_pnl,
                     val_t1.value.currency(),
@@ -1285,6 +1541,18 @@ pub fn attribute_pnl_metrics_based(
                     &mut attribution.meta.notes,
                     &mut non_finite_detected,
                 );
+            }
+            if !extra_spots.is_empty() {
+                attribution.meta.notes.push(format!(
+                    "Spot Delta/Gamma attribution applied to the primary spot driver only; \
+                     moves on additional spot ids ({}) are unattributed and flow to the \
+                     residual — provide per-spot sensitivities for multi-underlying books",
+                    extra_spots
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ));
             }
         }
 
@@ -1465,12 +1733,18 @@ pub fn attribute_pnl_metrics_based(
     // 7. Dividend attribution (accumulates into market_scalars_pnl alongside spot Delta/Gamma)
     if let Some(dividend01) = val_t0.measures.get(MetricId::Dividend01.as_str()) {
         if let Some(scalar_id) = instrument.dividend_schedule_id() {
-            // Dividend01 is dPV/d(dividend) — a per-unit sensitivity, so it must
-            // be applied to the absolute dividend shift, not a percentage shift.
+            // MO-T4 (quant review): the `Dividend01` producers emit **$ per
+            // 1bp** of absolute dividend-yield move (the central difference is
+            // rescaled by `DIVIDEND_BUMP_BP`, see equity_option/convertible
+            // `dividend_risk.rs`). `measure_scalar_absolute_shift` returns the
+            // DECIMAL Δq, so the move must be converted to bp before
+            // multiplying — the former per-unit pairing understated dividend
+            // P&L by 10,000×.
             if let Ok(div_abs_shift) =
                 measure_scalar_absolute_shift(scalar_id.as_str(), market_t0, market_t1)
             {
-                let div_amount = dividend01 * div_abs_shift;
+                let div_shift_bp = div_abs_shift * 10_000.0;
+                let div_amount = dividend01 * div_shift_bp;
                 attribution.market_scalars_pnl = factor_money_or_invalid(
                     attribution.market_scalars_pnl.amount() + div_amount,
                     val_t1.value.currency(),
@@ -1484,17 +1758,24 @@ pub fn attribute_pnl_metrics_based(
 
     // 9. Inflation sensitivity
     if let Some(inflation01) = val_t0.measures.get(MetricId::Inflation01.as_str()) {
+        // MarketDependencies does not (yet) declare inflation curves, so the
+        // average is taken over every inflation curve in the market. Sort the
+        // ids so the float summation order is deterministic (the context map
+        // is hash-ordered), and surface multi-curve averaging in the notes —
+        // in a shared multi-instrument market, unrelated inflation curves
+        // contaminate this instrument's average Δi (quant review MO-T2).
         let mut curve_ids = Vec::new();
         for curve_id in market_t1.curve_ids() {
             if market_t1.get_inflation_curve(curve_id).is_ok() {
                 curve_ids.push(curve_id.clone());
             }
         }
+        curve_ids.sort_unstable();
 
         let mut total_shift = 0.0;
         let mut curve_count = 0;
 
-        for curve_id in curve_ids {
+        for curve_id in &curve_ids {
             if let Ok(shift_bp) =
                 measure_inflation_curve_shift(curve_id.as_str(), market_t0, market_t1)
             {
@@ -1508,6 +1789,13 @@ pub fn attribute_pnl_metrics_based(
         } else {
             0.0
         };
+        if curve_count > 1 {
+            attribution.meta.notes.push(format!(
+                "Inflation attribution averaged the shift across {curve_count} inflation \
+                 curves found in the market (instrument-level inflation-curve dependencies \
+                 are not declared); unrelated curves may contaminate the average"
+            ));
+        }
 
         // First-order: Inflation01 × Δi (Δi in basis points)
         let inflation_amount = inflation01 * avg_shift;
@@ -1548,10 +1836,7 @@ pub fn attribute_pnl_metrics_based(
             // non-trivial). Same shape as the rates / credit twist guards.
             let mut total_abs = 0.0;
             let mut abs_count = 0usize;
-            for curve_id in market_t1.curve_ids() {
-                if market_t1.get_inflation_curve(curve_id).is_err() {
-                    continue;
-                }
+            for curve_id in &curve_ids {
                 let v = inflation_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
                 if v > 0.0 {
                     total_abs += v;

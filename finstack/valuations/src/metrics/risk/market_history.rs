@@ -146,11 +146,18 @@ impl MarketScenario {
 fn key_rate_bp_bump(curve_id: &CurveId, tenor_years: f64, shift: f64) -> (CurveId, BumpSpec) {
     let shift_bp = shift * 10_000.0;
 
-    let (prev, next) = find_triangular_neighbors(tenor_years);
-    (
-        curve_id.clone(),
-        BumpSpec::triangular_key_rate_bp(prev, tenor_years, next, shift_bp),
-    )
+    // Wing buckets use the dedicated half-triangle constructors so the
+    // partition-of-unity invariant holds and no infinite sentinel reaches the
+    // curve bump paths (non-finite bounds are rejected there).
+    let spec = match find_triangular_neighbors(tenor_years) {
+        (Some(prev), Some(next)) => {
+            BumpSpec::triangular_key_rate_bp(prev, tenor_years, next, shift_bp)
+        }
+        (None, Some(next)) => BumpSpec::triangular_key_rate_first_bp(tenor_years, next, shift_bp),
+        (Some(prev), None) => BumpSpec::triangular_key_rate_last_bp(prev, tenor_years, shift_bp),
+        (None, None) => BumpSpec::parallel_bp(shift_bp),
+    };
+    (curve_id.clone(), spec)
 }
 
 /// Return the `CurveId` a bump is keyed by, if it is routed through the
@@ -167,7 +174,11 @@ fn bump_curve_id(bump: &MarketBump) -> Option<CurveId> {
 }
 
 /// Find the neighboring bucket boundaries for a triangular key-rate bump.
-fn find_triangular_neighbors(tenor: f64) -> (f64, f64) {
+///
+/// `None` means "no neighbour on that side" (wing bucket): the caller must
+/// use the flat half-triangle constructors rather than 0.0/∞ sentinels,
+/// which break the Σwᵢ(t)=1 invariant (and ∞ produces NaN weights).
+fn find_triangular_neighbors(tenor: f64) -> (Option<f64>, Option<f64>) {
     let buckets = &crate::metrics::sensitivities::config::STANDARD_BUCKETS_YEARS;
 
     // Absolute tolerance for exact-tenor matching. `f64::EPSILON` (~2.2e-16)
@@ -176,19 +187,18 @@ fn find_triangular_neighbors(tenor: f64) -> (f64, f64) {
     // wrong triangular bucket. `1e-6` is the project-wide tenor tolerance.
     const TENOR_TOL: f64 = 1e-6;
 
-    let mut prev = 0.0;
+    let mut prev = None;
     for (i, &bucket) in buckets.iter().enumerate() {
         if (tenor - bucket).abs() <= TENOR_TOL {
-            let next = buckets.get(i + 1).copied().unwrap_or(f64::INFINITY);
-            return (prev, next);
+            return (prev, buckets.get(i + 1).copied());
         }
         if tenor < bucket {
-            return (prev, bucket);
+            return (prev, Some(bucket));
         }
-        prev = bucket;
+        prev = Some(bucket);
     }
 
-    (prev, f64::INFINITY)
+    (prev, None)
 }
 
 /// Historical market data for VaR calculation.
@@ -259,8 +269,30 @@ mod tests {
     fn triangular_neighbors_surround_non_standard_tenor() {
         let (prev, next) = find_triangular_neighbors(4.0);
 
-        assert_eq!(prev, 3.0);
-        assert_eq!(next, 5.0);
+        assert_eq!(prev, Some(3.0));
+        assert_eq!(next, Some(5.0));
+    }
+
+    #[test]
+    fn triangular_neighbors_wings_have_no_sentinels() {
+        // First standard bucket: no left neighbour (flat half triangle), the
+        // next standard bucket on the right.
+        let buckets = &crate::metrics::sensitivities::config::STANDARD_BUCKETS_YEARS;
+        let (prev, next) = find_triangular_neighbors(buckets[0]);
+        assert_eq!(prev, None);
+        assert_eq!(next, Some(buckets[1]));
+
+        // Last standard bucket and beyond: no right neighbour. Infinite
+        // sentinels are rejected by the curve bump paths, so they must never
+        // be produced here.
+        let last = *buckets.last().unwrap();
+        let (prev, next) = find_triangular_neighbors(last);
+        assert_eq!(prev, Some(buckets[buckets.len() - 2]));
+        assert_eq!(next, None);
+
+        let (prev, next) = find_triangular_neighbors(last + 10.0);
+        assert_eq!(prev, Some(last));
+        assert_eq!(next, None);
     }
 
     #[test]

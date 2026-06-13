@@ -63,6 +63,30 @@ where
     pandas_dataframe(py)?.call1((py_rows,))
 }
 
+/// Like [`serde_rows_to_dataframe`], but an empty input yields a zero-row
+/// DataFrame that still carries the fixed column schema.
+///
+/// `pd.DataFrame([])` has NO columns, so pipelines filtering the documented
+/// columns (`df.query("kind.str.startswith('rates')")`) raise on instruments
+/// without detail blocks — exactly the heterogeneous-portfolio case the long
+/// format exists for (quant review MO-B2).
+pub fn serde_rows_to_dataframe_with_schema<'py, T>(
+    py: Python<'py>,
+    rows: &[T],
+    columns: &[&str],
+) -> PyResult<Bound<'py, PyAny>>
+where
+    T: Serialize,
+{
+    if rows.is_empty() {
+        let kwargs = pyo3::types::PyDict::new(py);
+        kwargs.set_item("columns", columns.to_vec())?;
+        let empty = PyList::empty(py);
+        return pandas_dataframe(py)?.call((empty,), Some(&kwargs));
+    }
+    serde_rows_to_dataframe(py, rows)
+}
+
 /// Convert a slice of `time::Date` into a Python list suitable for a DataFrame index.
 pub fn dates_to_pylist<'py>(
     py: Python<'py>,

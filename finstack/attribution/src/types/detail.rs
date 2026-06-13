@@ -12,6 +12,127 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+/// Per-(curve, tenor) P&L map: keyed by `(curve_id, tenor_label)`.
+type CurveTenorPnlMap = IndexMap<(CurveId, String), Money>;
+
+/// Serde representation for `IndexMap<(CurveId, String), Money>` keyed maps.
+///
+/// JSON object keys must be strings, so the `(curve_id, tenor)` tuple is
+/// encoded as `"{curve_id}|{tenor}"` (e.g. `"USD-OIS|5Y"`). Decoding splits
+/// on the LAST `'|'` so a curve id containing `'|'` still round-trips
+/// (tenor labels never contain one). Plain derived `Serialize` on a
+/// tuple-keyed map fails at runtime with "key must be a string" (quant
+/// review M10), so these maps must go through this module.
+mod curve_tenor_key_map {
+    use super::*;
+    use serde::de::Error as _;
+    use serde::ser::SerializeMap;
+
+    pub fn serialize<S>(map: &CurveTenorPnlMap, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut out = serializer.serialize_map(Some(map.len()))?;
+        for ((curve_id, tenor), value) in map {
+            out.serialize_entry(&format!("{}|{}", curve_id.as_str(), tenor), value)?;
+        }
+        out.end()
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<CurveTenorPnlMap, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw: IndexMap<String, Money> = IndexMap::deserialize(deserializer)?;
+        raw.into_iter()
+            .map(|(key, value)| {
+                let (curve, tenor) = key.rsplit_once('|').ok_or_else(|| {
+                    D::Error::custom(format!("expected 'curve_id|tenor' key, got {key:?}"))
+                })?;
+                Ok(((CurveId::new(curve), tenor.to_string()), value))
+            })
+            .collect()
+    }
+}
+
+/// Serde representation for `Option<IndexMap<(CurveId, String), Money>>`.
+mod opt_curve_tenor_key_map {
+    use super::*;
+
+    pub fn serialize<S>(map: &Option<CurveTenorPnlMap>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match map {
+            Some(inner) => {
+                #[derive(Serialize)]
+                struct Wrapper<'a>(
+                    #[serde(with = "super::curve_tenor_key_map")]
+                    &'a IndexMap<(CurveId, String), Money>,
+                );
+                serializer.serialize_some(&Wrapper(inner))
+            }
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<CurveTenorPnlMap>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Wrapper(
+            #[serde(with = "super::curve_tenor_key_map")] IndexMap<(CurveId, String), Money>,
+        );
+        let opt: Option<Wrapper> = Option::deserialize(deserializer)?;
+        Ok(opt.map(|w| w.0))
+    }
+}
+
+/// Serde representation for `IndexMap<(Currency, Currency), Money>` keyed
+/// maps: the pair is encoded as `"{from}/{to}"` (e.g. `"EUR/USD"`).
+mod currency_pair_key_map {
+    use super::*;
+    use serde::de::Error as _;
+    use serde::ser::SerializeMap;
+    use std::str::FromStr;
+
+    pub fn serialize<S>(
+        map: &IndexMap<(Currency, Currency), Money>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut out = serializer.serialize_map(Some(map.len()))?;
+        for ((from, to), value) in map {
+            out.serialize_entry(&format!("{from}/{to}"), value)?;
+        }
+        out.end()
+    }
+
+    pub fn deserialize<'de, D>(
+        deserializer: D,
+    ) -> Result<IndexMap<(Currency, Currency), Money>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw: IndexMap<String, Money> = IndexMap::deserialize(deserializer)?;
+        raw.into_iter()
+            .map(|(key, value)| {
+                let (from, to) = key.split_once('/').ok_or_else(|| {
+                    D::Error::custom(format!("expected 'FROM/TO' currency pair key, got {key:?}"))
+                })?;
+                let from = Currency::from_str(from)
+                    .map_err(|e| D::Error::custom(format!("bad currency {from:?}: {e}")))?;
+                let to = Currency::from_str(to)
+                    .map_err(|e| D::Error::custom(format!("bad currency {to:?}: {e}")))?;
+                Ok(((from, to), value))
+            })
+            .collect()
+    }
+}
+
 /// Hierarchy-level decomposition of credit P&L, opt-in via
 /// `AttributionSpec.credit_factor_model`.
 ///
@@ -38,17 +159,30 @@ pub struct CreditFactorAttribution {
     /// `format!("{}/{:016x}", model.as_of, fnv1a64(serde_json::to_string(model)))`.
     pub model_id: String,
     /// P&L attributed to the generic (PC) credit factor:
-    /// `-Σ_i CS01_i × β_i^PC × ΔF_PC`.
+    /// `Σ_i CS01_i × β_i^PC × ΔF_PC` (canonical signed CS01 = ∂PV/∂s,
+    /// negative for long credit — no extra negation).
     pub generic_pnl: Money,
     /// One entry per [`finstack_factor_model::credit::hierarchy::HierarchyDimension`]
     /// in the spec order recorded by the model's hierarchy.
     pub levels: Vec<LevelPnl>,
-    /// Total adder P&L: `-Σ_i CS01_i × Δadder_i`. This is the **parallel**
-    /// issuer-idiosyncratic move only; non-parallel curve-shape risk is
-    /// reported separately in [`Self::curve_shape_pnl`].
+    /// Total adder P&L: `Σ_i CS01_i × Δadder_i` (canonical signed CS01).
+    /// This is the **parallel** issuer-idiosyncratic move only; non-parallel
+    /// curve-shape risk is reported separately in [`Self::curve_shape_pnl`].
+    ///
+    /// **Degenerate (no factor observations) semantics**: when the market
+    /// carries no scalar series for any credit factor, nothing about the
+    /// issuer's spread move is identifiably systematic, so the entire
+    /// parallel ΔS is routed here (generic and level components are zero).
     pub adder_pnl_total: Money,
     /// P&L attributed to the **non-parallel** part of the hazard-curve move
     /// (steepening / twist / term-structure roll) — the curve-shape residual.
+    ///
+    /// On the linear (MetricsBased / Taylor) wire the parallel steps are
+    /// single-CS01 × Δbp products, so this closing residual also absorbs
+    /// **spread convexity** of large parallel moves — read it as
+    /// "non-parallel + higher-order", not pure curve shape, on that path.
+    /// The reprice-based parallel/waterfall cascades distribute convexity
+    /// into the steps via cumulative bumps.
     ///
     /// Audit item #1: previously this residual was absorbed into
     /// `adder_pnl_total`, which mislabeled curve-shape risk as
@@ -99,7 +233,9 @@ pub struct RatesCurvesAttribution {
     /// P&L by curve ID.
     pub by_curve: IndexMap<CurveId, Money>,
 
-    /// P&L by (curve_id, tenor).
+    /// P&L by (curve_id, tenor), serialized with `"{curve_id}|{tenor}"` keys.
+    #[serde(with = "curve_tenor_key_map", default)]
+    #[schemars(with = "IndexMap<String, Money>")]
     pub by_tenor: IndexMap<(CurveId, String), Money>,
 
     /// Total discount curves P&L.
@@ -117,7 +253,9 @@ pub struct CreditCurvesAttribution {
     /// P&L by curve ID.
     pub by_curve: IndexMap<CurveId, Money>,
 
-    /// P&L by (curve_id, tenor).
+    /// P&L by (curve_id, tenor), serialized with `"{curve_id}|{tenor}"` keys.
+    #[serde(with = "curve_tenor_key_map", default)]
+    #[schemars(with = "IndexMap<String, Money>")]
     pub by_tenor: IndexMap<(CurveId, String), Money>,
 }
 
@@ -130,7 +268,10 @@ pub struct InflationCurvesAttribution {
     /// P&L by curve ID.
     pub by_curve: IndexMap<CurveId, Money>,
 
-    /// P&L by (curve_id, tenor) for term-structured inflation curves.
+    /// P&L by (curve_id, tenor) for term-structured inflation curves,
+    /// serialized with `"{curve_id}|{tenor}"` keys.
+    #[serde(with = "opt_curve_tenor_key_map", default)]
+    #[schemars(with = "Option<IndexMap<String, Money>>")]
     pub by_tenor: Option<IndexMap<(CurveId, String), Money>>,
 }
 
@@ -148,7 +289,10 @@ pub struct CorrelationsAttribution {
 /// Provides per-currency-pair breakdown.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct FxAttribution {
-    /// P&L by (from_currency, to_currency) pair.
+    /// P&L by (from_currency, to_currency) pair, serialized with
+    /// `"{FROM}/{TO}"` keys (e.g. `"EUR/USD"`).
+    #[serde(with = "currency_pair_key_map", default)]
+    #[schemars(with = "IndexMap<String, Money>")]
     pub by_pair: IndexMap<(Currency, Currency), Money>,
 }
 
@@ -262,8 +406,11 @@ impl<'de> Deserialize<'de> for SourceLine {
         let v = serde_json::Value::deserialize(deserializer)?;
         if let Some(obj) = v.as_object() {
             if obj.contains_key("total") {
-                // New shape.
+                // New shape. `deny_unknown_fields` keeps this inbound surface
+                // as strict as the rest of the crate (quant review minor: a
+                // typo'd key was previously dropped silently).
                 #[derive(Deserialize)]
+                #[serde(deny_unknown_fields)]
                 struct Helper {
                     total: Money,
                     #[serde(default)]
@@ -360,11 +507,13 @@ pub struct CarryDetail {
 ///
 /// # Attribution method coverage
 ///
-/// Note: Parallel and Waterfall attribution methods do not currently populate
-/// `carry_detail` (only `coupon_income` and `theta` from `apply_total_return_carry`
-/// for some paths). Therefore `credit_carry_decomposition` is typically emitted
-/// only on the MetricsBased / Taylor path. Future PRs may extend Parallel/Waterfall
-/// to populate carry — the decomposition logic is method-agnostic.
+/// All four methods populate `carry_detail`: Parallel, Waterfall and Taylor
+/// via `apply_total_return_carry` (theta + coupon_income; pull-to-par and
+/// funding lines stay `None` on those paths), MetricsBased from the carry
+/// decomposition metrics. `credit_carry_decomposition` is therefore emitted
+/// on any path whose `carry_detail.coupon_income` is populated when a
+/// `CreditFactorModel` is supplied — the decomposition logic is
+/// method-agnostic.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CreditCarryDecomposition {
     /// Deterministic traceability id of the model used (matches

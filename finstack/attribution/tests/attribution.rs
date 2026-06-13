@@ -25,5 +25,9 @@ mod finstack_test_utils {
     ));
 }
 
+#[allow(dead_code)]
+#[path = "support/attribution_test_utils.rs"]
+mod attribution_support;
+
 #[path = "attribution/mod.rs"]
 mod attribution;

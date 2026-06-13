@@ -224,6 +224,8 @@ impl SimulationDecomposer {
             ));
         }
 
+        super::parametric::validate_finite_sensitivities(sensitivities)?;
+
         Self::validate_covariance_storage(covariance.as_slice(), covariance.n_factors())
     }
 

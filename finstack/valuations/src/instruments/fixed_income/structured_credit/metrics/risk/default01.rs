@@ -91,8 +91,10 @@ impl MetricCalculator for Default01Calculator {
 
         // Near CDR ≈ 0 the down bump clamps and the move becomes one-sided,
         // so divide by the achieved width rather than the nominal 2·bump.
+        // Quant review MO-T5: rescale the per-unit slope to the documented
+        // `$ per 1bp` convention (pairs with `measure_default_shift` in bp).
         let default01 = if achieved_bump > 0.0 {
-            (pv_up - pv_down) / achieved_bump
+            (pv_up - pv_down) / achieved_bump * 0.0001
         } else {
             0.0
         };

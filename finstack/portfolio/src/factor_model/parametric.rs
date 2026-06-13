@@ -8,6 +8,35 @@ use finstack_factor_model::{FactorCovarianceMatrix, RiskMeasure};
 
 use crate::sensitivity::SensitivityMatrix;
 
+/// Reject sensitivity matrices that contain non-finite deltas.
+///
+/// A single NaN sensitivity would otherwise propagate into a NaN portfolio
+/// variance which `f64::max(NaN, 0.0)` silently collapses to zero risk —
+/// the worst possible failure mode for a production risk engine. The error
+/// names the offending position and factor so the bad price can be traced.
+///
+/// # Errors
+///
+/// Returns [`finstack_core::Error::Validation`] naming the first position /
+/// factor pair whose delta is NaN or infinite.
+pub(crate) fn validate_finite_sensitivities(
+    sensitivities: &SensitivityMatrix,
+) -> finstack_core::Result<()> {
+    let n_factors = sensitivities.n_factors();
+    for (position_idx, row) in sensitivities.as_slice().chunks_exact(n_factors).enumerate() {
+        for (factor_idx, delta) in row.iter().enumerate() {
+            if !delta.is_finite() {
+                let position_id = &sensitivities.position_ids()[position_idx];
+                let factor_id = sensitivities.factor_ids()[factor_idx].as_str();
+                return Err(finstack_core::Error::Validation(format!(
+                    "Sensitivity for position '{position_id}' on factor '{factor_id}' is not finite ({delta}); refusing to compute risk from non-finite sensitivities"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Covariance-based decomposer for linear factor risk measures.
 ///
 /// `ParametricDecomposer` assumes the incoming [`SensitivityMatrix`] rows are already
@@ -50,6 +79,8 @@ impl ParametricDecomposer {
                     .to_string(),
             ));
         }
+
+        validate_finite_sensitivities(sensitivities)?;
 
         let n = covariance.n_factors();
         let data = covariance.as_slice();
@@ -198,7 +229,11 @@ impl ParametricDecomposer {
     }
 
     fn validated_variance(variance: f64) -> finstack_core::Result<f64> {
-        if variance < -Self::VARIANCE_TOLERANCE {
+        if !variance.is_finite() {
+            Err(finstack_core::Error::Validation(format!(
+                "Portfolio variance is not finite ({variance}); check sensitivities and covariance inputs"
+            )))
+        } else if variance < -Self::VARIANCE_TOLERANCE {
             Err(finstack_core::Error::Validation(format!(
                 "Portfolio variance must be non-negative, got {variance}"
             )))

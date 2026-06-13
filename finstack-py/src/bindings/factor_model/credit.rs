@@ -6,7 +6,7 @@
 //! `finstack-portfolio`.
 
 use crate::bindings::date_utils::parse_iso_date_py as parse_date;
-use crate::errors::display_to_py;
+use crate::errors::{core_to_py, display_to_py};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -219,10 +219,12 @@ impl PyCreditCalibrator {
     ///
     /// Raises:
     ///     ValueError: If inputs are structurally invalid or calibration fails.
-    fn calibrate(&self, inputs_json: &str) -> PyResult<PyCreditFactorModel> {
+    fn calibrate(&self, py: Python<'_>, inputs_json: &str) -> PyResult<PyCreditFactorModel> {
         let inputs: finstack_factor_model::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(display_to_py)?;
-        let model = self.inner.calibrate(inputs).map_err(display_to_py)?;
+        let model = py
+            .allow_threads(|| self.inner.calibrate(inputs))
+            .map_err(core_to_py)?;
         Ok(PyCreditFactorModel::from_inner(model))
     }
 
@@ -460,11 +462,13 @@ impl PyPeriodDecomposition {
 ///
 /// Args:
 ///     model: Calibrated :class:`CreditFactorModel` artifact.
-///     observed_spreads: Dict mapping issuer ID string to observed spread (float).
+///     observed_spreads_json: JSON string (e.g. via ``json.dumps``) of a mapping
+///         from issuer ID string to observed spread (float).
 ///     observed_generic: Generic (PC) factor value at ``as_of``.
 ///     as_of: Valuation date in ISO 8601 format.
-///     runtime_tags: Optional dict of ``{issuer_id: {dim_key: tag_value}}`` for
-///         issuers not present in the model.
+///     runtime_tags_json: Optional JSON string of
+///         ``{issuer_id: {dim_key: tag_value}}`` for issuers not present in
+///         the model.
 ///
 /// Returns:
 ///     :class:`LevelsAtDate` snapshot with generic value, per-level bucket values,
@@ -475,8 +479,10 @@ impl PyPeriodDecomposition {
 ///         or if an issuer is missing a required hierarchy tag.
 ///
 /// Example:
+///     >>> import json
 ///     >>> from finstack.factor_model.credit import decompose_levels
-///     >>> snap = decompose_levels(model, {"ISSUER-A": 120.5}, 100.0, "2024-03-29")  # doctest: +SKIP
+///     >>> spreads_json = json.dumps({"ISSUER-A": 120.5})
+///     >>> snap = decompose_levels(model, spreads_json, 100.0, "2024-03-29")  # doctest: +SKIP
 #[pyfunction]
 #[pyo3(signature = (model, observed_spreads_json, observed_generic, as_of, runtime_tags_json=None))]
 fn decompose_levels(
@@ -622,10 +628,15 @@ impl PyFactorCovarianceForecast {
     /// Raises:
     ///     ValueError: If the horizon string is invalid or the model data is
     ///         inconsistent (mismatched axes, negative variance).
-    fn covariance_at(&self, horizon: &str) -> PyResult<String> {
+    fn covariance_at(&self, py: Python<'_>, horizon: &str) -> PyResult<String> {
         let h = parse_vol_horizon(horizon)?;
-        let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
-        let cov = forecast.covariance_at(h).map_err(display_to_py)?;
+        let cov = py
+            .allow_threads(|| {
+                let forecast =
+                    finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
+                forecast.covariance_at(h)
+            })
+            .map_err(display_to_py)?;
         serde_json::to_string_pretty(&cov).map_err(display_to_py)
     }
 
@@ -641,11 +652,15 @@ impl PyFactorCovarianceForecast {
     /// Raises:
     ///     ValueError: If the issuer is not present in the model's vol state or
     ///         the calibrated variance is negative.
-    fn idiosyncratic_vol(&self, issuer_id: &str, horizon: &str) -> PyResult<f64> {
+    fn idiosyncratic_vol(&self, py: Python<'_>, issuer_id: &str, horizon: &str) -> PyResult<f64> {
         let h = parse_vol_horizon(horizon)?;
         let id = finstack_core::types::IssuerId::new(issuer_id);
-        let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
-        forecast.idiosyncratic_vol(&id, h).map_err(display_to_py)
+        py.allow_threads(|| {
+            let forecast =
+                finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
+            forecast.idiosyncratic_vol(&id, h)
+        })
+        .map_err(display_to_py)
     }
 
     /// Build a portfolio-level ``FactorModel`` JSON using ``Σ(t, h)`` at the
@@ -665,13 +680,21 @@ impl PyFactorCovarianceForecast {
     /// Raises:
     ///     ValueError: If the horizon or risk measure is invalid, or the model
     ///         builder rejects the assembled configuration.
-    fn factor_model_at(&self, horizon: &str, risk_measure_json: &str) -> PyResult<String> {
+    fn factor_model_at(
+        &self,
+        py: Python<'_>,
+        horizon: &str,
+        risk_measure_json: &str,
+    ) -> PyResult<String> {
         let h = parse_vol_horizon(horizon)?;
         let measure: finstack_factor_model::RiskMeasure =
             serde_json::from_str(risk_measure_json).map_err(display_to_py)?;
-        let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
-        let config = forecast
-            .factor_model_config_at(h, measure)
+        let config = py
+            .allow_threads(|| {
+                let forecast =
+                    finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
+                forecast.factor_model_config_at(h, measure)
+            })
             .map_err(display_to_py)?;
         serde_json::to_string_pretty(&config).map_err(display_to_py)
     }

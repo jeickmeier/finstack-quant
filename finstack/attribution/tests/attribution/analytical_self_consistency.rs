@@ -232,15 +232,29 @@ fn run_analytical_parity_test(tc: &AnalyticalParityTestCase) {
         tc.name, rate_change_bp, expected_rates_pnl, actual_rates_pnl, rel_diff
     );
 
-    assert!(
-        rel_diff < tc.tolerance_pct || actual_abs < 200.0, // Skip tolerance check for very small values
-        "{}: Rates P&L ({:.2}) differs from analytical estimate ({:.2}) by {:.2}% (tolerance: {}%)",
-        tc.name,
-        actual_rates_pnl,
-        expected_rates_pnl,
-        rel_diff,
-        tc.tolerance_pct
-    );
+    // Quant review MO-X5: any "skip for small values" gate must key on the
+    // INDEPENDENT analytical estimate, never on the value under test — the
+    // old `|| actual_abs < 200.0` escape let a collapsed-magnitude rates P&L
+    // (e.g. a 100× unit error shrinking $4,600 to $150) pass all three
+    // magnitude pins as long as the sign survived.
+    if expected_abs >= 200.0 {
+        assert!(
+            actual_abs > 0.5 * expected_abs,
+            "{}: Rates P&L magnitude collapsed: actual {:.2} < 50% of analytical estimate {:.2}",
+            tc.name,
+            actual_rates_pnl,
+            expected_rates_pnl
+        );
+        assert!(
+            rel_diff < tc.tolerance_pct,
+            "{}: Rates P&L ({:.2}) differs from analytical estimate ({:.2}) by {:.2}% (tolerance: {}%)",
+            tc.name,
+            actual_rates_pnl,
+            expected_rates_pnl,
+            rel_diff,
+            tc.tolerance_pct
+        );
+    }
 }
 
 #[test]

@@ -8,10 +8,10 @@
   "expected_attribution": {
     "actual_pnl": 533.2294526727566,
     "carry_pnl": -58.4990180088063,
-    "eur_rate_pnl_first_order": 0.0,
+    "eur_rate_pnl_first_order": -0.0,
     "fx_pnl_first_order": 485.22276677393154,
-    "residual_first_order": 213.254712775828,
-    "usd_rate_pnl_first_order": -106.74900886819671
+    "residual_first_order": -0.2433049605654105,
+    "usd_rate_pnl_first_order": 106.74900886819671
   },
   "instrument": "FxForward",
   "name": "EURUSD-1Y-FORWARD",

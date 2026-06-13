@@ -155,6 +155,17 @@ impl MetricId {
     pub const CarryDecompositionDegenerate: Self =
         Self(Cow::Borrowed("carry_decomposition_degenerate"));
 
+    /// Realized theta/carry horizon in **calendar days**.
+    ///
+    /// `Theta`, `CarryTotal`, `CouponIncome`, `PullToPar`, `RollDown` and
+    /// `FundingCost` are *period totals* over the producer's `theta_period`
+    /// override (default `"1D"`), capped at the instrument's expiry. This
+    /// metric records the days actually rolled so consumers rescaling those
+    /// totals to a different window (e.g. P&L attribution multiplying by the
+    /// attribution window's day count) can divide by the producer horizon
+    /// instead of silently assuming it was one day.
+    pub const ThetaPeriodDays: Self = Self(Cow::Borrowed("theta_period_days"));
+
     /// Breakeven parameter shift: how much can the configured target parameter
     /// (spread, yield, vol, correlation) move before carry + roll-down is wiped out.
     ///

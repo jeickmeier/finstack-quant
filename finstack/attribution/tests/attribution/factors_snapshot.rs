@@ -428,3 +428,84 @@ fn test_scalars_snapshot_extract() {
     assert_eq!(snapshot.inflation_indices.len(), 0);
     assert_eq!(snapshot.dividends.len(), 0);
 }
+
+/// Quant review B2: `restore_market` must preserve every market-data family
+/// the snapshot does not model. The previous implementation rebuilt the
+/// context from scratch and silently dropped price / vol-index curves, SABR
+/// vol cubes, collateral CSA mappings, etc., hard-failing (or silently
+/// corrupting) every factor reprice for instruments that depend on them.
+#[test]
+fn test_restore_preserves_families_outside_the_snapshot_model() {
+    use finstack_core::market_data::surfaces::VolCube;
+    use finstack_core::market_data::term_structures::{PriceCurve, VolatilityIndexCurve};
+    use finstack_core::math::volatility::sabr::SabrParams;
+    use finstack_core::types::CurveId;
+
+    let as_of = date!(2025 - 01 - 15);
+    let price_curve = PriceCurve::builder("WTI")
+        .base_date(as_of)
+        .spot_price(70.0)
+        .knots([(0.0, 70.0), (1.0, 72.0)])
+        .build()
+        .unwrap();
+    let vol_index = VolatilityIndexCurve::builder("VIX")
+        .base_date(as_of)
+        .spot_level(15.0)
+        .knots([(0.0, 15.0), (1.0, 18.0)])
+        .build()
+        .unwrap();
+    let sabr = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let cube = VolCube::builder("USD-SWAPTION")
+        .expiries(&[1.0])
+        .tenors(&[5.0])
+        .node(sabr, 0.03)
+        .build()
+        .unwrap();
+
+    let market_t1 = MarketContext::new()
+        .insert(create_test_discount_curve("USD-OIS", as_of))
+        .insert(create_test_hazard_curve("ACME-HAZ", as_of))
+        .insert(price_curve)
+        .insert(vol_index)
+        .insert_vol_cube(cube)
+        .map_collateral("CSA-USD", CurveId::new("USD-OIS"));
+
+    let market_t0 = MarketContext::new().insert(create_test_discount_curve("USD-OIS", as_of));
+
+    // Restore the rates family to T0: everything else must survive.
+    let snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::RATES);
+    let restored = MarketSnapshot::restore_market(&market_t1, &snapshot, MarketRestoreFlags::RATES);
+
+    assert!(restored.get_discount("USD-OIS").is_ok(), "rates restored");
+    assert!(restored.get_hazard("ACME-HAZ").is_ok(), "hazard preserved");
+    assert!(
+        restored.get_price_curve("WTI").is_ok(),
+        "price curve must survive a rates restore"
+    );
+    assert!(
+        restored.get_vol_index_curve("VIX").is_ok(),
+        "vol-index curve must survive a rates restore"
+    );
+    assert!(
+        restored.get_vol_cube("USD-SWAPTION").is_ok(),
+        "SABR vol cube must survive a rates restore"
+    );
+    assert!(
+        restored.get_collateral("CSA-USD").is_ok(),
+        "collateral CSA mapping must survive a rates restore"
+    );
+
+    // A VOL-flagged restore replaces cubes wholesale: T0 has none, so the
+    // cube must be gone afterwards (vol cubes belong to the VOL family now).
+    let vol_snapshot = MarketSnapshot::extract(&market_t0, MarketRestoreFlags::VOL);
+    let vol_restored =
+        MarketSnapshot::restore_market(&market_t1, &vol_snapshot, MarketRestoreFlags::VOL);
+    assert!(
+        vol_restored.get_vol_cube("USD-SWAPTION").is_err(),
+        "VOL restore must replace vol cubes from the snapshot"
+    );
+    assert!(
+        vol_restored.get_price_curve("WTI").is_ok(),
+        "price curve must survive a vol restore"
+    );
+}

@@ -419,6 +419,20 @@ impl MarketContext {
         })
     }
 
+    /// Rebind all credit indices against the curves currently in the context
+    /// (mutable).
+    ///
+    /// Credit indices hold direct references to their hazard / base
+    /// correlation / issuer curves. After replacing any of those curves
+    /// wholesale (e.g. a snapshot restore in P&L attribution), call this so
+    /// the indices re-resolve against the new curve objects.
+    ///
+    /// Returns the IDs of any credit indices that were invalidated (removed)
+    /// because their required curves are no longer present or changed type.
+    pub fn rebind_credit_indices_mut(&mut self) -> Vec<CurveId> {
+        self.rebind_all_credit_indices()
+    }
+
     /// Rebind all credit indices to current curves.
     ///
     /// Returns the IDs of any credit indices that were invalidated (removed)

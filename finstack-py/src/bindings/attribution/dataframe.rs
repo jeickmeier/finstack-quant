@@ -4,6 +4,11 @@
 /// [`super::pnl_attribution::PyPnlAttribution::to_long_dataframe`]). Currency is
 /// owned because `Currency::Display` allocates; the row is dropped immediately
 /// after JSON serialization so the per-row String is cheap.
+///
+/// Each row's `currency` is taken from its OWN `Money` value, never from the
+/// parent factor aggregate: detail maps are not currency-validated by
+/// `validate_currencies`, so stamping the parent's currency could silently
+/// mislabel a mixed-currency payload (quant review MO-B3).
 #[derive(serde::Serialize)]
 pub(super) struct LongDetailRow {
     kind: &'static str,
@@ -20,7 +25,6 @@ pub(super) fn build_long_detail_rows(
     let mut rows = Vec::new();
 
     if let Some(detail) = &attribution.rates_detail {
-        let ccy_str = attribution.rates_curves_pnl.currency().to_string();
         for (curve_id, money) in &detail.by_curve {
             rows.push(LongDetailRow {
                 kind: "rates.by_curve",
@@ -28,7 +32,7 @@ pub(super) fn build_long_detail_rows(
                 key_a: curve_id.as_str().to_string(),
                 key_b: None,
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
         for ((curve_id, tenor), money) in &detail.by_tenor {
@@ -38,7 +42,7 @@ pub(super) fn build_long_detail_rows(
                 key_a: curve_id.as_str().to_string(),
                 key_b: Some(tenor.clone()),
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
         rows.push(LongDetailRow {
@@ -47,7 +51,7 @@ pub(super) fn build_long_detail_rows(
             key_a: String::new(),
             key_b: None,
             amount: detail.discount_total.amount(),
-            currency: ccy_str.clone(),
+            currency: detail.discount_total.currency().to_string(),
         });
         rows.push(LongDetailRow {
             kind: "rates.forward_total",
@@ -55,12 +59,11 @@ pub(super) fn build_long_detail_rows(
             key_a: String::new(),
             key_b: None,
             amount: detail.forward_total.amount(),
-            currency: ccy_str,
+            currency: detail.forward_total.currency().to_string(),
         });
     }
 
     if let Some(detail) = &attribution.credit_detail {
-        let ccy_str = attribution.credit_curves_pnl.currency().to_string();
         for (curve_id, money) in &detail.by_curve {
             rows.push(LongDetailRow {
                 kind: "credit.by_curve",
@@ -68,7 +71,7 @@ pub(super) fn build_long_detail_rows(
                 key_a: curve_id.as_str().to_string(),
                 key_b: None,
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
         for ((curve_id, tenor), money) in &detail.by_tenor {
@@ -78,13 +81,12 @@ pub(super) fn build_long_detail_rows(
                 key_a: curve_id.as_str().to_string(),
                 key_b: Some(tenor.clone()),
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }
 
     if let Some(detail) = &attribution.inflation_detail {
-        let ccy_str = attribution.inflation_curves_pnl.currency().to_string();
         for (curve_id, money) in &detail.by_curve {
             rows.push(LongDetailRow {
                 kind: "inflation.by_curve",
@@ -92,7 +94,7 @@ pub(super) fn build_long_detail_rows(
                 key_a: curve_id.as_str().to_string(),
                 key_b: None,
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
         if let Some(by_tenor) = &detail.by_tenor {
@@ -103,14 +105,13 @@ pub(super) fn build_long_detail_rows(
                     key_a: curve_id.as_str().to_string(),
                     key_b: Some(tenor.clone()),
                     amount: money.amount(),
-                    currency: ccy_str.clone(),
+                    currency: money.currency().to_string(),
                 });
             }
         }
     }
 
     if let Some(detail) = &attribution.correlations_detail {
-        let ccy_str = attribution.correlations_pnl.currency().to_string();
         for (curve_id, money) in &detail.by_curve {
             rows.push(LongDetailRow {
                 kind: "correlations.by_curve",
@@ -118,13 +119,12 @@ pub(super) fn build_long_detail_rows(
                 key_a: curve_id.as_str().to_string(),
                 key_b: None,
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }
 
     if let Some(detail) = &attribution.fx_detail {
-        let ccy_str = attribution.fx_pnl.currency().to_string();
         for ((from, to), money) in &detail.by_pair {
             rows.push(LongDetailRow {
                 kind: "fx.by_pair",
@@ -132,13 +132,12 @@ pub(super) fn build_long_detail_rows(
                 key_a: from.to_string(),
                 key_b: Some(to.to_string()),
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }
 
     if let Some(detail) = &attribution.vol_detail {
-        let ccy_str = attribution.vol_pnl.currency().to_string();
         for (surface_id, money) in &detail.by_surface {
             rows.push(LongDetailRow {
                 kind: "vol.by_surface",
@@ -146,13 +145,12 @@ pub(super) fn build_long_detail_rows(
                 key_a: surface_id.as_str().to_string(),
                 key_b: None,
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }
 
     if let Some(detail) = &attribution.cross_factor_detail {
-        let ccy_str = attribution.cross_factor_pnl.currency().to_string();
         for (pair_label, money) in &detail.by_pair {
             rows.push(LongDetailRow {
                 kind: "cross_factor.by_pair",
@@ -160,13 +158,12 @@ pub(super) fn build_long_detail_rows(
                 key_a: pair_label.clone(),
                 key_b: None,
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }
 
     if let Some(detail) = &attribution.scalars_detail {
-        let ccy_str = attribution.market_scalars_pnl.currency().to_string();
         let mut push_scalar_map = |kind: &'static str,
                                    map: &indexmap::IndexMap<
             finstack_core::types::CurveId,
@@ -179,7 +176,7 @@ pub(super) fn build_long_detail_rows(
                     key_a: id.as_str().to_string(),
                     key_b: None,
                     amount: money.amount(),
-                    currency: ccy_str.clone(),
+                    currency: money.currency().to_string(),
                 });
             }
         };
@@ -190,7 +187,6 @@ pub(super) fn build_long_detail_rows(
     }
 
     if let Some(detail) = &attribution.model_params_detail {
-        let ccy_str = attribution.model_params_pnl.currency().to_string();
         let mut push_opt = |key: &'static str, money: &Option<finstack_core::money::Money>| {
             if let Some(m) = money {
                 rows.push(LongDetailRow {
@@ -199,7 +195,7 @@ pub(super) fn build_long_detail_rows(
                     key_a: key.to_string(),
                     key_b: None,
                     amount: m.amount(),
-                    currency: ccy_str.clone(),
+                    currency: m.currency().to_string(),
                 });
             }
         };
@@ -214,7 +210,7 @@ pub(super) fn build_long_detail_rows(
                 key_a: k.clone(),
                 key_b: None,
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }
@@ -237,7 +233,6 @@ pub(super) fn build_carry_detail_rows(
     let Some(detail) = &attribution.carry_detail else {
         return rows;
     };
-    let ccy_str = detail.total.currency().to_string();
 
     let mut push = |kind: &'static str, key_a: &str, money: &finstack_core::money::Money| {
         rows.push(LongDetailRow {
@@ -246,7 +241,7 @@ pub(super) fn build_carry_detail_rows(
             key_a: key_a.to_string(),
             key_b: None,
             amount: money.amount(),
-            currency: ccy_str.clone(),
+            currency: money.currency().to_string(),
         });
     };
 
@@ -289,7 +284,6 @@ pub(super) fn build_credit_factor_rows(
     let Some(detail) = &attribution.credit_factor_detail else {
         return rows;
     };
-    let ccy_str = detail.generic_pnl.currency().to_string();
 
     rows.push(LongDetailRow {
         kind: "credit_factor.generic",
@@ -297,7 +291,7 @@ pub(super) fn build_credit_factor_rows(
         key_a: "generic".to_string(),
         key_b: None,
         amount: detail.generic_pnl.amount(),
-        currency: ccy_str.clone(),
+        currency: detail.generic_pnl.currency().to_string(),
     });
     for level in &detail.levels {
         rows.push(LongDetailRow {
@@ -306,7 +300,7 @@ pub(super) fn build_credit_factor_rows(
             key_a: level.level_name.clone(),
             key_b: None,
             amount: level.total.amount(),
-            currency: ccy_str.clone(),
+            currency: level.total.currency().to_string(),
         });
         for (bucket, money) in &level.by_bucket {
             rows.push(LongDetailRow {
@@ -315,7 +309,7 @@ pub(super) fn build_credit_factor_rows(
                 key_a: level.level_name.clone(),
                 key_b: Some(bucket.clone()),
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }
@@ -325,7 +319,7 @@ pub(super) fn build_credit_factor_rows(
         key_a: "adder".to_string(),
         key_b: None,
         amount: detail.adder_pnl_total.amount(),
-        currency: ccy_str.clone(),
+        currency: detail.adder_pnl_total.currency().to_string(),
     });
     rows.push(LongDetailRow {
         kind: "credit_factor.curve_shape",
@@ -333,7 +327,7 @@ pub(super) fn build_credit_factor_rows(
         key_a: "curve_shape".to_string(),
         key_b: None,
         amount: detail.curve_shape_pnl.amount(),
-        currency: ccy_str.clone(),
+        currency: detail.curve_shape_pnl.currency().to_string(),
     });
     if let Some(by_issuer) = &detail.adder_pnl_by_issuer {
         for (issuer_id, money) in by_issuer {
@@ -343,7 +337,7 @@ pub(super) fn build_credit_factor_rows(
                 key_a: "adder".to_string(),
                 key_b: Some(issuer_id.as_str().to_string()),
                 amount: money.amount(),
-                currency: ccy_str.clone(),
+                currency: money.currency().to_string(),
             });
         }
     }

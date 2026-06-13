@@ -169,10 +169,13 @@ fn positions() -> Vec<CreditAttributionInput> {
     ]
 }
 
+/// Expected linear credit P&L `Σ CS01_i × ΔS_i` with the canonical signed
+/// CS01 (∂PV/∂s, negative for long credit): a long-credit book shows a loss
+/// when spreads widen.
 fn synthetic_credit_pnl(positions: &[CreditAttributionInput], ds: &BTreeMap<IssuerId, f64>) -> f64 {
     positions
         .iter()
-        .map(|p| -p.cs01.amount() * ds[&p.issuer_id])
+        .map(|p| p.cs01.amount() * ds[&p.issuer_id])
         .sum()
 }
 

@@ -10,22 +10,22 @@
   },
   "currency": "USD",
   "expected_attribution": {
-    "actual_pnl": 5011.084421800682,
-    "carry_pnl": 566.2349721449427,
+    "actual_pnl": 4266.30267171585,
+    "carry_pnl": 68.36153094819747,
     "rates_pnl_first_order": 4198.310814164874,
-    "residual_first_order": 246.538635490866
+    "residual_first_order": -0.3696733972210495
   },
   "instrument": "VanillaSwap",
   "name": "USD-IRS-5Y-PAYER",
   "quantlib": {
     "t0": {
       "dv01": 4198.310814165045,
-      "fair_rate": 0.05127212254710113,
+      "fair_rate": 0.05127212254710099,
       "npv": 492168.8428086594,
-      "theta_one_day": 566.2349721449427
+      "theta_one_day": 68.36153094819747
     },
     "t1": {
-      "npv": 497179.9272304601
+      "npv": 496435.1454803753
     },
     "version": "1.42.1"
   },

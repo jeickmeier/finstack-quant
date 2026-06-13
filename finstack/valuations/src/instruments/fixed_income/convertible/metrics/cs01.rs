@@ -67,16 +67,23 @@ impl MetricCalculator for Cs01Calculator {
 ///
 /// The triangular weight runs `buckets[i-1] → buckets[i] → buckets[i+1]`, so
 /// the sum of all bucket bumps is a parallel bump (partition of unity) — hence
-/// the per-bucket CS01s sum to the parallel CS01.
+/// the per-bucket CS01s sum to the parallel CS01. The wing buckets use the
+/// dedicated half-triangle constructors: a `prev = 0.0` sentinel would break
+/// the partition below the first bucket, and an infinite `next` sentinel is
+/// rejected by the curve bump paths (NaN weight beyond the last bucket).
 fn key_rate_spec(i: usize, bump_bp: f64, buckets: &[f64]) -> BumpSpec {
-    let prev = if i == 0 { 0.0 } else { buckets[i - 1] };
     let target = buckets[i];
-    let next = if i + 1 == buckets.len() {
-        f64::INFINITY
-    } else {
-        buckets[i + 1]
-    };
-    BumpSpec::triangular_key_rate_bp(prev, target, next, bump_bp)
+    if i == 0 && buckets.len() == 1 {
+        return BumpSpec::parallel_bp(bump_bp);
+    }
+    if i == 0 {
+        return BumpSpec::triangular_key_rate_first_bp(target, buckets[1], bump_bp);
+    }
+    let prev = buckets[i - 1];
+    if i + 1 == buckets.len() {
+        return BumpSpec::triangular_key_rate_last_bp(prev, target, bump_bp);
+    }
+    BumpSpec::triangular_key_rate_bp(prev, target, buckets[i + 1], bump_bp)
 }
 
 /// Key-rate (bucketed) CS01 calculator for convertible bonds.

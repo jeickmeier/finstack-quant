@@ -2,6 +2,7 @@
 
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe, serde_rows_to_dataframe,
+    serde_rows_to_dataframe_with_schema,
 };
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
@@ -15,6 +16,8 @@ use super::dataframe::{build_carry_detail_rows, build_credit_factor_rows, build_
 /// interactions, model parameters, market scalars, and residual.
 ///
 /// Construct via :func:`attribute_pnl` or :meth:`from_json`.
+const LONG_DETAIL_COLUMNS: [&str; 6] = ["kind", "factor", "key_a", "key_b", "amount", "currency"];
+
 #[pyclass(
     name = "PnlAttribution",
     module = "finstack.attribution",
@@ -279,15 +282,18 @@ impl PyPnlAttribution {
     /// Export attribution as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``instrument_id``, ``method``, ``t0``, ``t1``, ``currency``,
-    /// ``total_pnl``, ``mark_to_market_pnl`` (nullable), ``carry``,
+    /// ``total_pnl``, ``mark_to_market_pnl`` (``None`` for payloads predating
+    /// the field — note the column dtype is then ``object``, not ``float64``;
+    /// coerce with ``pd.to_numeric`` before concatenating mixed vintages),
+    /// ``carry``,
     /// ``rates_curves_pnl``, ``credit_curves_pnl``, ``inflation_curves_pnl``,
     /// ``correlations_pnl``, ``fx_pnl``, ``vol_pnl``, ``cross_factor_pnl``,
     /// ``model_params_pnl``, ``market_scalars_pnl``, ``residual``,
     /// ``residual_pct``, ``num_repricings``, ``result_invalid``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        // `mark_to_market_pnl` is Option<Money>; serialize as null when missing
-        // so pandas treats the column as a nullable float (consistent with the
-        // additive serde extension on the Rust struct).
+        // `mark_to_market_pnl` is Option<Money>; serialize as null when
+        // missing. A null makes pandas infer dtype `object` for the column
+        // (documented caveat above) — present values give `float64`.
         let row = serde_json::json!({
             "instrument_id": self.inner.meta.instrument_id,
             "method": self.inner.meta.method.to_string(),
@@ -346,37 +352,44 @@ impl PyPnlAttribution {
     /// to slice the desired view.
     fn to_long_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = build_long_detail_rows(&self.inner);
-        serde_rows_to_dataframe(py, &rows)
+        serde_rows_to_dataframe_with_schema(py, &rows, &LONG_DETAIL_COLUMNS)
     }
 
-    /// Export the carry decomposition as a typed wide DataFrame.
+    /// Export the carry decomposition as a long-format DataFrame.
     ///
-    /// Columns: ``component`` (theta / coupon_income / pull_to_par / roll_down
-    /// / funding_cost / total), ``amount``, ``currency``, ``rates_part``
-    /// (nullable), ``credit_part`` (nullable). The ``rates_part`` / ``credit_part``
-    /// columns are populated only when a ``CreditFactorModel`` was supplied to
-    /// the attribution and the source line carries a typed split (PR-8b §7.1).
+    /// Columns: ``kind`` (``carry.total`` / ``carry.theta`` /
+    /// ``carry.coupon_income`` / ``carry.coupon_income.rates`` /
+    /// ``carry.coupon_income.credit`` / ``carry.pull_to_par`` /
+    /// ``carry.roll_down`` / ``carry.roll_down.rates`` /
+    /// ``carry.roll_down.credit`` / ``carry.funding_cost``), ``factor``
+    /// (always ``"carry"``), ``key_a``, ``key_b`` (always null here),
+    /// ``amount``, ``currency``. The rates/credit split rows are present only
+    /// when a ``CreditFactorModel`` was supplied to the attribution and the
+    /// source line carries a typed split (PR-8b §7.1).
     ///
-    /// Returns an empty DataFrame when ``carry_detail`` is not populated.
+    /// Returns an empty DataFrame (zero rows, schema columns present) when
+    /// ``carry_detail`` is not populated.
     fn to_carry_detail_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = build_carry_detail_rows(&self.inner);
-        serde_rows_to_dataframe(py, &rows)
+        serde_rows_to_dataframe_with_schema(py, &rows, &LONG_DETAIL_COLUMNS)
     }
 
-    /// Export the credit-factor hierarchy decomposition as a typed long
+    /// Export the credit-factor hierarchy decomposition as a long-format
     /// DataFrame.
     ///
-    /// Columns: ``component`` (generic / level / adder / curve_shape /
-    /// adder_by_issuer), ``level_name`` (nullable, populated for level rows),
-    /// ``bucket`` (nullable, populated for per-bucket and per-issuer rows),
-    /// ``amount``, ``currency``, ``model_id``.
+    /// Columns: ``kind`` (``credit_factor.generic`` / ``credit_factor.level``
+    /// / ``credit_factor.level.by_bucket`` / ``credit_factor.adder`` /
+    /// ``credit_factor.curve_shape`` / ``credit_factor.adder_by_issuer``),
+    /// ``factor`` (always ``"credit_factor"``), ``key_a`` (level name or
+    /// component), ``key_b`` (bucket path / issuer id when applicable),
+    /// ``amount``, ``currency``.
     ///
-    /// Returns an empty DataFrame when ``credit_factor_detail`` is not
-    /// populated (no ``credit_factor_model`` was supplied, or the instrument
-    /// has no resolvable issuer).
+    /// Returns an empty DataFrame (zero rows, schema columns present) when
+    /// ``credit_factor_detail`` is not populated (no ``credit_factor_model``
+    /// was supplied, or the instrument has no resolvable issuer).
     fn to_credit_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let rows = build_credit_factor_rows(&self.inner);
-        serde_rows_to_dataframe(py, &rows)
+        serde_rows_to_dataframe_with_schema(py, &rows, &LONG_DETAIL_COLUMNS)
     }
 
     fn __repr__(&self) -> String {

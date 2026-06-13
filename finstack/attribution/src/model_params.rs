@@ -102,7 +102,9 @@ pub fn with_model_params(
 
 /// Compute a prepayment parameter shift between two snapshots.
 ///
-/// Returns shift in basis points for use with Prepayment01 metric.
+/// Returns the shift in **basis points** of CPR. Pairs directly with the
+/// `Prepayment01` metric, which is `$ per 1bp` of CPR:
+/// `model_params_pnl ≈ Prepayment01 × measure_prepayment_shift(t0, t1)`.
 ///
 /// # Arguments
 ///
@@ -153,7 +155,8 @@ fn prepayment_shift(
 
 /// Measure prepayment parameter shift between two snapshots.
 ///
-/// Returns shift in basis points, or 0.0 if not applicable.
+/// Returns the shift in **basis points** of CPR (0.0 if not applicable),
+/// pairing directly with the `$ per 1bp` `Prepayment01` metric.
 pub fn measure_prepayment_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,
@@ -166,7 +169,8 @@ pub fn measure_prepayment_shift(
 
 /// Compute a default rate parameter shift between two snapshots.
 ///
-/// Returns shift in basis points for use with Default01 metric.
+/// Returns the shift in **basis points** of CDR. Pairs directly with the
+/// `Default01` metric (`$ per 1bp` of CDR).
 fn default_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,
@@ -191,7 +195,8 @@ fn default_shift(
 
 /// Measure default rate parameter shift between two snapshots.
 ///
-/// Returns shift in basis points, or 0.0 if not applicable.
+/// Returns the shift in **basis points** of CDR (0.0 if not applicable),
+/// pairing directly with the `$ per 1bp` `Default01` metric.
 pub fn measure_default_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,
@@ -204,7 +209,8 @@ pub fn measure_default_shift(
 
 /// Compute a recovery rate parameter shift between two snapshots.
 ///
-/// Returns shift in percentage points (not basis points) for use with Recovery01 metric.
+/// Returns the shift in **percentage points** (not basis points). Pairs
+/// directly with the `Recovery01` metric (`$ per 1%` recovery move).
 fn recovery_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,
@@ -229,7 +235,8 @@ fn recovery_shift(
 
 /// Measure recovery rate parameter shift between two snapshots.
 ///
-/// Returns shift in percentage points, or 0.0 if not applicable.
+/// Returns the shift in **percentage points** (0.0 if not applicable),
+/// pairing directly with the `$ per 1%` `Recovery01` metric.
 pub fn measure_recovery_shift(
     snapshot_t0: &ModelParamsSnapshot,
     snapshot_t1: &ModelParamsSnapshot,

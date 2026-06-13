@@ -91,6 +91,12 @@ impl MetricCalculator for CarryDecompositionCalculator {
             MetricId::CarryDecompositionDegenerate,
             if degenerate { 1.0 } else { 0.0 },
         );
+        // Stamp the realized horizon so consumers rescaling these period
+        // totals (e.g. P&L attribution) can normalize instead of assuming 1D.
+        context.computed.insert(
+            MetricId::ThetaPeriodDays,
+            (rolled_date - context.as_of).whole_days() as f64,
+        );
 
         Ok(carry_total)
     }

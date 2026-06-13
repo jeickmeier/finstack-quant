@@ -1,5 +1,77 @@
 # Quant Finance Review — `finstack/attribution` Crate and Bindings
 
+> **Remediation status (2026-06-12): COMPLETE for all Blockers and Majors.**
+> B1 (cross-factor sign + residual-zero regression test), B2 (clone-and-overwrite
+> `restore_market`, VOL extended to cubes/FX-delta surfaces, credit-index rebind,
+> round-trip preservation test — also fixes MO-E3 Arc deep-clones), B3 (wing
+> constructors in taylor.rs + convertible BucketedCs01 + VaR market-history
+> neighbors; `bump_in_place` bucket-grid validation in core; wing-knot tests),
+> B4 (per-MetricId convexity dispatch: street ×100 vs raw dollar), B5 (credit
+> factor sign de-inverted, docs + tests realigned), M1 (forward curves in the
+> metrics-based rates ladder + per-curve fallback MO-T1), M2 (total-return
+> coupon add-back in metrics-based), M3 (`theta_period_days` horizon stamp in
+> theta/carry producers + normalization in attribution), M4 (ILB inflation
+> convexity → raw $/decimal²), M5 (issuer betas on the cascade scalar path),
+> M6 (translation preserves total-return add-back at T1 FX), M7 (carry split
+> clamped to [0,1]), M8 (carry-input error surfacing + try-money), M9
+> (duplicate waterfall factors rejected), M10 (string-keyed serde for
+> by_tenor/by_pair + fully-populated roundtrip test), M11 (bare-string method
+> forms restored), M12 (core_to_py error taxonomy), M13 (fixture generator
+> sign fixed, FX-forward fixture regenerated — true first-order residual
+> −$0.24 — per-factor assertions enabled), M14 (IRS fixture regenerated to age
+> the same trade — QL theta $68.36 vs finstack $66.56, confirming finstack;
+> per-component tolerances + reconciliation assertion). Remediation also fixed
+> two bugs found *while* fixing: **IRS `market_dependencies()` returned empty**
+> (rates factor structurally zero in metrics-based attribution — override
+> added, float-leg discount curve added to deps) and the **QL fixture
+> generator's constant-maturity "theta"** (rebuilt a fresh 5Y swap at each
+> date).
+>
+> **Moderates and Minors: COMPLETE (second remediation pass, same day).**
+> MO-T1, MO-T2 (deterministic ordering + note), MO-T3 (Delta/Gamma applied
+> once to the primary spot driver, extra-spot note), MO-T4 (Dividend01
+> consumed in bp matching the $/bp producers), MO-T5 (structured-credit
+> Prepayment01/Default01 rescaled to the documented $/bp and Recovery01 to
+> $/1% — now matching the CDS-side producers and the `measure_*_shift`
+> recipes; pinned by a metric×shift-vs-reprice reconciliation test),
+> MO-C1 (lookup-failure notes), MO-C2 (legacy USD-default re-currency),
+> MO-C3 (no-factor-observations credit move routed to the idiosyncratic
+> adder instead of the synthesized oscillating level split; semantics
+> documented), MO-C4 (curve_shape warn/doc reworded "non-parallel +
+> higher-order"), MO-E1 (empty-T0 skip notes), MO-E2 (execution_policy
+> stamped in meta), MO-E3 (Arc handles in restore), MO-E4 (`FIXING:` series
+> reclassified into the FORWARD family with drop-and-replace semantics +
+> carry LOCF documented; `retain_series_mut` added to core), MO-E5
+> (translation val_t0 priced with the T0-parameter instrument), MO-B1
+> (schema gate in validate, py+wasm), MO-B2 (schema columns on empty
+> DataFrames), MO-B3 (per-row currency), MO-B4 (5 behavioral Python entry
+> tests incl. KeyError taxonomy + `wasm_attribution.rs` e2e suite + dts
+> contract assertions), MO-X1–X4 (new tests: coupon-inside-window
+> total-return identity incl. `mark_to_market_pnl`; negative-rates regime
+> via `ValidationMode::NegativeRateFriendly`; forward-curve basis move
+> through the metrics-based key-rate ladder; vol skew-vs-parallel
+> attribution bound), MO-X5 (escape hatch keyed to expected magnitude).
+> Minors: production `unreachable!()` arms → warn-and-skip; misleading FX
+> conversion comments rewritten (native-currency identity conversions);
+> `num_repricings` now counts the carry-input metric pricing, the execute()
+> currency probe, the translation reprice and the credit-detail CS01 pair;
+> missing-DV01/CS01 silent zeros now noted; Fx01 multi-pair note;
+> result-envelope schema validated on deserialize; `CreditFactorModel.
+> schema_version` gated in the cascade planner; duplicate model factor ids
+> deduped with warn; release-safe step/P&L shape check + visible USD
+> fallback; `SourceLine` deserialize is deny-unknown-fields; `scale()`
+> non-finite guard; rounding-context stamp pinned for all four methods;
+> proptest seeded (`RngSeed::Fixed`); bond residual bounded by the QL
+> fixture's first-order residual; binding doc drift fixed (`__all__`
+> sorted, compact-JSON wording, dtype caveat, `full_cross_attribution`
+> documented, `AttributionParams` doc).
+>
+> Still open: the judgment-call open questions below (notably OQ3
+> coupon-on-T1 window convention, OQ6 waterfall FX position, OQ10 binding
+> naming exemption / canonical-export parity-contract status), and the
+> facade-level `.mjs` attribution test (needs a wasm pkg build; the Rust
+> wasm-bindgen suite and dts assertions are in place).
+
 **Date:** 2026-06-12
 **Scope:** `finstack/attribution` (~12.7k source lines: parallel/waterfall/Taylor/metrics-based methodologies, credit cascade/factor decomposition, market snapshots, target-currency translation, spec/envelope types), `finstack-py/src/bindings/attribution/`, `finstack-wasm/src/api/attribution/` + JS facade, `parity_contract.toml` attribution sections, and the crate's ~8.8k-line test/bench surface (incl. `quantlib_parity.rs`).
 **Method:** Five parallel subsystem reviews (Taylor/metrics-based/model-params; credit + types/spec; engine core parallel/waterfall/snapshot/FX; bindings parity; tests/numerical regression). Every Blocker and Major was independently adversarially verified by separate agents instructed to refute it (Blockers by two agents each, one constructing a numeric counterexample from source). All 22 Blocker/Major claims were confirmed; two were downgraded to Moderate during verification. The `credit_factor.rs` sign inversion was additionally hand-verified.

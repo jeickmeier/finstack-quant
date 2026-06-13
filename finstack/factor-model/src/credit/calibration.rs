@@ -376,12 +376,13 @@ impl CreditCalibrator {
         );
 
         // -- 6. Adder series → idiosyncratic vol. ---------------------------
-        // First compute from-history vols for IssuerBeta issuers only.
-        let from_history_vols = issuer_beta_adder_vols(
-            &peel_outcome.adder_series,
-            &modes,
-            self.config.annualization_factor,
-        );
+        // Compute from-history vols for every issuer with enough residual
+        // observations, regardless of mode: under `GloballyOff` (the default
+        // policy) all issuers are `BucketOnly`, and restricting this step to
+        // `IssuerBeta` issuers would leave every idiosyncratic vol at the
+        // hard-coded 0.0 fallback — silently zeroing issuer-specific risk.
+        let from_history_vols =
+            adder_vols_from_history(&peel_outcome.adder_series, self.config.annualization_factor);
         // Build per-level peer proxy index: level_k → bucket_path → [vols].
         let peer_proxy_index = build_peer_proxy_index(
             &from_history_vols,
@@ -568,10 +569,74 @@ fn validate_calibration_config(config: &CreditCalibrationConfig) -> Result<()> {
         validate_non_negative_finite("CreditCalibrator: ridge alpha", alpha)?;
     }
 
+    // Custom dimension keys join into dotted dimension paths inside factor
+    // IDs; a '.' inside the key would mis-segment those paths the same way a
+    // dotted tag value would.
+    for dim in &config.hierarchy.levels {
+        let key = dimension_key(dim);
+        if key.contains('.') {
+            return Err(validation_err(format!(
+                "CreditCalibrator: hierarchy dimension key {key:?} contains '.', \
+                 which is reserved as the path separator"
+            )));
+        }
+    }
+
     Ok(())
 }
 
 fn validate_calibration_inputs(inputs: &CreditCalibrationInputs) -> Result<()> {
+    // Date grid must be strictly increasing (sorted, no duplicates): every
+    // downstream step (differencing, as_of lookup, history alignment) assumes
+    // it, and a shuffled or duplicated grid would silently corrupt returns.
+    for pair in inputs.history_panel.dates.windows(2) {
+        if pair[0] >= pair[1] {
+            return Err(validation_err(format!(
+                "CreditCalibrator: history_panel.dates must be strictly increasing; \
+                 found {:?} followed by {:?}",
+                pair[0], pair[1]
+            )));
+        }
+    }
+
+    // The anchor cross-section must cover exactly the calibrated universe.
+    // A history issuer missing from `asof_spreads` would silently receive
+    // `adder_at_anchor = 0.0` and shift every bucket peer's anchor mean; an
+    // asof-only issuer would silently enter anchor bucket means with unit
+    // betas while receiving no artifact row. Both directions are data gaps
+    // the caller must resolve explicitly.
+    let history_only: Vec<&str> = inputs
+        .history_panel
+        .spreads
+        .keys()
+        .filter(|id| !inputs.asof_spreads.contains_key(*id))
+        .map(IssuerId::as_str)
+        .collect();
+    if !history_only.is_empty() {
+        return Err(validation_err(format!(
+            "CreditCalibrator: asof_spreads is missing {} issuer(s) present in \
+             history_panel.spreads (first few: {:?}); supply an as_of spread for \
+             every calibrated issuer",
+            history_only.len(),
+            &history_only[..history_only.len().min(5)]
+        )));
+    }
+    let asof_only: Vec<&str> = inputs
+        .asof_spreads
+        .keys()
+        .filter(|id| !inputs.history_panel.spreads.contains_key(*id))
+        .map(IssuerId::as_str)
+        .collect();
+    if !asof_only.is_empty() {
+        return Err(validation_err(format!(
+            "CreditCalibrator: asof_spreads contains {} issuer(s) absent from \
+             history_panel.spreads (first few: {:?}); anchor-only issuers would \
+             distort bucket anchors without receiving an artifact row",
+            asof_only.len(),
+            &asof_only[..asof_only.len().min(5)]
+        )));
+    }
+
     for (idx, value) in inputs.generic_factor.values.iter().copied().enumerate() {
         validate_finite(
             format!("CreditCalibrator: generic_factor.values[{idx}]"),
@@ -736,9 +801,20 @@ fn build_bucket_inventory(
     for (issuer, mode) in modes {
         let issuer_tags = tags.get(issuer).cloned().unwrap_or_default();
         // Update tag taxonomy (every dimension seen contributes a value).
+        // Tag values used by hierarchy dimensions must not contain the '.'
+        // bucket-path separator: a dotted value would mis-segment
+        // `synth_tags_from_path`, the fold-up parent computation, and the
+        // matcher's factor IDs, silently corrupting factor identity.
         for dim in &hierarchy.levels {
             let key = dimension_key(dim);
             if let Some(v) = issuer_tags.0.get(&key) {
+                if v.contains('.') {
+                    return Err(validation_err(format!(
+                        "CreditCalibrator: issuer {:?} tag {key:?} = {v:?} contains '.', \
+                         which is reserved as the bucket-path separator",
+                        issuer.as_str()
+                    )));
+                }
                 tag_taxonomy.entry(key).or_default().insert(v.clone());
             }
         }

@@ -6,9 +6,9 @@ use finstack_core::Result;
 use finstack_valuations::instruments::{
     Attributes, Instrument, InstrumentCurves, MarketDependencies,
 };
-use smallvec::SmallVec;
 use finstack_valuations::metrics::MetricId;
 use finstack_valuations::results::ValuationResult;
+use smallvec::SmallVec;
 use std::sync::OnceLock;
 
 #[derive(Clone)]

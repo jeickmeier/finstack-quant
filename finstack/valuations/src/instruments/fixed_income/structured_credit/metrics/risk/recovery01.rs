@@ -47,9 +47,13 @@ impl MetricCalculator for Recovery01Calculator {
         inst_down.credit_model.recovery_spec = recovery_down;
         let pv_down = inst_down.price(context.curves.as_ref(), as_of)?.amount();
 
-        // RECOVERY01 = (PV_up - PV_down) / achieved_bump
+        // RECOVERY01 = slope × 1% — dollars per 1% (0.01) recovery move,
+        // matching the documented convention AND the CDS-side Recovery01
+        // producers (`slope * RECOVERY_BUMP`); the former per-unit figure was
+        // 100× larger, giving the same MetricId two units across producers
+        // (quant review MO-T5). Pairs with `measure_recovery_shift` (pct-pt).
         let recovery01 = if achieved_bump > 0.0 {
-            (pv_up - pv_down) / achieved_bump
+            (pv_up - pv_down) / achieved_bump * 0.01
         } else {
             0.0
         };

@@ -51,6 +51,39 @@ pub(crate) fn triangular_weight(t: f64, prev: Option<f64>, target: f64, next: Op
     }
 }
 
+/// Validate a triangular key-rate bucket grid before applying it.
+///
+/// Every finite bound must satisfy `prev < target < next`, and any provided
+/// bound must be finite: a non-finite neighbour (e.g. `Some(f64::INFINITY)`
+/// as a "no right neighbour" sentinel) would make [`triangular_weight`]
+/// compute `∞/∞ = NaN` for knots beyond `target` and corrupt the curve.
+/// Wing buckets must be expressed with `None`, not infinite sentinels.
+///
+/// Mirrors the validation on the copy-path bump constructors
+/// (`with_triangular_key_rate_bump_neighbors`) so the in-place and copy bump
+/// paths reject the same malformed grids.
+#[inline]
+pub(crate) fn validate_triangular_bucket_grid(
+    prev: Option<f64>,
+    target: f64,
+    next: Option<f64>,
+) -> crate::Result<()> {
+    if !target.is_finite() {
+        return Err(crate::error::InputError::Invalid.into());
+    }
+    if let Some(p) = prev {
+        if !p.is_finite() || p >= target {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+    }
+    if let Some(n) = next {
+        if !n.is_finite() || target >= n {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+    }
+    Ok(())
+}
+
 /// Helper to shift knot times backward by `dt` and filter out expired points (t <= 0).
 ///
 /// Used by `roll_forward` implementations in discount and forward curves.

@@ -564,9 +564,10 @@ impl ForwardCurve {
     /// This ensures: **sum of bucketed DV01 = parallel DV01**
     ///
     /// # Arguments
-    /// * `prev_bucket` - Previous bucket time in years (use 0.0 for first bucket)
+    /// * `prev_bucket` - Previous bucket time in years (`None` for the first bucket)
     /// * `target_bucket` - Target bucket time in years (peak of the triangle)
-    /// * `next_bucket` - Next bucket time in years (use f64::INFINITY for last bucket)
+    /// * `next_bucket` - Next bucket time in years (`None` for the last bucket;
+    ///   never pass `f64::INFINITY` — non-finite bounds are rejected)
     /// * `bp` - Bump size in basis points (100bp = 1%)
     ///
     /// # Returns
@@ -611,6 +612,7 @@ impl ForwardCurve {
         if self.knots.len() < 2 {
             return self.with_parallel_bump(bp);
         }
+        super::common::validate_triangular_bucket_grid(prev_bucket, target_bucket, next_bucket)?;
 
         let bump_rate = bp / 10_000.0;
         let bumped_rates: Vec<(f64, f64)> = self
@@ -672,6 +674,14 @@ impl ForwardCurve {
                 target_bucket,
                 next_bucket,
             } => {
+                // Reject malformed bucket grids (e.g. infinite sentinels)
+                // before mutating: a non-finite neighbour yields NaN weights
+                // and corrupts the curve.
+                super::common::validate_triangular_bucket_grid(
+                    prev_bucket,
+                    target_bucket,
+                    next_bucket,
+                )?;
                 for (fwd, &t) in self.forwards.iter_mut().zip(self.knots.iter()) {
                     let weight = super::common::triangular_weight(
                         t,

@@ -236,11 +236,29 @@ pub struct AttributionResult {
     pub results_meta: ResultsMeta,
 }
 
+/// Deserialization gate for [`AttributionResultEnvelope::schema`].
+fn validate_result_schema<'de, D>(deserializer: D) -> std::result::Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error as _;
+    let schema = String::deserialize(deserializer)?;
+    if schema != ATTRIBUTION_SCHEMA_V1 {
+        return Err(D::Error::custom(format!(
+            "unsupported attribution result schema {schema:?}; expected {ATTRIBUTION_SCHEMA_V1:?}"
+        )));
+    }
+    Ok(schema)
+}
+
 /// Top-level envelope for attribution results.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AttributionResultEnvelope {
-    /// Schema version identifier
+    /// Schema version identifier. Validated on DESERIALIZE (quant review
+    /// minor): a result envelope read back from storage with an unknown
+    /// schema version is rejected instead of silently re-interpreted.
+    #[serde(deserialize_with = "validate_result_schema")]
     pub schema: String,
     /// The attribution result
     pub result: AttributionResult,

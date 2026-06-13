@@ -884,8 +884,11 @@ fn test_quantlib_parity_full_greeks_suite() {
         )
         .unwrap();
 
-    // Verify all metrics computed successfully
-    assert_eq!(result.measures.len(), 7, "All 7 metrics should be computed");
+    // Verify all metrics computed successfully: 7 requested + the
+    // `theta_period_days` horizon stamp the theta producer always emits
+    // alongside Theta (quant review M3).
+    assert_eq!(result.measures.len(), 8, "All 7 metrics + horizon stamp");
+    assert!(result.measures.contains_key("theta_period_days"));
 
     // Verify all are finite
     for (name, value) in &result.measures {

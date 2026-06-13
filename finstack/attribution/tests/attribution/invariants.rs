@@ -530,7 +530,13 @@ fn test_portfolio_additivity_invariant() {
 // =============================================================================
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(15))]
+    // Fixed RNG seed per the repo testing standard (deterministic runs;
+    // failures reproduce locally without the persistence file).
+    #![proptest_config(ProptestConfig {
+        cases: 15,
+        rng_seed: proptest::test_runner::RngSeed::Fixed(0x5EED_2026),
+        ..ProptestConfig::default()
+    })]
 
     /// Property: Carry should be non-negative for a coupon-bearing bond held over one day.
     ///

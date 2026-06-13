@@ -256,3 +256,79 @@ fn taylor_vol_factor_gamma_matches_full_revaluation() {
         relative_error * 100.0,
     );
 }
+
+/// MO-X4 (quant review): a pure SKEW change — wings move, ATM column fixed —
+/// must not be misread as a parallel vol move. `measure_vol_surface_shift`
+/// averages the surface move, so an antisymmetric skew nets toward zero and
+/// the vol factor must attribute LESS P&L than a genuine 1-point parallel
+/// shift; the unexplained smile P&L lands in the residual and the
+/// reconciliation must still close.
+#[test]
+fn vol_skew_change_attributes_less_than_parallel_shift() {
+    let as_of_t0 = date!(2025 - 01 - 01);
+    let as_of_t1 = date!(2025 - 01 - 02);
+
+    // T1 surface: skew steepens ±2 vol points around an UNCHANGED ATM column.
+    let skewed = |vol: f64, skew: f64| {
+        VolSurface::builder("EQ-VOL")
+            .expiries(&[0.5, 1.0, 2.0])
+            .strikes(&[80.0, 100.0, 120.0])
+            .row(&[vol + skew, vol, vol - skew])
+            .row(&[vol + skew, vol, vol - skew])
+            .row(&[vol + skew, vol, vol - skew])
+            .build()
+            .unwrap()
+    };
+    let base_market = build_market(VOL_BASE);
+    let skew_market = {
+        let mut m = build_market(VOL_BASE);
+        m.replace_surfaces_mut([(
+            finstack_core::types::CurveId::new("EQ-VOL"),
+            std::sync::Arc::new(skewed(VOL_BASE, 0.02)),
+        )]);
+        m
+    };
+    let parallel_market = build_market(VOL_BASE + VOL_SHIFT_ABS);
+
+    let option: Arc<dyn Instrument> = Arc::new(build_option());
+    let run = |market_t1: &MarketContext| {
+        attribute_pnl_taylor(
+            &option,
+            &base_market,
+            market_t1,
+            as_of_t0,
+            as_of_t1,
+            &TaylorAttributionConfig::default(),
+            ExecutionPolicy::Serial,
+        )
+        .expect("taylor attribution should succeed")
+    };
+
+    let skew_attr = run(&skew_market);
+    let parallel_attr = run(&parallel_market);
+
+    // Reconciliation closes for the skew scenario (factors + residual = total).
+    let attributed = skew_attr.carry.amount()
+        + skew_attr.rates_curves_pnl.amount()
+        + skew_attr.vol_pnl.amount()
+        + skew_attr.market_scalars_pnl.amount()
+        + skew_attr.cross_factor_pnl.amount()
+        + skew_attr.residual.amount();
+    assert!(
+        (attributed - skew_attr.total_pnl.amount()).abs() < 1e-6,
+        "skew scenario must reconcile: attributed {attributed}, total {}",
+        skew_attr.total_pnl.amount()
+    );
+    assert!(!skew_attr.result_invalid, "skew attribution must be valid");
+
+    // The ATM option's vol factor under a ±2pt skew (ATM fixed) must be
+    // smaller than under a genuine 1pt parallel move — the averaged shift
+    // nets toward zero rather than registering a large parallel move.
+    assert!(
+        skew_attr.vol_pnl.amount().abs() < parallel_attr.vol_pnl.amount().abs(),
+        "a pure skew (ATM fixed) must attribute less vol P&L ({}) than a 1pt \
+         parallel shift ({})",
+        skew_attr.vol_pnl.amount(),
+        parallel_attr.vol_pnl.amount()
+    );
+}

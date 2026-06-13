@@ -43,16 +43,35 @@ use indexmap::IndexMap;
 use rayon::prelude::*;
 use std::sync::Arc;
 
+/// Additive cross-factor interaction contribution for a pair of factors.
+///
+/// Parallel factor P&Ls are measured from the T₁ base
+/// (`fᵢ = V(all-T₁) − V(factorᵢ@T₀)`), so for two moved factors the exact
+/// two-factor identity is
+///
+/// ```text
+/// total = f_a + f_b + [V(a@T₀) + V(b@T₀) − V(all-T₁) − V(ab@T₀)]
+/// ```
+///
+/// i.e. the additive interaction term is the **negated** mixed second
+/// difference `−(V₁₁ − V(a@T₀) − V(b@T₀) + V(ab@T₀))`. Storing this value in
+/// `cross_factor_pnl` makes `compute_residual`'s additive convention
+/// reconcile: extracting the pairwise cross terms drives the residual of a
+/// two-factor attribution to exactly zero. This matches the metrics-based
+/// path, whose Taylor cross-gamma term is additive by construction, so
+/// `cross_factor_pnl` has the same "additive contribution to the attributed
+/// sum" semantics across methods. (A positive value means the factors'
+/// co-movement *added* P&L beyond the sum of their isolated effects.)
 fn cross_interaction_pnl(
     val_t1: Money,
     val_with_t0_a: Money,
     val_with_t0_b: Money,
     val_with_t0_ab: Money,
 ) -> Result<Money> {
-    val_t1
-        .checked_sub(val_with_t0_a)?
-        .checked_sub(val_with_t0_b)?
-        .checked_add(val_with_t0_ab)
+    val_with_t0_a
+        .checked_add(val_with_t0_b)?
+        .checked_sub(val_t1)?
+        .checked_sub(val_with_t0_ab)
 }
 
 /// Cross-factor tolerance for including an interaction term in the detail map.
@@ -137,6 +156,60 @@ fn record_cross_pair(
     }
 }
 
+/// MO-E1 (quant review): surface factors that were skipped because T0 had no
+/// market data for the family while T1 does — e.g. a hazard curve first
+/// marked between T0 and T1, a vol surface introduced, an FX matrix attached.
+/// Without a note the entire move silently flows into the residual and
+/// operators cannot distinguish "cross-effect residual" from "factor dropped
+/// because T0 data was missing".
+fn note_skipped_empty_t0_factors(
+    attribution: &mut PnlAttribution,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) {
+    use ParallelRestoredFactor as F;
+    let families: [(F, MarketRestoreFlags, &str); 7] = [
+        (F::Rates, MarketRestoreFlags::RATES, "RatesCurves"),
+        (F::Credit, MarketRestoreFlags::CREDIT, "CreditCurves"),
+        (
+            F::Inflation,
+            MarketRestoreFlags::INFLATION,
+            "InflationCurves",
+        ),
+        (
+            F::Correlations,
+            MarketRestoreFlags::CORRELATION,
+            "Correlations",
+        ),
+        (F::FX, MarketRestoreFlags::FX, "Fx"),
+        (F::Volatility, MarketRestoreFlags::VOL, "Volatility"),
+        (
+            F::MarketScalars,
+            MarketRestoreFlags::SCALARS,
+            "MarketScalars",
+        ),
+    ];
+    for (factor, flags, name) in families {
+        let snap_t0 = MarketSnapshot::extract(market_t0, flags);
+        if restored_factor_has_data(factor, &snap_t0) {
+            continue;
+        }
+        let snap_t1 = MarketSnapshot::extract(market_t1, flags);
+        if restored_factor_has_data(factor, &snap_t1) {
+            tracing::warn!(
+                instrument_id = %attribution.meta.instrument_id,
+                factor = name,
+                "factor skipped: T0 market has no data for this family while T1 does; \
+                 its move is unattributed and falls into the residual"
+            );
+            attribution.meta.notes.push(format!(
+                "Factor {name} skipped: T0 market has no data for this family while T1 \
+                 does; its move is unattributed and falls into the residual"
+            ));
+        }
+    }
+}
+
 fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSnapshot) -> bool {
     match factor {
         // MO2 fix: gate Rates on the underlying snapshot so we don't burn a
@@ -144,12 +217,18 @@ fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSna
         // neither market has rates. Aligns with the other restored-factor
         // variants' semantics.
         ParallelRestoredFactor::Rates => {
-            !snapshot.discount_curves.is_empty() || !snapshot.forward_curves.is_empty()
+            !snapshot.discount_curves.is_empty()
+                || !snapshot.forward_curves.is_empty()
+                || !snapshot.fixing_series.is_empty()
         }
         ParallelRestoredFactor::Credit => !snapshot.hazard_curves.is_empty(),
         ParallelRestoredFactor::Inflation => !snapshot.inflation_curves.is_empty(),
         ParallelRestoredFactor::Correlations => !snapshot.base_correlation_curves.is_empty(),
-        ParallelRestoredFactor::Volatility => !snapshot.surfaces.is_empty(),
+        ParallelRestoredFactor::Volatility => {
+            !snapshot.surfaces.is_empty()
+                || !snapshot.vol_cubes.is_empty()
+                || !snapshot.fx_delta_vol_surfaces.is_empty()
+        }
         ParallelRestoredFactor::MarketScalars => {
             !snapshot.prices.is_empty()
                 || !snapshot.series.is_empty()
@@ -157,7 +236,9 @@ fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSna
                 || !snapshot.dividends.is_empty()
         }
         ParallelRestoredFactor::Discount => !snapshot.discount_curves.is_empty(),
-        ParallelRestoredFactor::Forward => !snapshot.forward_curves.is_empty(),
+        ParallelRestoredFactor::Forward => {
+            !snapshot.forward_curves.is_empty() || !snapshot.fixing_series.is_empty()
+        }
         ParallelRestoredFactor::FX => snapshot.fx.is_some(),
     }
 }
@@ -408,6 +489,9 @@ pub fn attribute_pnl_parallel_with_credit_model(
         AttributionMethod::Parallel,
         Some(_config),
     );
+    // Policy-visibility invariant: stamp the execution policy the
+    // attribution ran under (workspace rule: results carry the parallel flag).
+    attribution.meta.execution_policy = Some(execution_policy);
 
     let mut val_with_t0_rates: Option<Money> = None;
     let mut val_with_t0_credit: Option<Money> = None;
@@ -427,13 +511,23 @@ pub fn attribute_pnl_parallel_with_credit_model(
     // Theta is pre-computed), but in parallel attribution the total carry
     // is reported. Use `carry_detail` for the decomposition when available.
     //
-    // FX CONVENTION: Both T₀ and carry values are converted at T₁ FX rates
-    // (via `compute_pnl`). This isolates the pricing effect of time passage
-    // from FX translation effects. The FX factor (Step 7) captures all
-    // translation P&L, ensuring consistent summation.
+    // FX CONVENTION: attribution reports in the instrument's NATIVE pricing
+    // currency, so the `compute_pnl` conversion here is a same-currency
+    // identity (no FX rate is ever applied on this path). Reporting-currency
+    // translation happens exclusively in `translate_to_target_ccy`; the FX
+    // factor (Step 7) captures only the *pricing impact* of swapping the FX
+    // matrix inside the pricer.
     // Carry freezes the market at T₀: it reprices at the T₁ date against the
     // unchanged T₀ market context, so the T₀ context is used directly rather
     // than deep-cloned (the reprice and carry-input helpers only borrow it).
+    //
+    // FIXINGS UNDER CARRY (quant review MO-E4): the frozen T₀ market has no
+    // fixing for the T₁ date, so seasoned floating-rate pricing falls back to
+    // last-observation-carried-forward (`ScalarTimeSeries::value_on` LOCF) —
+    // i.e. carry assumes the latest known fixing persists, the "unchanged
+    // market" convention. The actual reset P&L (yesterday's projection
+    // becoming today's fixing) is attributed to the rates factor: fixing
+    // series restore with the FORWARD family in `MarketSnapshot`.
     //
     // Carry must isolate *pure time passage*: it reprices the T₀-parameter
     // instrument (`instrument_t0`), not `instrument`. Using `instrument` here
@@ -452,6 +546,13 @@ pub fn attribute_pnl_parallel_with_credit_model(
         as_of_t1,
         val_t1.currency(),
     );
+    attribution.meta.notes.extend(carry_inputs.warnings);
+    if carry_inputs.invalid {
+        attribution.result_invalid = true;
+    }
+    // `total_return_carry_inputs` performed one full `price_with_metrics`
+    // (RollDown) pricing — count it (quant review minor).
+    num_repricings += 1;
 
     apply_total_return_carry(
         &mut attribution,
@@ -479,7 +580,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
                 snapshot: Box::new(discount_snap),
             });
         }
-        if !forward_snap.forward_curves.is_empty() {
+        if !forward_snap.forward_curves.is_empty() || !forward_snap.fixing_series.is_empty() {
             factor_specs.push(ParallelLatentFactorSpec::Market {
                 factor: ParallelRestoredFactor::Forward,
                 flags: MarketRestoreFlags::FORWARD,
@@ -644,7 +745,16 @@ pub fn attribute_pnl_parallel_with_credit_model(
                         val_with_t0_scalars = Some(res.reprice_val);
                         attribution.market_scalars_pnl = res.pnl;
                     }
-                    ParallelRestoredFactor::Rates => unreachable!(),
+                    // The full-cross path pushes Discount/Forward separately,
+                    // never the combined Rates spec. A future edit adding it
+                    // must extend the val_with_t0 bookkeeping — soft-skip with
+                    // a warn instead of panicking in a deny-panic crate.
+                    ParallelRestoredFactor::Rates => {
+                        tracing::warn!(
+                            "unexpected combined Rates spec in full-cross first-order loop; \
+                             result ignored (Discount/Forward are tracked separately)"
+                        );
+                    }
                 },
                 ParallelLatentFactorSpec::ModelParams { .. } => {
                     val_with_t0_params = Some(res.reprice_val);
@@ -847,8 +957,12 @@ pub fn attribute_pnl_parallel_with_credit_model(
             num_repricings += 1;
             val_with_t0_fx = Some(fx_reprice);
 
-            // Compute combined FX P&L (exposure + translation)
-            // Uses T₀ FX for converting T₀ PV and T₁ FX for converting T₁ PV
+            // FX-exposure (pricing-impact) P&L: the FX matrix was restored to
+            // T₀ inside the pricer for `fx_reprice`. Both values are in the
+            // instrument's native currency, so the `compute_pnl_with_fx`
+            // conversions below are same-currency identities — the with-fx
+            // variant matters only for external callers with target ≠ native;
+            // reporting-currency translation lives in `translate_to_target_ccy`.
             attribution.fx_pnl = compute_pnl_with_fx(
                 fx_reprice,
                 val_t1,
@@ -886,7 +1000,11 @@ pub fn attribute_pnl_parallel_with_credit_model(
                         attribution.vol_pnl = pnl;
                         val_with_t0_vol = Some(reprice);
                     }
-                    _ => unreachable!("only volatility is present in this ordered loop"),
+                    _ => {
+                        tracing::warn!(
+                            "unexpected non-volatility spec in the post-FX vol loop; ignored"
+                        );
+                    }
                 }
             }
         }
@@ -955,7 +1073,11 @@ pub fn attribute_pnl_parallel_with_credit_model(
                         attribution.market_scalars_pnl = pnl;
                         val_with_t0_scalars = Some(reprice);
                     }
-                    _ => unreachable!("only market scalars are present in this ordered loop"),
+                    _ => {
+                        tracing::warn!(
+                            "unexpected non-scalar spec in the post-FX scalars loop; ignored"
+                        );
+                    }
                 }
             }
         }
@@ -1197,6 +1319,8 @@ pub fn attribute_pnl_parallel_with_credit_model(
             }
         }
     }
+
+    note_skipped_empty_t0_factors(&mut attribution, market_t0, market_t1);
 
     finalize_attribution(
         &mut attribution,

@@ -6,9 +6,9 @@ __all__: list[str] = [
     "PnlAttribution",
     "attribute_pnl",
     "attribute_pnl_from_spec",
-    "validate_attribution_json",
-    "default_waterfall_order",
     "default_attribution_metrics",
+    "default_waterfall_order",
+    "validate_attribution_json",
 ]
 
 # ---------------------------------------------------------------------------
@@ -383,7 +383,7 @@ def validate_attribution_json(json: str) -> str:
         json: JSON-serialized ``AttributionEnvelope``.
 
     Returns:
-        Canonical pretty-printed JSON.
+        Canonical compact JSON.
     """
     ...
 

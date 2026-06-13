@@ -1,7 +1,7 @@
 //! P&L attribution entry points and JSON helpers.
 
 use crate::bindings::module_utils::py_to_json_string;
-use crate::errors::{display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use pyo3::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -38,6 +38,10 @@ use pyo3::prelude::*;
 ///     * ``{"Taylor": {"include_gamma": true, ...}}``
 /// config : dict, optional
 ///     Optional attribution config overrides (tolerance, metrics, bump sizes).
+/// full_cross_attribution : bool, optional
+///     When true, the parallel method evaluates every pairwise cross-factor
+///     interaction (full cross matrix) instead of the default six economic
+///     pairs. More repricings, smaller residual.
 ///
 /// Returns
 /// -------
@@ -77,7 +81,7 @@ pub(crate) fn attribute_pnl(
         &method_json,
         config_json.as_deref(),
     )
-    .map_err(display_to_py)?;
+    .map_err(core_to_py)?;
 
     if let Some(val) = full_cross_attribution {
         spec.full_cross_attribution = val;
@@ -88,7 +92,11 @@ pub(crate) fn attribute_pnl(
     // built from `&str` arguments above), so concurrent Python callers can run
     // attributions in parallel without serializing on the GIL. Rayon
     // parallelism inside `spec.execute()` is unaffected.
-    let result = py.detach(|| spec.execute()).map_err(display_to_py)?;
+    // Errors keep the project taxonomy (quant review M12): missing market
+    // data → KeyError, validation → ValueError, internal/operational →
+    // RuntimeError — so production pipelines catching ValueError for bad
+    // inputs do not silently swallow missing-curve failures.
+    let result = py.detach(|| spec.execute()).map_err(core_to_py)?;
     serde_json::to_string(&result.attribution).map_err(display_to_py)
 }
 
@@ -115,8 +123,9 @@ pub(crate) fn attribute_pnl(
 pub(crate) fn attribute_pnl_from_spec(py: Python<'_>, spec_json: &str) -> PyResult<String> {
     use finstack_attribution::AttributionEnvelope;
 
-    let envelope: AttributionEnvelope = serde_json::from_str(spec_json).map_err(display_to_py)?;
-    let result_envelope = py.detach(|| envelope.execute()).map_err(display_to_py)?;
+    let envelope: AttributionEnvelope = serde_json::from_str(spec_json)
+        .map_err(|e| serde_json_to_py(e, "invalid attribution envelope JSON"))?;
+    let result_envelope = py.detach(|| envelope.execute()).map_err(core_to_py)?;
     serde_json::to_string(&result_envelope).map_err(display_to_py)
 }
 
@@ -126,8 +135,10 @@ pub(crate) fn attribute_pnl_from_spec(py: Python<'_>, spec_json: &str) -> PyResu
 
 /// Validate an attribution specification JSON.
 ///
-/// Deserializes the input against the ``AttributionEnvelope`` schema and
-/// returns the canonical (re-serialized) JSON.
+/// Deserializes the input against the ``AttributionEnvelope`` schema,
+/// checks the ``schema`` version tag (the same gate ``execute`` applies, so
+/// a payload that validates here cannot later be rejected at execution),
+/// and returns the canonical (re-serialized) JSON.
 ///
 /// Parameters
 /// ----------
@@ -142,6 +153,13 @@ pub(crate) fn attribute_pnl_from_spec(py: Python<'_>, spec_json: &str) -> PyResu
 pub(crate) fn validate_attribution_json(json: &str) -> PyResult<String> {
     let envelope: finstack_attribution::AttributionEnvelope =
         serde_json::from_str(json).map_err(|e| serde_json_to_py(e, "invalid attribution JSON"))?;
+    if envelope.schema != finstack_attribution::ATTRIBUTION_SCHEMA_V1 {
+        return Err(crate::errors::value_error(format!(
+            "unsupported attribution schema {:?}; expected {:?}",
+            envelope.schema,
+            finstack_attribution::ATTRIBUTION_SCHEMA_V1
+        )));
+    }
     serde_json::to_string(&envelope).map_err(display_to_py)
 }
 

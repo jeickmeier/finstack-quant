@@ -81,13 +81,16 @@ rust_lib   = "finstack/factor-model/src/lib.rs"
 python_package = "finstack.factor_model"
 visibility = "pub"
 status = "exists"
-note = "Generic factor-model primitives are Rust-first today; credit hierarchy APIs are exposed under finstack.factor_model.credit."
+note = "Generic factor-model primitives are Rust-first today; credit hierarchy APIs are exposed under finstack.factor_model.credit. Known asymmetry: WASM handles (finstack-wasm/src/api/factor_model/mod.rs) are toJson-only, while Python exposes typed accessors on CreditFactorModel/LevelsAtDate/PeriodDecomposition; this is an accepted host-language divergence, not drift."
 
 [crates.factor_model.modules]
-primitives = { python = "finstack.factor_model.primitives", status = "missing", note = "FactorId/FactorType/FactorDefinition typed host-language constructors deferred; JSON contracts remain Rust-owned." }
-matching   = { python = "finstack.factor_model.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned." }
-credit     = { python = "finstack.factor_model.credit", status = "exists", note = "CreditFactorModel, CreditCalibrator, LevelsAtDate, PeriodDecomposition, FactorCovarianceForecast, decompose_levels, decompose_period." }
-calibration = { python = "finstack.factor_model.calibration", status = "missing", note = "Generic FactorCalibrator is a Rust trait and not directly host-language constructible." }
+primitives         = { python = "finstack.factor_model.primitives", status = "missing", note = "FactorId/FactorType/FactorDefinition typed host-language constructors deferred; JSON contracts remain Rust-owned." }
+matching           = { python = "finstack.factor_model.matching", status = "missing", note = "MatchingConfig typed host-language constructors deferred; JSON contracts remain Rust-owned." }
+credit             = { python = "finstack.factor_model.credit", status = "exists", note = "CreditFactorModel, CreditCalibrator, LevelsAtDate, PeriodDecomposition, FactorCovarianceForecast, decompose_levels, decompose_period." }
+config             = { python = "finstack.factor_model.config", status = "missing", note = "FactorModelConfig is consumed as JSON via portfolio risk bindings; no typed host-language constructors." }
+covariance         = { python = "finstack.factor_model.covariance", status = "missing", note = "FactorCovarianceMatrix is JSON-only at the binding boundary (produced by FactorCovarianceForecast.covariance_at)." }
+error              = { python = "finstack.factor_model.error", status = "missing", note = "FactorModelError surfaces as Python exceptions via the centralized error mapping; not a host-language module." }
+sensitivity_matrix = { python = "finstack.factor_model.sensitivity_matrix", status = "missing", note = "Sensitivity-matrix assembly is Rust-internal to the portfolio risk pipeline." }
 
 # ---------------------------------------------------------------------------
 # finstack-analytics  →  finstack.analytics

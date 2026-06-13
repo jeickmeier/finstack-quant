@@ -15,7 +15,7 @@ use crate::market_data::{
     dividends::DividendSchedule,
     scalars::InflationIndex,
     scalars::{MarketScalar, ScalarTimeSeries},
-    surfaces::VolSurface,
+    surfaces::{FxDeltaVolSurface, VolCube, VolSurface},
 };
 
 impl MarketContext {
@@ -211,6 +211,84 @@ impl MarketContext {
     {
         self.surfaces.clear();
         self.surfaces.extend(surfaces);
+        self
+    }
+
+    /// Retain only the curves for which `pred` returns `true` (mutable).
+    ///
+    /// Intended for snapshot-restore workflows that need drop-and-replace
+    /// semantics for a single curve family (e.g. P&L attribution factor
+    /// isolation): drop the flagged family's curves, then re-insert the
+    /// snapshot's, leaving every other family untouched.
+    pub fn retain_curves_mut(
+        &mut self,
+        mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
+    ) -> &mut Self {
+        self.curves.retain(|id, curve| pred(id, curve));
+        self
+    }
+
+    /// Iterate over the SABR volatility cubes.
+    pub fn vol_cubes_iter(&self) -> impl Iterator<Item = (&CurveId, &Arc<VolCube>)> {
+        self.vol_cubes.iter()
+    }
+
+    /// Iterate over the FX delta-quoted volatility surfaces.
+    pub fn fx_delta_vol_surfaces_iter(
+        &self,
+    ) -> impl Iterator<Item = (&CurveId, &Arc<FxDeltaVolSurface>)> {
+        self.fx_delta_vol_surfaces.iter()
+    }
+
+    /// Replace all SABR volatility cubes (mutable).
+    ///
+    /// This is intended for snapshot restore workflows.
+    pub fn replace_vol_cubes_mut<I>(&mut self, cubes: I) -> &mut Self
+    where
+        I: IntoIterator<Item = (CurveId, Arc<VolCube>)>,
+    {
+        self.vol_cubes.clear();
+        self.vol_cubes.extend(cubes);
+        self
+    }
+
+    /// Replace all FX delta-quoted volatility surfaces (mutable).
+    ///
+    /// This is intended for snapshot restore workflows.
+    pub fn replace_fx_delta_vol_surfaces_mut<I>(&mut self, surfaces: I) -> &mut Self
+    where
+        I: IntoIterator<Item = (CurveId, Arc<FxDeltaVolSurface>)>,
+    {
+        self.fx_delta_vol_surfaces.clear();
+        self.fx_delta_vol_surfaces.extend(surfaces);
+        self
+    }
+
+    /// Retain only the scalar time series for which `pred` returns `true`
+    /// (mutable).
+    ///
+    /// Intended for snapshot-restore workflows that partition the series
+    /// store by convention (e.g. `FIXING:`-prefixed rate fixings belong to
+    /// the rates family, everything else to market scalars).
+    pub fn retain_series_mut(
+        &mut self,
+        mut pred: impl FnMut(&CurveId, &ScalarTimeSeries) -> bool,
+    ) -> &mut Self {
+        self.series.retain(|id, series| pred(id, series));
+        self
+    }
+
+    /// Clear all market scalars — prices, time series, inflation indices and
+    /// dividend schedules (mutable).
+    ///
+    /// Intended for snapshot restore workflows with drop-and-replace scalar
+    /// semantics: a scalar present in the current market but absent from the
+    /// snapshot must not survive the restore.
+    pub fn clear_market_scalars_mut(&mut self) -> &mut Self {
+        self.prices.clear();
+        self.series.clear();
+        self.inflation_indices.clear();
+        self.dividends.clear();
         self
     }
 }

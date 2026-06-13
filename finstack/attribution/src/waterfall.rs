@@ -247,6 +247,22 @@ pub fn attribute_pnl_waterfall_with_credit_model(
             factor_order[0]
         )));
     }
+    // Reject duplicate factors: factor P&L is recorded by assignment, so a
+    // repeated factor would find the market already rolled, measure ~0, and
+    // silently overwrite the genuine first-pass P&L (the real move would leak
+    // into the residual); a repeated Carry would additionally double-count
+    // coupon income into `total_pnl` via `apply_total_return_carry`.
+    {
+        let mut seen = std::collections::HashSet::new();
+        for factor in &factor_order {
+            if !seen.insert(factor) {
+                return Err(Error::Validation(format!(
+                    "Waterfall attribution factor_order contains duplicate factor {factor:?}; \
+                     each factor may appear at most once"
+                )));
+            }
+        }
+    }
     validate_attribution_period(as_of_t0, as_of_t1)?;
 
     // Step 1: Price at T₀
@@ -279,6 +295,9 @@ pub fn attribute_pnl_waterfall_with_credit_model(
         AttributionMethod::Waterfall(factor_order.clone()),
         Some(_config),
     );
+    // Policy-visibility invariant: stamp the execution policy the
+    // attribution ran under (workspace rule: results carry the parallel flag).
+    attribution.meta.execution_policy = Some(ExecutionPolicy::Serial);
 
     // Plan a credit cascade if a model was supplied. Falls back to the legacy
     // single CreditCurves step when planning yields None (no issuer tag, no
@@ -340,6 +359,13 @@ pub fn attribute_pnl_waterfall_with_credit_model(
                     ctx.as_of_t1,
                     factor_pnl.currency(),
                 );
+                attribution.meta.notes.extend(carry_inputs.warnings);
+                if carry_inputs.invalid {
+                    attribution.result_invalid = true;
+                }
+                // `total_return_carry_inputs` performed one full
+                // `price_with_metrics` (RollDown) pricing — count it.
+                ctx.count_extra_repricing();
 
                 apply_total_return_carry(
                     &mut attribution,
@@ -417,6 +443,13 @@ struct WaterfallContext<'a> {
 impl<'a> WaterfallContext<'a> {
     fn num_repricings(&self) -> usize {
         self.num_repricings
+    }
+
+    /// Count a pricing performed outside `apply_factor` (e.g. the carry
+    /// helper's `price_with_metrics` call) so `meta.num_repricings` reflects
+    /// true pricing cost.
+    fn count_extra_repricing(&mut self) {
+        self.num_repricings += 1;
     }
 
     /// Apply the credit cascade as a sequence of per-step bumps replacing the

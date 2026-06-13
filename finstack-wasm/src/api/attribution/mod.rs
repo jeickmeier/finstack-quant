@@ -33,7 +33,9 @@ pub struct AttributionParams {
 impl AttributionParams {
     #[wasm_bindgen(constructor)]
     #[allow(clippy::too_many_arguments)]
-    /// Create the instrument from a JS spec object.
+    /// Bundle the attribution inputs (instrument / markets / dates / method
+    /// JSON strings plus optional config and full-cross flag) for
+    /// `attributePnl`.
     pub fn new(
         instrument_json: String,
         market_t0_json: String,
@@ -192,12 +194,21 @@ pub fn attribute_pnl_from_spec(spec_json: &str) -> Result<String, JsValue> {
 
 /// Validate an attribution specification JSON.
 ///
-/// Deserializes against the `AttributionEnvelope` schema and returns
-/// the canonical JSON.
+/// Deserializes against the `AttributionEnvelope` schema, checks the
+/// `schema` version tag (the same gate `execute` applies, so a payload that
+/// validates here cannot later be rejected at execution), and returns the
+/// canonical JSON.
 #[wasm_bindgen(js_name = validateAttributionJson)]
 pub fn validate_attribution_json(json: &str) -> Result<String, JsValue> {
     let envelope: finstack_attribution::AttributionEnvelope =
         serde_json::from_str(json).map_err(to_js_err)?;
+    if envelope.schema != finstack_attribution::ATTRIBUTION_SCHEMA_V1 {
+        return Err(JsValue::from_str(&format!(
+            "unsupported attribution schema {:?}; expected {:?}",
+            envelope.schema,
+            finstack_attribution::ATTRIBUTION_SCHEMA_V1
+        )));
+    }
     serde_json::to_string(&envelope).map_err(to_js_err)
 }
 

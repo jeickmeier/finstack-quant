@@ -561,3 +561,77 @@ fn test_structured_credit_pool_balance_cleanup() {
     // Assert: Should handle small balances gracefully
     assert!(result.is_ok());
 }
+
+#[test]
+fn test_sensitivity01_units_reconcile_with_reprice() {
+    // Quant review MO-T5: pin the producer unit conventions —
+    // `Prepayment01` is $ per 1bp of CPR, `Recovery01` is $ per 1% of
+    // recovery — by reconciling `metric × shift` against a true reprice with
+    // the shifted parameter. This is the multiplication the public
+    // attribution helpers (`measure_prepayment_shift` in bp,
+    // `measure_recovery_shift` in pct-pt) document, so a producer/consumer
+    // unit drift (the old per-unit figures were 10⁴× / 10²× larger) fails
+    // loudly here.
+    use finstack_cashflows::builder::PrepaymentModelSpec;
+
+    let mut sc = StructuredCredit::new_abs(
+        "TEST_ABS_UNIT_RECON",
+        create_simple_pool(),
+        create_simple_tranches(),
+        Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+        maturity_date(),
+        "USD-OIS",
+    )
+    .with_payment_calendar("nyse");
+    sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.06);
+    sc.credit_model.recovery_spec.rate = 0.40;
+
+    let market = MarketContext::new().insert(flat_discount_curve(0.04, test_date()));
+
+    let result = sc
+        .price_with_metrics(
+            &market,
+            test_date(),
+            &[MetricId::Prepayment01, MetricId::Recovery01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("sensitivity metrics should compute");
+    let base_pv = result.value.amount();
+    let prepayment01 = *result
+        .measures
+        .get(MetricId::Prepayment01.as_str())
+        .unwrap();
+    let recovery01 = *result.measures.get(MetricId::Recovery01.as_str()).unwrap();
+
+    // Reprice with CPR shifted by +20bp; first-order prediction must hold.
+    let shift_bp = 20.0;
+    let mut sc_up = sc.clone();
+    sc_up.credit_model.prepayment_spec =
+        PrepaymentModelSpec::constant_cpr(0.06 + shift_bp / 10_000.0);
+    let pv_up = sc_up
+        .value(&market, test_date())
+        .expect("shifted reprice")
+        .amount();
+    let predicted = prepayment01 * shift_bp;
+    let actual = pv_up - base_pv;
+    assert!(
+        (predicted - actual).abs() <= 0.10 * actual.abs().max(1.0),
+        "Prepayment01 × Δbp must first-order match a reprice: predicted {predicted}, actual {actual}"
+    );
+
+    // Reprice with recovery shifted by +5 percentage points. (`sc` is no
+    // longer needed: move it.)
+    let shift_pct = 5.0;
+    let mut sc_rec = sc;
+    sc_rec.credit_model.recovery_spec.rate = 0.40 + shift_pct / 100.0;
+    let pv_rec = sc_rec
+        .value(&market, test_date())
+        .expect("recovery reprice")
+        .amount();
+    let predicted = recovery01 * shift_pct;
+    let actual = pv_rec - base_pv;
+    assert!(
+        (predicted - actual).abs() <= 0.10 * actual.abs().max(1.0),
+        "Recovery01 × Δpct must first-order match a reprice: predicted {predicted}, actual {actual}"
+    );
+}

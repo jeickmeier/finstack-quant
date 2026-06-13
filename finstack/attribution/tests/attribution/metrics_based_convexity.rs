@@ -147,41 +147,50 @@ fn test_valuation_result_supports_all_second_order_metrics() {
 fn test_convexity_formula_correctness() {
     // Verify the mathematical correctness of the convexity term calculation.
     //
-    // The implementation in metrics_based.rs uses the percentage convexity formula:
-    //   Convexity P&L = ½ × P₀ × Convexity × (Δr)²
+    // The implementation in metrics_based.rs dispatches per MetricId
+    // (quant review B4):
     //
-    // Where:
-    //   - P₀ = instrument price/value
-    //   - Convexity = percentage convexity metric (dimensionless)
-    //   - Δr = rate shift in decimal (e.g., 0.0050 for 50bp)
+    //   `Convexity` (bond producer, STREET convexity = (∂²P/∂y²)/P/100,
+    //   Bloomberg YAS convention):
+    //     Convexity P&L = ½ × P₀ × Convexity × 100 × (Δy)²
     //
-    // Note: The shift must be converted from bp to decimal (divide by 10,000)
-    // because convexity is a percentage metric.
+    //   `IrConvexity` (IRS producer, raw dollar second derivative ∂²PV/∂r²):
+    //     Convexity P&L = ½ × IrConvexity × (Δy)²   (no P₀ factor)
+    //
+    // The shift must be converted from bp to decimal (divide by 10,000).
 
     let p0: f64 = 1_000_000.0; // $1M bond price
-    let convexity: f64 = 80.0; // Typical percentage convexity for a 5-year bond
+    let convexity: f64 = 0.8; // Typical street convexity for a 5-year bond
     let shift_bp: f64 = 50.0; // 50bp shift
     let shift_decimal: f64 = shift_bp / 10_000.0; // 0.005
 
-    // Second-order term matching implementation formula
-    let convexity_pnl: f64 = 0.5 * p0 * convexity * shift_decimal * shift_decimal;
+    // Street convexity term matching the implementation formula.
+    let convexity_pnl: f64 = 0.5 * p0 * convexity * 100.0 * shift_decimal * shift_decimal;
 
-    // With $1M, convexity=80, 50bp shift:
-    // 0.5 * 1,000,000 * 80 * 0.005 * 0.005 = 0.5 * 1,000,000 * 80 * 0.000025 = 1,000
+    // With $1M, street convexity 0.8, 50bp shift:
+    // 0.5 * 1,000,000 * 0.8 * 100 * 0.005 * 0.005 = 1,000
     assert!((convexity_pnl - 1000.0).abs() < 0.01);
 
     // For smaller shifts (1bp), convexity effect is minimal
     let small_shift_bp: f64 = 1.0;
     let small_shift_decimal: f64 = small_shift_bp / 10_000.0; // 0.0001
-    let small_convexity_pnl: f64 = 0.5 * p0 * convexity * small_shift_decimal * small_shift_decimal;
+    let small_convexity_pnl: f64 =
+        0.5 * p0 * convexity * 100.0 * small_shift_decimal * small_shift_decimal;
 
-    // 0.5 * 1,000,000 * 80 * 0.0001 * 0.0001 = 0.4
+    // 0.5 * 1,000,000 * 0.8 * 100 * 0.0001 * 0.0001 = 0.4
     assert!((small_convexity_pnl - 0.4).abs() < 0.01);
 
     // Convexity effect scales with (Δr)²
     // 50bp shift is 50x larger than 1bp, so convexity P&L is 50² = 2500x larger
     let ratio: f64 = convexity_pnl / small_convexity_pnl;
     assert!((ratio - 2500.0).abs() < 1.0);
+
+    // IrConvexity is a dollar second derivative: the equivalent dollar gamma
+    // for the same economics is d²PV/dr² = P₀ × C_street × 100, and the
+    // consumer applies it WITHOUT the P₀ factor.
+    let ir_convexity: f64 = p0 * convexity * 100.0;
+    let ir_convexity_pnl: f64 = 0.5 * ir_convexity * shift_decimal * shift_decimal;
+    assert!((ir_convexity_pnl - convexity_pnl).abs() < 1e-9);
 }
 
 #[test]
@@ -214,10 +223,11 @@ fn test_metrics_based_convexity_reduces_residual() {
     let p0 = 1_000_000.0;
     let shift_decimal = measured_shift_bp / 10_000.0;
     let dv01 = -4_500.0; // $ per bp
-    let convexity = 80.0; // dimensionless
+    let convexity = 0.8; // street convexity (per-100, Bloomberg YAS), bond producer convention
 
-    // Compute expected P&L using the actual measured shift for self-consistency
-    let expected_convexity_pnl = 0.5 * p0 * convexity * shift_decimal * shift_decimal;
+    // Compute expected P&L using the actual measured shift for self-consistency.
+    // Street convexity term: ½ × P₀ × C × 100 × (Δy)².
+    let expected_convexity_pnl = 0.5 * p0 * convexity * 100.0 * shift_decimal * shift_decimal;
     let total_pnl = dv01 * measured_shift_bp + expected_convexity_pnl;
 
     let mut measures_first = IndexMap::new();
@@ -307,5 +317,81 @@ fn test_metrics_based_convexity_reduces_residual() {
         "Convexity should reduce residual, first={:.2}, second={:.2}",
         residual_first,
         residual_second
+    );
+}
+
+/// End-to-end pin of the `IrConvexity` (dollar second derivative) consumer
+/// dispatch: the metric is applied as ½ × d²PV/dr² × (Δy)² with NO P₀
+/// factor. Before the B4 fix the consumer multiplied by P₀, overstating swap
+/// convexity P&L by ~the instrument PV (and zeroing it for par swaps).
+#[test]
+fn test_metrics_based_ir_convexity_uses_dollar_convention() {
+    use finstack_core::market_data::diff::{measure_discount_curve_shift, TenorSamplingMethod};
+
+    let as_of_t0 = date!(2025 - 01 - 15);
+    let as_of_t1 = date!(2025 - 01 - 16);
+
+    let market_t0 = MarketContext::new().insert(build_flat_curve("USD-OIS", as_of_t0, 0.04));
+    let market_t1 = MarketContext::new().insert(build_flat_curve("USD-OIS", as_of_t1, 0.05));
+
+    let measured_shift_bp = measure_discount_curve_shift(
+        "USD-OIS",
+        &market_t0,
+        &market_t1,
+        TenorSamplingMethod::Standard,
+    )
+    .unwrap();
+
+    let instrument: Arc<dyn Instrument> = Arc::new(
+        TestInstrument::new("METRICS-IRCONVEXITY", Money::new(1_000.0, Currency::USD))
+            .with_discount_curves(&["USD-OIS"]),
+    );
+
+    // Near-par swap: tiny PV, real dollar gamma. The old P₀-scaled formula
+    // would shrink the convexity term by ~1000x here.
+    let p0 = 1_000.0;
+    let shift_decimal = measured_shift_bp / 10_000.0;
+    let dv01 = -4_500.0; // $ per bp
+    let ir_convexity = 80_000_000.0; // d²PV/dr² in dollars per decimal²
+
+    let expected_convexity_pnl = 0.5 * ir_convexity * shift_decimal * shift_decimal;
+    let total_pnl = dv01 * measured_shift_bp + expected_convexity_pnl;
+
+    let mut measures = IndexMap::new();
+    measures.insert(MetricId::Theta, 0.0);
+    measures.insert(MetricId::Dv01, dv01);
+    measures.insert(MetricId::IrConvexity, ir_convexity);
+
+    let meta = results_meta(&FinstackConfig::default());
+    let val_t0 = ValuationResult::stamped_with_meta(
+        "METRICS-IRCONVEXITY",
+        as_of_t0,
+        Money::new(p0, Currency::USD),
+        meta.clone(),
+    )
+    .with_measures(measures.clone());
+    let val_t1 = ValuationResult::stamped_with_meta(
+        "METRICS-IRCONVEXITY",
+        as_of_t1,
+        Money::new(p0 + total_pnl, Currency::USD),
+        meta,
+    )
+    .with_measures(measures);
+
+    let attr = attribute_pnl_metrics_based(
+        &instrument,
+        &market_t0,
+        &market_t1,
+        &val_t0,
+        &val_t1,
+        as_of_t0,
+        as_of_t1,
+    )
+    .unwrap();
+
+    assert!(
+        attr.residual.amount().abs() < 1.0,
+        "IrConvexity dollar convention should reconcile to ~zero residual, got {:.2}",
+        attr.residual.amount()
     );
 }

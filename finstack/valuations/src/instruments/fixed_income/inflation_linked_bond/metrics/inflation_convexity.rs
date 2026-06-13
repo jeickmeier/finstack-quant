@@ -1,8 +1,12 @@
 //! Inflation convexity calculator for inflation-linked bonds.
 //!
-//! Calculates the (dimensionless) second derivative of the bond value with
-//! respect to parallel inflation curve shifts, normalized by the base PV —
-//! consistent with the bond `convexity.rs` definition `Convexity = (1/P) · d²P/dy²`.
+//! Calculates the **raw dollar second derivative** `d²PV/dπ²` of the bond
+//! value with respect to parallel inflation curve shifts (π in decimal) —
+//! the `InflationConvexity` MetricId convention shared with the inflation
+//! swap producer and consumed by P&L attribution as
+//! `½ × InflationConvexity × (Δi_decimal)²` with no P₀ factor (quant review
+//! M4: the former `(1/P)`-normalized figure understated ILB inflation
+//! convexity P&L by a factor of ~P₀).
 //!
 //! Uses numerical differentiation with 1bp bumps to the inflation curve.
 
@@ -53,10 +57,11 @@ impl MetricCalculator for InflationConvexityCalculator {
             return Ok(0.0);
         }
 
-        // InflationConvexity = (PV_up + PV_down - 2×PV_base) / (bump² × PV_base)
-        // Normalizing by PV_base yields a dimensionless convexity, consistent with
-        // the bond `convexity.rs` definition `Convexity = (1/P) · d²P/dy²`.
-        let inflation_convexity = (pv_up + pv_down - 2.0 * base_pv) / (bump_bp * bump_bp) / base_pv;
+        // InflationConvexity = (PV_up + PV_down - 2×PV_base) / bump²
+        // — the raw dollar second derivative d²PV/dπ² ($ per decimal²),
+        // matching the inflation swap producer and the attribution consumer
+        // (one MetricId = one unit).
+        let inflation_convexity = (pv_up + pv_down - 2.0 * base_pv) / (bump_bp * bump_bp);
 
         Ok(inflation_convexity)
     }
@@ -100,11 +105,13 @@ mod tests {
         bond
     }
 
-    /// W-28(b): the reported `InflationConvexity` is dimensionless — it equals the
-    /// numerical second derivative divided by `bump²` AND by the base PV, matching
-    /// the bond `convexity.rs` definition rather than a currency-per-bp² figure.
+    /// Quant review M4: the reported `InflationConvexity` is the **raw dollar
+    /// second derivative** `d²PV/dπ²` ($ per decimal²) — the same convention
+    /// as the inflation swap producer and the attribution consumer. The
+    /// former `(1/P)`-normalized figure understated ILB inflation convexity
+    /// P&L by a factor of ~P₀.
     #[test]
-    fn inflation_convexity_is_dimensionless() {
+    fn inflation_convexity_is_raw_dollar_second_derivative() {
         let as_of = date!(2024 - 01 - 15);
         let bond = sample_bond();
         let market = market(as_of);
@@ -127,10 +134,11 @@ mod tests {
         let pv_up = bond.value(&curves_up, as_of).expect("pv up").amount();
         let pv_down = bond.value(&curves_down, as_of).expect("pv down").amount();
 
-        // Dimensionless reference (matches bond convexity: (1/P)·d²P/dy²).
-        let expected = (pv_up + pv_down - 2.0 * base_pv) / (bump * bump) / base_pv;
-        // The buggy currency-per-bp² figure (no /base_pv) would be ~base_pv× larger.
-        let buggy = (pv_up + pv_down - 2.0 * base_pv) / (bump * bump);
+        // Raw dollar second derivative ($ per decimal²) — the MetricId unit.
+        let expected = (pv_up + pv_down - 2.0 * base_pv) / (bump * bump);
+        // The (1/P)-normalized figure would be ~base_pv× smaller and break
+        // the consumer formula `½ × C × Δi²` (no P₀ factor).
+        let wrong_dimensionless = (pv_up + pv_down - 2.0 * base_pv) / (bump * bump) / base_pv;
 
         let result = bond
             .price_with_metrics(
@@ -147,11 +155,11 @@ mod tests {
 
         assert!(
             (reported - expected).abs() < 1e-6 * expected.abs().max(1.0),
-            "reported {reported} should match dimensionless {expected}"
+            "reported {reported} should match the raw dollar figure {expected}"
         );
         assert!(
-            (reported - buggy).abs() > 1.0,
-            "reported {reported} must NOT equal the currency-per-bp² figure {buggy}"
+            (reported - wrong_dimensionless).abs() > 1.0,
+            "reported {reported} must NOT equal the (1/P)-normalized figure {wrong_dimensionless}"
         );
     }
 

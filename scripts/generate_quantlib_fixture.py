@@ -254,64 +254,58 @@ def build_irs_fixture() -> dict[str, Any]:
         with contextlib.suppress(RuntimeError):
             fixing_index.addFixing(fixing_date, 0.05)
 
-    def swap_on(date: ql.Date, rate: float) -> tuple[float, ql.VanillaSwap]:
-        ql.Settings.instance().evaluationDate = date
-        yts = _flat_yield_handle(rate, day_count)
-        index = ql.USDLibor(ql.Period(3, ql.Months), yts)
-        swap = ql.MakeVanillaSwap(
-            ql.Period(5, ql.Years),
-            index,
-            fixed_rate,
-            ql.Period(0, ql.Days),
-            nominal=notional,
-            swapType=ql.Swap.Payer,
-            pricingEngine=ql.DiscountingSwapEngine(yts),
+    # Build the swap ONCE at t0 (schedule anchored to the t0 spot date) and
+    # revalue THE SAME trade for theta / DV01 / the t1 mark by relinking the
+    # curve handle and moving the evaluation date. The previous version
+    # rebuilt a fresh 5Y swap with MakeVanillaSwap at every date — a
+    # constant-maturity roll whose "theta" included the schedule
+    # reconstruction effect (~$500/day on this fixture, an order of
+    # magnitude above the true trade-level carry) and whose "P&L" was not
+    # the P&L of any single trade (quant review M14).
+    relink = ql.RelinkableYieldTermStructureHandle()
+
+    def flat_ts(rate: float) -> ql.FlatForward:
+        ts = ql.FlatForward(
+            0,
+            ql.UnitedStates(ql.UnitedStates.GovernmentBond),
+            ql.QuoteHandle(ql.SimpleQuote(rate)),
+            day_count,
+            ql.Continuous,
         )
-        return swap.NPV(), swap
+        ts.enableExtrapolation()
+        return ts
 
-    npv_t0, swap_t0 = swap_on(t0, rate_t0)
-    npv_t1, _ = swap_on(t1, rate_t1)
-
-    # DV01 via central difference on the discount curve.
     ql.Settings.instance().evaluationDate = t0
-    yts_up = _flat_yield_handle(rate_t0 + 1e-4, day_count)
-    index_up = ql.USDLibor(ql.Period(3, ql.Months), yts_up)
-    swap_up = ql.MakeVanillaSwap(
+    relink.linkTo(flat_ts(rate_t0))
+    index = ql.USDLibor(ql.Period(3, ql.Months), relink)
+    swap = ql.MakeVanillaSwap(
         ql.Period(5, ql.Years),
-        index_up,
+        index,
         fixed_rate,
         ql.Period(0, ql.Days),
         nominal=notional,
         swapType=ql.Swap.Payer,
-        pricingEngine=ql.DiscountingSwapEngine(yts_up),
+        pricingEngine=ql.DiscountingSwapEngine(relink),
     )
-    yts_dn = _flat_yield_handle(rate_t0 - 1e-4, day_count)
-    index_dn = ql.USDLibor(ql.Period(3, ql.Months), yts_dn)
-    swap_dn = ql.MakeVanillaSwap(
-        ql.Period(5, ql.Years),
-        index_dn,
-        fixed_rate,
-        ql.Period(0, ql.Days),
-        nominal=notional,
-        swapType=ql.Swap.Payer,
-        pricingEngine=ql.DiscountingSwapEngine(yts_dn),
-    )
-    dv01 = (swap_up.NPV() - swap_dn.NPV()) / 2.0
+    npv_t0 = swap.NPV()
+    fair_rate_t0 = swap.fairRate()
 
-    # Theta: 1-day P&L holding the curve fixed.
+    # DV01 via central difference on the discount curve (same trade).
+    relink.linkTo(flat_ts(rate_t0 + 1e-4))
+    npv_up = swap.NPV()
+    relink.linkTo(flat_ts(rate_t0 - 1e-4))
+    npv_dn = swap.NPV()
+    dv01 = (npv_up - npv_dn) / 2.0
+
+    # Theta: 1-day P&L of the SAME swap holding the curve flat (the curve's
+    # base rolls with the evaluation date; the schedule does not move).
     ql.Settings.instance().evaluationDate = t1
-    yts_frozen = _flat_yield_handle(rate_t0, day_count)
-    index_frozen = ql.USDLibor(ql.Period(3, ql.Months), yts_frozen)
-    swap_frozen_t1 = ql.MakeVanillaSwap(
-        ql.Period(5, ql.Years),
-        index_frozen,
-        fixed_rate,
-        ql.Period(0, ql.Days),
-        nominal=notional,
-        swapType=ql.Swap.Payer,
-        pricingEngine=ql.DiscountingSwapEngine(yts_frozen),
-    )
-    theta_one_day = swap_frozen_t1.NPV() - npv_t0
+    relink.linkTo(flat_ts(rate_t0))
+    theta_one_day = swap.NPV() - npv_t0
+
+    # T1 mark: same swap, t1 curve.
+    relink.linkTo(flat_ts(rate_t1))
+    npv_t1 = swap.NPV()
 
     # Convention: `dv01` is the dollar PV change per 1bp UP shift (computed
     # by `(npv_up − npv_dn)/2`). For a long bond it is negative. The signed
@@ -351,7 +345,7 @@ def build_irs_fixture() -> dict[str, Any]:
             "version": ql.__version__,
             "t0": {
                 "npv": npv_t0,
-                "fair_rate": swap_t0.fairRate(),
+                "fair_rate": fair_rate_t0,
                 "dv01": dv01,
                 "theta_one_day": theta_one_day,
             },
@@ -434,8 +428,12 @@ def build_fx_forward_fixture() -> dict[str, Any]:
     theta_one_day = npv_frozen_t1 - npv_t0
 
     fx_pnl = spot_delta * (spot_t1 - spot_t0)
-    usd_rate_pnl = -usd_dv01 * 10_000.0 * (r_usd_t1 - r_usd_t0)
-    eur_rate_pnl = -eur_dv01 * 10_000.0 * (r_eur_t1 - r_eur_t0)
+    # DV01s above are already the SIGNED PV change per +1bp (central
+    # difference of NPV), so first-order P&L is dv01 x move with NO extra
+    # negation (quant review M13: the former minus sign flipped the rate
+    # factor and inflated residual_first_order from -0.24 to +213).
+    usd_rate_pnl = usd_dv01 * 10_000.0 * (r_usd_t1 - r_usd_t0)
+    eur_rate_pnl = eur_dv01 * 10_000.0 * (r_eur_t1 - r_eur_t0)
     actual_pnl = npv_t1 - npv_t0
 
     return {

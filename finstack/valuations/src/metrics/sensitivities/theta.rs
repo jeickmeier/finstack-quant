@@ -390,6 +390,8 @@ struct ThetaBreakdown {
     total: f64,
     carry: f64,
     roll_down: f64,
+    /// Calendar days actually rolled (theta_period capped at expiry).
+    horizon_days: f64,
 }
 
 fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Result<ThetaBreakdown> {
@@ -411,6 +413,7 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
             total: 0.0,
             carry: 0.0,
             roll_down: 0.0,
+            horizon_days: 0.0,
         });
     }
 
@@ -433,6 +436,7 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
         total: carry + roll_down,
         carry,
         roll_down,
+        horizon_days: (rolled_date - context.as_of).whole_days() as f64,
     })
 }
 
@@ -443,6 +447,12 @@ fn store_theta_breakdown(context: &mut crate::metrics::MetricContext, breakdown:
     context
         .computed
         .insert(crate::metrics::MetricId::ThetaRollDown, breakdown.roll_down);
+    // Stamp the realized horizon so consumers rescaling these period totals
+    // (e.g. P&L attribution) can normalize instead of assuming 1 day.
+    context.computed.insert(
+        crate::metrics::MetricId::ThetaPeriodDays,
+        breakdown.horizon_days,
+    );
 }
 
 /// Universal theta calculator that works with any instrument via the Instrument trait.

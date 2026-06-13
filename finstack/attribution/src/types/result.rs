@@ -242,6 +242,14 @@ pub struct PnlAttribution {
     pub vol_pnl: Money,
 
     /// Cross-factor interaction P&L (rates×credit, spot×vol, FX×rates, etc.).
+    ///
+    /// Stored as the **additive contribution to the attributed sum**: for the
+    /// parallel method this is the negated mixed second difference
+    /// `V(a@T₀) + V(b@T₀) − V(all-T₁) − V(ab@T₀)` summed over factor pairs,
+    /// so that extracting cross terms drives the residual toward zero; for
+    /// the metrics-based method it is the Taylor cross-gamma term, which is
+    /// additive by construction. A positive value means factor co-movement
+    /// added P&L beyond the sum of the isolated factor effects.
     pub cross_factor_pnl: Money,
 
     /// Model parameters P&L.
@@ -349,6 +357,13 @@ pub struct AttributionMeta {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fx_policy: Option<FxPolicyMeta>,
 
+    /// Execution policy the attribution ran under (workspace
+    /// policy-visibility invariant: results stamp the parallel flag).
+    /// `None` for methods without a policy knob (metrics-based) and for
+    /// payloads predating this field.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution_policy: Option<ExecutionPolicy>,
+
     /// Diagnostic notes and warnings.
     #[serde(default)]
     pub notes: Vec<String>,
@@ -423,6 +438,7 @@ impl PnlAttribution {
                 residual_pct: 100.0,
                 rounding: RoundingContext::default(),
                 fx_policy: None,
+                execution_policy: None,
                 notes: Vec::new(),
             },
         }
@@ -458,7 +474,19 @@ impl PnlAttribution {
     /// Scale all attribution values by a factor.
     ///
     /// Useful for scaling per-unit attribution to position quantity.
+    ///
+    /// A non-finite `factor` flags the attribution invalid and leaves the
+    /// values untouched instead of panicking inside `Money`'s arithmetic
+    /// (this crate forbids panics on public APIs).
     pub fn scale(&mut self, factor: f64) {
+        if !factor.is_finite() {
+            self.meta.notes.push(format!(
+                "PnlAttribution::scale called with non-finite factor ({factor}); \
+                 values left unscaled and attribution flagged invalid"
+            ));
+            self.result_invalid = true;
+            return;
+        }
         self.total_pnl *= factor;
         if let Some(m) = self.mark_to_market_pnl.as_mut() {
             *m *= factor;
@@ -613,6 +641,26 @@ impl PnlAttribution {
     ///
     /// On error, sets residual to zero and adds a diagnostic note to metadata.
     pub fn compute_residual(&mut self) -> Result<()> {
+        // MO-C2 (quant review): payloads predating `fx_translation_pnl` /
+        // `curve_shape_pnl` deserialize those fields with the `zero_money_usd`
+        // serde default. A zero-valued USD default on a non-USD attribution
+        // must not hard-fail currency validation for an otherwise valid
+        // legacy result — re-currency the zero defaults to the report ccy.
+        // (`abs() <= 0.0` is an exact bit-zero test without a float equality.)
+        let report_ccy = self.total_pnl.currency();
+        if self.fx_translation_pnl.currency() != report_ccy
+            && self.fx_translation_pnl.amount().abs() <= 0.0
+        {
+            self.fx_translation_pnl = Money::new(0.0, report_ccy);
+        }
+        if let Some(detail) = self.credit_factor_detail.as_mut() {
+            if detail.curve_shape_pnl.currency() != report_ccy
+                && detail.curve_shape_pnl.amount().abs() <= 0.0
+            {
+                detail.curve_shape_pnl = Money::new(0.0, report_ccy);
+            }
+        }
+
         // Validate currencies first
         if let Err(e) = self.validate_currencies() {
             let note = format!(

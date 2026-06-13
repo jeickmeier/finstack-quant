@@ -15,5 +15,6 @@ pub(crate) use interp::{
 };
 pub(crate) use knot_ops::{
     bump_knots_parallel, bump_knots_percentage, bump_knots_triangular, infer_spot_from_knots,
-    roll_knots, triangular_weight, validate_non_negative_knots, validate_unit_range,
+    roll_knots, triangular_weight, validate_non_negative_knots, validate_triangular_bucket_grid,
+    validate_unit_range,
 };

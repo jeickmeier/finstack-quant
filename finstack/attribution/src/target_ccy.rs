@@ -106,16 +106,24 @@ pub fn translate_to_target_ccy(
     attribution.market_scalars_pnl = translate(attribution.market_scalars_pnl)?;
     attribution.fx_translation_pnl = fx_translation;
 
-    // Total in target_ccy = val_t1_target − val_t0_target. Recover val_t1
-    // from native_total_pnl + val_t0 (which we trust since it was supplied).
-    let val_t1_native = val_t0.checked_add(
-        attribution
-            .mark_to_market_pnl
-            .unwrap_or(attribution.total_pnl),
-    )?;
+    // Total in target_ccy = MTM translation + the total-return add-back.
+    //
+    // Native `total_pnl` follows the total-return convention: the methods add
+    // intra-period coupon income on top of the raw MTM (`mark_to_market_pnl`)
+    // via `apply_total_return_carry`. The MTM component is rebuilt from the
+    // T0/T1 values; the coupon add-back (total − MTM, zero when no cashflows
+    // occurred) must travel at T1 FX — the same rate at which the translated
+    // `carry` still contains it — or the recomputed residual is polluted by
+    // the full coupon and `total_pnl` silently flips to MTM-only (quant
+    // review M6).
+    let native_total_pnl = attribution.total_pnl;
+    let native_mtm = attribution.mark_to_market_pnl.unwrap_or(native_total_pnl);
+    let coupon_addback_native = native_total_pnl.checked_sub(native_mtm)?;
+
+    let val_t1_native = val_t0.checked_add(native_mtm)?;
     let val_t1_at_t1 = market_t1.convert_money(val_t1_native, target_ccy, as_of_t1)?;
     let translated_mtm = val_t1_at_t1.checked_sub(val_t0_at_t0)?;
-    attribution.total_pnl = translated_mtm;
+    attribution.total_pnl = translated_mtm.checked_add(translate(coupon_addback_native)?)?;
 
     // mark_to_market_pnl in target_ccy retains the raw price change interpretation.
     if let Some(_mtm) = attribution.mark_to_market_pnl {
@@ -287,7 +295,67 @@ mod tests {
         attr.carry = Money::new(20.0, Currency::EUR);
         // Force consistent zero-residual starting point.
         attr.compute_residual().expect("residual");
+        translate_and_assert_eur_to_usd(attr, val_t0_native);
+    }
 
+    /// Quant review M6: translation must preserve the total-return convention.
+    /// When the native attribution carries coupon income (total_pnl = MTM +
+    /// coupon, carry includes the coupon), the translated total must add the
+    /// coupon back at T1 FX — the rate the translated carry contains it at —
+    /// or the recomputed residual is polluted by the full coupon.
+    #[test]
+    fn translate_preserves_total_return_coupon_addback() {
+        let val_t0_native = Money::new(1000.0, Currency::EUR);
+        // Raw MTM = +100 EUR; apply_total_return_carry added a 30 EUR coupon:
+        // total = 130, carry = theta 20 + coupon 30 = 50, rates = 80.
+        let mut attr = PnlAttribution::new(
+            Money::new(100.0, Currency::EUR),
+            "EUR-BOND-COUPON",
+            date!(2025 - 01 - 15),
+            date!(2025 - 01 - 16),
+            AttributionMethod::Parallel,
+        );
+        attr.total_pnl = Money::new(130.0, Currency::EUR);
+        attr.carry = Money::new(50.0, Currency::EUR);
+        attr.rates_curves_pnl = Money::new(80.0, Currency::EUR);
+        attr.compute_residual().expect("residual");
+        assert!(
+            attr.residual.amount().abs() < 1e-12,
+            "native attribution must start reconciled"
+        );
+
+        translate_to_target_ccy(
+            &mut attr,
+            val_t0_native,
+            Currency::USD,
+            &market(1.10),
+            &market(1.20),
+            date!(2025 - 01 - 15),
+            date!(2025 - 01 - 16),
+        )
+        .expect("translate");
+
+        // translated_mtm = 1100×1.20 − 1000×1.10 = 220 USD;
+        // coupon add-back at T1 FX = 30 × 1.20 = 36 USD → total 256 USD.
+        assert!(
+            (attr.total_pnl.amount() - 256.0).abs() < 1e-9,
+            "total must keep the total-return convention, got {}",
+            attr.total_pnl.amount()
+        );
+        assert!(
+            (attr.mark_to_market_pnl.expect("mtm").amount() - 220.0).abs() < 1e-9,
+            "mark_to_market_pnl must stay the raw translated MTM"
+        );
+        // carry 50×1.2 = 60, rates 80×1.2 = 96, fx_translation 1000×0.1 = 100
+        // → attributed 256 = total: residual must remain ~0, not −coupon×fx1.
+        assert!(
+            attr.residual.amount().abs() < 1e-9,
+            "translated residual must not absorb the coupon, got {}",
+            attr.residual.amount()
+        );
+    }
+
+    fn translate_and_assert_eur_to_usd(mut attr: PnlAttribution, val_t0_native: Money) {
         translate_to_target_ccy(
             &mut attr,
             val_t0_native,

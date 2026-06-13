@@ -513,6 +513,9 @@ pub fn attribute_pnl_taylor(
         AttributionMethod::Taylor(config.clone()),
         None,
     );
+    // Policy-visibility invariant: stamp the execution policy the
+    // attribution ran under (workspace rule: results carry the parallel flag).
+    attribution.meta.execution_policy = Some(execution_policy);
 
     // Taylor factor P&Ls arrive as raw f64s; a degenerate curve or bump can
     // make one non-finite. Route every f64 → Money construction through
@@ -631,19 +634,24 @@ struct KeyRateBucket {
 }
 
 /// Triangular key-rate bump spec for bucket `i` of `KEY_RATE_BUCKETS_YEARS`.
+///
+/// The wing buckets use the dedicated half-triangle constructors so the
+/// `Σ wᵢ(t) = 1.0` partition-of-unity invariant holds across the whole curve
+/// (matching the canonical `BucketedDv01` calculator): the first bucket is
+/// flat at 1.0 below its tenor (passing `prev = 0.0` instead would understate
+/// sub-3M DV01), and the last bucket is flat at 1.0 beyond 30Y (passing
+/// `next = ∞` instead produces a NaN weight for any knot past 30Y and aborts
+/// the whole factor).
 fn key_rate_bump_spec(i: usize, bump_bp: f64) -> BumpSpec {
-    let prev = if i == 0 {
-        0.0
-    } else {
-        KEY_RATE_BUCKETS_YEARS[i - 1]
-    };
     let target = KEY_RATE_BUCKETS_YEARS[i];
-    let next = if i + 1 == KEY_RATE_BUCKETS_YEARS.len() {
-        f64::INFINITY
-    } else {
-        KEY_RATE_BUCKETS_YEARS[i + 1]
-    };
-    BumpSpec::triangular_key_rate_bp(prev, target, next, bump_bp)
+    if i == 0 {
+        return BumpSpec::triangular_key_rate_first_bp(target, KEY_RATE_BUCKETS_YEARS[1], bump_bp);
+    }
+    let prev = KEY_RATE_BUCKETS_YEARS[i - 1];
+    if i + 1 == KEY_RATE_BUCKETS_YEARS.len() {
+        return BumpSpec::triangular_key_rate_last_bp(prev, target, bump_bp);
+    }
+    BumpSpec::triangular_key_rate_bp(prev, target, KEY_RATE_BUCKETS_YEARS[i + 1], bump_bp)
 }
 
 /// Compute rate (DV01) attribution for a single discount curve — KEY-RATE

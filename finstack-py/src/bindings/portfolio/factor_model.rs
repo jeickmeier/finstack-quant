@@ -16,12 +16,10 @@
 //! map cleanly to a JSON-first PyO3 surface and are not required by the
 //! result-type contract this slice fulfils.
 
-use std::collections::HashMap;
-
 use indexmap::IndexMap;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
-use pyo3::types::{PyModule, PyType};
+use pyo3::types::{PyDict, PyModule, PyType};
 
 use finstack_portfolio::factor_model::{
     self as fm, CreditVolReport, DecompositionConfig, DecompositionMethod, FactorAssignmentReport,
@@ -1355,13 +1353,15 @@ impl PyLevelVolContribution {
     }
 
     /// Per-bucket contributions keyed by the bucket path.
+    ///
+    /// Keys are returned in deterministic (sorted) bucket-path order.
     #[getter]
-    fn by_bucket(&self) -> HashMap<String, f64> {
-        self.inner
-            .by_bucket
-            .iter()
-            .map(|(k, v)| (k.clone(), *v))
-            .collect()
+    fn by_bucket<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let d = PyDict::new(py);
+        for (k, v) in &self.inner.by_bucket {
+            d.set_item(k, v)?;
+        }
+        Ok(d)
     }
 
     fn __repr__(&self) -> String {
@@ -1787,7 +1787,12 @@ fn evaluate_risk_budget_typed(
 
     let mut targets: IndexMap<PositionId, f64> = IndexMap::with_capacity(n);
     for (id, &pct) in shared_ids.iter().zip(target_var_pct.iter()) {
-        targets.insert(id.clone(), pct);
+        if targets.insert(id.clone(), pct).is_some() {
+            return Err(crate::errors::value_error(format!(
+                "duplicate position_id '{}' in position_ids",
+                id.as_str()
+            )));
+        }
     }
     let budget = RiskBudget::new(targets).with_threshold(utilization_threshold);
     let result = py

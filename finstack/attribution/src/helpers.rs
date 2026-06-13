@@ -187,6 +187,11 @@ pub(crate) fn apply_total_return_carry(
 pub(crate) struct TotalReturnCarryInputs {
     pub coupon_income: Money,
     pub roll_down: Option<Money>,
+    /// Diagnostics for the caller to merge into `meta.notes`.
+    pub warnings: Vec<String>,
+    /// True when a non-finite cashflow/metric value was zeroed; the caller
+    /// must set `result_invalid` so tolerance checks refuse a clean pass.
+    pub invalid: bool,
 }
 
 pub(crate) fn total_return_carry_inputs(
@@ -197,10 +202,40 @@ pub(crate) fn total_return_carry_inputs(
     as_of_t1: Date,
     currency: Currency,
 ) -> TotalReturnCarryInputs {
-    let coupon_income_value =
-        collect_cashflows_in_period(instrument, cashflow_market, as_of_t0, as_of_t1, currency)
-            .unwrap_or(0.0);
-    let coupon_income = Money::new(coupon_income_value, currency);
+    let mut warnings = Vec::new();
+    let mut invalid = false;
+
+    // A failed cashflow collection must be VISIBLE: coupon income feeds
+    // `total_pnl` via `apply_total_return_carry`, so silently defaulting to
+    // zero would flip the attribution from total-return to MTM-only with no
+    // observability (quant review M8).
+    let coupon_income = match collect_cashflows_in_period(
+        instrument,
+        cashflow_market,
+        as_of_t0,
+        as_of_t1,
+        currency,
+    ) {
+        Ok(value) => factor_money_or_invalid(
+            value,
+            currency,
+            "carry coupon income",
+            &mut warnings,
+            &mut invalid,
+        ),
+        Err(e) => {
+            tracing::warn!(
+                instrument_id = instrument.id(),
+                error = %e,
+                "cashflow collection failed; coupon income omitted from total-return carry"
+            );
+            warnings.push(format!(
+                "Carry coupon income unavailable (cashflow collection failed: {e}); \
+                     total-return adjustment skipped — total_pnl is MTM-only for this period"
+            ));
+            Money::new(0.0, currency)
+        }
+    };
 
     let roll_down_opt = if let Ok(val_res) = instrument.price_with_metrics(
         roll_down_market,
@@ -213,11 +248,21 @@ pub(crate) fn total_return_carry_inputs(
         None
     };
     let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
-    let roll_down = roll_down_opt.map(|rd| Money::new(rd * time_period_days, currency));
+    let roll_down = roll_down_opt.map(|rd| {
+        factor_money_or_invalid(
+            rd * time_period_days,
+            currency,
+            "carry roll-down",
+            &mut warnings,
+            &mut invalid,
+        )
+    });
 
     TotalReturnCarryInputs {
         coupon_income,
         roll_down,
+        warnings,
+        invalid,
     }
 }
 

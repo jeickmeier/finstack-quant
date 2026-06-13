@@ -33,13 +33,12 @@ use finstack_core::money::Money;
 use finstack_core::types::{CurveId, IssuerId};
 use finstack_core::Result;
 use finstack_factor_model::credit::hierarchy::{
-    dimension_key, CreditFactorModel, HierarchyDimension, IssuerBetaRow, IssuerTags,
+    dimension_key, CreditFactorModel, HierarchyDimension, IssuerBetaRow,
 };
 use finstack_factor_model::matching::{
     bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
 };
 
-use finstack_factor_model::{decompose_levels, decompose_period};
 use finstack_valuations::calibration::bumps::{
     bump_hazard_shift, bump_hazard_spreads, BumpRequest,
 };
@@ -228,9 +227,21 @@ pub(crate) fn plan_credit_cascade(
     instrument: &Arc<dyn Instrument>,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
+    _as_of_t0: Date,
+    _as_of_t1: Date,
 ) -> Result<Option<CreditCascade>> {
+    // Gate the model schema before consuming it (quant review minor): the
+    // model's own docs require checking `SCHEMA_VERSION` before trusting
+    // content, and a silently-accepted future schema could re-interpret beta
+    // or factor semantics.
+    if model.schema_version != CreditFactorModel::SCHEMA_VERSION {
+        return Err(finstack_core::Error::Validation(format!(
+            "unsupported CreditFactorModel schema_version {:?}; expected {:?}",
+            model.schema_version,
+            CreditFactorModel::SCHEMA_VERSION
+        )));
+    }
+
     // Resolve issuer id from instrument attributes.
     let issuer_id_str = match instrument.attributes().get_meta(ISSUER_ID_META_KEY) {
         Some(s) => s.to_string(),
@@ -247,7 +258,6 @@ pub(crate) fn plan_credit_cascade(
         );
         return Ok(None);
     };
-    let tags = issuer_row.tags.clone();
 
     // Resolve hazard + discount curves from the instrument's market dependencies.
     let market_deps = instrument.market_dependencies()?;
@@ -304,10 +314,19 @@ pub(crate) fn plan_credit_cascade(
         let mut steps: Vec<CreditCascadeStep> =
             Vec::with_capacity(model.hierarchy.levels.len() + 2);
         let mut explained_bp = 0.0;
+        // Quant review M5: the calibrated model identity is
+        // `S_i = β_PC·F_PC + Σ_k β_k·F_level_k + adder_i`, so each scalar
+        // factor move must be scaled by the ISSUER's beta before it explains
+        // any of ΔS_i (matching `CreditStepKind`'s documented `bp = β × ΔF`
+        // and the synthesized non-scalar path below). The raw moves were
+        // previously used unscaled, mislabeling the β-residual as
+        // idiosyncratic adder for any non-unit-beta issuer.
+        let beta_pc = issuer_row.betas.pc;
+        let level_betas = issuer_row.betas.levels.clone();
         let mut append_factor = |factor_id: &str, steps: &mut Vec<CreditCascadeStep>| {
             if factor_id == model.generic_factor.series_id || factor_id == CREDIT_GENERIC_FACTOR_ID
             {
-                let generic_bp = generic_move.unwrap_or(0.0);
+                let generic_bp = beta_pc * generic_move.unwrap_or(0.0);
                 explained_bp += generic_bp;
                 steps.push(CreditCascadeStep {
                     kind: CreditStepKind::Generic,
@@ -318,7 +337,8 @@ pub(crate) fn plan_credit_cascade(
             }
             for (k, (level_factor_id, move_bp)) in scalar_level_moves.iter().enumerate() {
                 if factor_id == level_factor_id {
-                    let level_bp = move_bp.unwrap_or(0.0);
+                    let beta_k = level_betas.get(k).copied().unwrap_or(0.0);
+                    let level_bp = beta_k * move_bp.unwrap_or(0.0);
                     explained_bp += level_bp;
                     steps.push(CreditCascadeStep {
                         kind: CreditStepKind::Level(k),
@@ -332,7 +352,19 @@ pub(crate) fn plan_credit_cascade(
         };
 
         let mut matched_config_factor = false;
+        // Dedupe config factor ids (quant review minor): a duplicated id would
+        // append two cascade steps for the same factor; the cumulative-bump
+        // executor would double-apply the move and the detail builder's
+        // last-wins assignment would silently break the detail-sum invariant.
+        let mut seen_factor_ids: std::collections::HashSet<&str> = std::collections::HashSet::new();
         for factor in &model.config.factors {
+            if !seen_factor_ids.insert(factor.id.as_str()) {
+                tracing::warn!(
+                    factor_id = factor.id.as_str(),
+                    "duplicate factor id in CreditFactorModel.config.factors ignored"
+                );
+                continue;
+            }
             matched_config_factor |= append_factor(factor.id.as_str(), &mut steps);
         }
         if !matched_config_factor {
@@ -362,61 +394,34 @@ pub(crate) fn plan_credit_cascade(
         }));
     }
 
-    // Synthesize a single-issuer period decomposition: feed S_t0=0, S_t1=ΔS_i,
-    // generic=0 to mirror the PR-7 linear wire. Δgeneric will be 0; the level-0
-    // bucket carries ΔS_i; remaining levels and the adder are zero (modulo
-    // calibrated betas).
-    let mut s_t0: BTreeMap<IssuerId, f64> = BTreeMap::new();
-    let mut s_t1: BTreeMap<IssuerId, f64> = BTreeMap::new();
-    s_t0.insert(issuer_id.clone(), 0.0);
-    s_t1.insert(issuer_id.clone(), ds_i);
-
-    let mut runtime_tags: BTreeMap<IssuerId, IssuerTags> = BTreeMap::new();
-    runtime_tags.insert(issuer_id.clone(), tags);
-
-    let from = decompose_levels(model, &s_t0, 0.0, as_of_t0, Some(&runtime_tags))
-        .map_err(|e| finstack_core::Error::Validation(format!("decompose_levels(t0): {e}")))?;
-    let to = decompose_levels(model, &s_t1, 0.0, as_of_t1, Some(&runtime_tags))
-        .map_err(|e| finstack_core::Error::Validation(format!("decompose_levels(t1): {e}")))?;
-    let period = decompose_period(&from, &to)
-        .map_err(|e| finstack_core::Error::Validation(format!("decompose_period: {e}")))?;
-
-    // Build cascade steps.
-    let beta_pc = issuer_row.betas.pc;
-    let generic_bp = beta_pc * period.d_generic;
-
+    // No market scalar series for any credit factor (quant review MO-C3):
+    // without observed factor moves, NOTHING about the issuer's spread move
+    // is identifiably systematic, so the entire ΔS_i is routed to the
+    // idiosyncratic adder. The former approach synthesized a single-issuer
+    // period decomposition (S_t0 = 0 → ΔS_i), which estimated each "level
+    // factor move" from the one issuer's own residual: with unit betas the
+    // whole ΔS landed in level 0 mislabeled as systematic rating risk, and
+    // with calibrated betas the components oscillated (e.g. 3ΔS / −8ΔS /
+    // +6ΔS) — reconciling exactly but economically meaningless, and the
+    // adder-magnitude warning could never fire for genuinely idiosyncratic
+    // moves.
     let mut steps: Vec<CreditCascadeStep> = Vec::with_capacity(model.hierarchy.levels.len() + 2);
-
     steps.push(CreditCascadeStep {
         kind: CreditStepKind::Generic,
         label: "credit::generic".to_string(),
-        delta_bp: generic_bp,
+        delta_bp: 0.0,
     });
-
     for (k, level_name) in level_names.iter().enumerate() {
-        let bucket = model
-            .hierarchy
-            .bucket_path(&issuer_row.tags, k)
-            .unwrap_or_default();
-        let d_level = period.by_level[k]
-            .deltas
-            .get(&bucket)
-            .copied()
-            .unwrap_or(0.0);
-        let beta_k = issuer_row.betas.levels.get(k).copied().unwrap_or(0.0);
-        let level_bp = beta_k * d_level;
         steps.push(CreditCascadeStep {
             kind: CreditStepKind::Level(k),
             label: format!("credit::{level_name}"),
-            delta_bp: level_bp,
+            delta_bp: 0.0,
         });
     }
-
-    let adder_bp = period.d_adder.get(&issuer_id).copied().unwrap_or(0.0);
     steps.push(CreditCascadeStep {
         kind: CreditStepKind::Adder,
         label: "credit::adder".to_string(),
-        delta_bp: adder_bp,
+        delta_bp: ds_i,
     });
     // Curve-shape residual: snap-to-T1 catches the non-parallel hazard move.
     steps.push(CreditCascadeStep {
@@ -545,11 +550,28 @@ pub(crate) fn build_credit_factor_attribution(
     use super::credit_factor::credit_factor_model_id;
     use super::types::{CreditFactorAttribution, LevelPnl};
 
+    // Release-safe shape check (quant review minor): a silent zip truncation
+    // would break the detail-sum invariant with no signal in release builds.
+    if step_pnls.len() != cascade.steps.len() {
+        tracing::warn!(
+            issuer_id = %cascade.issuer_id,
+            step_pnls = step_pnls.len(),
+            steps = cascade.steps.len(),
+            "credit cascade step P&L count does not match planned steps; \
+             the shorter length is used and the detail sum may not reconcile"
+        );
+    }
     debug_assert_eq!(step_pnls.len(), cascade.steps.len());
     let ccy = step_pnls
         .first()
         .map(|m| m.currency())
         .unwrap_or(finstack_core::currency::Currency::USD);
+    if step_pnls.is_empty() {
+        tracing::warn!(
+            issuer_id = %cascade.issuer_id,
+            "credit cascade produced no step P&Ls; emitting an all-zero detail (USD)"
+        );
+    }
 
     // Resolve issuer's bucket path for per-bucket detail (single-instrument
     // scope: each level has at most one populated bucket).
@@ -632,7 +654,10 @@ pub(crate) fn build_credit_factor_attribution(
             ratio = curve_shape_abs / total_credit_abs,
             threshold = ADDER_MAGNITUDE_WARN_RATIO,
             "credit cascade curve-shape magnitude exceeds {:.0}% of total credit \
-             P&L — the hazard curve experienced a significant non-parallel move",
+             P&L — non-parallel hazard move and/or higher-order (spread \
+             convexity) effects the parallel CS01 steps cannot capture; on the \
+             linear (metrics-based / Taylor) wire this fires for large parallel \
+             moves too",
             ADDER_MAGNITUDE_WARN_RATIO * 100.0
         );
     }
@@ -786,7 +811,7 @@ mod tests {
     }
 
     #[test]
-    fn credit_cascade_uses_fixed_bp_factor_moves_from_market_scalars() {
+    fn credit_cascade_scales_market_scalar_factor_moves_by_issuer_betas() {
         let as_of_t0 = create_date(2025, Month::January, 1).unwrap();
         let as_of_t1 = create_date(2025, Month::January, 2).unwrap();
         let curve_id = CurveId::new("ISSUER-B-HAZ");
@@ -835,10 +860,27 @@ mod tests {
             ]
         );
         assert_eq!(deltas.len(), 5);
-        assert!((deltas[0] - 25.0).abs() < 1e-10, "generic should be +25bp");
-        assert!((deltas[1] - 7.0).abs() < 1e-10, "rating should be +7bp");
-        assert!((deltas[2] - (-2.0)).abs() < 1e-10, "region should be -2bp");
-        assert!((deltas[3]).abs() < 1e-10, "adder should reconcile to zero");
+        // Each factor step is β_issuer × ΔF (quant review M5): the calibrated
+        // identity is S_i = β_PC·F_PC + Σ β_k·L_k + adder_i, so with
+        // β_pc = 2, β_levels = [3, 4]:
+        //   generic = 2 × 25bp = 50bp; rating = 3 × 7bp = 21bp;
+        //   region = 4 × (−2bp) = −8bp; explained = 63bp.
+        // ΔS_i = 30bp hazard move (recovery 0 ⇒ par spread ≡ hazard), so the
+        // idiosyncratic adder reconciles to 30 − 63 = −33bp.
+        assert!(
+            (deltas[0] - 50.0).abs() < 1e-10,
+            "generic should be β_pc×25bp"
+        );
+        assert!((deltas[1] - 21.0).abs() < 1e-10, "rating should be β_0×7bp");
+        assert!(
+            (deltas[2] - (-8.0)).abs() < 1e-10,
+            "region should be β_1×(−2bp)"
+        );
+        assert!(
+            (deltas[3] - (-33.0)).abs() < 1e-9,
+            "adder should reconcile ΔS − Σβ·ΔF, got {}",
+            deltas[3]
+        );
         assert!(
             (deltas[4]).abs() < 1e-10,
             "curve_shape carries no bp value (it is a snap step)"
@@ -901,10 +943,17 @@ mod tests {
             ]
         );
         assert_eq!(deltas.len(), 5);
-        assert!((deltas[0] - 25.0).abs() < 1e-10);
-        assert!((deltas[1] - 5.0).abs() < 1e-10);
-        assert!((deltas[2] - (-2.0)).abs() < 1e-10);
-        assert!((deltas[3] - 2.0).abs() < 1e-10);
+        // β-scaled steps (quant review M5) with β_pc = 2, β_levels = [3, 4]:
+        // rating = 3 × 25 = 75bp, generic = 2 × 5 = 10bp,
+        // region = 4 × (−2) = −8bp; adder = 30 − 77 = −47bp.
+        assert!((deltas[0] - 75.0).abs() < 1e-10);
+        assert!((deltas[1] - 10.0).abs() < 1e-10);
+        assert!((deltas[2] - (-8.0)).abs() < 1e-10);
+        assert!(
+            (deltas[3] - (-47.0)).abs() < 1e-9,
+            "adder should reconcile ΔS − Σβ·ΔF, got {}",
+            deltas[3]
+        );
         assert!(
             (deltas[4]).abs() < 1e-10,
             "curve_shape carries no bp value (it is a snap step)"

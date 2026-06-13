@@ -483,3 +483,19 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
         "withCouponPeriod(startEpochDays: number, endEpochDays: number): DayCountContext;"
     ));
 }
+
+#[test]
+fn attribution_dts_matches_json_pipeline_surface() {
+    // Quant review MO-B4: the attribution namespace previously had zero dts
+    // assertions.
+    let dts = index_dts();
+
+    assert!(dts.contains("export interface AttributionNamespace"));
+    assert!(dts.contains("attributePnl(params: unknown): string;"));
+    assert!(dts.contains("AttributionParams: new ("));
+    assert!(dts.contains("attributePnlFromSpec(specJson: string): string;"));
+    assert!(dts.contains("validateAttributionJson(json: string): string;"));
+    assert!(dts.contains("defaultWaterfallOrder(): string[];"));
+    assert!(dts.contains("defaultAttributionMetrics(): string[];"));
+    assert!(dts.contains("export declare const attribution: AttributionNamespace;"));
+}

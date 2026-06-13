@@ -652,6 +652,69 @@ fn test_waterfall_rejects_non_carry_first_order() {
     );
 }
 
+#[test]
+fn test_waterfall_rejects_duplicate_factors() {
+    // A duplicated factor would silently overwrite its first-pass P&L with ~0
+    // (the market is already rolled on the second application) and a
+    // duplicated Carry would double-count coupon income into total_pnl, so
+    // duplicates are a hard validation error naming the repeated factor.
+    let as_of_t0 = create_date(2025, Month::January, 15).unwrap();
+    let as_of_t1 = create_date(2025, Month::January, 16).unwrap();
+
+    let bond = Bond::fixed(
+        "US-BOND-DUP-FACTOR",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        create_date(2025, Month::January, 1).unwrap(),
+        create_date(2030, Month::January, 1).unwrap(),
+        "USD-OIS",
+    )
+    .unwrap();
+    let bond_instrument: Arc<dyn Instrument> = Arc::new(bond);
+    let market_t0 = MarketContext::new();
+    let market_t1 = MarketContext::new();
+    let config = FinstackConfig::default();
+
+    let dup_order = vec![
+        AttributionFactor::Carry,
+        AttributionFactor::RatesCurves,
+        AttributionFactor::RatesCurves,
+    ];
+    let result = attribute_pnl_waterfall(
+        &bond_instrument,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        dup_order,
+        false,
+        None,
+    );
+    let err = result.expect_err("duplicate factors must be rejected");
+    let msg = format!("{err}");
+    assert!(
+        msg.contains("duplicate") && msg.contains("RatesCurves"),
+        "error message must name the duplicated factor, got: {msg}"
+    );
+
+    // A duplicated Carry is rejected by the same guard.
+    let dup_carry = vec![AttributionFactor::Carry, AttributionFactor::Carry];
+    let err = attribute_pnl_waterfall(
+        &bond_instrument,
+        &market_t0,
+        &market_t1,
+        as_of_t0,
+        as_of_t1,
+        &config,
+        dup_carry,
+        false,
+        None,
+    )
+    .expect_err("duplicate Carry must be rejected");
+    assert!(format!("{err}").contains("duplicate"));
+}
+
 finstack_valuations::impl_empty_cashflow_provider!(
     FxLinkedInstrument,
     finstack_cashflows::builder::CashflowRepresentation::NoResidual

@@ -119,14 +119,19 @@ pub(crate) fn parent_qualified_name(
 }
 
 /// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.
+///
+/// A Python `str` is first parsed as JSON; when that fails it is treated as
+/// a **bare string value** (`serde_json::Value::String`). This is what
+/// externally-tagged serde enums expect for unit variants — e.g. the
+/// documented `attribute_pnl(..., method="Parallel")` form, which previously
+/// raised `ValueError: invalid method JSON` (quant review M11).
 pub(crate) fn py_to_json_value<'py>(
     py: Python<'py>,
     obj: &Bound<'py, PyAny>,
     label: &str,
 ) -> PyResult<Value> {
     if let Ok(json) = obj.extract::<String>() {
-        return serde_json::from_str(&json)
-            .map_err(|e| crate::errors::value_error(format!("invalid {label} JSON: {e}")));
+        return Ok(serde_json::from_str(&json).unwrap_or(Value::String(json)));
     }
 
     let json_mod = py.import("json")?;

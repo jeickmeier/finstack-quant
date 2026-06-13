@@ -816,6 +816,14 @@ impl DiscountCurve {
                 target_bucket,
                 next_bucket,
             } => {
+                // Reject malformed bucket grids (e.g. infinite sentinels)
+                // before mutating: a non-finite neighbour yields NaN weights
+                // and corrupts the curve.
+                super::common::validate_triangular_bucket_grid(
+                    prev_bucket,
+                    target_bucket,
+                    next_bucket,
+                )?;
                 for (df, &t) in self.dfs.iter_mut().zip(self.knots.iter()) {
                     let weight = super::common::triangular_weight(
                         t,

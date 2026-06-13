@@ -175,7 +175,11 @@ impl AttributionSpec {
                     &attribution,
                     &mut detail_notes,
                 ) {
-                    Ok(Some(detail)) => attribution.credit_factor_detail = Some(detail),
+                    Ok(Some(detail)) => {
+                        attribution.credit_factor_detail = Some(detail);
+                        // The detail back-solve performs 2 CS01 repricings.
+                        attribution.meta.num_repricings += 2;
+                    }
                     Ok(None) => {
                         if detail_notes.is_empty() {
                             attribution.meta.notes.push(
@@ -202,12 +206,10 @@ impl AttributionSpec {
             // Best-effort: failures fall back to leaving the existing scalar
             // CarryDetail untouched and append a diagnostic note.
             //
-            // Note: Parallel and Waterfall attribution methods do not currently
-            // populate `carry_detail` (only `coupon_income` and `theta` from
-            // `apply_total_return_carry` for some paths). Therefore
-            // `credit_carry_decomposition` is typically emitted only on the
-            // MetricsBased / Taylor path. Future PRs may extend Parallel/Waterfall
-            // to populate carry — the decomposition logic is method-agnostic.
+            // All four methods populate `carry_detail` (parallel / waterfall /
+            // Taylor via `apply_total_return_carry`; metrics-based from the
+            // carry decomposition metrics), so the split is attempted on every
+            // path — the decomposition logic is method-agnostic.
             match self.compute_carry_credit_split_and_decomposition(
                 model_ref,
                 &instrument_arc,
@@ -232,28 +234,60 @@ impl AttributionSpec {
                     // translation formula. We can't reuse the per-method
                     // val_t0 because it's not surfaced; the extra reprice is
                     // cheap relative to a full attribution run.
-                    match instrument_arc.value(&market_t0, self.as_of_t0) {
-                        Ok(val_t0_native) => match crate::translate_to_target_ccy(
-                            &mut attribution,
-                            val_t0_native,
-                            target_ccy,
-                            &market_t0,
-                            &market_t1,
-                            self.as_of_t0,
-                            self.as_of_t1,
-                        ) {
-                            Ok(()) => {}
-                            Err(e) => attribution
-                                .meta
-                                .notes
-                                .push(format!("target_ccy translation failed: {e}")),
-                        },
+                    //
+                    // MO-E5 (quant review): when T0 model parameters were
+                    // supplied, the methods priced their val_t0 with the
+                    // T0-PARAMETER instrument — the translation must use the
+                    // same instrument or `fx_translation_pnl` and the
+                    // recovered val_t1 drift by the parameter-induced
+                    // valuation gap.
+                    let t0_instrument = match self.model_params_t0.as_ref() {
+                        Some(params) => {
+                            match crate::model_params::with_model_params(&instrument_arc, params) {
+                                Ok(inst) => inst,
+                                Err(e) => {
+                                    attribution.meta.notes.push(format!(
+                                        "target_ccy translation: T0 model-parameter application \
+                                         failed ({e}); using T1-parameter instrument for val_t0"
+                                    ));
+                                    std::sync::Arc::clone(&instrument_arc)
+                                }
+                            }
+                        }
+                        None => std::sync::Arc::clone(&instrument_arc),
+                    };
+                    match t0_instrument.value(&market_t0, self.as_of_t0) {
+                        Ok(val_t0_native) => {
+                            attribution.meta.num_repricings += 1;
+                            match crate::translate_to_target_ccy(
+                                &mut attribution,
+                                val_t0_native,
+                                target_ccy,
+                                &market_t0,
+                                &market_t1,
+                                self.as_of_t0,
+                                self.as_of_t1,
+                            ) {
+                                Ok(()) => {}
+                                Err(e) => attribution
+                                    .meta
+                                    .notes
+                                    .push(format!("target_ccy translation failed: {e}")),
+                            }
+                        }
                         Err(e) => attribution.meta.notes.push(format!(
                             "target_ccy translation skipped: T0 reprice failed - {e}"
                         )),
                     }
                 }
             }
+        }
+
+        // The currency-detection probe at the top of `execute` performed one
+        // full valuation; account for it so `num_repricings` reflects true
+        // pricing cost (quant review minor).
+        if instrument_ccy.is_some() {
+            attribution.meta.num_repricings += 1;
         }
 
         // Create results metadata

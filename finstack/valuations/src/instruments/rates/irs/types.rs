@@ -650,6 +650,18 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
     ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
         Some(&self.pricing_overrides)
     }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_core::Result<crate::instruments::common_impl::dependencies::MarketDependencies>
+    {
+        // Without this override the trait default returns EMPTY dependencies,
+        // which silently zeroed the rates factor in metrics-based P&L
+        // attribution for every IRS (the move fell into the residual).
+        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
+            self,
+        )
+    }
 }
 
 impl CashflowProvider for InterestRateSwap {
@@ -679,8 +691,11 @@ impl crate::instruments::common_impl::traits::CurveDependencies for InterestRate
     fn curve_dependencies(
         &self,
     ) -> finstack_core::Result<crate::instruments::common_impl::traits::InstrumentCurves> {
+        // Both legs' discount curves (they may differ, e.g. CSA discounting on
+        // one leg); the builder de-duplicates identical ids.
         crate::instruments::common_impl::traits::InstrumentCurves::builder()
             .discount(self.fixed.discount_curve_id.clone())
+            .discount(self.float.discount_curve_id.clone())
             .forward(self.float.forward_curve_id.clone())
             .build()
     }

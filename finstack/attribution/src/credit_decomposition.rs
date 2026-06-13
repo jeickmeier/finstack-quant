@@ -268,14 +268,34 @@ impl AttributionSpec {
                         .unwrap_or(self.as_of_t0)
                 })
         });
-        let r = disc
-            .zero_rate_on_date(tenor_date, Compounding::Continuous)
-            .unwrap_or(0.0);
+        // MO-C1 (quant review): a failed curve lookup must be distinguishable
+        // from a genuinely zero-rate/zero-spread issuer — silently defaulting
+        // to 0.0 mislabels the whole coupon as the other leg's carry.
+        let mut lookup_warnings: Vec<String> = Vec::new();
+        let r = match disc.zero_rate_on_date(tenor_date, Compounding::Continuous) {
+            Ok(v) => v,
+            Err(e) => {
+                lookup_warnings.push(format!(
+                    "Carry credit split: discount zero-rate lookup failed ({e}); \
+                     rates leg of the split treated as 0"
+                ));
+                0.0
+            }
+        };
         // Credit triangle: the spread driving the credit share of yield is the
         // hazard rate scaled by LGD = 1 − recovery (O'Kane, "Modelling
         // Single-name and Multi-name Credit Derivatives", Ch. 5; Hull Ch. 24).
         // The bare hazard rate would overstate the credit portion by 1/(1−R).
-        let hazard = haz.hazard_rate_on_date(tenor_date).unwrap_or(0.0);
+        let hazard = match haz.hazard_rate_on_date(tenor_date) {
+            Ok(v) => v,
+            Err(e) => {
+                lookup_warnings.push(format!(
+                    "Carry credit split: hazard-rate lookup failed ({e}); \
+                     credit leg of the split treated as 0"
+                ));
+                0.0
+            }
+        };
         let s = hazard * (1.0 - haz.recovery_rate());
 
         // 4. Split coupon_income proportionally to r and s.
@@ -288,13 +308,24 @@ impl AttributionSpec {
             Some(line) => line.total,
             None => return Ok(()),
         };
+        // Quant review M7: with negative rates (EUR/JPY books) `r + s` can be
+        // arbitrarily close to zero while `s` is material, making the naive
+        // share `s / (r + s)` explode (±10²–10⁶ × coupon into the two legs
+        // with opposite signs, while still reconciling). Since the curve
+        // builders enforce hazard ≥ 0 and recovery ∈ [0, 1], `s ≥ 0` always —
+        // so the economically meaningful credit share is clamped to [0, 1],
+        // and a near-cancelling denominator (|r + s| small relative to the
+        // component magnitudes) falls back to the degenerate all-rates split.
         let total_yield = r + s;
-        let (coupon_rates, coupon_credit) = if total_yield.abs() > 1e-15 {
-            let credit_amt = coupon.amount() * (s / total_yield);
+        let denominator_is_stable = total_yield.abs() > 1e-12 * r.abs().max(s).max(1e-3);
+        let (coupon_rates, coupon_credit) = if denominator_is_stable {
+            let credit_share = (s / total_yield).clamp(0.0, 1.0);
+            let credit_amt = coupon.amount() * credit_share;
             let rates_amt = coupon.amount() - credit_amt;
             (Money::new(rates_amt, ccy), Money::new(credit_amt, ccy))
         } else {
-            // Degenerate: zero total yield. Push everything to rates.
+            // Degenerate: total yield ≈ 0 (zero curves, or negative rates
+            // cancelling the spread). Push everything to rates.
             (coupon, Money::new(0.0, ccy))
         };
 
@@ -420,6 +451,7 @@ impl AttributionSpec {
                 adder_by_issuer,
             },
         });
+        attribution.meta.notes.extend(lookup_warnings);
 
         Ok(())
     }

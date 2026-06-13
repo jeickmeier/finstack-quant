@@ -47,7 +47,10 @@ fn test_complete_pricing_workflow() {
         )
         .unwrap();
 
-    assert_eq!(result_all.measures.len(), 7, "Step 3: All metrics computed");
+    // 7 requested metrics + the `theta_period_days` horizon stamp the theta
+    // producer always emits alongside Theta (quant review M3).
+    assert_eq!(result_all.measures.len(), 8, "Step 3: All metrics computed");
+    assert!(result_all.measures.contains_key("theta_period_days"));
 
     // 4. Validate all metrics are finite
     for (name, value) in &result_all.measures {

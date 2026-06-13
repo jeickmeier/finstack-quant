@@ -557,3 +557,118 @@ fn test_model_params_snapshot_json_structure() {
     assert!(structured.get("default_spec").is_some());
     assert!(structured.get("recovery_spec").is_some());
 }
+
+/// Quant review M10/tests-5: serde roundtrip with EVERY optional detail field
+/// POPULATED, including the formerly tuple-keyed maps (`by_tenor`, `by_pair`)
+/// that plain derived `Serialize` could not represent in JSON at all
+/// ("key must be a string" at runtime). Pins the string-keyed wire format:
+/// `"{curve_id}|{tenor}"` and `"{FROM}/{TO}"`.
+#[test]
+fn test_populated_detail_fields_roundtrip_through_json() {
+    use finstack_attribution::{
+        CorrelationsAttribution, CreditCurvesAttribution, CrossFactorDetail, FxAttribution,
+        InflationCurvesAttribution, RatesCurvesAttribution, VolAttribution,
+    };
+    use finstack_core::types::CurveId;
+    use indexmap::IndexMap;
+
+    let usd = |v: f64| Money::new(v, Currency::USD);
+
+    let mut attr = finstack_attribution::PnlAttribution::new(
+        usd(1000.0),
+        "DETAIL-BOND",
+        create_date(2025, Month::January, 1).unwrap(),
+        create_date(2025, Month::January, 2).unwrap(),
+        AttributionMethod::Parallel,
+    );
+
+    let mut rates_by_curve = IndexMap::new();
+    rates_by_curve.insert(CurveId::new("USD-OIS"), usd(50.0));
+    let mut rates_by_tenor = IndexMap::new();
+    rates_by_tenor.insert((CurveId::new("USD-OIS"), "5Y".to_string()), usd(30.0));
+    rates_by_tenor.insert((CurveId::new("USD-OIS"), "10Y".to_string()), usd(20.0));
+    attr.rates_detail = Some(RatesCurvesAttribution {
+        by_curve: rates_by_curve,
+        by_tenor: rates_by_tenor,
+        discount_total: usd(50.0),
+        forward_total: usd(0.0),
+    });
+
+    let mut credit_by_curve = IndexMap::new();
+    credit_by_curve.insert(CurveId::new("ACME-HAZ"), usd(-12.0));
+    let mut credit_by_tenor = IndexMap::new();
+    credit_by_tenor.insert((CurveId::new("ACME-HAZ"), "5Y".to_string()), usd(-12.0));
+    attr.credit_detail = Some(CreditCurvesAttribution {
+        by_curve: credit_by_curve,
+        by_tenor: credit_by_tenor,
+    });
+
+    let mut infl_by_curve = IndexMap::new();
+    infl_by_curve.insert(CurveId::new("US-CPI"), usd(3.0));
+    let mut infl_by_tenor = IndexMap::new();
+    infl_by_tenor.insert((CurveId::new("US-CPI"), "5Y".to_string()), usd(3.0));
+    attr.inflation_detail = Some(InflationCurvesAttribution {
+        by_curve: infl_by_curve,
+        by_tenor: Some(infl_by_tenor),
+    });
+
+    let mut corr_by_curve = IndexMap::new();
+    corr_by_curve.insert(CurveId::new("CDX-BASE-CORR"), usd(1.5));
+    attr.correlations_detail = Some(CorrelationsAttribution {
+        by_curve: corr_by_curve,
+    });
+
+    let mut fx_by_pair = IndexMap::new();
+    fx_by_pair.insert((Currency::EUR, Currency::USD), usd(7.0));
+    attr.fx_detail = Some(FxAttribution {
+        by_pair: fx_by_pair,
+    });
+
+    let mut vol_by_surface = IndexMap::new();
+    vol_by_surface.insert(CurveId::new("SPX-VOL"), usd(-4.0));
+    attr.vol_detail = Some(VolAttribution {
+        by_surface: vol_by_surface,
+    });
+
+    let mut cross_by_pair = IndexMap::new();
+    cross_by_pair.insert("Rates×Credit".to_string(), usd(-2.0));
+    attr.cross_factor_detail = Some(CrossFactorDetail {
+        total: usd(-2.0),
+        by_pair: cross_by_pair,
+    });
+
+    // Serialization must SUCCEED (the old tuple-keyed derive failed here) and
+    // the string keys must follow the documented format.
+    let json = serde_json::to_string(&attr).expect("populated detail must serialize to JSON");
+    assert!(json.contains("USD-OIS|5Y"), "tenor keys use 'curve|tenor'");
+    assert!(json.contains("EUR/USD"), "fx keys use 'FROM/TO'");
+
+    let parsed: finstack_attribution::PnlAttribution =
+        serde_json::from_str(&json).expect("roundtrip parse");
+    let rates = parsed.rates_detail.expect("rates detail");
+    assert_eq!(
+        rates.by_tenor[&(CurveId::new("USD-OIS"), "5Y".to_string())],
+        usd(30.0)
+    );
+    assert_eq!(
+        parsed.credit_detail.expect("credit detail").by_tenor
+            [&(CurveId::new("ACME-HAZ"), "5Y".to_string())],
+        usd(-12.0)
+    );
+    assert_eq!(
+        parsed
+            .inflation_detail
+            .expect("inflation detail")
+            .by_tenor
+            .expect("inflation by_tenor")[&(CurveId::new("US-CPI"), "5Y".to_string())],
+        usd(3.0)
+    );
+    assert_eq!(
+        parsed.fx_detail.expect("fx detail").by_pair[&(Currency::EUR, Currency::USD)],
+        usd(7.0)
+    );
+    assert_eq!(
+        parsed.vol_detail.expect("vol detail").by_surface[&CurveId::new("SPX-VOL")],
+        usd(-4.0)
+    );
+}

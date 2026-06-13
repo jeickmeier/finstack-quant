@@ -186,6 +186,27 @@ fn synthetic_parallel_instrument_surfaces_rates_credit_cross_factor() {
         parallel_detail.total.amount(),
         parallel.cross_factor_pnl.amount()
     );
+
+    // The cross term is stored as the additive reconciliation contribution
+    // (the negated mixed second difference). For V = k·r·h each isolated
+    // factor is measured with the other at its (higher) T1 level, so the sum
+    // of isolated effects overstates the total and the additive cross term
+    // must be negative: −k·(r1−r0)·(h1−h0).
+    assert!(
+        parallel.cross_factor_pnl.amount() < 0.0,
+        "additive cross term should be negative for an up-up co-movement on V = k·r·h, got {}",
+        parallel.cross_factor_pnl.amount()
+    );
+
+    // With the pairwise cross term extracted, this purely bilinear two-factor
+    // instrument must reconcile exactly: total = rates + credit + cross, so
+    // the residual collapses to ~0 (it was −2× the interaction before the
+    // sign fix).
+    assert!(
+        parallel.residual.amount().abs() < 1e-6,
+        "residual should be ~0 once the cross term is extracted, got {}",
+        parallel.residual.amount()
+    );
 }
 
 fn assert_policy_equivalent(left: &PnlAttribution, right: &PnlAttribution) {

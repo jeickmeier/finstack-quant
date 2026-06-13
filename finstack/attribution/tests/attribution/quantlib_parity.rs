@@ -108,9 +108,11 @@ struct BondExpectedAttribution {
     actual_pnl: f64,
     carry_pnl: f64,
     rates_pnl_first_order: f64,
-    /// QL's first-order residual is mostly second-order convexity. Used as a
-    /// rough magnitude check on finstack's residual, not a tight assertion.
-    #[allow(dead_code)]
+    /// QL's first-order residual is mostly second-order convexity. The bond
+    /// test bounds finstack's residual by it: the metrics path includes the
+    /// convexity term, so its residual must not exceed QL's FIRST-order
+    /// residual (plus tolerance) — a convexity-handling regression that
+    /// inflates the residual while carry/rates stay in tolerance fails here.
     residual_first_order: f64,
 }
 
@@ -224,6 +226,18 @@ fn quantlib_parity_metrics_based_bond_attribution() {
         recon,
         attribution.total_pnl.amount(),
         recon_err
+    );
+
+    // Residual magnitude bound vs the QL fixture (quant review tests-12):
+    // finstack's metrics path includes the convexity term, so its residual
+    // must be no larger than QL's first-order residual plus the factor
+    // tolerance (scaled to face value).
+    assert!(
+        attribution.residual.amount().abs()
+            <= exp.residual_first_order.abs() + ATTR_FACTOR_TOLERANCE * 10_000.0,
+        "bond residual ({}) must not exceed QL's first-order residual ({})",
+        attribution.residual.amount(),
+        exp.residual_first_order
     );
 
     // Sanity: finstack's total_pnl matches QL's actual_pnl within the
@@ -360,11 +374,20 @@ fn build_irs(
     swap
 }
 
-/// Attribution-level tolerance for IRS components (USD on $10M notional,
-/// ~0.05% of notional). Wider than the bond case because of the underlying
-/// schedule drift documented on
-/// `IRS_NPV_TOLERANCE_USD` in the valuations parity test.
-const IRS_ATTR_TOLERANCE_USD: f64 = 5_000.0;
+/// Per-component IRS tolerances (quant review M14): a single $5k absolute
+/// tolerance was vacuous — the fixture's carry is $566 and rates P&L $4,198,
+/// so a zeroed or sign-flipped carry, and a fully dropped rates factor, all
+/// passed. Factor P&Ls are first differences, largely immune to the NPV-level
+/// schedule drift, so each component is bounded relative to its own expected
+/// magnitude: carry within max($100, 25%); rates within max($250, 5%) —
+/// consistent with the 5% relative DV01 drift documented in the valuations
+/// parity test.
+fn irs_carry_tolerance(expected: f64) -> f64 {
+    (0.25 * expected.abs()).max(100.0)
+}
+fn irs_rates_tolerance(expected: f64) -> f64 {
+    (0.05 * expected.abs()).max(250.0)
+}
 
 #[test]
 fn quantlib_parity_metrics_based_irs_attribution() {
@@ -414,34 +437,55 @@ fn quantlib_parity_metrics_based_irs_attribution() {
 
     let exp = &fixture.expected_attribution;
 
+    let carry_tol = irs_carry_tolerance(exp.carry_pnl);
     let carry_diff = (attribution.carry.amount() - exp.carry_pnl).abs();
     assert!(
-        carry_diff < IRS_ATTR_TOLERANCE_USD,
+        carry_diff < carry_tol,
         "IRS carry parity: finstack={}, ql_expected={}, diff={} > tol {}",
         attribution.carry.amount(),
         exp.carry_pnl,
         carry_diff,
-        IRS_ATTR_TOLERANCE_USD
+        carry_tol
     );
 
+    let rates_tol = irs_rates_tolerance(exp.rates_pnl_first_order);
     let rates_diff = (attribution.rates_curves_pnl.amount() - exp.rates_pnl_first_order).abs();
     assert!(
-        rates_diff < IRS_ATTR_TOLERANCE_USD,
+        rates_diff < rates_tol,
         "IRS rates parity: finstack={}, ql_expected={}, diff={} > tol {}",
         attribution.rates_curves_pnl.amount(),
         exp.rates_pnl_first_order,
         rates_diff,
-        IRS_ATTR_TOLERANCE_USD
+        rates_tol
     );
 
     let total_diff = (attribution.total_pnl.amount() - exp.actual_pnl).abs();
     assert!(
-        // Same NPV-drift tolerance as the valuations parity (≈0.15% of notional).
-        total_diff < 15_000.0,
+        // Total carries the NPV-level schedule drift: max($1k, 0.05% notional).
+        total_diff < (0.0005 * fixture.spec.notional).max(1_000.0),
         "IRS total_pnl parity: finstack={}, ql_actual_pnl={}, diff={}",
         attribution.total_pnl.amount(),
         exp.actual_pnl,
         total_diff
+    );
+
+    // Reconciliation invariant (previously missing on the IRS leg): the
+    // attribution must internally close, Σ factors + residual ≡ total.
+    let attributed_sum = attribution.carry.amount()
+        + attribution.rates_curves_pnl.amount()
+        + attribution.credit_curves_pnl.amount()
+        + attribution.inflation_curves_pnl.amount()
+        + attribution.correlations_pnl.amount()
+        + attribution.fx_pnl.amount()
+        + attribution.vol_pnl.amount()
+        + attribution.cross_factor_pnl.amount()
+        + attribution.model_params_pnl.amount()
+        + attribution.market_scalars_pnl.amount();
+    let recon_err =
+        (attributed_sum + attribution.residual.amount() - attribution.total_pnl.amount()).abs();
+    assert!(
+        recon_err < 1e-6,
+        "IRS reconciliation: Σ factors + residual must equal total, err={recon_err}"
     );
 }
 
@@ -524,12 +568,12 @@ fn fx_market(as_of: Date, usd_rate: f64, eur_rate: f64, spot_eur_usd: f64) -> Ma
 /// FxForward uses the same CIRP formula as the QL fixture so the base PV is
 /// essentially exact.
 const FX_FWD_TOTAL_TOLERANCE_USD: f64 = 5.0;
-/// Per-factor tolerance on linear FX-attribution components. The QL fixture's
-/// own `residual_first_order` is ~$213 on a $533 total move — a structural
-/// second-order residual the linear path cannot capture by construction.
-/// We assert tight agreement on the well-defined linear components (carry,
-/// USD rate × Δr) and a looser bound on the spot-dominated FX bucket.
-#[allow(dead_code)]
+/// Per-factor tolerance on linear FX-attribution components. The fixture's
+/// `residual_first_order` is ~−$0.24 on a $533 total move (a 1-day FX
+/// forward is nearly linear), so per-factor agreement is asserted tightly:
+/// carry within $1, rate factors within $2, and the spot-dominated FX bucket
+/// within 1% + $5 (routing between fx_pnl and market_scalars_pnl varies with
+/// the metric the pricer reported).
 const FX_FWD_FACTOR_TOLERANCE_USD: f64 = 5.0;
 
 #[test]
@@ -574,9 +618,15 @@ fn quantlib_parity_metrics_based_fx_forward_attribution() {
         fixture.scenario.spot_t1,
     );
 
+    // BucketedDv01 is required for correct multi-curve attribution: the
+    // aggregate Dv01 for an FX forward is a JOINT both-curves bump (≈ 0 by
+    // construction, USD and EUR DV01s cancel), so the aggregate fallback
+    // cannot attribute a single-curve move — the per-curve key-rate series
+    // pairs each curve's DV01 with its own realized shift.
     let metrics = [
         MetricId::Theta,
         MetricId::Dv01,
+        MetricId::BucketedDv01,
         MetricId::Delta,
         MetricId::Fx01,
     ];
@@ -631,27 +681,41 @@ fn quantlib_parity_metrics_based_fx_forward_attribution() {
         attribution.total_pnl.amount()
     );
 
-    // FX-component parity: the linear path captures Delta × Δspot + DV01 × Δrate
-    // on the USD curve. The EUR move is 0 in the fixture, so eur_rate_pnl
-    // should be ≈ 0 from both sides.
+    // Per-factor parity (quant review M13: these assertions were previously
+    // discarded with `let _ = (...)`, and the fixture itself carried a
+    // sign-flipped rate P&L rationalized as a "structural second-order
+    // residual" — false for a 1-day FX forward, whose true first-order
+    // residual is −$0.24).
     //
-    // Pragmatic note: finstack's "fx_pnl" component is *pricing-impact* FX
-    // (FX matrix into the pricer); the QL fixture's `fx_pnl_first_order` is
-    // computed as `spot_delta × Δspot` which is the same quantity. We assert
-    // the sum of finstack's FX-related components matches QL within
-    // FX_FWD_FACTOR_TOLERANCE_USD.
-    let _ = (
+    // Carry: theta × 1 day, closed-form on both sides.
+    let carry_diff = (attribution.carry.amount() - exp.carry_pnl).abs();
+    assert!(
+        carry_diff < 1.0,
+        "FxForward carry parity: finstack={}, ql={}, diff={}",
+        attribution.carry.amount(),
         exp.carry_pnl,
-        exp.usd_rate_pnl_first_order,
-        exp.eur_rate_pnl_first_order,
-        exp.fx_pnl_first_order,
+        carry_diff
     );
+
+    // Rates: both curves feed the rates bucket; the fixture moves only USD
+    // (+1bp) so the rates factor must match usd + eur (= usd + 0) tightly.
+    let rates_expected = exp.usd_rate_pnl_first_order + exp.eur_rate_pnl_first_order;
+    let rates_diff = (attribution.rates_curves_pnl.amount() - rates_expected).abs();
+    assert!(
+        rates_diff < 2.0,
+        "FxForward rates parity: finstack={}, ql(usd+eur)={}, diff={}",
+        attribution.rates_curves_pnl.amount(),
+        rates_expected,
+        rates_diff
+    );
+
+    // FX-component parity: the linear path captures Delta × Δspot + DV01 × Δrate
+    // on the USD curve. finstack may route the spot-driven FX P&L through
+    // either `fx_pnl` (Fx01 × Δfx) or `market_scalars_pnl` (Delta × Δspot)
+    // depending on which metric the pricer reported, so the two are summed.
     let fx_total = attribution.fx_pnl.amount() + attribution.market_scalars_pnl.amount();
     let fx_total_diff = (fx_total - exp.fx_pnl_first_order).abs();
-    // Loose bound because finstack may route the spot-driven FX P&L through
-    // either `fx_pnl` (Fx01 × Δfx) or `market_scalars_pnl` (Delta × Δspot)
-    // depending on which metric the pricer reported.
-    let fx_tol = exp.fx_pnl_first_order.abs() * 0.10 + FX_FWD_FACTOR_TOLERANCE_USD;
+    let fx_tol = exp.fx_pnl_first_order.abs() * 0.01 + FX_FWD_FACTOR_TOLERANCE_USD;
     assert!(
         fx_total_diff < fx_tol,
         "FxForward FX-component parity: finstack(fx+scalars)={}, ql_fx_first_order={}, diff={} > tol {}",
@@ -659,5 +723,17 @@ fn quantlib_parity_metrics_based_fx_forward_attribution() {
         exp.fx_pnl_first_order,
         fx_total_diff,
         fx_tol
+    );
+
+    // The fixture's own first-order residual must stay tiny — this pins the
+    // generator's sign convention (a flipped rate sign inflates it to ~$213).
+    let fixture_residual = exp.actual_pnl
+        - exp.carry_pnl
+        - exp.usd_rate_pnl_first_order
+        - exp.eur_rate_pnl_first_order
+        - exp.fx_pnl_first_order;
+    assert!(
+        fixture_residual.abs() < 1.0,
+        "fixture first-order residual should be ~0 for a 1-day FX forward, got {fixture_residual}"
     );
 }
