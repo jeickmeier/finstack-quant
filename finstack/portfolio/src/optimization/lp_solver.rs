@@ -240,7 +240,9 @@ impl DefaultLpOptimizer {
     ///
     /// This covers Steps 4 and 5 of [`Self::optimize`]: lowering the objective
     /// expression and each [`Constraint`] into coefficient vectors. A synthetic
-    /// budget row is appended when the problem declares none.
+    /// budget row is appended when the problem declares none, except under
+    /// [`WeightingScheme::UnitScaling`] where a sum-of-multipliers budget is
+    /// dimensionally meaningless and must be caller-explicit (MO-9).
     fn build_lp_rows(
         problem: &PortfolioOptimizationProblem,
         decision_features: &[DecisionFeatures],
@@ -342,6 +344,12 @@ impl DefaultLpOptimizer {
         }
 
         if !has_budget {
+            if matches!(problem.weighting, WeightingScheme::UnitScaling) {
+                return Err(Error::invalid_input(
+                    "MO-9: UnitScaling requires an explicit budget or other bounding constraints; \
+                     the optimizer will not synthesize sum(multipliers) = 1",
+                ));
+            }
             lp_constraints.push(LpConstraint {
                 coefficients: vec![1.0; n_vars],
                 relation: Inequality::Eq,

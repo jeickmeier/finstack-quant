@@ -22,9 +22,11 @@
 //!
 //! Only the [`FactorVolModel::Sample`] variant is supported. `OneStep` and
 //! `Unconditional` map to the calibrated annualized variance unchanged;
-//! `NSteps(n)` multiplies variance by `n` (i.e. square-root-of-time scaling
-//! when converted to vol). `VolHorizon::Custom` is intentionally **not**
-//! exposed in PR-6 to keep PyO3 / WASM binding generation in PR-10/11 simple.
+//! `NSteps(n)` means `n` annualized model periods and multiplies variance by
+//! `n`; fractional calendar horizons use `Years(y)` or parser input
+//! `{"n_steps": N, "periods_per_year": P}`. `VolHorizon::Custom` is
+//! intentionally **not** exposed in PR-6 to keep PyO3 / WASM binding generation
+//! in PR-10/11 simple.
 //!
 //! # Reuse
 //!
@@ -37,7 +39,6 @@
 
 use std::collections::BTreeMap;
 
-use finstack_core::math::special_functions::{norm_pdf, standard_normal_inv_cdf};
 use finstack_core::types::IssuerId;
 use finstack_factor_model::credit::hierarchy::{
     CreditFactorModel, FactorVolModel, IdiosyncraticVolModel,
@@ -53,19 +54,22 @@ use finstack_valuations::Error as ValuationsError;
 
 /// Forecast horizon used to scale a calibrated `Sample` vol estimate.
 ///
-/// PR-6 supports three horizons. The `Custom` variant from the design spec is
-/// intentionally **not** exposed yet to keep the PyO3 / WASM bindings (PR-10
-/// / PR-11) simple to generate without serializing arbitrary scaling
-/// callables.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// PR-6 supports annualized period counts and explicit fractional-year
+/// horizons. The `Custom` variant from the design spec is intentionally
+/// **not** exposed yet to keep the PyO3 / WASM bindings simple to generate
+/// without serializing arbitrary scaling callables.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum VolHorizon {
     /// One-period horizon. Returns the calibrated annualized variance
     /// unchanged (Sample model).
     OneStep,
-    /// `n`-period horizon. Variance scales linearly with `n`; vol therefore
-    /// scales as `sqrt(n)` after the variance → vol conversion. `n = 0`
-    /// returns zero variance.
+    /// `n` annualized model periods. Variance scales linearly with `n`; vol
+    /// therefore scales as `sqrt(n)` after the variance → vol conversion.
+    /// `n = 0` returns zero variance.
     NSteps(usize),
+    /// Fractional-year horizon. For example, 10 trading days from annualized
+    /// variances should use `Years(10.0 / 252.0)` rather than `NSteps(10)`.
+    Years(f64),
     /// Long-run / unconditional horizon. For a [`FactorVolModel::Sample`]
     /// model the long-run variance is the sample variance, so this is
     /// numerically identical to [`Self::OneStep`] in PR-6. The variant is
@@ -84,6 +88,9 @@ impl VolHorizon {
     /// - `"one_step"` → [`VolHorizon::OneStep`]
     /// - `"unconditional"` → [`VolHorizon::Unconditional`]
     /// - a JSON object string `'{"n_steps": N}'` → [`VolHorizon::NSteps`]
+    /// - a JSON object string `'{"years": Y}'` → [`VolHorizon::Years`]
+    /// - a JSON object string `'{"n_steps": N, "periods_per_year": P}'`
+    ///   → [`VolHorizon::Years`] with `Y = N / P` (MO-20)
     ///
     /// # Errors
     ///
@@ -94,20 +101,42 @@ impl VolHorizon {
             "one_step" => Ok(VolHorizon::OneStep),
             "unconditional" => Ok(VolHorizon::Unconditional),
             other => {
-                // Try JSON object {"n_steps": N}.
+                // Try JSON object {"years": Y} or {"n_steps": N}.
                 let v: serde_json::Value = serde_json::from_str(other).map_err(|_| {
                     format!(
                         "invalid horizon {other:?}: expected \"one_step\", \"unconditional\", \
-                         or {{\"n_steps\": N}}"
+                         {{\"years\": Y}}, or {{\"n_steps\": N}}"
                     )
                 })?;
+                if let Some(years) = v.get("years").and_then(serde_json::Value::as_f64) {
+                    if years.is_finite() && years >= 0.0 {
+                        return Ok(VolHorizon::Years(years));
+                    }
+                    return Err(format!(
+                        "invalid horizon object {other:?}: years must be finite and non-negative"
+                    ));
+                }
                 let n = v
                     .get("n_steps")
                     .and_then(serde_json::Value::as_u64)
                     .ok_or_else(|| {
-                        format!("invalid horizon object {other:?}: expected {{\"n_steps\": N}}")
-                    })? as usize;
-                Ok(VolHorizon::NSteps(n))
+                        format!(
+                            "invalid horizon object {other:?}: expected {{\"years\": Y}} or \
+                             {{\"n_steps\": N}}"
+                        )
+                    })?;
+                if let Some(periods_per_year) = v
+                    .get("periods_per_year")
+                    .and_then(serde_json::Value::as_f64)
+                {
+                    if periods_per_year.is_finite() && periods_per_year > 0.0 {
+                        return Ok(VolHorizon::Years(n as f64 / periods_per_year));
+                    }
+                    return Err(format!(
+                        "invalid horizon object {other:?}: periods_per_year must be finite and positive"
+                    ));
+                }
+                Ok(VolHorizon::NSteps(n as usize))
             }
         }
     }
@@ -122,6 +151,7 @@ impl VolHorizon {
             // f64 mantissa precision (53 bits ≈ 9e15).
             #[allow(clippy::cast_precision_loss)]
             Self::NSteps(n) => variance * (n as f64),
+            Self::Years(years) => variance * years,
         }
     }
 }
@@ -192,10 +222,10 @@ impl<'a> FactorCovarianceForecast<'a> {
             let variance = match vol_model {
                 FactorVolModel::Sample { variance } => horizon.scale_sample_variance(*variance),
             };
-            if variance < 0.0 {
+            if !variance.is_finite() || variance < 0.0 {
                 return Err(ValuationsError::Core(finstack_core::Error::Validation(
                     format!(
-                        "FactorCovarianceForecast: negative variance {variance} for factor {fid}"
+                        "FactorCovarianceForecast: invalid variance {variance} for factor {fid}"
                     ),
                 )));
             }
@@ -240,10 +270,10 @@ impl<'a> FactorCovarianceForecast<'a> {
         let variance = match model {
             IdiosyncraticVolModel::Sample { variance } => horizon.scale_sample_variance(*variance),
         };
-        if variance < 0.0 {
+        if !variance.is_finite() || variance < 0.0 {
             return Err(ValuationsError::Core(finstack_core::Error::Validation(
                 format!(
-                    "FactorCovarianceForecast: negative idiosyncratic variance {variance} for \
+                    "FactorCovarianceForecast: invalid idiosyncratic variance {variance} for \
                      issuer {}",
                     issuer_id.as_str()
                 ),
@@ -305,9 +335,9 @@ impl<'a> FactorCovarianceForecast<'a> {
 ///
 /// Produced by [`build_credit_vol_report`] from a portfolio
 /// [`RiskDecomposition`] together with the calibrated [`CreditFactorModel`].
-/// All values are in the units of [`Self::measure`]. `idiosyncratic_total` is
-/// computed by combining per-position residual *variances* (independent), then
-/// converted to match `measure`.
+/// All values are in the units of [`Self::measure`]. `idiosyncratic_total`
+/// mirrors [`RiskDecomposition::residual_risk`] so the report remains
+/// additive with the Euler-scaled factor contributions.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CreditVolReport {
     /// Total annualized risk under the chosen risk measure (matches
@@ -320,11 +350,11 @@ pub struct CreditVolReport {
     /// Per-hierarchy-level rollup, indexed positionally so callers can pair
     /// each entry with the matching [`CreditFactorModel::hierarchy`] level.
     pub by_level: Vec<LevelVolContribution>,
-    /// Portfolio idiosyncratic risk in the units of [`Self::measure`]: the sum
-    /// of independent per-position residual *variances* (from
-    /// [`RiskDecomposition::position_residual_contributions`]), converted to
-    /// `measure` units — identity for Variance, `sqrt` for Volatility, and the
-    /// standalone parametric tail figure carrying the loss sign for VaR/ES.
+    /// Portfolio idiosyncratic risk in the units of [`Self::measure`], sourced
+    /// from [`RiskDecomposition::residual_risk`]. This is an Euler-scaled
+    /// residual contribution, not standalone residual-only risk, so
+    /// `generic + levels + idiosyncratic_total` reconciles to [`Self::total`]
+    /// for additive credit decompositions.
     pub idiosyncratic_total: f64,
     /// Optional per-position breakdown if requested by the caller.
     pub by_position_optional: Option<Vec<PositionVolContribution>>,
@@ -352,16 +382,12 @@ pub struct PositionVolContribution {
     /// Total factor-driven (systematic) risk for the position.
     pub factor_total: f64,
     /// Idiosyncratic (issuer-specific) risk for the position in the units of
-    /// [`CreditVolReport::measure`]. Computed from the per-position residual
-    /// *variance*, then converted to match `measure`: identity for Variance,
-    /// `sqrt` for Volatility, and the standalone parametric tail figure
-    /// (`-z·σ` for VaR, `-(φ(z)/(1−c))·σ` for ES, carrying the loss sign) for
-    /// the tail measures.
+    /// [`CreditVolReport::measure`]. Allocated from
+    /// [`CreditVolReport::idiosyncratic_total`] in proportion to residual
+    /// variance so per-position rows remain additive.
     pub idiosyncratic: f64,
-    /// Approximate total combining factor and idiosyncratic contributions in
-    /// the units of `measure`. For Volatility, this is `factor + idio` rather
-    /// than `sqrt(factor² + idio²)` — see PR-7 for refinement when
-    /// factor-residual covariance becomes available.
+    /// Additive total combining factor and idiosyncratic contributions in the
+    /// units of `measure`.
     pub total: f64,
 }
 
@@ -443,16 +469,18 @@ pub fn build_credit_vol_report(
             .or_insert(0.0) += fc.absolute_risk;
     }
 
-    // Sum per-position residual variances (independent across positions, so
-    // portfolio idiosyncratic variance = sum of individual variances).
+    // Sum per-position residual variances for per-position allocation weights.
     let idiosyncratic_variance_sum: f64 = decomposition
         .position_residual_contributions
         .iter()
         .map(|c| c.residual_variance)
         .sum();
-    // Convert to match `measure` (sign/scale consistent with the systematic side).
-    let idiosyncratic_total =
-        idiosyncratic_in_measure_units(idiosyncratic_variance_sum, decomposition.measure);
+    let idiosyncratic_total = decomposition.residual_risk;
+    let residual_allocation_scale = if idiosyncratic_variance_sum > 0.0 {
+        idiosyncratic_total / idiosyncratic_variance_sum
+    } else {
+        0.0
+    };
 
     let by_position_optional = if by_position {
         // Aggregate per-position factor totals. We key on the position id's
@@ -465,8 +493,8 @@ pub fn build_credit_vol_report(
                 .or_insert_with(|| (pfc.position_id.clone(), 0.0));
             entry.1 += pfc.risk_contribution;
         }
-        // Accumulate residual *variances* per position (correct for independent
-        // residuals). Conversion to `measure` units happens after the loop.
+        // Accumulate residual *variances* per position, then allocate the
+        // additive residual contribution by variance share (MO-18).
         let mut idio_by_pos: BTreeMap<String, (PositionId, f64)> = BTreeMap::new();
         for prc in &decomposition.position_residual_contributions {
             let entry = idio_by_pos
@@ -474,9 +502,8 @@ pub fn build_credit_vol_report(
                 .or_insert_with(|| (prc.position_id.clone(), 0.0));
             entry.1 += prc.residual_variance;
         }
-        // Convert variance sums to match `measure`.
         for (_, variance) in idio_by_pos.values_mut() {
-            *variance = idiosyncratic_in_measure_units(*variance, decomposition.measure);
+            *variance *= residual_allocation_scale;
         }
 
         let mut all_keys: std::collections::BTreeSet<String> =
@@ -522,39 +549,10 @@ pub fn build_credit_vol_report(
     }
 }
 
-/// Convert an idiosyncratic (residual) *variance* into the units of `measure`,
-/// matching the sign/scale convention used for the systematic side
-/// ([`RiskDecomposition::total_risk`]).
-///
-/// Residual contributions are independent across positions, so a portfolio (or
-/// per-position) idiosyncratic variance maps to:
-/// - [`RiskMeasure::Variance`] → the variance unchanged;
-/// - [`RiskMeasure::Volatility`] → its square root (a volatility);
-/// - [`RiskMeasure::VaR`] → the standalone parametric VaR `-z_c · σ`, where
-///   `z_c = Φ⁻¹(c)`;
-/// - [`RiskMeasure::ExpectedShortfall`] → `-(φ(z_c) / (1 − c)) · σ`.
-///
-/// The tail measures carry the loss (negative) sign so the idiosyncratic figure
-/// is directly comparable to the systematic total. The `-z·σ` and
-/// `-(φ(z)/(1−c))·σ` forms are exactly what the systematic simulation converges
-/// to for a normal factor model.
-fn idiosyncratic_in_measure_units(variance: f64, measure: RiskMeasure) -> f64 {
-    match measure {
-        RiskMeasure::Variance => variance,
-        RiskMeasure::Volatility => variance.max(0.0).sqrt(),
-        RiskMeasure::VaR { confidence } => {
-            -standard_normal_inv_cdf(confidence) * variance.max(0.0).sqrt()
-        }
-        RiskMeasure::ExpectedShortfall { confidence } => {
-            let z = standard_normal_inv_cdf(confidence);
-            -(norm_pdf(z) / (1.0 - confidence)) * variance.max(0.0).sqrt()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::factor_model::PositionFactorContribution;
     use finstack_core::dates::create_date;
     use finstack_core::market_data::bumps::BumpUnits;
     use finstack_core::types::{CurveId, IssuerId};
@@ -721,6 +719,14 @@ mod tests {
             VolHorizon::parse(r#"{"n_steps": 7}"#).unwrap(),
             VolHorizon::NSteps(7)
         );
+        assert_eq!(
+            VolHorizon::parse(r#"{"years": 0.5}"#).unwrap(),
+            VolHorizon::Years(0.5)
+        );
+        assert_eq!(
+            VolHorizon::parse(r#"{"n_steps": 10, "periods_per_year": 252}"#).unwrap(),
+            VolHorizon::Years(10.0 / 252.0)
+        );
     }
 
     #[test]
@@ -730,6 +736,9 @@ mod tests {
         let err2 =
             VolHorizon::parse(r#"{"steps": 3}"#).expect_err("must reject object missing n_steps");
         assert!(err2.contains("n_steps"));
+        let err3 = VolHorizon::parse(r#"{"years": -0.1}"#)
+            .expect_err("MO-20: must reject negative year fraction");
+        assert!(err3.contains("years"));
     }
 
     #[test]
@@ -818,6 +827,24 @@ mod tests {
     }
 
     #[test]
+    fn mo20_years_scales_annualized_variance_by_fractional_years() {
+        let model = two_factor_model();
+        let forecast = FactorCovarianceForecast::new(&model);
+        let one = forecast.covariance_at(VolHorizon::OneStep).unwrap();
+        let ten_days = forecast
+            .covariance_at(
+                VolHorizon::parse(r#"{"n_steps": 10, "periods_per_year": 252}"#).unwrap(),
+            )
+            .unwrap();
+        for (a, b) in one.as_slice().iter().zip(ten_days.as_slice().iter()) {
+            assert!(
+                ((10.0 / 252.0) * a - b).abs() < 1e-12,
+                "MO-20: expected 10/252·{a}={b}"
+            );
+        }
+    }
+
+    #[test]
     fn factor_model_at_uses_horizon_covariance() {
         // Use a hierarchical matching config so the rebuilt FactorModel has
         // a valid matcher for the configured factors. The factors stay
@@ -876,7 +903,7 @@ mod tests {
                     marginal_risk: 0.0,
                 },
             ],
-            residual_risk: 0.0,
+            residual_risk: 4.0,
             position_factor_contributions: vec![],
             position_residual_contributions: vec![PositionResidualContribution {
                 position_id: PositionId::new("pos-1"),
@@ -965,17 +992,24 @@ mod tests {
     }
 
     #[test]
-    fn credit_vol_report_idiosyncratic_in_var_units() {
-        use finstack_core::math::special_functions::standard_normal_inv_cdf;
-
+    fn mo18_credit_vol_report_uses_additive_residual_risk() {
         let model = two_factor_model();
         let confidence = 0.99;
         let decomposition = RiskDecomposition {
             total_risk: -50.0,
             measure: RiskMeasure::VaR { confidence },
-            factor_contributions: vec![],
-            residual_risk: 0.0,
-            position_factor_contributions: vec![],
+            factor_contributions: vec![FactorContribution {
+                factor_id: FactorId::new("credit::generic"),
+                absolute_risk: -40.0,
+                relative_risk: 0.8,
+                marginal_risk: 0.0,
+            }],
+            residual_risk: -10.0,
+            position_factor_contributions: vec![PositionFactorContribution {
+                position_id: PositionId::new("pos-1"),
+                factor_id: FactorId::new("credit::generic"),
+                risk_contribution: -40.0,
+            }],
             position_residual_contributions: vec![
                 PositionResidualContribution {
                     position_id: PositionId::new("pos-1"),
@@ -996,29 +1030,17 @@ mod tests {
 
         let report = build_credit_vol_report(&decomposition, &model, true);
 
-        // VaR idiosyncratic must be reported in loss (negative) units consistent
-        // with the systematic total: -z_c * sqrt(sum of independent residual
-        // variances).
-        let z = standard_normal_inv_cdf(confidence);
-        let expected_total = -z * (4.0_f64 + 5.0).sqrt();
-        assert!(
-            (report.idiosyncratic_total - expected_total).abs() < 1e-9,
-            "idio VaR units: got {}, expected {}",
-            report.idiosyncratic_total,
-            expected_total
-        );
-        assert!(
-            report.idiosyncratic_total < 0.0,
-            "VaR idiosyncratic must carry the loss sign"
-        );
+        assert!((report.generic - (-40.0)).abs() < 1e-12);
+        assert!((report.idiosyncratic_total - (-10.0)).abs() < 1e-12);
+        assert!((report.generic + report.idiosyncratic_total - report.total).abs() < 1e-12);
 
-        // Per-position idiosyncratic uses the same convention.
         let by_pos = report.by_position_optional.expect("by_position rows");
         let pos1 = by_pos
             .iter()
             .find(|p| p.position_id == PositionId::new("pos-1"))
             .expect("pos-1 present");
-        let expected_pos1 = -z * 4.0_f64.sqrt();
+        let expected_pos1 = -10.0 * (4.0 / 9.0);
         assert!((pos1.idiosyncratic - expected_pos1).abs() < 1e-9);
+        assert!((pos1.total - (pos1.factor_total + pos1.idiosyncratic)).abs() < 1e-12);
     }
 }

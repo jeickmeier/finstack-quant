@@ -1502,7 +1502,8 @@ impl PyCreditVolReport {
 ///   - ``VolHorizon.one_step()``
 ///   - ``VolHorizon.unconditional()``
 ///   - ``VolHorizon.n_steps(n)``
-///   - ``VolHorizon.parse("one_step" | "unconditional" | '{"n_steps": N}')``
+///   - ``VolHorizon.years(years)``
+///   - ``VolHorizon.parse("one_step" | "unconditional" | '{"n_steps": N}' | '{"years": Y}')``
 #[pyclass(
     name = "VolHorizon",
     module = "finstack.portfolio",
@@ -1540,6 +1541,18 @@ impl PyVolHorizon {
         Self::from_inner(VolHorizon::NSteps(n))
     }
 
+    #[classmethod]
+    #[pyo3(text_signature = "(cls, years)")]
+    fn years(_cls: &Bound<'_, PyType>, years: f64) -> PyResult<Self> {
+        if years.is_finite() && years >= 0.0 {
+            Ok(Self::from_inner(VolHorizon::Years(years)))
+        } else {
+            Err(crate::errors::value_error(
+                "years must be finite and non-negative",
+            ))
+        }
+    }
+
     /// Parse a horizon descriptor string (matches the Rust ``VolHorizon::parse``).
     #[classmethod]
     #[pyo3(text_signature = "(cls, s)")]
@@ -1549,13 +1562,14 @@ impl PyVolHorizon {
             .map_err(crate::errors::value_error)
     }
 
-    /// Variant label: ``"one_step"`` / ``"unconditional"`` / ``"n_steps"``.
+    /// Variant label: ``"one_step"`` / ``"unconditional"`` / ``"n_steps"`` / ``"years"``.
     #[getter]
     fn kind(&self) -> &'static str {
         match self.inner {
             VolHorizon::OneStep => "one_step",
             VolHorizon::Unconditional => "unconditional",
             VolHorizon::NSteps(_) => "n_steps",
+            VolHorizon::Years(_) => "years",
         }
     }
 
@@ -1568,11 +1582,21 @@ impl PyVolHorizon {
         }
     }
 
+    /// Fractional-year horizon when ``kind == "years"``, ``None`` otherwise.
+    #[getter]
+    fn years_value(&self) -> Option<f64> {
+        match self.inner {
+            VolHorizon::Years(years) => Some(years),
+            _ => None,
+        }
+    }
+
     fn __repr__(&self) -> String {
         match self.inner {
             VolHorizon::OneStep => "VolHorizon.one_step()".to_owned(),
             VolHorizon::Unconditional => "VolHorizon.unconditional()".to_owned(),
             VolHorizon::NSteps(n) => format!("VolHorizon.n_steps({n})"),
+            VolHorizon::Years(years) => format!("VolHorizon.years({years})"),
         }
     }
 }

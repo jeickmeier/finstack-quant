@@ -1044,3 +1044,44 @@ fn test_notional_weighting_implied_quantities_use_notional_denominator() {
     assert_eq!(result.implied_quantities.get("POS_1"), Some(&1.0));
     assert_eq!(result.implied_quantities.get("POS_2"), Some(&3.0));
 }
+
+#[test]
+fn mo9_unit_scaling_without_budget_does_not_synthesize_sum_multiplier_budget() {
+    let as_of = create_date(2024, Month::January, 1).unwrap();
+    let position = Position::new(
+        "POS_1",
+        "ENT_A",
+        "INST_1",
+        Arc::new(MetricInstrument::new(
+            "INST_1",
+            Money::new(100.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        1.0,
+        PositionUnit::Units,
+    )
+    .unwrap();
+
+    let portfolio = PortfolioBuilder::new("UNIT_SCALING_PORTFOLIO")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(position)
+        .build()
+        .unwrap();
+
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(1.0),
+            filter: None,
+        }),
+    );
+    problem.weighting = WeightingScheme::UnitScaling;
+    problem.constraints.clear();
+
+    let err = DefaultLpOptimizer
+        .optimize(&problem, &build_mock_market(), &FinstackConfig::default())
+        .expect_err("MO-9: UnitScaling must not get a synthetic budget");
+    assert!(err.to_string().contains("MO-9"), "unexpected error: {err}");
+}
