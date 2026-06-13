@@ -1319,8 +1319,8 @@ mod tests {
                     InstrumentType::CapFloor,
                     ModelKey::Discounting
                 ))
-                .is_some(),
-            "CapFloor Discounting pricer should be registered"
+                .is_none(),
+            "CapFloor Discounting pricer should not alias Black76"
         );
         assert!(
             registry

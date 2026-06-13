@@ -186,8 +186,8 @@ impl CDSTranchePricer {
             };
             let scale = if recovery_is_stochastic {
                 let unconditional_pool_exposure = copula_ref.integrate_fn(&|factors| {
-                    let z = factors.first().copied().unwrap_or(0.0);
-                    conditional_p(factors) * exposure_at(z)
+                    let recovery_driver = self.recovery_driver_for_factors(factors);
+                    conditional_p(factors) * exposure_at(recovery_driver)
                 });
                 super::expected_loss::stochastic_recovery_exposure_scale(
                     default_prob * base_exposure,
@@ -197,12 +197,12 @@ impl CDSTranchePricer {
                 1.0
             };
             let expected_loss = copula_ref.integrate_fn(&|factors| {
-                let z = factors.first().copied().unwrap_or(0.0);
+                let recovery_driver = self.recovery_driver_for_factors(factors);
                 self.conditional_equity_tranche_capped(
                     num_constituents,
                     cap_notional,
                     conditional_p(factors),
-                    scale * exposure_at(z),
+                    scale * exposure_at(recovery_driver),
                 )
             });
             return Ok(expected_loss);

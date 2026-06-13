@@ -591,6 +591,10 @@ fn infer_single_period_frequency(start_date: Date, maturity: Date) -> Tenor {
 impl crate::instruments::common_impl::traits::Instrument for CapFloor {
     impl_instrument_base!(crate::pricer::InstrumentType::CapFloor);
 
+    fn default_model(&self) -> crate::pricer::ModelKey {
+        crate::pricer::ModelKey::Black76
+    }
+
     fn base_value(
         &self,
         curves: &finstack_core::market_data::context::MarketContext,

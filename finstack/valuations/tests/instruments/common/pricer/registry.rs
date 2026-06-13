@@ -763,7 +763,7 @@ fn test_standard_registry_has_all_options_pricers() {
             InstrumentType::CapFloor,
             ModelKey::Discounting
         ))
-        .is_some());
+        .is_none());
 
     // Swaption
     assert!(registry

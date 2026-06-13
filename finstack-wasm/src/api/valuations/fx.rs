@@ -135,6 +135,10 @@ macro_rules! fx_class {
 
             #[wasm_bindgen(js_name = priceWithMetrics)]
             /// Price the instrument and compute the requested metrics.
+            ///
+            /// WASM keeps optional arguments trailing for JavaScript callers,
+            /// so the order is `(marketJson, asOf, metrics, model?, ...)`.
+            /// Python uses `(market, as_of, model="default", metrics=...)`.
             pub fn price_with_metrics(
                 &self,
                 market_json: &str,
@@ -245,7 +249,7 @@ macro_rules! fx_option_class {
                 metric_value(&self.json, market_json, as_of, model, "volga")
             }
 
-            /// Benchmark regression alpha/beta statistics per asset.
+            /// Compute standard FX option Greeks as a JavaScript object.
             pub fn greeks(
                 &self,
                 market_json: &str,

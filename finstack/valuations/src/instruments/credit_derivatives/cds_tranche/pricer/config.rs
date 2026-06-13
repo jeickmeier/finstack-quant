@@ -350,11 +350,13 @@ impl CDSTranchePricerConfig {
 /// Heterogeneous expected loss evaluation method
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeteroMethod {
-    /// Genuine saddle-point approximation (SPA): the conditional tranchelet
-    /// loss `E[min(L,K) | Z]` is evaluated from the exact conditional
-    /// cumulant-generating function via a Lugannani-Rice / Antonov-Mechkov-
-    /// Misirpashaev saddle-point expansion. Captures the true skew of the
-    /// loss distribution and never places mass on `L < 0`.
+    /// Moment-matched normal approximation for heterogeneous pool loss.
+    ///
+    /// The legacy variant name is retained for API compatibility, but this is
+    /// not the CGF-based saddle-point implementation. It matches the
+    /// conditional loss mean and variance and can place bounded probability
+    /// mass below zero; see `saddlepoint.rs` for the true SPA helper retained
+    /// for validation work.
     Spa,
     /// Exact convolution method (slower but more accurate)
     ExactConvolution,

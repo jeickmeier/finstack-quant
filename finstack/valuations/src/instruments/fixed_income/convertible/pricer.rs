@@ -173,7 +173,7 @@ impl ConvertibleBondValuator {
         // Process coupon cashflows (exclude reset-only events) using schedule day count
         let mut coupon_map: HashMap<usize, f64> = HashMap::default();
         for cf in cashflow_schedule.coupons() {
-            if cf.date < base_date {
+            if cf.date <= base_date {
                 continue;
             }
             let bounded_step = map_date_to_step(
@@ -1462,6 +1462,29 @@ mod tests {
             .insert_price("AAPL", MarketScalar::Unitless(150.0))
             .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
             .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02))
+    }
+
+    #[test]
+    fn coupon_on_valuation_date_is_not_added_to_tree_step_zero() {
+        let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("valid date");
+        let market = create_test_market_context();
+        let bond = create_test_bond();
+        let inputs = prepare_for_pricing(&bond, &market, as_of).expect("pricing inputs");
+        let valuator = ConvertibleBondValuator::new(
+            &bond,
+            &inputs.cashflow_schedule,
+            inputs.time_to_maturity,
+            50,
+            as_of,
+            &market,
+            inputs.volatility,
+        )
+        .expect("valuator");
+
+        assert!(
+            !valuator.coupon_map.contains_key(&0),
+            "coupon dated exactly on as_of must not be added at tree step 0"
+        );
     }
 
     #[test]

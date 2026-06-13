@@ -387,3 +387,59 @@ fn test_callable_no_quote_default_basis_dv01_is_yield_basis() {
     // Sanity: both are negative for a long bond.
     assert!(dv01 < 0.0, "long-bond DV01 should be negative, got {dv01}");
 }
+
+#[test]
+fn test_callable_workout_duration_uses_workout_yield_denominator() {
+    use finstack_valuations::instruments::PricingOverrides;
+
+    let as_of = date!(2025 - 01 - 01);
+    let mut callable = callable_risk_bond(as_of);
+    callable.pricing_overrides = PricingOverrides::default()
+        .with_quoted_clean_price(115.0)
+        .with_implied_vol(0.01);
+    let market = callable_risk_market(as_of);
+
+    let result = callable
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[
+                MetricId::Ytm,
+                MetricId::Ytw,
+                MetricId::DurationMac,
+                MetricId::DurationMod,
+                MetricId::YieldDv01,
+            ],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("callable quoted bond workout metrics should compute");
+
+    let ytm = result.measures["ytm"];
+    let ytw = result.measures["ytw"];
+    let duration_mac = result.measures["duration_mac"];
+    let duration_mod = result.measures["duration_mod"];
+    let yield_dv01 = result.measures["yield_dv01"];
+    let m = 2.0;
+    let expected_workout_mod = duration_mac / (1.0 + ytw / m);
+    let maturity_yield_mod = duration_mac / (1.0 + ytm / m);
+
+    assert!(
+        (ytm - ytw).abs() > 1e-3,
+        "premium callable test must distinguish YTM from YTW: ytm={ytm}, ytw={ytw}"
+    );
+    assert!(
+        (duration_mod - expected_workout_mod).abs() < 1e-10,
+        "Workout duration_mod must use YTW denominator: got {duration_mod}, expected {expected_workout_mod}"
+    );
+    assert!(
+        (duration_mod - maturity_yield_mod).abs() > 1e-4,
+        "test must distinguish workout denominator from maturity-yield denominator"
+    );
+
+    let dirty_quote = 1_150_000.0;
+    let expected_yield_dv01 = -(dirty_quote * duration_mod * 0.0001);
+    assert!(
+        (yield_dv01 - expected_yield_dv01).abs() < 0.10,
+        "YieldDv01 must use workout dirty quote and workout duration: got {yield_dv01}, expected {expected_yield_dv01}"
+    );
+}

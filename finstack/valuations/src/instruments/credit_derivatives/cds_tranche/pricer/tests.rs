@@ -1,6 +1,7 @@
-use super::config::DEFAULT_QUADRATURE_ORDER;
+use super::config::{DiscountAt, DEFAULT_QUADRATURE_ORDER};
 use super::*;
 use crate::cashflow::primitives::CFKind;
+use crate::correlation::copula::CopulaSpec;
 use crate::instruments::credit_derivatives::cds_tranche::parameters::CDSTrancheParams;
 use crate::instruments::credit_derivatives::cds_tranche::{CDSTranche, TrancheSide};
 use finstack_core::currency::Currency;
@@ -2403,6 +2404,77 @@ fn mid_period_protection_uses_survival_weighted_timing() {
     assert!(
         pv_mid.is_finite() && pv_end.is_finite(),
         "both protection-timing PVs must be finite"
+    );
+}
+
+#[test]
+fn first_period_default_timing_starts_at_contractual_effective_date() {
+    let market_ctx = sample_market_context();
+    let index_data = market_ctx
+        .get_credit_index("CDX.NA.IG.42")
+        .expect("test index data");
+    let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
+    let effective_date = Date::from_calendar_date(2025, Month::June, 20).expect("date");
+    let mut tranche = sample_tranche();
+    tranche.effective_date = Some(effective_date);
+    tranche.running_coupon_bp = 0.0;
+
+    let pricer = CDSTranchePricer::new();
+    let rows = pricer
+        .project_discountable_rows(&tranche, &market_ctx, as_of)
+        .expect("projected rows");
+    let default_row = rows
+        .iter()
+        .find(|row| row.cashflow.kind == CFKind::DefaultedNotional)
+        .expect("default row");
+
+    let DiscountAt::WithinPeriod { start, fraction } = default_row.discount_at else {
+        panic!("mid-period protection should discount default row within period");
+    };
+    assert_eq!(start, effective_date);
+
+    let t_start = pricer
+        .years_from_base(&index_data, effective_date)
+        .expect("effective-date time")
+        .max(0.0);
+    let t_end = pricer
+        .years_from_base(&index_data, default_row.cashflow.date)
+        .expect("payment-date time");
+    let expected = pricer.within_period_default_fraction(&index_data, t_start, t_end);
+    let stale_zero_based = pricer.within_period_default_fraction(&index_data, 0.0, t_end);
+
+    assert!(
+        (fraction - expected).abs() < 1e-12,
+        "first-period default fraction must start from contractual effective date: \
+         got={fraction}, expected={expected}"
+    );
+    assert!(
+        (fraction - stale_zero_based).abs() > 1e-6,
+        "regression guard must distinguish contractual-start timing from zero-based timing: \
+         got={fraction}, zero_based={stale_zero_based}"
+    );
+}
+
+#[test]
+fn student_t_recovery_driver_uses_scaled_market_factor() {
+    let student_t = CDSTranchePricer::with_params(
+        CDSTranchePricerConfig::default()
+            .with_student_t_copula(5.0)
+            .expect("valid Student-t copula"),
+    );
+    let gaussian = CDSTranchePricer::new();
+
+    assert_eq!(
+        student_t.params.copula_spec,
+        CopulaSpec::student_t(5.0).expect("valid")
+    );
+    assert!(
+        (student_t.recovery_driver_for_factors(&[2.0, 4.0]) - 1.0).abs() < 1e-12,
+        "Student-t recovery driver must use Z/sqrt(W)"
+    );
+    assert!(
+        (gaussian.recovery_driver_for_factors(&[2.0, 4.0]) - 2.0).abs() < 1e-12,
+        "Gaussian recovery driver must remain the first factor"
     );
 }
 

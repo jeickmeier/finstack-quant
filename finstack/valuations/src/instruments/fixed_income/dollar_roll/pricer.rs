@@ -16,10 +16,10 @@ use finstack_core::Result;
 /// - Front leg: Short TBA (receive price at front settlement)
 /// - Back leg: Long TBA (pay price at back settlement)
 ///
-/// Net value = Front leg value - Back leg value
+/// Net value = Back leg value - Front leg value
 ///
-/// Positive value means the roll is profitable (you receive more
-/// from the front sale than you pay for the back purchase).
+/// Positive value means the back purchase is more valuable than the front
+/// sale from the buyer's perspective.
 pub(crate) fn price_dollar_roll(
     roll: &DollarRoll,
     market: &MarketContext,

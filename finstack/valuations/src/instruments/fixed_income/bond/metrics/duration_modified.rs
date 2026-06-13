@@ -61,12 +61,28 @@ impl MetricCalculator for ModifiedDurationCalculator {
                 })
             })?;
 
+        let denominator_yield = if has_options {
+            if let Some(flows) = context.cashflows.as_ref() {
+                if let Some((workout_yield, _, _)) =
+                    super::quoted_workout_path(bond, context.curves.as_ref(), context.as_of, flows)?
+                {
+                    workout_yield
+                } else {
+                    ytm
+                }
+            } else {
+                ytm
+            }
+        } else {
+            ytm
+        };
+
         let m =
             crate::instruments::fixed_income::bond::pricing::quote_conversions::periods_per_year(
                 bond.cashflow_spec.frequency(),
             )?
             .max(1.0);
-        let denom = 1.0 + ytm / m;
+        let denom = 1.0 + denominator_yield / m;
         if denom.abs() < 1e-12 {
             return Err(finstack_core::Error::Validation(
                 "Modified duration undefined when 1 + ytm/m is near zero".to_string(),

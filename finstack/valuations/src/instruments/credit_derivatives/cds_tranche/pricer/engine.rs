@@ -73,6 +73,28 @@ impl CDSTranchePricer {
         }
     }
 
+    /// Factor supplied to the stochastic recovery model.
+    ///
+    /// Gaussian-family recovery models are calibrated to the same systematic
+    /// market factor that drives conditional default probabilities. For the
+    /// Student-t copula, `factors[0]` is the normal numerator and `factors[1]`
+    /// is the chi-square scale mixture, so the actual market factor is
+    /// `Z / sqrt(W)`.
+    pub(super) fn recovery_driver_for_factors(&self, factors: &[f64]) -> f64 {
+        match self.params.copula_spec {
+            CopulaSpec::StudentT { .. } if factors.len() >= 2 => {
+                let z = factors[0];
+                let w = factors[1];
+                if z.is_finite() && w.is_finite() && w > 0.0 {
+                    z / w.sqrt()
+                } else {
+                    z
+                }
+            }
+            _ => factors.first().copied().unwrap_or(0.0),
+        }
+    }
+
     pub(super) fn conditional_default_prob_copula(
         &self,
         copula: &dyn Copula,
@@ -249,7 +271,15 @@ impl CDSTranchePricer {
                 finstack_core::dates::DayCountContext::default(),
             )?;
             let payment_time = payment_times[i];
-            let prior_time = if i == 0 { 0.0 } else { payment_times[i - 1] };
+            let prior_time = if i == 0 {
+                if period_start <= _index_data_arc.index_credit_curve.base_date() {
+                    0.0
+                } else {
+                    self.years_from_base(_index_data_arc.as_ref(), period_start)?
+                }
+            } else {
+                payment_times[i - 1]
+            };
 
             // Survival-weighted mean within-period default fraction.
             //

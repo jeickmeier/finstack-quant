@@ -415,69 +415,18 @@ impl CmsSwap {
         market: &finstack_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> finstack_core::Result<Vec<(Date, Money)>> {
-        use crate::instruments::rates::cms_option::pricer::convexity_adjustment;
-        use finstack_core::dates::{DateExt, DayCountContext};
-
-        let vol_surface = market.get_surface(self.vol_surface_id.as_str())?;
         let mut flows = Vec::new();
 
         for (i, &fixing_date) in self.cms_fixing_dates.iter().enumerate() {
             let payment_date = self.cms_payment_dates[i];
             let accrual_fraction = self.cms_accrual_fractions[i];
 
-            let swap_start = fixing_date;
-            let swap_tenor_months = (self.cms_tenor * 12.0).round() as i32;
-            let swap_end = swap_start.add_months(swap_tenor_months);
-            let (forward_swap_rate, _) =
-                crate::instruments::rates::exotics_shared::forward_swap_rate::calculate_forward_swap_rate(
-                    crate::instruments::rates::exotics_shared::forward_swap_rate::ForwardSwapRateInputs {
-                        market,
-                        discount_curve_id: &self.discount_curve_id,
-                        forward_curve_id: &self.forward_curve_id,
-                        as_of,
-                        start: swap_start,
-                        end: swap_end,
-                        fixed_freq: self.resolved_swap_fixed_freq(),
-                        fixed_day_count: self.resolved_swap_day_count(),
-                        float_freq: self.resolved_swap_float_freq(),
-                        float_day_count: self.resolved_swap_float_day_count(),
-                    },
-                )?;
-            if forward_swap_rate <= 0.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "Forward swap rate {} is non-positive for fixing date {}",
-                    forward_swap_rate, fixing_date
-                )));
+            if payment_date <= as_of {
+                continue;
             }
 
-            // Time-to-fixing is calendar time for the vol axis: ACT/365F,
-            // not the CMS accrual day count.
-            let time_to_fixing =
-                DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
-            let adj = if time_to_fixing > 0.0 {
-                convexity_adjustment(
-                    vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),
-                    time_to_fixing,
-                    self.cms_tenor,
-                    forward_swap_rate,
-                )
-            } else {
-                0.0
-            };
-
-            // Convexity-adjusted linear CMS forward (before cap/floor).
-            let adjusted_forward = forward_swap_rate + adj;
-            // Expected option-adjusted coupon rate (Hagan 2003).
-            // See `apply_cms_cap_floor` for the full derivation comment.
-            let coupon_rate = super::pricer::apply_cms_cap_floor(
-                adjusted_forward,
-                self.cms_spread,
-                self.cms_cap,
-                self.cms_floor,
-                &vol_surface,
-                time_to_fixing,
-            );
-
+            let coupon_rate =
+                super::pricer::cms_coupon_rate(self, market, as_of, fixing_date, 1.0)?;
             let signed_amount = match self.side {
                 crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
                     -coupon_rate * accrual_fraction * self.notional.amount()
@@ -875,6 +824,71 @@ mod tests {
             "floored CMS: discounted cms_leg_flows ({discounted_sum:.4}) must match \
              base_value ({base_pv:.4}); gap = {:.4}",
             (discounted_sum - base_pv).abs()
+        );
+    }
+
+    #[test]
+    fn cms_leg_flows_use_recorded_fixing_for_seasoned_coupon() {
+        use finstack_core::market_data::fixings::cms_fixing_series_id;
+        use finstack_core::market_data::scalars::ScalarTimeSeries;
+
+        let fixing = date(2024, 12, 1);
+        let as_of = date(2025, 1, 1);
+        let pay = date(2025, 3, 1);
+        let swap = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-SEASONED-FLOWS"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Receive)
+            .cms_tenor(10.0)
+            .cms_fixing_dates(vec![fixing])
+            .cms_payment_dates(vec![pay])
+            .cms_accrual_fractions(vec![0.25])
+            .cms_day_count(DayCount::Act365F)
+            .cms_spread(0.0)
+            .swap_convention_opt(Some(
+                crate::instruments::common_impl::parameters::IRSConvention::USDStandard,
+            ))
+            .funding_leg(FundingLeg::Fixed {
+                rate: 0.0,
+                payment_dates: vec![pay],
+                accrual_fractions: vec![0.25],
+                day_count: DayCount::Act365F,
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build()
+            .expect("CMS swap should build");
+        let market = recon_market(as_of);
+
+        let err = swap
+            .cms_leg_flows(&market, as_of)
+            .expect_err("seasoned flow without fixing should error");
+        assert!(
+            err.to_string().contains("FIXING:CMS-10Y:USD-LIBOR-3M"),
+            "error must identify missing CMS fixing series: {err}"
+        );
+
+        let observed = 0.0412;
+        let series = ScalarTimeSeries::new(
+            cms_fixing_series_id("USD-LIBOR-3M", 10.0),
+            vec![(fixing, observed)],
+            None,
+        )
+        .expect("fixing series");
+        let market = market.insert_series(series);
+
+        let flows = swap
+            .cms_leg_flows(&market, as_of)
+            .expect("seasoned CMS leg flows");
+
+        assert_eq!(flows.len(), 1);
+        assert_eq!(flows[0].0, pay);
+        let expected = observed * 0.25 * 1_000_000.0;
+        assert!(
+            (flows[0].1.amount() - expected).abs() < 0.01,
+            "seasoned flow must use recorded fixing: expected {expected}, got {}",
+            flows[0].1.amount()
         );
     }
 

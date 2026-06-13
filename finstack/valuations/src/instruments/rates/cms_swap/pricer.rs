@@ -82,7 +82,6 @@ impl CmsSwapPricer {
         convexity_scale: f64,
     ) -> Result<f64> {
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-        let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
 
         let mut total_pv = 0.0;
 
@@ -94,97 +93,7 @@ impl CmsSwapPricer {
                 continue;
             }
 
-            // Seasoned coupon: the CMS rate fixed in the past. Value it off
-            // the recorded fixing (mirroring the cap/floor pricer) — never
-            // re-project from the live curve, which books phantom P&L. The
-            // rate is known, so there is no convexity adjustment and the
-            // embedded cap/floor collapses to intrinsic (time_to_fixing = 0).
-            if fixing_date < as_of {
-                let observed =
-                    crate::instruments::rates::exotics_shared::fixings::historical_cms_fixing(
-                        market,
-                        &inst.forward_curve_id,
-                        inst.cms_tenor,
-                        fixing_date,
-                    )?;
-                let coupon_rate = apply_cms_cap_floor(
-                    observed,
-                    inst.cms_spread,
-                    inst.cms_cap,
-                    inst.cms_floor,
-                    &vol_surface,
-                    0.0,
-                );
-                let df_pay =
-                    relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
-                total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
-                continue;
-            }
-
-            let swap_start = fixing_date;
-            let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
-            let swap_end = swap_start.add_months(swap_tenor_months);
-
-            let (forward_swap_rate, _annuity) =
-                crate::instruments::rates::exotics_shared::forward_swap_rate::calculate_forward_swap_rate(
-                    crate::instruments::rates::exotics_shared::forward_swap_rate::ForwardSwapRateInputs {
-                        market,
-                        discount_curve_id: &inst.discount_curve_id,
-                        forward_curve_id: &inst.forward_curve_id,
-                        as_of,
-                        start: swap_start,
-                        end: swap_end,
-                        fixed_freq: inst.resolved_swap_fixed_freq(),
-                        fixed_day_count: inst.resolved_swap_day_count(),
-                        float_freq: inst.resolved_swap_float_freq(),
-                        float_day_count: inst.resolved_swap_float_day_count(),
-                    },
-                )?;
-
-            if forward_swap_rate <= 0.0 {
-                return Err(finstack_core::Error::Validation(format!(
-                    "Forward swap rate {} is non-positive for fixing date {}",
-                    forward_swap_rate, fixing_date
-                )));
-            }
-
-            // Calendar time for the vol axis: ACT/365F, not the accrual day count.
-            let time_to_fixing =
-                DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
-
-            let adj = if time_to_fixing > 0.0 {
-                // ASSUMPTION: `vol_surface` must be the swaption volatility
-                // surface for the CMS reference swap tenor (`inst.cms_tenor`),
-                // keyed by (expiry, strike). The lookup below uses
-                // `(time_to_fixing, forward_swap_rate)` — i.e. at-the-money on
-                // the forward swap rate — and the surface has no separate
-                // swap-tenor axis, so the caller must supply the surface that
-                // corresponds to the CMS reference swap tenor.
-                convexity_adjustment(
-                    vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),
-                    time_to_fixing,
-                    inst.cms_tenor,
-                    forward_swap_rate,
-                ) * convexity_scale
-            } else {
-                0.0
-            };
-
-            // Convexity-adjusted forward CMS rate (the payment-measure
-            // martingale forward). The coupon is paid on `cms_rate + spread`.
-            let adjusted_forward = forward_swap_rate + adj;
-
-            // Expected option-adjusted coupon rate (Hagan 2003).
-            // See `apply_cms_cap_floor` for the full derivation comment.
-            let coupon_rate = apply_cms_cap_floor(
-                adjusted_forward,
-                inst.cms_spread,
-                inst.cms_cap,
-                inst.cms_floor,
-                &vol_surface,
-                time_to_fixing,
-            );
-
+            let coupon_rate = cms_coupon_rate(inst, market, as_of, fixing_date, convexity_scale)?;
             let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
 
             total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
@@ -284,6 +193,91 @@ impl Pricer for CmsSwapPricer {
 pub(crate) fn compute_pv(inst: &CmsSwap, market: &MarketContext, as_of: Date) -> Result<Money> {
     let pricer = CmsSwapPricer::new();
     pricer.price_internal(inst, market, as_of)
+}
+
+/// Expected CMS coupon rate for one CMS leg period.
+///
+/// This is shared by `CmsSwapPricer::pv_cms_leg` and `CmsSwap::cms_leg_flows`
+/// so seasoned fixings, negative-rate behavior, convexity adjustment, and
+/// embedded cap/floor optionality cannot drift across valuation and cashflow
+/// export.
+pub(super) fn cms_coupon_rate(
+    inst: &CmsSwap,
+    market: &MarketContext,
+    as_of: Date,
+    fixing_date: Date,
+    convexity_scale: f64,
+) -> Result<f64> {
+    let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
+
+    // Seasoned coupon: the CMS rate fixed in the past. Value it off the
+    // recorded fixing — never re-project from the live curve, which books
+    // phantom P&L. The rate is known, so there is no convexity adjustment and
+    // embedded cap/floor optionality collapses to intrinsic (time_to_fixing=0).
+    if fixing_date < as_of {
+        let observed = crate::instruments::rates::exotics_shared::fixings::historical_cms_fixing(
+            market,
+            &inst.forward_curve_id,
+            inst.cms_tenor,
+            fixing_date,
+        )?;
+        return Ok(apply_cms_cap_floor(
+            observed,
+            inst.cms_spread,
+            inst.cms_cap,
+            inst.cms_floor,
+            &vol_surface,
+            0.0,
+        ));
+    }
+
+    let swap_start = fixing_date;
+    let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
+    let swap_end = swap_start.add_months(swap_tenor_months);
+
+    let (forward_swap_rate, _annuity) =
+        crate::instruments::rates::exotics_shared::forward_swap_rate::calculate_forward_swap_rate(
+            crate::instruments::rates::exotics_shared::forward_swap_rate::ForwardSwapRateInputs {
+                market,
+                discount_curve_id: &inst.discount_curve_id,
+                forward_curve_id: &inst.forward_curve_id,
+                as_of,
+                start: swap_start,
+                end: swap_end,
+                fixed_freq: inst.resolved_swap_fixed_freq(),
+                fixed_day_count: inst.resolved_swap_day_count(),
+                float_freq: inst.resolved_swap_float_freq(),
+                float_day_count: inst.resolved_swap_float_day_count(),
+            },
+        )?;
+
+    // Calendar time for the vol axis: ACT/365F, not the accrual day count.
+    let time_to_fixing =
+        DayCount::Act365F.year_fraction(as_of, fixing_date, DayCountContext::default())?;
+
+    let adj = if time_to_fixing > 0.0 && forward_swap_rate > 0.0 {
+        // The lognormal Hagan convexity adjustment is undefined at
+        // non-positive forwards. In negative-rate regimes, keep the linear CMS
+        // coupon and let embedded cap/floor optionality use the Bachelier
+        // fallback in `cms_embedded_option_value`.
+        convexity_adjustment(
+            vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),
+            time_to_fixing,
+            inst.cms_tenor,
+            forward_swap_rate,
+        ) * convexity_scale
+    } else {
+        0.0
+    };
+
+    Ok(apply_cms_cap_floor(
+        forward_swap_rate + adj,
+        inst.cms_spread,
+        inst.cms_cap,
+        inst.cms_floor,
+        &vol_surface,
+        time_to_fixing,
+    ))
 }
 
 /// Compute the option-adjusted expected coupon rate for a capped/floored CMS
@@ -603,6 +597,27 @@ mod tests {
             "an OTM CMS cap must still reduce the leg via the embedded caplet's \
              time value (not a no-op mean clamp): capped={pv_capped}, \
              uncapped={pv_uncapped}"
+        );
+    }
+
+    #[test]
+    fn cms_swap_leg_allows_negative_forward_rates() {
+        let as_of = date(2025, 1, 1);
+        let swap = capped_cms_swap(None);
+        let market = cms_market_with_vol(as_of, 0.25).insert(flat_forward_with_tenor(
+            "USD-LIBOR-3M",
+            as_of,
+            -0.005,
+            2.0,
+        ));
+
+        let pv = CmsSwapPricer::new()
+            .pv_cms_leg(&swap, &market, as_of, 1.0)
+            .expect("negative forward CMS leg should price");
+
+        assert!(
+            pv.is_finite() && pv < 0.0,
+            "uncapped negative-forward CMS coupon should price as a finite negative leg PV, got {pv}"
         );
     }
 

@@ -346,12 +346,16 @@ fn collect_fx_barrier_inputs(
         )));
     }
 
+    let domestic_df = curves
+        .get_discount(inst.domestic_discount_curve_id.as_str())?
+        .df_between_dates(as_of, inst.expiry)?;
+
     Ok((
         inputs.spot,
         inputs.r_domestic,
         inputs.r_foreign,
         sigma,
-        inputs.t,
+        domestic_df,
     ))
 }
 
@@ -1166,6 +1170,73 @@ mod tests {
             mc_pv,
             analytical_pv,
             rel_err * 100.0
+        );
+    }
+
+    #[test]
+    fn mc_inputs_pass_domestic_discount_factor_not_year_fraction() {
+        let as_of = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        let expiry = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+
+        let option = FxBarrierOption::builder()
+            .id("FXBAR-MC-DF".into())
+            .strike(1.10)
+            .barrier(1.30)
+            .rebate_opt(None)
+            .option_type(OptionType::Call)
+            .barrier_type(BarrierType::UpAndOut)
+            .expiry(expiry)
+            .notional(Money::new(1_000_000.0, Currency::EUR))
+            .base_currency(Currency::EUR)
+            .quote_currency(Currency::USD)
+            .day_count(finstack_core::dates::DayCount::Act365F)
+            .use_gobet_miri(true)
+            .domestic_discount_curve_id("USD-OIS".into())
+            .foreign_discount_curve_id("EUR-OIS".into())
+            .fx_spot_id_opt(Some("EURUSD-SPOT".into()))
+            .vol_surface_id("EURUSD-VOL".into())
+            .pricing_overrides(crate::instruments::PricingOverrides::default())
+            .attributes(crate::instruments::common_impl::traits::Attributes::new())
+            .build()
+            .expect("fx barrier option");
+
+        let domestic_df_at_two_years = (-0.03_f64 * 2.0).exp();
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, domestic_df_at_two_years)])
+                    .build()
+                    .expect("dom curve"),
+            )
+            .insert(
+                DiscountCurve::builder("EUR-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (2.0, (-0.01_f64 * 2.0).exp())])
+                    .build()
+                    .expect("for curve"),
+            )
+            .insert_surface(
+                VolSurface::builder("EURUSD-VOL")
+                    .expiries(&[2.0])
+                    .strikes(&[1.10])
+                    .row(&[0.12])
+                    .build()
+                    .expect("vol surface"),
+            )
+            .insert_price("EURUSD-SPOT", MarketScalar::Unitless(1.10));
+
+        let expected_domestic_df = market
+            .get_discount("USD-OIS")
+            .expect("dom curve")
+            .df_between_dates(as_of, expiry)
+            .expect("domestic df");
+        let (_, _, _, _, discount_factor) =
+            collect_fx_barrier_inputs(&option, &market, as_of).expect("inputs");
+
+        assert!(
+            (discount_factor - expected_domestic_df).abs() < 1e-12,
+            "MC discount factor must be domestic DF {expected_domestic_df}, got {discount_factor}"
         );
     }
 }

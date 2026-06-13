@@ -1279,6 +1279,7 @@ export type FxInstrumentSpec = Record<string, unknown> | string;
 export interface FxInstrument {
   toJson(): string;
   price(marketJson: string, asOf: string, model?: string | null): string;
+  /** WASM order keeps optional arguments trailing: metrics precedes model. */
   priceWithMetrics(
     marketJson: string,
     asOf: string,

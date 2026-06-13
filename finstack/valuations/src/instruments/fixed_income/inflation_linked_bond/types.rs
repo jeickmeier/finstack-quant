@@ -1047,8 +1047,8 @@ impl InflationLinkedBond {
         let p_dn = price_from_yield(y0 - bp)?;
         let dp_dy = (p_up - p_dn) / (2.0 * bp);
 
-        // Modified duration in years per 1 delta in yield: D = - (1/P) * dP/dy
-        let p0 = base_clean.max(1e-6);
+        // Modified duration in years per 1 delta in yield: D = - (1/P_dirty) * dP_dirty/dy
+        let p0 = price_from_yield(y0)?.max(1e-6);
         Ok(-(dp_dy / p0))
     }
 }
@@ -1374,6 +1374,90 @@ mod tests {
             .accrued_real_interest(as_of)
             .expect("ACT/ACT (ISMA) accrued interest must not require a day-count override");
         assert!(accrued.is_finite() && accrued >= 0.0, "accrued = {accrued}");
+    }
+
+    #[test]
+    fn real_duration_uses_dirty_model_price_denominator() {
+        use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
+            price_from_ytm_compounded_params, YieldCompounding,
+        };
+
+        let issue = d(2024, Month::January, 15);
+        let as_of = d(2024, Month::April, 15);
+        let maturity = d(2034, Month::January, 15);
+        let bond = InflationLinkedBond {
+            id: InstrumentId::new("ILB-DURATION-DIRTY"),
+            notional: Money::new(1_000_000.0, Currency::USD),
+            real_coupon: Decimal::try_from(0.04).expect("valid coupon"),
+            frequency: Tenor::semi_annual(),
+            day_count: DayCount::Thirty360,
+            issue_date: issue,
+            maturity,
+            base_index: 100.0,
+            base_date: issue,
+            indexation_method: IndexationMethod::TIPS,
+            lag: InflationLag::None,
+            deflation_protection: DeflationProtection::MaturityOnly,
+            bdc: BusinessDayConvention::Following,
+            stub: StubKind::None,
+            calendar_id: None,
+            discount_curve_id: CurveId::new("USD-REAL"),
+            inflation_index_id: CurveId::new("US-CPI"),
+            quoted_clean: Some(100.0),
+            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            attributes: Attributes::new(),
+        };
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-REAL")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (10.0, 1.0)])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                InflationCurve::builder("US-CPI")
+                    .base_date(as_of)
+                    .base_cpi(100.0)
+                    .knots([(0.0, 100.0), (10.0, 100.0)])
+                    .build()
+                    .expect("inflation curve"),
+            );
+
+        let duration = bond.real_duration(&market, as_of).expect("real duration");
+        let y0 = bond.real_yield(100.0, &market, as_of).expect("real yield");
+        let flows = bond.build_real_schedule(as_of).expect("real schedule");
+        let price_from_yield = |y: f64| -> Result<f64> {
+            let price = price_from_ytm_compounded_params(
+                bond.day_count,
+                bond.frequency,
+                &flows,
+                as_of,
+                y,
+                YieldCompounding::Street,
+            )?;
+            Ok(price / bond.notional.amount() * 100.0)
+        };
+        let bp = 1e-4;
+        let p_up = price_from_yield(y0 + bp).expect("price up");
+        let p_dn = price_from_yield(y0 - bp).expect("price down");
+        let p_dirty = price_from_yield(y0).expect("dirty model price");
+        let dp_dy = (p_up - p_dn) / (2.0 * bp);
+        let expected_dirty_duration = -(dp_dy / p_dirty);
+        let clean_denominator_duration = -(dp_dy / 100.0);
+
+        assert!(
+            (p_dirty - 100.0).abs() > 0.05,
+            "test must be mid-period with non-trivial accrued dirty/clean gap, dirty={p_dirty}"
+        );
+        assert!(
+            (duration - expected_dirty_duration).abs() < 1e-10,
+            "real duration must use dirty model price denominator: got {duration}, expected {expected_dirty_duration}"
+        );
+        assert!(
+            (duration - clean_denominator_duration).abs() > 1e-4,
+            "test must distinguish dirty denominator from clean denominator"
+        );
     }
 
     fn d(year: i32, month: Month, day: u8) -> Date {

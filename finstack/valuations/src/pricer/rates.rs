@@ -87,13 +87,6 @@ pub(crate) fn register_rates_pricers(registry: &mut PricerRegistry) {
         ModelKey::Black76,
         crate::instruments::rates::cap_floor::pricing::pricer::SimpleCapFloorBlackPricer::default(),
     );
-    registry.register(
-        InstrumentType::CapFloor,
-        ModelKey::Discounting,
-        crate::instruments::rates::cap_floor::pricing::pricer::SimpleCapFloorBlackPricer::with_model(
-            ModelKey::Discounting,
-        ),
-    );
 
     // Swaption
     registry.register(

@@ -215,11 +215,6 @@ impl SimpleCapFloorBlackPricer {
             model: ModelKey::Black76,
         }
     }
-
-    /// Create a cap/floor pricer with specified model key
-    pub(crate) fn with_model(model: ModelKey) -> Self {
-        Self { model }
-    }
 }
 
 impl Default for SimpleCapFloorBlackPricer {
