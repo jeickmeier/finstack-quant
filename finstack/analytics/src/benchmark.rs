@@ -398,7 +398,7 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
 
 /// OLS beta only — slope of `r_portfolio` on `r_benchmark`.
 ///
-/// Equivalent to `greeks(returns, benchmark, _).beta` but skips the alpha,
+/// Equivalent to the beta component of [`greeks`] but skips the alpha,
 /// correlation, and adjusted-R² arithmetic. Used by callers (e.g. Treynor)
 /// that need only the slope and otherwise pay for unused outputs.
 ///
@@ -423,10 +423,28 @@ pub(crate) fn beta_only(returns: &[f64], benchmark: &[f64]) -> f64 {
     oc.optimal_beta()
 }
 
+fn periodic_risk_free_rate(risk_free_rate: f64, ann_factor: f64) -> f64 {
+    if !risk_free_rate.is_finite() || !ann_factor.is_finite() || ann_factor <= 0.0 {
+        return f64::NAN;
+    }
+    (1.0 + risk_free_rate).powf(1.0 / ann_factor) - 1.0
+}
+
+fn jensen_alpha(
+    mean_port: f64,
+    mean_bench: f64,
+    beta: f64,
+    ann_factor: f64,
+    risk_free_rate: f64,
+) -> f64 {
+    let rf_period = periodic_risk_free_rate(risk_free_rate, ann_factor);
+    (mean_port - rf_period - beta * (mean_bench - rf_period)) * ann_factor
+}
+
 /// Greeks (alpha, beta, R-squared, adjusted R-squared) from a single-factor regression.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GreeksResult {
-    /// Annualized alpha (intercept).
+    /// Annualized Jensen alpha.
     pub alpha: f64,
     /// Beta (slope) of portfolio vs benchmark.
     pub beta: f64,
@@ -438,8 +456,12 @@ pub struct GreeksResult {
 
 /// Single-factor greeks for portfolio vs benchmark.
 ///
-/// Runs a simple OLS regression `r_portfolio = α + β × r_benchmark` and
-/// returns the annualized alpha, beta, R², and adjusted R² from that fit.
+/// Runs a simple OLS regression to estimate beta, then reports annualized
+/// Jensen alpha:
+///
+/// ```text
+/// α = ((mean(r_p) - rf_period) - β × (mean(r_b) - rf_period)) × ann_factor
+/// ```
 ///
 /// Unlike [`beta`], this function does not compute standard errors
 /// and is lighter-weight for scenarios where the point estimates are
@@ -450,10 +472,11 @@ pub struct GreeksResult {
 /// * `returns`    - Portfolio return series.
 /// * `benchmark`  - Benchmark return series.
 /// * `ann_factor` - Number of periods per year. Used to annualize alpha.
+/// * `risk_free_rate` - Annualized risk-free rate used for Jensen alpha.
 ///
 /// # Returns
 ///
-/// A [`GreeksResult`] with `alpha` (annualized), `beta`, `r_squared`, and
+/// A [`GreeksResult`] with annualized Jensen `alpha`, `beta`, `r_squared`, and
 /// `adjusted_r_squared`. Returns zeros for empty inputs. For a zero-variance
 /// benchmark the regression cannot identify a slope, so `alpha` and `beta`
 /// are [`f64::NAN`] (matching the [`rolling_greeks`] degenerate-window
@@ -466,11 +489,16 @@ pub struct GreeksResult {
 ///
 /// let r = [0.01, 0.02, 0.03, 0.04, 0.05];
 /// let b = [0.005, 0.01, 0.015, 0.02, 0.025];
-/// let g = greeks(&r, &b, 252.0);
+/// let g = greeks(&r, &b, 252.0, 0.02);
 /// assert!((g.beta - 2.0).abs() < 1e-10);
 /// assert!((g.r_squared - 1.0).abs() < 1e-10);
 /// ```
-pub(crate) fn greeks(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> GreeksResult {
+pub(crate) fn greeks(
+    returns: &[f64],
+    benchmark: &[f64],
+    ann_factor: f64,
+    risk_free_rate: f64,
+) -> GreeksResult {
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return GreeksResult {
@@ -489,7 +517,7 @@ pub(crate) fn greeks(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> Gre
     } else {
         oc.optimal_beta()
     };
-    let alpha = (oc.mean_x() - beta * oc.mean_y()) * ann_factor;
+    let alpha = jensen_alpha(oc.mean_x(), oc.mean_y(), beta, ann_factor, risk_free_rate);
     let c = oc.correlation();
     let r_squared = c * c;
     let adjusted_r_squared = if n > 2 {
@@ -530,6 +558,7 @@ pub struct RollingGreeks {
 ///   end dates in the output.
 /// * `window` - Look-back window length in periods.
 /// * `ann_factor` - Number of periods per year for alpha annualization.
+/// * `risk_free_rate` - Annualized risk-free rate used for Jensen alpha.
 ///
 /// # Returns
 ///
@@ -552,7 +581,7 @@ pub struct RollingGreeks {
 /// let dates: Vec<Date> = (1..=20)
 ///     .map(|d| Date::from_calendar_date(2025, Month::January, d).unwrap())
 ///     .collect();
-/// let rg = rolling_greeks(&r, &b, &dates, 5, 252.0);
+/// let rg = rolling_greeks(&r, &b, &dates, 5, 252.0, 0.02);
 /// assert_eq!(rg.betas.len(), 16); // 20 − 5 + 1
 /// ```
 pub(crate) fn rolling_greeks(
@@ -561,6 +590,7 @@ pub(crate) fn rolling_greeks(
     dates: &[Date],
     window: usize,
     ann_factor: f64,
+    risk_free_rate: f64,
 ) -> RollingGreeks {
     let n = returns.len().min(benchmark.len()).min(dates.len());
     if n < window || window == 0 {
@@ -589,6 +619,7 @@ pub(crate) fn rolling_greeks(
     let mut out_dates = Vec::with_capacity(count);
     let mut alphas = Vec::with_capacity(count);
     let mut betas = Vec::with_capacity(count);
+    let rf_period = periodic_risk_free_rate(risk_free_rate, ann_factor);
 
     // Incremental O(n) sliding-window OLS via running sums.
     let w = window as f64;
@@ -606,7 +637,7 @@ pub(crate) fn rolling_greeks(
             (f64::NAN, f64::NAN)
         } else {
             let beta = (w * srb - sb * sr) / denom;
-            let alpha = (sr / w - beta * sb / w) * ann_factor;
+            let alpha = (sr / w - rf_period - beta * (sb / w - rf_period)) * ann_factor;
             (alpha, beta)
         };
         out_dates.push(dates[i - 1]);
@@ -650,10 +681,11 @@ pub(crate) fn rolling_greeks(
 
 /// Up-market capture ratio: portfolio performance during benchmark up-periods.
 ///
-/// Computes the ratio of the portfolio's geometric mean return to the benchmark's
-/// geometric mean return over periods where the benchmark return is non-negative.
+/// Computes the ratio of the portfolio's annualized geometric return to the
+/// benchmark's annualized geometric return over periods where the benchmark
+/// return is non-negative, matching empyrical's annualized capture convention.
 /// A value > 1.0 means the portfolio amplifies benchmark gains on a per-period
-/// geometric basis within the benchmark-up subset.
+/// annualized geometric basis within the benchmark-up subset.
 ///
 /// **Convention:** Zero-return benchmark days (`r_bench = 0.0`) are classified
 /// as "up" periods (using `>=`). Some vendors (e.g., Morningstar) use strict
@@ -665,6 +697,7 @@ pub(crate) fn rolling_greeks(
 ///
 /// * `returns`   - Portfolio return series.
 /// * `benchmark` - Benchmark return series.
+/// * `ann_factor` - Annualization factor used for subset geometric returns.
 ///
 /// # Returns
 ///
@@ -679,25 +712,29 @@ pub(crate) fn rolling_greeks(
 /// // Portfolio doubles the benchmark in up periods.
 /// let r = [0.04, -0.01, 0.06];
 /// let b = [0.02, -0.03, 0.03];
-/// let uc = up_capture(&r, &b);
+/// let uc = up_capture(&r, &b, 252.0);
 /// assert!(uc > 1.0);
 /// ```
 #[must_use]
-pub(crate) fn up_capture(returns: &[f64], benchmark: &[f64]) -> f64 {
-    geometric_capture(returns, benchmark, |bench_return| bench_return >= 0.0)
+pub(crate) fn up_capture(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
+    geometric_capture(returns, benchmark, ann_factor, |bench_return| {
+        bench_return >= 0.0
+    })
 }
 
 /// Down-market capture ratio: portfolio performance during benchmark down-periods.
 ///
-/// Computes the ratio of the portfolio's geometric mean return to the benchmark's
-/// geometric mean return over periods where the benchmark return is negative.
+/// Computes the ratio of the portfolio's annualized geometric return to the
+/// benchmark's annualized geometric return over periods where the benchmark
+/// return is negative, matching empyrical's annualized capture convention.
 /// A value < 1.0 means the portfolio loses less than the benchmark during
-/// downturns on a per-period geometric basis (desirable).
+/// downturns on an annualized geometric basis (desirable).
 ///
 /// # Arguments
 ///
 /// * `returns`   - Portfolio return series.
 /// * `benchmark` - Benchmark return series.
+/// * `ann_factor` - Annualization factor used for subset geometric returns.
 ///
 /// # Returns
 ///
@@ -712,12 +749,14 @@ pub(crate) fn up_capture(returns: &[f64], benchmark: &[f64]) -> f64 {
 /// // Portfolio loses less than benchmark in down periods (defensive).
 /// let r = [0.04, -0.01, 0.06];
 /// let b = [0.02, -0.03, 0.03];
-/// let dc = down_capture(&r, &b);
+/// let dc = down_capture(&r, &b, 252.0);
 /// assert!(dc < 1.0);
 /// ```
 #[must_use]
-pub(crate) fn down_capture(returns: &[f64], benchmark: &[f64]) -> f64 {
-    geometric_capture(returns, benchmark, |bench_return| bench_return < 0.0)
+pub(crate) fn down_capture(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
+    geometric_capture(returns, benchmark, ann_factor, |bench_return| {
+        bench_return < 0.0
+    })
 }
 
 /// Capture ratio = up capture / down capture.
@@ -729,6 +768,7 @@ pub(crate) fn down_capture(returns: &[f64], benchmark: &[f64]) -> f64 {
 ///
 /// * `returns`   - Portfolio return series.
 /// * `benchmark` - Benchmark return series.
+/// * `ann_factor` - Annualization factor used for subset geometric returns.
 ///
 /// # Returns
 ///
@@ -741,19 +781,19 @@ pub(crate) fn down_capture(returns: &[f64], benchmark: &[f64]) -> f64 {
 ///
 /// let r = [0.04, -0.01, 0.06];
 /// let b = [0.02, -0.03, 0.03];
-/// let cr = capture_ratio(&r, &b);
+/// let cr = capture_ratio(&r, &b, 252.0);
 /// assert!(cr > 1.0);
 /// ```
 #[must_use]
-pub(crate) fn capture_ratio(returns: &[f64], benchmark: &[f64]) -> f64 {
-    let dc = down_capture(returns, benchmark);
+pub(crate) fn capture_ratio(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
+    let dc = down_capture(returns, benchmark, ann_factor);
     if dc.is_nan() {
         return f64::NAN;
     }
     if dc == 0.0 {
         return 0.0;
     }
-    let uc = up_capture(returns, benchmark);
+    let uc = up_capture(returns, benchmark, ann_factor);
     if uc.is_nan() {
         return f64::NAN;
     }
@@ -803,7 +843,7 @@ pub(crate) fn batting_average(returns: &[f64], benchmark: &[f64]) -> f64 {
 /// Result of a multi-factor regression.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MultiFactorResult {
-    /// Annualized intercept (alpha).
+    /// Raw regression intercept annualized with the supplied factor frequency.
     pub alpha: f64,
     /// Regression coefficients, one per factor.
     pub betas: Vec<f64>,
@@ -883,10 +923,14 @@ fn svd_least_squares(factors: &[&[f64]], y: &[f64]) -> crate::Result<Vec<f64>> {
         .collect())
 }
 
-fn geometric_capture<F>(returns: &[f64], benchmark: &[f64], include: F) -> f64
+fn geometric_capture<F>(returns: &[f64], benchmark: &[f64], ann_factor: f64, include: F) -> f64
 where
     F: Fn(f64) -> bool,
 {
+    if !ann_factor.is_finite() || ann_factor <= 0.0 {
+        return f64::NAN;
+    }
+
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
@@ -915,8 +959,8 @@ where
     }
 
     let count = port_logs.len() as f64;
-    let port_geom = (neumaier_sum(port_logs) / count).exp() - 1.0;
-    let bench_geom = (neumaier_sum(bench_logs) / count).exp() - 1.0;
+    let port_geom = (neumaier_sum(port_logs) * ann_factor / count).exp() - 1.0;
+    let bench_geom = (neumaier_sum(bench_logs) * ann_factor / count).exp() - 1.0;
     if bench_geom.abs() < 1e-18 {
         return 0.0;
     }
@@ -950,7 +994,7 @@ where
 ///
 /// A [`MultiFactorResult`] containing:
 ///
-/// - `alpha`: annualized intercept
+/// - `alpha`: raw regression intercept, annualized with the supplied factor frequency
 /// - `betas`: one loading per factor
 /// - `r_squared` and `adjusted_r_squared`: goodness-of-fit measures
 /// - `residual_vol`: annualized residual volatility
@@ -1188,7 +1232,7 @@ mod tests {
     fn greeks_basic() {
         let r = [0.01, 0.02, 0.03, 0.04, 0.05];
         let b = [0.005, 0.01, 0.015, 0.02, 0.025];
-        let g = greeks(&r, &b, 252.0);
+        let g = greeks(&r, &b, 252.0, 0.0);
         assert!((g.beta - 2.0).abs() < 1e-10);
     }
 
@@ -1196,7 +1240,7 @@ mod tests {
     fn greeks_reports_adjusted_r_squared() {
         let r = [0.011, 0.018, 0.031, 0.039, 0.052, 0.061];
         let b = [0.005, 0.010, 0.015, 0.020, 0.025, 0.030];
-        let g = greeks(&r, &b, 252.0);
+        let g = greeks(&r, &b, 252.0, 0.0);
         let n = r.len() as f64;
         let expected = 1.0 - (1.0 - g.r_squared) * (n - 1.0) / (n - 2.0);
 
@@ -1205,12 +1249,64 @@ mod tests {
     }
 
     #[test]
+    fn greeks_alpha_is_annualized_jensen_alpha() {
+        let ann_factor = 12.0;
+        let risk_free_rate = 0.12;
+        let beta_value = 1.6;
+        let intercept = 0.001;
+        let b = [-0.02, -0.01, 0.00, 0.01, 0.02, 0.03];
+        let r: Vec<f64> = b
+            .iter()
+            .map(|&bench| intercept + beta_value * bench)
+            .collect();
+
+        let zero_rf = greeks(&r, &b, ann_factor, 0.0);
+        let nonzero_rf = greeks(&r, &b, ann_factor, risk_free_rate);
+        let rf_period = (1.0_f64 + risk_free_rate).powf(1.0 / ann_factor) - 1.0;
+        let expected_change = rf_period * (zero_rf.beta - 1.0) * ann_factor;
+
+        assert!((zero_rf.beta - beta_value).abs() < 1e-12);
+        assert!((zero_rf.alpha - intercept * ann_factor).abs() < 1e-12);
+        assert!((nonzero_rf.alpha - zero_rf.alpha - expected_change).abs() < 1e-12);
+    }
+
+    #[test]
     fn rolling_greeks_basic() {
         let r: Vec<f64> = (0..20).map(|i| (i as f64 + 1.0) * 0.001).collect();
         let b: Vec<f64> = (0..20).map(|i| i as f64 * 0.0005).collect();
         let dates: Vec<Date> = (1..=20).map(jan).collect();
-        let rg = rolling_greeks(&r, &b, &dates, 5, 252.0);
+        let rg = rolling_greeks(&r, &b, &dates, 5, 252.0, 0.0);
         assert_eq!(rg.betas.len(), 16);
+    }
+
+    #[test]
+    fn rolling_greeks_alpha_is_annualized_jensen_alpha() {
+        let ann_factor = 12.0;
+        let risk_free_rate = 0.12;
+        let beta_value = 1.4;
+        let intercept = 0.002;
+        let b: Vec<f64> = (0..12).map(|i| -0.03 + i as f64 * 0.006).collect();
+        let r: Vec<f64> = b
+            .iter()
+            .map(|&bench| intercept + beta_value * bench)
+            .collect();
+        let dates: Vec<Date> = (1..=12).map(jan).collect();
+
+        let zero_rf = rolling_greeks(&r, &b, &dates, 6, ann_factor, 0.0);
+        let nonzero_rf = rolling_greeks(&r, &b, &dates, 6, ann_factor, risk_free_rate);
+        let rf_period = (1.0_f64 + risk_free_rate).powf(1.0 / ann_factor) - 1.0;
+        let expected_change = rf_period * (beta_value - 1.0) * ann_factor;
+
+        for ((zero_alpha, nonzero_alpha), beta) in zero_rf
+            .alphas
+            .iter()
+            .zip(nonzero_rf.alphas.iter())
+            .zip(nonzero_rf.betas.iter())
+        {
+            assert!((*beta - beta_value).abs() < 1e-12);
+            assert!((*zero_alpha - intercept * ann_factor).abs() < 1e-12);
+            assert!((*nonzero_alpha - *zero_alpha - expected_change).abs() < 1e-12);
+        }
     }
 
     #[test]
@@ -1221,7 +1317,7 @@ mod tests {
         let r: Vec<f64> = (0..20).map(|i| (i as f64 + 1.0) * 0.001).collect();
         let b: Vec<f64> = vec![0.5_f64; 20];
         let dates: Vec<Date> = (1..=20).map(jan).collect();
-        let rg = rolling_greeks(&r, &b, &dates, window, 252.0);
+        let rg = rolling_greeks(&r, &b, &dates, window, 252.0, 0.0);
         assert_eq!(rg.alphas.len(), rg.dates.len());
         assert_eq!(rg.betas.len(), rg.dates.len());
         assert!(
@@ -1241,7 +1337,7 @@ mod tests {
         let b: Vec<f64> = (0..30).map(|i| i as f64 * 0.0005 + 0.001).collect();
         r[7] = f64::NAN;
         let dates: Vec<Date> = (1..=30).map(jan).collect();
-        let rg = rolling_greeks(&r, &b, &dates, window, 252.0);
+        let rg = rolling_greeks(&r, &b, &dates, window, 252.0, 0.0);
 
         for (k, beta) in rg.betas.iter().enumerate() {
             // Window k covers return indices [k, k + window).
@@ -1264,7 +1360,7 @@ mod tests {
 
         assert!(beta_only(&r, &b).is_nan());
 
-        let g = greeks(&r, &b, 252.0);
+        let g = greeks(&r, &b, 252.0, 0.0);
         assert!(g.beta.is_nan());
         assert!(g.alpha.is_nan());
 
@@ -1326,7 +1422,7 @@ mod tests {
             .collect();
         let dates: Vec<Date> = (0..n).map(|i| jan(1) + Duration::days(i as i64)).collect();
 
-        let rolling = rolling_greeks(&r, &b, &dates, window, ann_factor);
+        let rolling = rolling_greeks(&r, &b, &dates, window, ann_factor, 0.0);
         let (_, expected_betas) = exact_rolling_greeks(&r, &b, window, ann_factor);
 
         let max_beta_diff = rolling
@@ -1350,7 +1446,7 @@ mod tests {
         // up_capture = (1.10−1) / (1.05−1) = 0.10/0.05 = 2.0
         let r = [0.10, -0.05];
         let b = [0.05, -0.10];
-        let uc = up_capture(&r, &b);
+        let uc = up_capture(&r, &b, 1.0);
         assert!((uc - 2.0).abs() < 1e-12);
     }
 
@@ -1361,7 +1457,7 @@ mod tests {
         // down_capture = (0.95−1) / (0.90−1) = −0.05/−0.10 = 0.5
         let r = [0.10, -0.05];
         let b = [0.05, -0.10];
-        let dc = down_capture(&r, &b);
+        let dc = down_capture(&r, &b, 1.0);
         assert!((dc - 0.5).abs() < 1e-12);
     }
 
@@ -1370,7 +1466,7 @@ mod tests {
         // up/down = 2.0/0.5 = 4.0
         let r = [0.10, -0.05];
         let b = [0.05, -0.10];
-        let cr = capture_ratio(&r, &b);
+        let cr = capture_ratio(&r, &b, 1.0);
         assert!((cr - 4.0).abs() < 1e-12);
     }
 
@@ -1382,16 +1478,27 @@ mod tests {
         // bench geometric return = sqrt((1.02)(1.03)) − 1
         let r = [0.04, -0.01, 0.06];
         let b = [0.02, -0.03, 0.03];
-        let uc = up_capture(&r, &b);
+        let uc = up_capture(&r, &b, 1.0);
         let expected = ((1.04_f64 * 1.06_f64).sqrt() - 1.0) / ((1.02_f64 * 1.03_f64).sqrt() - 1.0);
         assert!((uc - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn up_capture_uses_empyrical_style_annualized_subset_return() {
+        let r = vec![0.02; 36];
+        let b = vec![0.015; 36];
+        let uc = up_capture(&r, &b, 12.0);
+        let expected = ((1.02_f64).powf(12.0) - 1.0) / ((1.015_f64).powf(12.0) - 1.0);
+
+        assert!((uc - expected).abs() < 1e-12);
+        assert!((uc - 1.371_251_926_947_35).abs() < 1e-12);
     }
 
     #[test]
     fn up_capture_uses_geometric_subset_returns() {
         let r = [1.0, 0.0, -0.4];
         let b = [0.5, 0.5, -0.1];
-        let uc = up_capture(&r, &b);
+        let uc = up_capture(&r, &b, 1.0);
         let expected_port = (2.0_f64 * 1.0_f64).sqrt() - 1.0;
         let expected_bench = (1.5_f64 * 1.5_f64).sqrt() - 1.0;
         let expected = expected_port / expected_bench;
@@ -1403,7 +1510,7 @@ mod tests {
         // Portfolio loses less than benchmark → dc < 1.0 (desirable)
         let r = [0.04, -0.01, 0.06];
         let b = [0.02, -0.03, 0.03];
-        let dc = down_capture(&r, &b);
+        let dc = down_capture(&r, &b, 1.0);
         // Down periods: index 1. port_prod=0.99, bench_prod=0.97
         let expected = (0.99 - 1.0) / (0.97 - 1.0);
         assert!((dc - expected).abs() < 1e-12);
@@ -1414,7 +1521,7 @@ mod tests {
     fn down_capture_uses_geometric_subset_returns() {
         let r = [-0.25, 0.0, 0.1];
         let b = [-0.5, -0.5, 0.1];
-        let dc = down_capture(&r, &b);
+        let dc = down_capture(&r, &b, 1.0);
         let expected_port = (0.75_f64 * 1.0_f64).sqrt() - 1.0;
         let expected_bench = (0.5_f64 * 0.5_f64).sqrt() - 1.0;
         let expected = expected_port / expected_bench;
@@ -1425,21 +1532,21 @@ mod tests {
     fn up_capture_no_up_periods() {
         let r = [0.01, 0.02];
         let b = [-0.01, -0.02];
-        assert_eq!(up_capture(&r, &b), 0.0);
+        assert_eq!(up_capture(&r, &b, 1.0), 0.0);
     }
 
     #[test]
     fn down_capture_no_down_periods() {
         let r = [0.01, 0.02];
         let b = [0.01, 0.02];
-        assert_eq!(down_capture(&r, &b), 0.0);
+        assert_eq!(down_capture(&r, &b, 1.0), 0.0);
     }
 
     #[test]
     fn capture_ratio_perfect_tracking() {
         // Portfolio = benchmark → up_capture=1, down_capture=1, ratio=1
         let r = [0.02, -0.03, 0.01, -0.01];
-        let cr = capture_ratio(&r, &r);
+        let cr = capture_ratio(&r, &r, 1.0);
         assert!((cr - 1.0).abs() < 1e-12);
     }
 

@@ -24,63 +24,79 @@ impl Performance {
     /// benchmark to estimate beta.
     pub fn treynor(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
-        let bench = self.active_bench();
         self.map_tickers(|i| {
-            let r = self.active_returns(i);
+            let (r, bench) = self.active_pair_returns(i);
             let ann_ret = risk_metrics::mean_return(r, true, ann);
             let beta = beta_only(r, bench);
             treynor(ann_ret, risk_free_rate, beta)
         })
     }
 
-    /// Up-market capture ratio for each ticker versus the active benchmark.
+    /// Empyrical-style annualized geometric up-capture for each ticker versus the active benchmark.
     pub fn up_capture(&self) -> Vec<f64> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| up_capture(self.active_returns(i), bench))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            up_capture(r, bench, self.ann())
+        })
     }
 
-    /// Down-market capture ratio for each ticker versus the active benchmark.
+    /// Empyrical-style annualized geometric down-capture for each ticker versus the active benchmark.
     pub fn down_capture(&self) -> Vec<f64> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| down_capture(self.active_returns(i), bench))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            down_capture(r, bench, self.ann())
+        })
     }
 
-    /// Capture ratio (up-capture divided by down-capture) for each ticker.
+    /// Empyrical-style annualized geometric capture ratio for each ticker.
     pub fn capture_ratio(&self) -> Vec<f64> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| capture_ratio(self.active_returns(i), bench))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            capture_ratio(r, bench, self.ann())
+        })
     }
 
     /// Annualized tracking error for each ticker versus the active benchmark.
     pub fn tracking_error(&self) -> Vec<f64> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| tracking_error(self.active_returns(i), bench, true, self.ann()))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            tracking_error(r, bench, true, self.ann())
+        })
     }
 
     /// Annualized information ratio for each ticker versus the active benchmark.
     pub fn information_ratio(&self) -> Vec<f64> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| information_ratio(self.active_returns(i), bench, true, self.ann()))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            information_ratio(r, bench, true, self.ann())
+        })
     }
 
     /// R-squared for each ticker versus the active benchmark.
     pub fn r_squared(&self) -> Vec<f64> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| r_squared(self.active_returns(i), bench))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            r_squared(r, bench)
+        })
     }
 
     /// OLS beta estimates for each ticker versus the active benchmark.
     pub fn beta(&self) -> Vec<BetaResult> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| beta(self.active_returns(i), bench))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            beta(r, bench)
+        })
     }
 
     /// Single-factor greeks for each ticker versus the active benchmark.
     ///
-    /// Alpha is annualized using the configured observation frequency.
-    pub fn greeks(&self) -> Vec<GreeksResult> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| greeks(self.active_returns(i), bench, self.ann()))
+    /// Alpha is annualized Jensen alpha using the configured observation
+    /// frequency and the supplied annualized risk-free rate.
+    pub fn greeks(&self, risk_free_rate: f64) -> Vec<GreeksResult> {
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            greeks(r, bench, self.ann(), risk_free_rate)
+        })
     }
 
     /// Rolling greeks (alpha, beta) for a specific ticker vs the benchmark.
@@ -89,14 +105,21 @@ impl Performance {
     ///
     /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
     /// `ticker_idx` is outside the loaded ticker columns.
-    pub fn rolling_greeks(&self, ticker_idx: usize, window: usize) -> crate::Result<RollingGreeks> {
+    pub fn rolling_greeks(
+        &self,
+        ticker_idx: usize,
+        window: usize,
+        risk_free_rate: f64,
+    ) -> crate::Result<RollingGreeks> {
         self.ensure_ticker_idx(ticker_idx)?;
+        let (r, bench) = self.active_pair_returns(ticker_idx);
         Ok(rolling_greeks(
-            self.active_returns(ticker_idx),
-            self.active_bench(),
-            self.active_dates(),
+            r,
+            bench,
+            self.active_pair_dates(ticker_idx),
             window,
             self.ann(),
+            risk_free_rate,
         ))
     }
 
@@ -105,17 +128,19 @@ impl Performance {
     /// Fraction of periods where the ticker's return exceeds the benchmark's
     /// return over the active window.
     pub fn batting_average(&self) -> Vec<f64> {
-        let bench = self.active_bench();
-        self.map_tickers(|i| batting_average(self.active_returns(i), bench))
+        self.map_tickers(|i| {
+            let (r, bench) = self.active_pair_returns(i);
+            batting_average(r, bench)
+        })
     }
 
     /// M-squared (Modigliani-Modigliani) for each ticker.
     pub fn m_squared(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
-        let bench = self.active_bench();
-        let (_, bench_vol) = risk_metrics::mean_vol_annualized(bench, ann);
         self.map_tickers(|i| {
-            let (ann_ret, ann_vol) = risk_metrics::mean_vol_annualized(self.active_returns(i), ann);
+            let (r, bench) = self.active_pair_returns(i);
+            let (ann_ret, ann_vol) = risk_metrics::mean_vol_annualized(r, ann);
+            let (_, bench_vol) = risk_metrics::mean_vol_annualized(bench, ann);
             m_squared(ann_ret, ann_vol, bench_vol, risk_free_rate)
         })
     }

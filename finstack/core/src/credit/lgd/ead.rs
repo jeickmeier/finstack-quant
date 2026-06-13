@@ -116,7 +116,7 @@ impl EadCalculator {
         if self.undrawn <= 0.0 {
             return None;
         }
-        Some(((observed_ead - self.drawn) / self.undrawn).clamp(0.0, 1.0))
+        Some((observed_ead - self.drawn) / self.undrawn)
     }
 
     /// Current utilization rate = drawn / (drawn + undrawn).
@@ -199,6 +199,14 @@ mod tests {
             "LEQ = {}, expected 0.75 (= CCF)",
             leq
         );
+    }
+
+    #[test]
+    fn ead_leq_returns_raw_realized_values() {
+        let calc = EadCalculator::revolver(60.0, 40.0).expect("valid");
+
+        assert_eq!(calc.leq_from_observed_ead(120.0), Some(1.5));
+        assert_eq!(calc.leq_from_observed_ead(40.0), Some(-0.5));
     }
 
     #[test]

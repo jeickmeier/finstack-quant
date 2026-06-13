@@ -391,12 +391,12 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
 ///
 /// - [`InputError::TooFewPoints`](crate::error::InputError::TooFewPoints): Empty flow slice
 /// - [`Error::CurrencyMismatch`](crate::Error::CurrencyMismatch): Mixed currencies
-pub fn npv_prediscounted_money(flows: &[(Date, Money)]) -> crate::Result<Money> {
+pub fn sum_prediscounted_money(flows: &[Money]) -> crate::Result<Money> {
     if flows.is_empty() {
         return Err(crate::error::InputError::TooFewPoints.into());
     }
-    let ccy = flows[0].1.currency();
-    for (_, amt) in flows.iter().skip(1) {
+    let ccy = flows[0].currency();
+    for amt in flows.iter().skip(1) {
         if amt.currency() != ccy {
             return Err(crate::Error::CurrencyMismatch {
                 expected: ccy,
@@ -405,10 +405,19 @@ pub fn npv_prediscounted_money(flows: &[(Date, Money)]) -> crate::Result<Money> 
         }
     }
     let mut total = Money::new(0.0, ccy);
-    for (_, amt) in flows {
+    for amt in flows {
         total = total.checked_add(*amt)?;
     }
     Ok(total)
+}
+
+/// Sum pre-discounted dated `Money` cashflows.
+///
+/// Dates are ignored because amounts are already discounted. Prefer
+/// [`sum_prediscounted_money`] for new code when dates carry no meaning.
+pub fn npv_prediscounted_money(flows: &[(Date, Money)]) -> crate::Result<Money> {
+    let amounts = flows.iter().map(|(_, amt)| *amt).collect::<Vec<_>>();
+    sum_prediscounted_money(&amounts)
 }
 
 /// Compute NPV of dated scalar cashflows using a flat annual discount rate.
@@ -925,6 +934,17 @@ mod tests {
             pv.amount(),
             (pv.amount() - 12000.0).abs()
         );
+    }
+
+    #[test]
+    fn sum_prediscounted_money_accepts_money_without_dates() {
+        let flows: Vec<Money> = (1..=120)
+            .map(|_| Money::new(100.0, Currency::USD))
+            .collect();
+
+        let pv = sum_prediscounted_money(&flows).expect("summation should succeed");
+        assert_eq!(pv.currency(), Currency::USD);
+        assert!((pv.amount() - 12000.0).abs() < 1e-12);
     }
 
     #[test]

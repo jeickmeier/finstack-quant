@@ -415,15 +415,9 @@ pub fn standard_normal_inv_cdf(p: f64) -> f64 {
 /// # Implementation
 ///
 /// This is a thin wrapper around `statrs::distribution::StudentsT::cdf`.
-/// For df > 100, uses the normal approximation for better performance.
 #[inline]
 pub fn student_t_cdf(x: f64, df: f64) -> f64 {
     debug_assert!(df > 0.0, "student_t_cdf requires df > 0, got {df}");
-    if df > 100.0 {
-        // High df (including +inf): normal approximation is accurate and faster.
-        // The approximation error decays as O(1/df).
-        return norm_cdf(x);
-    }
 
     use statrs::distribution::{ContinuousCDF, StudentsT};
     // StudentsT::new(location=0, scale=1, df) for standard t-distribution
@@ -483,12 +477,6 @@ pub fn student_t_inv_cdf(p: f64, df: f64) -> f64 {
     if p >= 1.0 {
         return f64::INFINITY;
     }
-    if df > 100.0 {
-        // High df (including +inf): normal approximation.
-        // The approximation error decays as O(1/df).
-        return standard_normal_inv_cdf(p);
-    }
-
     use statrs::distribution::{ContinuousCDF, StudentsT};
     match StudentsT::new(0.0, 1.0, df) {
         Ok(dist) => dist.inverse_cdf(p),
@@ -527,6 +515,24 @@ mod tests {
                 "df={df}"
             );
         }
+    }
+
+    #[test]
+    fn student_t_large_df_uses_exact_tail_not_normal_cutoff() {
+        use statrs::distribution::{ContinuousCDF, StudentsT};
+
+        let dist = StudentsT::new(0.0, 1.0, 101.0).unwrap();
+        let exact_cdf = dist.cdf(-3.0);
+        let exact_quantile = dist.inverse_cdf(0.001);
+
+        assert!(
+            (student_t_cdf(-3.0, 101.0) - exact_cdf).abs() < 1e-14,
+            "df=101 CDF should use exact Student-t tail"
+        );
+        assert!(
+            (student_t_inv_cdf(0.001, 101.0) - exact_quantile).abs() < 1e-12,
+            "df=101 inverse CDF should use exact Student-t tail"
+        );
     }
 
     #[test]

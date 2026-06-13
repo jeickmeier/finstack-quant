@@ -184,13 +184,27 @@ fn ticker_index<'py>(py: Python<'py>, ticker_names: &[String]) -> PyResult<Bound
 
 fn panel_to_dataframe<'py>(
     py: Python<'py>,
-    ticker_names: &[String],
-    dates: &[time::Date],
+    perf: &fa::Performance,
     panel: Vec<Vec<f64>>,
 ) -> PyResult<Bound<'py, PyAny>> {
+    let ticker_names = perf.ticker_names();
+    let dates = perf.active_dates();
     let data = PyDict::new(py);
-    for (name, series) in ticker_names.iter().zip(panel.into_iter()) {
-        data.set_item(name, vec_to_pyarray(py, series))?;
+    for (ticker_idx, (name, series)) in ticker_names.iter().zip(panel.into_iter()).enumerate() {
+        let ticker_dates = perf
+            .active_dates_for_ticker(ticker_idx)
+            .map_err(core_to_py)?;
+        let mut padded = vec![f64::NAN; dates.len()];
+        let mut global_idx = 0usize;
+        for (&date, &value) in ticker_dates.iter().zip(series.iter()) {
+            while global_idx < dates.len() && dates[global_idx] < date {
+                global_idx += 1;
+            }
+            if global_idx < dates.len() && dates[global_idx] == date {
+                padded[global_idx] = value;
+            }
+        }
+        data.set_item(name, vec_to_pyarray(py, padded))?;
     }
     let dates = dates_to_pylist(py, dates)?;
     let idx = dates.into_pyobject(py)?.into_any();
@@ -358,6 +372,23 @@ impl PyPerformance {
             .collect()
     }
 
+    /// Date grid corresponding to one ticker's active return series.
+    ///
+    /// On edge-ragged panels this excludes leading/trailing missing rows for
+    /// the selected ticker.
+    fn active_dates_for_ticker<'py>(
+        &self,
+        py: Python<'py>,
+        ticker_idx: usize,
+    ) -> PyResult<Vec<Bound<'py, PyAny>>> {
+        self.inner
+            .active_dates_for_ticker(ticker_idx)
+            .map_err(core_to_py)?
+            .iter()
+            .map(|&d| date_to_py(py, d))
+            .collect()
+    }
+
     // -- Scalar-per-ticker methods --
 
     /// CAGR for each ticker.
@@ -384,6 +415,9 @@ impl PyPerformance {
     }
 
     /// Sortino ratio for each ticker.
+    ///
+    /// ``mar`` is a per-period minimum acceptable return, unlike Sharpe
+    /// ``risk_free_rate`` inputs, which are annualized.
     #[pyo3(signature = (mar = 0.0))]
     fn sortino(&self, mar: f64) -> Vec<f64> {
         self.inner.sortino(mar)
@@ -460,6 +494,9 @@ impl PyPerformance {
     }
 
     /// Downside deviation for each ticker.
+    ///
+    /// ``mar`` is a per-period threshold, unlike Sharpe ``risk_free_rate``
+    /// inputs, which are annualized.
     #[pyo3(signature = (mar = 0.0))]
     fn downside_deviation(&self, mar: f64) -> Vec<f64> {
         self.inner.downside_deviation(mar)
@@ -470,17 +507,17 @@ impl PyPerformance {
         self.inner.max_drawdown_duration()
     }
 
-    /// Up-capture ratio for each ticker vs benchmark.
+    /// Empyrical-style annualized geometric up-capture ratio vs benchmark.
     fn up_capture(&self) -> Vec<f64> {
         self.inner.up_capture()
     }
 
-    /// Down-capture ratio for each ticker vs benchmark.
+    /// Empyrical-style annualized geometric down-capture ratio vs benchmark.
     fn down_capture(&self) -> Vec<f64> {
         self.inner.down_capture()
     }
 
-    /// Capture ratio for each ticker vs benchmark.
+    /// Empyrical-style annualized geometric capture ratio vs benchmark.
     fn capture_ratio(&self) -> Vec<f64> {
         self.inner.capture_ratio()
     }
@@ -634,25 +671,30 @@ impl PyPerformance {
             .collect()
     }
 
-    /// Greeks (alpha, beta, R²) for each ticker vs benchmark.
-    fn greeks(&self) -> Vec<PyGreeksResult> {
+    /// Greeks (annualized Jensen alpha, beta, R²) for each ticker vs benchmark.
+    #[pyo3(signature = (risk_free_rate = 0.0))]
+    fn greeks(&self, risk_free_rate: f64) -> Vec<PyGreeksResult> {
         self.inner
-            .greeks()
+            .greeks(risk_free_rate)
             .into_iter()
             .map(|g| PyGreeksResult { inner: g })
             .collect()
     }
 
     /// Rolling greeks for a specific ticker.
-    #[pyo3(signature = (ticker_idx, window = 63))]
+    #[pyo3(signature = (ticker_idx, window = 63, risk_free_rate = 0.0))]
     fn rolling_greeks(
         &self,
         py: Python<'_>,
         ticker_idx: usize,
         window: usize,
+        risk_free_rate: f64,
     ) -> PyResult<PyRollingGreeks> {
         let inner = py
-            .detach(|| self.inner.rolling_greeks(ticker_idx, window))
+            .detach(|| {
+                self.inner
+                    .rolling_greeks(ticker_idx, window, risk_free_rate)
+            })
             .map_err(core_to_py)?;
         Ok(PyRollingGreeks { inner })
     }
@@ -852,24 +894,14 @@ impl PyPerformance {
     ///
     /// Returns a DataFrame with a date index and one column per ticker.
     fn cumulative_returns_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        panel_to_dataframe(
-            py,
-            self.inner.ticker_names(),
-            self.inner.active_dates(),
-            self.inner.cumulative_returns(),
-        )
+        panel_to_dataframe(py, &self.inner, self.inner.cumulative_returns())
     }
 
     /// Drawdown series for all tickers as a pandas ``DataFrame``.
     ///
     /// Returns a DataFrame with a date index and one column per ticker.
     fn drawdown_series_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        panel_to_dataframe(
-            py,
-            self.inner.ticker_names(),
-            self.inner.active_dates(),
-            self.inner.drawdown_series(),
-        )
+        panel_to_dataframe(py, &self.inner, self.inner.drawdown_series())
     }
 
     /// Correlation matrix as a pandas ``DataFrame``.

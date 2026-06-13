@@ -322,12 +322,12 @@ pub fn binomial_pmf_all(n: usize, p: f64) -> Vec<f64> {
         return pmf;
     }
 
-    let ratio = p / (1.0 - p);
-    let mut prob = (1.0 - p).powi(n as i32);
-    pmf[0] = prob;
+    let log_ratio = p.ln() - (1.0 - p).ln();
+    let mut log_prob = n as f64 * (1.0 - p).ln();
+    pmf[0] = log_prob.exp();
     for k in 0..n {
-        prob *= (n - k) as f64 / (k + 1) as f64 * ratio;
-        pmf[k + 1] = prob;
+        log_prob += ((n - k) as f64).ln() - ((k + 1) as f64).ln() + log_ratio;
+        pmf[k + 1] = log_prob.exp();
     }
     pmf
 }
@@ -1878,6 +1878,22 @@ mod tests {
             let total: f64 = pmf.iter().sum();
             assert!((total - 1.0).abs() < 1e-9, "n={n}, p={p}: pmf sum={total}");
         }
+    }
+
+    #[test]
+    fn binomial_pmf_all_large_n_keeps_probability_mass() {
+        let pmf = binomial_pmf_all(2_000, 0.5);
+        let sum: f64 = pmf.iter().sum();
+        let mode = pmf[1_000];
+
+        assert!(
+            (sum - 1.0).abs() < 1e-10,
+            "large-n PMF must sum to 1, got {sum}"
+        );
+        assert!(
+            mode > 0.0,
+            "mode probability should be positive for n=2000, p=0.5"
+        );
     }
 
     #[test]

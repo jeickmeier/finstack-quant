@@ -96,6 +96,27 @@ class TestConstruction:
         assert perf_returns.benchmark_idx == 1
         assert len(perf_returns.dates()) == 60
 
+    def test_ragged_price_dataframe_exports_pad_edges(self) -> None:
+        dates = pd.to_datetime(_daily_dates(6))
+        prices = pd.DataFrame(
+            {
+                "BENCH": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+                "PORT": [math.nan, math.nan, 50.0, 55.0, 60.5, math.nan],
+            },
+            index=dates,
+        )
+
+        perf = Performance(prices, benchmark_ticker="BENCH")
+        assert perf.active_dates_for_ticker(1) == [date(2024, 1, 4), date(2024, 1, 5)]
+
+        cumulative = perf.cumulative_returns_to_dataframe()
+        assert list(cumulative.index.date) == _daily_dates(5, start=date(2024, 1, 2))
+        assert pd.isna(cumulative.loc[pd.Timestamp(date(2024, 1, 2)), "PORT"])
+        assert pd.isna(cumulative.loc[pd.Timestamp(date(2024, 1, 3)), "PORT"])
+        assert cumulative.loc[pd.Timestamp(date(2024, 1, 4)), "PORT"] == pytest.approx(0.10)
+        assert cumulative.loc[pd.Timestamp(date(2024, 1, 5)), "PORT"] == pytest.approx(0.21)
+        assert pd.isna(cumulative.loc[pd.Timestamp(date(2024, 1, 6)), "PORT"])
+
     def test_from_arrays(self) -> None:
         dates = _daily_dates(5)
         prices = [[100.0, 101.0, 102.0, 103.0, 104.0], [50.0, 50.5, 51.0, 51.5, 52.0]]
@@ -233,11 +254,47 @@ class TestBenchmark:
         assert len(results) == 2
         assert all(isinstance(r, GreeksResult) for r in results)
 
+    def test_greeks_risk_free_rate_changes_jensen_alpha(self) -> None:
+        dates = _daily_dates(6)
+        benchmark = [-0.02, -0.01, 0.0, 0.01, 0.02, 0.03]
+        target = [2.0 * value for value in benchmark]
+        perf = Performance.from_returns_arrays(
+            dates,
+            [target, benchmark],
+            ["TARGET", "BENCH"],
+            benchmark_ticker="BENCH",
+            freq="monthly",
+        )
+
+        zero_rf = perf.greeks()[0]
+        nonzero_rf = perf.greeks(risk_free_rate=0.12)[0]
+
+        assert zero_rf.alpha == pytest.approx(0.0, abs=1e-12)
+        assert nonzero_rf.alpha > zero_rf.alpha
+
     def test_rolling_greeks(self, perf_prices: Performance) -> None:
         rg = perf_prices.rolling_greeks(0, window=10)
         assert isinstance(rg, RollingGreeks)
         assert len(rg.alphas) == len(rg.betas)
         assert len(rg.dates) == len(rg.alphas)
+
+    def test_rolling_greeks_risk_free_rate_changes_jensen_alpha(self) -> None:
+        dates = _daily_dates(8)
+        benchmark = [-0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.04]
+        target = [1.5 * value for value in benchmark]
+        perf = Performance.from_returns_arrays(
+            dates,
+            [target, benchmark],
+            ["TARGET", "BENCH"],
+            benchmark_ticker="BENCH",
+            freq="monthly",
+        )
+
+        zero_rf = perf.rolling_greeks(0, window=5)
+        nonzero_rf = perf.rolling_greeks(0, window=5, risk_free_rate=0.12)
+
+        assert list(zero_rf.alphas) == pytest.approx([0.0] * len(zero_rf.alphas), abs=1e-12)
+        assert all(actual > base for actual, base in zip(nonzero_rf.alphas, zero_rf.alphas, strict=True))
 
     def test_rolling_window_metrics(self, perf_prices: Performance) -> None:
         rs = perf_prices.rolling_sharpe(0, window=10)

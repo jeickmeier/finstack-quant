@@ -22,6 +22,7 @@ from finstack.core.market_data import (
     MarketContext,
 )
 from finstack.core.money import Money
+from finstack.core.types import Percentage, Rate
 import pytest
 
 
@@ -125,6 +126,29 @@ class TestMoneyParity:
     def test_small_value(self, usd: Currency) -> None:
         """Sub-cent amounts survive the round trip."""
         assert Money(0.01, usd).amount == pytest.approx(0.01)
+
+    def test_nonzero_scalar_right_subtraction_rejected(self, usd: Currency) -> None:
+        """Money rejects nonzero scalar - Money just like nonzero scalar + Money."""
+        with pytest.raises(TypeError, match="unsupported right operand"):
+            5.0 - Money(1.0, usd)
+
+
+class TestCoreTypesParity:
+    """Core scalar type contracts."""
+
+    def test_rate_hash_matches_equality_for_signed_zero(self) -> None:
+        pos_zero = Rate(0.0)
+        neg_zero = Rate(-0.0)
+
+        assert pos_zero == neg_zero
+        assert hash(pos_zero) == hash(neg_zero)
+
+    def test_percentage_hash_matches_equality_for_signed_zero(self) -> None:
+        pos_zero = Percentage(0.0)
+        neg_zero = Percentage(-0.0)
+
+        assert pos_zero == neg_zero
+        assert hash(pos_zero) == hash(neg_zero)
 
 
 class TestDayCountParity:

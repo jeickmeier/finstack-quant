@@ -10,6 +10,11 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 use std::hash::{Hash, Hasher};
 
+#[inline]
+fn canonical_f64_bits(value: f64) -> u64 {
+    (value + 0.0).to_bits()
+}
+
 /// Wrapper for [`Rate`].
 #[pyclass(
     module = "finstack.core.types",
@@ -35,7 +40,7 @@ impl PyRate {
 
 impl Hash for PyRate {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.inner.as_decimal().to_bits().hash(state);
+        canonical_f64_bits(self.inner.as_decimal()).hash(state);
     }
 }
 
@@ -277,7 +282,7 @@ impl PyPercentage {
 
 impl Hash for PyPercentage {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.inner.as_percent().to_bits().hash(state);
+        canonical_f64_bits(self.inner.as_percent()).hash(state);
     }
 }
 

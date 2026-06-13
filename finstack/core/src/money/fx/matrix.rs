@@ -200,14 +200,9 @@ impl FxMatrix {
                 triangulated: false,
             });
         }
-        if let Some(r_rev) = reciprocal_opt {
-            return Ok(FxRateResult {
-                rate: reciprocal_rate_or_err(r_rev, to, from)?,
-                triangulated: false,
-            });
-        }
         // Pinned fixings are authoritative and outrank the transient provider
-        // cache and the provider itself for their `(on, policy)`.
+        // cache, reciprocal pair-global quotes, and the provider itself for
+        // their `(on, policy)`.
         if let Some(rate) = pinned_direct_opt {
             let rate = validate_fx_rate(from, to, rate)?;
             return Ok(FxRateResult {
@@ -216,6 +211,12 @@ impl FxMatrix {
             });
         }
         if let Some(r_rev) = pinned_reciprocal_opt {
+            return Ok(FxRateResult {
+                rate: reciprocal_rate_or_err(r_rev, to, from)?,
+                triangulated: false,
+            });
+        }
+        if let Some(r_rev) = reciprocal_opt {
             return Ok(FxRateResult {
                 rate: reciprocal_rate_or_err(r_rev, to, from)?,
                 triangulated: false,
@@ -359,9 +360,11 @@ impl FxMatrix {
     /// # Parameters
     /// - `quotes`: slice of `(from, to, rate)` tuples
     pub fn set_quotes(&self, quotes: &[(Currency, Currency, f64)]) -> crate::Result<()> {
-        let mut map = self.quotes.lock();
         for &(from, to, rate) in quotes {
             validate_fx_rate(from, to, rate)?;
+        }
+        let mut map = self.quotes.lock();
+        for &(from, to, rate) in quotes {
             map.insert(Pair(from, to), rate);
         }
         Ok(())
@@ -852,28 +855,30 @@ impl FxMatrix {
             self.read_pinned_pair_bidir(from, to, on, policy);
         let (observed_direct_opt, observed_reciprocal_opt) =
             self.read_observed_pair_bidir(from, to, on, policy);
-        // 1) Explicit pair-global quote wins
+        // 1) Explicit direct pair-global quote wins
         if let Some(r) = direct_opt {
             return validate_fx_rate(from, to, r);
         }
-        if let Some(r_rev) = reciprocal_opt {
-            return reciprocal_rate_or_err(r_rev, to, from);
-        }
-        // 2) Pinned fixings outrank the transient observed cache and provider
+        // 2) Pinned fixings outrank reciprocal pair-global quotes, the
+        // transient observed cache, and the provider.
         if let Some(r) = pinned_direct_opt {
             return validate_fx_rate(from, to, r);
         }
         if let Some(r_rev) = pinned_reciprocal_opt {
             return reciprocal_rate_or_err(r_rev, to, from);
         }
-        // 3) Provider-observed cache
+        // 3) Reciprocal pair-global quote
+        if let Some(r_rev) = reciprocal_opt {
+            return reciprocal_rate_or_err(r_rev, to, from);
+        }
+        // 4) Provider-observed cache
         if let Some(q) = observed_direct_opt {
             return validate_fx_rate(from, to, q.rate);
         }
         if let Some(q_rev) = observed_reciprocal_opt {
             return reciprocal_rate_or_err(q_rev.rate, to, from);
         }
-        // 4) Fetch from the provider
+        // 5) Fetch from the provider
         let r = self.provider.rate(from, to, on, policy)?;
         let r = validate_fx_rate(from, to, r)?;
         self.insert_observed_quote(from, to, on, policy, r, false);

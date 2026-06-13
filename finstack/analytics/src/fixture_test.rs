@@ -93,6 +93,7 @@ fn rust_core_matches_api_invariants_fixture() {
         &fixture.dates,
         5,
         252.0,
+        0.0,
     );
     assert_vec_close(&rolling.alphas, &expected.rolling_greeks.alphas);
     assert_vec_close(&rolling.betas, &expected.rolling_greeks.betas);

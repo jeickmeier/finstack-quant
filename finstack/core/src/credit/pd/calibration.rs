@@ -17,6 +17,22 @@ use crate::math::{norm_cdf, standard_normal_inv_cdf};
 
 use super::error::PdCalibrationError;
 
+/// Basel IRB minimum one-year PD floor: 3 basis points.
+pub const BASEL_IRB_PD_FLOOR: f64 = 0.0003;
+
+/// Apply the Basel IRB 3bp PD floor to a finite PD estimate.
+///
+/// Generic PD conversion and calibration helpers intentionally do not apply
+/// regulatory floors by default. Use this helper explicitly in IRB workflows.
+#[must_use]
+pub fn apply_basel_irb_pd_floor(pd: f64) -> f64 {
+    if pd.is_nan() {
+        f64::NAN
+    } else {
+        pd.max(BASEL_IRB_PD_FLOOR)
+    }
+}
+
 /// Parameters for the Merton-Vasicek single-factor PiT/TtC conversion.
 ///
 /// Uses the asymptotic single risk factor (ASRF) model:

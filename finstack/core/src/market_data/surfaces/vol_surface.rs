@@ -819,6 +819,10 @@ impl VolSurface {
             return self.value_clamped(clamped_expiry, strike);
         }
 
+        if self.quote_type == VolQuoteType::Normal {
+            return self.value_clamped(clamped_expiry, strike);
+        }
+
         // Strike is out of bounds — use SVI wing extrapolation
         // Find the closest expiry index for the slice
         let expiry_idx = find_closest_grid_index(&self.expiries, clamped_expiry);

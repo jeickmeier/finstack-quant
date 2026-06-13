@@ -744,6 +744,56 @@ fn with_bumped_rate_rejects_invalid_bumps() {
 }
 
 #[test]
+fn set_quotes_is_atomic_on_invalid_entry() {
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+
+    let err = matrix.set_quotes(&[
+        (Currency::EUR, Currency::USD, 1.25),
+        (Currency::GBP, Currency::USD, 0.0),
+    ]);
+    assert!(err.is_err(), "invalid batch quote should fail");
+
+    let rate = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, d))
+        .unwrap()
+        .rate;
+    assert!(
+        (rate - 1.10).abs() < 1e-12,
+        "failed set_quotes batch must not insert earlier valid entries"
+    );
+}
+
+#[test]
+fn pinned_quote_outranks_pair_global_reciprocal() {
+    let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
+    let d = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+
+    matrix
+        .set_quote(Currency::USD, Currency::EUR, 0.80)
+        .expect("valid reciprocal global quote");
+    matrix
+        .set_quote_on(
+            Currency::EUR,
+            Currency::USD,
+            d,
+            FxConversionPolicy::CashflowDate,
+            1.30,
+        )
+        .expect("valid pinned quote");
+
+    let rate = matrix
+        .rate(FxQuery::new(Currency::EUR, Currency::USD, d))
+        .unwrap()
+        .rate;
+
+    assert!(
+        (rate - 1.30).abs() < 1e-12,
+        "pinned fixing should win over an opposite-direction pair-global quote"
+    );
+}
+
+#[test]
 fn fx_matrix_state_round_trips_pinned_quotes() {
     // 2026-06-09 core quant review: persistence previously dropped pinned
     // (date/policy-scoped) quotes. After snapshot + restore, a pinned fixing

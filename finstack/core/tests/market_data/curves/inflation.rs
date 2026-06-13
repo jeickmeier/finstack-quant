@@ -8,7 +8,7 @@
 //! - Serialization roundtrips
 
 use finstack_core::market_data::term_structures::InflationCurve;
-use finstack_core::math::interp::InterpStyle;
+use finstack_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use time::{Date, Month};
 
 fn _test_date() -> Date {
@@ -158,6 +158,7 @@ mod serde_tests {
                 (10.0, 360.0),
             ])
             .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatZero)
             .build()
             .unwrap();
 
@@ -168,6 +169,7 @@ mod serde_tests {
         assert_eq!(original.base_cpi(), deserialized.base_cpi());
         assert_eq!(original.knots(), deserialized.knots());
         assert_eq!(original.cpi_levels(), deserialized.cpi_levels());
+        assert_eq!(original.extrapolation(), deserialized.extrapolation());
 
         // Test CPI interpolation
         for t in [0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 5.0, 7.5, 10.0] {
@@ -195,6 +197,36 @@ mod serde_tests {
                 deserialized_rate
             );
         }
+    }
+
+    #[test]
+    fn builder_extrapolation_controls_cpi_beyond_last_knot() {
+        let flat_zero = InflationCurve::builder("US-CPI")
+            .base_cpi(300.0)
+            .base_date(_test_date())
+            .knots([(0.0, 300.0), (1.0, 306.0)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .build()
+            .unwrap();
+        let flat_forward = InflationCurve::builder("US-CPI")
+            .base_cpi(300.0)
+            .base_date(_test_date())
+            .knots([(0.0, 300.0), (1.0, 306.0)])
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .build()
+            .unwrap();
+
+        assert_eq!(flat_zero.extrapolation(), ExtrapolationPolicy::FlatZero);
+        assert_eq!(
+            flat_forward.extrapolation(),
+            ExtrapolationPolicy::FlatForward
+        );
+        assert!(
+            flat_forward.cpi(2.0) > flat_zero.cpi(2.0),
+            "flat-forward CPI should continue the positive inflation trend"
+        );
     }
 
     #[test]

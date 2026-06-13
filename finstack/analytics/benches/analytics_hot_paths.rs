@@ -142,7 +142,7 @@ fn bench_rolling_greeks(c: &mut Criterion) {
     c.bench_function("Performance::rolling_greeks 2.5k window=63", |b| {
         b.iter(|| {
             black_box(
-                perf.rolling_greeks(1, 63)
+                perf.rolling_greeks(1, 63, 0.0)
                     .expect("rolling greeks bench input"),
             )
         });

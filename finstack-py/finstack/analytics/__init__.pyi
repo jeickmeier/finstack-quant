@@ -99,7 +99,11 @@ class PeriodStats:
     def __repr__(self) -> str: ...
 
 class BetaResult:
-    """Regression beta with confidence interval."""
+    """Regression beta with confidence interval.
+
+    The 95% interval uses Student-t critical values for finite samples and an
+    asymptotic normal approximation once ``n - 2 >= 240``.
+    """
 
     @property
     def beta(self) -> float:
@@ -124,7 +128,7 @@ class GreeksResult:
 
     @property
     def alpha(self) -> float:
-        """Jensen's alpha (annualized)."""
+        """Annualized Jensen alpha."""
 
     @property
     def beta(self) -> float:
@@ -166,7 +170,7 @@ class MultiFactorResult:
 
     @property
     def alpha(self) -> float:
-        """Intercept (alpha)."""
+        """Raw regression intercept, annualized with the supplied factor frequency."""
 
     @property
     def betas(self) -> npt.NDArray[np.float64]:
@@ -362,6 +366,9 @@ class Performance:
     def active_dates(self) -> list[datetime.date]:
         """Observation dates of the currently active analysis window."""
 
+    def active_dates_for_ticker(self, ticker_idx: int) -> list[datetime.date]:
+        """Observation dates for one ticker's active return series."""
+
     # -- Scalar-per-ticker methods --
 
     def cagr(self) -> list[float]:
@@ -381,7 +388,10 @@ class Performance:
         """Sharpe ratio for each ticker."""
 
     def sortino(self, mar: float = 0.0) -> list[float]:
-        """Sortino ratio for each ticker."""
+        """Sortino ratio for each ticker.
+
+        ``mar`` is per-period; Sharpe risk-free inputs are annualized.
+        """
 
     def calmar(self) -> list[float]:
         """Calmar ratio for each ticker.
@@ -427,19 +437,22 @@ class Performance:
         """Per-ticker ``(value_at_risk, expected_shortfall)`` from one tail pass."""
 
     def downside_deviation(self, mar: float = 0.0) -> list[float]:
-        """Downside deviation for each ticker."""
+        """Downside deviation for each ticker.
+
+        ``mar`` is per-period; Sharpe risk-free inputs are annualized.
+        """
 
     def max_drawdown_duration(self) -> list[int]:
         """Max drawdown duration (calendar days) for each ticker."""
 
     def up_capture(self) -> list[float]:
-        """Up-capture ratio for each ticker vs benchmark."""
+        """Empyrical-style annualized geometric up-capture vs benchmark."""
 
     def down_capture(self) -> list[float]:
-        """Down-capture ratio for each ticker vs benchmark."""
+        """Empyrical-style annualized geometric down-capture vs benchmark."""
 
     def capture_ratio(self) -> list[float]:
-        """Capture ratio for each ticker vs benchmark."""
+        """Empyrical-style annualized geometric capture ratio vs benchmark."""
 
     def omega_ratio(self, threshold: float = 0.0) -> list[float]:
         """Omega ratio for each ticker."""
@@ -544,10 +557,15 @@ class Performance:
     def beta(self) -> list[BetaResult]:
         """Beta for each ticker vs benchmark."""
 
-    def greeks(self) -> list[GreeksResult]:
-        """Greeks (alpha, beta, R²) for each ticker vs benchmark."""
+    def greeks(self, risk_free_rate: float = 0.0) -> list[GreeksResult]:
+        """Greeks (annualized Jensen alpha, beta, R²) for each ticker vs benchmark."""
 
-    def rolling_greeks(self, ticker_idx: int, window: int = 63) -> RollingGreeks:
+    def rolling_greeks(
+        self,
+        ticker_idx: int,
+        window: int = 63,
+        risk_free_rate: float = 0.0,
+    ) -> RollingGreeks:
         """Rolling greeks for a specific ticker."""
 
     def rolling_volatility(self, ticker_idx: int, window: int = 63) -> DatedSeries:

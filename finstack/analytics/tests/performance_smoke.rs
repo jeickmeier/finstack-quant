@@ -106,8 +106,8 @@ fn performance_facade_exercises_broad_api_surface() {
     let _ = perf.information_ratio();
     let _ = perf.r_squared();
     let _ = perf.beta();
-    let _ = perf.greeks();
-    let _ = perf.rolling_greeks(0, 30).expect("rolling greeks");
+    let _ = perf.greeks(0.0);
+    let _ = perf.rolling_greeks(0, 30, 0.0).expect("rolling greeks");
     let _ = perf.batting_average();
     let _ = perf.m_squared(0.02);
     let _ = perf.modified_sharpe(0.02, 0.95);

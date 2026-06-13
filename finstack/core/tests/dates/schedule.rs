@@ -578,12 +578,13 @@ fn test_imm_schedule_basic() {
         .into_iter()
         .collect();
 
-    // Should get 4 dates: Mar 19, Jun 18, Sep 17, Dec 17 (2025 third Wednesdays)
-    assert_eq!(dates.len(), 4);
-    assert_eq!(dates[0], make_date(2025, 3, 19)); // Third Wednesday of March
-    assert_eq!(dates[1], make_date(2025, 6, 18)); // Third Wednesday of June
-    assert_eq!(dates[2], make_date(2025, 9, 17)); // Third Wednesday of September
-    assert_eq!(dates[3], make_date(2025, 12, 17)); // Third Wednesday of December
+    // Effective date anchors the front accrual, then IMM roll dates follow.
+    assert_eq!(dates.len(), 5);
+    assert_eq!(dates[0], start);
+    assert_eq!(dates[1], make_date(2025, 3, 19)); // Third Wednesday of March
+    assert_eq!(dates[2], make_date(2025, 6, 18)); // Third Wednesday of June
+    assert_eq!(dates[3], make_date(2025, 9, 17)); // Third Wednesday of September
+    assert_eq!(dates[4], make_date(2025, 12, 17)); // Third Wednesday of December
 }
 
 #[test]
@@ -609,7 +610,7 @@ fn test_imm_schedule_start_on_imm_date() {
 
 #[test]
 fn test_imm_schedule_start_after_first_imm() {
-    // Start after March IMM should skip to June
+    // Start after March IMM should anchor the front accrual, then roll to June
     let start = make_date(2025, 3, 20); // Day after March IMM
     let end = make_date(2025, 9, 30);
 
@@ -621,10 +622,10 @@ fn test_imm_schedule_start_after_first_imm() {
         .into_iter()
         .collect();
 
-    // Should start from June IMM
-    assert_eq!(dates.len(), 2);
-    assert_eq!(dates[0], make_date(2025, 6, 18)); // June IMM
-    assert_eq!(dates[1], make_date(2025, 9, 17)); // September IMM
+    assert_eq!(dates.len(), 3);
+    assert_eq!(dates[0], start);
+    assert_eq!(dates[1], make_date(2025, 6, 18)); // June IMM
+    assert_eq!(dates[2], make_date(2025, 9, 17)); // September IMM
 }
 
 #[test]
@@ -649,6 +650,25 @@ fn test_imm_schedule_empty_range_errors() {
 }
 
 #[test]
+fn test_imm_schedule_preserves_effective_date_front_anchor() {
+    let start = make_date(2025, 1, 15);
+    let end = make_date(2025, 6, 20);
+
+    let dates: Vec<_> = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .imm()
+        .build()
+        .unwrap()
+        .into_iter()
+        .collect();
+
+    assert_eq!(
+        dates,
+        vec![start, make_date(2025, 3, 19), make_date(2025, 6, 18)]
+    );
+}
+
+#[test]
 fn test_imm_schedule_year_rollover() {
     // IMM schedule spanning year boundary
     let start = make_date(2025, 10, 1);
@@ -662,11 +682,12 @@ fn test_imm_schedule_year_rollover() {
         .into_iter()
         .collect();
 
-    // Dec 2025, Mar 2026, Jun 2026
-    assert_eq!(dates.len(), 3);
-    assert_eq!(dates[0], make_date(2025, 12, 17)); // December 2025 third Wednesday
-    assert_eq!(dates[1], make_date(2026, 3, 18)); // March 2026 third Wednesday
-    assert_eq!(dates[2], make_date(2026, 6, 17)); // June 2026 third Wednesday
+    // Effective date plus Dec 2025, Mar 2026, Jun 2026
+    assert_eq!(dates.len(), 4);
+    assert_eq!(dates[0], start);
+    assert_eq!(dates[1], make_date(2025, 12, 17)); // December 2025 third Wednesday
+    assert_eq!(dates[2], make_date(2026, 3, 18)); // March 2026 third Wednesday
+    assert_eq!(dates[3], make_date(2026, 6, 17)); // June 2026 third Wednesday
 }
 
 #[test]
@@ -739,17 +760,18 @@ fn test_imm_vs_cds_imm_difference() {
         .into_iter()
         .collect();
 
-    // IMM snaps forward (2 dates); CDS anchors at the prior roll for the
-    // standard front accrual (3 dates) — 2026-06-09 core quant review.
-    assert_eq!(imm_dates.len(), 2);
+    // IMM anchors at the effective date; CDS anchors at the prior roll for the
+    // standard front accrual.
+    assert_eq!(imm_dates.len(), 3);
     assert_eq!(cds_dates.len(), 3);
 
-    // IMM: third Wednesday (Mar 19, Jun 18)
+    // IMM: effective date, then third Wednesday (Mar 19, Jun 18)
     // CDS: 20th, anchored at prior roll (Dec 20 2024, Mar 20, Jun 20)
-    assert_eq!(imm_dates[0], make_date(2025, 3, 19));
+    assert_eq!(imm_dates[0], start);
     assert_eq!(cds_dates[0], make_date(2024, 12, 20));
-    assert_eq!(imm_dates[1], make_date(2025, 6, 18));
+    assert_eq!(imm_dates[1], make_date(2025, 3, 19));
     assert_eq!(cds_dates[1], make_date(2025, 3, 20));
+    assert_eq!(imm_dates[2], make_date(2025, 6, 18));
     assert_eq!(cds_dates[2], make_date(2025, 6, 20));
 }
 

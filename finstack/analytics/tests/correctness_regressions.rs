@@ -6,6 +6,13 @@ fn d(year: i32, month: Month, day: u8) -> Date {
     Date::from_calendar_date(year, month, day).expect("valid date")
 }
 
+fn assert_close(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() < 1e-12,
+        "expected {expected}, got {actual}"
+    );
+}
+
 #[test]
 fn performance_cagr_uses_default_act_365_25_convention_for_single_return_window() {
     let dates = vec![d(2023, Month::January, 1), d(2024, Month::January, 1)];
@@ -86,6 +93,133 @@ fn performance_new_rejects_interior_nan_return_data() {
         result.is_err(),
         "interior non-finite returns should be rejected rather than coerced"
     );
+}
+
+#[test]
+fn performance_new_accepts_edge_ragged_price_columns() {
+    let dates: Vec<Date> = (1..=6).map(|day| d(2024, Month::January, day)).collect();
+    let perf = Performance::new(
+        dates.clone(),
+        vec![
+            vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
+            vec![f64::NAN, f64::NAN, 50.0, 55.0, 60.5, f64::NAN],
+        ],
+        vec!["BENCH".to_string(), "PORT".to_string()],
+        Some("BENCH"),
+        PeriodKind::Daily,
+    )
+    .expect("edge-ragged price panel should build");
+
+    assert_eq!(
+        perf.active_dates_for_ticker(1)
+            .expect("active ticker dates"),
+        &dates[3..5]
+    );
+    assert_eq!(perf.cumulative_returns()[1].len(), 2);
+}
+
+#[test]
+fn performance_from_returns_accepts_edge_ragged_return_columns() {
+    let dates: Vec<Date> = (1..=5).map(|day| d(2024, Month::January, day)).collect();
+    let perf = Performance::from_returns(
+        dates.clone(),
+        vec![
+            vec![0.01, 0.02, 0.03, 0.04, 0.05],
+            vec![f64::NAN, 0.02, 0.03, 0.04, f64::NAN],
+        ],
+        vec!["BENCH".to_string(), "PORT".to_string()],
+        Some("BENCH"),
+        PeriodKind::Daily,
+    )
+    .expect("edge-ragged return panel should build");
+
+    assert_eq!(
+        perf.active_dates_for_ticker(1)
+            .expect("active ticker dates"),
+        &dates[1..4]
+    );
+    assert_eq!(perf.drawdown_series()[1].len(), 3);
+}
+
+#[test]
+fn performance_rejects_interior_missing_values_in_ragged_panels() {
+    let dates: Vec<Date> = (1..=4).map(|day| d(2024, Month::January, day)).collect();
+
+    assert!(
+        Performance::new(
+            dates.clone(),
+            vec![vec![100.0, f64::NAN, 102.0, 103.0]],
+            vec!["PORT".to_string()],
+            None,
+            PeriodKind::Daily,
+        )
+        .is_err(),
+        "interior missing prices inside a finite price span should be rejected"
+    );
+
+    assert!(
+        Performance::from_returns(
+            dates,
+            vec![vec![0.01, f64::NAN, 0.02, 0.03]],
+            vec!["PORT".to_string()],
+            None,
+            PeriodKind::Daily,
+        )
+        .is_err(),
+        "interior missing returns inside a finite return span should be rejected"
+    );
+}
+
+#[test]
+fn performance_rejects_invalid_price_spans() {
+    let dates = vec![d(2024, Month::January, 1), d(2024, Month::January, 2)];
+
+    assert!(
+        Performance::new(
+            dates.clone(),
+            vec![vec![f64::NAN, f64::NAN]],
+            vec!["PORT".to_string()],
+            None,
+            PeriodKind::Daily,
+        )
+        .is_err(),
+        "price column with no finite positive observations should be rejected"
+    );
+
+    assert!(
+        Performance::new(
+            dates,
+            vec![vec![f64::NAN, 100.0]],
+            vec!["PORT".to_string()],
+            None,
+            PeriodKind::Daily,
+        )
+        .is_err(),
+        "price column with only one finite positive observation should be rejected"
+    );
+}
+
+#[test]
+fn benchmark_relative_metrics_use_overlapping_dates_only() {
+    let dates: Vec<Date> = (1..=5).map(|day| d(2024, Month::January, day)).collect();
+    let perf = Performance::from_returns(
+        dates,
+        vec![
+            vec![0.50, 0.01, 0.02, 0.03, -0.40],
+            vec![f64::NAN, 0.02, 0.04, 0.06, f64::NAN],
+        ],
+        vec!["BENCH".to_string(), "PORT".to_string()],
+        Some("BENCH"),
+        PeriodKind::Monthly,
+    )
+    .expect("edge-ragged returns should build");
+
+    assert_close(perf.beta()[1].beta, 2.0);
+    assert_close(perf.correlation_matrix()[0][1], 1.0);
+
+    let expected_up_capture = ((1.02_f64 * 1.04_f64 * 1.06_f64).powf(12.0 / 3.0) - 1.0)
+        / ((1.01_f64 * 1.02_f64 * 1.03_f64).powf(12.0 / 3.0) - 1.0);
+    assert_close(perf.up_capture()[1], expected_up_capture);
 }
 
 #[test]

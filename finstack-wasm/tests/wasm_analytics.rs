@@ -94,6 +94,34 @@ fn from_returns_exposes_active_dates() {
 }
 
 #[wasm_bindgen_test]
+fn from_returns_exposes_ticker_specific_active_dates() {
+    let dates = vec![
+        "2025-01-01".to_string(),
+        "2025-01-02".to_string(),
+        "2025-01-03".to_string(),
+        "2025-01-04".to_string(),
+    ];
+    let returns = vec![
+        vec![0.01, 0.02, 0.03, 0.04],
+        vec![f64::NAN, 0.04, 0.06, f64::NAN],
+    ];
+    let names = vec!["BENCH".to_string(), "PORT".to_string()];
+    let perf = WasmPerformance::from_returns(
+        to_js(&dates),
+        to_f64_matrix(&returns),
+        to_js(&names),
+        Some("BENCH".to_string()),
+        Some("daily".to_string()),
+    )
+    .unwrap();
+
+    assert_eq!(
+        perf.active_dates_for_ticker(1).unwrap(),
+        vec!["2025-01-02".to_string(), "2025-01-03".to_string()]
+    );
+}
+
+#[wasm_bindgen_test]
 fn ticker_names_round_trip() {
     let perf = build_perf();
     let names: Vec<String> = serde_wasm_bindgen::from_value(perf.ticker_names().unwrap()).unwrap();
@@ -185,14 +213,47 @@ fn beta_and_greeks_return_per_ticker_structs() {
     let betas: serde_json::Value = serde_wasm_bindgen::from_value(perf.beta().unwrap()).unwrap();
     assert_eq!(betas.as_array().unwrap().len(), 2);
 
-    let greeks: serde_json::Value = serde_wasm_bindgen::from_value(perf.greeks().unwrap()).unwrap();
+    let greeks: serde_json::Value =
+        serde_wasm_bindgen::from_value(perf.greeks(None).unwrap()).unwrap();
     assert_eq!(greeks.as_array().unwrap().len(), 2);
+}
+
+#[wasm_bindgen_test]
+fn greeks_optional_risk_free_rate_changes_alpha() {
+    let dates = vec![
+        "2025-01-01".to_string(),
+        "2025-01-02".to_string(),
+        "2025-01-03".to_string(),
+        "2025-01-04".to_string(),
+        "2025-01-05".to_string(),
+    ];
+    let benchmark = vec![-0.02, -0.01, 0.0, 0.01, 0.02];
+    let target: Vec<f64> = benchmark.iter().map(|&b| 2.0 * b).collect();
+    let names = vec!["TARGET".to_string(), "BENCH".to_string()];
+    let perf = WasmPerformance::from_returns(
+        to_js(&dates),
+        to_f64_matrix(&[target, benchmark]),
+        to_js(&names),
+        Some("BENCH".to_string()),
+        Some("monthly".to_string()),
+    )
+    .unwrap();
+
+    let zero: serde_json::Value =
+        serde_wasm_bindgen::from_value(perf.greeks(None).unwrap()).unwrap();
+    let nonzero: serde_json::Value =
+        serde_wasm_bindgen::from_value(perf.greeks(Some(0.12)).unwrap()).unwrap();
+    let zero_alpha = zero[0]["alpha"].as_f64().unwrap();
+    let nonzero_alpha = nonzero[0]["alpha"].as_f64().unwrap();
+
+    assert!(zero_alpha.abs() < 1e-12);
+    assert!(nonzero_alpha > zero_alpha);
 }
 
 #[wasm_bindgen_test]
 fn rolling_greeks_emit_dates_alphas_betas() {
     let perf = build_perf();
-    let raw = perf.rolling_greeks(0, Some(5)).unwrap();
+    let raw = perf.rolling_greeks(0, Some(5), None).unwrap();
     let date_array: Array = Reflect::get(&raw, &JsValue::from_str("dates"))
         .unwrap()
         .dyn_into()

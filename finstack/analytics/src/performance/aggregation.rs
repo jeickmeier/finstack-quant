@@ -6,8 +6,9 @@
 use super::{LookbackReturns, Performance};
 use crate::aggregation::{group_by_period, period_stats_from_grouped, PeriodStats};
 use crate::dates::{Date, FiscalConfig, HolidayCalendar, PeriodKind};
-use crate::drawdown::{drawdown_details, DrawdownEpisode};
+use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
 use crate::lookback;
+use crate::math::stats::correlation;
 use crate::returns::{comp_sum, comp_total, excess_returns};
 
 impl Performance {
@@ -36,7 +37,7 @@ impl Performance {
     ) -> crate::Result<Vec<DrawdownEpisode>> {
         self.ensure_ticker_idx(ticker_idx)?;
         let dd = self.active_drawdown_values(ticker_idx);
-        let dates = self.active_dates();
+        let dates = self.active_dates_for_ticker_unchecked(ticker_idx);
         Ok(drawdown_details(dd, dates, n))
     }
 
@@ -51,47 +52,20 @@ impl Performance {
             return matrix;
         }
 
-        // Use the shortest active series so all column lookups are bounds-safe
-        // when callers feed misaligned panels through `active_returns`.
-        let t = (0..n)
-            .map(|i| self.active_returns(i).len())
-            .min()
-            .unwrap_or(0);
-        if t == 0 {
-            for (i, row) in matrix.iter_mut().enumerate().take(n) {
-                row[i] = 1.0;
-            }
-            return matrix;
-        }
-
-        // One Welford pass per column gives mean+variance; centering once
-        // avoids the n²-mean recomputation hidden inside pairwise `covariance`.
-        // Store the centered panel as a single flat row-major buffer (`n × t`)
-        // so the pairwise dot products read contiguous memory.
-        let mut centered: Vec<f64> = Vec::with_capacity(n * t);
-        let mut std_devs: Vec<f64> = Vec::with_capacity(n);
         for i in 0..n {
-            let series = &self.active_returns(i)[..t];
-            let (m, var) = crate::math::stats::mean_var(series);
-            centered.extend(series.iter().map(|&v| v - m));
-            std_devs.push(var.sqrt());
-        }
-
-        let denom = if t > 1 { (t - 1) as f64 } else { 1.0 };
-        for i in 0..n {
-            matrix[i][i] = 1.0;
-            let ci = &centered[i * t..i * t + t];
-            for j in (i + 1)..n {
-                let scale = std_devs[i] * std_devs[j];
-                let corr = if scale == 0.0 {
+            let (head, tail) = matrix.split_at_mut(i + 1);
+            let row_i = &mut head[i];
+            row_i[i] = 1.0;
+            for (offset, row_j) in tail.iter_mut().enumerate() {
+                let j = i + 1 + offset;
+                let (lhs, rhs) = self.active_two_ticker_returns(i, j);
+                let corr = if lhs.len() < 2 {
                     0.0
                 } else {
-                    let cj = &centered[j * t..j * t + t];
-                    let dot: f64 = ci.iter().zip(cj).map(|(a, b)| a * b).sum();
-                    (dot / denom) / scale
+                    correlation(lhs, rhs)
                 };
-                matrix[i][j] = corr;
-                matrix[j][i] = corr;
+                row_i[j] = corr;
+                row_j[i] = corr;
             }
         }
         matrix
@@ -99,9 +73,10 @@ impl Performance {
 
     /// Cumulative outperformance versus the active benchmark.
     pub fn cumulative_returns_outperformance(&self) -> Vec<Vec<f64>> {
-        let bench_cum = comp_sum(self.active_bench());
         self.map_tickers(|i| {
-            let port_cum = comp_sum(self.active_returns(i));
+            let (port, bench) = self.active_pair_returns(i);
+            let port_cum = comp_sum(port);
+            let bench_cum = comp_sum(bench);
             port_cum
                 .iter()
                 .zip(bench_cum.iter())
@@ -112,10 +87,15 @@ impl Performance {
 
     /// Drawdown difference versus the active benchmark.
     pub fn drawdown_difference(&self) -> Vec<Vec<f64>> {
-        let bench_dd = self.active_bench_drawdown_values();
         self.map_tickers(|i| {
-            let dd = self.active_drawdown_values(i);
-            dd.iter().zip(bench_dd.iter()).map(|(p, b)| p - b).collect()
+            let (port, bench) = self.active_pair_returns(i);
+            let port_dd = to_drawdown_series(port);
+            let bench_dd = to_drawdown_series(bench);
+            port_dd
+                .iter()
+                .zip(bench_dd.iter())
+                .map(|(p, b)| p - b)
+                .collect()
         })
     }
 
@@ -135,14 +115,9 @@ impl Performance {
         fiscal_config: FiscalConfig,
         calendar: &dyn HolidayCalendar,
     ) -> crate::Result<LookbackReturns> {
-        let dates = self.active_dates();
-        let mtd = lookback::mtd_select(dates, ref_date);
-        let qtd = lookback::qtd_select(dates, ref_date);
-        let ytd = lookback::ytd_select(dates, ref_date);
-        let fytd = lookback::fytd_select(dates, ref_date, fiscal_config, calendar)?;
-
-        let compute = |range: &core::ops::Range<usize>| -> Vec<f64> {
+        let compute = |selector: fn(&[Date], Date) -> core::ops::Range<usize>| -> Vec<f64> {
             self.map_tickers(|i| {
+                let range = selector(self.active_dates_for_ticker_unchecked(i), ref_date);
                 let r = self.active_returns(i);
                 let start = range.start.min(r.len());
                 let end = range.end.min(r.len()).max(start);
@@ -150,11 +125,23 @@ impl Performance {
             })
         };
 
+        let fytd = self
+            .map_tickers(|i| {
+                let dates = self.active_dates_for_ticker_unchecked(i);
+                let range = lookback::fytd_select(dates, ref_date, fiscal_config, calendar)?;
+                let r = self.active_returns(i);
+                let start = range.start.min(r.len());
+                let end = range.end.min(r.len()).max(start);
+                Ok(comp_total(&r[start..end]))
+            })
+            .into_iter()
+            .collect::<crate::Result<Vec<_>>>()?;
+
         Ok(LookbackReturns {
-            mtd: compute(&mtd),
-            qtd: compute(&qtd),
-            ytd: compute(&ytd),
-            fytd: Some(compute(&fytd)),
+            mtd: compute(lookback::mtd_select),
+            qtd: compute(lookback::qtd_select),
+            ytd: compute(lookback::ytd_select),
+            fytd: Some(fytd),
         })
     }
 
@@ -172,7 +159,7 @@ impl Performance {
     ) -> crate::Result<PeriodStats> {
         self.ensure_ticker_idx(ticker_idx)?;
         let grouped = group_by_period(
-            self.active_dates(),
+            self.active_dates_for_ticker_unchecked(ticker_idx),
             self.active_returns(ticker_idx),
             agg_freq,
             fiscal_config,

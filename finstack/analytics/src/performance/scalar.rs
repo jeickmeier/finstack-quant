@@ -46,20 +46,24 @@ impl Performance {
     /// # Ok::<(), finstack_core::Error>(())
     /// ```
     pub fn cagr(&self) -> crate::Result<Vec<f64>> {
-        let Some((start, end)) = self.active_holding_period() else {
-            return Err(crate::error::InputError::InvalidReturnSeries {
-                ticker: "<panel>".into(),
-                index: self.start_idx,
-                reason: format!(
-                    "active range [{}..{}] has no positive holding period on the price-date grid",
-                    self.start_idx, self.end_idx
-                ),
-            }
-            .into());
-        };
-        let basis = risk_metrics::CagrBasis::dates(start, end);
         (0..self.ticker_names.len())
-            .map(|i| risk_metrics::cagr(self.active_returns(i), basis))
+            .map(|i| {
+                let Some((start, end)) = self.active_holding_period_for_ticker(i) else {
+                    return Err(crate::error::InputError::InvalidReturnSeries {
+                        ticker: self.ticker_names[i].clone(),
+                        index: self.start_idx,
+                        reason: format!(
+                            "active range [{}..{}] has no positive holding period for ticker {}",
+                            self.start_idx, self.end_idx, self.ticker_names[i]
+                        ),
+                    }
+                    .into());
+                };
+                risk_metrics::cagr(
+                    self.active_returns(i),
+                    risk_metrics::CagrBasis::dates(start, end),
+                )
+            })
             .collect()
     }
 
@@ -330,7 +334,12 @@ impl Performance {
     ///
     /// One maximum drawdown duration per ticker in column order.
     pub fn max_drawdown_duration(&self) -> Vec<i64> {
-        self.map_tickers(|i| dd_max_duration(self.active_drawdown_values(i), self.active_dates()))
+        self.map_tickers(|i| {
+            dd_max_duration(
+                self.active_drawdown_values(i),
+                self.active_dates_for_ticker_unchecked(i),
+            )
+        })
     }
 
     /// Omega ratio for each ticker.
@@ -455,10 +464,12 @@ impl Performance {
     /// annualized.
     pub fn burke_ratio(&self, risk_free_rate: f64, n: usize) -> crate::Result<Vec<f64>> {
         let cagrs = self.cagr()?;
-        let dates = self.active_dates();
         Ok(self.map_tickers(|i| {
-            let episodes =
-                crate::drawdown::drawdown_details(self.active_drawdown_values(i), dates, n);
+            let episodes = crate::drawdown::drawdown_details(
+                self.active_drawdown_values(i),
+                self.active_dates_for_ticker_unchecked(i),
+                n,
+            );
             let dd_vals: Vec<f64> = episodes.iter().map(|e| e.max_drawdown).collect();
             crate::drawdown::burke_ratio(cagrs[i], &dd_vals, risk_free_rate)
         }))

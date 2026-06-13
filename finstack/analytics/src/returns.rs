@@ -8,55 +8,6 @@
 
 use crate::math::summation::NeumaierAccumulator;
 
-/// Replace infinities with NaN and strip trailing all-NaN rows in-place.
-///
-/// Infinite values arise from divisions by zero in price series (e.g., a
-/// price that transitions from 0). Trailing NaNs at the end of the slice
-/// indicate missing data and are removed to avoid biasing later statistics.
-///
-/// # Arguments
-///
-/// * `r` - Mutable return vector. Modified in place.
-///
-/// # Returns
-///
-/// Nothing; the vector is mutated directly.
-///
-/// # Examples
-///
-/// ```ignore
-/// use finstack_analytics::returns::clean_returns;
-///
-/// let mut r = vec![0.01, f64::INFINITY, 0.02, f64::NAN, f64::NAN];
-/// clean_returns(&mut r);
-/// assert_eq!(r.len(), 3);   // two trailing NaNs removed
-/// assert!(r[1].is_nan());   // infinity replaced with NaN
-/// ```
-pub(crate) fn clean_returns(r: &mut Vec<f64>, ticker: &str) {
-    let initial_len = r.len();
-    let mut inf_count = 0usize;
-    for v in r.iter_mut() {
-        if v.is_infinite() {
-            *v = f64::NAN;
-            inf_count += 1;
-        }
-    }
-    while r.last().is_some_and(|v| v.is_nan()) {
-        r.pop();
-    }
-    let trimmed = initial_len - r.len();
-    if trimmed > 0 || inf_count > 0 {
-        tracing::warn!(
-            ticker,
-            initial_len,
-            trimmed,
-            infinities_replaced = inf_count,
-            final_len = r.len(),
-            "clean_returns: replaced infinities and stripped trailing NaN rows"
-        );
-    }
-}
-
 /// Pairwise simple (percentage-change) returns from a price series.
 ///
 /// For prices `[p0, p1, p2, ...]` returns `[p1/p0 - 1, p2/p1 - 1, ...]`
@@ -375,14 +326,5 @@ mod tests {
             cs[2].is_nan(),
             "invalid compounding should propagate forward"
         );
-    }
-
-    #[test]
-    fn clean_returns_strips_inf_and_trailing_nan() {
-        let mut r = vec![0.01, f64::INFINITY, 0.02, f64::NAN, f64::NAN];
-        clean_returns(&mut r, "TEST");
-        assert_eq!(r.len(), 3);
-        assert!(r[1].is_nan());
-        assert!((r[2] - 0.02).abs() < 1e-12);
     }
 }

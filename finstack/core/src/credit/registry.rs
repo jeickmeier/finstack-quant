@@ -220,8 +220,10 @@ impl CreditAssumptionRegistry {
 
         for record in &self.pd_master_scales {
             for grade in &record.grades {
-                if !(0.0..=1.0).contains(&grade.upper_pd)
-                    || !(0.0..=1.0).contains(&grade.central_pd)
+                if grade.upper_pd <= 0.0
+                    || grade.upper_pd > 1.0
+                    || grade.central_pd <= 0.0
+                    || grade.central_pd > 1.0
                     || grade.central_pd > grade.upper_pd
                 {
                     return Err(Error::Validation(format!(
@@ -501,6 +503,22 @@ mod tests {
         assert_eq!(
             loaded.default_rating_factor_table_id(),
             embedded.default_rating_factor_table_id()
+        );
+    }
+
+    #[test]
+    fn registry_rejects_zero_pd_upper_bound() {
+        let mut registry = embedded_registry()
+            .expect("embedded registry should load")
+            .clone();
+        registry.pd_master_scales[0].grades[0].upper_pd = 0.0;
+
+        let err = registry
+            .validate()
+            .expect_err("zero upper PD should fail validation");
+        assert!(
+            err.to_string().contains("invalid grade"),
+            "unexpected error: {err}"
         );
     }
 }

@@ -970,7 +970,7 @@ impl<'a> ScheduleBuilder<'a> {
         // Generate dates based on mode
         let mut dates = if self.imm_mode {
             // Standard IMM: generate dates using next_imm to get proper third Wednesdays
-            let imm_dates = generate_imm_dates(self.start, self.end);
+            let mut imm_dates = generate_imm_dates(self.start, self.end);
             if imm_dates.is_empty() {
                 // No IMM date falls inside [start, end]: a silently empty
                 // schedule means zero cashflows / PV = 0 downstream. Error
@@ -981,6 +981,9 @@ impl<'a> ScheduleBuilder<'a> {
                      (first IMM date after start exceeds end)",
                     self.start, self.end
                 )));
+            }
+            if imm_dates.first().is_some_and(|&first| self.start < first) {
+                imm_dates.insert(0, self.start);
             }
             imm_dates
         } else if self.cds_imm_mode {

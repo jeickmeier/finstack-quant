@@ -61,7 +61,7 @@ impl Performance {
     pub fn rolling_returns(&self, ticker_idx: usize, window: usize) -> crate::Result<DatedSeries> {
         self.ensure_ticker_idx(ticker_idx)?;
         let returns = self.active_returns(ticker_idx);
-        let dates = self.active_dates();
+        let dates = self.active_dates_for_ticker_unchecked(ticker_idx);
         let n = returns.len().min(dates.len());
         if window == 0 || window > n {
             return Ok(DatedSeries::default());
@@ -132,7 +132,7 @@ impl Performance {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(rolling_volatility(
             self.active_returns(ticker_idx),
-            self.active_dates(),
+            self.active_dates_for_ticker_unchecked(ticker_idx),
             window,
             self.ann(),
         ))
@@ -161,7 +161,7 @@ impl Performance {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(rolling_sortino(
             self.active_returns(ticker_idx),
-            self.active_dates(),
+            self.active_dates_for_ticker_unchecked(ticker_idx),
             window,
             self.ann(),
             mar,
@@ -193,7 +193,7 @@ impl Performance {
         self.ensure_ticker_idx(ticker_idx)?;
         Ok(rolling_sharpe(
             self.active_returns(ticker_idx),
-            self.active_dates(),
+            self.active_dates_for_ticker_unchecked(ticker_idx),
             window,
             self.ann(),
             risk_free_rate,

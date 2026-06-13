@@ -491,7 +491,11 @@ export interface VarEsResult {
   expected_shortfall: Float64Array;
 }
 
-/** OLS beta result with standard error and 95% confidence interval. */
+/** OLS beta result with standard error and 95% confidence interval.
+ *
+ * The interval uses Student-t critical values for finite samples and an
+ * asymptotic normal approximation once n - 2 >= 240.
+ */
 export interface BetaResult {
   beta: number;
   std_err: number;
@@ -499,7 +503,7 @@ export interface BetaResult {
   ci_upper: number;
 }
 
-/** Single-factor greeks (alpha, beta, R², adjusted R²). */
+/** Single-factor greeks (annualized Jensen alpha, beta, R², adjusted R²). */
 export interface GreeksResult {
   alpha: number;
   beta: number;
@@ -514,7 +518,7 @@ export interface RollingGreeksResult {
   betas: Float64Array;
 }
 
-/** Multi-factor regression result. */
+/** Multi-factor regression result. Alpha is the raw regression intercept, annualized. */
 export interface MultiFactorResult {
   alpha: number;
   betas: number[];
@@ -568,10 +572,13 @@ export declare class Performance {
   dates(): string[];
   /** Dates of the currently active analysis window as ISO date strings. */
   activeDates(): string[];
+  /** Dates for one ticker's active return series as ISO date strings. */
+  activeDatesForTicker(tickerIdx: number): string[];
   cagr(): Float64Array;
   meanReturn(annualize?: boolean): Float64Array;
   volatility(annualize?: boolean): Float64Array;
   sharpe(riskFreeRate?: number): Float64Array;
+  /** Sortino ratio; mar is a per-period threshold. */
   sortino(mar?: number): Float64Array;
   calmar(): Float64Array;
   maxDrawdown(): Float64Array;
@@ -587,10 +594,14 @@ export declare class Performance {
   skewKurt(): SkewKurtResult;
   /** Historical VaR and expected shortfall from one tail pass per asset. */
   valueAtRiskAndEs(confidence?: number): VarEsResult;
+  /** Downside deviation; mar is a per-period threshold. */
   downsideDeviation(mar?: number): Float64Array;
   maxDrawdownDuration(): number[];
+  /** Empyrical-style annualized geometric up-capture. */
   upCapture(): Float64Array;
+  /** Empyrical-style annualized geometric down-capture. */
   downCapture(): Float64Array;
+  /** Empyrical-style annualized geometric up/down capture ratio. */
   captureRatio(): Float64Array;
   omegaRatio(threshold?: number): Float64Array;
   treynor(riskFreeRate?: number): Float64Array;
@@ -617,8 +628,8 @@ export declare class Performance {
   drawdownDifference(): Float64Array[];
   excessReturns(rf: NumericArray, nperiods?: number): Float64Array[];
   beta(): BetaResult[];
-  greeks(): GreeksResult[];
-  rollingGreeks(tickerIdx: number, window?: number): RollingGreeksResult;
+  greeks(riskFreeRate?: number): GreeksResult[];
+  rollingGreeks(tickerIdx: number, window?: number, riskFreeRate?: number): RollingGreeksResult;
   rollingVolatility(tickerIdx: number, window?: number): DatedSeries;
   rollingSortino(tickerIdx: number, window?: number, mar?: number): DatedSeries;
   rollingSharpe(tickerIdx: number, window?: number, riskFreeRate?: number): DatedSeries;

@@ -206,6 +206,7 @@ impl TryFrom<RawInflationCurve> for InflationCurve {
             .indexation_lag_months(state.indexation_lag_months)
             .knots(state.knot_points)
             .interp(state.interp_style)
+            .extrapolation(state.extrapolation)
             .build()
     }
 }
@@ -243,6 +244,7 @@ impl InflationCurve {
             indexation_lag_months: DEFAULT_INDEXATION_LAG_MONTHS,
             points: Vec::new(),
             style: InterpStyle::LogLinear,
+            extrapolation: ExtrapolationPolicy::default(),
         }
     }
 
@@ -470,6 +472,7 @@ impl InflationCurve {
                     .zip(self.cpi_levels.iter().copied()),
             )
             .interp(self.interp.style())
+            .extrapolation(self.interp.extrapolation())
     }
 
     /// Roll the curve forward by a specified number of days.
@@ -511,6 +514,7 @@ impl InflationCurve {
             .indexation_lag_months(self.indexation_lag_months)
             .base_cpi(new_base_cpi)
             .knots(rolled_points)
+            .extrapolation(self.interp.extrapolation())
             .build()
     }
 }
@@ -553,6 +557,7 @@ pub struct InflationCurveBuilder {
     indexation_lag_months: u32,
     points: Vec<(f64, f64)>, // (t, cpi)
     style: InterpStyle,
+    extrapolation: ExtrapolationPolicy,
 }
 
 impl InflationCurveBuilder {
@@ -598,6 +603,12 @@ impl InflationCurveBuilder {
         self
     }
 
+    /// Select extrapolation policy for CPI lookups outside the knot range.
+    pub fn extrapolation(mut self, extrapolation: ExtrapolationPolicy) -> Self {
+        self.extrapolation = extrapolation;
+        self
+    }
+
     /// Validate input and build the [`InflationCurve`].
     pub fn build(self) -> crate::Result<InflationCurve> {
         if !self.base_date_set {
@@ -620,7 +631,7 @@ impl InflationCurveBuilder {
             self.style,
             knots.clone(),
             cpi_levels.clone(),
-            ExtrapolationPolicy::default(),
+            self.extrapolation,
         )?;
         Ok(InflationCurve {
             id: self.id,

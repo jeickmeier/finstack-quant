@@ -242,6 +242,18 @@ impl WasmPerformance {
             .collect()
     }
 
+    /// Date grid for one ticker's active return series as ISO date strings.
+    #[wasm_bindgen(js_name = activeDatesForTicker)]
+    pub fn active_dates_for_ticker(&self, ticker_idx: usize) -> Result<Vec<String>, JsValue> {
+        Ok(self
+            .inner
+            .active_dates_for_ticker(ticker_idx)
+            .map_err(to_js_err)?
+            .iter()
+            .map(|&d| date_to_iso(d))
+            .collect())
+    }
+
     // ── Scalar metrics ──
 
     /// Compound annual growth rate per asset.
@@ -265,7 +277,7 @@ impl WasmPerformance {
         vec_f64_to_js(&self.inner.sharpe(risk_free_rate.unwrap_or(0.0)))
     }
 
-    /// Sortino ratio per asset for the given minimum acceptable return.
+    /// Sortino ratio per asset for the given per-period minimum acceptable return.
     pub fn sortino(&self, mar: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.sortino(mar.unwrap_or(0.0)))
     }
@@ -360,7 +372,7 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = downsideDeviation)]
-    /// Downside deviation per asset below the minimum acceptable return.
+    /// Downside deviation per asset below the per-period minimum acceptable return.
     pub fn downside_deviation(&self, mar: Option<f64>) -> JsValue {
         vec_f64_to_js(&self.inner.downside_deviation(mar.unwrap_or(0.0)))
     }
@@ -373,19 +385,19 @@ impl WasmPerformance {
     }
 
     #[wasm_bindgen(js_name = upCapture)]
-    /// Upside capture ratio versus the benchmark per asset.
+    /// Empyrical-style annualized geometric up-capture versus the benchmark per asset.
     pub fn up_capture(&self) -> JsValue {
         vec_f64_to_js(&self.inner.up_capture())
     }
 
     #[wasm_bindgen(js_name = downCapture)]
-    /// Downside capture ratio versus the benchmark per asset.
+    /// Empyrical-style annualized geometric down-capture versus the benchmark per asset.
     pub fn down_capture(&self) -> JsValue {
         vec_f64_to_js(&self.inner.down_capture())
     }
 
     #[wasm_bindgen(js_name = captureRatio)]
-    /// Up/down capture ratio versus the benchmark per asset.
+    /// Empyrical-style annualized geometric up/down capture ratio versus the benchmark per asset.
     pub fn capture_ratio(&self) -> JsValue {
         vec_f64_to_js(&self.inner.capture_ratio())
     }
@@ -571,21 +583,26 @@ impl WasmPerformance {
         to_js(&self.inner.beta())
     }
 
-    /// Benchmark regression alpha/beta statistics per asset.
-    pub fn greeks(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.inner.greeks())
+    /// Benchmark regression annualized Jensen alpha/beta statistics per asset.
+    pub fn greeks(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
+        to_js(&self.inner.greeks(risk_free_rate.unwrap_or(0.0)))
     }
 
     #[wasm_bindgen(js_name = rollingGreeks)]
-    /// Rolling benchmark alpha/beta for one asset over a window.
+    /// Rolling benchmark annualized Jensen alpha/beta for one asset over a window.
     pub fn rolling_greeks(
         &self,
         ticker_idx: usize,
         window: Option<usize>,
+        risk_free_rate: Option<f64>,
     ) -> Result<JsValue, JsValue> {
         let rg = self
             .inner
-            .rolling_greeks(ticker_idx, window.unwrap_or(DEFAULT_ROLLING_WINDOW))
+            .rolling_greeks(
+                ticker_idx,
+                window.unwrap_or(DEFAULT_ROLLING_WINDOW),
+                risk_free_rate.unwrap_or(0.0),
+            )
             .map_err(to_js_err)?;
         rolling_greeks_to_js(&rg)
     }

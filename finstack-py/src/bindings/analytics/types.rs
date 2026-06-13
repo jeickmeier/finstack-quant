@@ -146,7 +146,7 @@ pub struct PyGreeksResult {
 
 #[pymethods]
 impl PyGreeksResult {
-    /// Jensen's alpha (annualized).
+    /// Annualized Jensen alpha.
     #[getter]
     fn alpha(&self) -> f64 {
         self.inner.alpha
@@ -234,7 +234,7 @@ pub struct PyMultiFactorResult {
 
 #[pymethods]
 impl PyMultiFactorResult {
-    /// Intercept (alpha).
+    /// Raw regression intercept, annualized with the supplied factor frequency.
     #[getter]
     fn alpha(&self) -> f64 {
         self.inner.alpha

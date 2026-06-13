@@ -304,9 +304,14 @@ impl PyMoney {
         }
     }
 
-    /// Right-subtract: ``scalar - money`` in this money's currency.
+    /// Right-subtract; supports ``0 - money`` for Python sum-style identities.
     fn __rsub__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         let scalar: f64 = other.extract()?;
+        if scalar != 0.0 {
+            return Err(PyTypeError::new_err(
+                "unsupported right operand for Money subtraction (expected 0)",
+            ));
+        }
         let zero = Money::try_new(scalar, self.inner.currency()).map_err(core_to_py)?;
         zero.checked_sub(self.inner)
             .map(Self::from_inner)

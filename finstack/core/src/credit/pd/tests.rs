@@ -2,7 +2,10 @@
 
 #[cfg(test)]
 mod calibration_tests {
-    use crate::credit::pd::{pit_to_ttc, ttc_to_pit, PdCalibrationError, PdCycleParams};
+    use crate::credit::pd::{
+        apply_basel_irb_pd_floor, pit_to_ttc, ttc_to_pit, PdCalibrationError, PdCycleParams,
+        BASEL_IRB_PD_FLOOR,
+    };
 
     /// PiT/TtC round-trip: converting TtC -> PiT -> TtC should recover the original.
     #[test]
@@ -76,6 +79,19 @@ mod calibration_tests {
             pd_pit,
             pd_ttc
         );
+    }
+
+    #[test]
+    fn basel_irb_pd_floor_is_explicit_opt_in() {
+        let params = PdCycleParams {
+            asset_correlation: 0.20,
+            cycle_index: 1.5,
+        };
+        let raw = ttc_to_pit(0.0001, &params).unwrap();
+
+        assert!(raw < BASEL_IRB_PD_FLOOR);
+        assert_eq!(apply_basel_irb_pd_floor(raw), BASEL_IRB_PD_FLOOR);
+        assert_eq!(apply_basel_irb_pd_floor(0.01), 0.01);
     }
 
     /// PD output is always in (0, 1).

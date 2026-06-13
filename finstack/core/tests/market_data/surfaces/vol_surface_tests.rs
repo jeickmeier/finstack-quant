@@ -1,5 +1,5 @@
 use finstack_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
-use finstack_core::market_data::surfaces::VolSurface;
+use finstack_core::market_data::surfaces::{VolQuoteType, VolSurface};
 
 #[test]
 fn test_vol_surface_builder_basic() {
@@ -56,6 +56,25 @@ fn test_vol_surface_value_clamped() {
     // expiry=1.5 is midpoint between rows at strike=90: (0.20 + 0.19) / 2 = 0.195
     let v3 = surface.value_clamped(1.5, 80.0);
     assert!((v3 - 0.195).abs() < 1e-12);
+}
+
+#[test]
+fn normal_vol_surface_wing_extrapolation_uses_flat_clamp() {
+    let surface = VolSurface::builder("NORMAL")
+        .expiries(&[1.0])
+        .strikes(&[0.01, 0.015, 0.02, 0.025, 0.03])
+        .quote_type(VolQuoteType::Normal)
+        .row(&[0.0060, 0.0065, 0.0070, 0.0075, 0.0080])
+        .build()
+        .unwrap();
+
+    let wing = surface.value_extrapolated(1.0, 0.05, 0.02);
+    let clamped = surface.value_clamped(1.0, 0.05);
+
+    assert!(
+        (wing - clamped).abs() < 1e-14,
+        "normal-vol wings should clamp in normal-vol units, got {wing} vs {clamped}"
+    );
 }
 
 #[test]

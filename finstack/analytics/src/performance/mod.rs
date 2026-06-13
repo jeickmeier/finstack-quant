@@ -7,7 +7,7 @@
 use crate::dates::{Date, Duration, PeriodKind};
 
 use super::drawdown::to_drawdown_series;
-use super::returns::{clean_returns, pairwise_returns};
+use super::returns::pairwise_returns;
 
 mod aggregation;
 mod benchmark;
@@ -62,6 +62,7 @@ pub struct Performance {
     price_dates: Vec<Date>,
     dates: Vec<Date>,
     returns: Vec<Vec<f64>>,
+    return_spans: Vec<TickerSpan>,
     ticker_names: Vec<String>,
     benchmark_idx: usize,
     drawdowns: Vec<Vec<f64>>,
@@ -69,6 +70,32 @@ pub struct Performance {
     freq: PeriodKind,
     start_idx: usize,
     end_idx: usize,
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+struct TickerSpan {
+    start: usize,
+    end: usize,
+}
+
+impl TickerSpan {
+    fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    fn intersect(self, other: Self) -> Self {
+        let start = self.start.max(other.start);
+        let end = self.end.min(other.end).max(start);
+        Self { start, end }
+    }
+
+    fn len(self) -> usize {
+        self.end.saturating_sub(self.start)
+    }
+
+    fn is_empty(self) -> bool {
+        self.start >= self.end
+    }
 }
 
 fn invalid_return_series(
@@ -114,11 +141,90 @@ fn validate_strictly_ascending_dates(dates: &[Date]) -> crate::Result<()> {
     Ok(())
 }
 
-fn clean_return_column(
-    mut col: Vec<f64>,
+fn valid_price(value: f64) -> bool {
+    value.is_finite() && value > 0.0
+}
+
+fn validate_edge_missing_prices(col: &[f64], ticker: &str) -> crate::Result<(usize, usize)> {
+    let Some(first) = col.iter().position(|&value| valid_price(value)) else {
+        return Err(invalid_return_series(
+            ticker,
+            0,
+            "price column has no finite positive observations",
+        )
+        .into());
+    };
+    let last = col
+        .iter()
+        .rposition(|&value| valid_price(value))
+        .unwrap_or(first);
+
+    for (idx, &value) in col.iter().enumerate() {
+        if idx < first || idx > last {
+            if !value.is_nan() {
+                return Err(invalid_return_series(
+                    ticker,
+                    idx,
+                    format!(
+                        "edge missing prices must be NaN; found {value} outside the finite price span"
+                    ),
+                )
+                .into());
+            }
+            continue;
+        }
+
+        if !valid_price(value) {
+            let reason = if value.is_nan() {
+                "interior missing price inside finite price span".to_string()
+            } else {
+                format!("non-positive or non-finite price inside finite price span ({value})")
+            };
+            return Err(invalid_return_series(ticker, idx, reason).into());
+        }
+    }
+
+    if last == first {
+        return Err(invalid_return_series(
+            ticker,
+            first,
+            "price column needs at least two finite positive observations",
+        )
+        .into());
+    }
+
+    Ok((first, last))
+}
+
+fn price_column_to_returns(
+    col: &[f64],
+    ticker: &str,
+    expected_price_len: usize,
+) -> crate::Result<(Vec<f64>, TickerSpan)> {
+    if col.len() != expected_price_len {
+        return Err(invalid_return_series(
+            ticker,
+            col.len().min(expected_price_len),
+            format!(
+                "price column length {} does not match dates length {}",
+                col.len(),
+                expected_price_len
+            ),
+        )
+        .into());
+    }
+
+    let (first_price_idx, last_price_idx) = validate_edge_missing_prices(col, ticker)?;
+    let returns = pairwise_returns(&col[first_price_idx..=last_price_idx]);
+    let span = TickerSpan::new(first_price_idx, last_price_idx);
+    Ok((returns, span))
+}
+
+fn return_column_to_span(
+    col: Vec<f64>,
     ticker: &str,
     expected_len: usize,
-) -> crate::Result<Vec<f64>> {
+) -> crate::Result<(Vec<f64>, TickerSpan)> {
     if col.len() != expected_len {
         return Err(invalid_return_series(
             ticker,
@@ -132,35 +238,149 @@ fn clean_return_column(
         .into());
     }
 
-    clean_returns(&mut col, ticker);
-    if col.len() != expected_len {
-        return Err(invalid_return_series(
-            ticker,
-            col.len(),
-            format!(
-                "{} trailing NaN/non-finite rows stripped; series no longer aligned with date grid (length {} vs expected {})",
-                expected_len - col.len(),
-                col.len(),
-                expected_len
-            ),
-        )
-        .into());
-    }
-
-    if let Some((index, value)) = col
+    let Some(first) = col.iter().position(|value| value.is_finite()) else {
+        return Err(
+            invalid_return_series(ticker, 0, "return column has no finite observations").into(),
+        );
+    };
+    let last = col
         .iter()
-        .enumerate()
-        .find(|(_, &v)| !v.is_finite() || v <= -1.0)
-    {
-        let reason = if !value.is_finite() {
-            format!("non-finite return ({value})")
-        } else {
-            format!("return <= -1.0 ({value}); total wipeout makes downstream metrics meaningless")
-        };
-        return Err(invalid_return_series(ticker, index, reason).into());
+        .rposition(|value| value.is_finite())
+        .unwrap_or(first);
+
+    for (index, &value) in col.iter().enumerate() {
+        if index < first || index > last {
+            if !value.is_nan() {
+                return Err(invalid_return_series(
+                    ticker,
+                    index,
+                    format!(
+                        "edge missing returns must be NaN; found {value} outside the finite return span"
+                    ),
+                )
+                .into());
+            }
+            continue;
+        }
+
+        if !value.is_finite() {
+            return Err(invalid_return_series(
+                ticker,
+                index,
+                format!("interior non-finite return ({value})"),
+            )
+            .into());
+        }
+        if value <= -1.0 {
+            return Err(invalid_return_series(
+                ticker,
+                index,
+                format!("return <= -1.0 ({value}); total wipeout remains outside Performance panel support"),
+            )
+            .into());
+        }
     }
 
-    Ok(col)
+    Ok((col[first..=last].to_vec(), TickerSpan::new(first, last + 1)))
+}
+
+fn local_range(span: TickerSpan, global: TickerSpan) -> core::ops::Range<usize> {
+    let start = global.start.saturating_sub(span.start).min(span.len());
+    let end = global
+        .end
+        .saturating_sub(span.start)
+        .min(span.len())
+        .max(start);
+    start..end
+}
+
+fn build_synthetic_price_dates(dates: &[Date]) -> Vec<Date> {
+    let prior_date = if dates.len() >= 2 {
+        let gap = (dates[1] - dates[0]).whole_days();
+        dates[0]
+            .checked_sub(Duration::days(gap))
+            .unwrap_or(dates[0])
+    } else {
+        dates[0]
+    };
+    let mut price_dates = Vec::with_capacity(dates.len() + 1);
+    price_dates.push(prior_date);
+    price_dates.extend_from_slice(dates);
+    price_dates
+}
+
+impl Performance {
+    fn global_active_span(&self) -> TickerSpan {
+        TickerSpan::new(self.start_idx, self.end_idx.min(self.dates.len()))
+    }
+
+    fn active_span_for_ticker(&self, ticker_idx: usize) -> TickerSpan {
+        self.return_spans
+            .get(ticker_idx)
+            .copied()
+            .unwrap_or_else(|| TickerSpan::new(0, 0))
+            .intersect(self.global_active_span())
+    }
+
+    fn active_pair_span(&self, ticker_idx: usize) -> TickerSpan {
+        let ticker_span = self.active_span_for_ticker(ticker_idx);
+        let bench_span = self.active_span_for_ticker(self.benchmark_idx);
+        ticker_span.intersect(bench_span)
+    }
+
+    fn active_two_ticker_span(&self, lhs_idx: usize, rhs_idx: usize) -> TickerSpan {
+        self.active_span_for_ticker(lhs_idx)
+            .intersect(self.active_span_for_ticker(rhs_idx))
+    }
+
+    fn returns_for_span(&self, ticker_idx: usize, global: TickerSpan) -> &[f64] {
+        let Some(series) = self.returns.get(ticker_idx) else {
+            return &[];
+        };
+        let Some(span) = self.return_spans.get(ticker_idx).copied() else {
+            return &[];
+        };
+        if global.is_empty() {
+            return &[];
+        }
+        let range = local_range(span, global);
+        &series[range]
+    }
+
+    fn active_pair_returns(&self, ticker_idx: usize) -> (&[f64], &[f64]) {
+        let span = self.active_pair_span(ticker_idx);
+        (
+            self.returns_for_span(ticker_idx, span),
+            self.returns_for_span(self.benchmark_idx, span),
+        )
+    }
+
+    fn active_two_ticker_returns(&self, lhs_idx: usize, rhs_idx: usize) -> (&[f64], &[f64]) {
+        let span = self.active_two_ticker_span(lhs_idx, rhs_idx);
+        (
+            self.returns_for_span(lhs_idx, span),
+            self.returns_for_span(rhs_idx, span),
+        )
+    }
+
+    fn active_pair_dates(&self, ticker_idx: usize) -> &[Date] {
+        let span = self.active_pair_span(ticker_idx);
+        &self.dates[span.start.min(self.dates.len())..span.end.min(self.dates.len())]
+    }
+
+    fn active_holding_period_for_ticker(&self, ticker_idx: usize) -> Option<(Date, Date)> {
+        let span = self.active_span_for_ticker(ticker_idx);
+        if span.is_empty() || self.price_dates.len() < 2 {
+            return None;
+        }
+        let end_idx = span.end.min(self.price_dates.len() - 1);
+        let start_idx = span.start.min(end_idx);
+        if start_idx >= end_idx {
+            None
+        } else {
+            Some((self.price_dates[start_idx], self.price_dates[end_idx]))
+        }
+    }
 }
 
 impl Performance {
@@ -177,7 +397,8 @@ impl Performance {
     /// * `dates` - Chronologically sorted date vector, one entry per price
     ///   observation.
     /// * `prices` - Price matrix: `prices[i]` is the full price series for
-    ///   ticker `i`.
+    ///   ticker `i`. Each ticker may have leading/trailing `NaN` values, but
+    ///   the finite price span must be contiguous and strictly positive.
     /// * `ticker_names` - Names corresponding to each column of `prices`.
     /// * `benchmark_ticker` - Name of the benchmark ticker. Uses column 0 if
     ///   `None`; returns an error if a non-`None` ticker name is not found.
@@ -194,6 +415,7 @@ impl Performance {
     /// * `prices` or `dates` is empty.
     /// * `ticker_names.len() != prices.len()`.
     /// * any price column length differs from `dates.len()`.
+    /// * any ticker has no contiguous finite positive price span.
     /// * `benchmark_ticker` is supplied but not found in `ticker_names`.
     /// * derived returns are non-finite or below `-1.0`.
     ///
@@ -233,31 +455,26 @@ impl Performance {
             return Err(invalid_return_series("<panel>", 0, "prices or dates is empty").into());
         }
         validate_strictly_ascending_dates(&dates)?;
-        if let Some((col_idx, bad)) = prices
-            .iter()
-            .enumerate()
-            .find(|(_, price_col)| price_col.len() != dates.len())
-        {
-            let ticker = ticker_names
-                .get(col_idx)
-                .cloned()
-                .unwrap_or_else(|| format!("col[{col_idx}]"));
+        if ticker_names.len() != prices.len() {
             return Err(invalid_return_series(
-                ticker,
+                "<panel>",
                 0,
                 format!(
-                    "price column length {} does not match dates length {}",
-                    bad.len(),
-                    dates.len()
+                    "ticker_names.len() = {} does not match prices.len() = {}",
+                    ticker_names.len(),
+                    prices.len()
                 ),
             )
             .into());
         }
 
-        let returns_matrix: Vec<Vec<f64>> = prices
-            .iter()
-            .map(|price_col| pairwise_returns(price_col))
-            .collect();
+        let mut returns_matrix: Vec<Vec<f64>> = Vec::with_capacity(prices.len());
+        let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(prices.len());
+        for (ticker, price_col) in ticker_names.iter().zip(prices.iter()) {
+            let (returns, span) = price_column_to_returns(price_col, ticker, dates.len())?;
+            returns_matrix.push(returns);
+            return_spans.push(span);
+        }
         let return_dates = if dates.len() > 1 {
             dates[1..].to_vec()
         } else {
@@ -267,6 +484,7 @@ impl Performance {
             dates,
             return_dates,
             returns_matrix,
+            return_spans,
             ticker_names,
             benchmark_ticker,
             freq,
@@ -290,7 +508,9 @@ impl Performance {
     ///
     /// * `dates` - Chronologically sorted return-aligned dates.
     /// * `returns` - Return matrix: `returns[i]` is the simple-return series
-    ///   for ticker `i`, with one entry per `dates` row.
+    ///   for ticker `i`, with one entry per `dates` row. Each ticker may have
+    ///   leading/trailing `NaN` values, but the finite return span must be
+    ///   contiguous.
     /// * `ticker_names` - Names corresponding to each column of `returns`.
     /// * `benchmark_ticker` - Name of the benchmark ticker. Uses column 0 if
     ///   `None`; returns an error if a non-`None` ticker name is not found.
@@ -300,8 +520,8 @@ impl Performance {
     ///
     /// Returns [`crate::error::InputError::Invalid`] when inputs are empty,
     /// the column count does not match `ticker_names`, any return column has
-    /// the wrong length, the benchmark name is unknown, or any return value
-    /// is non-finite or `< -1.0`.
+    /// the wrong length, the benchmark name is unknown, any ticker lacks a
+    /// contiguous finite return span, or any active return value is `< -1.0`.
     pub fn from_returns(
         dates: Vec<Date>,
         returns: Vec<Vec<f64>>,
@@ -313,23 +533,32 @@ impl Performance {
             return Err(invalid_return_series("<panel>", 0, "returns or dates is empty").into());
         }
         validate_strictly_ascending_dates(&dates)?;
+        if ticker_names.len() != returns.len() {
+            return Err(invalid_return_series(
+                "<panel>",
+                0,
+                format!(
+                    "ticker_names.len() = {} does not match returns.len() = {}",
+                    ticker_names.len(),
+                    returns.len()
+                ),
+            )
+            .into());
+        }
 
-        let prior_date = if dates.len() >= 2 {
-            let gap = (dates[1] - dates[0]).whole_days();
-            dates[0]
-                .checked_sub(Duration::days(gap))
-                .unwrap_or(dates[0])
-        } else {
-            dates[0]
-        };
-        let mut price_dates = Vec::with_capacity(dates.len() + 1);
-        price_dates.push(prior_date);
-        price_dates.extend_from_slice(&dates);
+        let mut all_returns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
+        let mut return_spans: Vec<TickerSpan> = Vec::with_capacity(returns.len());
+        for (ticker, col) in ticker_names.iter().zip(returns.into_iter()) {
+            let (clean, span) = return_column_to_span(col, ticker, dates.len())?;
+            all_returns.push(clean);
+            return_spans.push(span);
+        }
 
         Self::assemble(
-            price_dates,
+            build_synthetic_price_dates(&dates),
             dates,
-            returns,
+            all_returns,
+            return_spans,
             ticker_names,
             benchmark_ticker,
             freq,
@@ -344,6 +573,7 @@ impl Performance {
         price_dates: Vec<Date>,
         return_dates: Vec<Date>,
         returns: Vec<Vec<f64>>,
+        return_spans: Vec<TickerSpan>,
         ticker_names: Vec<String>,
         benchmark_ticker: Option<&str>,
         freq: PeriodKind,
@@ -372,22 +602,32 @@ impl Performance {
             None => 0,
         };
 
-        let expected_len = return_dates.len();
-        let mut all_returns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
-        let mut all_drawdowns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
-        for (ticker, col) in ticker_names.iter().zip(returns.into_iter()) {
-            let clean = clean_return_column(col, ticker, expected_len)?;
-            let dd = to_drawdown_series(&clean);
-            all_drawdowns.push(dd);
-            all_returns.push(clean);
+        if return_spans.len() != returns.len() {
+            return Err(invalid_return_series(
+                "<panel>",
+                0,
+                format!(
+                    "return_spans.len() = {} does not match returns.len() = {}",
+                    return_spans.len(),
+                    returns.len()
+                ),
+            )
+            .into());
         }
 
-        let end_idx = all_returns.first().map_or(0, Vec::len);
+        let mut all_drawdowns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
+        for col in &returns {
+            let dd = to_drawdown_series(col);
+            all_drawdowns.push(dd);
+        }
+
+        let end_idx = return_dates.len();
 
         Ok(Self {
             price_dates,
             dates: return_dates,
-            returns: all_returns,
+            returns,
+            return_spans,
             ticker_names,
             benchmark_idx,
             drawdowns: all_drawdowns,
@@ -464,7 +704,7 @@ impl Performance {
     }
 
     fn full_range_len(&self) -> usize {
-        self.returns.first().map_or(0, Vec::len)
+        self.dates.len()
     }
 
     fn using_full_range(&self) -> bool {
@@ -478,29 +718,10 @@ impl Performance {
         }
 
         self.active_window_drawdowns = Some(
-            self.returns
-                .iter()
-                .map(|series| {
-                    let end = self.end_idx.min(series.len());
-                    let start = self.start_idx.min(end);
-                    to_drawdown_series(&series[start..end])
-                })
+            (0..self.returns.len())
+                .map(|ticker_idx| to_drawdown_series(self.active_returns(ticker_idx)))
                 .collect(),
         );
-    }
-
-    fn active_holding_period(&self) -> Option<(Date, Date)> {
-        let range = self.active_range();
-        if range.start >= range.end || self.price_dates.len() < 2 {
-            return None;
-        }
-        let last_price_idx = self.price_dates.len() - 1;
-        let start_idx = range.start.min(last_price_idx);
-        let end_idx = range.end.min(last_price_idx);
-        if start_idx >= end_idx {
-            return None;
-        }
-        Some((self.price_dates[start_idx], self.price_dates[end_idx]))
     }
 
     /// Reject `ticker_idx` outside the loaded ticker columns.
@@ -530,18 +751,7 @@ impl Performance {
     }
 
     fn active_returns(&self, ticker_idx: usize) -> &[f64] {
-        let range = self.active_range();
-        self.returns
-            .get(ticker_idx)
-            .map(|r| {
-                let end = range.end.min(r.len());
-                &r[range.start.min(end)..end]
-            })
-            .unwrap_or(&[])
-    }
-
-    fn active_bench(&self) -> &[f64] {
-        self.active_returns(self.benchmark_idx)
+        self.returns_for_span(ticker_idx, self.active_span_for_ticker(ticker_idx))
     }
 
     /// Date slice corresponding to the currently active analysis window.
@@ -549,6 +759,25 @@ impl Performance {
         let range = self.active_range();
         let end = range.end.min(self.dates.len());
         &self.dates[range.start.min(end)..end]
+    }
+
+    /// Date slice corresponding to a ticker's currently active return series.
+    ///
+    /// On edge-ragged panels this may be shorter than [`Self::active_dates`]
+    /// because leading/trailing missing observations are excluded per ticker.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::error::InputError::InvalidReturnSeries`] when
+    /// `ticker_idx` is outside the loaded ticker columns.
+    pub fn active_dates_for_ticker(&self, ticker_idx: usize) -> crate::Result<&[Date]> {
+        self.ensure_ticker_idx(ticker_idx)?;
+        Ok(self.active_dates_for_ticker_unchecked(ticker_idx))
+    }
+
+    fn active_dates_for_ticker_unchecked(&self, ticker_idx: usize) -> &[Date] {
+        let span = self.active_span_for_ticker(ticker_idx);
+        &self.dates[span.start.min(self.dates.len())..span.end.min(self.dates.len())]
     }
 
     fn active_drawdown_values(&self, ticker_idx: usize) -> &[f64] {
@@ -565,10 +794,6 @@ impl Performance {
             .and_then(|drawdowns| drawdowns.get(ticker_idx))
             .map(Vec::as_slice)
             .unwrap_or(&[])
-    }
-
-    fn active_bench_drawdown_values(&self) -> &[f64] {
-        self.active_drawdown_values(self.benchmark_idx)
     }
 
     fn ann(&self) -> f64 {

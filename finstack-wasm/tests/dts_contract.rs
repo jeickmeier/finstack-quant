@@ -107,7 +107,11 @@ fn analytics_dts_matches_runtime_hotspots() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "rollingGreeks(tickerIdx: number, window?: number): RollingGreeksResult;",
+        "rollingGreeks(tickerIdx: number, window?: number, riskFreeRate?: number): RollingGreeksResult;",
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "activeDatesForTicker(tickerIdx: number): string[];",
     ));
     assert!(contains_ignoring_ws(
         &dts,

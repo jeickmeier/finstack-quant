@@ -32,7 +32,10 @@ pub mod term_structure;
 mod tests;
 
 // Re-exports
-pub use calibration::{central_tendency, pit_to_ttc, ttc_to_pit, PdCycleParams};
+pub use calibration::{
+    apply_basel_irb_pd_floor, central_tendency, pit_to_ttc, ttc_to_pit, PdCycleParams,
+    BASEL_IRB_PD_FLOOR,
+};
 pub use error::PdCalibrationError;
 pub use master_scale::{MasterScale, MasterScaleGrade, MasterScaleResult};
 pub use term_structure::{PdTermStructure, PdTermStructureBuilder};
