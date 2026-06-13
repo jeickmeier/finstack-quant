@@ -13,7 +13,7 @@ use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
 use finstack_core::HashMap;
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A portfolio of positions across multiple entities.
 ///
@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 /// and instrument. Positions can be grouped and aggregated by entity or by
 /// arbitrary attributes (tags). Optional book hierarchy provides multi-level
 /// organizational structure.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Portfolio {
     /// Unique identifier for this portfolio
     pub id: String,
@@ -44,46 +44,60 @@ pub struct Portfolio {
     /// portfolio assumes no interior mutability: concurrent reads are safe, but
     /// mutating an instrument after adding it to a portfolio is undefined at
     /// the application level.
-    #[serde(skip)]
     pub(crate) positions: Vec<Position>,
 
     /// Index mapping position ID → index in `positions` for O(1) lookup.
     ///
     /// Rebuilt automatically via [`rebuild_index`] when constructing a portfolio
     /// through the builder or `from_spec`.
-    #[serde(skip)]
     pub(crate) position_index: HashMap<PositionId, usize>,
 
     /// Inverted index mapping market factor keys to affected position indices.
     ///
     /// Rebuilt together with `position_index` via [`rebuild_index`].
     /// Enables selective repricing when only a subset of market data changes.
-    #[serde(skip)]
     pub(crate) dependency_index: DependencyIndex,
 
     /// Index mapping entity ID → owned position indices, so `positions_for_entity`
     /// avoids a full O(N) scan. Rebuilt via [`rebuild_index`].
-    #[serde(skip)]
     pub(crate) entity_index: HashMap<EntityId, Vec<usize>>,
 
     /// Index mapping attribute key → position indices carrying that key. Narrows
     /// `positions_with_attribute` to the positions that actually have the key;
     /// the value comparison still runs over that reduced set. Rebuilt via
     /// [`rebuild_index`].
-    #[serde(skip)]
     pub(crate) attribute_key_index: HashMap<String, Vec<usize>>,
 
     /// Optional hierarchical book organization
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub books: IndexMap<BookId, Book>,
 
     /// Portfolio-level tags
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub tags: IndexMap<String, String>,
 
     /// Additional metadata
-    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
     pub meta: IndexMap<String, serde_json::Value>,
+}
+
+impl Serialize for Portfolio {
+    fn serialize<S>(&self, _serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Err(serde::ser::Error::custom(
+            "direct Portfolio serialization is unsupported because positions contain runtime instruments; use Portfolio::to_spec() or PortfolioSpec",
+        ))
+    }
+}
+
+impl<'de> Deserialize<'de> for Portfolio {
+    fn deserialize<D>(_deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Err(serde::de::Error::custom(
+            "direct Portfolio deserialization is unsupported because positions require runtime instruments; use Portfolio::from_spec(PortfolioSpec)",
+        ))
+    }
 }
 
 /// Serializable portfolio specification.
@@ -310,6 +324,8 @@ impl Portfolio {
     /// - All position IDs are unique
     /// - All positions reference valid entities
     /// - Dummy entity exists if needed
+    /// - Position book references point to existing books
+    /// - Book position references point to existing positions
     /// - Book hierarchy contains no cycles
     ///
     /// # Returns
@@ -341,6 +357,29 @@ impl Portfolio {
                     position_id: position.position_id.clone(),
                     entity_id: position.entity_id.clone(),
                 });
+            }
+        }
+
+        // Validate book references before hierarchy traversal so missing books
+        // or positions fail directly instead of being treated as empty groups.
+        for position in &self.positions {
+            if let Some(book_id) = &position.book_id {
+                if !self.books.contains_key(book_id) {
+                    return Err(Error::validation(format!(
+                        "Position '{}' references non-existent book '{}'",
+                        position.position_id, book_id
+                    )));
+                }
+            }
+        }
+        for (book_id, book) in &self.books {
+            for position_id in &book.position_ids {
+                if !seen_ids.contains(position_id) {
+                    return Err(Error::validation(format!(
+                        "Book '{}' references non-existent position '{}'",
+                        book_id, position_id
+                    )));
+                }
             }
         }
 
@@ -483,8 +522,39 @@ impl Portfolio {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Entity;
+    use crate::book::Book;
+    use crate::position::{Position, PositionUnit};
+    use crate::types::{Entity, PositionId};
+    use finstack_core::money::Money;
+    use finstack_valuations::instruments::rates::deposit::Deposit;
+    use std::sync::Arc;
     use time::macros::date;
+
+    fn test_position_with_book(book_id: &str) -> Position {
+        let as_of = date!(2024 - 01 - 01);
+        let dep = Deposit::builder()
+            .id("DEP_BOOK_TEST".into())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .start_date(as_of)
+            .maturity(date!(2024 - 02 - 01))
+            .day_count(finstack_core::dates::DayCount::Act360)
+            .discount_curve_id("USD".into())
+            .quote_rate_opt(Some(
+                rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
+            ))
+            .build()
+            .expect("test instrument should build");
+        Position::new(
+            "POS_BOOK_TEST",
+            "ACME",
+            "DEP_BOOK_TEST",
+            Arc::new(dep),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("test position should build")
+        .with_book(book_id)
+    }
 
     #[test]
     fn test_portfolio_creation() {
@@ -512,5 +582,61 @@ mod tests {
 
         // Valid portfolio
         assert!(portfolio.validate().is_ok());
+    }
+
+    #[test]
+    fn minor2_direct_portfolio_serde_fails_fast() {
+        let portfolio = Portfolio::builder("FUND_A")
+            .base_ccy(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .build()
+            .expect("test portfolio should build");
+
+        let err = serde_json::to_string(&portfolio)
+            .expect_err("minor 2: direct Portfolio serialization must fail");
+        assert!(
+            err.to_string().contains("PortfolioSpec"),
+            "minor 2: error should point callers at PortfolioSpec, got {err}"
+        );
+
+        let err = serde_json::from_str::<Portfolio>(r#"{"id":"FUND_A"}"#)
+            .expect_err("minor 2: direct Portfolio deserialization must fail");
+        assert!(
+            err.to_string().contains("PortfolioSpec"),
+            "minor 2: error should point callers at PortfolioSpec, got {err}"
+        );
+    }
+
+    #[test]
+    fn minor3_validate_rejects_position_book_reference_to_missing_book() {
+        let portfolio = Portfolio::builder("FUND_A")
+            .base_ccy(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .entity(Entity::new("ACME"))
+            .position(test_position_with_book("MISSING_BOOK"))
+            .build()
+            .expect_err("minor 3: missing position book reference must fail validation");
+
+        assert!(
+            portfolio.to_string().contains("non-existent book"),
+            "minor 3: unexpected validation error: {portfolio}"
+        );
+    }
+
+    #[test]
+    fn minor3_validate_rejects_book_reference_to_missing_position() {
+        let mut book = Book::new("BOOK_A", Some("Book A".to_string()));
+        book.add_position(PositionId::new("MISSING_POSITION"));
+        let portfolio = Portfolio::builder("FUND_A")
+            .base_ccy(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .book(book)
+            .build()
+            .expect_err("minor 3: missing book position reference must fail validation");
+
+        assert!(
+            portfolio.to_string().contains("non-existent position"),
+            "minor 3: unexpected validation error: {portfolio}"
+        );
     }
 }

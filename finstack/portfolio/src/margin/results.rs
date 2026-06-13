@@ -242,19 +242,42 @@ impl PortfolioMarginResult {
     /// * `result` - The netting set margin to add
     /// * `fx_rate` - FX rate to convert from netting set currency to base currency
     ///   (e.g., if netting set is EUR and base is USD, rate is EUR/USD)
-    pub fn add_netting_set_with_fx(&mut self, result: NettingSetMargin, fx_rate: f64) {
+    pub fn add_netting_set_with_fx(
+        &mut self,
+        result: NettingSetMargin,
+        fx_rate: f64,
+    ) -> crate::Result<()> {
         if !fx_rate.is_finite() || fx_rate <= 0.0 {
-            tracing::error!(
-                netting_set_id = ?result.netting_set_id,
-                fx_rate,
-                "Invalid FX rate for margin aggregation; must be positive and finite"
-            );
-            return;
+            return Err(crate::Error::invalid_input(format!(
+                "invalid FX rate for margin aggregation on netting set {:?}: rate must be positive and finite, got {fx_rate}",
+                result.netting_set_id
+            )));
         }
 
         let im = result.initial_margin.amount() * fx_rate;
         let vm = result.variation_margin.amount() * fx_rate;
-        let total = result.total_margin.amount() * fx_rate;
+        let mut converted = NettingSetMargin::new(
+            result.netting_set_id,
+            result.as_of,
+            Money::new(im, self.base_currency),
+            Money::new(vm, self.base_currency),
+            result.position_count,
+            result.im_methodology,
+        );
+        converted.sensitivities = result
+            .sensitivities
+            .map(|sensitivities| sensitivities.scaled_to_currency(self.base_currency, fx_rate));
+        converted.im_breakdown = result
+            .im_breakdown
+            .into_iter()
+            .map(|(label, amount)| {
+                (
+                    label,
+                    Money::new(amount.amount() * fx_rate, self.base_currency),
+                )
+            })
+            .collect();
+        let total = converted.total_margin.amount();
 
         self.total_initial_margin =
             Money::new(self.total_initial_margin.amount() + im, self.base_currency);
@@ -263,9 +286,10 @@ impl PortfolioMarginResult {
             self.base_currency,
         );
         self.total_margin = Money::new(self.total_margin.amount() + total, self.base_currency);
-        self.total_positions += result.position_count;
+        self.total_positions += converted.position_count;
         self.by_netting_set
-            .insert(result.netting_set_id.clone(), result);
+            .insert(converted.netting_set_id.clone(), converted);
+        Ok(())
     }
 
     /// Get the number of netting sets.
@@ -318,6 +342,13 @@ impl PortfolioMarginResult {
     /// * `position_id` - Position whose margin calculation degraded.
     /// * `message` - Human-readable reason for the degradation.
     pub fn add_degraded_position(&mut self, position_id: PositionId, message: impl Into<String>) {
+        if self
+            .degraded_positions
+            .iter()
+            .any(|(existing, _)| existing == &position_id)
+        {
+            return;
+        }
         self.degraded_positions.push((position_id, message.into()));
     }
 }
@@ -429,7 +460,9 @@ mod tests {
         );
 
         let eur_usd_rate = 1.10;
-        portfolio_result.add_netting_set_with_fx(eur_netting_set, eur_usd_rate);
+        portfolio_result
+            .add_netting_set_with_fx(eur_netting_set, eur_usd_rate)
+            .expect("valid FX rate should convert");
 
         // Verify conversion: 1M EUR * 1.10 = 1.1M USD
         assert!((portfolio_result.total_initial_margin.amount() - 1_100_000.0).abs() < 1e-9);

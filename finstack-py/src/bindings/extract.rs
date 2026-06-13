@@ -17,7 +17,7 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::portfolio::types::{PyPortfolio, PyPortfolioResult, PyPortfolioValuation};
 use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
-use crate::errors::display_to_py as to_py;
+use crate::errors::{display_to_py as to_py, portfolio_to_py};
 
 // ---------------------------------------------------------------------------
 // Zero-clone access types (available for callers that only need &T)
@@ -220,7 +220,7 @@ pub fn extract_portfolio_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<Portfolio
     let json: String = obj.extract()?;
     let spec: finstack_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(&json).map_err(to_py)?;
-    let portfolio = finstack_portfolio::Portfolio::from_spec(spec).map_err(to_py)?;
+    let portfolio = finstack_portfolio::Portfolio::from_spec(spec).map_err(portfolio_to_py)?;
     Ok(PortfolioAccess::Owned(Box::new(portfolio)))
 }
 

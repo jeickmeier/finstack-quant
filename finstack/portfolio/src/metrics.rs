@@ -15,7 +15,7 @@
 //! zero native PV fall back to the FX matrix in the
 //! [`finstack_core::market_data::context::MarketContext`].
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::types::{EntityId, PositionId};
 use crate::valuation::PortfolioValuation;
 use finstack_core::currency::Currency;
@@ -257,6 +257,19 @@ pub fn aggregate_metrics(
     as_of: finstack_core::dates::Date,
 ) -> Result<PortfolioMetrics> {
     use rayon::prelude::*;
+
+    let valuation_base_ccy = valuation.total_base_ccy.currency();
+    if base_ccy != valuation_base_ccy {
+        return Err(Error::invalid_input(format!(
+            "M-17: aggregate_metrics base_ccy {base_ccy} does not match valuation base currency {valuation_base_ccy}"
+        )));
+    }
+    if as_of != valuation.as_of {
+        return Err(Error::invalid_input(format!(
+            "M-17: aggregate_metrics as_of {as_of} does not match valuation as_of {}",
+            valuation.as_of
+        )));
+    }
 
     let position_entries: Vec<_> = valuation.position_values.iter().collect();
 

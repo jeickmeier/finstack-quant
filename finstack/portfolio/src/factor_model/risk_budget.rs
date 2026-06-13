@@ -162,15 +162,25 @@ impl RiskBudget {
         }
 
         let actual_by_id: IndexMap<&PositionId, f64> = components.into_iter().collect();
+        let portfolio_var_magnitude = portfolio_var.abs();
+        if portfolio_var_magnitude <= 1e-15
+            && actual_by_id
+                .values()
+                .any(|component| component.abs() > 1e-15)
+        {
+            return Err(finstack_core::Error::Validation(
+                "portfolio VaR must be non-zero when component VaR is non-zero".to_string(),
+            ));
+        }
 
         let mut positions = Vec::with_capacity(self.targets.len());
         let mut total_overbudget = 0.0;
         let mut has_breach = false;
 
         for (position_id, &target_frac) in &self.targets {
-            let actual_component = actual_by_id.get(position_id).copied().unwrap_or(0.0);
+            let actual_component = actual_by_id.get(position_id).copied().unwrap_or(0.0).abs();
 
-            let target_component = target_frac * portfolio_var;
+            let target_component = target_frac * portfolio_var_magnitude;
 
             let utilization = if target_component.abs() > 1e-15 {
                 actual_component / target_component
@@ -196,6 +206,26 @@ impl RiskBudget {
                 actual_component_var: actual_component,
                 target_component_var: target_component,
                 utilization,
+                excess,
+            });
+        }
+
+        for (position_id, actual_component_signed) in &actual_by_id {
+            if self.targets.contains_key(*position_id) {
+                continue;
+            }
+            let actual_component = actual_component_signed.abs();
+            if actual_component <= 1e-15 {
+                continue;
+            }
+            let excess = actual_component;
+            total_overbudget += excess;
+            has_breach = true;
+            positions.push(PositionBudgetEntry {
+                position_id: (*position_id).clone(),
+                actual_component_var: actual_component,
+                target_component_var: 0.0,
+                utilization: f64::INFINITY,
                 excess,
             });
         }
@@ -383,6 +413,57 @@ mod tests {
         assert!(result.has_breach, "should detect breach for position A");
         assert!(result.total_overbudget > 0.0);
 
+        Ok(())
+    }
+
+    #[test]
+    fn risk_budget_handles_negative_loss_convention_components() -> TestResult {
+        let mut targets = IndexMap::new();
+        targets.insert(PositionId::new("A"), 0.20);
+        targets.insert(PositionId::new("B"), 0.80);
+
+        let budget = RiskBudget::new(targets).with_threshold(1.50);
+        let components = [
+            (&PositionId::new("A"), -40.0),
+            (&PositionId::new("B"), -60.0),
+        ];
+        let result = budget.evaluate_components(components, -100.0)?;
+
+        let a_entry = result
+            .positions
+            .iter()
+            .find(|entry| entry.position_id == "A")
+            .ok_or_else(|| finstack_core::Error::Validation("Position A not found".to_string()))?;
+        assert!(result.has_breach);
+        assert!(result.total_overbudget > 0.0);
+        assert!((a_entry.utilization - 2.0).abs() < 1e-12);
+        assert!(a_entry.excess > 0.0);
+        Ok(())
+    }
+
+    #[test]
+    fn risk_budget_flags_unbudgeted_nonzero_positions() -> TestResult {
+        let mut targets = IndexMap::new();
+        targets.insert(PositionId::new("A"), 1.0);
+
+        let budget = RiskBudget::new(targets);
+        let components = [
+            (&PositionId::new("A"), 80.0),
+            (&PositionId::new("UNBUDGETED"), 20.0),
+        ];
+        let result = budget.evaluate_components(components, 100.0)?;
+
+        let unbudgeted = result
+            .positions
+            .iter()
+            .find(|entry| entry.position_id == "UNBUDGETED")
+            .ok_or_else(|| {
+                finstack_core::Error::Validation("Unbudgeted position not found".to_string())
+            })?;
+        assert!(result.has_breach);
+        assert_eq!(unbudgeted.target_component_var, 0.0);
+        assert!(unbudgeted.utilization.is_infinite());
+        assert!(unbudgeted.excess > 0.0);
         Ok(())
     }
 

@@ -188,6 +188,16 @@ mod replay_tests {
         assert_eq!(result.steps[0].date, date!(2024 - 01 - 01));
         assert_eq!(result.steps[1].date, date!(2024 - 01 - 02));
         assert_eq!(result.steps[2].date, date!(2024 - 01 - 03));
+        assert_eq!(
+            result.steps[1].valuation.as_of,
+            date!(2024 - 01 - 02),
+            "M-14: replay must value each snapshot at its snapshot date"
+        );
+        assert_eq!(
+            result.steps[2].valuation.as_of,
+            date!(2024 - 01 - 03),
+            "M-14: replay must value each snapshot at its snapshot date"
+        );
 
         // Summary
         assert_eq!(result.summary.num_steps, 3);

@@ -363,9 +363,9 @@ fn validate_decomposition_inputs(
         )));
     }
 
-    if config.confidence <= 0.0 || config.confidence >= 1.0 {
+    if !config.confidence.is_finite() || config.confidence <= 0.5 || config.confidence >= 1.0 {
         return Err(finstack_core::Error::Validation(format!(
-            "confidence must be in (0, 1), got {}",
+            "confidence must be finite and in (0.5, 1), got {}",
             config.confidence
         )));
     }
@@ -717,9 +717,9 @@ impl HistoricalPositionDecomposer {
             )));
         }
 
-        if config.confidence <= 0.0 || config.confidence >= 1.0 {
+        if !config.confidence.is_finite() || config.confidence <= 0.5 || config.confidence >= 1.0 {
             return Err(finstack_core::Error::Validation(format!(
-                "confidence must be in (0, 1), got {}",
+                "confidence must be finite and in (0.5, 1), got {}",
                 config.confidence
             )));
         }
@@ -1261,6 +1261,33 @@ mod tests {
         let result =
             decomposer.decompose_positions(&[1.0], &[0.04], &[PositionId::new("A")], &config);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn minor22_23_rejects_sub_median_and_nan_confidence() {
+        let decomposer = ParametricPositionDecomposer;
+        for confidence in [0.5, f64::NAN] {
+            let mut config = DecompositionConfig::parametric_95();
+            config.confidence = confidence;
+            let result =
+                decomposer.decompose_positions(&[1.0], &[0.04], &[PositionId::new("A")], &config);
+            assert!(
+                result.is_err(),
+                "minor 22/23: confidence {confidence:?} must fail"
+            );
+        }
+
+        let historical = HistoricalPositionDecomposer;
+        for confidence in [0.5, f64::NAN] {
+            let mut config = DecompositionConfig::historical(0.95);
+            config.confidence = confidence;
+            let result =
+                historical.decompose_from_pnls(&[-1.0, -2.0], &[PositionId::new("A")], 2, &config);
+            assert!(
+                result.is_err(),
+                "minor 22/23: historical confidence {confidence:?} must fail"
+            );
+        }
     }
 
     #[test]

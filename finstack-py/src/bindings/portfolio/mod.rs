@@ -95,6 +95,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "twrr_modified_dietz",
         "twrr_linked",
         "mwr_xirr",
+        "SensitivityMatrix",
+        "FactorPnlProfile",
+        "FactorRiskDecomposition",
+        "compute_factor_sensitivities",
+        "compute_pnl_profiles",
+        "decompose_factor_risk",
         // factor_model typed result classes (Slice 8)
         "FactorContribution",
         "PositionFactorContribution",

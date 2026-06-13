@@ -453,9 +453,14 @@ impl SimulationDecomposer {
             .iter()
             .map(|value| value * scale)
             .collect();
+        let marginal_multiplier = if matches!(measure, RiskMeasure::Variance) {
+            2.0
+        } else {
+            1.0
+        };
         let marginal: Vec<f64> = marginal_component_variances
             .iter()
-            .map(|value| value * scale)
+            .map(|value| value * scale * marginal_multiplier)
             .collect();
 
         RiskDecomposition {

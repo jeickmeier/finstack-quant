@@ -576,8 +576,8 @@ impl PyPositionFilter {
 
     /// Match positions NOT matched by the inner filter.
     #[classmethod]
-    #[pyo3(text_signature = "(cls, inner)")]
-    fn not(_cls: &Bound<'_, PyType>, inner: PyPositionFilter) -> Self {
+    #[pyo3(name = "not_", text_signature = "(cls, inner)")]
+    fn not_(_cls: &Bound<'_, PyType>, inner: PyPositionFilter) -> Self {
         Self::from_inner(PositionFilter::Not(Box::new(inner.inner)))
     }
 

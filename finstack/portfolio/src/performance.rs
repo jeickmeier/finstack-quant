@@ -93,6 +93,13 @@ pub struct DietzFlow {
 /// where the return is not meaningfully defined.
 #[must_use]
 pub fn twrr_modified_dietz(period: &TwrrPeriod) -> Option<f64> {
+    if period.cashflows.iter().any(|flow| {
+        !flow.fraction_of_period_remaining.is_finite()
+            || !(0.0..=1.0).contains(&flow.fraction_of_period_remaining)
+    }) {
+        return None;
+    }
+
     let numerator = period.ending_market_value
         - period.beginning_market_value
         - period.cashflows.iter().map(|f| f.amount).sum::<f64>();
@@ -101,7 +108,7 @@ pub fn twrr_modified_dietz(period: &TwrrPeriod) -> Option<f64> {
         + period
             .cashflows
             .iter()
-            .map(|f| f.fraction_of_period_remaining.clamp(0.0, 1.0) * f.amount)
+            .map(|f| f.fraction_of_period_remaining * f.amount)
             .sum::<f64>();
 
     if !denominator.is_finite() || denominator <= 0.0 {
@@ -151,8 +158,9 @@ pub struct DatedCashflow {
 /// `(end_date - start_date).whole_days() as f64 / 365.0`. This matches
 /// GIPS guidance for periods longer than one year and keeps results
 /// comparable across calendar regimes. Pass `0.0` (or any non-positive
-/// value) to skip annualization and return only the cumulative figure;
-/// the `annualised` field will then mirror `cumulative`.
+/// value) to skip annualization and return only the cumulative figure. Per GIPS
+/// 2020, horizons shorter than one year are also reported as cumulative rather
+/// than annualized. In those cases the `annualised` field mirrors `cumulative`.
 #[must_use]
 pub fn twrr_linked(periods: &[f64], horizon_years: f64) -> Option<LinkedReturn> {
     if periods.iter().any(|r| !r.is_finite()) {
@@ -163,7 +171,7 @@ pub fn twrr_linked(periods: &[f64], horizon_years: f64) -> Option<LinkedReturn> 
         return None;
     }
     let cumulative = growth - 1.0;
-    let annualised = if horizon_years > 0.0 {
+    let annualised = if horizon_years >= 1.0 {
         growth.powf(1.0 / horizon_years) - 1.0
     } else {
         cumulative
@@ -243,6 +251,23 @@ mod tests {
         assert!((r - 0.10).abs() < 1e-15);
     }
 
+    #[test]
+    fn minor6_modified_dietz_rejects_out_of_range_flow_weights() {
+        let period = TwrrPeriod {
+            beginning_market_value: 100.0,
+            ending_market_value: 110.0,
+            cashflows: vec![DietzFlow {
+                amount: 10.0,
+                fraction_of_period_remaining: 1.01,
+            }],
+        };
+
+        assert!(
+            twrr_modified_dietz(&period).is_none(),
+            "minor 6: Dietz flow weights outside [0, 1] must not be clamped"
+        );
+    }
+
     /// Geometric linking of two sub-period returns.
     ///
     /// r_1 = +5%, r_2 = +3% over 1 year total:
@@ -262,6 +287,16 @@ mod tests {
         let linked = twrr_linked(&[0.10], 2.0).expect("finite");
         // annualised = (1.10)^(1/2) − 1 ≈ 4.88088%
         assert!((linked.annualised - 0.04880884817015154).abs() < 1e-12);
+    }
+
+    #[test]
+    fn minor7_linked_return_does_not_annualise_sub_one_year_horizon() {
+        let linked = twrr_linked(&[0.10], 0.5).expect("finite");
+
+        assert_eq!(
+            linked.annualised, linked.cumulative,
+            "minor 7: sub-one-year horizons should report cumulative return"
+        );
     }
 
     /// Non-finite period → None.

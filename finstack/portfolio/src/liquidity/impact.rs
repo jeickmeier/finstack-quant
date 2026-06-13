@@ -10,6 +10,7 @@ use super::types::LiquidityProfile;
 
 /// Input parameters for a market impact calculation.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TradeParams {
     /// Total quantity to execute (positive = buy, negative = sell).
     pub quantity: f64,

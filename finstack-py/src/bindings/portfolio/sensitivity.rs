@@ -5,7 +5,7 @@
 
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::{display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 
@@ -301,7 +301,7 @@ fn compute_factor_sensitivities(
                 bump_config_json.as_deref(),
             )
         })
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
 
     Ok(PySensitivityMatrix::from_inner(matrix))
 }
@@ -360,7 +360,7 @@ fn compute_pnl_profiles(
                 n_scenario_points,
             )
         })
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
 
     Ok(profiles
         .iter()
@@ -400,7 +400,8 @@ struct PyFactorRiskDecomposition {
 
 impl PyFactorRiskDecomposition {
     fn from_inner(decomp: finstack_portfolio::factor_model::RiskDecomposition) -> Self {
-        let measure = format!("{:?}", decomp.measure);
+        let measure = serde_json::to_string(&decomp.measure)
+            .unwrap_or_else(|_| format!("{:?}", decomp.measure));
         let factor_ids: Vec<String> = decomp
             .factor_contributions
             .iter()
@@ -590,23 +591,19 @@ fn decompose_factor_risk(
         .map(finstack_factor_model::FactorId::new)
         .collect();
 
-    if sensitivities.n_factors == 0 {
-        return Err(crate::errors::value_error(
-            "sensitivity matrix has no factors; decomposition requires at least one factor",
-        ));
-    }
-
     let mut matrix = finstack_portfolio::sensitivity::SensitivityMatrix::zeros(
         sensitivities.position_ids.clone(),
         factor_ids,
     );
-    for (i, chunk) in sensitivities
-        .data
-        .chunks_exact(sensitivities.n_factors)
-        .enumerate()
-    {
-        for (j, &val) in chunk.iter().enumerate() {
-            matrix.set_delta(i, j, val);
+    if sensitivities.n_factors > 0 {
+        for (i, chunk) in sensitivities
+            .data
+            .chunks_exact(sensitivities.n_factors)
+            .enumerate()
+        {
+            for (j, &val) in chunk.iter().enumerate() {
+                matrix.set_delta(i, j, val);
+            }
         }
     }
 
@@ -628,7 +625,7 @@ fn decompose_factor_risk(
                 &measure,
             )
         })
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
 
     Ok(PyFactorRiskDecomposition::from_inner(result))
 }

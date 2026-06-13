@@ -1908,8 +1908,8 @@ export interface PortfolioNamespace {
     portfolioVar: number,
     utilizationThreshold: number
   ): string;
-  rollEffectiveSpread(returnsJson: string): number;
-  amihudIlliquidity(returnsJson: string, volumesJson: string): number;
+  rollEffectiveSpread(returnsJson: string): number | undefined;
+  amihudIlliquidity(returnsJson: string, volumesJson: string): number | undefined;
   daysToLiquidate(positionValue: number, avgDailyVolume: number, participationRate: number): number;
   liquidityTier(daysToLiquidate: number): string;
   lvarBangia(
@@ -1928,7 +1928,7 @@ export interface PortfolioNamespace {
     temporaryImpactCoef: number,
     referencePrice?: number | null
   ): string;
-  kyleLambda(volumesJson: string, returnsJson: string): number;
+  kyleLambda(volumesJson: string, returnsJson: string): number | undefined;
   /** Compute first-order factor sensitivities.
    *
    * ⚠️ BLOCKING: prefer `computeFactorSensitivitiesWithMarket` for repeated

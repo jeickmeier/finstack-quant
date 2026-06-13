@@ -479,6 +479,495 @@ fn test_short_candidates_can_take_negative_weights() {
         Some(&-0.4)
     );
     assert_eq!(result.implied_quantities.get("LONG_CANDIDATE"), Some(&0.6));
+
+    let trades = result.to_trade_list();
+    assert!(
+        trades.iter().any(|trade| {
+            trade.position_id == "SHORT_CANDIDATE"
+                && trade.trade_type == finstack_portfolio::optimization::TradeType::NewPosition
+        }),
+        "MO-10: selected short candidates must be classified as new positions"
+    );
+    let rebalanced = result
+        .to_rebalanced_portfolio()
+        .expect("MO-7: selected candidates should materialize");
+    assert_eq!(
+        rebalanced
+            .get_position("SHORT_CANDIDATE")
+            .map(|position| position.quantity),
+        Some(-0.4),
+        "MO-7: rebalanced portfolio should include the short candidate"
+    );
+    assert_eq!(
+        rebalanced
+            .get_position("LONG_CANDIDATE")
+            .map(|position| position.quantity),
+        Some(0.6),
+        "MO-7: rebalanced portfolio should include the long candidate"
+    );
+}
+
+#[test]
+fn m7_existing_short_accepts_negative_weight_bounds() -> Result<(), Box<dyn std::error::Error>> {
+    let as_of = create_date(2024, Month::January, 1)?;
+    let long_instrument = Arc::new(MetricInstrument::new(
+        "LONG_INST",
+        Money::new(100.0, Currency::USD),
+        IndexMap::new(),
+    ));
+    let short_instrument = Arc::new(MetricInstrument::new(
+        "SHORT_INST",
+        Money::new(100.0, Currency::USD),
+        IndexMap::new(),
+    ));
+    let long = Position::new(
+        "POS_LONG",
+        "ENT_A",
+        "LONG_INST",
+        long_instrument,
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let short = Position::new(
+        "POS_SHORT",
+        "ENT_A",
+        "SHORT_INST",
+        short_instrument,
+        -1.0,
+        PositionUnit::Units,
+    )?;
+    let portfolio = PortfolioBuilder::new("SHORT_BOOK")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(long)
+        .position(short)
+        .build()?;
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(0.0),
+            filter: None,
+        }),
+    );
+    problem.constraints = vec![
+        finstack_portfolio::optimization::Constraint::WeightBounds {
+            filter: finstack_portfolio::optimization::PositionFilter::ByPositionIds(vec![
+                "POS_LONG".into(),
+            ]),
+            min: 0.75,
+            max: 1.0,
+            label: Some("M-7 fixed long bounds".to_string()),
+        },
+        finstack_portfolio::optimization::Constraint::WeightBounds {
+            filter: finstack_portfolio::optimization::PositionFilter::ByPositionIds(vec![
+                "POS_SHORT".into(),
+            ]),
+            min: -1.0,
+            max: -0.25,
+            label: Some("M-7 existing short bounds".to_string()),
+        },
+        finstack_portfolio::optimization::Constraint::Budget { rhs: 0.5 },
+    ];
+
+    let optimizer = DefaultLpOptimizer;
+    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+
+    assert!(
+        result.status.is_feasible(),
+        "M-7: existing short negative bounds should remain feasible, got {:?}",
+        result.status
+    );
+    let short_weight = result
+        .optimal_weights
+        .get("POS_SHORT")
+        .expect("short position optimized");
+    assert!(*short_weight <= -0.25 && *short_weight >= -1.0);
+    Ok(())
+}
+
+#[test]
+fn m8_candidate_entity_filters_apply_to_metric_constraints(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let as_of = create_date(2024, Month::January, 1)?;
+    let portfolio = PortfolioBuilder::new("EMPTY")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .build()?;
+    let non_target = CandidatePosition::new(
+        "NON_TARGET_CAND",
+        "OTHER",
+        Arc::new(MetricInstrument::new(
+            "NON_TARGET",
+            Money::new(100.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        PositionUnit::Units,
+    );
+    let target = CandidatePosition::new(
+        "TARGET_CAND",
+        "TARGET",
+        Arc::new(MetricInstrument::new(
+            "TARGET",
+            Money::new(100.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        PositionUnit::Units,
+    );
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(0.0),
+            filter: None,
+        }),
+    )
+    .with_trade_universe(
+        finstack_portfolio::optimization::TradeUniverse::default()
+            .with_candidate(non_target)
+            .with_candidate(target),
+    );
+    problem
+        .constraints
+        .push(finstack_portfolio::optimization::Constraint::MetricBound {
+            label: Some("M-8 target candidate exposure".to_string()),
+            metric: MetricExpr::WeightedSum {
+                metric: PerPositionMetric::Constant(1.0),
+                filter: Some(
+                    finstack_portfolio::optimization::PositionFilter::ByEntityId("TARGET".into()),
+                ),
+            },
+            op: finstack_portfolio::optimization::Inequality::Ge,
+            rhs: 1.0,
+        });
+
+    let optimizer = DefaultLpOptimizer;
+    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+
+    assert!(
+        result.status.is_feasible(),
+        "M-8: candidate entity filter should make the target constraint feasible, got {:?}",
+        result.status
+    );
+    assert_eq!(result.optimal_weights.get("TARGET_CAND"), Some(&1.0));
+    Ok(())
+}
+
+#[test]
+fn m9_turnover_slack_uses_actual_turnover() -> Result<(), Box<dyn std::error::Error>> {
+    let as_of = create_date(2024, Month::January, 1)?;
+    let mut low_measures = IndexMap::new();
+    low_measures.insert(MetricId::Ytm, 0.0);
+    let mut high_measures = IndexMap::new();
+    high_measures.insert(MetricId::Ytm, 0.10);
+
+    let low = Position::new(
+        "POS_LOW",
+        "ENT_A",
+        "LOW_INST",
+        Arc::new(MetricInstrument::new(
+            "LOW_INST",
+            Money::new(100.0, Currency::USD),
+            low_measures,
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let high = Position::new(
+        "POS_HIGH",
+        "ENT_A",
+        "HIGH_INST",
+        Arc::new(MetricInstrument::new(
+            "HIGH_INST",
+            Money::new(100.0, Currency::USD),
+            high_measures,
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let portfolio = PortfolioBuilder::new("TURNOVER_BOOK")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(low)
+        .position(high)
+        .build()?;
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Metric(MetricId::Ytm),
+            filter: None,
+        }),
+    );
+    problem.constraints = vec![
+        finstack_portfolio::optimization::Constraint::Budget { rhs: 1.0 },
+        finstack_portfolio::optimization::Constraint::MaxTurnover {
+            label: Some("M-9 turnover".to_string()),
+            max_turnover: 0.5,
+        },
+    ];
+
+    let optimizer = DefaultLpOptimizer;
+    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+
+    assert!(
+        result.status.is_feasible(),
+        "M-9: turnover-constrained optimization should remain feasible, got {:?}",
+        result.status
+    );
+    assert!(
+        (result.turnover() - 0.5).abs() < 1e-8,
+        "M-9: expected solver to consume the turnover budget, got {}",
+        result.turnover()
+    );
+    let slack = result
+        .constraint_slacks
+        .get("M-9 turnover")
+        .expect("turnover slack is reported");
+    assert!(
+        slack.abs() < 1e-8,
+        "M-9: turnover slack should be based on actual solved turnover, got {slack}"
+    );
+    Ok(())
+}
+
+#[test]
+fn m9_duplicate_turnover_constraints_are_rejected() -> Result<(), Box<dyn std::error::Error>> {
+    let as_of = create_date(2024, Month::January, 1)?;
+    let first = Position::new(
+        "POS_A",
+        "ENT_A",
+        "A_INST",
+        Arc::new(MetricInstrument::new(
+            "A_INST",
+            Money::new(100.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let second = Position::new(
+        "POS_B",
+        "ENT_A",
+        "B_INST",
+        Arc::new(MetricInstrument::new(
+            "B_INST",
+            Money::new(100.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let portfolio = PortfolioBuilder::new("DUPLICATE_TURNOVER_BOOK")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(first)
+        .position(second)
+        .build()?;
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(0.0),
+            filter: None,
+        }),
+    );
+    problem.constraints = vec![
+        finstack_portfolio::optimization::Constraint::Budget { rhs: 1.0 },
+        finstack_portfolio::optimization::Constraint::MaxTurnover {
+            label: Some("M-9 turnover A".to_string()),
+            max_turnover: 0.4,
+        },
+        finstack_portfolio::optimization::Constraint::MaxTurnover {
+            label: Some("M-9 turnover B".to_string()),
+            max_turnover: 0.2,
+        },
+    ];
+
+    let optimizer = DefaultLpOptimizer;
+    let err = optimizer
+        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+        .expect_err("M-9: duplicate turnover constraints must fail fast");
+    assert!(
+        err.to_string().contains("M-9") && err.to_string().contains("MaxTurnover"),
+        "M-9: duplicate turnover error should identify the review fix, got {err}"
+    );
+    Ok(())
+}
+
+#[test]
+fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let as_of = create_date(2024, Month::January, 1)?;
+    let mut low_measures = IndexMap::new();
+    low_measures.insert(MetricId::Ytm, 0.0);
+    let mut high_measures = IndexMap::new();
+    high_measures.insert(MetricId::Ytm, 10.0);
+    let low = Position::new(
+        "POS_LOW",
+        "ENT_A",
+        "LOW_INST",
+        Arc::new(MetricInstrument::new(
+            "LOW_INST",
+            Money::new(100.0, Currency::USD),
+            low_measures,
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let high = Position::new(
+        "POS_HIGH",
+        "ENT_A",
+        "HIGH_INST",
+        Arc::new(MetricInstrument::new(
+            "HIGH_INST",
+            Money::new(100.0, Currency::USD),
+            high_measures,
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let portfolio = PortfolioBuilder::new("FILTERED_AVG")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(low)
+        .position(high)
+        .build()?;
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Metric(MetricId::Ytm),
+            filter: None,
+        }),
+    );
+    problem.constraints = vec![
+        finstack_portfolio::optimization::Constraint::Budget { rhs: 1.0 },
+        finstack_portfolio::optimization::Constraint::MetricBound {
+            label: Some("MO-6 high average cap".to_string()),
+            metric: MetricExpr::ValueWeightedAverage {
+                metric: PerPositionMetric::Metric(MetricId::Ytm),
+                filter: Some(
+                    finstack_portfolio::optimization::PositionFilter::ByPositionIds(vec![
+                        "POS_HIGH".into(),
+                    ]),
+                ),
+            },
+            op: finstack_portfolio::optimization::Inequality::Le,
+            rhs: 5.0,
+        },
+    ];
+
+    let optimizer = DefaultLpOptimizer;
+    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+
+    assert!(
+        result.status.is_feasible(),
+        "MO-6: filtered average problem should remain feasible, got {:?}",
+        result.status
+    );
+    assert!(
+        result
+            .optimal_weights
+            .get("POS_HIGH")
+            .copied()
+            .unwrap_or_default()
+            .abs()
+            < 1e-8,
+        "MO-6: filtered average cap should force the high-metric bucket out"
+    );
+    Ok(())
+}
+
+#[test]
+fn mo8_value_weight_existing_zero_pv_position_errors() -> Result<(), Box<dyn std::error::Error>> {
+    let as_of = create_date(2024, Month::January, 1)?;
+    let zero_pv = Position::new(
+        "POS_ZERO",
+        "ENT_A",
+        "ZERO_INST",
+        Arc::new(MetricInstrument::new(
+            "ZERO_INST",
+            Money::new(0.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let portfolio = PortfolioBuilder::new("ZERO_PV")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(zero_pv)
+        .build()?;
+    let problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(0.0),
+            filter: None,
+        }),
+    );
+
+    let optimizer = DefaultLpOptimizer;
+    let err = optimizer
+        .optimize(&problem, &MarketContext::new(), &FinstackConfig::default())
+        .expect_err("MO-8: zero-PV existing ValueWeight positions must fail fast");
+    assert!(err.to_string().contains("MO-8"), "unexpected error: {err}");
+    Ok(())
+}
+
+#[test]
+fn minor14_notional_weight_uses_unit_aware_scale_factor() -> Result<(), Box<dyn std::error::Error>>
+{
+    let as_of = create_date(2024, Month::January, 1)?;
+    let percentage = Position::new(
+        "POS_PERCENT",
+        "ENT_A",
+        "PERCENT_INST",
+        Arc::new(MetricInstrument::new(
+            "PERCENT_INST",
+            Money::new(100.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        50.0,
+        PositionUnit::Percentage,
+    )?;
+    let unit = Position::new(
+        "POS_UNIT",
+        "ENT_A",
+        "UNIT_INST",
+        Arc::new(MetricInstrument::new(
+            "UNIT_INST",
+            Money::new(100.0, Currency::USD),
+            IndexMap::new(),
+        )),
+        1.0,
+        PositionUnit::Units,
+    )?;
+    let portfolio = PortfolioBuilder::new("NOTIONAL_SCALE")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("ENT_A"))
+        .position(percentage)
+        .position(unit)
+        .build()?;
+    let mut problem = PortfolioOptimizationProblem::new(
+        portfolio,
+        Objective::Maximize(MetricExpr::WeightedSum {
+            metric: PerPositionMetric::Constant(0.0),
+            filter: None,
+        }),
+    );
+    problem.weighting = WeightingScheme::NotionalWeight;
+
+    let optimizer = DefaultLpOptimizer;
+    let result = optimizer.optimize(&problem, &MarketContext::new(), &FinstackConfig::default())?;
+
+    assert!(
+        (result.current_weights["POS_PERCENT"] - (1.0 / 3.0)).abs() < 1e-12,
+        "minor 14: percentage notional should use quantity / 100"
+    );
+    assert!((result.current_weights["POS_UNIT"] - (2.0 / 3.0)).abs() < 1e-12);
+    Ok(())
 }
 
 #[test]

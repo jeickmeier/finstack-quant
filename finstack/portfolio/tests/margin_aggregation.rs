@@ -126,7 +126,9 @@ fn test_add_netting_set_with_fx_converts_correctly() {
 
     // EUR/USD = 1.10
     let eur_usd_rate = 1.10;
-    result.add_netting_set_with_fx(eur_ns, eur_usd_rate);
+    result
+        .add_netting_set_with_fx(eur_ns, eur_usd_rate)
+        .expect("valid FX rate should convert");
 
     // Verify conversion: 1M EUR * 1.10 = 1.1M USD
     assert_eq!(result.total_initial_margin.amount(), 1_100_000.0);
@@ -160,7 +162,9 @@ fn test_mixed_currency_aggregation_with_fx() {
         8,
         ImMethodology::Simm,
     );
-    result.add_netting_set_with_fx(eur_ns, 1.08); // EUR/USD = 1.08
+    result
+        .add_netting_set_with_fx(eur_ns, 1.08)
+        .expect("valid EUR/USD rate should convert");
 
     // Add GBP netting set with FX conversion
     let gbp_ns = NettingSetMargin::new(
@@ -171,7 +175,9 @@ fn test_mixed_currency_aggregation_with_fx() {
         5,
         ImMethodology::Simm,
     );
-    result.add_netting_set_with_fx(gbp_ns, 1.27); // GBP/USD = 1.27
+    result
+        .add_netting_set_with_fx(gbp_ns, 1.27)
+        .expect("valid GBP/USD rate should convert");
 
     // Verify aggregation:
     // USD IM: 5M
@@ -209,12 +215,15 @@ fn test_zero_fx_rate() {
         ImMethodology::Simm,
     );
 
-    // Zero FX rate (edge case - shouldn't happen in practice)
-    result.add_netting_set_with_fx(eur_ns, 0.0);
+    // M-11: invalid FX rates must fail loudly instead of dropping the set.
+    let err = result
+        .add_netting_set_with_fx(eur_ns, 0.0)
+        .expect_err("zero FX rate should fail");
 
-    // Result should be zero
+    assert!(err.to_string().contains("invalid FX rate"));
     assert_eq!(result.total_initial_margin.amount(), 0.0);
     assert_eq!(result.total_variation_margin.amount(), 0.0);
+    assert_eq!(result.netting_set_count(), 0);
 }
 
 #[test]
@@ -313,7 +322,9 @@ fn test_portfolio_totals_with_mixed_currencies() {
         3,
         ImMethodology::Simm,
     );
-    result.add_netting_set_with_fx(bilateral, 1.10);
+    result
+        .add_netting_set_with_fx(bilateral, 1.10)
+        .expect("valid EUR/USD rate should convert");
 
     // Portfolio totals should be in USD (properly converted)
     // USD IM: 3M, EUR IM converted: 2M * 1.10 = 2.2M, Total: 5.2M
@@ -328,4 +339,12 @@ fn test_portfolio_totals_with_mixed_currencies() {
     // = 3.5M + 2.53M = 6.03M
     let expected_total = 3_500_000.0 + ((2_000_000.0 + 300_000.0) * 1.10);
     assert!((result.total_margin.amount() - expected_total).abs() < 1e-6);
+
+    // M-12: stored netting-set rows must be base-currency amounts so splits do
+    // not add native EUR into USD totals.
+    let (cleared_total, bilateral_total) = result.cleared_bilateral_split();
+    assert_eq!(cleared_total.currency(), Currency::USD);
+    assert_eq!(bilateral_total.currency(), Currency::USD);
+    assert!((cleared_total.amount() - 3_500_000.0).abs() < 1e-6);
+    assert!((bilateral_total.amount() - 2_530_000.0).abs() < 1e-6);
 }

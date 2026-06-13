@@ -5,9 +5,11 @@ mod common;
 use common::*;
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
+use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::term_structures::DiscountCurve;
 use finstack_core::math::interp::InterpStyle;
+use finstack_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_core::money::Money;
 use finstack_portfolio::position::{Position, PositionUnit};
 use finstack_portfolio::types::Entity;
@@ -64,9 +66,13 @@ fn bumped_usd_market() -> MarketContext {
 }
 
 fn make_deposit(id: &str, curve_id: &str, notional: f64) -> Deposit {
+    make_deposit_ccy(id, curve_id, notional, Currency::USD)
+}
+
+fn make_deposit_ccy(id: &str, curve_id: &str, notional: f64, currency: Currency) -> Deposit {
     Deposit::builder()
         .id(id.into())
-        .notional(Money::new(notional, Currency::USD))
+        .notional(Money::new(notional, currency))
         .start_date(base_date())
         .maturity(base_date() + time::Duration::days(90))
         .day_count(finstack_core::dates::DayCount::Act360)
@@ -74,6 +80,34 @@ fn make_deposit(id: &str, curve_id: &str, notional: f64) -> Deposit {
         .quote_rate_opt(Some(rust_decimal::Decimal::try_from(0.045).unwrap()))
         .build()
         .unwrap()
+}
+
+struct StaticFx {
+    rate: f64,
+}
+
+impl FxProvider for StaticFx {
+    fn rate(
+        &self,
+        _from: Currency,
+        _to: Currency,
+        _on: Date,
+        _policy: FxConversionPolicy,
+    ) -> finstack_core::Result<f64> {
+        Ok(self.rate)
+    }
+}
+
+fn fx_matrix(rate: f64) -> FxMatrix {
+    FxMatrix::new(Arc::new(StaticFx { rate }))
+}
+
+fn market_with_fx(
+    usd_knots: &[(f64, f64)],
+    eur_knots: &[(f64, f64)],
+    eur_usd: f64,
+) -> MarketContext {
+    make_market(usd_knots, eur_knots).insert_fx(fx_matrix(eur_usd))
 }
 
 fn build_two_curve_portfolio() -> Portfolio {
@@ -393,6 +427,54 @@ fn base_then_selective_reprice_round_trip() {
     assert!(
         (base.total_base_ccy.amount() - bumped.total_base_ccy.amount()).abs() > 1e-6,
         "bumped total should differ from base"
+    );
+}
+
+#[test]
+fn selective_reprice_fx_change_reprices_native_non_base_positions() {
+    let dep_eur = make_deposit_ccy("DEP_EUR", "EUR", 1_000_000.0, Currency::EUR);
+    let pos_eur = Position::new(
+        "POS_EUR",
+        "ENTITY_A",
+        "DEP_EUR",
+        Arc::new(dep_eur),
+        1.0,
+        PositionUnit::Units,
+    )
+    .unwrap();
+    let portfolio = PortfolioBuilder::new("TEST")
+        .base_ccy(Currency::USD)
+        .as_of(base_date())
+        .entity(Entity::new("ENTITY_A"))
+        .position(pos_eur)
+        .build()
+        .unwrap();
+    let config = FinstackConfig::default();
+    let options = PortfolioValuationOptions::default();
+    let base_market = market_with_fx(&USD_KNOTS, &EUR_KNOTS, 1.10);
+    let bumped_market = market_with_fx(&USD_KNOTS, &EUR_KNOTS, 1.20);
+
+    let base_val = value_portfolio(&portfolio, &base_market, &config, &options).unwrap();
+    let full_val = value_portfolio(&portfolio, &bumped_market, &config, &options).unwrap();
+    let selective_val = revalue_affected(
+        &portfolio,
+        &bumped_market,
+        &config,
+        &options,
+        &base_val,
+        &[MarketFactorKey::fx(Currency::EUR, Currency::USD)],
+    )
+    .unwrap();
+
+    assert!(
+        (full_val.total_base_ccy.amount() - selective_val.total_base_ccy.amount()).abs() < 1e-10,
+        "B-3 selective FX repricing should match full repricing: full={}, selective={}",
+        full_val.total_base_ccy.amount(),
+        selective_val.total_base_ccy.amount()
+    );
+    assert!(
+        (base_val.total_base_ccy.amount() - selective_val.total_base_ccy.amount()).abs() > 1e-6,
+        "FX-only selective repricing should not reuse the stale prior base value"
     );
 }
 

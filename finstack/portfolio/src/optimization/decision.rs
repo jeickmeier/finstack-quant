@@ -2,7 +2,7 @@ use super::problem::PortfolioOptimizationProblem;
 use super::tolerances::{GROSS_BASE_TOL, MIN_WEIGHT_TOL, PV_PER_UNIT_TOL};
 use super::types::{MissingMetricPolicy, WeightingScheme};
 use crate::error::{Error, Result};
-use crate::types::{AttributeValue, PositionId};
+use crate::types::{AttributeValue, EntityId, PositionId};
 use finstack_core::config::FinstackConfig;
 use finstack_core::market_data::context::MarketContext;
 use finstack_valuations::metrics::MetricId;
@@ -26,6 +26,7 @@ pub(crate) struct OptimizationDenominators {
 #[derive(Clone, Debug)]
 pub(crate) struct DecisionItem {
     pub position_id: PositionId,
+    pub entity_id: EntityId,
     /// Whether this represents an existing portfolio position.
     pub is_existing: bool,
     /// Whether this position is held (weight locked to current).
@@ -109,9 +110,12 @@ pub(crate) fn build_decision_space(
         let pv_base = pv_entry.value_base.amount();
         let pv_native = pv_entry.value_native.amount();
         gross_pv_base += pv_base.abs();
-        // For NotionalWeight: use signed quantity as notional proxy
-        position_notionals.insert(position.position_id.clone(), position.quantity);
-        gross_notional += position.quantity.abs();
+        // For NotionalWeight: use the same unit-aware scale factor that
+        // portfolio valuation and factor risk use, so Percentage positions
+        // contribute 50% as 0.5 instead of raw 50.0.
+        let notional_proxy = position.scale_factor();
+        position_notionals.insert(position.position_id.clone(), notional_proxy);
+        gross_notional += notional_proxy.abs();
 
         // Extract measures
         let mut measures = IndexMap::new();
@@ -150,27 +154,48 @@ pub(crate) fn build_decision_space(
             && matches!(problem.missing_metric_policy, MissingMetricPolicy::Exclude);
         let is_held = explicit_hold || is_excluded || freeze_for_missing_metrics;
 
+        let pv_per_unit = if position.quantity != 0.0 {
+            pv_base / position.quantity
+        } else {
+            0.0
+        };
+        if matches!(problem.weighting, WeightingScheme::ValueWeight)
+            && !is_held
+            && position.quantity.abs() > PV_PER_UNIT_TOL
+            && pv_per_unit.abs() < PV_PER_UNIT_TOL
+        {
+            return Err(Error::invalid_input(format!(
+                "MO-8: existing position {} has zero base-currency PV per unit under ValueWeight; \
+                 cannot reconstruct a non-zero optimized quantity",
+                position.position_id
+            )));
+        }
+
         items.push(DecisionItem {
             position_id: position.position_id.clone(),
+            entity_id: position.entity_id.clone(),
             is_existing: true,
             is_held,
             current_quantity: position.quantity,
         });
 
-        // Default weight bounds: [0, 1]; will be refined by constraints later.
+        // M-7: Preserve the sign of existing positions by default. Longs remain
+        // long-only, shorts remain short-only; explicit WeightBounds constraints
+        // can further tighten these ranges.
+        let (min_weight, max_weight) = if pv_base < 0.0 {
+            (-1.0, 0.0)
+        } else {
+            (0.0, 1.0)
+        };
         features.push(DecisionFeatures {
             pv_base,
             pv_native,
             // When quantity == 0, treat pv_per_unit as 0 to avoid division by zero.
-            pv_per_unit: if position.quantity != 0.0 {
-                pv_base / position.quantity
-            } else {
-                0.0
-            },
+            pv_per_unit,
             measures,
             attributes: position.attributes.clone(),
-            min_weight: 0.0,
-            max_weight: 1.0,
+            min_weight,
+            max_weight,
         });
     }
 
@@ -260,6 +285,7 @@ pub(crate) fn build_decision_space(
 
         items.push(DecisionItem {
             position_id: candidate.id.clone(),
+            entity_id: candidate.entity_id.clone(),
             is_existing: false,
             is_held: missing_required_metrics
                 && matches!(problem.missing_metric_policy, MissingMetricPolicy::Exclude),

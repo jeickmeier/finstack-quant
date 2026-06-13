@@ -310,7 +310,7 @@ impl FactorModel {
                 (
                     position.position_id.to_string(),
                     position.instrument.as_ref() as &dyn Instrument,
-                    position.quantity,
+                    position.scale_factor(),
                 )
             })
             .collect();
@@ -367,7 +367,7 @@ impl FactorModel {
                     );
                     let delta = credit_curve_parallel_delta(
                         position.instrument.as_ref(),
-                        position.quantity,
+                        position.scale_factor(),
                         market,
                         as_of,
                         curve_id,
@@ -415,7 +415,7 @@ impl FactorModel {
         Ok(decomposition)
     }
 
-    fn add_credit_residual_risk(
+    pub(crate) fn add_credit_residual_risk(
         &self,
         decomposition: &mut RiskDecomposition,
         portfolio: &Portfolio,
@@ -448,7 +448,7 @@ impl FactorModel {
                 if let Some(curve_id) = credit_curve_id(dependency) {
                     exposure += credit_curve_parallel_delta(
                         position.instrument.as_ref(),
-                        position.quantity,
+                        position.scale_factor(),
                         market,
                         as_of,
                         curve_id,
@@ -1217,6 +1217,64 @@ mod tests {
             }
             Ok(matrix)
         }
+    }
+
+    struct WeightEchoEngine;
+
+    impl FactorSensitivityEngine for WeightEchoEngine {
+        fn compute_sensitivities(
+            &self,
+            positions: &[(String, &dyn Instrument, f64)],
+            factors: &[FactorDefinition],
+            _market: &MarketContext,
+            _as_of: finstack_core::dates::Date,
+        ) -> finstack_core::Result<SensitivityMatrix> {
+            let position_ids: Vec<String> = positions.iter().map(|(id, _, _)| id.clone()).collect();
+            let factor_ids: Vec<_> = factors.iter().map(|f| f.id.clone()).collect();
+            let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);
+            for (i, (_, _, weight)) in positions.iter().enumerate() {
+                matrix.set_delta(i, 0, *weight);
+            }
+            Ok(matrix)
+        }
+    }
+
+    #[test]
+    fn test_b1_percentage_position_uses_scale_factor_for_sensitivities() {
+        let model = FactorModelBuilder::new()
+            .config(simple_config())
+            .with_custom_sensitivity_engine(WeightEchoEngine)
+            .build()
+            .expect("model should build");
+
+        let position = Position::new(
+            "pos-100pct",
+            DUMMY_ENTITY_ID,
+            "inst-1",
+            Arc::new(MockInstrument::new("inst-1", "USD-OIS", vec![])),
+            100.0,
+            PositionUnit::Percentage,
+        )
+        .expect("percentage position should build");
+
+        let portfolio = Portfolio::builder("portfolio")
+            .base_ccy(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .position(position)
+            .build()
+            .expect("portfolio should build");
+
+        let decomp = model
+            .analyze(&portfolio, &MarketContext::new(), date!(2024 - 01 - 01))
+            .expect("analysis should succeed");
+
+        // B-1: 100% should be economically equivalent to a scale factor of 1,
+        // not a raw engine weight of 100. With Σ=0.04 and S=1, variance is 0.04.
+        assert!(
+            (decomp.total_risk - 0.04).abs() < 1e-12,
+            "percentage position risk should use scale factor, got {}",
+            decomp.total_risk
+        );
     }
 
     #[test]

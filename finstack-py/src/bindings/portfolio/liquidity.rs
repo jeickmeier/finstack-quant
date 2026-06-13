@@ -9,9 +9,7 @@
 //! than opaque `#[pyclass]` wrappers to keep the API numpy-friendly.
 
 use crate::errors::display_to_py;
-use finstack_portfolio::liquidity::{
-    self, AlmgrenChrissModel, KyleLambdaModel, LiquidityProfile, MarketImpactModel, TradeParams,
-};
+use finstack_portfolio::liquidity::{self, KyleLambdaModel};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -114,8 +112,8 @@ fn days_to_liquidate(position_value: f64, avg_daily_volume: f64, participation_r
 ///     with Tier 1 most liquid and Tier 5 least liquid.
 #[pyfunction]
 fn liquidity_tier(days_to_liquidate: f64) -> &'static str {
-    let thresholds = [1.0, 5.0, 20.0, 60.0];
-    liquidity::classify_tier(days_to_liquidate, &thresholds).as_binding_str()
+    let config = liquidity::LiquidityConfig::default();
+    liquidity::classify_tier(days_to_liquidate, &config.tier_thresholds).as_binding_str()
 }
 
 // ---------------------------------------------------------------------------
@@ -229,57 +227,22 @@ fn almgren_chriss_impact<'py>(
     temporary_impact_coef: f64,
     reference_price: Option<f64>,
 ) -> PyResult<Bound<'py, PyDict>> {
-    if !avg_daily_volume.is_finite() || avg_daily_volume <= 0.0 {
-        return Err(crate::errors::value_error(
-            "avg_daily_volume must be finite and positive",
-        ));
-    }
-    if !volatility.is_finite() || volatility <= 0.0 {
-        return Err(crate::errors::value_error(
-            "volatility must be finite and positive",
-        ));
-    }
-    if let Some(price) = reference_price {
-        if !price.is_finite() || price <= 0.0 {
-            return Err(crate::errors::value_error(
-                "reference_price must be finite and positive",
-            ));
-        }
-    }
-
-    // Delta fixed at 0.5 (standard square-root market impact).
-    let model = AlmgrenChrissModel::new(permanent_impact_coef, temporary_impact_coef, 0.5)
-        .map_err(display_to_py)?;
-
-    // Use the supplied arrival/decision price for notional scaling. When it is
-    // omitted, preserve the historical unit-price convention.
-    let mid = reference_price.unwrap_or(1.0);
-    let profile = LiquidityProfile::new(
-        "AC_CALIBRATION",
-        mid,
-        mid * 0.999,
-        mid * 1.001,
+    let est = liquidity::almgren_chriss_uniform_impact(
+        position_size,
         avg_daily_volume,
-        1.0,
-        0.0,
+        volatility,
+        execution_horizon_days,
+        permanent_impact_coef,
+        temporary_impact_coef,
+        reference_price,
     )
     .map_err(display_to_py)?;
-
-    let params = TradeParams {
-        quantity: position_size,
-        horizon_days: execution_horizon_days,
-        daily_volatility: volatility,
-        profile,
-        risk_aversion: None,
-        reference_price,
-    };
-    let est = model.estimate_cost(&params).map_err(display_to_py)?;
 
     let out = PyDict::new(py);
     out.set_item("permanent_impact", est.permanent_impact)?;
     out.set_item("temporary_impact", est.temporary_impact)?;
-    out.set_item("total_impact", est.total_cost)?;
-    out.set_item("expected_cost_bps", est.cost_bps)?;
+    out.set_item("total_impact", est.total_impact)?;
+    out.set_item("expected_cost_bps", est.expected_cost_bps)?;
     Ok(out)
 }
 

@@ -151,6 +151,117 @@ fn summable_vs_non_summable_metrics() {
 }
 
 #[test]
+fn m17_aggregate_metrics_rejects_mismatched_base_currency() {
+    let as_of = base_date();
+    let end_date = as_of + Duration::days(30);
+
+    let dep = Deposit::builder()
+        .id("DEP_1M".into())
+        .notional(Money::new(1_000_000.0, Currency::USD))
+        .start_date(as_of)
+        .maturity(end_date)
+        .day_count(finstack_core::dates::DayCount::Act360)
+        .discount_curve_id("USD".into())
+        .quote_rate_opt(Some(
+            rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
+        ))
+        .build()
+        .unwrap();
+
+    let position = Position::new(
+        "POS_1",
+        "E1",
+        "DEP_1M",
+        Arc::new(dep),
+        1.0,
+        PositionUnit::Units,
+    )
+    .unwrap();
+
+    let portfolio = PortfolioBuilder::new("P")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("E1"))
+        .position(position)
+        .build()
+        .unwrap();
+
+    let market = market_with_usd();
+    let config = FinstackConfig::default();
+    let valuation = finstack_portfolio::valuation::value_portfolio(
+        &portfolio,
+        &market,
+        &config,
+        &Default::default(),
+    )
+    .unwrap();
+
+    let err =
+        finstack_portfolio::metrics::aggregate_metrics(&valuation, Currency::EUR, &market, as_of)
+            .expect_err("M-17: mismatched aggregation base currency must fail");
+    assert!(
+        err.to_string().contains("base_ccy"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn m17_aggregate_metrics_rejects_mismatched_as_of() {
+    let as_of = base_date();
+    let end_date = as_of + Duration::days(30);
+
+    let dep = Deposit::builder()
+        .id("DEP_1M".into())
+        .notional(Money::new(1_000_000.0, Currency::USD))
+        .start_date(as_of)
+        .maturity(end_date)
+        .day_count(finstack_core::dates::DayCount::Act360)
+        .discount_curve_id("USD".into())
+        .quote_rate_opt(Some(
+            rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
+        ))
+        .build()
+        .unwrap();
+
+    let position = Position::new(
+        "POS_1",
+        "E1",
+        "DEP_1M",
+        Arc::new(dep),
+        1.0,
+        PositionUnit::Units,
+    )
+    .unwrap();
+
+    let portfolio = PortfolioBuilder::new("P")
+        .base_ccy(Currency::USD)
+        .as_of(as_of)
+        .entity(Entity::new("E1"))
+        .position(position)
+        .build()
+        .unwrap();
+
+    let market = market_with_usd();
+    let config = FinstackConfig::default();
+    let valuation = finstack_portfolio::valuation::value_portfolio(
+        &portfolio,
+        &market,
+        &config,
+        &Default::default(),
+    )
+    .unwrap();
+
+    let err = finstack_portfolio::metrics::aggregate_metrics(
+        &valuation,
+        Currency::USD,
+        &market,
+        as_of + Duration::days(1),
+    )
+    .expect_err("M-17: mismatched aggregation date must fail");
+    assert!(err.to_string().contains("as_of"), "unexpected error: {err}");
+}
+
+#[test]
 fn summable_metrics_scale_with_quantity_and_short_sign() {
     let as_of = base_date();
     let mut measures = IndexMap::new();

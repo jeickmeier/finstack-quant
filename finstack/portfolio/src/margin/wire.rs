@@ -17,6 +17,12 @@ use crate::types::PositionId;
 
 use super::results::{NettingSetMargin, PortfolioMarginResult};
 
+const MARGIN_WIRE_AMOUNT_TOLERANCE: f64 = 1e-9;
+
+fn amounts_close(lhs: f64, rhs: f64) -> bool {
+    (lhs - rhs).abs() <= MARGIN_WIRE_AMOUNT_TOLERANCE
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 struct CurrencyTenorEntry {
     currency: Currency,
@@ -302,7 +308,23 @@ impl serde::Serialize for NettingSetMargin {
 
 impl<'de> serde::Deserialize<'de> for NettingSetMargin {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Ok(NettingSetMarginWire::deserialize(deserializer)?.into())
+        let wire = NettingSetMarginWire::deserialize(deserializer)?;
+        let currency = wire.initial_margin.currency();
+        if wire.variation_margin.currency() != currency || wire.total_margin.currency() != currency
+        {
+            return Err(serde::de::Error::custom(
+                "minor 17: netting-set margin currencies must match",
+            ));
+        }
+        let expected_total = wire.initial_margin.amount() + wire.variation_margin.amount().max(0.0);
+        if !amounts_close(wire.total_margin.amount(), expected_total) {
+            return Err(serde::de::Error::custom(format!(
+                "minor 17: netting-set total_margin {} does not equal initial_margin + max(variation_margin, 0) {}",
+                wire.total_margin.amount(),
+                expected_total
+            )));
+        }
+        Ok(wire.into())
     }
 }
 
@@ -396,6 +418,63 @@ impl serde::Serialize for PortfolioMarginResult {
 
 impl<'de> serde::Deserialize<'de> for PortfolioMarginResult {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        Ok(PortfolioMarginResultWire::deserialize(deserializer)?.into())
+        let wire = PortfolioMarginResultWire::deserialize(deserializer)?;
+        let base = wire.base_currency;
+        for (label, money) in [
+            ("total_initial_margin", wire.total_initial_margin),
+            ("total_variation_margin", wire.total_variation_margin),
+            ("total_margin", wire.total_margin),
+        ] {
+            if money.currency() != base {
+                return Err(serde::de::Error::custom(format!(
+                    "minor 17: {label} currency {} does not match base currency {base}",
+                    money.currency()
+                )));
+            }
+        }
+
+        let mut sum_im = 0.0;
+        let mut sum_vm = 0.0;
+        let mut sum_total = 0.0;
+        let mut sum_positions = 0usize;
+        for netting_set in &wire.netting_sets {
+            if netting_set.initial_margin.currency() != base
+                || netting_set.variation_margin.currency() != base
+                || netting_set.total_margin.currency() != base
+            {
+                return Err(serde::de::Error::custom(format!(
+                    "minor 17: netting set {:?} is not stored in base currency {base}",
+                    netting_set.netting_set_id
+                )));
+            }
+            let expected_total = netting_set.initial_margin.amount()
+                + netting_set.variation_margin.amount().max(0.0);
+            if !amounts_close(netting_set.total_margin.amount(), expected_total) {
+                return Err(serde::de::Error::custom(format!(
+                    "minor 17: netting-set total_margin {} does not equal initial_margin + max(variation_margin, 0) {}",
+                    netting_set.total_margin.amount(),
+                    expected_total
+                )));
+            }
+            sum_im += netting_set.initial_margin.amount();
+            sum_vm += netting_set.variation_margin.amount();
+            sum_total += netting_set.total_margin.amount();
+            sum_positions += netting_set.position_count;
+        }
+        if !amounts_close(wire.total_initial_margin.amount(), sum_im)
+            || !amounts_close(wire.total_variation_margin.amount(), sum_vm)
+            || !amounts_close(wire.total_margin.amount(), sum_total)
+        {
+            return Err(serde::de::Error::custom(
+                "minor 17: portfolio margin totals do not equal netting-set sums",
+            ));
+        }
+        if wire.total_positions != sum_positions {
+            return Err(serde::de::Error::custom(format!(
+                "minor 17: total_positions {} does not equal netting-set position count {}",
+                wire.total_positions, sum_positions
+            )));
+        }
+        Ok(wire.into())
     }
 }

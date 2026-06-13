@@ -153,7 +153,8 @@ impl Position {
     /// # Errors
     ///
     /// Returns [`Error::InvalidInput`] if `quantity` is NaN or infinite, or if
-    /// `unit` is [`PositionUnit::Percentage`] and `quantity` exceeds `100.0`.
+    /// `unit` is [`PositionUnit::Percentage`] and `quantity` is outside
+    /// `[-100.0, 100.0]`.
     ///
     /// # Examples
     ///
@@ -215,9 +216,9 @@ impl Position {
             );
         }
 
-        if matches!(unit, PositionUnit::Percentage) && quantity > 100.0 {
+        if matches!(unit, PositionUnit::Percentage) && quantity.abs() > 100.0 {
             return Err(Error::invalid_input(format!(
-                "Percentage quantity must be <= 100.0, got: {} (position_id: {})",
+                "Percentage quantity must be between -100.0 and 100.0, got: {} (position_id: {})",
                 quantity, pos_id
             )));
         }
@@ -399,7 +400,7 @@ impl Position {
     /// This function applies unit-aware scaling logic:
     /// - `Units`: Direct multiplication (quantity = number of units)
     /// - `Notional`: Direct multiplication (quantity = notional amount; instrument should return unit price)
-    /// - `FaceValue`: Direct multiplication (quantity = face value; instrument typically returns full PV)
+    /// - `FaceValue`: Direct multiplication (quantity = face value; instrument returns PV per face unit)
     /// - `Percentage`: Quantity represents percentage points (e.g., 50 = 50%), always divided by 100
     ///
     /// # Arguments
@@ -652,6 +653,31 @@ mod tests {
             PositionUnit::Percentage,
         )
         .expect_err("percentage quantities above 100 should be invalid");
+
+        assert!(err.to_string().contains("Percentage quantity"));
+    }
+
+    #[test]
+    fn minor1_percentage_quantity_below_negative_one_hundred_is_rejected() {
+        let deposit = Deposit::builder()
+            .id("DEP_1M".into())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .start_date(date!(2024 - 01 - 01))
+            .maturity(date!(2024 - 02 - 01))
+            .day_count(finstack_core::dates::DayCount::Act360)
+            .discount_curve_id("USD".into())
+            .build()
+            .expect("test should succeed");
+
+        let err = Position::new(
+            "POS_001",
+            "FUND_A",
+            "DEP_1M",
+            Arc::new(deposit),
+            -100.0001,
+            PositionUnit::Percentage,
+        )
+        .expect_err("minor 1: percentage quantities below -100 should be invalid");
 
         assert!(err.to_string().contains("Percentage quantity"));
     }

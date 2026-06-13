@@ -15,6 +15,14 @@ use indexmap::IndexMap;
 const MAX_BOOK_GROUPING_RECURSION_DEPTH: usize = 512;
 const UNTAGGED_GROUP: &str = "_untagged";
 
+fn attribute_group_key(position: &Position, attr_key: &str) -> String {
+    position
+        .attributes
+        .get(attr_key)
+        .map(ToString::to_string)
+        .unwrap_or_else(|| UNTAGGED_GROUP.to_owned())
+}
+
 /// Group positions by a specific tag or attribute.
 ///
 /// Positions that do not contain the requested attribute are placed in the
@@ -36,20 +44,10 @@ pub fn group_by_attribute<'a>(
     let mut groups: IndexMap<String, Vec<&'a Position>> = IndexMap::new();
 
     for position in positions {
-        if let Some(attr_value) = position
-            .attributes
-            .get(attr_key)
-            .and_then(|v| v.as_text())
-            .map(str::to_owned)
-        {
-            groups.entry(attr_value).or_default().push(position);
-        } else {
-            // Positions without this attribute go into "untagged"
-            groups
-                .entry(UNTAGGED_GROUP.to_owned())
-                .or_default()
-                .push(position);
-        }
+        groups
+            .entry(attribute_group_key(position, attr_key))
+            .or_default()
+            .push(position);
     }
 
     groups
@@ -78,19 +76,21 @@ pub fn aggregate_by_attribute(
     let mut aggregated: IndexMap<String, Money> = IndexMap::new();
 
     for position in positions {
-        let attr_value = position
-            .attributes
-            .get(attr_key)
-            .and_then(|v| v.as_text())
-            .map(str::to_owned)
-            .unwrap_or_else(|| UNTAGGED_GROUP.to_owned());
+        let attr_value = attribute_group_key(position, attr_key);
 
-        if let Some(position_value) = valuation.position_values.get(&position.position_id) {
-            let total = aggregated
-                .entry(attr_value)
-                .or_insert_with(|| Money::new(0.0, base_ccy));
-            *total = total.checked_add(position_value.value_base)?;
-        }
+        let position_value = valuation
+            .position_values
+            .get(&position.position_id)
+            .ok_or_else(|| {
+                crate::error::Error::invalid_input(format!(
+                    "MO-3: valuation is missing position '{}'",
+                    position.position_id
+                ))
+            })?;
+        let total = aggregated
+            .entry(attr_value)
+            .or_insert_with(|| Money::new(0.0, base_ccy));
+        *total = total.checked_add(position_value.value_base)?;
     }
 
     Ok(aggregated)
@@ -124,22 +124,22 @@ pub fn aggregate_by_multiple_attributes(
         // Build compound key from all attributes
         let key: Vec<String> = attr_keys
             .iter()
-            .map(|&attr_key| {
-                position
-                    .attributes
-                    .get(attr_key)
-                    .and_then(|v| v.as_text())
-                    .map(str::to_owned)
-                    .unwrap_or_else(|| UNTAGGED_GROUP.to_owned())
-            })
+            .map(|&attr_key| attribute_group_key(position, attr_key))
             .collect();
 
-        if let Some(position_value) = valuation.position_values.get(&position.position_id) {
-            let total = aggregated
-                .entry(key)
-                .or_insert_with(|| Money::new(0.0, base_ccy));
-            *total = total.checked_add(position_value.value_base)?;
-        }
+        let position_value = valuation
+            .position_values
+            .get(&position.position_id)
+            .ok_or_else(|| {
+                crate::error::Error::invalid_input(format!(
+                    "MO-3: valuation is missing position '{}'",
+                    position.position_id
+                ))
+            })?;
+        let total = aggregated
+            .entry(key)
+            .or_insert_with(|| Money::new(0.0, base_ccy));
+        *total = total.checked_add(position_value.value_base)?;
     }
 
     Ok(aggregated)
@@ -237,9 +237,12 @@ pub fn aggregate_by_book(
 
         // Add direct position values
         for pos_id in &book.position_ids {
-            if let Some(&&value) = position_values.get(pos_id) {
-                total = total.checked_add(value)?;
-            }
+            let &&value = position_values.get(pos_id).ok_or_else(|| {
+                crate::error::Error::invalid_input(format!(
+                    "MO-3: valuation is missing book position '{pos_id}'"
+                ))
+            })?;
+            total = total.checked_add(value)?;
         }
 
         // Recursively add child book totals
@@ -364,7 +367,7 @@ mod tests {
     }
 
     #[test]
-    fn group_by_attribute_uses_untagged_for_missing_and_non_text_values() {
+    fn minor9_group_by_attribute_keeps_numeric_values_out_of_untagged() {
         let as_of = date!(2024 - 01 - 01);
         let dep1 = Deposit::builder()
             .id("DEP_1".into())
@@ -414,8 +417,9 @@ mod tests {
         let positions = vec![missing, numeric];
         let groups = group_by_attribute(&positions, "rating");
 
-        assert_eq!(groups.len(), 1);
-        assert_eq!(groups.get("_untagged").map(Vec::len), Some(2));
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups.get("_untagged").map(Vec::len), Some(1));
+        assert_eq!(groups.get("650").map(Vec::len), Some(1));
     }
 
     #[test]
@@ -493,6 +497,36 @@ mod tests {
         assert!(total.amount().abs() >= 0.0);
     }
 
+    #[test]
+    fn mo3_aggregate_by_attribute_rejects_missing_valuation_position() {
+        let as_of = date!(2024 - 01 - 01);
+        let dep = Deposit::builder()
+            .id("DEP_MISSING_VAL".into())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .start_date(as_of)
+            .maturity(date!(2024 - 02 - 01))
+            .day_count(finstack_core::dates::DayCount::Act360)
+            .discount_curve_id("USD".into())
+            .quote_rate_opt(Some(
+                rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
+            ))
+            .build()
+            .expect("test instrument should build");
+        let position = Position::new(
+            "POS_MISSING_VAL",
+            "ENTITY_A",
+            "DEP_MISSING_VAL",
+            Arc::new(dep),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("test position should build");
+
+        let err = aggregate_by_attribute(&empty_valuation(), &[position], "rating", Currency::USD)
+            .expect_err("MO-3: missing valuation row must fail grouping");
+        assert!(err.to_string().contains("MO-3"), "unexpected error: {err}");
+    }
+
     fn empty_valuation() -> PortfolioValuation {
         PortfolioValuation {
             as_of: date!(2024 - 01 - 01),
@@ -517,6 +551,17 @@ mod tests {
         let err = aggregate_by_book(&empty_valuation(), &books, Currency::USD)
             .expect_err("cyclic hierarchy should fail");
         assert!(err.to_string().contains("cycle"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn mo3_aggregate_by_book_rejects_missing_position_value() {
+        let mut book = Book::new("root", Some("Root".to_string()));
+        book.add_position(crate::types::PositionId::new("MISSING_POSITION"));
+        let books = IndexMap::from([(BookId::from("root"), book)]);
+
+        let err = aggregate_by_book(&empty_valuation(), &books, Currency::USD)
+            .expect_err("MO-3: missing book position value must fail grouping");
+        assert!(err.to_string().contains("MO-3"), "unexpected error: {err}");
     }
 
     #[test]

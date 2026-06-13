@@ -8,11 +8,10 @@ use super::types::{
     MetricExpr, MissingMetricPolicy, PerPositionMetric, WeightingScheme, PV_PER_UNIT_TOL,
 };
 use crate::error::{Error, Result};
-use crate::portfolio::Portfolio;
 use crate::types::{EntityId, PositionId};
 use finstack_core::config::FinstackConfig;
 use finstack_core::market_data::context::MarketContext;
-use finstack_core::math::summation::neumaier_sum;
+use finstack_core::math::summation::NeumaierAccumulator;
 use finstack_valuations::metrics::MetricId;
 use good_lp::{constraint, default_solver, variable, Expression, Solution, SolverModel};
 use indexmap::IndexMap;
@@ -93,16 +92,9 @@ impl DefaultLpOptimizer {
         metrics
     }
 
-    /// Resolve the entity ID for a decision item, falling back to empty for candidates.
-    fn decision_entity_id(item: &DecisionItem, portfolio: &Portfolio) -> EntityId {
-        if item.is_existing {
-            portfolio
-                .get_position(item.position_id.as_str())
-                .map(|p| p.entity_id.clone())
-                .unwrap_or_else(|| EntityId::new(""))
-        } else {
-            EntityId::new("")
-        }
+    /// Resolve the entity ID for a decision item.
+    fn decision_entity_id(item: &DecisionItem) -> &EntityId {
+        &item.entity_id
     }
 
     /// Lower a `PerPositionMetric` to a per‑decision value `m_i`.
@@ -144,16 +136,24 @@ impl DefaultLpOptimizer {
         feats: &[DecisionFeatures],
         missing_policy: MissingMetricPolicy,
         items: &[DecisionItem],
-        portfolio: &Portfolio,
     ) -> Result<Vec<f64>> {
         let mut coeffs = Vec::with_capacity(feats.len());
         match expr {
+            MetricExpr::ValueWeightedAverage {
+                filter: Some(_), ..
+            } => {
+                return Err(Error::invalid_input(
+                    "MO-6: filtered ValueWeightedAverage objectives are unsupported because \
+                     the filtered denominator is decision-dependent; use a MetricBound \
+                     or an unfiltered average objective",
+                ));
+            }
             MetricExpr::WeightedSum { metric, filter }
             | MetricExpr::ValueWeightedAverage { metric, filter } => {
                 for (item, feat) in items.iter().zip(feats) {
                     if let Some(f) = filter {
                         if !f.matches(
-                            &Self::decision_entity_id(item, portfolio),
+                            Self::decision_entity_id(item),
                             &item.position_id,
                             &feat.attributes,
                         ) {
@@ -180,6 +180,43 @@ impl DefaultLpOptimizer {
             }
         }
 
+        Ok(coeffs)
+    }
+
+    /// Build the linearized row for `ValueWeightedAverage(metric) OP rhs`.
+    ///
+    /// The bound `average(metric over F) OP rhs` is represented as
+    /// `Σ_F w_i * (m_i - rhs) OP 0`, avoiding the earlier dimensionally wrong
+    /// `Σ_F w_i * m_i OP rhs` encoding when the filtered weight share is not 1.
+    fn build_value_weighted_average_bound_coefficients(
+        metric: &PerPositionMetric,
+        filter: Option<&super::universe::PositionFilter>,
+        rhs: f64,
+        feats: &[DecisionFeatures],
+        missing_policy: MissingMetricPolicy,
+        items: &[DecisionItem],
+    ) -> Result<Vec<f64>> {
+        let mut coeffs = Vec::with_capacity(feats.len());
+        for (item, feat) in items.iter().zip(feats) {
+            if let Some(f) = filter {
+                if !f.matches(
+                    Self::decision_entity_id(item),
+                    &item.position_id,
+                    &feat.attributes,
+                ) {
+                    coeffs.push(0.0);
+                    continue;
+                }
+            }
+            if matches!(metric, PerPositionMetric::PvNative) {
+                return Err(Error::invalid_input(
+                    "PvNative is not valid in ValueWeightedAverage constraints; \
+                     use PerPositionMetric::PvBase instead.",
+                ));
+            }
+            let m_i = Self::per_position_metric_value(metric, feat, missing_policy)?;
+            coeffs.push(m_i - rhs);
+        }
         Ok(coeffs)
     }
 }
@@ -211,6 +248,17 @@ impl DefaultLpOptimizer {
         n_vars: usize,
         has_budget: bool,
     ) -> Result<LpRows> {
+        let turnover_constraint_count = problem
+            .constraints
+            .iter()
+            .filter(|c| matches!(c, Constraint::MaxTurnover { .. }))
+            .count();
+        if turnover_constraint_count > 1 {
+            return Err(Error::invalid_input(
+                "M-9: duplicate MaxTurnover constraints are ambiguous; combine them into one cap",
+            ));
+        }
+
         // Step 4: Build objective coefficients.
         let objective_expr = &problem.objective;
         let coeffs_objective = match objective_expr {
@@ -220,7 +268,6 @@ impl DefaultLpOptimizer {
                     decision_features,
                     problem.missing_metric_policy,
                     decision_items,
-                    &problem.portfolio,
                 )?
             }
         };
@@ -236,17 +283,32 @@ impl DefaultLpOptimizer {
                     op,
                     rhs,
                 } => {
-                    let a = Self::build_metric_coefficients(
-                        metric,
-                        decision_features,
-                        problem.missing_metric_policy,
-                        decision_items,
-                        &problem.portfolio,
-                    )?;
+                    let (a, lowered_rhs) = match metric {
+                        MetricExpr::ValueWeightedAverage { metric, filter } => (
+                            Self::build_value_weighted_average_bound_coefficients(
+                                metric,
+                                filter.as_ref(),
+                                *rhs,
+                                decision_features,
+                                problem.missing_metric_policy,
+                                decision_items,
+                            )?,
+                            0.0,
+                        ),
+                        MetricExpr::WeightedSum { .. } => (
+                            Self::build_metric_coefficients(
+                                metric,
+                                decision_features,
+                                problem.missing_metric_policy,
+                                decision_items,
+                            )?,
+                            *rhs,
+                        ),
+                    };
                     lp_constraints.push(LpConstraint {
                         coefficients: a,
                         relation: *op,
-                        rhs: *rhs,
+                        rhs: lowered_rhs,
                         name: label.clone(),
                         is_turnover_placeholder: false,
                     });
@@ -333,11 +395,7 @@ impl DefaultLpOptimizer {
                 )));
             }
 
-            let (var_min, var_max, offset) = if min_w < 0.0 {
-                (0.0, max_w - min_w, min_w)
-            } else {
-                (min_w, max_w, 0.0)
-            };
+            let (var_min, var_max, offset) = (min_w, max_w, 0.0);
 
             w_vars.push(WeightVarSpec {
                 var: vars.add(variable().min(var_min).max(var_max)),
@@ -524,11 +582,12 @@ impl DefaultLpOptimizer {
         }
 
         // Objective value at solution: a · w*
-        let mut objective_value = 0.0_f64;
+        let mut objective_acc = NeumaierAccumulator::new();
         for (coef, w_var) in rows.coeffs_objective.iter().zip(w_vars) {
             let w_star = solution.value(w_var.var) + w_var.offset;
-            objective_value = neumaier_sum([objective_value, *coef * w_star].into_iter());
+            objective_acc.add(*coef * w_star);
         }
+        let objective_value = objective_acc.current();
 
         // Evaluate additional metric expressions of interest (for now: just objective).
         let mut metric_values: IndexMap<String, f64> = IndexMap::new();
@@ -537,6 +596,9 @@ impl DefaultLpOptimizer {
         // Constraint slacks
         let mut constraint_slacks: IndexMap<String, f64> = IndexMap::new();
         for lc in &rows.lp_constraints {
+            if lc.is_turnover_placeholder {
+                continue;
+            }
             if let Some(name) = &lc.name {
                 let mut lhs_val = 0.0;
                 for (var, coef) in w_vars.iter().zip(&lc.coefficients) {
@@ -550,6 +612,33 @@ impl DefaultLpOptimizer {
                 };
                 constraint_slacks.insert(name.clone(), slack);
             }
+        }
+        if let Some(Constraint::MaxTurnover {
+            label,
+            max_turnover,
+        }) = problem
+            .constraints
+            .iter()
+            .find(|c| matches!(c, Constraint::MaxTurnover { .. }))
+        {
+            let actual_turnover: f64 = decision_items
+                .iter()
+                .map(|item| {
+                    let w0 = current_weights
+                        .get(&item.position_id)
+                        .copied()
+                        .unwrap_or(0.0);
+                    let w_star = optimal_weights
+                        .get(&item.position_id)
+                        .copied()
+                        .unwrap_or(0.0);
+                    (w_star - w0).abs()
+                })
+                .sum();
+            constraint_slacks.insert(
+                label.clone().unwrap_or_else(|| "turnover".to_string()),
+                *max_turnover - actual_turnover,
+            );
         }
 
         let dual_values: IndexMap<String, f64> = IndexMap::new();

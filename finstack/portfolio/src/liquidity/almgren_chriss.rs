@@ -102,14 +102,12 @@ impl AlmgrenChrissModel {
             ));
         }
 
-        // Empirical calibration:
-        // gamma ~ spread / (2 * ADV) -- permanent impact per share
-        let gamma = profile.relative_spread() / (2.0 * profile.avg_daily_volume);
+        // Empirical calibration in price space:
+        // gamma ~ spread / (2 * ADV) -- permanent price impact per share.
+        let gamma = profile.spread() / (2.0 * profile.avg_daily_volume);
 
-        // eta ~ daily_volatility * sqrt(mid / ADV)
-        // This calibration makes temporary impact scale with volatility
-        // and inversely with the square root of turnover
-        let eta = daily_volatility * (profile.mid / profile.avg_daily_volume).sqrt();
+        // eta ~ sigma_price / sqrt(ADV), with sigma_price = daily_vol * mid.
+        let eta = daily_volatility * profile.mid / profile.avg_daily_volume.sqrt();
 
         let delta = 0.5;
 
@@ -159,8 +157,9 @@ impl MarketImpactModel for AlmgrenChrissModel {
             0.0
         };
 
-        // Execution risk: volatility * sqrt(T) * |Q| * reference_price
-        let execution_risk = params.daily_volatility * t.sqrt() * q.abs() * reference_price;
+        // Uniform execution holds inventory linearly from Q to 0, so
+        // integrated inventory variance contributes T / 3.
+        let execution_risk = params.daily_volatility * (t / 3.0).sqrt() * q.abs() * reference_price;
 
         Ok(ImpactEstimate {
             permanent_impact: perm_cost,
@@ -197,6 +196,11 @@ impl MarketImpactModel for AlmgrenChrissModel {
         let t = params.horizon_days;
         let dt = t / num_buckets as f64;
         let risk_aversion = params.risk_aversion.unwrap_or(1e-6);
+        if !risk_aversion.is_finite() || risk_aversion < 0.0 {
+            return Err(Error::invalid_input(
+                "risk_aversion must be finite and non-negative",
+            ));
+        }
         let sigma = params.daily_volatility * params.effective_reference_price();
 
         // The closed-form `sinh` schedule used below is the optimal solution
@@ -246,14 +250,13 @@ impl MarketImpactModel for AlmgrenChrissModel {
                 quantities.push(per_bucket);
             }
         } else {
-            let sinh_kt = kappa_t.sinh();
             for j in 1..=num_buckets {
                 let t_j = j as f64 * dt;
                 time_points.push(t_j);
                 let rem = if j == num_buckets {
                     0.0 // Ensure exact completion
                 } else {
-                    q * (kappa * (t - t_j)).sinh() / sinh_kt
+                    q * stable_sinh_ratio(kappa * (t - t_j), kappa_t)
                 };
                 remaining.push(rem);
             }
@@ -299,6 +302,27 @@ impl MarketImpactModel for AlmgrenChrissModel {
     fn model_name(&self) -> &str {
         "Almgren-Chriss"
     }
+}
+
+fn stable_sinh_ratio(numerator: f64, denominator: f64) -> f64 {
+    if numerator == 0.0 {
+        return 0.0;
+    }
+    if denominator.abs() <= 50.0 {
+        return numerator.sinh() / denominator.sinh();
+    }
+
+    let num_term = if numerator.abs() > 50.0 {
+        1.0
+    } else {
+        1.0 - (-2.0 * numerator).exp()
+    };
+    let den_term = if denominator.abs() > 50.0 {
+        1.0
+    } else {
+        1.0 - (-2.0 * denominator).exp()
+    };
+    (numerator - denominator).exp() * num_term / den_term
 }
 
 #[cfg(test)]
@@ -353,8 +377,9 @@ mod tests {
     #[test]
     fn from_profile_calibrates() -> std::result::Result<(), Box<dyn std::error::Error>> {
         let profile = test_profile()?;
-        let model = AlmgrenChrissModel::from_profile(&profile, 0.02);
-        assert!(model.is_ok());
+        let model = AlmgrenChrissModel::from_profile(&profile, 0.02)?;
+        assert!((model.gamma - 5e-7).abs() < 1e-12);
+        assert!((model.eta - 0.002).abs() < 1e-12);
         Ok(())
     }
 
@@ -369,6 +394,11 @@ mod tests {
         assert!(est.temporary_impact >= 0.0);
         assert!(est.cost_bps >= 0.0);
         assert!(est.execution_risk >= 0.0);
+        let expected_execution_risk = params.daily_volatility * params.horizon_days.sqrt()
+            / 3.0_f64.sqrt()
+            * params.quantity.abs()
+            * params.effective_reference_price();
+        assert!((est.execution_risk - expected_execution_risk).abs() < 1e-9);
         Ok(())
     }
 
@@ -473,6 +503,30 @@ mod tests {
         let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0)?;
         let params = test_params(10_000.0)?;
         assert!(model.optimal_trajectory(&params, 0).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn trajectory_rejects_negative_risk_aversion(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let model = AlmgrenChrissModel::new(0.001, 0.01, 1.0)?;
+        let mut params = test_params(10_000.0)?;
+        params.risk_aversion = Some(-1.0);
+        assert!(model.optimal_trajectory(&params, 5).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn trajectory_large_kappa_t_stays_finite() -> std::result::Result<(), Box<dyn std::error::Error>>
+    {
+        let model = AlmgrenChrissModel::new(0.001, 1e-6, 1.0)?;
+        let mut params = test_params(10_000.0)?;
+        params.risk_aversion = Some(1e8);
+        let traj = model.optimal_trajectory(&params, 5)?;
+        assert!(traj.quantities.iter().all(|v| v.is_finite()));
+        assert!(traj.remaining.iter().all(|v| v.is_finite()));
+        assert!(traj.expected_cost.is_finite());
+        assert!(traj.cost_variance.is_finite());
         Ok(())
     }
 

@@ -45,7 +45,7 @@ pub enum SpreadVolatilityKind {
 /// # References
 ///
 /// - Bid-ask spread conventions: `docs/REFERENCES.md#hasbrouck2007MarketMicrostructure`
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct LiquidityProfile {
     /// Instrument identifier (must match `Position::instrument_id`).
     pub instrument_id: String,
@@ -87,6 +87,48 @@ pub struct LiquidityProfile {
     /// Defaults to 20 (one calendar month). Used to qualify the
     /// statistical reliability of ADV and spread estimates.
     pub observation_days: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LiquidityProfileWire {
+    instrument_id: String,
+    mid: f64,
+    bid: f64,
+    ask: f64,
+    avg_daily_volume: f64,
+    avg_trade_size: f64,
+    spread_volatility: f64,
+    #[serde(default)]
+    spread_volatility_kind: SpreadVolatilityKind,
+    observation_days: u32,
+}
+
+impl<'de> Deserialize<'de> for LiquidityProfile {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = LiquidityProfileWire::deserialize(deserializer)?;
+        if wire.observation_days == 0 {
+            return Err(serde::de::Error::custom(
+                "minor 12: observation_days must be positive",
+            ));
+        }
+        let mut profile = Self::new(
+            wire.instrument_id,
+            wire.mid,
+            wire.bid,
+            wire.ask,
+            wire.avg_daily_volume,
+            wire.avg_trade_size,
+            wire.spread_volatility,
+        )
+        .map_err(serde::de::Error::custom)?;
+        profile.spread_volatility_kind = wire.spread_volatility_kind;
+        profile.observation_days = wire.observation_days;
+        Ok(profile)
+    }
 }
 
 impl LiquidityProfile {
@@ -256,6 +298,7 @@ impl LiquidityTier {
 /// Provides default parameter values that can be overridden per analysis.
 /// All thresholds use trading days (not calendar days).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LiquidityConfig {
     /// Maximum fraction of ADV that can be traded per day without
     /// excessive impact. Typical range: 0.05-0.25.
@@ -472,6 +515,43 @@ mod tests {
         let p2: LiquidityProfile = serde_json::from_str(&json)?;
         assert_eq!(p, p2);
         Ok(())
+    }
+
+    #[test]
+    fn minor12_profile_serde_rejects_invalid_mid_and_unknown_fields() {
+        let invalid_mid = r#"{
+            "instrument_id": "AAPL",
+            "mid": 0.0,
+            "bid": 149.90,
+            "ask": 150.10,
+            "avg_daily_volume": 50000000.0,
+            "avg_trade_size": 200.0,
+            "spread_volatility": 0.001,
+            "spread_volatility_kind": "relative",
+            "observation_days": 20
+        }"#;
+        let err = serde_json::from_str::<LiquidityProfile>(invalid_mid)
+            .expect_err("minor 12: zero mid must fail serde validation");
+        assert!(err.to_string().contains("mid"), "unexpected error: {err}");
+
+        let unknown_field = r#"{
+            "instrument_id": "AAPL",
+            "mid": 150.0,
+            "bid": 149.90,
+            "ask": 150.10,
+            "avg_daily_volume": 50000000.0,
+            "avg_trade_size": 200.0,
+            "spread_volatility": 0.001,
+            "spread_volatility_kind": "relative",
+            "observation_days": 20,
+            "extra": true
+        }"#;
+        let err = serde_json::from_str::<LiquidityProfile>(unknown_field)
+            .expect_err("minor 12: unknown liquidity profile fields must fail");
+        assert!(
+            err.to_string().contains("unknown field"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

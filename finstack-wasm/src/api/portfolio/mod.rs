@@ -342,7 +342,7 @@ pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<String, 
     let config = finstack_core::config::FinstackConfig::default();
     let result = finstack_portfolio::optimization::optimize_from_spec(&spec, &market, &config)
         .map_err(to_js_err)?;
-    serde_json::to_string_pretty(&result).map_err(to_js_err)
+    serde_json::to_string(&result).map_err(to_js_err)
 }
 
 /// Replay a portfolio through dated market snapshots.
@@ -388,7 +388,9 @@ pub fn parametric_var_decomposition(
     covariance_json: &str,
     confidence: f64,
 ) -> Result<String, JsValue> {
-    use finstack_portfolio::factor_model::{DecompositionConfig, ParametricPositionDecomposer};
+    use finstack_portfolio::factor_model::{
+        parametric_var_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
+    };
     use finstack_portfolio::types::PositionId;
 
     let ids: Vec<String> = serde_json::from_str(position_ids_json).map_err(to_js_err)?;
@@ -405,7 +407,8 @@ pub fn parametric_var_decomposition(
     let result = decomposer
         .decompose_positions(&weights, &cov_flat, &ids, &config)
         .map_err(to_js_err)?;
-    serde_json::to_string(&result).map_err(to_js_err)
+    let out = parametric_var_decomposition_view(&result);
+    serde_json::to_string(&out).map_err(to_js_err)
 }
 
 /// Decompose portfolio Expected Shortfall into position contributions via
@@ -457,7 +460,8 @@ pub fn historical_var_decomposition(
     confidence: f64,
 ) -> Result<String, JsValue> {
     use finstack_portfolio::factor_model::{
-        flatten_position_pnls, DecompositionConfig, HistoricalPositionDecomposer,
+        flatten_position_pnls, parametric_var_decomposition_view, DecompositionConfig,
+        HistoricalPositionDecomposer,
     };
     use finstack_portfolio::types::PositionId;
 
@@ -472,7 +476,8 @@ pub fn historical_var_decomposition(
     let result = HistoricalPositionDecomposer
         .decompose_from_pnls(&flat, &ids, n_scenarios, &config)
         .map_err(to_js_err)?;
-    serde_json::to_string(&result).map_err(to_js_err)
+    let out = parametric_var_decomposition_view(&result);
+    serde_json::to_string(&out).map_err(to_js_err)
 }
 
 /// Evaluate a per-position risk budget against actual component VaRs.
@@ -484,7 +489,7 @@ pub fn evaluate_risk_budget(
     portfolio_var: f64,
     utilization_threshold: f64,
 ) -> Result<String, JsValue> {
-    use finstack_portfolio::factor_model::RiskBudget;
+    use finstack_portfolio::factor_model::{risk_budget_result_view, RiskBudget};
     use finstack_portfolio::types::PositionId;
     use indexmap::IndexMap;
 
@@ -517,7 +522,8 @@ pub fn evaluate_risk_budget(
             portfolio_var,
         )
         .map_err(to_js_err)?;
-    serde_json::to_string(&result).map_err(to_js_err)
+    let out = risk_budget_result_view(&result, portfolio_var, utilization_threshold);
+    serde_json::to_string(&out).map_err(to_js_err)
 }
 
 /// Forward to the shared `finstack_portfolio::factor_model::flatten_square_matrix`
@@ -535,20 +541,24 @@ fn flatten_square_matrix(
 // Liquidity: spread estimators, tiering, LVaR, market impact
 // =============================================================================
 
-/// Effective bid-ask spread via Roll (1984). NaN when the serial covariance
-/// is non-negative (Roll assumption violated) or inputs too short.
+/// Effective bid-ask spread via Roll (1984). Returns `undefined` when the
+/// serial covariance is non-negative (Roll assumption violated) or inputs too short.
 #[wasm_bindgen(js_name = rollEffectiveSpread)]
-pub fn roll_effective_spread(returns_json: &str) -> Result<f64, JsValue> {
+pub fn roll_effective_spread(returns_json: &str) -> Result<Option<f64>, JsValue> {
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
-    Ok(finstack_portfolio::liquidity::roll_effective_spread(&returns).unwrap_or(f64::NAN))
+    Ok(finstack_portfolio::liquidity::roll_effective_spread(
+        &returns,
+    ))
 }
 
 /// Amihud (2002) illiquidity ratio from returns and volumes.
 #[wasm_bindgen(js_name = amihudIlliquidity)]
-pub fn amihud_illiquidity(returns_json: &str, volumes_json: &str) -> Result<f64, JsValue> {
+pub fn amihud_illiquidity(returns_json: &str, volumes_json: &str) -> Result<Option<f64>, JsValue> {
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     let volumes: Vec<f64> = serde_json::from_str(volumes_json).map_err(to_js_err)?;
-    Ok(finstack_portfolio::liquidity::amihud_illiquidity(&returns, &volumes).unwrap_or(f64::NAN))
+    Ok(finstack_portfolio::liquidity::amihud_illiquidity(
+        &returns, &volumes,
+    ))
 }
 
 /// Trading days required to liquidate at the given participation rate.
@@ -572,8 +582,8 @@ pub fn days_to_liquidate(
 #[wasm_bindgen(js_name = liquidityTier)]
 pub fn liquidity_tier(days_to_liquidate: f64) -> String {
     use finstack_portfolio::liquidity::classify_tier;
-    let thresholds = [1.0, 5.0, 20.0, 60.0];
-    classify_tier(days_to_liquidate, &thresholds)
+    let config = finstack_portfolio::liquidity::LiquidityConfig::default();
+    classify_tier(days_to_liquidate, &config.tier_thresholds)
         .as_binding_str()
         .to_string()
 }
@@ -624,15 +634,12 @@ pub fn almgren_chriss_impact(
 }
 
 /// Kyle (1985) linear price impact lambda estimated from observed volumes
-/// and returns via the Amihud-ratio proxy. NaN on invalid inputs.
+/// and returns via the Amihud-ratio proxy. Returns `undefined` on invalid inputs.
 #[wasm_bindgen(js_name = kyleLambda)]
-pub fn kyle_lambda(volumes_json: &str, returns_json: &str) -> Result<f64, JsValue> {
+pub fn kyle_lambda(volumes_json: &str, returns_json: &str) -> Result<Option<f64>, JsValue> {
     let volumes: Vec<f64> = serde_json::from_str(volumes_json).map_err(to_js_err)?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
-    Ok(
-        finstack_portfolio::liquidity::KyleLambdaModel::lambda_from_series(&volumes, &returns)
-            .unwrap_or(f64::NAN),
-    )
+    Ok(finstack_portfolio::liquidity::KyleLambdaModel::lambda_from_series(&volumes, &returns))
 }
 
 #[cfg(test)]
@@ -925,6 +932,28 @@ mod tests {
         assert!((parsed["cumulative"].as_f64().expect("cumulative") - 0.0815).abs() < 1e-12);
         assert!((parsed["annualised"].as_f64().expect("annualised") - 0.0815).abs() < 1e-12);
         assert_eq!(parsed["num_periods"], serde_json::json!(2));
+    }
+
+    #[test]
+    fn mo24_liquidity_estimators_return_none_for_missing_estimates() {
+        assert_eq!(roll_effective_spread("[0.01]").expect("valid json"), None);
+        assert_eq!(
+            amihud_illiquidity("[0.01]", "[0.0]").expect("valid json"),
+            None
+        );
+        assert_eq!(kyle_lambda("[0.0]", "[0.01]").expect("valid json"), None);
+    }
+
+    #[test]
+    fn mo28_liquidity_tier_uses_default_config_thresholds() {
+        let config = finstack_portfolio::liquidity::LiquidityConfig::default();
+        let threshold = config.tier_thresholds[0];
+        let expected =
+            finstack_portfolio::liquidity::classify_tier(threshold, &config.tier_thresholds)
+                .as_binding_str()
+                .to_string();
+
+        assert_eq!(liquidity_tier(threshold), expected);
     }
 
     #[test]

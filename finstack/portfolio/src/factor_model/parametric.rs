@@ -292,7 +292,12 @@ impl RiskDecomposer for ParametricDecomposer {
                     } else {
                         0.0
                     };
-                    let marginal_risk = marginal_component_variance * scale;
+                    let marginal_multiplier = if matches!(measure, RiskMeasure::Variance) {
+                        2.0
+                    } else {
+                        1.0
+                    };
+                    let marginal_risk = marginal_component_variance * scale * marginal_multiplier;
 
                     FactorContribution {
                         factor_id: factor_id.clone(),
@@ -415,8 +420,8 @@ mod tests {
         assert!((credit.absolute_risk - 375.0).abs() < 1e-10);
         assert!((rates.relative_risk - (550.0 / 925.0)).abs() < 1e-10);
         assert!((credit.relative_risk - (375.0 / 925.0)).abs() < 1e-10);
-        assert!((rates.marginal_risk - 5.5).abs() < 1e-10);
-        assert!((credit.marginal_risk - 7.5).abs() < 1e-10);
+        assert!((rates.marginal_risk - 11.0).abs() < 1e-10);
+        assert!((credit.marginal_risk - 15.0).abs() < 1e-10);
         assert!((result.residual_risk).abs() < 1e-12);
 
         let sum_relative: f64 = result

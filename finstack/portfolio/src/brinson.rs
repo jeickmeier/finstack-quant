@@ -291,6 +291,12 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
     let mut compounded_p = 1.0_f64;
     let mut compounded_b = 1.0_f64;
     for p in periods {
+        if !p.portfolio_return.is_finite() || !p.benchmark_return.is_finite() {
+            return Err(Error::invalid_input(format!(
+                "Carino linking requires finite period returns, got portfolio_return = {}, benchmark_return = {}",
+                p.portfolio_return, p.benchmark_return
+            )));
+        }
         compounded_p *= 1.0 + p.portfolio_return;
         compounded_b *= 1.0 + p.benchmark_return;
     }
@@ -381,6 +387,11 @@ pub fn carino_link_from_sector_periods(
 /// undefined in that regime, and silently substituting unity would mask a
 /// genuine modeling error in the upstream period returns.
 fn carino_coefficient(r_p: f64, r_b: f64) -> Result<f64> {
+    if !r_p.is_finite() || !r_b.is_finite() {
+        return Err(Error::invalid_input(format!(
+            "Carino coefficient requires finite returns (got r_p = {r_p}, r_b = {r_b})"
+        )));
+    }
     let one_plus_rp = 1.0 + r_p;
     let one_plus_rb = 1.0 + r_b;
     if one_plus_rp <= 0.0 || one_plus_rb <= 0.0 {
@@ -394,7 +405,7 @@ fn carino_coefficient(r_p: f64, r_b: f64) -> Result<f64> {
     if diff.abs() < 1e-12 {
         Ok(1.0 / one_plus_rp)
     } else {
-        Ok((one_plus_rp.ln() - one_plus_rb.ln()) / diff)
+        Ok((diff / one_plus_rb).ln_1p() / diff)
     }
 }
 
@@ -540,6 +551,16 @@ mod tests {
     fn carino_coefficient_rejects_negative_unity_or_below() {
         assert!(carino_coefficient(-1.0, 0.05).is_err());
         assert!(carino_coefficient(0.05, -1.5).is_err());
+    }
+
+    #[test]
+    fn carino_linking_rejects_non_finite_period_returns() {
+        let mut p = brinson_fachler(&period_two_sector(0.6, 0.5, 0.03, 0.02, 0.01, 0.01))
+            .expect("valid period");
+        p.portfolio_return = f64::NAN;
+
+        let err = carino_link(&[p]).expect_err("M-16 non-finite returns must fail");
+        assert!(err.to_string().contains("finite"));
     }
 
     #[test]

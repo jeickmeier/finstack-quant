@@ -67,7 +67,7 @@ use serde::{Deserialize, Serialize};
 /// The portfolio-level aggregates are reported in portfolio base currency,
 /// while `by_position` remains in each instrument's native currency so callers
 /// can inspect raw instrument attribution before FX translation.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct PortfolioAttribution {
     /// Total portfolio P&L in base currency.
     ///
@@ -121,7 +121,6 @@ pub struct PortfolioAttribution {
     ///
     /// Aggregated from each position's native-currency `cross_factor_pnl`
     /// after conversion to portfolio base currency.
-    #[serde(default = "default_zero_usd_money")]
     pub cross_factor_pnl: Money,
 
     /// Implied volatility changes P&L in base currency.
@@ -176,8 +175,68 @@ pub struct PortfolioAttribution {
     pub result_invalid: bool,
 }
 
-fn default_zero_usd_money() -> Money {
-    Money::new(0.0, Currency::USD)
+#[derive(Deserialize)]
+struct PortfolioAttributionWire {
+    total_pnl: Money,
+    carry: Money,
+    rates_curves_pnl: Money,
+    credit_curves_pnl: Money,
+    inflation_curves_pnl: Money,
+    correlations_pnl: Money,
+    fx_pnl: Money,
+    fx_translation_pnl: Money,
+    #[serde(default)]
+    cross_factor_pnl: Option<Money>,
+    vol_pnl: Money,
+    model_params_pnl: Money,
+    market_scalars_pnl: Money,
+    residual: Money,
+    by_position: IndexMap<PositionId, PnlAttribution>,
+    rates_detail: Option<RatesCurvesAttribution>,
+    credit_detail: Option<CreditCurvesAttribution>,
+    inflation_detail: Option<InflationCurvesAttribution>,
+    correlations_detail: Option<CorrelationsAttribution>,
+    fx_detail: Option<FxAttribution>,
+    vol_detail: Option<VolAttribution>,
+    scalars_detail: Option<ScalarsAttribution>,
+    #[serde(default)]
+    result_invalid: bool,
+}
+
+impl<'de> Deserialize<'de> for PortfolioAttribution {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = PortfolioAttributionWire::deserialize(deserializer)?;
+        let total_currency = wire.total_pnl.currency();
+        Ok(Self {
+            total_pnl: wire.total_pnl,
+            carry: wire.carry,
+            rates_curves_pnl: wire.rates_curves_pnl,
+            credit_curves_pnl: wire.credit_curves_pnl,
+            inflation_curves_pnl: wire.inflation_curves_pnl,
+            correlations_pnl: wire.correlations_pnl,
+            fx_pnl: wire.fx_pnl,
+            fx_translation_pnl: wire.fx_translation_pnl,
+            cross_factor_pnl: wire
+                .cross_factor_pnl
+                .unwrap_or_else(|| Money::new(0.0, total_currency)),
+            vol_pnl: wire.vol_pnl,
+            model_params_pnl: wire.model_params_pnl,
+            market_scalars_pnl: wire.market_scalars_pnl,
+            residual: wire.residual,
+            by_position: wire.by_position,
+            rates_detail: wire.rates_detail,
+            credit_detail: wire.credit_detail,
+            inflation_detail: wire.inflation_detail,
+            correlations_detail: wire.correlations_detail,
+            fx_detail: wire.fx_detail,
+            vol_detail: wire.vol_detail,
+            scalars_detail: wire.scalars_detail,
+            result_invalid: wire.result_invalid,
+        })
+    }
 }
 
 /// Report from reconciling position-level P&L attribution against portfolio totals.
@@ -656,7 +715,7 @@ impl PortfolioAttribution {
         // Header
         lines.push(
             "position_id,total,carry,rates_curves,credit_curves,\
-             inflation_curves,correlations,fx,vol,model_params,\
+             inflation_curves,correlations,fx,cross_factor,vol,model_params,\
              market_scalars,residual"
                 .to_string(),
         );
@@ -664,7 +723,7 @@ impl PortfolioAttribution {
         // Data rows (one per position)
         for (position_id, pos_attr) in &self.by_position {
             lines.push(format!(
-                "{},{},{},{},{},{},{},{},{},{},{},{}",
+                "{},{},{},{},{},{},{},{},{},{},{},{},{}",
                 position_id,
                 pos_attr.total_pnl.amount(),
                 pos_attr.carry.amount(),
@@ -673,6 +732,7 @@ impl PortfolioAttribution {
                 pos_attr.inflation_curves_pnl.amount(),
                 pos_attr.correlations_pnl.amount(),
                 pos_attr.fx_pnl.amount(),
+                pos_attr.cross_factor_pnl.amount(),
                 pos_attr.vol_pnl.amount(),
                 pos_attr.model_params_pnl.amount(),
                 pos_attr.market_scalars_pnl.amount(),
@@ -877,10 +937,11 @@ mod tests {
     #[test]
     fn test_position_detail_to_csv_includes_each_position_breakdown() {
         let mut by_position = IndexMap::new();
-        by_position.insert(
-            PositionId::from("POS_A"),
-            sample_position_attr("POS_A", 120.0, 10.0, 5.0),
-        );
+        by_position.insert(PositionId::from("POS_A"), {
+            let mut attr = sample_position_attr("POS_A", 120.0, 10.0, 5.0);
+            attr.cross_factor_pnl = Money::new(3.0, Currency::USD);
+            attr
+        });
         by_position.insert(
             PositionId::from("POS_B"),
             sample_position_attr("POS_B", -20.0, -2.0, 1.0),
@@ -914,8 +975,51 @@ mod tests {
 
         let csv = portfolio_attr.position_detail_to_csv();
         assert!(csv.contains("position_id,total,carry"));
-        assert!(csv.contains("POS_A,120"));
+        assert!(
+            csv.contains("cross_factor"),
+            "MO-5: position CSV must expose cross-factor P&L"
+        );
+        assert!(csv.contains("POS_A,120,10,105,0,0,0,0,3,0,0,0,5"));
         assert!(csv.contains("POS_B,-20"));
+    }
+
+    #[test]
+    fn mo4_deserialize_missing_cross_factor_uses_total_currency() {
+        let base_ccy = Currency::EUR;
+        let zero = Money::new(0.0, base_ccy);
+        let attr = PortfolioAttribution {
+            total_pnl: Money::new(100.0, base_ccy),
+            carry: zero,
+            rates_curves_pnl: zero,
+            credit_curves_pnl: zero,
+            inflation_curves_pnl: zero,
+            correlations_pnl: zero,
+            fx_pnl: zero,
+            fx_translation_pnl: zero,
+            cross_factor_pnl: zero,
+            vol_pnl: zero,
+            model_params_pnl: zero,
+            market_scalars_pnl: zero,
+            residual: zero,
+            by_position: IndexMap::new(),
+            rates_detail: None,
+            credit_detail: None,
+            inflation_detail: None,
+            correlations_detail: None,
+            fx_detail: None,
+            vol_detail: None,
+            scalars_detail: None,
+            result_invalid: false,
+        };
+        let mut value = serde_json::to_value(&attr).expect("serialize attribution");
+        value
+            .as_object_mut()
+            .expect("attribution serializes to object")
+            .remove("cross_factor_pnl");
+
+        let restored: PortfolioAttribution =
+            serde_json::from_value(value).expect("MO-4: legacy payload should deserialize");
+        assert_eq!(restored.cross_factor_pnl, Money::new(0.0, Currency::EUR));
     }
 
     #[test]

@@ -213,12 +213,19 @@ pub fn score_portfolio_liquidity(
     // Weighted-average days to liquidate
     let total_scored_value: f64 = position_scores.iter().map(|s| s.position_value).sum();
     let weighted_avg_days_to_liquidate = if total_scored_value > 0.0 {
-        position_scores
+        if position_scores
             .iter()
-            .filter(|s| s.days_to_liquidate.is_finite())
-            .map(|s| s.days_to_liquidate * s.position_value)
-            .sum::<f64>()
-            / total_scored_value
+            .any(|s| s.position_value > 0.0 && s.days_to_liquidate.is_infinite())
+        {
+            f64::INFINITY
+        } else {
+            position_scores
+                .iter()
+                .filter(|s| s.days_to_liquidate.is_finite())
+                .map(|s| s.days_to_liquidate * s.position_value)
+                .sum::<f64>()
+                / total_scored_value
+        }
     } else {
         0.0
     };
@@ -226,12 +233,8 @@ pub fn score_portfolio_liquidity(
     // Maximum concentration
     let (max_pct_of_adv, most_concentrated_position) = position_scores
         .iter()
-        .filter(|s| s.pct_of_adv.is_finite())
-        .max_by(|a, b| {
-            a.pct_of_adv
-                .partial_cmp(&b.pct_of_adv)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        })
+        .filter(|s| !s.pct_of_adv.is_nan())
+        .max_by(|a, b| a.pct_of_adv.total_cmp(&b.pct_of_adv))
         .map(|s| (s.pct_of_adv, Some(s.position_id.clone())))
         .unwrap_or((0.0, None));
 
@@ -278,6 +281,17 @@ pub fn score_portfolio_liquidity(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::position::{Position, PositionUnit};
+    use crate::types::Entity;
+    use crate::valuation::{PortfolioValuation, PositionValue};
+    use crate::Portfolio;
+    use finstack_core::currency::Currency;
+    use finstack_core::money::fx::FxConversionPolicy;
+    use finstack_core::money::Money;
+    use finstack_valuations::instruments::rates::deposit::Deposit;
+    use indexmap::IndexMap;
+    use std::sync::Arc;
+    use time::macros::date;
 
     #[test]
     fn position_score_serde_round_trip() -> std::result::Result<(), Box<dyn std::error::Error>> {
@@ -308,5 +322,101 @@ mod tests {
         let sum =
             alloc.tier1_pct + alloc.tier2_pct + alloc.tier3_pct + alloc.tier4_pct + alloc.tier5_pct;
         assert!((sum - 100.0).abs() < 1e-10);
+    }
+
+    fn test_position(position_id: &str, instrument_id: &str) -> Position {
+        let as_of = date!(2024 - 01 - 01);
+        let deposit = Deposit::builder()
+            .id(instrument_id.to_string().into())
+            .notional(Money::new(1.0, Currency::USD))
+            .start_date(as_of)
+            .maturity(date!(2024 - 02 - 01))
+            .day_count(finstack_core::dates::DayCount::Act360)
+            .discount_curve_id("USD".into())
+            .build()
+            .expect("test deposit should build");
+        Position::new(
+            position_id,
+            "E",
+            instrument_id,
+            Arc::new(deposit),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("test position should build")
+    }
+
+    fn synthetic_position_value(position_id: &str, amount: f64) -> PositionValue {
+        PositionValue {
+            position_id: PositionId::new(position_id),
+            entity_id: "E".into(),
+            value_native: Money::new(amount, Currency::USD),
+            value_base: Money::new(amount, Currency::USD),
+            metric_scale: 1.0,
+            risk_metrics_complete: true,
+            risk_error: None,
+            valuation_result: None,
+        }
+    }
+
+    #[test]
+    fn mo13_infinite_dtl_drives_weighted_average_and_concentration() {
+        let as_of = date!(2024 - 01 - 01);
+        let liquid = test_position("LIQUID", "LIQ");
+        let stuck = test_position("STUCK", "STUCK");
+        let portfolio = Portfolio::builder("P")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .entity(Entity::new("E"))
+            .position(liquid)
+            .position(stuck)
+            .build()
+            .expect("portfolio should build");
+        let valuation = PortfolioValuation {
+            as_of,
+            position_values: [
+                (
+                    PositionId::new("LIQUID"),
+                    synthetic_position_value("LIQUID", 100.0),
+                ),
+                (
+                    PositionId::new("STUCK"),
+                    synthetic_position_value("STUCK", 100.0),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+            total_base_ccy: Money::new(200.0, Currency::USD),
+            by_entity: IndexMap::new(),
+            degraded_positions: Vec::new(),
+            fx_collapse_policy: FxConversionPolicy::CashflowDate,
+        };
+        let profiles = [
+            (
+                "LIQ".to_string(),
+                LiquidityProfile::new("LIQ", 1.0, 1.0, 1.0, 100.0, 10.0, 0.0)
+                    .expect("profile should build"),
+            ),
+            (
+                "STUCK".to_string(),
+                LiquidityProfile::new("STUCK", 1.0, 1.0, 1.0, 0.0, 0.0, 0.0)
+                    .expect("profile should build"),
+            ),
+        ]
+        .into_iter()
+        .collect();
+        let config = LiquidityConfig {
+            participation_rate: 1.0,
+            ..LiquidityConfig::default()
+        };
+
+        let report = score_portfolio_liquidity(&portfolio, &valuation, &profiles, &config);
+
+        assert_eq!(report.weighted_avg_days_to_liquidate, f64::INFINITY);
+        assert_eq!(report.max_pct_of_adv, f64::INFINITY);
+        assert_eq!(
+            report.most_concentrated_position,
+            Some(PositionId::new("STUCK"))
+        );
     }
 }

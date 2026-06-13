@@ -45,36 +45,47 @@ impl KyleLambdaModel {
         Ok(Self { lambda })
     }
 
-    /// Estimate lambda directly from observed volume and return series using
-    /// the Amihud-ratio proxy.
+    /// Legacy Amihud-series calibration.
     ///
-    /// ```text
-    /// lambda ~= mean(|r_t| / V_t) * mean(V_t)
-    /// ```
-    ///
-    /// Returns `None` when the inputs are empty, mismatched in length, or
-    /// otherwise invalid (zero/non-finite mean volume, ill-defined Amihud ratio).
+    /// Returns `None` because converting the Amihud ratio to price-space Kyle
+    /// lambda requires a reference price. Use [`Self::lambda_from_series_with_mid`].
     pub fn lambda_from_series(volumes: &[f64], returns: &[f64]) -> Option<f64> {
         if volumes.is_empty() || volumes.len() != returns.len() {
             return None;
         }
-        let illiq = super::amihud_illiquidity(returns, volumes)?;
-        let mean_vol: f64 = volumes.iter().sum::<f64>() / volumes.len() as f64;
-        if !mean_vol.is_finite() || mean_vol <= 0.0 {
-            return None;
-        }
-        Self::from_amihud(illiq, mean_vol).ok().map(|m| m.lambda())
+        let _ = super::amihud_illiquidity(returns, volumes)?;
+        None
     }
 
-    /// Estimate lambda from a liquidity profile using the Amihud proxy.
+    /// Estimate price-space lambda from observed volume/return series and a
+    /// reference mid price.
     ///
     /// ```text
-    /// lambda ~= amihud_ratio * avg_daily_volume
+    /// lambda ~= mean(|r_t| / V_t) * reference_price
     /// ```
+    ///
+    /// Returns `None` when the inputs are empty, mismatched in length, otherwise
+    /// invalid, or when `reference_price` is non-positive/non-finite.
+    pub fn lambda_from_series_with_mid(
+        volumes: &[f64],
+        returns: &[f64],
+        reference_price: f64,
+    ) -> Option<f64> {
+        if volumes.is_empty() || volumes.len() != returns.len() {
+            return None;
+        }
+        let illiq = super::amihud_illiquidity(returns, volumes)?;
+        Self::from_amihud_with_mid(illiq, reference_price)
+            .ok()
+            .map(|m| m.lambda())
+    }
+
+    /// Legacy Amihud calibration retained only to fail closed.
     ///
     /// # Errors
     ///
-    /// Returns `Error::InvalidInput` if inputs are non-finite or negative.
+    /// Always returns `Error::InvalidInput` after validating the legacy inputs,
+    /// because the ADV-only signature cannot produce price-space lambda.
     pub fn from_amihud(amihud_ratio: f64, avg_daily_volume: f64) -> Result<Self> {
         if !amihud_ratio.is_finite() || amihud_ratio < 0.0 {
             return Err(Error::invalid_input(
@@ -86,7 +97,33 @@ impl KyleLambdaModel {
                 "avg_daily_volume must be finite and non-negative",
             ));
         }
-        Self::new(amihud_ratio * avg_daily_volume)
+        Err(Error::invalid_input(
+            "from_amihud requires a reference price; use from_amihud_with_mid",
+        ))
+    }
+
+    /// Estimate price-space lambda from an Amihud ratio and reference mid.
+    ///
+    /// ```text
+    /// lambda ~= amihud_ratio * reference_price
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::InvalidInput` if inputs are non-finite, negative, or if
+    /// `reference_price` is zero.
+    pub fn from_amihud_with_mid(amihud_ratio: f64, reference_price: f64) -> Result<Self> {
+        if !amihud_ratio.is_finite() || amihud_ratio < 0.0 {
+            return Err(Error::invalid_input(
+                "amihud_ratio must be finite and non-negative",
+            ));
+        }
+        if !reference_price.is_finite() || reference_price <= 0.0 {
+            return Err(Error::invalid_input(
+                "reference_price must be finite and positive",
+            ));
+        }
+        Self::new(amihud_ratio * reference_price)
     }
 
     /// Get the lambda parameter.
@@ -137,8 +174,10 @@ impl MarketImpactModel for KyleLambdaModel {
         };
 
         // Execution risk estimate based on volatility over the horizon
-        let execution_risk =
-            params.daily_volatility * params.horizon_days.sqrt() * q.abs() * reference_price;
+        let execution_risk = params.daily_volatility
+            * (params.horizon_days / 3.0).sqrt()
+            * q.abs()
+            * reference_price;
 
         Ok(ImpactEstimate {
             permanent_impact,
@@ -263,11 +302,24 @@ mod tests {
     }
 
     #[test]
-    fn from_amihud_basic() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    fn from_amihud_requires_reference_price() {
         let model = KyleLambdaModel::from_amihud(1e-9, 1_000_000.0);
-        assert!(model.is_ok());
-        let m = model?;
-        assert!((m.lambda() - 0.001).abs() < 1e-10);
+        assert!(
+            model.is_err(),
+            "B-4 legacy ADV-only calibration lacks the reference price needed for price-space lambda"
+        );
+    }
+
+    #[test]
+    fn from_amihud_with_mid_calibrates_price_space_lambda(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let model = KyleLambdaModel::from_amihud_with_mid(1e-8, 100.0)?;
+        assert!((model.lambda() - 1e-6).abs() < 1e-12);
+
+        let params = test_params(10_000.0)?;
+        let est = model.estimate_cost(&params)?;
+        assert!((est.total_cost - 50.0).abs() < 1e-10);
+        assert!((est.cost_bps - 0.5).abs() < 1e-10);
         Ok(())
     }
 
@@ -279,6 +331,11 @@ mod tests {
 
         assert!(est.total_cost >= 0.0);
         assert!(est.cost_bps >= 0.0);
+        let expected_execution_risk = params.daily_volatility * params.horizon_days.sqrt()
+            / 3.0_f64.sqrt()
+            * params.quantity.abs()
+            * params.effective_reference_price();
+        assert!((est.execution_risk - expected_execution_risk).abs() < 1e-9);
         Ok(())
     }
 

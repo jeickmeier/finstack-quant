@@ -52,9 +52,15 @@ impl DeltaBasedEngine {
 
         positions
             .iter()
-            .map(|(_, instrument, weight)| {
+            .map(|(position_id, instrument, weight)| {
                 let pv_up = instrument.value_raw(&up_market, as_of)?;
                 let pv_down = instrument.value_raw(&down_market, as_of)?;
+                if !pv_up.is_finite() || !pv_down.is_finite() {
+                    return Err(Error::Validation(format!(
+                        "minor 15: non-finite bumped PV for position '{position_id}' on factor '{}' (up = {pv_up}, down = {pv_down})",
+                        factor.id.as_str()
+                    )));
+                }
                 Ok((pv_up - pv_down) / (2.0 * bump_size) * *weight)
             })
             .collect()
@@ -271,6 +277,7 @@ mod tests {
     enum MockKind {
         CurveZero { curve_id: CurveId, tenor_years: f64 },
         Spot { spot_id: String },
+        NonFiniteRaw,
     }
 
     #[derive(Clone)]
@@ -310,6 +317,15 @@ mod tests {
             }
         }
 
+        fn non_finite_raw(id: &str) -> Self {
+            Self {
+                id: id.to_string(),
+                attributes: Attributes::new(),
+                kind: MockKind::NonFiniteRaw,
+                scale: 1.0,
+            }
+        }
+
         fn raw_value(&self, market: &MarketContext) -> Result<f64> {
             match &self.kind {
                 MockKind::CurveZero {
@@ -324,6 +340,7 @@ mod tests {
                     };
                     Ok(value * self.scale)
                 }
+                MockKind::NonFiniteRaw => Ok(f64::NAN),
             }
         }
     }
@@ -358,7 +375,12 @@ mod tests {
         }
 
         fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
-            Ok(Money::new(self.raw_value(market)?, Currency::USD))
+            let amount = if matches!(self.kind, MockKind::NonFiniteRaw) {
+                1.0
+            } else {
+                self.raw_value(market)?
+            };
+            Ok(Money::new(amount, Currency::USD))
         }
 
         fn value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
@@ -522,6 +544,32 @@ mod tests {
         assert_eq!(matrix.n_positions(), 1);
         assert_eq!(matrix.n_factors(), 1);
         assert!((matrix.delta(0, 0) - 1.0).abs() < 1e-3);
+        Ok(())
+    }
+
+    #[test]
+    fn minor15_delta_engine_rejects_non_finite_bumped_pv() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
+        let instrument = MockInstrument::non_finite_raw("bad-inst");
+        let positions = vec![("bad-pos".to_string(), &instrument as &dyn Instrument, 1.0)];
+        let factors = vec![FactorDefinition {
+            id: finstack_factor_model::FactorId::new("rates"),
+            factor_type: finstack_factor_model::FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new("USD-OIS")],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        }];
+
+        let err = DeltaBasedEngine::new(BumpSizeConfig::default())
+            .compute_sensitivities(&positions, &factors, &market, as_of)
+            .expect_err("minor 15: non-finite bumped PV must fail fast");
+        assert!(
+            err.to_string().contains("minor 15"),
+            "unexpected error: {err}"
+        );
         Ok(())
     }
 

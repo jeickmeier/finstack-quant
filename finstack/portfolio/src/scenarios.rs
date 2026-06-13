@@ -104,17 +104,29 @@ pub(crate) fn apply_scenario(
         .apply(scenario, &mut ctx)
         .map_err(|e| Error::ScenarioError(e.to_string()))?;
 
-    // Update portfolio positions with modified instruments (move boxes into `Arc`, no extra clone)
-    debug_assert_eq!(portfolio_copy.positions.len(), instruments.len());
-    for (position, modified_inst) in portfolio_copy
-        .positions
-        .iter_mut()
-        .zip(instruments.into_iter())
-    {
+    replace_portfolio_instruments(&mut portfolio_copy, instruments)?;
+
+    Ok((portfolio_copy, market_copy, report))
+}
+
+fn replace_portfolio_instruments(
+    portfolio: &mut Portfolio,
+    instruments: Vec<Box<dyn Instrument>>,
+) -> Result<()> {
+    let position_count = portfolio.positions.len();
+    let instrument_count = instruments.len();
+    if position_count != instrument_count {
+        return Err(Error::ScenarioError(format!(
+            "MO-16: scenario engine returned {instrument_count} instruments for {position_count} portfolio positions"
+        )));
+    }
+
+    // Update portfolio positions with modified instruments (move boxes into `Arc`, no extra clone).
+    for (position, modified_inst) in portfolio.positions.iter_mut().zip(instruments.into_iter()) {
         position.instrument = Arc::from(modified_inst);
     }
 
-    Ok((portfolio_copy, market_copy, report))
+    Ok(())
 }
 
 /// Apply a scenario and re-value the portfolio.
@@ -313,5 +325,48 @@ mod tests {
 
         let result = apply_and_revalue(&portfolio, &scenario, &market, &config);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn mo16_replace_portfolio_instruments_rejects_length_mismatch() {
+        let as_of = date!(2024 - 01 - 01);
+
+        let deposit = Deposit::builder()
+            .id("DEP_1M".into())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .start_date(as_of)
+            .maturity(date!(2024 - 02 - 01))
+            .day_count(finstack_core::dates::DayCount::Act360)
+            .discount_curve_id("USD".into())
+            .quote_rate_opt(Some(
+                rust_decimal::Decimal::try_from(0.045).expect("valid literal"),
+            ))
+            .build()
+            .expect("test should succeed");
+
+        let position = Position::new(
+            "POS_001",
+            "ENTITY_A",
+            "DEP_1M",
+            Arc::new(deposit),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("test should succeed");
+
+        let mut portfolio = PortfolioBuilder::new("TEST")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .entity(Entity::new("ENTITY_A"))
+            .position(position)
+            .build()
+            .expect("test should succeed");
+
+        let err = replace_portfolio_instruments(&mut portfolio, Vec::new())
+            .expect_err("MO-16: mismatched scenario result length must fail");
+        assert!(
+            matches!(err, Error::ScenarioError(_)),
+            "unexpected error: {err}"
+        );
     }
 }

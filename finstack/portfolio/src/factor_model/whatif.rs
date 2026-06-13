@@ -102,6 +102,7 @@ impl<'a> WhatIfEngine<'a> {
     /// Reallocate existing sensitivity rows to simulate remove/resize scenarios.
     pub fn position_what_if(&self, changes: &[PositionChange]) -> Result<WhatIfResult> {
         let mut sensitivities = self.base_sensitivities.clone();
+        let mut scenario_positions = self.portfolio.positions().to_vec();
 
         for change in changes {
             match change {
@@ -120,11 +121,18 @@ impl<'a> WhatIfEngine<'a> {
                     for factor_idx in 0..sensitivities.n_factors() {
                         sensitivities.set_delta(position_idx, factor_idx, 0.0);
                     }
+                    scenario_positions.retain(|position| position.position_id != *position_id);
                 }
                 PositionChange::Resize {
                     position_id,
                     new_quantity,
                 } => {
+                    if !new_quantity.is_finite() {
+                        return Err(Error::invalid_input(format!(
+                            "PositionChange::Resize new_quantity must be finite for position '{}', got {}",
+                            position_id, new_quantity
+                        )));
+                    }
                     let Some(position_idx) = self.position_index(position_id) else {
                         return Err(Error::invalid_input(format!(
                             "Unknown position '{}'",
@@ -148,14 +156,28 @@ impl<'a> WhatIfEngine<'a> {
                     for (factor_idx, delta) in row.into_iter().enumerate() {
                         sensitivities.set_delta(position_idx, factor_idx, delta * scale);
                     }
+                    if let Some(scenario_position) = scenario_positions
+                        .iter_mut()
+                        .find(|current| current.position_id == *position_id)
+                    {
+                        scenario_position.quantity = *new_quantity;
+                    }
                 }
             }
         }
 
-        let after = self.model.decomposer().decompose(
+        let mut after = self.model.decomposer().decompose(
             &sensitivities,
             self.model.covariance(),
             self.model.risk_measure(),
+        )?;
+        let mut scenario_portfolio = self.portfolio.clone();
+        scenario_portfolio.set_positions(scenario_positions)?;
+        self.model.add_credit_residual_risk(
+            &mut after,
+            &scenario_portfolio,
+            self.market,
+            self.as_of,
         )?;
 
         Ok(WhatIfResult {
@@ -173,10 +195,26 @@ impl<'a> WhatIfEngine<'a> {
 
         let positions = &self.portfolio.positions;
         let compute_position_pnl = |position: &Position| -> Result<(PositionId, f64)> {
+            let pricing_currency = position
+                .instrument
+                .base_value(self.market, self.as_of)?
+                .currency();
+            if pricing_currency != self.portfolio.base_ccy {
+                return Err(Error::validation(format!(
+                    "M-2: factor stress requires position '{}' to price in portfolio base currency {}; got {}. Explicit FX conversion policy is not implemented for factor stress.",
+                    position.position_id, self.portfolio.base_ccy, pricing_currency
+                )));
+            }
             let base_value = position.instrument.value_raw(self.market, self.as_of)?;
             let stressed_value = position
                 .instrument
                 .value_raw(&stressed_market, self.as_of)?;
+            if !base_value.is_finite() || !stressed_value.is_finite() {
+                return Err(Error::validation(format!(
+                    "M-1: non-finite factor-stress PV for position '{}' (base = {base_value}, stressed = {stressed_value})",
+                    position.position_id
+                )));
+            }
             let pnl = (stressed_value - base_value) * position.scale_factor();
             Ok((position.position_id.clone(), pnl))
         };
@@ -398,6 +436,38 @@ mod tests {
     }
 
     #[test]
+    fn test_m1_position_resize_rejects_non_finite_quantity() {
+        let Some((model, portfolio, market)) = build_test_model() else {
+            panic!("setup");
+        };
+        let base = model
+            .analyze(&portfolio, &market, date!(2024 - 01 - 01))
+            .expect("analysis");
+        let sensitivities = model
+            .compute_sensitivities(&portfolio, &market, date!(2024 - 01 - 01))
+            .expect("sensitivities");
+
+        let result = model
+            .what_if(
+                &base,
+                &sensitivities,
+                &portfolio,
+                &market,
+                date!(2024 - 01 - 01),
+            )
+            .position_what_if(&[PositionChange::Resize {
+                position_id: PositionId::new("pos-1"),
+                new_quantity: f64::NAN,
+            }]);
+
+        let err = result.expect_err("M-1 non-finite resize quantity must fail at input boundary");
+        assert!(
+            err.to_string().contains("new_quantity"),
+            "resize validation should name new_quantity, got {err}"
+        );
+    }
+
+    #[test]
     fn test_factor_stress_returns_position_pnl() {
         let setup = build_test_model();
         assert!(setup.is_some());
@@ -472,6 +542,48 @@ mod tests {
             (pnl_units - pnl_pct).abs() < 1e-9,
             "units={pnl_units}, percentage={pnl_pct}"
         );
+    }
+
+    #[test]
+    fn m2_factor_stress_rejects_non_base_currency_positions() {
+        let Some((model, _portfolio, market)) = build_test_model() else {
+            panic!("setup");
+        };
+        let position = Position::new(
+            "pos-eur",
+            DUMMY_ENTITY_ID,
+            "inst-eur",
+            Arc::new(
+                MockInstrument::new("inst-eur", "USD-OIS", 100.0).with_currency(Currency::EUR),
+            ),
+            1.0,
+            PositionUnit::Units,
+        )
+        .expect("position");
+        let portfolio = Portfolio::builder("portfolio-eur")
+            .base_ccy(Currency::USD)
+            .as_of(date!(2024 - 01 - 01))
+            .position(position)
+            .build()
+            .expect("portfolio");
+        let base = model
+            .analyze(&portfolio, &market, date!(2024 - 01 - 01))
+            .expect("base analysis");
+        let sensitivities = model
+            .compute_sensitivities(&portfolio, &market, date!(2024 - 01 - 01))
+            .expect("sensitivities");
+
+        let err = model
+            .what_if(
+                &base,
+                &sensitivities,
+                &portfolio,
+                &market,
+                date!(2024 - 01 - 01),
+            )
+            .factor_stress(&[(FactorId::new("Rates"), 1.0)])
+            .expect_err("M-2: cross-currency factor stress must fail fast");
+        assert!(err.to_string().contains("M-2"), "unexpected error: {err}");
     }
 
     #[test]
@@ -705,6 +817,7 @@ mod tests {
         attributes: Attributes,
         discount_curve: CurveId,
         scale: f64,
+        currency: Currency,
     }
 
     impl MockInstrument {
@@ -714,7 +827,13 @@ mod tests {
                 attributes: Attributes::default(),
                 discount_curve: CurveId::new(discount_curve),
                 scale,
+                currency: Currency::USD,
             }
+        }
+
+        fn with_currency(mut self, currency: Currency) -> Self {
+            self.currency = currency;
+            self
         }
     }
 
@@ -758,7 +877,7 @@ mod tests {
             _as_of: finstack_core::dates::Date,
         ) -> finstack_core::Result<Money> {
             let pv = market.get_discount(self.discount_curve.as_str())?.zero(1.0) * self.scale;
-            Ok(Money::new(pv, Currency::USD))
+            Ok(Money::new(pv, self.currency))
         }
 
         fn market_dependencies(&self) -> finstack_core::Result<MarketDependencies> {

@@ -276,6 +276,8 @@ class TestPortfolioNamespace:
     def test_portfolio_exports(self) -> None:
         """Portfolio should export parsing, building, metric functions, and typed wrappers."""
         from finstack.portfolio import (  # noqa: F401
+            FactorPnlProfile,
+            FactorRiskDecomposition,
             FinstackFxError,
             FinstackOptimizationError,
             FinstackValuationError,
@@ -283,13 +285,24 @@ class TestPortfolioNamespace:
             PortfolioError,
             PortfolioResult,
             PortfolioValuation,
+            SensitivityMatrix,
             aggregate_full_cashflows,
             aggregate_metrics,
             build_portfolio_from_spec,
+            compute_factor_sensitivities,
+            compute_pnl_profiles,
+            decompose_factor_risk,
             parse_portfolio_spec,
             portfolio_result_get_metric,
             portfolio_result_total_value,
         )
+
+    def test_m18_position_filter_exports_python_keyword_safe_not(self) -> None:
+        """PositionFilter exposes not_ rather than unusable Python keyword spelling."""
+        from finstack.portfolio import PositionFilter
+
+        assert callable(PositionFilter.not_)
+        assert not hasattr(PositionFilter, "not")
 
     def test_portfolio_domain_errors_are_typed(self) -> None:
         """Portfolio domain failures should expose a portfolio-specific exception."""

@@ -8,6 +8,7 @@
 
 use crate::errors::core_to_py;
 use finstack_portfolio::factor_model::{
+    flatten_position_pnls as core_flatten_position_pnls,
     flatten_square_matrix as core_flatten_square_matrix, DecompositionConfig,
     HistoricalPositionDecomposer, ParametricPositionDecomposer, PositionRiskDecomposition,
     RiskBudget,
@@ -26,6 +27,16 @@ use pyo3::types::{PyDict, PyList};
 /// validation diagnostics surface from both the Python and WASM bindings.
 fn flatten_square_matrix(matrix: Vec<Vec<f64>>, n: usize, label: &str) -> PyResult<Vec<f64>> {
     core_flatten_square_matrix(matrix, n, label)
+        .map_err(|e| crate::errors::value_error(e.to_string()))
+}
+
+/// Forward to the shared Rust scenario flattener so Python and WASM preserve
+/// the same row-count and scenario-count validation.
+fn flatten_position_pnls(
+    position_pnls: Vec<Vec<f64>>,
+    n_positions: usize,
+) -> PyResult<(Vec<f64>, usize)> {
+    core_flatten_position_pnls(position_pnls, n_positions)
         .map_err(|e| crate::errors::value_error(e.to_string()))
 }
 
@@ -213,41 +224,11 @@ fn historical_var_decomposition<'py>(
     confidence: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     let n = position_ids.len();
-    if position_pnls.len() != n {
-        return Err(crate::errors::value_error(format!(
-            "position_pnls must have {n} rows (one per position), got {}",
-            position_pnls.len()
-        )));
-    }
-    if n == 0 {
-        let ids = to_position_ids(position_ids);
-        let config = DecompositionConfig::historical(confidence);
-        let result = py
-            .detach(move || HistoricalPositionDecomposer.decompose_from_pnls(&[], &ids, 0, &config))
-            .map_err(core_to_py)?;
-        return var_decomposition_to_dict(py, &result);
-    }
-
-    let n_scenarios = position_pnls[0].len();
-    for (i, row) in position_pnls.iter().enumerate() {
-        if row.len() != n_scenarios {
-            return Err(crate::errors::value_error(format!(
-                "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
-                row.len()
-            )));
-        }
-    }
+    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, n)?;
 
     let config = DecompositionConfig::historical(confidence);
     let result = py
         .detach(move || {
-            // Transpose to row-major scenarios x positions layout expected by the engine.
-            let mut flat = Vec::with_capacity(n_scenarios * n);
-            for s in 0..n_scenarios {
-                for row in &position_pnls {
-                    flat.push(row[s]);
-                }
-            }
             let ids = to_position_ids(position_ids);
             HistoricalPositionDecomposer.decompose_from_pnls(&flat, &ids, n_scenarios, &config)
         })
@@ -337,12 +318,20 @@ fn evaluate_risk_budget<'py>(
     out.set_item("utilization_threshold", utilization_threshold)?;
 
     let positions = PyList::empty(py);
-    for (entry, target_pct) in result.positions.iter().zip(target_var_pct.iter()) {
+    let portfolio_var_magnitude = portfolio_var.abs();
+    for entry in &result.positions {
+        let target_pct = if portfolio_var_magnitude > 1e-15 {
+            entry.target_component_var / portfolio_var_magnitude
+        } else if entry.target_component_var.abs() > 1e-15 {
+            f64::INFINITY
+        } else {
+            0.0
+        };
         let d = PyDict::new(py);
         d.set_item("position_id", entry.position_id.as_str())?;
         d.set_item("actual_component_var", entry.actual_component_var)?;
         d.set_item("target_component_var", entry.target_component_var)?;
-        d.set_item("target_pct", *target_pct)?;
+        d.set_item("target_pct", target_pct)?;
         d.set_item("utilization", entry.utilization)?;
         d.set_item("excess", entry.excess)?;
         d.set_item("breach", entry.utilization > utilization_threshold)?;

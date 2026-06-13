@@ -166,7 +166,7 @@ pub fn decompose_factor_risk(
 
     let output = serde_json::json!({
         "total_risk": result.total_risk,
-        "measure": format!("{:?}", result.measure),
+        "measure": serde_json::to_value(result.measure).map_err(to_js_err)?,
         "residual_risk": result.residual_risk,
         "factor_contributions": result.factor_contributions.iter().map(|c| {
             serde_json::json!({
@@ -226,7 +226,7 @@ fn validate_sensitivity_data(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_sensitivity_data;
+    use super::{decompose_factor_risk, validate_sensitivity_data};
 
     #[test]
     fn validate_rejects_too_many_rows() {
@@ -290,5 +290,27 @@ mod tests {
         // Zero positions, zero factors, zero data rows — valid degenerate case
         let data: Vec<Vec<f64>> = vec![];
         assert!(validate_sensitivity_data(&data, 0, 0).is_ok());
+    }
+
+    #[test]
+    fn mo25_26_decompose_factor_risk_accepts_zero_factors_with_canonical_measure() {
+        let sensitivities = serde_json::json!({
+            "position_ids": [],
+            "factor_ids": [],
+            "data": []
+        })
+        .to_string();
+        let covariance = finstack_factor_model::FactorCovarianceMatrix::new(Vec::new(), Vec::new())
+            .expect("empty covariance should build");
+        let covariance_json = serde_json::to_string(&covariance).expect("serialize covariance");
+
+        let output = decompose_factor_risk(&sensitivities, &covariance_json, None)
+            .expect("MO-26: zero-factor decomposition should be accepted");
+        let value: serde_json::Value = serde_json::from_str(&output).expect("json output");
+        assert_eq!(value["total_risk"], 0.0);
+        assert_eq!(
+            value["measure"], "variance",
+            "MO-25: measure should use canonical serde form, not Debug"
+        );
     }
 }

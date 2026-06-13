@@ -103,6 +103,11 @@ impl NettingSet {
             self.aggregated_sensitivities = Some(sensitivities.clone());
         }
     }
+
+    /// Clear per-run aggregated sensitivities.
+    pub fn reset_sensitivities(&mut self) {
+        self.aggregated_sensitivities = None;
+    }
 }
 
 /// Manager for organizing positions into netting sets.
@@ -150,7 +155,12 @@ impl NettingSetManager {
     /// If the position has a margin spec with a netting set ID, it will be
     /// added to that set. Otherwise, it will be added to the default set
     /// (if configured) or skipped.
-    pub fn add_position(&mut self, position: &Position, netting_set_id: Option<NettingSetId>) {
+    pub fn add_position(
+        &mut self,
+        position: &Position,
+        netting_set_id: Option<NettingSetId>,
+        margin_spec: Option<OtcMarginSpec>,
+    ) {
         let ns_id = netting_set_id.or_else(|| self.default_set.clone());
 
         if let Some(id) = ns_id {
@@ -158,6 +168,18 @@ impl NettingSetManager {
                 .netting_sets
                 .entry(id.clone())
                 .or_insert_with(|| NettingSet::new(id));
+            if let Some(spec) = margin_spec {
+                match &ns.margin_spec {
+                    None => ns.margin_spec = Some(spec),
+                    Some(existing) if existing != &spec => {
+                        tracing::warn!(
+                            netting_set_id = ?ns.id,
+                            "Conflicting margin specs registered for netting set; keeping first spec"
+                        );
+                    }
+                    Some(_) => {}
+                }
+            }
             ns.add_position(position.position_id.clone());
         } else {
             tracing::warn!(
@@ -242,6 +264,13 @@ impl NettingSetManager {
     ) {
         if let Some(ns) = self.netting_sets.get_mut(netting_set_id) {
             ns.merge_sensitivities(sensitivities);
+        }
+    }
+
+    /// Clear all per-run aggregated sensitivities.
+    pub fn reset_sensitivities(&mut self) {
+        for netting_set in self.netting_sets.values_mut() {
+            netting_set.reset_sensitivities();
         }
     }
 }

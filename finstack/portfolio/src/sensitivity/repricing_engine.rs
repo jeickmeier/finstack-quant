@@ -134,7 +134,15 @@ impl FullRepricingEngine {
         super::traits::validate_single_currency(positions, market, as_of)?;
         let base_pvs: Vec<f64> = positions
             .iter()
-            .map(|(_, instrument, _)| instrument.value_raw(market, as_of))
+            .map(|(position_id, instrument, _)| {
+                let pv = instrument.value_raw(market, as_of)?;
+                if !pv.is_finite() {
+                    return Err(Error::Validation(format!(
+                        "minor 15: non-finite base PV for position '{position_id}' ({pv})"
+                    )));
+                }
+                Ok(pv)
+            })
             .collect::<Result<_>>()?;
 
         let mut profiles = Vec::with_capacity(factors.len());
@@ -158,6 +166,13 @@ impl FullRepricingEngine {
                     .enumerate()
                     .map(|(position_idx, (_, instrument, weight))| {
                         let pv = instrument.value_raw(&bumped_market, as_of)?;
+                        if !pv.is_finite() {
+                            let position_id = &positions[position_idx].0;
+                            return Err(Error::Validation(format!(
+                                "minor 15: non-finite bumped PV for position '{position_id}' on factor '{}' at shift {shift} ({pv})",
+                                factor.id.as_str()
+                            )));
+                        }
                         Ok((pv - base_pvs[position_idx]) * *weight)
                     })
                     .collect::<Result<_>>()?;
@@ -237,6 +252,7 @@ mod tests {
         curve_id: CurveId,
         tenor_years: f64,
         scale: f64,
+        base_value_override: Option<f64>,
     }
 
     finstack_valuations::impl_empty_cashflow_provider!(
@@ -252,6 +268,18 @@ mod tests {
                 curve_id: CurveId::new(curve_id),
                 tenor_years,
                 scale,
+                base_value_override: None,
+            }
+        }
+
+        fn non_finite_raw(id: &str, curve_id: &str) -> Self {
+            Self {
+                id: id.to_string(),
+                attributes: Attributes::new(),
+                curve_id: CurveId::new(curve_id),
+                tenor_years: 5.0,
+                scale: f64::NAN,
+                base_value_override: Some(1.0),
             }
         }
 
@@ -293,7 +321,12 @@ mod tests {
         }
 
         fn base_value(&self, market: &MarketContext, _as_of: Date) -> Result<Money> {
-            Ok(Money::new(self.raw_value(market)?, Currency::USD))
+            let amount = if let Some(amount) = self.base_value_override {
+                amount
+            } else {
+                self.raw_value(market)?
+            };
+            Ok(Money::new(amount, Currency::USD))
         }
 
         fn value_raw(&self, market: &MarketContext, _as_of: Date) -> Result<f64> {
@@ -424,6 +457,32 @@ mod tests {
         assert!(
             result.is_err(),
             "zero bump size must return an error instead of a NaN delta"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn minor15_full_repricing_rejects_non_finite_base_pv() -> Result<()> {
+        let as_of = date!(2025 - 01 - 01);
+        let market = test_market(as_of)?;
+        let instrument = MockInstrument::non_finite_raw("bad-inst", "USD-OIS");
+        let positions = vec![("bad-pos".to_string(), &instrument as &dyn Instrument, 1.0)];
+        let factors = vec![FactorDefinition {
+            id: FactorId::new("rates"),
+            factor_type: FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new("USD-OIS")],
+                units: BumpUnits::RateBp,
+            },
+            description: None,
+        }];
+
+        let err = FullRepricingEngine::new(BumpSizeConfig::default(), 5)
+            .compute_pnl_profiles(&positions, &factors, &market, as_of)
+            .expect_err("minor 15: non-finite base PV must fail fast");
+        assert!(
+            err.to_string().contains("minor 15"),
+            "unexpected error: {err}"
         );
         Ok(())
     }

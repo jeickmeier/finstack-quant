@@ -29,7 +29,8 @@ define_string_id! {
 ///   helpers reject cycles and excessively deep nesting instead of recursing
 ///   indefinitely
 /// - [`Book::child_book_ids`] drives rollup in [`crate::grouping::aggregate_by_book`];
-///   [`Book::parent_id`] is informational and is not validated against the child lists
+///   [`crate::portfolio::Portfolio::validate`] checks parent/child consistency
+///   between child lists and [`Book::parent_id`]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Book {
     /// Unique identifier for this book

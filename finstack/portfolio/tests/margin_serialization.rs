@@ -118,7 +118,9 @@ fn test_portfolio_margin_result_json_roundtrip() {
     result
         .add_netting_set(usd_margin)
         .expect("same-currency netting set should aggregate");
-    result.add_netting_set_with_fx(eur_margin, 1.1);
+    result
+        .add_netting_set_with_fx(eur_margin, 1.1)
+        .expect("valid FX rate should aggregate EUR netting set");
     result.positions_without_margin = 2;
     result.add_degraded_position(PositionId::new("POS_9"), "missing VM source");
 
@@ -129,4 +131,52 @@ fn test_portfolio_margin_result_json_roundtrip() {
     assert!(json.get("by_netting_set").is_none());
     assert!(json["netting_sets"].is_array());
     assert!(json["degraded_positions"].is_array());
+}
+
+#[test]
+fn minor17_netting_set_deserialize_rejects_inconsistent_total() {
+    let margin = NettingSetMargin::new(
+        NettingSetId::bilateral("BANK_A", "CSA_01"),
+        date!(2025 - 01 - 15),
+        Money::new(1_250_000.0, Currency::USD),
+        Money::new(150_000.0, Currency::USD),
+        4,
+        ImMethodology::Simm,
+    );
+    let mut json = serde_json::to_value(&margin).expect("margin should serialize");
+    json["total_margin"] =
+        serde_json::to_value(Money::new(1.0, Currency::USD)).expect("money should serialize");
+
+    let err = serde_json::from_value::<NettingSetMargin>(json)
+        .expect_err("minor 17: inconsistent netting-set total must fail");
+    assert!(
+        err.to_string().contains("minor 17"),
+        "unexpected error: {err}"
+    );
+}
+
+#[test]
+fn minor17_portfolio_margin_deserialize_rejects_inconsistent_totals() {
+    let margin = NettingSetMargin::new(
+        NettingSetId::cleared("LCH"),
+        date!(2025 - 01 - 15),
+        Money::new(900_000.0, Currency::USD),
+        Money::new(100_000.0, Currency::USD),
+        5,
+        ImMethodology::ClearingHouse,
+    );
+    let mut result = PortfolioMarginResult::new(date!(2025 - 01 - 15), Currency::USD);
+    result
+        .add_netting_set(margin)
+        .expect("same-currency netting set should aggregate");
+    let mut json = serde_json::to_value(&result).expect("result should serialize");
+    json["total_margin"] =
+        serde_json::to_value(Money::new(1.0, Currency::USD)).expect("money should serialize");
+
+    let err = serde_json::from_value::<PortfolioMarginResult>(json)
+        .expect_err("minor 17: inconsistent portfolio totals must fail");
+    assert!(
+        err.to_string().contains("minor 17"),
+        "unexpected error: {err}"
+    );
 }

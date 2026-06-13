@@ -580,6 +580,51 @@ impl SimmCalculator {
         total.max(0.0).sqrt()
     }
 
+    /// Calculate IR vega margin with multi-currency aggregation.
+    ///
+    /// This mirrors [`Self::calculate_ir_delta_multi_currency`] for the IR vega
+    /// risk class: same-tenor sensitivities are first grouped by currency so
+    /// one currency cannot overwrite another, then per-currency vega margins
+    /// are combined using the SIMM IR inter-currency correlation.
+    ///
+    /// # Arguments
+    ///
+    /// * `ir_vega` - Map of (currency, tenor) to signed IR vega sensitivity.
+    pub fn calculate_ir_vega_multi_currency(
+        &self,
+        ir_vega: &HashMap<(Currency, String), f64>,
+    ) -> f64 {
+        let mut by_currency: HashMap<Currency, HashMap<String, f64>> = HashMap::default();
+        for ((ccy, tenor), vega) in ir_vega {
+            *by_currency
+                .entry(*ccy)
+                .or_default()
+                .entry(tenor.clone())
+                .or_insert(0.0) += vega;
+        }
+
+        let mut currencies: Vec<(&Currency, &HashMap<String, f64>)> = by_currency.iter().collect();
+        currencies.sort_by_key(|(ccy, _)| **ccy);
+        let k_values: Vec<f64> = currencies
+            .into_iter()
+            .map(|(_, tenor_map)| self.calculate_ir_vega(tenor_map))
+            .collect();
+
+        if k_values.len() <= 1 {
+            return k_values.first().copied().unwrap_or(0.0);
+        }
+
+        let gamma = self.params.ir_inter_currency_correlation;
+        let mut total = 0.0;
+        for (i, k_i) in k_values.iter().enumerate() {
+            for (j, k_j) in k_values.iter().enumerate() {
+                let corr = if i == j { 1.0 } else { gamma };
+                total += corr * k_i * k_j;
+            }
+        }
+        total.max(0.0).sqrt()
+    }
+
     /// Calculate IR delta margin for a single currency from DV01-style sensitivities.
     ///
     /// Uses intra-bucket tenor correlations per ISDA SIMM methodology:
@@ -1071,12 +1116,7 @@ impl SimmCalculator {
 
         // IR Vega
         if !sensitivities.ir_vega.is_empty() {
-            let ir_vega_map: HashMap<String, f64> = sensitivities
-                .ir_vega
-                .iter()
-                .map(|((_, tenor), vega)| (tenor.clone(), *vega))
-                .collect();
-            let ir_vega_margin = self.calculate_ir_vega(&ir_vega_map);
+            let ir_vega_margin = self.calculate_ir_vega_multi_currency(&sensitivities.ir_vega);
             if ir_vega_margin > 0.0 {
                 breakdown.insert("IR_Vega".to_string(), Money::new(ir_vega_margin, currency));
                 *risk_class_margins
@@ -1552,6 +1592,27 @@ mod tests {
         let ir_vega_margin = calc.calculate_ir_vega(&vega_by_tenor);
         // Single tenor: sqrt((500K * 0.21)^2) = 500K * 0.21 = 105K
         assert!((ir_vega_margin - 105_000.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn m15_ir_vega_multi_currency_preserves_same_tenor_exposures() {
+        let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
+        let mut sensitivities = SimmSensitivities::new(Currency::USD);
+        sensitivities.add_ir_vega(Currency::USD, "5y", 500_000.0);
+        sensitivities.add_ir_vega(Currency::EUR, "5y", 500_000.0);
+
+        let (_, breakdown) = calc.calculate_from_sensitivities(&sensitivities, Currency::USD);
+        let ir_vega_margin = breakdown
+            .get("IR_Vega")
+            .expect("M-15: IR vega margin should be present")
+            .amount();
+
+        let single_currency_margin =
+            calc.calculate_ir_vega(&[("5y".to_string(), 500_000.0)].into_iter().collect());
+        assert!(
+            ir_vega_margin > single_currency_margin,
+            "M-15: same-tenor multi-currency IR vega must not collapse to one exposure"
+        );
     }
 
     #[test]

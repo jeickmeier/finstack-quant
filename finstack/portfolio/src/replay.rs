@@ -200,7 +200,7 @@ pub struct ReplayResult {
 }
 
 use crate::portfolio::Portfolio;
-use crate::valuation::{value_portfolio, value_portfolio_serial};
+use crate::valuation::{value_portfolio_at, value_portfolio_serial_at};
 use finstack_core::config::FinstackConfig;
 
 /// Portfolios below this position count benefit more from parallelizing the
@@ -254,12 +254,13 @@ pub fn replay_portfolio(
         timeline
             .snapshots
             .par_iter()
-            .map(|(_date, market)| {
-                value_portfolio_serial(
+            .map(|(date, market)| {
+                value_portfolio_serial_at(
                     portfolio,
                     market,
                     finstack_config,
                     &config.valuation_options,
+                    *date,
                 )
             })
             .collect()
@@ -267,12 +268,13 @@ pub fn replay_portfolio(
         timeline
             .snapshots
             .iter()
-            .map(|(_date, market)| {
-                value_portfolio(
+            .map(|(date, market)| {
+                value_portfolio_at(
                     portfolio,
                     market,
                     finstack_config,
                     &config.valuation_options,
+                    *date,
                 )
             })
             .collect()
@@ -440,7 +442,7 @@ fn compute_summary(steps: &[ReplayStep]) -> ReplaySummary {
     }
 
     let max_drawdown_pct = if peak_value.abs() > f64::EPSILON {
-        max_dd / peak_value
+        max_dd / peak_value.abs()
     } else {
         0.0
     };
@@ -456,5 +458,44 @@ fn compute_summary(steps: &[ReplayStep]) -> ReplaySummary {
         max_drawdown_pct,
         max_drawdown_peak_date: max_dd_peak_date,
         max_drawdown_trough_date: max_dd_trough_date,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_core::currency::Currency;
+    use finstack_core::money::fx::FxConversionPolicy;
+    use indexmap::IndexMap;
+    use time::macros::date;
+
+    fn synthetic_step(date: Date, value: f64) -> ReplayStep {
+        ReplayStep {
+            date,
+            valuation: PortfolioValuation {
+                as_of: date,
+                position_values: IndexMap::new(),
+                total_base_ccy: Money::new(value, Currency::USD),
+                by_entity: IndexMap::new(),
+                degraded_positions: Vec::new(),
+                fx_collapse_policy: FxConversionPolicy::CashflowDate,
+            },
+            daily_pnl: None,
+            cumulative_pnl: None,
+            attribution: None,
+        }
+    }
+
+    #[test]
+    fn minor16_drawdown_pct_is_positive_for_negative_peak_values() {
+        let steps = vec![
+            synthetic_step(date!(2024 - 01 - 01), -100.0),
+            synthetic_step(date!(2024 - 01 - 02), -150.0),
+        ];
+
+        let summary = compute_summary(&steps);
+
+        assert_eq!(summary.max_drawdown.amount(), 50.0);
+        assert_eq!(summary.max_drawdown_pct, 0.5);
     }
 }

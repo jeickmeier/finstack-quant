@@ -5,6 +5,7 @@ use crate::portfolio::Portfolio;
 use crate::types::{EntityId, PositionId};
 use finstack_core::config::FinstackConfig;
 use finstack_core::currency::Currency;
+use finstack_core::dates::Date;
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::math::summation::neumaier_sum;
 use finstack_core::money::fx::FxConversionPolicy;
@@ -390,8 +391,23 @@ pub fn value_portfolio(
     _config: &FinstackConfig,
     options: &PortfolioValuationOptions,
 ) -> Result<PortfolioValuation> {
+    value_portfolio_at(portfolio, market, _config, options, portfolio.as_of)
+}
+
+/// Value a portfolio at an explicit valuation date.
+///
+/// This is useful for replay and historical what-if workflows where the
+/// portfolio definition has a static book date but each market snapshot must
+/// be priced and FX-converted at the snapshot date.
+pub fn value_portfolio_at(
+    portfolio: &Portfolio,
+    market: &MarketContext,
+    _config: &FinstackConfig,
+    options: &PortfolioValuationOptions,
+    as_of: Date,
+) -> Result<PortfolioValuation> {
     if !should_value_portfolio_use_parallel(portfolio.positions.len()) {
-        return value_portfolio_serial(portfolio, market, _config, options);
+        return value_portfolio_serial_at(portfolio, market, _config, options, as_of);
     }
 
     let metrics = resolve_metrics(options);
@@ -401,11 +417,18 @@ pub fn value_portfolio(
         .positions
         .par_iter()
         .map(|position| {
-            value_single_position(position, market, portfolio, &metrics, options.strict_risk)
+            value_single_position(
+                position,
+                market,
+                portfolio,
+                as_of,
+                &metrics,
+                options.strict_risk,
+            )
         })
         .collect::<Result<Vec<_>>>()?;
 
-    assemble_valuation(position_values_vec, portfolio.base_ccy, portfolio.as_of)
+    assemble_valuation(position_values_vec, portfolio.base_ccy, as_of)
 }
 
 /// Serial counterpart to [`value_portfolio`] for nested-parallel call sites.
@@ -419,11 +442,12 @@ pub fn value_portfolio(
 ///
 /// Results are numerically identical to [`value_portfolio`] (same Neumaier
 /// aggregation of per-position contributions in positional order).
-pub(crate) fn value_portfolio_serial(
+pub(crate) fn value_portfolio_serial_at(
     portfolio: &Portfolio,
     market: &MarketContext,
     _config: &FinstackConfig,
     options: &PortfolioValuationOptions,
+    as_of: Date,
 ) -> Result<PortfolioValuation> {
     let metrics = resolve_metrics(options);
 
@@ -431,11 +455,18 @@ pub(crate) fn value_portfolio_serial(
         .positions
         .iter()
         .map(|position| {
-            value_single_position(position, market, portfolio, &metrics, options.strict_risk)
+            value_single_position(
+                position,
+                market,
+                portfolio,
+                as_of,
+                &metrics,
+                options.strict_risk,
+            )
         })
         .collect::<Result<Vec<_>>>()?;
 
-    assemble_valuation(position_values_vec, portfolio.base_ccy, portfolio.as_of)
+    assemble_valuation(position_values_vec, portfolio.base_ccy, as_of)
 }
 
 /// Value a single position with metrics and FX conversion.
@@ -445,6 +476,7 @@ fn value_single_position(
     position: &crate::position::Position,
     market: &MarketContext,
     portfolio: &Portfolio,
+    as_of: Date,
     metrics: &[MetricId],
     strict_risk: bool,
 ) -> Result<PositionValue> {
@@ -459,7 +491,7 @@ fn value_single_position(
                 .instrument
                 .price_with_metrics(
                     market,
-                    portfolio.as_of,
+                    as_of,
                     metrics,
                     finstack_valuations::instruments::PricingOptions::default(),
                 )
@@ -473,13 +505,13 @@ fn value_single_position(
     } else {
         match position.instrument.price_with_metrics(
             market,
-            portfolio.as_of,
+            as_of,
             metrics,
             finstack_valuations::instruments::PricingOptions::default(),
         ) {
             Ok(result) => (result, true, None),
             Err(metric_error) => {
-                let value = position.instrument.value(market, portfolio.as_of).map_err(
+                let value = position.instrument.value(market, as_of).map_err(
                     |e: finstack_core::Error| Error::ValuationError {
                         position_id: position.position_id.clone(),
                         // Both pricing paths failed: metrics first, then the
@@ -494,7 +526,7 @@ fn value_single_position(
                     },
                 )?;
                 (
-                    ValuationResult::stamped(position.instrument.id(), portfolio.as_of, value),
+                    ValuationResult::stamped(position.instrument.id(), as_of, value),
                     false,
                     Some(metric_error.to_string()),
                 )
@@ -510,8 +542,7 @@ fn value_single_position(
     // Convert to base currency via the shared FX helper so error semantics and
     // FxMatrix lookup conventions stay aligned with cashflows / attribution /
     // margin aggregation.
-    let value_base =
-        crate::fx::convert_to_base(scaled_native, portfolio.as_of, market, portfolio.base_ccy)?;
+    let value_base = crate::fx::convert_to_base(scaled_native, as_of, market, portfolio.base_ccy)?;
 
     Ok(PositionValue {
         position_id: position.position_id.clone(),
@@ -536,7 +567,14 @@ fn reuse_prior_or_value_position(
     if let Some(pv) = prior.position_values.get(position.position_id.as_str()) {
         Ok(pv.clone())
     } else {
-        value_single_position(position, market, portfolio, metrics, strict_risk)
+        value_single_position(
+            position,
+            market,
+            portfolio,
+            portfolio.as_of,
+            metrics,
+            strict_risk,
+        )
     }
 }
 
@@ -595,14 +633,44 @@ pub fn revalue_affected(
         "dependency index is stale: positions were mutated without updating \
          the index — call Portfolio::rebuild_index after direct mutation"
     );
-    let affected_indices = portfolio.dependency_index().affected_positions(changed);
+    let positions = &portfolio.positions;
+    let affected_indices = if changed
+        .iter()
+        .any(|key| matches!(key, crate::dependencies::MarketFactorKey::Fx { .. }))
+    {
+        (0..positions.len()).collect()
+    } else {
+        portfolio.dependency_index().affected_positions(changed)
+    };
 
     if affected_indices.is_empty() {
-        return Ok(prior.clone());
+        let prior_matches_current_positions = prior.position_values.len() == positions.len()
+            && positions.iter().all(|position| {
+                prior
+                    .get_position_value(position.position_id.as_str())
+                    .is_some()
+            });
+        if prior_matches_current_positions {
+            return Ok(prior.clone());
+        }
+        let metrics = resolve_metrics(options);
+        let position_values_vec = positions
+            .iter()
+            .map(|position| {
+                reuse_prior_or_value_position(
+                    position,
+                    market,
+                    portfolio,
+                    &metrics,
+                    options.strict_risk,
+                    prior,
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        return assemble_valuation(position_values_vec, portfolio.base_ccy, portfolio.as_of);
     }
 
     let metrics = resolve_metrics(options);
-    let positions = &portfolio.positions;
     let use_parallel = affected_indices.len() >= REVALUE_AFFECTED_PARALLEL_MIN_AFFECTED
         && affected_indices.len().saturating_mul(4) >= positions.len();
 
@@ -626,6 +694,7 @@ pub fn revalue_affected(
                         position,
                         market,
                         portfolio,
+                        portfolio.as_of,
                         &metrics,
                         options.strict_risk,
                     )
@@ -658,6 +727,7 @@ pub fn revalue_affected(
                     position,
                     market,
                     portfolio,
+                    portfolio.as_of,
                     &metrics,
                     options.strict_risk,
                 )?);

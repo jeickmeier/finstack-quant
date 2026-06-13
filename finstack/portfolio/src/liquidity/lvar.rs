@@ -24,6 +24,15 @@ use std::collections::HashMap;
 
 use super::types::{days_to_liquidate, LiquidityConfig, LiquidityProfile};
 
+fn validate_lvar_confidence(confidence: f64) -> Result<()> {
+    if !confidence.is_finite() || confidence <= 0.5 || confidence >= 1.0 {
+        return Err(Error::invalid_input(
+            "confidence must be finite and in the open interval (0.5, 1)",
+        ));
+    }
+    Ok(())
+}
+
 /// Result of a liquidity-adjusted VaR calculation for a single position.
 ///
 /// All VaR / LVaR fields follow the loss sign convention: **losses are negative**.
@@ -163,11 +172,7 @@ pub fn lvar_bangia_scalar(
             "spread_vol must be non-negative and finite",
         ));
     }
-    if !confidence.is_finite() || !(0.0..1.0).contains(&confidence) {
-        return Err(Error::invalid_input(
-            "confidence must be finite and in the open interval (0, 1)",
-        ));
-    }
+    validate_lvar_confidence(confidence)?;
     if !position_value.is_finite() {
         return Err(Error::invalid_input("position_value must be finite"));
     }
@@ -250,6 +255,7 @@ impl LvarCalculator {
                 "position_value must be finite, got {position_value}"
             )));
         }
+        validate_lvar_confidence(self.config.confidence_level)?;
 
         let pv = position_value.abs();
 
@@ -298,7 +304,11 @@ impl LvarCalculator {
         } else {
             1.0
         };
-        let lvar_horizon = var * horizon_scale;
+        let lvar_horizon = if var == 0.0 && dtl.is_infinite() {
+            0.0
+        } else {
+            var * horizon_scale
+        };
 
         // Composite: most conservative = most negative under loss sign convention.
         let lvar_composite = if lvar_bangia.is_finite() && lvar_horizon.is_finite() {
@@ -527,6 +537,52 @@ mod tests {
         assert!(calc
             .compute(&pos_id, -1000.0, f64::INFINITY, &profile)
             .is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn mo12_scalar_rejects_sub_median_confidence() {
+        let err = lvar_bangia_scalar(-1_000.0, 0.01, 0.001, 0.49, 100_000.0)
+            .expect_err("MO-12: confidence below 0.5 must be rejected");
+
+        assert!(
+            err.to_string().contains("confidence"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn mo12_calculator_rejects_unit_confidence(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let calc = LvarCalculator::new(LiquidityConfig {
+            confidence_level: 1.0,
+            ..LiquidityConfig::default()
+        });
+        let profile = test_profile()?;
+        let pos_id = PositionId::new("POS1");
+
+        let err = calc
+            .compute(&pos_id, -1_000.0, 100_000.0, &profile)
+            .expect_err("MO-12: confidence >= 1 must be rejected");
+        assert!(
+            err.to_string().contains("confidence"),
+            "unexpected error: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn mo12_zero_var_with_infinite_dtl_has_finite_horizon_lvar(
+    ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let calc = default_calculator();
+        let profile = LiquidityProfile::new("TEST", 100.0, 100.0, 100.0, 0.0, 0.0, 0.0)?;
+        let pos_id = PositionId::new("POS1");
+
+        let result = calc.compute(&pos_id, 0.0, 100_000.0, &profile)?;
+
+        assert_eq!(result.days_to_liquidate, f64::INFINITY);
+        assert_eq!(result.lvar_horizon, 0.0);
+        assert!(result.lvar_composite.is_finite());
         Ok(())
     }
 

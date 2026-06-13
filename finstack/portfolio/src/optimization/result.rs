@@ -2,7 +2,8 @@ use super::problem::PortfolioOptimizationProblem;
 use super::tolerances::{SLACK_TOL, WEIGHT_TOL};
 use crate::error::{Error, Result};
 use crate::portfolio::Portfolio;
-use crate::types::PositionId;
+use crate::position::Position;
+use crate::types::{Entity, PositionId};
 use finstack_core::config::ResultsMeta;
 use indexmap::IndexMap;
 use serde::ser::SerializeStruct;
@@ -165,6 +166,34 @@ impl PortfolioOptimizationResult {
                 position.quantity = *qty;
             }
         }
+        for candidate in &self.problem.trade_universe.candidates {
+            let Some(target_qty) = self.implied_quantities.get(&candidate.id).copied() else {
+                continue;
+            };
+            let target_weight = self
+                .optimal_weights
+                .get(&candidate.id)
+                .copied()
+                .unwrap_or(0.0);
+            if target_weight.abs() < WEIGHT_TOL || target_qty.abs() < WEIGHT_TOL {
+                continue;
+            }
+
+            portfolio
+                .entities
+                .entry(candidate.entity_id.clone())
+                .or_insert_with(|| Entity::new(candidate.entity_id.clone()));
+            let mut position = Position::new(
+                candidate.id.clone(),
+                candidate.entity_id.clone(),
+                candidate.instrument.id(),
+                std::sync::Arc::clone(&candidate.instrument),
+                target_qty,
+                candidate.unit,
+            )?;
+            position.attributes = candidate.attributes.clone();
+            portfolio.add_position(position)?;
+        }
 
         portfolio.validate()?;
         Ok(portfolio)
@@ -202,9 +231,9 @@ impl PortfolioOptimizationResult {
                 let current_qty = existing_position.map(|p| p.quantity).unwrap_or(0.0);
                 let target_qty = self.implied_quantities.get(pos_id).copied().unwrap_or(0.0);
 
-                let trade_type = if is_candidate && target_weight > WEIGHT_TOL {
+                let trade_type = if is_candidate && target_weight.abs() > WEIGHT_TOL {
                     TradeType::NewPosition
-                } else if !is_candidate && target_weight < WEIGHT_TOL {
+                } else if !is_candidate && target_weight.abs() < WEIGHT_TOL {
                     TradeType::CloseOut
                 } else {
                     TradeType::Existing
@@ -284,11 +313,11 @@ impl PortfolioOptimizationResult {
             .collect()
     }
 
-    /// Calculate total turnover (sum of absolute weight changes).
+    /// Calculate gross turnover (sum of absolute weight changes).
     ///
     /// # Returns
     ///
-    /// One-way turnover implied by the optimized weights.
+    /// Gross turnover implied by the optimized weights.
     #[must_use]
     pub fn turnover(&self) -> f64 {
         self.weight_deltas.values().map(|d| d.abs()).sum()
