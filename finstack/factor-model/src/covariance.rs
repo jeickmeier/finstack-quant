@@ -4,10 +4,21 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 /// User-supplied factor covariance matrix with row-major storage.
 ///
-/// Entries are expected to be on a consistent variance scale, typically annual
-/// variance/covariance for the factor returns used by the risk engine. The
-/// factor ID order is part of the contract: row `i`, column `j` corresponds to
-/// `factor_ids[i]` and `factor_ids[j]`.
+/// The factor ID order is part of the contract: row `i`, column `j`
+/// corresponds to `factor_ids[i]` and `factor_ids[j]`.
+///
+/// # Units contract
+///
+/// Entries are **annualized (co)variances of factor moves expressed in each
+/// factor's canonical bump unit** — the same unit the sensitivity engines use
+/// for deltas (see [`crate::BumpSizeConfig`] / [`crate::FactorBumpUnit`]):
+/// basis points for rates/credit/inflation, percent for equity/commodity/FX,
+/// vol points for volatility. With sensitivities `s` in P&L-per-canonical-unit
+/// and `Σ` in canonical-unit², `sᵀΣs` is directly an annual P&L variance.
+/// Mixing conventions — e.g. a covariance in decimal² (`0.0001²` per bp²)
+/// against per-bp sensitivities — mis-scales portfolio variance by `1e8`.
+/// The credit calibrator produces matrices in this convention from the spread
+/// panel's native units; hand-built matrices must match it.
 #[derive(Debug, Clone, Serialize)]
 pub struct FactorCovarianceMatrix {
     factor_ids: Vec<FactorId>,
@@ -37,18 +48,22 @@ impl FactorCovarianceMatrix {
             for j in (i + 1)..n {
                 let lhs = data[i * n + j];
                 let rhs = data[j * n + i];
-                if (lhs - rhs).abs() > 1e-12 {
+                // Scale-relative tolerance: an absolute 1e-12 would reject
+                // machine-symmetric matrices on bp² scales (entries ~1e4)
+                // while being needlessly loose on tiny-variance scales.
+                let tol = 1e-12 * lhs.abs().max(rhs.abs()).max(1.0);
+                if (lhs - rhs).abs() > tol {
                     return Err(finstack_core::Error::Validation(format!(
-                        "Covariance matrix is not symmetric at ({i}, {j})"
+                        "Covariance matrix is not symmetric at ({i}, {j}): {lhs} vs {rhs}"
                     )));
                 }
             }
         }
 
-        if !Self::is_psd(&data, n) {
-            return Err(finstack_core::Error::Validation(
-                "Covariance matrix is not positive semi-definite".to_string(),
-            ));
+        if let Err(e) = finstack_core::math::linalg::cholesky_correlation(&data, n) {
+            return Err(finstack_core::Error::Validation(format!(
+                "Covariance matrix is not positive semi-definite: {e}"
+            )));
         }
 
         Ok(Self {
@@ -78,6 +93,13 @@ impl FactorCovarianceMatrix {
     }
 
     /// Return the variance for a factor, or `0.0` if the factor is unknown.
+    ///
+    /// The `0.0` fallback means an unknown (e.g. mistyped) factor ID silently
+    /// contributes zero risk. Use [`Self::factor_ids`] to validate a query
+    /// universe up front, or rely on
+    /// [`crate::FactorModelConfig::validate_matching_factor_ids`] (called by
+    /// `CreditFactorModel::validate`) to reject undeclared factors at
+    /// config-load time.
     #[must_use]
     pub fn variance(&self, factor: &FactorId) -> f64 {
         let Some(&idx) = self.index.get(factor) else {
@@ -123,17 +145,6 @@ impl FactorCovarianceMatrix {
         }
         Ok(index)
     }
-
-    /// Positive-semidefinite test via the shared pivoted Cholesky routine.
-    ///
-    /// Delegates to [`finstack_core::math::linalg::cholesky_correlation`], the
-    /// same PSD-detection primitive used by `finstack_analytics`'s correlation
-    /// validation. A symmetric matrix is positive semi-definite iff the pivoted
-    /// Cholesky factorization succeeds (indefinite matrices produce a
-    /// `NotPositiveDefinite` error).
-    fn is_psd(data: &[f64], n: usize) -> bool {
-        finstack_core::math::linalg::cholesky_correlation(data, n).is_ok()
-    }
 }
 
 impl<'de> Deserialize<'de> for FactorCovarianceMatrix {
@@ -142,6 +153,7 @@ impl<'de> Deserialize<'de> for FactorCovarianceMatrix {
         D: Deserializer<'de>,
     {
         #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct FactorCovarianceMatrixSerde {
             factor_ids: Vec<FactorId>,
             n: usize,
@@ -200,7 +212,10 @@ mod tests {
         fn two_factor_covariance_rejects_out_of_bounds_correlation(
             variance_a in 1.0e-6_f64..1.0,
             variance_b in 1.0e-6_f64..1.0,
-            excess in 1.0e-6_f64..1.0,
+            // Keep the excess away from the marginally-indefinite corner:
+            // the pivoted-Cholesky PSD test has a numerical tolerance, so
+            // |rho| = 1 + 1e-6 can be accepted as PSD-within-tolerance.
+            excess in 1.0e-3_f64..1.0,
         ) {
             let covariance = (1.0 + excess) * (variance_a * variance_b).sqrt();
             let result = FactorCovarianceMatrix::new(

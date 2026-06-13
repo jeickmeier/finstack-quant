@@ -23,6 +23,11 @@ pub(crate) fn validate_finite_sensitivities(
     sensitivities: &SensitivityMatrix,
 ) -> finstack_core::Result<()> {
     let n_factors = sensitivities.n_factors();
+    if n_factors == 0 {
+        // Zero factor axes mean an empty matrix; nothing to validate
+        // (and `chunks_exact(0)` would panic).
+        return Ok(());
+    }
     for (position_idx, row) in sensitivities.as_slice().chunks_exact(n_factors).enumerate() {
         for (factor_idx, delta) in row.iter().enumerate() {
             if !delta.is_finite() {

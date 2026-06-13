@@ -48,7 +48,7 @@ impl FromStr for PricingMode {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         crate::parse::parse_normalized_enum(s)
-            .map_err(|_| finstack_core::InputError::Invalid.into())
+            .map_err(|e| finstack_core::Error::Validation(format!("PricingMode: {e}")))
     }
 }
 
@@ -146,7 +146,12 @@ impl<'de> Deserialize<'de> for RiskMeasure {
 }
 
 /// Per-factor-type bump magnitudes for finite-difference sensitivity engines.
+///
+/// Unknown fields are rejected on deserialization: every field here has a
+/// serde default, so a typo'd key (e.g. `"credit_bps"`) would otherwise be
+/// silently dropped and the bump would silently revert to 1.0.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BumpSizeConfig {
     /// Default rates bump in basis points.
     #[serde(default = "default_one")]
@@ -160,7 +165,8 @@ pub struct BumpSizeConfig {
     /// Default FX spot bump in percent.
     #[serde(default = "default_one")]
     pub fx_pct: f64,
-    /// Default volatility bump in absolute vol points.
+    /// Default volatility bump in vol points (`1.0` = one vol point =
+    /// `0.01` absolute vol).
     #[serde(default = "default_one")]
     pub vol_points: f64,
     /// Per-factor overrides that take precedence over factor-type defaults.
@@ -190,7 +196,7 @@ impl BumpSizeConfig {
     ///
     /// The returned `f64` is in the *canonical* units for the factor type:
     /// basis points for rates/credit/inflation, percent for equity/commodity/FX,
-    /// absolute vol points for volatility. Callers that cannot statically
+    /// vol points for volatility. Callers that cannot statically
     /// know the unit should use [`Self::bump_size_with_unit_for_factor`]
     /// instead — same numeric, but the unit flows through as a
     /// [`FactorBumpUnit`] tag.
@@ -246,19 +252,25 @@ impl BumpSizeConfig {
 /// expected unit.
 ///
 /// The variants intentionally mirror [`finstack_core::market_data::bumps::BumpUnits`]
-/// plus `Absolute` (used by vol-point shifts where the magnitude is
-/// already a dimensionless number of vol points, not a fraction or
-/// percent of something).
+/// plus `VolPoint` and `Absolute`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum FactorBumpUnit {
-    /// Absolute dimensionless shift — e.g. vol points (`0.01` = one vol point).
+    /// Absolute dimensionless shift applied as-is (`0.01` means +0.01 on the
+    /// quoted quantity). Not the canonical unit for any factor type; kept
+    /// for callers that pre-convert magnitudes themselves.
     Absolute,
     /// Basis-point shift; `1.0` means 1 bp = 0.0001 fractional.
     BasisPoint,
     /// Percent shift; `1.0` means 1 % = 0.01 fractional.
     Percent,
+    /// Vol-point shift; `1.0` means one vol point = 0.01 absolute vol.
+    ///
+    /// This matches [`BumpSizeConfig::vol_points`] (default `1.0` = one vol
+    /// point). Treating that magnitude as an `Absolute` shift would apply a
+    /// 100× oversized vol bump.
+    VolPoint,
     /// Direct fractional shift; `0.01` means 1 %.
     Fraction,
     /// Multiplicative factor on the base; `1.10` means +10 %.
@@ -272,7 +284,8 @@ impl FactorBumpUnit {
     ///   `BumpSizeConfig::rates_bp`, `credit_bp`).
     /// * Equity / Commodity / FX → `Percent` (matches
     ///   `BumpSizeConfig::equity_pct`, `fx_pct`).
-    /// * Volatility → `Absolute` (vol points).
+    /// * Volatility → `VolPoint` (matches `BumpSizeConfig::vol_points`;
+    ///   `1.0` = one vol point = `0.01` absolute vol).
     #[must_use]
     pub fn canonical_for(factor_type: &FactorType) -> Self {
         match factor_type {
@@ -281,7 +294,7 @@ impl FactorBumpUnit {
             | FactorType::Inflation
             | FactorType::Custom(_) => FactorBumpUnit::BasisPoint,
             FactorType::Equity | FactorType::Commodity | FactorType::FX => FactorBumpUnit::Percent,
-            FactorType::Volatility => FactorBumpUnit::Absolute,
+            FactorType::Volatility => FactorBumpUnit::VolPoint,
         }
     }
 
@@ -301,7 +314,10 @@ impl FactorBumpUnit {
         match self {
             FactorBumpUnit::Absolute | FactorBumpUnit::Fraction => value,
             FactorBumpUnit::BasisPoint => value * 1e-4,
-            FactorBumpUnit::Percent => value * 1e-2,
+            // One percent and one vol point both convert at 1e-2: a vol
+            // point is 0.01 of absolute vol just as a percent is 0.01 of
+            // the base.
+            FactorBumpUnit::Percent | FactorBumpUnit::VolPoint => value * 1e-2,
             // Multiplier is not a linear shift; expose as-is for callers
             // that know to build a multiplicative bump spec.
             FactorBumpUnit::Multiplier => value,
@@ -646,6 +662,27 @@ mod tests {
     #[test]
     fn test_pricing_mode_fromstr_rejects_unknown() {
         assert!("unknown".parse::<PricingMode>().is_err());
+    }
+
+    // Quant-review M4: a vol bump of 1.0 vol point must convert to 0.01
+    // absolute vol, not 1.0 (a 100x oversized bump).
+    #[test]
+    fn vol_point_unit_converts_one_point_to_one_percent() {
+        let (size, unit) = BumpSizeConfig::default()
+            .bump_size_with_unit_for_factor(&FactorId::new("VOL-1"), &FactorType::Volatility);
+        assert!((size - 1.0).abs() < 1e-12);
+        assert_eq!(unit, FactorBumpUnit::VolPoint);
+        assert!(
+            (unit.to_fraction(size) - 0.01).abs() < 1e-15,
+            "one vol point must be 0.01 absolute vol"
+        );
+    }
+
+    #[test]
+    fn bump_size_config_rejects_unknown_fields() {
+        let json = r#"{"credit_bps": 5.0}"#; // typo'd key must not silently revert to 1.0
+        let result: Result<BumpSizeConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
     }
 
     // ------------------------------------------------------------------

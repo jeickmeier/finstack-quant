@@ -4,9 +4,11 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Errors produced by factor-model workflows.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum FactorModelError {
     /// No factor matched a dependency for a position.
+    #[error("No factor matched dependency {dependency:?} for position '{position_id}'")]
     UnmatchedDependency {
         /// Position identifier.
         position_id: String,
@@ -14,25 +16,30 @@ pub enum FactorModelError {
         dependency: MarketDependency,
     },
     /// Covariance or loadings referenced a factor that was not supplied.
+    #[error("Factor '{factor_id}' referenced but not found")]
     MissingFactor {
         /// Missing factor identifier.
         factor_id: FactorId,
     },
     /// Covariance matrix failed validation.
+    #[error("Invalid covariance matrix: {reason}")]
     InvalidCovariance {
         /// Reason the covariance matrix is invalid.
         reason: String,
     },
     /// Repricing under a factor move failed.
+    #[error("Repricing failed for position '{position_id}' under factor '{factor_id}': {source}")]
     RepricingFailed {
         /// Position identifier.
         position_id: String,
         /// Factor that triggered repricing.
         factor_id: FactorId,
         /// Underlying source error.
+        #[source]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// Multiple factors matched where only one was allowed.
+    #[error("Ambiguous factor match for position '{position_id}': {candidates:?}")]
     AmbiguousMatch {
         /// Position identifier.
         position_id: String,
@@ -41,68 +48,32 @@ pub enum FactorModelError {
     },
 }
 
-impl fmt::Display for FactorModelError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::UnmatchedDependency {
-                position_id,
-                dependency,
-            } => write!(
-                f,
-                "No factor matched dependency {dependency:?} for position '{position_id}'"
-            ),
-            Self::MissingFactor { factor_id } => {
-                write!(f, "Factor '{factor_id}' referenced but not found")
-            }
-            Self::InvalidCovariance { reason } => {
-                write!(f, "Invalid covariance matrix: {reason}")
-            }
-            Self::RepricingFailed {
-                position_id,
-                factor_id,
-                source,
-            } => write!(
-                f,
-                "Repricing failed for position '{position_id}' under factor '{factor_id}': {source}"
-            ),
-            Self::AmbiguousMatch {
-                position_id,
-                candidates,
-            } => write!(
-                f,
-                "Ambiguous factor match for position '{position_id}': {candidates:?}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for FactorModelError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            Self::RepricingFailed { source, .. } => Some(source.as_ref()),
-            _ => None,
-        }
-    }
-}
-
 /// Policy for handling dependencies that do not match any factor.
+///
+/// Serializes in `snake_case` (matching the crate-wide convention and this
+/// type's own `Display`/`FromStr`); the legacy PascalCase wire forms are
+/// still accepted on input via serde aliases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum UnmatchedPolicy {
     /// Fail immediately when any dependency is unmatched.
     ///
     /// Use this in production risk runs where dropping unmapped risk would be a
     /// control failure.
+    #[serde(alias = "Strict")]
     Strict,
     /// Roll unmatched risk into a residual bucket.
     ///
     /// Use this when the engine should preserve total exposure while making the
     /// unmatched component explicit as residual risk.
     #[default]
+    #[serde(alias = "Residual")]
     Residual,
     /// Continue but surface a warning to the caller.
     ///
     /// Suitable for exploratory workflows where visibility matters but a hard
     /// failure would be too disruptive.
+    #[serde(alias = "Warn")]
     Warn,
 }
 
@@ -131,7 +102,7 @@ impl FromStr for UnmatchedPolicy {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         crate::parse::parse_normalized_enum(s)
-            .map_err(|_| finstack_core::InputError::Invalid.into())
+            .map_err(|e| finstack_core::Error::Validation(format!("UnmatchedPolicy: {e}")))
     }
 }
 
@@ -199,5 +170,14 @@ mod tests {
     #[test]
     fn test_unmatched_policy_fromstr_rejects_unknown() {
         assert!("unknown".parse::<UnmatchedPolicy>().is_err());
+    }
+
+    #[test]
+    fn unmatched_policy_serializes_snake_case_and_reads_legacy_pascal_case() {
+        let json = serde_json::to_string(&UnmatchedPolicy::Strict).unwrap_or_default();
+        assert_eq!(json, "\"strict\"");
+        // Legacy PascalCase wire form still accepted on input.
+        let legacy: Result<UnmatchedPolicy, _> = serde_json::from_str("\"Residual\"");
+        assert!(matches!(legacy, Ok(UnmatchedPolicy::Residual)));
     }
 }

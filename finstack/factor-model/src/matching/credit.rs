@@ -453,6 +453,151 @@ mod tests {
     }
 
     // --------------------------------------------------------------
+    // Quant-review M5: unsorted issuer_betas must not break lookup
+    // --------------------------------------------------------------
+    #[test]
+    fn matcher_resorts_unsorted_issuer_betas_before_binary_search() {
+        // Rows deliberately supplied in reverse order; binary search over the
+        // raw vector would miss "ISSUER-A" and silently fall back to β = 1.0.
+        let row_a = issuer_row("ISSUER-A", 0.9, vec![0.85, 0.8, 0.75], three_level_tags());
+        let row_z = issuer_row("ISSUER-Z", 1.1, vec![1.0, 1.0, 1.0], three_level_tags());
+        let matcher = CreditHierarchicalMatcher::new(CreditHierarchicalConfig {
+            dependency_filter: DependencyFilter::default(),
+            hierarchy: three_level_spec(),
+            issuer_betas: vec![row_z, row_a],
+        });
+
+        let dep = MarketDependency::CreditCurve {
+            id: CurveId::new("ISSUER-A-HAZARD"),
+        };
+        let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-A");
+        let entries = matcher
+            .match_factor_with_betas(&dep, &attrs)
+            .expect("must succeed")
+            .expect("must match");
+        assert!(
+            (entries[0].beta - 0.9).abs() < 1e-12,
+            "calibrated pc beta must be found despite unsorted input; got {}",
+            entries[0].beta
+        );
+    }
+
+    // --------------------------------------------------------------
+    // Quant-review M7: short beta vector is a typed error, not β = 1.0
+    // --------------------------------------------------------------
+    #[test]
+    fn matcher_errors_on_beta_shape_mismatch() {
+        // Two betas for a three-level hierarchy.
+        let row = issuer_row("ISSUER-SHORT", 0.9, vec![0.85, 0.8], three_level_tags());
+        let matcher = CreditHierarchicalMatcher::new(CreditHierarchicalConfig {
+            dependency_filter: DependencyFilter::default(),
+            hierarchy: three_level_spec(),
+            issuer_betas: vec![row],
+        });
+
+        let dep = MarketDependency::CreditCurve {
+            id: CurveId::new("ISSUER-SHORT-HAZARD"),
+        };
+        let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-SHORT");
+        let err = matcher
+            .match_factor_with_betas(&dep, &attrs)
+            .expect_err("short beta vector must error");
+        match err {
+            FactorMatchError::BetaShapeMismatch {
+                issuer_id,
+                actual,
+                expected,
+            } => {
+                assert_eq!(issuer_id, "ISSUER-SHORT");
+                assert_eq!(actual, 2);
+                assert_eq!(expected, 3);
+            }
+            other => panic!("unexpected error variant: {other:?}"),
+        }
+    }
+
+    // --------------------------------------------------------------
+    // Quant-review M6: unknown issuer with partial tags is an error;
+    // with no tags at all it stays the PC-only proxy fallback
+    // --------------------------------------------------------------
+    #[test]
+    fn unknown_issuer_with_partial_tags_errors_instead_of_truncating() {
+        let matcher = CreditHierarchicalMatcher::new(CreditHierarchicalConfig {
+            dependency_filter: DependencyFilter::default(),
+            hierarchy: three_level_spec(),
+            issuer_betas: vec![],
+        });
+        let dep = MarketDependency::CreditCurve {
+            id: CurveId::new("UNKNOWN-HAZARD"),
+        };
+
+        // Partial tags (rating only) → error naming the first missing dim.
+        let attrs_partial = Attributes::default()
+            .with_meta(ISSUER_ID_META_KEY, "UNKNOWN")
+            .with_meta("rating", "IG");
+        let err = matcher
+            .match_factor_with_betas(&dep, &attrs_partial)
+            .expect_err("partial tags must error, not silently truncate");
+        match err {
+            FactorMatchError::MissingRequiredTag { dimension } => {
+                assert_eq!(dimension, "region");
+            }
+            other => panic!("unexpected error variant: {other:?}"),
+        }
+
+        // No hierarchy tags at all → documented PC-only fallback.
+        let attrs_none = Attributes::default().with_meta(ISSUER_ID_META_KEY, "UNKNOWN");
+        let entries = matcher
+            .match_factor_with_betas(&dep, &attrs_none)
+            .expect("must succeed")
+            .expect("must match");
+        assert_eq!(entries.len(), 1, "PC-only proxy");
+        assert_eq!(
+            entries[0].factor_id,
+            FactorId::new(CREDIT_GENERIC_FACTOR_ID)
+        );
+    }
+
+    // --------------------------------------------------------------
+    // Folded-level sentinel: β = 0.0 levels emit no entry and are not
+    // enumerated
+    // --------------------------------------------------------------
+    #[test]
+    fn zero_beta_levels_are_skipped_in_matching_and_enumeration() {
+        // Level 1 folded (β = 0.0).
+        let row = issuer_row("ISSUER-F", 0.9, vec![0.85, 0.0, 0.75], three_level_tags());
+        let config = CreditHierarchicalConfig {
+            dependency_filter: DependencyFilter::default(),
+            hierarchy: three_level_spec(),
+            issuer_betas: vec![row],
+        };
+
+        let ids = config.enumerate_factor_ids();
+        assert!(
+            !ids.iter()
+                .any(|id| id.as_str() == "credit::level1::Rating.Region::IG.EU"),
+            "folded level-1 bucket must not be enumerated: {ids:?}"
+        );
+
+        let matcher = CreditHierarchicalMatcher::new(config);
+        let dep = MarketDependency::CreditCurve {
+            id: CurveId::new("ISSUER-F-HAZARD"),
+        };
+        let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-F");
+        let entries = matcher
+            .match_factor_with_betas(&dep, &attrs)
+            .expect("must succeed")
+            .expect("must match");
+        assert_eq!(entries.len(), 3, "PC + levels 0 and 2 only");
+        assert!(
+            entries
+                .iter()
+                .all(|e| e.factor_id.as_str() != "credit::level1::Rating.Region::IG.EU"),
+            "folded level must not be emitted: {entries:?}"
+        );
+    }
+
+    // --------------------------------------------------------------
     // PR-2 test: unknown issuer with full tags → BucketOnly (β = 1)
     // --------------------------------------------------------------
     #[test]

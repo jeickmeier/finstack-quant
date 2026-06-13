@@ -650,3 +650,32 @@ fn decompose_levels_excludes_folded_issuers_from_bucket_means() {
         Some(0.0)
     );
 }
+
+// ---------------------------------------------------------------------------
+// Quant-review: non-finite inputs are rejected before they poison bucket means
+// ---------------------------------------------------------------------------
+
+#[test]
+fn decompose_levels_rejects_non_finite_inputs() {
+    let model = sample_model();
+    let as_of = model.as_of;
+
+    // NaN spread for one issuer must be a typed error, not a poisoned cascade.
+    let mut spreads = spread_map(&[("ISSUER-A", 120.0), ("ISSUER-B", 95.0)]);
+    spreads.insert(IssuerId::new("ISSUER-A"), f64::NAN);
+    let err = decompose_levels(&model, &spreads, 100.0, as_of, None)
+        .expect_err("NaN spread must be rejected");
+    assert!(
+        err.to_string().contains("ISSUER-A"),
+        "error must name the offending issuer: {err}"
+    );
+
+    // Non-finite generic is rejected too.
+    let spreads = spread_map(&[("ISSUER-A", 120.0)]);
+    let err = decompose_levels(&model, &spreads, f64::INFINITY, as_of, None)
+        .expect_err("non-finite generic must be rejected");
+    assert!(
+        err.to_string().contains("observed_generic"),
+        "error must name the generic input: {err}"
+    );
+}

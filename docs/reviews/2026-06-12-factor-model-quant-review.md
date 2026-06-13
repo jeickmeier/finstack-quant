@@ -1,6 +1,37 @@
 # Quant Finance Review — `finstack/factor-model` Crate and Bindings
 
-> **Status (2026-06-12): REVIEW COMPLETE — findings reported, remediation NOT started.**
+> **Remediation status (2026-06-12): COMPLETE for all Majors and the actionable
+> Moderates/Minors.** Highlights: M1 asof-coverage hard error (both directions) +
+> strictly-increasing date validation; M2 `'.'`-in-tag rejection at calibration
+> and `CreditFactorModel::validate`, plus `validate_matching_factor_ids` wired
+> into `validate()` (with β = 0.0 folded-level sentinel excluded from matcher
+> emission and enumeration); M3 adder vols from history for ALL modes (n−1
+> estimator, unified with factor variances) — `GloballyOff` no longer zeroes
+> idio vol; M4 new `FactorBumpUnit::VolPoint` (1.0 vol pt → 0.01 fractional);
+> M5 matcher re-sorts `issuer_betas`; M6 unknown-issuer partial tags now error
+> (no-tags PC-only fallback retained); M7 `BetaShapeMismatch` typed error;
+> M8/M9 attribution mixed-currency + unknown-issuer hard errors; M10 covariance
+> units contract documented; M11 non-finite sensitivity/covariance screening in
+> parametric+simulation decomposers; M12 `validate_single_currency` in the delta
+> engine. Moderates: `min_history` counts usable return pairs, inbound
+> calibration types + `BumpSizeConfig` deny unknown fields, scale-relative
+> covariance symmetry tolerance, decompose non-finite input rejection,
+> Ridge/static-correlation authority + fold_ups load-bearing + tag-migration
+> docs, GIL released in `calibrate`, BTreeMap→PyDict ordering, duplicate
+> position_id ValueError, WASM non-finite → JS error, parity-contract inventory
+> fixed. Minors: hard asserts in `SensitivityMatrix`, `UnmatchedPolicy`
+> snake_case wire (legacy aliases kept), thiserror conversions, `Custom("")`
+> parse rejection, doc/docstring fixes. Regression tests added across
+> factor-model unit tests, `valuations/tests/credit_calibration.rs` (33),
+> `credit_decomposition.rs` (13), attribution and portfolio suites; all
+> verified with `mise run rust-lint`, `python-lint`, `wasm-lint` green and
+> 33 Python binding tests passing after `python-build`.
+> Deliberately NOT changed (open user decisions): attribution CS01 sign
+> convention (attribution review OQ1); peel self-inclusion bias (MD, documented
+> as model design); `decompose_period` cannot detect tag migration (documented
+> contract).
+>
+> Original review status (2026-06-12): REVIEW COMPLETE.
 > 59 findings (12 Major, 24 Moderate, 23 Minor; no Blockers). Every Major/Moderate
 > finding survived an adversarial multi-verifier pass (2–3 independent refutation
 > attempts per finding, majority vote); 2 candidate findings were refuted and are

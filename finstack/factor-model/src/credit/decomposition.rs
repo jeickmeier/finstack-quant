@@ -100,7 +100,7 @@ pub struct PeriodDecomposition {
 // ---------------------------------------------------------------------------
 
 /// Failure modes for the decomposition routines.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum DecompositionError {
     /// An issuer appeared in `observed_spreads` but had no

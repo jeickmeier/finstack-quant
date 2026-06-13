@@ -54,13 +54,19 @@ impl SensitivityMatrix {
 
     /// Read a matrix element.
     #[must_use]
+    /// # Panics
+    ///
+    /// Panics when either index is out of bounds. The checks are hard
+    /// asserts (not `debug_assert!`): with row-major storage an
+    /// out-of-range `factor_idx` can land inside another position's row,
+    /// and a silent wrong read in release builds is a risk bug.
     pub fn delta(&self, position_idx: usize, factor_idx: usize) -> f64 {
-        debug_assert!(
+        assert!(
             position_idx < self.n_positions(),
             "position_idx {position_idx} out of bounds for {} positions",
             self.n_positions()
         );
-        debug_assert!(
+        assert!(
             factor_idx < self.n_factors,
             "factor_idx {factor_idx} out of bounds for {} factors",
             self.n_factors
@@ -69,13 +75,17 @@ impl SensitivityMatrix {
     }
 
     /// Set a matrix element.
+    /// # Panics
+    ///
+    /// Panics when either index is out of bounds (hard assert; see
+    /// [`Self::delta`]).
     pub fn set_delta(&mut self, position_idx: usize, factor_idx: usize, value: f64) {
-        debug_assert!(
+        assert!(
             position_idx < self.n_positions(),
             "position_idx {position_idx} out of bounds for {} positions",
             self.n_positions()
         );
-        debug_assert!(
+        assert!(
             factor_idx < self.n_factors,
             "factor_idx {factor_idx} out of bounds for {} factors",
             self.n_factors

@@ -68,11 +68,18 @@ impl FromStr for FactorType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let n = crate::parse::normalize_label(s);
         if n.starts_with("custom:") || n.starts_with("custom_") {
+            // Take the name from the original input after the separator so
+            // user casing is preserved; separators '-', '/', and ' ' were
+            // normalized to '_', so accept any of them in the raw input.
             let name = s
-                .split_once(':')
-                .or_else(|| s.split_once('_'))
+                .split_once([':', '_', '-', '/', ' '])
                 .map(|(_, v)| v.trim())
                 .unwrap_or("");
+            if name.is_empty() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "FactorType: custom factor label {s:?} has an empty name"
+                )));
+            }
             return Ok(Self::Custom(name.to_string()));
         }
         match n.as_str() {
@@ -83,7 +90,9 @@ impl FromStr for FactorType {
             "volatility" | "vol" => Ok(Self::Volatility),
             "commodity" => Ok(Self::Commodity),
             "inflation" => Ok(Self::Inflation),
-            _ => Err(finstack_core::InputError::Invalid.into()),
+            _ => Err(finstack_core::Error::Validation(format!(
+                "FactorType: unknown label {s:?}"
+            ))),
         }
     }
 }

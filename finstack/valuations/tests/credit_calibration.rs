@@ -868,8 +868,14 @@ fn bucket_only_uses_peer_proxy_at_deepest_level() {
 
     // BucketOnly issuer X in the same IG.EU bucket.
     let x_id = IssuerId::new("ISSUER-X");
+    // Only the last two dates are observed -> a single usable return, which
+    // is below the 2-observation minimum for a FromHistory adder vol, so the
+    // peer-proxy cascade must engage (issuers with sufficient residual
+    // history now always take their own FromHistory vol, any mode).
     let x_series: Vec<Option<f64>> = (0..n)
-        .map(|i| Some(150.0 + 0.9 * generic_values[i] + 0.05 * ((i as f64) * 0.7).cos()))
+        .map(|i| {
+            (i >= n - 2).then(|| 150.0 + 0.9 * generic_values[i] + 0.05 * ((i as f64) * 0.7).cos())
+        })
         .collect();
     asof_spreads.insert(x_id.clone(), x_series[n - 1].unwrap());
     spreads.insert(x_id.clone(), x_series);
@@ -1000,8 +1006,14 @@ fn bucket_peer_proxy_falls_back_to_parent() {
 
     // BucketOnly issuer X in IG.APAC — no IG.APAC IssuerBeta peers.
     let x_id = IssuerId::new("ISSUER-X");
+    // Only the last two dates are observed -> a single usable return, which
+    // is below the 2-observation minimum for a FromHistory adder vol, so the
+    // peer-proxy cascade must engage (issuers with sufficient residual
+    // history now always take their own FromHistory vol, any mode).
     let x_series: Vec<Option<f64>> = (0..n)
-        .map(|i| Some(150.0 + 0.9 * generic_values[i] + 0.05 * ((i as f64) * 0.7).cos()))
+        .map(|i| {
+            (i >= n - 2).then(|| 150.0 + 0.9 * generic_values[i] + 0.05 * ((i as f64) * 0.7).cos())
+        })
         .collect();
     asof_spreads.insert(x_id.clone(), x_series[n - 1].unwrap());
     spreads.insert(x_id.clone(), x_series);
@@ -1131,8 +1143,14 @@ fn peer_proxy_cascade_falls_back_to_global() {
 
     // BucketOnly issuer X in HY.APAC — no HY IssuerBeta peers at any level.
     let x_id = IssuerId::new("ISSUER-X");
+    // Only the last two dates are observed -> a single usable return, which
+    // is below the 2-observation minimum for a FromHistory adder vol, so the
+    // peer-proxy cascade must engage (issuers with sufficient residual
+    // history now always take their own FromHistory vol, any mode).
     let x_series: Vec<Option<f64>> = (0..n)
-        .map(|i| Some(250.0 + 1.2 * generic_values[i] + 0.08 * ((i as f64) * 0.4).cos()))
+        .map(|i| {
+            (i >= n - 2).then(|| 250.0 + 1.2 * generic_values[i] + 0.08 * ((i as f64) * 0.4).cos())
+        })
         .collect();
     asof_spreads.insert(x_id.clone(), x_series[n - 1].unwrap());
     spreads.insert(x_id.clone(), x_series);
@@ -1217,15 +1235,19 @@ fn peer_proxy_cascade_falls_back_to_global() {
 }
 
 // ---------------------------------------------------------------------------
-// PR-5a Test 6: all-BucketOnly model uses 0.0 vol with Default source
+// PR-5a Test 6: GloballyOff issuers get FromHistory adder vols
 // ---------------------------------------------------------------------------
 
-/// When every issuer is `BucketOnly` (GloballyOff policy), there are no
-/// `IssuerBeta` peers anywhere. Every issuer must get `adder_vol = 0.0` and
-/// `AdderVolSource::Default`.
+/// Under `GloballyOff` every issuer is `BucketOnly`, but adder vols are still
+/// estimated from each issuer's own residual history (quant-review M3: the
+/// old IssuerBeta-only gate silently zeroed every idiosyncratic vol under the
+/// default policy). In this fixture every issuer is alone in its deepest
+/// (rating × region) bucket, so the final-level peel absorbs the residual
+/// completely and the FromHistory vol is exactly 0.0 — the bucket factor
+/// carries that risk instead. The source must still be `FromHistory`, not the
+/// `Default` fallback.
 #[test]
-fn peer_proxy_with_no_issuer_beta_anywhere_uses_zero() {
-    // GloballyOff → all issuers BucketOnly, no FromHistory vols anywhere.
+fn globally_off_issuers_get_from_history_adder_vols() {
     let cfg = CreditCalibrationConfig {
         min_bucket_size_per_level: BucketSizeThresholds {
             per_level: vec![1, 1],
@@ -1247,18 +1269,78 @@ fn peer_proxy_with_no_issuer_beta_anywhere_uses_zero() {
             "mode must be BucketOnly"
         );
         assert!(
-            row.adder_vol_annualized.abs() < 1e-12,
-            "adder_vol must be 0.0 when no IssuerBeta peers exist; got {} for {:?}",
-            row.adder_vol_annualized,
-            row.issuer_id.as_str()
-        );
-        assert!(
-            matches!(row.adder_vol_source, AdderVolSource::Default),
-            "adder_vol_source must be Default; got {:?} for {:?}",
+            matches!(row.adder_vol_source, AdderVolSource::FromHistory),
+            "adder_vol_source must be FromHistory under GloballyOff with full history; \
+             got {:?} for {:?}",
             row.adder_vol_source,
             row.issuer_id.as_str()
         );
+        assert!(
+            row.adder_vol_annualized.abs() < 1e-9,
+            "singleton-bucket residuals are fully absorbed by the deepest level, \
+             so the FromHistory vol must be 0.0; got {} for {:?}",
+            row.adder_vol_annualized,
+            row.issuer_id.as_str()
+        );
     }
+}
+
+/// The `Default` 0.0 fallback now only applies when no issuer anywhere has
+/// enough residual history for a `FromHistory` estimate (fewer than 2 usable
+/// observations in the working panel).
+#[test]
+fn adder_vol_defaults_to_zero_when_history_too_short_everywhere() {
+    let as_of = d(2024, Month::March, 31);
+    let dates = monthly_dates(2, as_of);
+    let generic_values = vec![100.0, 100.5];
+
+    let issuer = IssuerId::new("ISSUER-A");
+    let mut spreads: BTreeMap<IssuerId, Vec<Option<f64>>> = BTreeMap::new();
+    spreads.insert(issuer.clone(), vec![Some(120.0), Some(121.0)]);
+    let mut tags: BTreeMap<IssuerId, IssuerTags> = BTreeMap::new();
+    tags.insert(issuer.clone(), tags_for("IG", "EU"));
+    let mut asof_spreads = BTreeMap::new();
+    asof_spreads.insert(issuer, 121.0);
+
+    let cfg = CreditCalibrationConfig {
+        min_bucket_size_per_level: BucketSizeThresholds {
+            per_level: vec![1, 1],
+        },
+        ..config_with(
+            IssuerBetaPolicy::GloballyOff,
+            vec![HierarchyDimension::Rating, HierarchyDimension::Region],
+        )
+    };
+
+    let inputs = CreditCalibrationInputs {
+        history_panel: HistoryPanel { dates, spreads },
+        issuer_tags: IssuerTagPanel { tags },
+        generic_factor: GenericFactorSeries {
+            spec: GenericFactorSpec {
+                name: "CDX".to_owned(),
+                series_id: "cdx".to_owned(),
+            },
+            values: generic_values,
+        },
+        as_of,
+        asof_spreads,
+        idiosyncratic_overrides: BTreeMap::new(),
+    };
+
+    let model = CreditCalibrator::new(cfg)
+        .calibrate(inputs)
+        .expect("calibration succeeds");
+
+    let row = &model.issuer_betas[0];
+    assert!(
+        row.adder_vol_annualized.abs() < 1e-12,
+        "one usable return is below the FromHistory minimum; vol must be 0.0"
+    );
+    assert!(
+        matches!(row.adder_vol_source, AdderVolSource::Default),
+        "adder_vol_source must be Default; got {:?}",
+        row.adder_vol_source
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1737,4 +1819,111 @@ fn calibration_config_serialization_matches_schema() {
         "CreditCalibrationConfig serialization failed schema validation:\n  {}",
         errors.join("\n  ")
     );
+}
+
+// ---------------------------------------------------------------------------
+// Quant-review M1: asof_spreads must cover exactly the calibrated universe
+// ---------------------------------------------------------------------------
+
+/// A history issuer missing from `asof_spreads` previously got a silent
+/// `adder_at_anchor = 0.0` and shifted every bucket peer's anchor mean.
+#[test]
+fn calibration_rejects_asof_spreads_missing_a_history_issuer() {
+    let mut inputs = fixture_panel().into_inputs();
+    inputs.asof_spreads.remove(&IssuerId::new("ISSUER-B"));
+
+    let cfg = config_with(
+        IssuerBetaPolicy::GloballyOff,
+        vec![HierarchyDimension::Rating, HierarchyDimension::Region],
+    );
+    let err = CreditCalibrator::new(cfg)
+        .calibrate(inputs)
+        .expect_err("missing as_of spread must be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("ISSUER-B") && msg.contains("asof_spreads"),
+        "error must name the missing issuer: {msg}"
+    );
+}
+
+/// An asof-only issuer would silently enter anchor bucket means with unit
+/// betas while receiving no artifact row.
+#[test]
+fn calibration_rejects_asof_only_issuer() {
+    let mut inputs = fixture_panel().into_inputs();
+    inputs
+        .asof_spreads
+        .insert(IssuerId::new("ISSUER-GHOST"), 175.0);
+
+    let cfg = config_with(
+        IssuerBetaPolicy::GloballyOff,
+        vec![HierarchyDimension::Rating, HierarchyDimension::Region],
+    );
+    let err = CreditCalibrator::new(cfg)
+        .calibrate(inputs)
+        .expect_err("asof-only issuer must be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("ISSUER-GHOST"),
+        "error must name the anchor-only issuer: {msg}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Quant-review M2: '.' in hierarchy tag values corrupts factor identity
+// ---------------------------------------------------------------------------
+
+#[test]
+fn calibration_rejects_dotted_tag_values() {
+    let mut inputs = fixture_panel().into_inputs();
+    // "Cons.Disc" would mis-segment bucket paths in synth_tags_from_path,
+    // the fold-up parent computation, and the matcher's factor IDs.
+    inputs.issuer_tags.tags.insert(
+        IssuerId::new("ISSUER-A"),
+        IssuerTags(BTreeMap::from([
+            ("rating".to_owned(), "IG".to_owned()),
+            ("region".to_owned(), "Cons.Disc".to_owned()),
+        ])),
+    );
+
+    let cfg = config_with(
+        IssuerBetaPolicy::GloballyOff,
+        vec![HierarchyDimension::Rating, HierarchyDimension::Region],
+    );
+    let err = CreditCalibrator::new(cfg)
+        .calibrate(inputs)
+        .expect_err("dotted tag value must be rejected");
+    let msg = err.to_string();
+    assert!(
+        msg.contains("Cons.Disc") && msg.contains("separator"),
+        "error must name the offending tag value: {msg}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Quant-review: unsorted/duplicated date grids are rejected
+// ---------------------------------------------------------------------------
+
+#[test]
+fn calibration_rejects_unsorted_or_duplicated_dates() {
+    let mut inputs = fixture_panel().into_inputs();
+    let n = inputs.history_panel.dates.len();
+    inputs.history_panel.dates.swap(0, 1);
+
+    let cfg = config_with(
+        IssuerBetaPolicy::GloballyOff,
+        vec![HierarchyDimension::Rating, HierarchyDimension::Region],
+    );
+    let err = CreditCalibrator::new(cfg.clone())
+        .calibrate(inputs)
+        .expect_err("unsorted dates must be rejected");
+    assert!(err.to_string().contains("strictly increasing"));
+
+    let mut inputs = fixture_panel().into_inputs();
+    inputs.history_panel.dates[1] = inputs.history_panel.dates[0];
+    assert_eq!(inputs.history_panel.dates.len(), n);
+    let err = CreditCalibrator::new(cfg)
+        .calibrate(inputs)
+        .expect_err("duplicated dates must be rejected");
+    assert!(err.to_string().contains("strictly increasing"));
 }

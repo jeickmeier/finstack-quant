@@ -174,7 +174,9 @@ mod tests {
         let matcher = StubMatcher {
             behavior: StubBehavior::MultiEntry,
         };
-        let dependencies = vec![MarketDependency::Spot { id: "ISSUER".into() }];
+        let dependencies = vec![MarketDependency::Spot {
+            id: "ISSUER".into(),
+        }];
 
         let (assignment, unmatched) = assign_position_factors(
             &PositionId::new("pos-1"),
@@ -197,7 +199,9 @@ mod tests {
         let matcher = StubMatcher {
             behavior: StubBehavior::Error,
         };
-        let dependencies = vec![MarketDependency::Spot { id: "ISSUER".into() }];
+        let dependencies = vec![MarketDependency::Spot {
+            id: "ISSUER".into(),
+        }];
 
         let result = assign_position_factors(
             &PositionId::new("pos-1"),
@@ -211,6 +215,9 @@ mod tests {
         };
         let message = error.to_string();
         assert!(message.contains("pos-1"), "error names position: {message}");
-        assert!(message.contains("sector"), "error names dimension: {message}");
+        assert!(
+            message.contains("sector"),
+            "error names dimension: {message}"
+        );
     }
 }
