@@ -19,7 +19,11 @@ where
 
 /// Validate and canonicalize a covenant spec JSON string.
 pub fn validate_covenant_spec_json(json: &str) -> Result<String> {
-    roundtrip_json::<CovenantSpec>(json)
+    let value: CovenantSpec = serde_json::from_str(json)
+        .map_err(|e| finstack_core::Error::Validation(format!("Invalid covenant JSON: {e}")))?;
+    value.validate()?;
+    serde_json::to_string(&value)
+        .map_err(|e| finstack_core::Error::Validation(format!("Serialize covenant JSON: {e}")))
 }
 
 /// Validate and canonicalize a covenant report JSON string.
@@ -29,7 +33,11 @@ pub fn validate_covenant_report_json(json: &str) -> Result<String> {
 
 /// Validate and canonicalize a covenant engine JSON string.
 pub fn validate_covenant_engine_json(json: &str) -> Result<String> {
-    roundtrip_json::<CovenantEngine>(json)
+    let value: CovenantEngine = serde_json::from_str(json)
+        .map_err(|e| finstack_core::Error::Validation(format!("Invalid covenant JSON: {e}")))?;
+    value.validate()?;
+    serde_json::to_string(&value)
+        .map_err(|e| finstack_core::Error::Validation(format!("Serialize covenant JSON: {e}")))
 }
 
 /// Evaluate a covenant engine JSON string against a string-keyed metric map.
@@ -37,6 +45,7 @@ pub fn evaluate_engine_json(engine_json: &str, metrics_json: &str, as_of: &str) 
     let engine: CovenantEngine = serde_json::from_str(engine_json).map_err(|e| {
         finstack_core::Error::Validation(format!("Invalid covenant engine JSON: {e}"))
     })?;
+    engine.validate()?;
     let metrics: Vec<(String, f64)> =
         serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(metrics_json)
             .map_err(|e| finstack_core::Error::Validation(format!("Invalid metric map JSON: {e}")))?

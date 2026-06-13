@@ -10,7 +10,6 @@ description = "Loan covenant specifications and evaluation engine for Finstack: 
 
 [dependencies]
 finstack-core = { path = "../core" }
-finstack-monte-carlo = { path = "../monte_carlo", default-features = false }
 indexmap = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }

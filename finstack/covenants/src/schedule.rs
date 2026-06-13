@@ -16,6 +16,13 @@ impl ThresholdSchedule {
         Self(entries)
     }
 
+    /// Create a validated threshold schedule, sorting entries by date.
+    pub fn try_new(entries: Vec<(Date, f64)>) -> finstack_core::Result<Self> {
+        let schedule = Self::new(entries);
+        schedule.validate()?;
+        Ok(schedule)
+    }
+
     /// Check if the threshold schedule is empty.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -34,6 +41,25 @@ impl ThresholdSchedule {
     /// Consume the schedule and return the sorted entries.
     pub fn into_inner(self) -> Vec<(Date, f64)> {
         self.0
+    }
+
+    pub(crate) fn validate(&self) -> finstack_core::Result<()> {
+        for (_, value) in &self.0 {
+            if !value.is_finite() {
+                return Err(finstack_core::Error::Validation(
+                    "threshold schedule values must be finite".to_string(),
+                ));
+            }
+        }
+        for pair in self.0.windows(2) {
+            if pair[0].0 == pair[1].0 {
+                return Err(finstack_core::Error::Validation(format!(
+                    "threshold schedule contains duplicate date {}",
+                    pair[0].0
+                )));
+            }
+        }
+        Ok(())
     }
 }
 

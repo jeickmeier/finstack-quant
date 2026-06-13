@@ -1054,6 +1054,7 @@
               "type": "string"
             },
             "CollateralEligibility": {
+              "additionalProperties": false,
               "description": "Single collateral eligibility entry.\n\nDefines eligibility criteria and haircut for a specific type of collateral.",
               "properties": {
                 "asset_class": {
@@ -1546,6 +1547,7 @@
               ]
             },
             "CsaSpec": {
+              "additionalProperties": false,
               "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```ignore\nuse finstack_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\n# fn main() -> finstack_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::simm_standard(Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n};\n# Ok(())\n# }\n```",
               "properties": {
                 "base_currency": {
@@ -2630,6 +2632,7 @@
               "type": "object"
             },
             "EligibleCollateralSchedule": {
+              "additionalProperties": false,
               "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```ignore\nuse finstack_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_core::Error>(())\n```",
               "properties": {
                 "default_haircut": {
@@ -2959,7 +2962,7 @@
             },
             "FloatingRateSpec": {
               "additionalProperties": false,
-              "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings are **not yet supported**. Every observation date must\nfall on or after the forward curve base date: a reset or overnight\nobservation strictly before the curve base date cannot be projected from\nthe curve without silently replacing the realized fixing, so emission\nroutes it through [`FloatingRateFallback`] — `Error` (the default) fails\nthe build with a descriptive message naming the date and index;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only. To price a seasoned floating\ninstrument exactly, supply a curve based on/before the first unrealized\nobservation date.\n\n# Example\n\n```rust\nuse finstack_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_cashflows::builder::FloatingRateSpec;\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+              "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_cashflows::builder::FloatingRateSpec;\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
               "properties": {
                 "all_in_cap_bp": {
                   "default": null,
@@ -3151,6 +3154,7 @@
               ]
             },
             "ImParameters": {
+              "additionalProperties": false,
               "description": "Initial margin parameters.\n\nInitial margin is collateral posted to cover potential future exposure (PFE)\nduring the close-out period following a default. IM is required for\nnon-centrally cleared derivatives under BCBS-IOSCO rules.\n\n# Margin Period of Risk (MPOR)\n\nThe MPOR determines the horizon over which PFE is calculated:\n- Standard: 10 business days for bilateral derivatives\n- Reduced: 5 days for certain liquid products\n\n# Example\n\n```ignore\nuse finstack_margin::{ImMethodology, ImParameters};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\nlet im_params = ImParameters {\n    methodology: ImMethodology::Simm,\n    mpor_days: 10,\n    threshold: Money::new(50_000_000.0, Currency::USD),\n    mta: Money::new(0.0, Currency::USD), // Combined with VM MTA\n    segregated: true,\n};\n```",
               "properties": {
                 "methodology": {
@@ -3261,6 +3265,7 @@
               "type": "object"
             },
             "MarginCallTiming": {
+              "additionalProperties": false,
               "description": "Margin call timing parameters.\n\nSpecifies the operational timing for margin calls including\nnotification and dispute resolution windows.",
               "properties": {
                 "delivery_grace_days": {
@@ -3381,6 +3386,7 @@
               "type": "object"
             },
             "MaturityConstraints": {
+              "additionalProperties": false,
               "description": "Maturity constraints for eligible collateral.\n\nSome CSAs restrict collateral based on remaining maturity to limit\nduration risk in the collateral portfolio.",
               "properties": {
                 "max_remaining_years": {
@@ -3495,6 +3501,7 @@
               ]
             },
             "OtcMarginSpec": {
+              "additionalProperties": false,
               "description": "OTC derivative margin specification (ISDA CSA compliant).\n\nThis is the standard margin specification for bilateral and cleared\nOTC derivatives. It combines CSA terms with clearing-specific parameters.\n\n# Usage\n\nAttach this to any OTC derivative instrument that requires margining:\n- Interest Rate Swaps (IRS)\n- Credit Default Swaps (CDS)\n- CDS Indices\n- Total Return Swaps (TRS)\n\n# Example\n\n```ignore\nuse finstack_margin::{OtcMarginSpec, CsaSpec, ClearingStatus, ImMethodology, MarginTenor};\n\n# fn main() -> finstack_core::Result<()> {\n// Bilateral (uncleared) derivative\nlet bilateral_spec = OtcMarginSpec::bilateral_simm(CsaSpec::usd_regulatory()?);\n\n// Cleared derivative\nlet cleared_spec = OtcMarginSpec::cleared(\"LCH\", finstack_core::currency::Currency::USD)?;\n# Ok(())\n# }\n```",
               "properties": {
                 "clearing_status": {
@@ -4189,6 +4196,14 @@
                 },
                 "scenario_price_shock_pct": {
                   "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "scenario_spread_shock_bp": {
+                  "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
                   "format": "double",
                   "type": [
                     "number",
@@ -5285,6 +5300,7 @@
               ]
             },
             "VmParameters": {
+              "additionalProperties": false,
               "description": "Variation margin parameters.\n\nThese parameters govern the daily (or periodic) exchange of variation margin\nunder a CSA agreement. VM is exchanged to eliminate mark-to-market exposure.\n\n# ISDA CSA Standard Terms\n\nThe 2016 VM CSA introduced standardized terms for variation margin:\n- Zero threshold for in-scope entities\n- Daily exchange with T+1 settlement\n- Cash or highly liquid securities as collateral\n\n# Example\n\n```ignore\nuse finstack_margin::{MarginTenor, VmParameters};\nuse finstack_core::currency::Currency;\nuse finstack_core::money::Money;\n\nlet vm_params = VmParameters {\n    threshold: Money::new(10_000_000.0, Currency::USD),\n    mta: Money::new(500_000.0, Currency::USD),\n    rounding: Money::new(10_000.0, Currency::USD),\n    independent_amount: Money::new(0.0, Currency::USD),\n    frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n};\n```",
               "properties": {
                 "frequency": {

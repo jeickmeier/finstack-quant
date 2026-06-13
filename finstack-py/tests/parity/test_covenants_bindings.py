@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from finstack import covenants
 
 
@@ -36,3 +38,15 @@ def test_covenant_report_json_roundtrip() -> None:
     }
 
     assert json.loads(covenants.validate_covenant_report(json.dumps(report))) == report
+
+
+def test_covenant_engine_rejects_unknown_fields() -> None:
+    engine = {
+        "specs": [],
+        "breach_history": [],
+        "windows": [],
+        "waviers": [],
+    }
+
+    with pytest.raises(ValueError, match="unknown field"):
+        covenants.validate_covenant_engine(json.dumps(engine))

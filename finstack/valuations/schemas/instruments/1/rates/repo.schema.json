@@ -196,6 +196,7 @@
               "type": "string"
             },
             "CollateralEligibility": {
+              "additionalProperties": false,
               "description": "Single collateral eligibility entry.\n\nDefines eligibility criteria and haircut for a specific type of collateral.",
               "properties": {
                 "asset_class": {
@@ -1171,6 +1172,7 @@
               ]
             },
             "EligibleCollateralSchedule": {
+              "additionalProperties": false,
               "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```ignore\nuse finstack_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_core::Error>(())\n```",
               "properties": {
                 "default_haircut": {
@@ -1229,6 +1231,7 @@
               ]
             },
             "MaturityConstraints": {
+              "additionalProperties": false,
               "description": "Maturity constraints for eligible collateral.\n\nSome CSAs restrict collateral based on remaining maturity to limit\nduration risk in the collateral portfolio.",
               "properties": {
                 "max_remaining_years": {
@@ -1562,6 +1565,14 @@
                     "null"
                   ]
                 },
+                "scenario_spread_shock_bp": {
+                  "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
                 "spot_bump_pct": {
                   "default": null,
                   "description": "Custom spot bump size override (as percentage, e.g., 0.01 for 1%)\n\nWhen set, overrides both standard and adaptive spot bump calculations.",
@@ -1696,6 +1707,7 @@
               "type": "object"
             },
             "RepoMarginSpec": {
+              "additionalProperties": false,
               "description": "GMRA 2011 compliant repo margin specification.\n\nDefines margin maintenance parameters for repurchase agreements\nfollowing GMRA 2011 standards.\n\n# Example\n\n```ignore\nuse finstack_margin::{EligibleCollateralSchedule, MarginTenor, RepoMarginSpec, RepoMarginType};\n\nlet margin_spec = RepoMarginSpec {\n    margin_type: RepoMarginType::MarkToMarket,\n    margin_ratio: 1.02,           // 2% over-collateralization\n    margin_call_threshold: 0.01,  // 1% deviation triggers call\n    call_frequency: MarginTenor::Daily,\n    settlement_lag: 1,\n    pays_margin_interest: true,\n    margin_interest_rate: Some(0.05),\n    substitution_allowed: true,\n    eligible_substitutes: Some(EligibleCollateralSchedule::us_treasuries()?),\n};\n# Ok::<(), finstack_core::Error>(())\n```\n\n# GMRA 2011 References\n\n- Paragraph 4: Margin Maintenance\n- Paragraph 5: Income Payments\n- Paragraph 8: Substitution\n- Annex I: Margin Ratio and Haircut",
               "properties": {
                 "call_frequency": {

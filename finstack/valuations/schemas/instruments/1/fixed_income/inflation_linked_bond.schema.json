@@ -1460,6 +1460,14 @@
                     "null"
                   ]
                 },
+                "scenario_spread_shock_bp": {
+                  "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
                 "spot_bump_pct": {
                   "default": null,
                   "description": "Custom spot bump size override (as percentage, e.g., 0.01 for 1%)\n\nWhen set, overrides both standard and adaptive spot bump calculations.",

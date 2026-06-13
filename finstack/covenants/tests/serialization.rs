@@ -4,10 +4,11 @@
 
 use finstack_core::dates::{Date, Tenor};
 use finstack_covenants::{
-    BoundKind, ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence,
-    CovenantEngine, CovenantForecast, CovenantForecastConfig, CovenantMetricId, CovenantReport,
-    CovenantScope, CovenantSpec, CovenantTestSpec, CovenantType, CovenantWindow, FutureBreach,
-    SpringingCondition, ThresholdSchedule, ThresholdTest,
+    validate_covenant_engine_json, validate_covenant_report_json, BoundKind,
+    ConsequenceApplication, Covenant, CovenantBreach, CovenantConsequence, CovenantEngine,
+    CovenantForecast, CovenantForecastConfig, CovenantMetricId, CovenantReport, CovenantScope,
+    CovenantSpec, CovenantTestSpec, CovenantType, CovenantWindow, FutureBreach, SpringingCondition,
+    ThresholdSchedule, ThresholdTest,
 };
 use time::Month;
 
@@ -297,6 +298,44 @@ fn covenant_engine_roundtrip() {
 }
 
 #[test]
+fn validate_engine_json_rejects_unknown_top_level_and_nested_fields() {
+    let top_level_typo = serde_json::json!({
+        "specs": [],
+        "breach_history": [],
+        "windows": [],
+        "waviers": []
+    })
+    .to_string();
+    assert!(validate_covenant_engine_json(&top_level_typo).is_err());
+
+    let waiver_typo = serde_json::json!({
+        "specs": [],
+        "breach_history": [],
+        "windows": [],
+        "waivers": [{
+            "covenant_id": "max_debt_ebitda",
+            "effective_date": "2025-01-01",
+            "expiry_dat": "2025-03-31",
+            "amended_threshold": null,
+            "description": "typo should fail"
+        }]
+    })
+    .to_string();
+    assert!(validate_covenant_engine_json(&waiver_typo).is_err());
+}
+
+#[test]
+fn validate_report_json_rejects_unknown_fields() {
+    let report = serde_json::json!({
+        "covenant_type": "Debt/EBITDA <= 5.00x",
+        "passed": true,
+        "surprise": true
+    })
+    .to_string();
+    assert!(validate_covenant_report_json(&report).is_err());
+}
+
+#[test]
 fn consequence_application_roundtrip() {
     let application = ConsequenceApplication {
         consequence_type: "Rate Increase".to_string(),
@@ -330,6 +369,7 @@ fn covenant_forecast_config_roundtrip() {
         random_seed: Some(42),
         antithetic: true,
         reference_date: Some(date(2025, 1, 1)),
+        breach_probability_threshold: 0.05,
     };
 
     let rt = roundtrip(&config);
@@ -347,16 +387,17 @@ fn covenant_forecast_config_default_roundtrip() {
 fn covenant_forecast_roundtrip() {
     let forecast = CovenantForecast {
         covenant_id: "Debt/EBITDA <= 5.00x".to_string(),
+        covenant_description: "Debt/EBITDA <= 5.00x".to_string(),
         comparator: BoundKind::AtMost,
         test_dates: vec![date(2025, 3, 31), date(2025, 6, 30), date(2025, 9, 30)],
-        projected_values: vec![4.2, 4.5, 4.8],
+        projected_values: vec![Some(4.2), Some(4.5), Some(4.8)],
         thresholds: vec![5.0, 5.0, 5.0],
-        headroom: vec![0.16, 0.10, 0.04],
+        headroom: vec![Some(0.16), Some(0.10), Some(0.04)],
         breach_probability: vec![0.0, 0.0, 0.0],
         breach_probability_stderr: vec![0.0, 0.0, 0.0],
         first_breach_date: None,
-        min_headroom_date: date(2025, 9, 30),
-        min_headroom_value: 0.04,
+        min_headroom_date: Some(date(2025, 9, 30)),
+        min_headroom_value: Some(0.04),
     };
 
     let rt = roundtrip(&forecast);
@@ -367,16 +408,17 @@ fn covenant_forecast_roundtrip() {
 fn covenant_forecast_with_breach_roundtrip() {
     let forecast = CovenantForecast {
         covenant_id: "Interest Coverage >= 1.50x".to_string(),
+        covenant_description: "Interest Coverage >= 1.50x".to_string(),
         comparator: BoundKind::AtLeast,
         test_dates: vec![date(2025, 3, 31), date(2025, 6, 30)],
-        projected_values: vec![1.6, 1.3],
+        projected_values: vec![Some(1.6), Some(1.3)],
         thresholds: vec![1.5, 1.5],
-        headroom: vec![0.067, -0.133],
+        headroom: vec![Some(0.067), Some(-0.133)],
         breach_probability: vec![0.05, 0.75],
         breach_probability_stderr: vec![0.0, 0.0],
         first_breach_date: Some(date(2025, 6, 30)),
-        min_headroom_date: date(2025, 6, 30),
-        min_headroom_value: -0.133,
+        min_headroom_date: Some(date(2025, 6, 30)),
+        min_headroom_value: Some(-0.133),
     };
 
     let rt = roundtrip(&forecast);
@@ -384,13 +426,38 @@ fn covenant_forecast_with_breach_roundtrip() {
 }
 
 #[test]
+fn covenant_forecast_nullable_values_roundtrip_as_json_null() {
+    let forecast = CovenantForecast {
+        covenant_id: "max_debt_ebitda".to_string(),
+        covenant_description: "Debt/EBITDA <= 4.00x".to_string(),
+        comparator: BoundKind::AtMost,
+        test_dates: vec![date(2025, 3, 31)],
+        projected_values: vec![None],
+        thresholds: vec![4.0],
+        headroom: vec![None],
+        breach_probability: vec![1.0],
+        breach_probability_stderr: vec![0.0],
+        first_breach_date: Some(date(2025, 3, 31)),
+        min_headroom_date: None,
+        min_headroom_value: None,
+    };
+
+    let json = serde_json::to_string(&forecast).expect("serialize forecast");
+    assert!(json.contains("\"projected_values\":[null]"));
+    assert!(json.contains("\"headroom\":[null]"));
+    let restored: CovenantForecast = serde_json::from_str(&json).expect("round-trip forecast");
+    assert_eq!(restored, forecast);
+}
+
+#[test]
 fn future_breach_roundtrip() {
     let breach = FutureBreach {
         covenant_id: "Senior Leverage <= 3.00x".to_string(),
+        covenant_description: "Senior Leverage <= 3.00x".to_string(),
         breach_date: date(2025, 9, 30),
-        projected_value: 3.5,
+        projected_value: Some(3.5),
         threshold: 3.0,
-        headroom: -0.167,
+        headroom: Some(-0.167),
         breach_probability: 0.85,
     };
 

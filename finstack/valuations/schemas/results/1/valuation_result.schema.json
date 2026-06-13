@@ -1,6 +1,7 @@
 {
   "$defs": {
     "CovenantReport": {
+      "additionalProperties": false,
       "description": "Covenant check result.",
       "properties": {
         "actual_value": {
@@ -12,7 +13,7 @@
           ]
         },
         "covenant_id": {
-          "description": "Stable machine-readable identifier (from\n[`crate::CovenantType::covenant_id`]).",
+          "description": "Stable machine-readable covenant instance identifier.",
           "type": [
             "string",
             "null"

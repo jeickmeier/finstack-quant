@@ -10,8 +10,9 @@
 
 use finstack_core::dates::{Date, Tenor};
 use finstack_covenants::{
-    templates, Covenant, CovenantEngine, CovenantMetricId, CovenantSpec, CovenantType,
-    HashMapMetricSource, InstrumentMutator, ThresholdTest,
+    templates, Covenant, CovenantConsequence, CovenantEngine, CovenantMetricId, CovenantSpec,
+    CovenantType, CovenantWindow, HashMapMetricSource, InstrumentMutator, ThresholdSchedule,
+    ThresholdTest,
 };
 use time::Month;
 
@@ -230,4 +231,165 @@ fn relative_headroom_keeps_sign_for_negative_threshold() {
     let report = &reports["custom"];
     assert!(!report.passed);
     assert!(report.headroom.expect("headroom should be present") < 0.0);
+}
+
+#[test]
+fn persistent_breach_is_one_episode_with_one_consequence_application() {
+    let mut engine = CovenantEngine::new();
+    engine.add_spec(CovenantSpec::with_metric(
+        Covenant::new(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+            Tenor::quarterly(),
+        )
+        .with_cure_period(Some(30))
+        .with_consequence(CovenantConsequence::RateIncrease { bp_increase: 200.0 }),
+        CovenantMetricId::from("debt_to_ebitda"),
+    ));
+
+    let first_date = d(2025, 3, 31);
+    let second_date = d(2025, 6, 30);
+    engine
+        .evaluate_and_track(
+            &mut HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]),
+            first_date,
+        )
+        .expect("first breach should track");
+    engine
+        .evaluate_and_track(
+            &mut HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.5)]),
+            second_date,
+        )
+        .expect("persistent breach should evaluate");
+
+    assert_eq!(
+        engine.breach_history.len(),
+        1,
+        "continuous breach must remain one active episode"
+    );
+    assert_eq!(engine.breach_history[0].breach_date, first_date);
+    assert_eq!(engine.breach_history[0].cure_deadline, Some(d(2025, 4, 30)));
+
+    let breaches = engine.breach_history.clone();
+    let mut instrument = MockInstrument::default();
+    let applications = engine
+        .apply_consequences(&mut instrument, &breaches, d(2025, 7, 15))
+        .expect("consequence application should succeed");
+    assert_eq!(applications.len(), 1);
+    assert_eq!(instrument.rate_increases, vec![0.02]);
+
+    let applications = engine
+        .apply_consequences(&mut instrument, &breaches, d(2025, 7, 16))
+        .expect("repeat application should be deduped");
+    assert!(applications.is_empty());
+    assert_eq!(instrument.rate_increases, vec![0.02]);
+}
+
+#[test]
+fn recovery_before_cure_deadline_marks_breach_cured() {
+    let mut engine = CovenantEngine::new();
+    engine.add_spec(CovenantSpec::with_metric(
+        Covenant::new(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+            Tenor::quarterly(),
+        )
+        .with_cure_period(Some(30))
+        .with_consequence(CovenantConsequence::Default),
+        CovenantMetricId::from("debt_to_ebitda"),
+    ));
+
+    engine
+        .evaluate_and_track(
+            &mut HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]),
+            d(2025, 3, 31),
+        )
+        .expect("breach should track");
+    engine
+        .evaluate_and_track(
+            &mut HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.5)]),
+            d(2025, 4, 15),
+        )
+        .expect("recovery should evaluate");
+
+    assert_eq!(engine.breach_history.len(), 1);
+    assert!(
+        engine.breach_history[0].is_cured,
+        "passing before cure deadline must mark active breach cured"
+    );
+
+    let breaches = engine.breach_history.clone();
+    let mut instrument = MockInstrument::default();
+    let applications = engine
+        .apply_consequences(&mut instrument, &breaches, d(2025, 5, 15))
+        .expect("cured breach should be ignored");
+    assert!(applications.is_empty());
+    assert!(!instrument.in_default);
+}
+
+#[test]
+fn validation_rejects_negative_cure_duplicate_schedule_and_overlapping_windows() {
+    let mut negative_cure = CovenantEngine::new();
+    negative_cure.add_spec(CovenantSpec::with_metric(
+        Covenant::new(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+            Tenor::quarterly(),
+        )
+        .with_cure_period(Some(-1)),
+        CovenantMetricId::from("debt_to_ebitda"),
+    ));
+    assert!(negative_cure.validate().is_err());
+
+    let duplicate_schedule =
+        ThresholdSchedule::try_new(vec![(d(2025, 1, 1), 4.5), (d(2025, 1, 1), 4.0)]);
+    assert!(duplicate_schedule.is_err());
+
+    let mut overlapping = CovenantEngine::new();
+    let spec = CovenantSpec::with_metric(
+        Covenant::new(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+            Tenor::quarterly(),
+        ),
+        CovenantMetricId::from("debt_to_ebitda"),
+    );
+    overlapping.add_window(CovenantWindow {
+        start: d(2025, 1, 1),
+        end: d(2025, 6, 30),
+        covenants: vec![spec.clone()],
+    });
+    overlapping.add_window(CovenantWindow {
+        start: d(2025, 6, 1),
+        end: d(2025, 12, 31),
+        covenants: vec![spec],
+    });
+    assert!(overlapping.validate().is_err());
+}
+
+#[test]
+fn window_fallback_to_base_specs_is_explicit() {
+    let mut engine = CovenantEngine::new();
+    engine.add_spec(CovenantSpec::with_metric(
+        Covenant::new(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.0 },
+            Tenor::quarterly(),
+        ),
+        CovenantMetricId::from("debt_to_ebitda"),
+    ));
+    engine.add_window(CovenantWindow {
+        start: d(2025, 1, 1),
+        end: d(2025, 3, 31),
+        covenants: vec![CovenantSpec::with_metric(
+            Covenant::new(
+                CovenantType::MinInterestCoverage { threshold: 2.0 },
+                Tenor::quarterly(),
+            ),
+            CovenantMetricId::from("interest_coverage"),
+        )],
+    });
+
+    let reports = engine
+        .evaluate(
+            &mut HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.0)]),
+            d(2025, 6, 30),
+        )
+        .expect("outside all windows should fall back to base specs");
+    assert!(reports.contains_key("max_debt_ebitda"));
 }

@@ -28,6 +28,7 @@ use crate::schedule::{threshold_for_date, ThresholdSchedule};
 use crate::CovenantReport;
 use finstack_core::dates::Date;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 // Covenant type definitions were previously under loan; re-introduce minimal versions locally
 /// Whether a covenant is tested periodically or only upon an action.
@@ -41,6 +42,7 @@ pub enum CovenantScope {
 
 /// Optional activation condition for springing covenants.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SpringingCondition {
     /// Metric that controls activation (e.g., revolver utilization).
     pub metric_id: CovenantMetricId,
@@ -50,6 +52,7 @@ pub struct SpringingCondition {
 
 /// Financial covenant specification with test frequency and consequences.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Covenant {
     /// Type of covenant (leverage, coverage, etc.)
     pub covenant_type: CovenantType,
@@ -141,10 +144,20 @@ impl Covenant {
             .clone()
             .unwrap_or_else(|| self.covenant_type.covenant_id().to_string())
     }
+
+    pub(crate) fn validate(&self) -> finstack_core::Result<()> {
+        if self.cure_period_days.is_some_and(|days| days < 0) {
+            return Err(finstack_core::Error::Validation(
+                "cure_period_days must be non-negative".to_string(),
+            ));
+        }
+        self.covenant_type.validate()
+    }
 }
 
 /// Type of financial or operational covenant
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum CovenantType {
     /// Maximum debt-to-EBITDA ratio
     MaxDebtToEBITDA {
@@ -272,6 +285,7 @@ impl std::fmt::Display for CovenantType {
 
 /// Threshold test type (maximum or minimum bound)
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum ThresholdTest {
     /// Maximum allowed value
     Maximum(f64),
@@ -289,6 +303,32 @@ pub enum BoundKind {
 }
 
 impl CovenantType {
+    fn validate(&self) -> finstack_core::Result<()> {
+        let value = match self {
+            CovenantType::MaxDebtToEBITDA { threshold }
+            | CovenantType::MinInterestCoverage { threshold }
+            | CovenantType::MinFixedChargeCoverage { threshold }
+            | CovenantType::MaxTotalLeverage { threshold }
+            | CovenantType::MaxSeniorLeverage { threshold }
+            | CovenantType::MinAssetCoverage { threshold }
+            | CovenantType::MinDSCR { threshold }
+            | CovenantType::MaxNetDebtToEBITDA { threshold }
+            | CovenantType::MaxCapex { threshold }
+            | CovenantType::MinLiquidity { threshold } => Some(*threshold),
+            CovenantType::Custom { test, .. } => match test {
+                ThresholdTest::Maximum(t) | ThresholdTest::Minimum(t) => Some(*t),
+            },
+            CovenantType::Basket { limit, .. } => Some(*limit),
+            CovenantType::Negative { .. } | CovenantType::Affirmative { .. } => None,
+        };
+        if value.is_some_and(|v| !v.is_finite()) {
+            return Err(finstack_core::Error::Validation(
+                "covenant thresholds and limits must be finite".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Returns the inequality direction required for numeric covenants.
     pub fn bound_kind(&self) -> Option<BoundKind> {
         match self {
@@ -405,6 +445,7 @@ impl CovenantType {
 
 /// Consequence of covenant breach
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum CovenantConsequence {
     /// Event of default
     Default,
@@ -435,6 +476,7 @@ pub enum CovenantConsequence {
 /// Whether the covenant test is triggered by a scheduled maintenance check or
 /// a specific incurrence action. The engine uses this to filter specs by scope.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum EvaluationTrigger {
     /// Scheduled periodic test (e.g., quarterly compliance).
     Maintenance,
@@ -447,8 +489,10 @@ pub enum EvaluationTrigger {
 
 /// A covenant waiver or amendment granted by lenders.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CovenantWaiver {
-    /// Stable identifier of the waived covenant (from [`CovenantType::covenant_id`]).
+    /// Stable instance identifier of the waived covenant
+    /// (from [`Covenant::instance_key`]).
     pub covenant_id: String,
     /// Start date of the waiver period.
     pub effective_date: Date,
@@ -485,6 +529,7 @@ pub(crate) type CustomMetricCalculator =
 /// Note: The `custom_evaluator` field is not serialized as it contains
 /// a function pointer. When deserializing, it will be set to `None`.
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CovenantSpec {
     /// The covenant to evaluate
     pub covenant: Covenant,
@@ -544,6 +589,14 @@ impl CovenantSpec {
         self.threshold_schedule = Some(schedule);
         self
     }
+
+    pub(crate) fn validate(&self) -> finstack_core::Result<()> {
+        self.covenant.validate()?;
+        if let Some(schedule) = &self.threshold_schedule {
+            schedule.validate()?;
+        }
+        Ok(())
+    }
 }
 
 /// Covenant test specification with timing windows.
@@ -552,6 +605,7 @@ impl CovenantSpec {
 /// The `CovenantEngine` does not currently evaluate `CovenantTestSpec`
 /// instances directly.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CovenantTestSpec {
     /// Covenant specifications to test
     pub specs: Vec<CovenantSpec>,
@@ -563,6 +617,7 @@ pub struct CovenantTestSpec {
 
 /// Covenant window for scheduled testing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CovenantWindow {
     /// Start date of the window
     pub start: Date,
@@ -574,8 +629,9 @@ pub struct CovenantWindow {
 
 /// Covenant breach tracking.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CovenantBreach {
-    /// Stable identifier matching [`CovenantType::covenant_id`].
+    /// Stable identifier matching [`Covenant::instance_key`].
     #[serde(default)]
     pub covenant_id: String,
     /// Human-readable description (from `Display`).
@@ -599,6 +655,7 @@ pub struct CovenantBreach {
 /// Note: The `custom_metrics` field is not serialized as it contains
 /// function pointers. When deserializing, it will be set to default (empty).
 #[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CovenantEngine {
     /// Active covenant specifications
     pub specs: Vec<CovenantSpec>,
@@ -648,6 +705,67 @@ impl CovenantEngine {
         }
     }
 
+    /// Validate engine configuration before evaluation or JSON canonicalization.
+    pub fn validate(&self) -> finstack_core::Result<()> {
+        for spec in &self.specs {
+            spec.validate()?;
+        }
+        for window in &self.windows {
+            if window.start > window.end {
+                return Err(finstack_core::Error::Validation(format!(
+                    "covenant window start {} must be on or before end {}",
+                    window.start, window.end
+                )));
+            }
+            for spec in &window.covenants {
+                spec.validate()?;
+            }
+        }
+        for left_index in 0..self.windows.len() {
+            for right_index in (left_index + 1)..self.windows.len() {
+                let left = &self.windows[left_index];
+                let right = &self.windows[right_index];
+                if left.start <= right.end && left.end >= right.start {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "covenant windows must not overlap: [{}, {}] overlaps [{}, {}]",
+                        left.start, left.end, right.start, right.end
+                    )));
+                }
+            }
+        }
+        let mut seen_windows = BTreeSet::new();
+        for window in &self.windows {
+            let key = (window.start, window.end);
+            if !seen_windows.insert(key) {
+                return Err(finstack_core::Error::Validation(format!(
+                    "duplicate covenant window [{}, {}]",
+                    window.start, window.end
+                )));
+            }
+        }
+        for waiver in &self.waivers {
+            if waiver
+                .expiry_date
+                .is_some_and(|expiry| expiry < waiver.effective_date)
+            {
+                return Err(finstack_core::Error::Validation(format!(
+                    "waiver '{}' expiry date must be on or after effective date",
+                    waiver.covenant_id
+                )));
+            }
+            if waiver
+                .amended_threshold
+                .is_some_and(|value| !value.is_finite())
+            {
+                return Err(finstack_core::Error::Validation(format!(
+                    "waiver '{}' amended_threshold must be finite",
+                    waiver.covenant_id
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Add a covenant specification.
     pub fn add_spec(&mut self, spec: CovenantSpec) -> &mut Self {
         self.specs.push(spec);
@@ -656,20 +774,9 @@ impl CovenantEngine {
 
     /// Add a covenant window.
     ///
-    /// # Panics (debug builds)
-    ///
-    /// Panics via `debug_assert!` if the new window overlaps with an existing
-    /// window. Windows must have non-overlapping date ranges to avoid ambiguity
-    /// about which covenants apply on a given date.
+    /// Window overlap is validated by [`validate`](Self::validate) before
+    /// evaluation and JSON canonicalization.
     pub fn add_window(&mut self, window: CovenantWindow) -> &mut Self {
-        debug_assert!(
-            !self.windows.iter().any(|w| {
-                window.start <= w.end && window.end >= w.start
-            }),
-            "Covenant windows must not overlap. New window [{}, {}] overlaps with an existing window.",
-            window.start,
-            window.end,
-        );
         self.windows.push(window);
         self
     }
@@ -706,6 +813,7 @@ impl CovenantEngine {
         context: &mut dyn CovenantMetricSource,
         test_date: Date,
     ) -> finstack_core::Result<IndexMap<String, CovenantReport>> {
+        self.validate()?;
         let applicable_specs = self.get_applicable_specs_internal(test_date);
         self.evaluate_specs(&applicable_specs, context, test_date)
     }
@@ -826,6 +934,7 @@ impl CovenantEngine {
         test_date: Date,
         trigger: &EvaluationTrigger,
     ) -> finstack_core::Result<IndexMap<String, CovenantReport>> {
+        self.validate()?;
         let required_scope = match trigger {
             EvaluationTrigger::Maintenance => CovenantScope::Maintenance,
             EvaluationTrigger::Incurrence { .. } => CovenantScope::Incurrence,
@@ -853,6 +962,34 @@ impl CovenantEngine {
         let reports = self.evaluate(context, test_date)?;
 
         for (_key, report) in &reports {
+            if !report.passed {
+                continue;
+            }
+            let Some(cid) = report.covenant_id.as_deref() else {
+                continue;
+            };
+            if let Some(breach) = self
+                .breach_history
+                .iter_mut()
+                .filter(|b| b.covenant_id == cid && !b.is_cured && b.breach_date <= test_date)
+                .max_by_key(|b| b.breach_date)
+            {
+                if breach
+                    .cure_deadline
+                    .is_some_and(|deadline| test_date <= deadline)
+                {
+                    tracing::info!(
+                        covenant_id = cid,
+                        breach_date = %breach.breach_date,
+                        %test_date,
+                        "marking covenant breach cured by metric recovery",
+                    );
+                    breach.is_cured = true;
+                }
+            }
+        }
+
+        for (_key, report) in &reports {
             if report.passed {
                 continue;
             }
@@ -865,7 +1002,7 @@ impl CovenantEngine {
             let already_tracked = self
                 .breach_history
                 .iter()
-                .any(|b| b.covenant_id == cid && !b.is_cured && b.breach_date == test_date);
+                .any(|b| b.covenant_id == cid && !b.is_cured && b.breach_date <= test_date);
             if already_tracked {
                 continue;
             }
@@ -1081,16 +1218,7 @@ impl CovenantEngine {
         };
 
         let mut detail = None;
-        let passed = if metric_value.is_nan() {
-            // Only a NaN metric is genuinely indeterminate → treat as a breach.
-            // An infinite metric is *not* a breach per se: e.g. an interest- or
-            // fixed-charge-coverage ratio with a ~zero denominator yields +∞,
-            // which is infinitely *good* for a minimum (`AtLeast`) covenant.
-            // IEEE ordering already gives the right answer once NaN is excluded:
-            // `+∞ >= threshold` passes `AtLeast`, `-∞ <= threshold` passes
-            // `AtMost`, and the opposite infinities correctly fail.
-            false
-        } else if covenant_type.is_ratio_max() && metric_value < 0.0 {
+        let passed = if covenant_type.is_ratio_max() && metric_value < 0.0 {
             // Negative leverage-type ratio: the denominator (EBITDA) has gone
             // negative, so the ratio is not meaningful. Treat as a breach
             // rather than letting `value <= threshold` pass with huge
@@ -1101,11 +1229,7 @@ impl CovenantEngine {
             );
             false
         } else {
-            match covenant_type.bound_kind() {
-                Some(BoundKind::AtMost) => metric_value <= threshold,
-                Some(BoundKind::AtLeast) => metric_value >= threshold,
-                None => true,
-            }
+            !is_covenant_breached(covenant_type, metric_value, threshold)
         };
 
         let headroom = Some(headroom_for(
@@ -1242,6 +1366,27 @@ pub(crate) fn headroom_for(bound: Option<BoundKind>, value: f64, threshold: f64)
         Some(BoundKind::AtMost) => (threshold - value) / denom,
         Some(BoundKind::AtLeast) => (value - threshold) / denom,
         None => 0.0,
+    }
+}
+
+/// Shared point-in-time and forecast breach convention.
+pub(crate) fn is_covenant_breached(
+    covenant_type: &CovenantType,
+    value: f64,
+    threshold: f64,
+) -> bool {
+    if value.is_nan() {
+        // Only NaN is genuinely indeterminate. Infinities retain IEEE ordering:
+        // +inf is good for minimum covenants and bad for maximum covenants.
+        return true;
+    }
+    if covenant_type.is_ratio_max() && value < 0.0 {
+        return true;
+    }
+    match covenant_type.bound_kind() {
+        Some(BoundKind::AtMost) => value > threshold,
+        Some(BoundKind::AtLeast) => value < threshold,
+        None => false,
     }
 }
 

@@ -2,12 +2,12 @@ use serde::{Deserialize, Serialize};
 
 /// Covenant check result.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CovenantReport {
     /// Type of covenant being checked
     pub covenant_type: String,
 
-    /// Stable machine-readable identifier (from
-    /// [`crate::CovenantType::covenant_id`]).
+    /// Stable machine-readable covenant instance identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub covenant_id: Option<String>,
 

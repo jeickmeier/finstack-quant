@@ -155,7 +155,7 @@ fn last_day_of_month(year: i32, month: Month) -> u8 {
 ///
 /// # References
 ///
-/// - Monte Carlo scenario generation: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
+/// - Lognormal breach probability: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 pub fn forecast_covenant(
     covenant: &CovenantSpec,
     model: &FinancialModelSpec,
@@ -228,7 +228,7 @@ pub fn forecast_covenants(
 ///
 /// # References
 ///
-/// - Monte Carlo breach estimation: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
+/// - Lognormal breach probability: `docs/REFERENCES.md#glasserman-2004-monte-carlo`
 pub fn forecast_breaches(
     results: &StatementResult,
     covenants: &CovenantEngine,
@@ -339,7 +339,7 @@ pub fn to_table(forecast: &CovenantForecast) -> Result<TableEnvelope> {
                 .with_role(TableColumnRole::Index),
             TableColumn::new(
                 "projected_value",
-                TableColumnData::Float64(forecast.projected_values.clone()),
+                TableColumnData::NullableFloat64(forecast.projected_values.clone()),
             )
             .with_role(TableColumnRole::Measure),
             TableColumn::new(
@@ -349,7 +349,7 @@ pub fn to_table(forecast: &CovenantForecast) -> Result<TableEnvelope> {
             .with_role(TableColumnRole::Measure),
             TableColumn::new(
                 "headroom",
-                TableColumnData::Float64(forecast.headroom.clone()),
+                TableColumnData::NullableFloat64(forecast.headroom.clone()),
             )
             .with_role(TableColumnRole::Measure),
             TableColumn::new(
@@ -512,7 +512,7 @@ mod tests {
                 .expect("partial coverage must not hard-fail");
 
         assert_eq!(breaches.len(), 1);
-        assert_eq!(breaches[0].projected_value, 4.5);
+        assert_eq!(breaches[0].projected_value, Some(4.5));
     }
 
     #[test]
@@ -553,8 +553,9 @@ mod tests {
 
         // 4. Verify
         assert_eq!(breaches.len(), 1);
-        assert_eq!(breaches[0].covenant_id, "Debt/EBITDA <= 4.00x");
-        assert_eq!(breaches[0].projected_value, 4.5);
+        assert_eq!(breaches[0].covenant_id, "max_debt_ebitda");
+        assert_eq!(breaches[0].covenant_description, "Debt/EBITDA <= 4.00x");
+        assert_eq!(breaches[0].projected_value, Some(4.5));
 
         // Verify date approximation (Q2 2025 -> June 30)
         let expected_date = Date::from_calendar_date(2025, Month::June, 30)

@@ -135,14 +135,14 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(
         py,
         [
-            "validate_covenant_spec",
-            "validate_covenant_report",
-            "validate_covenant_engine",
+            "cov_lite",
             "evaluate_engine",
             "lbo_standard",
-            "cov_lite",
-            "real_estate",
             "project_finance",
+            "real_estate",
+            "validate_covenant_engine",
+            "validate_covenant_report",
+            "validate_covenant_spec",
         ],
     )?;
     m.setattr("__all__", all)?;
