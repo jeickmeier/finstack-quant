@@ -741,29 +741,6 @@ mod tests {
         assert!((result1 - result2).abs() < 1e-12);
     }
 
-    #[test]
-    fn test_xirr_with_daycount_act360() {
-        let flows = [
-            (
-                create_date(2024, Month::January, 1).expect("Valid test date"),
-                -100_000.0,
-            ),
-            (
-                create_date(2024, Month::July, 1).expect("Valid test date"),
-                102_500.0,
-            ),
-        ];
-
-        let result_365 = xirr_with_daycount(&flows, DayCount::Act365F, None)
-            .expect("XIRR with Act/365F should succeed");
-        let result_360 = xirr_with_daycount(&flows, DayCount::Act360, None)
-            .expect("XIRR with Act/360 should succeed");
-
-        assert!(result_365 > 0.0);
-        assert!(result_360 > 0.0);
-        assert!((result_360 - result_365).abs() < 0.015);
-    }
-
     /// IRR is scale-invariant: a 1e9-notional stream must converge to the
     /// same rate as the identical stream scaled to 1.0. Before amounts were
     /// normalized by max |amount|, the absolute NPV acceptance tolerance was

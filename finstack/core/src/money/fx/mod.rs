@@ -91,4 +91,33 @@ mod tests {
     fn test_fx_conversion_policy_fromstr_rejects_unknown() {
         assert!("unknown".parse::<FxConversionPolicy>().is_err());
     }
+
+    #[test]
+    fn fx_conversion_policy_serde_uses_snake_case_wire_names() {
+        for (variant, expected_json) in [
+            (FxConversionPolicy::CashflowDate, r#""cashflow_date""#),
+            (FxConversionPolicy::PeriodEnd, r#""period_end""#),
+            (FxConversionPolicy::PeriodAverage, r#""period_average""#),
+            (FxConversionPolicy::Custom, r#""custom""#),
+        ] {
+            let json = serde_json::to_string(&variant).expect("serializes");
+            assert_eq!(json, expected_json);
+
+            let restored: FxConversionPolicy =
+                serde_json::from_str(expected_json).expect("deserializes");
+            assert_eq!(restored, variant);
+        }
+    }
+
+    #[test]
+    fn fx_query_defaults_policy_and_rejects_unknown_fields() {
+        let query: FxQuery = serde_json::from_str(r#"{"from":"USD","to":"EUR","on":"2025-01-01"}"#)
+            .expect("policy should default");
+        assert_eq!(query.policy, FxConversionPolicy::CashflowDate);
+
+        let result: std::result::Result<FxQuery, _> = serde_json::from_str(
+            r#"{"from":"USD","to":"EUR","on":"2025-01-01","unexpected":true}"#,
+        );
+        assert!(result.is_err());
+    }
 }

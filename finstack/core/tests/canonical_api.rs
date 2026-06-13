@@ -10,7 +10,7 @@
 //! - **IRR**: Tests for `irr()` and `irr_with_daycount()`
 //! - **Quadrature**: Tests for `GaussHermiteQuadrature::new()`
 
-use finstack_core::cashflow::{irr, npv, npv_with_options, xirr, xirr_with_daycount, NpvOptions};
+use finstack_core::cashflow::{irr, npv, npv_with_options, xirr_with_daycount, NpvOptions};
 use finstack_core::currency::Currency;
 use finstack_core::dates::DayCountContext;
 use finstack_core::dates::{Date, DayCount};
@@ -141,29 +141,6 @@ mod npv_tests {
 
 mod irr_tests {
     use super::*;
-
-    /// Test that `irr()` on dated flows uses Act365F default.
-    #[test]
-    fn dated_irr_uses_act365f_default() {
-        let flows: Vec<(Date, f64)> = vec![
-            (d(2024, 1, 1), -100_000.0),
-            (d(2024, 7, 1), 5_000.0),
-            (d(2025, 1, 1), 105_000.0),
-        ];
-
-        // xirr() uses hidden Act365F default
-        let irr_default = xirr(&flows, None).unwrap();
-
-        // Explicit day count should match
-        let irr_explicit = xirr_with_daycount(&flows, DayCount::Act365F, None).unwrap();
-
-        assert!(
-            (irr_default - irr_explicit).abs() < IRR_TOLERANCE,
-            "irr() should use Act365F default: irr()={}, irr_with_daycount(Act365F)={}",
-            irr_default,
-            irr_explicit
-        );
-    }
 
     /// Test that periodic IRR works correctly for evenly-spaced flows.
     #[test]

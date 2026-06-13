@@ -247,6 +247,51 @@ mod tests {
     }
 
     #[test]
+    fn require_fixing_value_bounded_returns_rate_within_window() {
+        let series = sample_series();
+        let rate = require_fixing_value_bounded(
+            Some(&series),
+            "USD-SOFR",
+            date!(2024 - 01 - 04),
+            date!(2024 - 01 - 10),
+            1,
+        )
+        .expect("Jan 3 fixing is within one calendar day");
+
+        assert!((rate - 0.054).abs() < 1e-10);
+    }
+
+    #[test]
+    fn require_fixing_value_bounded_errors_when_stale_or_missing_series() {
+        let series = sample_series();
+        let stale = require_fixing_value_bounded(
+            Some(&series),
+            "USD-SOFR",
+            date!(2024 - 01 - 08),
+            date!(2024 - 01 - 10),
+            2,
+        )
+        .expect_err("Jan 5 fixing is three days stale");
+        assert!(
+            stale.to_string().contains("within 2 calendar days"),
+            "unexpected error: {stale}"
+        );
+
+        let missing = require_fixing_value_bounded(
+            None,
+            "USD-SOFR",
+            date!(2024 - 01 - 04),
+            date!(2024 - 01 - 10),
+            1,
+        )
+        .expect_err("missing series should be rejected");
+        assert!(
+            missing.to_string().contains("FIXING:USD-SOFR"),
+            "unexpected error: {missing}"
+        );
+    }
+
+    #[test]
     fn require_fixing_value_errors_when_series_is_none() {
         let result = require_fixing_value(
             None,

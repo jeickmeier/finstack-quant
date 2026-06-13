@@ -254,15 +254,6 @@ fn test_neumaier_accumulator_incremental() {
 }
 
 #[test]
-fn test_neumaier_accumulator_clone() {
-    let mut acc = NeumaierAccumulator::new();
-    acc.add(7.5);
-
-    let acc_cloned = acc; // Copy, not clone
-    assert_eq!(acc_cloned.total(), 7.5, "Clone should preserve state");
-}
-
-#[test]
 fn test_neumaier_accumulator_alternating() {
     let mut acc = NeumaierAccumulator::new();
 

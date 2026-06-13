@@ -1266,6 +1266,54 @@ mod statistical_operations {
     }
 
     #[test]
+    fn quantile_handles_bounds_and_skips_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![f64::NAN, 4.0, 1.0, 9.0, f64::NAN];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        for (q, expected) in [(0.0, 1.0), (0.5, 4.0), (1.0, 9.0), (1.5, 9.0)] {
+            let expr = CompiledExpr::new(Expr::call(
+                Function::Quantile,
+                vec![Expr::column("v"), Expr::literal(q)],
+            ));
+            let result = expr.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+            assert!(result.iter().all(|&r| (r - expected).abs() < 1e-12));
+        }
+    }
+
+    #[test]
+    fn quantile_all_nan_input_returns_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![f64::NAN, f64::NAN];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let expr = CompiledExpr::new(Expr::call(
+            Function::Quantile,
+            vec![Expr::column("v"), Expr::literal(0.25)],
+        ));
+        let result = expr.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+
+        assert!(result.iter().all(|r| r.is_nan()));
+    }
+
+    #[test]
+    fn abs_and_sign_apply_elementwise_and_preserve_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![-3.0, 0.0, 4.0, f64::NAN];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let abs = CompiledExpr::new(Expr::call(Function::Abs, vec![Expr::column("v")]));
+        let abs_result = abs.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+        assert_eq!(&abs_result[..3], &[3.0, 0.0, 4.0]);
+        assert!(abs_result[3].is_nan());
+
+        let sign = CompiledExpr::new(Expr::call(Function::Sign, vec![Expr::column("v")]));
+        let sign_result = sign.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+        assert_eq!(&sign_result[..3], &[-1.0, 0.0, 1.0]);
+        assert!(sign_result[3].is_nan());
+    }
+
+    #[test]
     fn median_skips_nan() {
         // Unified reducer NaN policy: NaNs are excluded from the sample and
         // the count (same as quantile). Previously NaN sorted as the largest
@@ -1334,6 +1382,59 @@ mod statistical_operations {
         assert!(result[0].is_nan());
         assert!(result[1].is_nan()); // window all-NaN
         assert!((result[2] - 1.0).abs() < 1e-12); // window [NaN, 1] → 1.0
+    }
+
+    #[test]
+    fn rolling_nan_policy_propagates_for_sum_but_skips_for_min_max_count() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![1.0, f64::NAN, 3.0];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        let rolling_sum = CompiledExpr::new(Expr::call(
+            Function::RollingSum,
+            vec![Expr::column("v"), Expr::literal(2.0)],
+        ));
+        let sum_result = rolling_sum
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+        assert!(sum_result.iter().all(|r| r.is_nan()));
+
+        let rolling_min = CompiledExpr::new(Expr::call(
+            Function::RollingMin,
+            vec![Expr::column("v"), Expr::literal(2.0)],
+        ));
+        let min_result = rolling_min
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+        assert!(min_result[0].is_nan());
+        assert_eq!(min_result[1], 1.0);
+        assert_eq!(min_result[2], 3.0);
+
+        let rolling_max = CompiledExpr::new(Expr::call(
+            Function::RollingMax,
+            vec![Expr::column("v"), Expr::literal(2.0)],
+        ));
+        let max_result = rolling_max
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+        assert!(max_result[0].is_nan());
+        assert_eq!(max_result[1], 1.0);
+        assert_eq!(max_result[2], 3.0);
+
+        let rolling_count = CompiledExpr::new(Expr::call(
+            Function::RollingCount,
+            vec![Expr::column("v"), Expr::literal(2.0)],
+        ));
+        let count_result = rolling_count
+            .eval(&ctx, &cols, EvalOpts::default())
+            .unwrap()
+            .values;
+        assert!(count_result[0].is_nan());
+        assert_eq!(count_result[1], 1.0);
+        assert_eq!(count_result[2], 1.0);
     }
 
     #[test]
@@ -1412,6 +1513,44 @@ mod statistical_operations {
             err.to_string().contains("constant"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn invalid_rolling_window_outputs_all_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![1.0, 2.0, 3.0];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        for invalid_window in [0.0, -1.0, 1.5, f64::NAN] {
+            let expr = CompiledExpr::new(Expr::call(
+                Function::RollingMean,
+                vec![Expr::column("v"), Expr::literal(invalid_window)],
+            ));
+            let result = expr.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+            assert!(
+                result.iter().all(|r| r.is_nan()),
+                "invalid rolling window {invalid_window} should produce all NaN, got {result:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_lag_step_outputs_all_nan() {
+        let ctx = SimpleContext::new(["v"]).expect("unique columns");
+        let v = vec![1.0, 2.0, 3.0];
+        let cols: Vec<&[f64]> = vec![v.as_slice()];
+
+        for invalid_step in [0.0, -2.0, 2.25, f64::NAN] {
+            let expr = CompiledExpr::new(Expr::call(
+                Function::Lag,
+                vec![Expr::column("v"), Expr::literal(invalid_step)],
+            ));
+            let result = expr.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+            assert!(
+                result.iter().all(|r| r.is_nan()),
+                "invalid lag step {invalid_step} should produce all NaN, got {result:?}"
+            );
+        }
     }
 }
 

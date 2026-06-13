@@ -195,10 +195,3 @@ fn test_flat_curve_clone() {
     assert_eq!(cloned.day_count(), curve.day_count());
     assert!((cloned.df(1.0) - curve.df(1.0)).abs() < 1e-12);
 }
-
-#[test]
-fn test_flat_curve_serde_not_implemented() {
-    // FlatCurve doesn't implement Serialize/Deserialize
-    // This test documents that fact
-    // If serde is added in the future, this test should be updated
-}

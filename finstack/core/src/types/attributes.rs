@@ -143,4 +143,37 @@ mod tests {
         assert_eq!(attrs.tags, deserialized.tags);
         assert_eq!(attrs.meta, deserialized.meta);
     }
+
+    #[test]
+    fn matches_selector_supports_wildcard_tags_and_meta_equality() {
+        let attrs = Attributes::default()
+            .with_tag("energy")
+            .with_tag("distressed")
+            .with_meta("region", "NA")
+            .with_meta("rating", "CCC");
+
+        assert!(attrs.matches_selector("*"));
+        assert!(attrs.matches_selector("tag:energy"));
+        assert!(attrs.matches_selector("tag:distressed"));
+        assert!(attrs.matches_selector("meta:region=NA"));
+        assert!(attrs.matches_selector("meta:rating=CCC"));
+
+        assert!(!attrs.matches_selector("tag:financials"));
+        assert!(!attrs.matches_selector("meta:region=EMEA"));
+        assert!(!attrs.matches_selector("meta:missing=NA"));
+    }
+
+    #[test]
+    fn matches_selector_rejects_malformed_or_unknown_selectors() {
+        let attrs = Attributes::default()
+            .with_tag("energy")
+            .with_meta("region", "NA");
+
+        assert!(!attrs.matches_selector(""));
+        assert!(!attrs.matches_selector("energy"));
+        assert!(!attrs.matches_selector("meta:region"));
+        assert!(!attrs.matches_selector("sector:energy"));
+        assert!(!attrs.matches_selector("tag:"));
+        assert!(!attrs.matches_selector("meta:=NA"));
+    }
 }

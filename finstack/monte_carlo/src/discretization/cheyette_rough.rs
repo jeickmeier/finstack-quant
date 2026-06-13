@@ -19,7 +19,7 @@
 //!   drives the Volterra process. Also supplied by the fractional noise
 //!   integration.
 //!
-//! # Rate–Vol Correlation 
+//! # Rate–Vol Correlation
 //!
 //! The model correlates the rate Brownian motion `W` with the Volterra
 //! *driver* `W̃` by `dW·dW̃ = ρ dt`. The correlated rate increment is built

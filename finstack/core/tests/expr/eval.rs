@@ -11,7 +11,7 @@
 //! Function-specific behavior tests are in functions.rs.
 
 use finstack_core::config::{results_meta, FinstackConfig};
-use finstack_core::expr::{BinOp, CompiledExpr, EvalOpts, Expr, Function, SimpleContext};
+use finstack_core::expr::{BinOp, CompiledExpr, EvalOpts, Expr, Function, SimpleContext, UnaryOp};
 
 fn create_test_data() -> (SimpleContext, Vec<Vec<f64>>) {
     let ctx = SimpleContext::new(["x", "y"]).expect("unique columns");
@@ -127,6 +127,26 @@ fn binop_div() {
 }
 
 #[test]
+fn binop_division_by_zero_returns_nan() {
+    let ctx = SimpleContext::new(["num", "den"]).expect("unique columns");
+    let num = vec![1.0, -2.0, 0.0, 4.0];
+    let den = vec![0.0, 0.0, 0.0, 2.0];
+    let cols: Vec<&[f64]> = vec![num.as_slice(), den.as_slice()];
+
+    let div = CompiledExpr::new(Expr::bin_op(
+        BinOp::Div,
+        Expr::column("num"),
+        Expr::column("den"),
+    ));
+    let result = div.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+
+    assert!(result[0].is_nan());
+    assert!(result[1].is_nan());
+    assert!(result[2].is_nan());
+    assert_eq!(result[3], 2.0);
+}
+
+#[test]
 fn binop_comparisons() {
     let (ctx, data) = create_test_data();
     let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
@@ -148,6 +168,69 @@ fn binop_comparisons() {
     ));
     let result = lt.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
     assert_eq!(result, vec![1.0, 1.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn binop_extended_comparisons_logic_and_modulo() {
+    let ctx = SimpleContext::new(["lhs", "rhs"]).expect("unique columns");
+    let lhs = vec![4.0, 5.0, 5.0, 0.0];
+    let rhs = vec![2.0, 5.0, 6.0, 1.0];
+    let cols: Vec<&[f64]> = vec![lhs.as_slice(), rhs.as_slice()];
+
+    let cases = [
+        (BinOp::Mod, vec![0.0, 0.0, 5.0, 0.0]),
+        (BinOp::Eq, vec![0.0, 1.0, 0.0, 0.0]),
+        (BinOp::Ne, vec![1.0, 0.0, 1.0, 1.0]),
+        (BinOp::Le, vec![0.0, 1.0, 1.0, 1.0]),
+        (BinOp::Ge, vec![1.0, 1.0, 0.0, 0.0]),
+        (BinOp::And, vec![1.0, 1.0, 1.0, 0.0]),
+        (BinOp::Or, vec![1.0, 1.0, 1.0, 1.0]),
+    ];
+
+    for (op, expected) in cases {
+        let expr = CompiledExpr::new(Expr::bin_op(op, Expr::column("lhs"), Expr::column("rhs")));
+        let result = expr.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+        assert_eq!(result, expected, "{op:?}");
+    }
+}
+
+#[test]
+fn unary_not_maps_zero_to_true_and_non_zero_to_false() {
+    let ctx = SimpleContext::new(["flag"]).expect("unique columns");
+    let flag = vec![0.0, 1.0, -2.0, f64::NAN];
+    let cols: Vec<&[f64]> = vec![flag.as_slice()];
+
+    let expr = CompiledExpr::new(Expr::unary_op(UnaryOp::Not, Expr::column("flag")));
+    let result = expr.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+
+    assert_eq!(result, vec![1.0, 0.0, 0.0, 0.0]);
+}
+
+#[test]
+fn cs_ref_eval_returns_validation_error() {
+    let (ctx, data) = create_test_data();
+    let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
+
+    let expr = CompiledExpr::new(Expr::cs_ref("debt", "total"));
+    let result = expr.eval(&ctx, &cols, EvalOpts::default());
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn try_new_scalar_accepts_scalar_functions_and_rejects_statements_functions() {
+    let scalar = Expr::call(
+        Function::Abs,
+        vec![Expr::bin_op(
+            BinOp::Sub,
+            Expr::column("x"),
+            Expr::literal(2.0),
+        )],
+    );
+    assert!(CompiledExpr::try_new_scalar(scalar).is_ok());
+
+    let statements_layer = Expr::call(Function::Ttm, vec![Expr::column("x"), Expr::literal(4.0)]);
+    assert!(CompiledExpr::try_new_scalar(statements_layer).is_err());
 }
 
 // =============================================================================
@@ -268,15 +351,26 @@ fn with_cache_configuration() {
     );
 
     let meta = results_meta(&FinstackConfig::default());
+    let plain = CompiledExpr::with_planning(expr.clone(), meta.clone()).unwrap();
     let compiled = CompiledExpr::with_planning(expr, meta)
         .unwrap()
         .with_cache(1);
+    assert!(!compiled.has_cache());
 
     let mut opts = EvalOpts::default();
     opts.cache_budget_mb = Some(1);
     opts.max_arena_bytes = 1_073_741_824;
 
     let result = compiled.eval(&ctx, &cols, opts).unwrap().values;
+    let expected = plain.eval(&ctx, &cols, EvalOpts::default()).unwrap().values;
+
+    for (actual, expected) in result.iter().zip(expected.iter()) {
+        if expected.is_nan() {
+            assert!(actual.is_nan());
+        } else {
+            assert!((actual - expected).abs() < 1e-12);
+        }
+    }
 
     assert!(result[0].is_nan());
     assert!((result[1] - 3.0).abs() < 1e-12);

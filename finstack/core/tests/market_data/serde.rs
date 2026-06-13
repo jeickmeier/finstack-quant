@@ -201,6 +201,45 @@ fn market_context_v1_snapshot_without_hierarchy_restores_with_none() {
 }
 
 #[test]
+fn market_context_state_rejects_unsupported_versions() {
+    for version in [
+        0,
+        finstack_core::market_data::context::MARKET_CONTEXT_STATE_VERSION + 1,
+    ] {
+        let mut json = serde_json::to_value(MarketContextState::from(&MarketContext::new()))
+            .expect("state serializes");
+        json.as_object_mut()
+            .expect("state is object")
+            .insert("version".into(), serde_json::json!(version));
+
+        let state: MarketContextState =
+            serde_json::from_value(json.clone()).expect("version is syntactically valid state");
+        assert!(
+            MarketContext::try_from(state).is_err(),
+            "try_from should reject version {version}"
+        );
+
+        let restored: Result<MarketContext, _> = serde_json::from_value(json);
+        assert!(
+            restored.is_err(),
+            "MarketContext serde restore should reject version {version}"
+        );
+    }
+}
+
+#[test]
+fn market_context_state_rejects_unknown_top_level_fields() {
+    let mut json =
+        serde_json::to_value(MarketContextState::from(&MarketContext::new())).expect("state");
+    json.as_object_mut()
+        .expect("state is object")
+        .insert("unexpected".into(), serde_json::json!(true));
+
+    let result: Result<MarketContextState, _> = serde_json::from_value(json);
+    assert!(result.is_err());
+}
+
+#[test]
 fn market_context_restore_uses_quote_only_fx_snapshot() {
     let fx_provider = Arc::new(SimpleFxProvider::new());
     let fx = FxMatrix::try_with_config(

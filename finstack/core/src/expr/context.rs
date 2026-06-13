@@ -47,23 +47,3 @@ impl SimpleContext {
         self.column_indices.get(name).copied()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn simple_context_maps_columns_in_insertion_order() {
-        let ctx = SimpleContext::new(["price", "volume", "flag"]).expect("unique columns");
-        assert_eq!(ctx.index_of("price"), Some(0));
-        assert_eq!(ctx.index_of("volume"), Some(1));
-        assert_eq!(ctx.index_of("flag"), Some(2));
-        assert_eq!(ctx.index_of("missing"), None);
-    }
-
-    #[test]
-    fn simple_context_rejects_duplicate_column_names() {
-        let err = SimpleContext::new(["a", "b", "a"]);
-        assert!(err.is_err());
-    }
-}

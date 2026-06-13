@@ -36,6 +36,26 @@ fn d(year: i32, month: u8, day: u8) -> Date {
 
 const TOL: f64 = DAYCOUNT_TOLERANCE;
 
+#[test]
+fn year_fraction_rejects_inverted_dates_but_signed_accepts_them() {
+    let start = d(2025, 7, 1);
+    let end = d(2025, 1, 1);
+    let ctx = DayCountContext::default();
+
+    assert!(DayCount::Act365F.year_fraction(start, end, ctx).is_err());
+    let signed = DayCount::Act365F
+        .signed_year_fraction(start, end, ctx)
+        .expect("signed year fraction should allow inverted dates");
+
+    assert!(signed < 0.0);
+    assert_eq!(
+        DayCount::Act365F
+            .signed_year_fraction(start, start, ctx)
+            .expect("same date"),
+        0.0
+    );
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(128))]
 
@@ -685,6 +705,24 @@ fn actact_isma_reference_period_handles_long_first_stub() {
     );
 }
 
+#[test]
+fn actact_isma_reference_period_rejects_invalid_ranges() {
+    assert!(act_act_isma_year_fraction_with_reference_period(
+        make_date(2025, 3, 31),
+        make_date(2025, 1, 15),
+        make_date(2024, 9, 30),
+        make_date(2025, 3, 31),
+    )
+    .is_err());
+    assert!(act_act_isma_year_fraction_with_reference_period(
+        make_date(2025, 1, 15),
+        make_date(2025, 3, 31),
+        make_date(2025, 3, 31),
+        make_date(2025, 3, 31),
+    )
+    .is_err());
+}
+
 // =============================================================================
 // Bus/252 - Calendar-Dependent
 // =============================================================================
@@ -708,6 +746,21 @@ fn bus252_requires_calendar() {
     };
     let yf = DayCount::Bus252.year_fraction(start, end, ctx).unwrap();
     assert!(yf > 0.0);
+}
+
+#[test]
+fn bus252_rejects_zero_basis() {
+    let calendar = TARGET2;
+    let ctx = DayCountContext {
+        calendar: Some(&calendar),
+        frequency: None,
+        bus_basis: Some(0),
+        coupon_period: None,
+    };
+
+    assert!(DayCount::Bus252
+        .year_fraction(make_date(2025, 1, 1), make_date(2025, 1, 10), ctx)
+        .is_err());
 }
 
 #[test]

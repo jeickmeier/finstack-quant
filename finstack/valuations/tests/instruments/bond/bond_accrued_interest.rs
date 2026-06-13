@@ -392,11 +392,21 @@ fn test_accrued_interest_amortizing_schedule_driven() {
                     .year_fraction(prev, end, DayCountContext::default())
                     .unwrap(),
             };
-            let elapsed = schedule
+            let dc_elapsed = schedule
                 .day_count
                 .year_fraction(prev, as_of, DayCountContext::default())
                 .unwrap()
                 .max(0.0);
+            let dc_total = schedule
+                .day_count
+                .year_fraction(prev, end, DayCountContext::default())
+                .unwrap();
+            let elapsed = if dc_total.is_finite() && dc_total > 0.0 {
+                total_period * dc_elapsed / dc_total
+            } else {
+                dc_elapsed
+            }
+            .clamp(0.0, total_period);
             expected = coupon_total * (elapsed / total_period);
             break;
         }

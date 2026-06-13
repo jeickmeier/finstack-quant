@@ -73,6 +73,24 @@ fn builder_requires_explicit_base_date() {
 }
 
 #[test]
+fn builder_infers_day_count_from_curve_id() {
+    for (id, expected) in [
+        ("USD-SOFR", DayCount::Act360),
+        ("GBP-SONIA", DayCount::Act365F),
+        ("EUR-ESTR", DayCount::Act360),
+        ("TEST", DayCount::Act365F),
+    ] {
+        let curve = DiscountCurve::builder(id)
+            .base_date(sample_base_date())
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .build()
+            .expect("valid curve");
+
+        assert_eq!(curve.day_count(), expected, "{id}");
+    }
+}
+
+#[test]
 fn monotonic_df_accepted() {
     let result = DiscountCurve::builder("VALID-MONOTONIC")
         .base_date(sample_base_date())
@@ -231,10 +249,10 @@ fn interpolation_consistency_at_knot_points() {
             .interp(InterpStyle::CubicHermite)
             .build()
             .unwrap(),
-        DiscountCurve::builder("FF")
+        DiscountCurve::builder("PQF")
             .base_date(base_date)
             .knots(knots)
-            .interp(InterpStyle::LogLinear)
+            .interp(InterpStyle::PiecewiseQuadraticForward)
             .build()
             .unwrap(),
     ];
@@ -257,7 +275,7 @@ fn interpolation_styles_produce_valid_results() {
         InterpStyle::LogLinear,
         InterpStyle::MonotoneConvex,
         InterpStyle::CubicHermite,
-        InterpStyle::LogLinear,
+        InterpStyle::PiecewiseQuadraticForward,
     ] {
         let curve = DiscountCurve::builder("TEST")
             .base_date(base_date)

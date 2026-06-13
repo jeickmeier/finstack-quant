@@ -775,9 +775,12 @@ mod tests {
 
     #[test]
     fn sifma_with_calendar_matches_algorithmic() {
-        // The calendar-based and non-calendar-based paths should agree when calendar is available
-        let d1 = sifma_settlement_date_for_class(Month::March, 2026, SifmaSettlementClass::B);
-        assert!(d1.is_some());
+        let date = sifma_settlement_date_for_class(Month::March, 2026, SifmaSettlementClass::B)
+            .expect("published SIFMA table should contain March 2026 Class B");
+        assert_eq!(
+            date,
+            Date::from_calendar_date(2026, Month::March, 17).expect("valid date")
+        );
     }
 
     #[test]

@@ -312,7 +312,7 @@ impl CommoditySwap {
     /// valid holiday calendar, exchange holidays are also excluded from the
     /// average. Otherwise, only weekends are filtered.
     ///
-    /// # Past vs future observations 
+    /// # Past vs future observations
     ///
     /// Observation dates strictly before `as_of` read from
     /// [`realized_fixings`](Self::realized_fixings); a missing past fixing is

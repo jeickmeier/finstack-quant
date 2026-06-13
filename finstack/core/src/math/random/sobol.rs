@@ -531,6 +531,20 @@ mod tests {
     }
 
     #[test]
+    fn test_fill_u01_matches_consecutive_points() {
+        let mut sobol_fill = SobolRng::try_new(2, 123).expect("valid dimension");
+        let mut out = vec![0.0; 4];
+        sobol_fill.fill_u01(&mut out);
+
+        let mut sobol_points = SobolRng::try_new(2, 123).expect("valid dimension");
+        let p1 = sobol_points.next_point();
+        let p2 = sobol_points.next_point();
+
+        assert_eq!(out, vec![p1[0], p1[1], p2[0], p2[1]]);
+        assert!(out.iter().all(|&u| (0.0..1.0).contains(&u)));
+    }
+
+    #[test]
     fn test_owen_scrambling() {
         let mut sobol_no_scramble = SobolRng::try_new(2, 0).expect("valid dimension");
         let mut sobol_scrambled = SobolRng::try_new(2, 12345).expect("valid dimension");
@@ -540,6 +554,19 @@ mod tests {
         let p2 = sobol_scrambled.next_point();
 
         assert_ne!(p1[0], p2[0]);
+    }
+
+    #[test]
+    fn test_scrambled_sobol_is_deterministic_for_same_seed() {
+        let mut sobol1 = SobolRng::try_new(3, 12345).expect("valid dimension");
+        let mut sobol2 = SobolRng::try_new(3, 12345).expect("valid dimension");
+        let mut different_seed = SobolRng::try_new(3, 54321).expect("valid dimension");
+
+        for _ in 0..32 {
+            assert_eq!(sobol1.next_point(), sobol2.next_point());
+        }
+
+        assert_ne!(sobol1.next_point(), different_seed.next_point());
     }
 
     #[test]

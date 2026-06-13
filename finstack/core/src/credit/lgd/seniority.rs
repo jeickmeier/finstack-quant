@@ -394,12 +394,36 @@ mod tests {
     use super::*;
     use crate::math::random::Pcg64Rng;
     use crate::math::RandomNumberGenerator;
+    use std::str::FromStr;
 
     #[test]
     fn beta_recovery_mean_matches_input() {
         let br = BetaRecovery::new(0.45, 0.20).expect("valid params");
         assert!((br.mean() - 0.45).abs() < 1e-12);
         assert!((br.std_dev() - 0.20).abs() < 1e-12);
+    }
+
+    #[test]
+    fn seniority_class_from_str_accepts_aliases_and_rejects_unknown() {
+        assert_eq!(
+            SeniorityClass::from_str("first-lien secured").expect("alias"),
+            SeniorityClass::FirstLienSecured
+        );
+        assert_eq!(
+            SeniorityClass::from_str("2nd lien secured").expect("alias"),
+            SeniorityClass::SecondLienSecured
+        );
+        assert_eq!(
+            SeniorityClass::from_str("sub").expect("alias"),
+            SeniorityClass::Subordinated
+        );
+
+        let err = SeniorityClass::from_str("super senior")
+            .expect_err("unknown seniority should be rejected");
+        assert!(
+            err.to_string().contains("unknown seniority class"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

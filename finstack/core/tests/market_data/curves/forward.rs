@@ -160,6 +160,102 @@ fn builder_rejects_non_positive_tenor() {
     );
 }
 
+#[test]
+fn df_chains_simple_forward_periods() {
+    let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
+        .base_date(test_date())
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.05), (1.0, 0.05)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .unwrap();
+
+    assert_eq!(curve.df(0.0).unwrap(), 1.0);
+    let one_year_df = curve.df(1.0).unwrap();
+    let expected = 1.0 / (1.0_f64 + 0.05 * 0.5).powi(2);
+    assert!((one_year_df - expected).abs() < 1e-14);
+}
+
+#[test]
+fn df_rejects_invalid_times_and_accrual_steps() {
+    let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
+        .base_date(test_date())
+        .knots([(0.0, 0.03), (1.0, 0.03)])
+        .build()
+        .unwrap();
+
+    assert!(curve.df(f64::NAN).is_err());
+    assert!(curve.df(-0.25).is_err());
+
+    let pathological = ForwardCurve::builder("USD-SOFR6M", 0.5)
+        .base_date(test_date())
+        .knots([(0.0, -3.0), (1.0, -3.0)])
+        .build()
+        .unwrap();
+    assert!(
+        pathological.df(1.0).is_err(),
+        "negative forwards that imply non-positive accrual denominators must error"
+    );
+}
+
+#[test]
+fn df_on_date_curve_uses_curve_day_count() {
+    let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
+        .base_date(test_date())
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.05), (1.0, 0.05)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .unwrap();
+    let date = test_date() + time::Duration::days(180);
+
+    let df = curve.df_on_date_curve(date).unwrap();
+    let expected = 1.0 / (1.0 + 0.05 * 0.5);
+    assert!((df - expected).abs() < 1e-14);
+}
+
+#[test]
+fn non_linear_df_uses_rate_period_path() {
+    let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
+        .base_date(test_date())
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.05), (0.5, 0.05), (1.0, 0.05)])
+        .interp(InterpStyle::CubicHermite)
+        .build()
+        .unwrap();
+
+    let df = curve.df(1.0).unwrap();
+    let expected = 1.0 / (1.0_f64 + 0.05 * 0.5).powi(2);
+    assert!((df - expected).abs() < 1e-12);
+}
+
+#[test]
+fn rate_period_matches_linear_curve_integral_average() {
+    let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
+        .base_date(test_date())
+        .knots([(0.0, 0.02), (10.0, 0.12)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .unwrap();
+
+    let avg = curve.rate_period(2.0, 8.0);
+    let expected = 0.02 + 0.01 * ((2.0 + 8.0) / 2.0);
+    assert!((avg - expected).abs() < 1e-14);
+}
+
+#[test]
+fn rate_period_handles_zero_width_and_long_flat_intervals() {
+    let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
+        .base_date(test_date())
+        .knots([(0.0, 0.04), (30.0, 0.04)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .unwrap();
+
+    assert_eq!(curve.rate_period(3.0, 3.0), curve.rate(3.0));
+    assert!((curve.rate_period(0.0, 25.0) - 0.04).abs() < 1e-14);
+}
+
 // =============================================================================
 // Serialization Tests
 // =============================================================================
@@ -218,7 +314,6 @@ mod serde_tests {
             InterpStyle::Linear,
             InterpStyle::LogLinear,
             InterpStyle::CubicHermite,
-            InterpStyle::LogLinear,
         ];
 
         for style in interp_styles {

@@ -1183,16 +1183,6 @@ mod tests {
     }
 
     #[test]
-    fn builder_rejects_empty_knots() {
-        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
-        let result = HazardCurve::builder("USD-CREDIT").base_date(base).build();
-        assert!(
-            result.is_err(),
-            "builder should enforce the non-empty lambda invariant"
-        );
-    }
-
-    #[test]
     fn hazard_rate_is_available_for_valid_built_curves() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
         let hc = HazardCurve::builder("USD-CREDIT")

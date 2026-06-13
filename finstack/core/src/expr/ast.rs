@@ -528,8 +528,6 @@ pub struct EvaluationResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
 
     #[test]
     fn expr_builder_variants_match_expected_nodes() {
@@ -560,18 +558,5 @@ mod tests {
         let conditional =
             Expr::if_then_else(Expr::column("flag"), Expr::literal(1.0), Expr::literal(0.0));
         assert!(matches!(conditional.node, ExprNode::IfThenElse { .. }));
-    }
-
-    #[test]
-    fn expr_id_is_ignored_for_hash_and_equality() {
-        let expr_a = Expr::column("x").with_id(1);
-        let expr_b = Expr::column("x").with_id(999);
-        assert_eq!(expr_a, expr_b);
-
-        let mut hasher_a = DefaultHasher::new();
-        expr_a.hash(&mut hasher_a);
-        let mut hasher_b = DefaultHasher::new();
-        expr_b.hash(&mut hasher_b);
-        assert_eq!(hasher_a.finish(), hasher_b.finish());
     }
 }

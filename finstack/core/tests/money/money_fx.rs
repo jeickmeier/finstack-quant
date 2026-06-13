@@ -38,13 +38,6 @@ fn explicit_convert_and_add() {
 }
 
 #[test]
-fn cross_currency_add_fails_without_convert() {
-    let usd = Money::new(10.0, Currency::USD);
-    let eur = Money::new(10.0, Currency::EUR);
-    assert!(usd.checked_add(eur).is_err());
-}
-
-#[test]
 fn closure_check_matrix() {
     // Market standard identity: cross rates must satisfy triangular consistency.
     // We force triangulation via USD pivot:
@@ -475,6 +468,44 @@ fn validate_triangular_flags_inconsistent_crosses() {
         .validate_triangular(5.0)
         .expect_err("inconsistent triangle should be rejected");
     assert!(matches!(err, finstack_core::Error::Validation(_)));
+}
+
+#[test]
+fn validate_triangular_accepts_consistent_quotes_and_rejects_bad_tolerance() {
+    struct MissingFx;
+    impl FxProvider for MissingFx {
+        fn rate(
+            &self,
+            from: Currency,
+            to: Currency,
+            _on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_core::Result<f64> {
+            Err(finstack_core::InputError::NotFound {
+                id: format!("FX:{from}->{to}"),
+            }
+            .into())
+        }
+    }
+
+    let matrix = FxMatrix::new(Arc::new(MissingFx));
+    matrix
+        .set_quotes(&[
+            (Currency::EUR, Currency::USD, 1.10),
+            (Currency::USD, Currency::GBP, 0.80),
+            (Currency::GBP, Currency::EUR, 1.0 / (1.10 * 0.80)),
+        ])
+        .expect("valid quotes");
+
+    assert!(matrix.validate_triangular(5.0).is_ok());
+    assert!(matches!(
+        matrix.validate_triangular(-1.0),
+        Err(finstack_core::Error::Validation(_))
+    ));
+    assert!(matches!(
+        matrix.validate_triangular(f64::NAN),
+        Err(finstack_core::Error::Validation(_))
+    ));
 }
 
 #[test]

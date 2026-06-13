@@ -292,7 +292,6 @@ impl BrownianBridge {
 
 #[cfg(test)]
 mod tests {
-    use super::super::sobol_pca::{effective_dimension, pca_ordering};
     use super::*;
 
     #[test]
@@ -430,55 +429,5 @@ mod tests {
         assert!(bridge
             .construct_path_irregular(&z, &mut w5, &[0.0, 0.2, 0.4, 0.5])
             .is_err());
-    }
-
-    #[test]
-    fn test_pca_ordering_identity() {
-        // Identity matrix: all eigenvalues = 1
-        let correlation = vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
-
-        let (eigenvalues, _, _) = pca_ordering(&correlation, 3).expect("3x3 matrix should succeed");
-
-        // All eigenvalues should be 1
-        for &val in &eigenvalues {
-            assert!((val - 1.0).abs() < 0.01);
-        }
-    }
-
-    #[test]
-    fn test_pca_ordering_sorted() {
-        // High correlation matrix
-        let correlation = vec![1.0, 0.8, 0.6, 0.8, 1.0, 0.7, 0.6, 0.7, 1.0];
-
-        let (eigenvalues, _, _) = pca_ordering(&correlation, 3).expect("3x3 matrix should succeed");
-
-        println!("Eigenvalues: {:?}", eigenvalues);
-
-        // Should be sorted in descending order
-        for i in 1..eigenvalues.len() {
-            assert!(
-                eigenvalues[i - 1] >= eigenvalues[i],
-                "Eigenvalues not sorted: {} vs {}",
-                eigenvalues[i - 1],
-                eigenvalues[i]
-            );
-        }
-
-        // First eigenvalue should be largest (captures most variance)
-        assert!(eigenvalues[0] > eigenvalues[1]);
-    }
-
-    #[test]
-    fn test_effective_dimension() {
-        // Equal eigenvalues → d_eff = n
-        let eigenvalues_equal = vec![1.0, 1.0, 1.0];
-        let d_eff = effective_dimension(&eigenvalues_equal);
-        assert!((d_eff - 3.0).abs() < 0.01);
-
-        // One dominant → d_eff ≈ 1
-        let eigenvalues_dominant = vec![2.99, 0.005, 0.005];
-        let d_eff = effective_dimension(&eigenvalues_dominant);
-        println!("Effective dimension (dominant): {:.2}", d_eff);
-        assert!(d_eff < 1.2);
     }
 }

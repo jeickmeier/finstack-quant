@@ -279,8 +279,5 @@ fn xirr_trait_matches_ctx_helper_on_act365f_default() {
     let a = xirr(&flows, None).expect("xirr converges");
     let b = xirr_with_daycount_ctx(&flows, DayCount::Act365F, DayCountContext::default(), None)
         .expect("ctx helper converges");
-    assert!(
-        (a - b).abs() < 1e-12,
-        "XIRR parity mismatch: xirr={a}, ctx={b}",
-    );
+    assert_eq!(a, b, "XIRR parity mismatch");
 }

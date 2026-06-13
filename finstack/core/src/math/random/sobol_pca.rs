@@ -197,6 +197,14 @@ mod tests {
 
         println!("Eigenvalues (high correlation): {:?}", eigenvalues);
 
+        for pair in eigenvalues.windows(2) {
+            assert!(
+                pair[0] >= pair[1],
+                "Eigenvalues must be sorted descending: {:?}",
+                eigenvalues
+            );
+        }
+
         // First eigenvalue should dominate
         assert!(eigenvalues[0] > 2.0); // Should be ~2.7
         assert!(eigenvalues[1] < 1.0); // Others smaller

@@ -162,7 +162,7 @@ impl VolSurfaceTarget {
         // a meaningful tolerance for the vega-weighted SSE objective minimized
         // by the SABR Levenberg-Marquardt calibrator: reusing it previously
         // "worked" only because the LM solver silently returned its best
-        // iterate on MaxIterations. 
+        // iterate on MaxIterations.
         // `core::math::solver_multi::minimize` errors loudly on
         // non-convergence, so the SABR fit uses the calibrator's attainable
         // production defaults (tolerance 1e-4 on the SSE, 2000 iterations).

@@ -1100,7 +1100,7 @@ mod tests {
         // A down-bump that would push a hazard rate negative now fails loudly
         // instead of clamping to zero (clamping made two-sided CS01 silently
         // asymmetric for tight names) — unified with `bump_in_place`; see
-        // 
+        //
         use crate::dates::Date;
         use crate::market_data::term_structures::HazardCurve;
         use time::Month;

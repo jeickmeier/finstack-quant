@@ -311,4 +311,44 @@ mod tests {
         assert_eq!(restored.metadata.get("orientation"), Some(&json!("long")));
         assert_eq!(restored.column("period_id").map(TableColumn::len), Some(2));
     }
+
+    #[test]
+    fn typed_accessors_return_matching_columns_only() {
+        let strings = TableColumn::new(
+            "name",
+            TableColumnData::String(vec!["alpha".into(), "beta".into()]),
+        );
+        let nullable_floats = TableColumn::new(
+            "score",
+            TableColumnData::NullableFloat64(vec![Some(1.5), None]),
+        );
+        let uints = TableColumnData::UInt32(vec![1, 2]);
+        let nullable_ints = TableColumnData::NullableInt64(vec![Some(-1), None]);
+
+        assert_eq!(
+            strings.as_strings(),
+            Some(vec!["alpha".to_string(), "beta".to_string()].as_slice())
+        );
+        assert_eq!(strings.as_f64(), None);
+        assert_eq!(
+            nullable_floats.as_nullable_f64(),
+            Some([Some(1.5), None].as_slice())
+        );
+        assert_eq!(uints.as_u32(), Some([1, 2].as_slice()));
+        assert_eq!(
+            nullable_ints.as_nullable_i64(),
+            Some([Some(-1), None].as_slice())
+        );
+    }
+
+    #[test]
+    fn empty_table_and_columns_report_empty_state() {
+        let table = TableEnvelope::new(vec![]).expect("empty table is valid");
+        let column = TableColumn::new("empty", TableColumnData::Int64(vec![]));
+
+        assert!(table.is_empty());
+        assert!(column.is_empty());
+        assert!(column.data.is_empty());
+        assert_eq!(table.column("missing"), None);
+    }
 }

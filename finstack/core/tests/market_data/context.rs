@@ -10,7 +10,9 @@ use finstack_core::market_data::dividends::DividendSchedule;
 use finstack_core::market_data::scalars::{
     InflationIndex, InflationInterpolation, MarketScalar, ScalarTimeSeries, SeriesInterpolation,
 };
+use finstack_core::market_data::surfaces::{FxDeltaVolSurface, VolCube, VolSurface};
 use finstack_core::market_data::term_structures::CreditIndexData;
+use finstack_core::math::volatility::sabr::SabrParams;
 use finstack_core::money::fx::{FxConversionPolicy, FxMatrix, FxProvider};
 use finstack_core::money::Money;
 use finstack_core::types::CurveId;
@@ -563,6 +565,183 @@ fn market_context_update_and_bump_failures() {
             spec: BumpSpec::parallel_bp(10.0),
         }])
         .is_err());
+}
+
+#[test]
+fn market_context_observed_mutations_report_credit_index_rebind_status() {
+    let hazard = sample_hazard_curve("CDX");
+    let base_corr = sample_base_correlation_curve("CDX-BC");
+    let credit_index = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.4)
+        .index_credit_curve(Arc::new(hazard.clone()))
+        .base_correlation_curve(Arc::new(base_corr.clone()))
+        .build()
+        .unwrap();
+
+    let ctx = MarketContext::new()
+        .insert(hazard)
+        .insert(base_corr)
+        .insert_credit_index("CDX-IG", credit_index);
+
+    let (bumped, info) = ctx
+        .bump_observed([MarketBump::BaseCorrBucketPts {
+            surface_id: CurveId::from("CDX-BC"),
+            detachments: Some(vec![7.0]),
+            points: 0.01,
+        }])
+        .expect("base-correlation bump should succeed");
+
+    assert!(
+        !info.has_invalidations(),
+        "same-type base-correlation bump should rebind without invalidating indices"
+    );
+    assert!(bumped.get_credit_index("CDX-IG").is_ok());
+
+    let mut cross_type = bumped;
+    cross_type.retain_curves_mut(|id, _| id.as_str() != "CDX");
+    let invalidated = cross_type.rebind_credit_indices_mut();
+    assert_eq!(invalidated, vec![CurveId::from("CDX-IG")]);
+    assert!(cross_type.get_credit_index("CDX-IG").is_err());
+}
+
+#[test]
+fn market_context_roll_forward_observed_propagates_errors_and_metadata() {
+    let stable = MarketContext::new().insert(sample_discount_curve("USD-OIS"));
+    let (rolled, info) = stable
+        .roll_forward_observed(30)
+        .expect("short roll should succeed");
+
+    assert!(!info.has_invalidations());
+    assert!(rolled.get_discount("USD-OIS").is_ok());
+
+    let sparse = finstack_core::market_data::term_structures::DiscountCurve::builder("SPARSE")
+        .base_date(sample_base_date())
+        .knots([(0.0, 1.0), (0.25, 0.99)])
+        .build()
+        .unwrap();
+    MarketContext::new()
+        .insert(sparse)
+        .roll_forward_observed(400)
+        .expect_err("rolling past sparse curve support should fail");
+}
+
+#[test]
+fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
+    let series_keep = ScalarTimeSeries::new(
+        "KEEP",
+        vec![
+            (sample_base_date(), 1.0),
+            (sample_base_date() + time::Duration::days(30), 2.0),
+        ],
+        None,
+    )
+    .unwrap();
+    let series_drop = ScalarTimeSeries::new(
+        "DROP",
+        vec![
+            (sample_base_date(), 3.0),
+            (sample_base_date() + time::Duration::days(30), 4.0),
+        ],
+        None,
+    )
+    .unwrap();
+    let index = InflationIndex::new(
+        "US-CPI",
+        vec![
+            (sample_base_date(), 100.0),
+            (sample_base_date() + time::Duration::days(31), 101.0),
+        ],
+        Currency::USD,
+    )
+    .unwrap();
+    let divs =
+        DividendSchedule::new("DIVS").add_cash(sample_base_date(), Money::new(1.0, Currency::USD));
+    let cube = VolCube::from_grid(
+        "SWPT",
+        &[1.0],
+        &[5.0],
+        &[SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap()],
+        &[0.03],
+    )
+    .unwrap();
+    let fx_delta = FxDeltaVolSurface::new(
+        "EURUSD-DELTA-VOL",
+        vec![0.25, 1.0],
+        vec![0.08, 0.09],
+        vec![0.01, 0.015],
+        vec![0.005, 0.007],
+    )
+    .unwrap();
+
+    let mut ctx = MarketContext::new()
+        .insert(sample_discount_curve("USD-OIS"))
+        .insert(sample_forward_curve("USD-LIBOR"))
+        .insert_surface(sample_vol_surface())
+        .insert_vol_cube(cube)
+        .insert_fx_delta_vol_surface(fx_delta)
+        .insert_price("SPOT", MarketScalar::Unitless(100.0))
+        .insert_series(series_keep)
+        .insert_series(series_drop)
+        .insert_inflation_index("US-CPI", index)
+        .insert_dividends(divs);
+
+    ctx.retain_curves_mut(|id, _| id.as_str() == "USD-OIS")
+        .retain_series_mut(|id, _| id.as_str() == "KEEP")
+        .replace_surfaces_mut([(
+            CurveId::from("NEW-VOL"),
+            Arc::new(
+                VolSurface::builder("NEW-VOL")
+                    .expiries(&[0.5])
+                    .strikes(&[1.0])
+                    .row(&[0.20])
+                    .build()
+                    .unwrap(),
+            ),
+        )])
+        .replace_vol_cubes_mut([(
+            CurveId::from("NEW-SWPT"),
+            Arc::new(
+                VolCube::from_grid(
+                    "NEW-SWPT",
+                    &[1.0],
+                    &[5.0],
+                    &[SabrParams::new(0.030, 0.5, -0.1, 0.3).unwrap()],
+                    &[0.025],
+                )
+                .unwrap(),
+            ),
+        )])
+        .replace_fx_delta_vol_surfaces_mut([(
+            CurveId::from("GBPUSD-DELTA-VOL"),
+            Arc::new(
+                FxDeltaVolSurface::new(
+                    "GBPUSD-DELTA-VOL",
+                    vec![0.25, 1.0],
+                    vec![0.07, 0.08],
+                    vec![0.01, 0.012],
+                    vec![0.004, 0.006],
+                )
+                .unwrap(),
+            ),
+        )]);
+
+    assert!(ctx.get_discount("USD-OIS").is_ok());
+    assert!(ctx.get_forward("USD-LIBOR").is_err());
+    assert!(ctx.get_series("KEEP").is_ok());
+    assert!(ctx.get_series("DROP").is_err());
+    assert!(ctx.get_surface("EQ-VOL").is_err());
+    assert!(ctx.get_surface("NEW-VOL").is_ok());
+    assert!(ctx.get_vol_cube("SWPT").is_err());
+    assert!(ctx.get_vol_cube("NEW-SWPT").is_ok());
+    assert!(ctx.get_fx_delta_vol_surface("EURUSD-DELTA-VOL").is_err());
+    assert!(ctx.get_fx_delta_vol_surface("GBPUSD-DELTA-VOL").is_ok());
+
+    ctx.clear_market_scalars_mut();
+    assert!(ctx.get_price("SPOT").is_err());
+    assert!(ctx.get_series("KEEP").is_err());
+    assert!(ctx.get_inflation_index("US-CPI").is_err());
+    assert!(ctx.get_dividend_schedule("DIVS").is_err());
 }
 
 #[test]

@@ -242,3 +242,70 @@ pub struct YieldForecast {
     /// 95% confidence band upper bound per tenor (length N).
     pub upper_95: Vec<f64>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dates::Date;
+    use time::Month;
+
+    fn panel() -> DMatrix<f64> {
+        DMatrix::from_row_slice(2, 2, &[0.01, 0.02, 0.011, 0.021])
+    }
+
+    fn date(day: u8) -> Date {
+        Date::from_calendar_date(2025, Month::January, day).expect("valid test date")
+    }
+
+    #[test]
+    fn yield_panel_new_rejects_invalid_inputs() {
+        assert!(YieldPanel::new(panel(), vec![2.0, 1.0], None).is_err());
+        assert!(YieldPanel::new(panel(), vec![1.0, -2.0], None).is_err());
+        assert!(YieldPanel::new(panel(), vec![1.0], None).is_err());
+
+        let one_row = DMatrix::from_row_slice(1, 2, &[0.01, 0.02]);
+        assert!(YieldPanel::new(one_row, vec![1.0, 2.0], None).is_err());
+
+        assert!(YieldPanel::new(panel(), vec![1.0, 2.0], Some(vec![date(1)])).is_err());
+
+        let with_nan = DMatrix::from_row_slice(2, 2, &[0.01, f64::NAN, 0.011, 0.021]);
+        assert!(YieldPanel::new(with_nan, vec![1.0, 2.0], None).is_err());
+    }
+
+    #[test]
+    fn yield_panel_from_rows_builds_valid_panel() {
+        let panel = YieldPanel::from_rows(
+            vec![1.0, 2.0],
+            vec![vec![0.01, 0.02], vec![0.011, 0.021]],
+            Some(vec![date(1), date(2)]),
+        )
+        .expect("valid rows should build");
+
+        assert_eq!(panel.num_dates(), 2);
+        assert_eq!(panel.num_tenors(), 2);
+        assert_eq!(panel.yields[(1, 1)], 0.021);
+    }
+
+    #[test]
+    fn yield_panel_from_rows_rejects_ragged_rows() {
+        let err = YieldPanel::from_rows(vec![1.0, 2.0], vec![vec![0.01, 0.02], vec![0.011]], None)
+            .expect_err("ragged rows should be rejected");
+
+        assert!(err.to_string().contains("row 1"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn yield_panel_from_yield_changes_reconstructs_synthetic_grid() {
+        let panel = YieldPanel::from_yield_changes(vec![
+            vec![0.001, 0.002, 0.003],
+            vec![0.004, 0.005, 0.006],
+        ])
+        .expect("valid yield changes should build");
+
+        assert_eq!(panel.tenors, vec![1.0, 2.0, 3.0]);
+        assert_eq!(panel.num_dates(), 3);
+        assert_eq!(panel.yields[(0, 0)], 0.0);
+        assert!((panel.yields[(2, 2)] - 0.009).abs() < 1e-12);
+        assert_eq!(panel.yield_changes().nrows(), 2);
+    }
+}

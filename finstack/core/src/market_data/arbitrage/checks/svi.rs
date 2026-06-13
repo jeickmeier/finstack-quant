@@ -200,3 +200,77 @@ impl SviArbitrageCheck {
         all
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn butterfly_density_reports_negative_density_samples() {
+        let params = SviParams {
+            a: 0.044_305_840_516_802_71,
+            b: 0.553_365_870_766_427_3,
+            rho: -0.6284714869358965,
+            m: -0.25653822799947434,
+            sigma: 0.066_468_598_928_966_02,
+        };
+        params
+            .validate()
+            .expect("chosen SVI slice satisfies constructor-level constraints");
+
+        let check = SviArbitrageCheck {
+            expiries: vec![1.0],
+            params: vec![params],
+            k_range: (-1.0, 1.0),
+            n_samples: 200,
+        };
+
+        let violations = check.check_butterfly_density();
+        assert!(
+            violations
+                .iter()
+                .any(|v| matches!(v.violation_type, ArbitrageType::SviButterflyCondition)),
+            "negative SVI density should be reported as a butterfly violation"
+        );
+        assert!(violations.iter().all(|v| v.magnitude > 0.0));
+    }
+
+    #[test]
+    fn butterfly_density_clean_params_return_no_violations() {
+        let params = SviParams {
+            a: 0.04,
+            b: 0.20,
+            rho: -0.2,
+            m: 0.0,
+            sigma: 0.3,
+        };
+        params.validate().expect("clean SVI params should validate");
+
+        let check = SviArbitrageCheck {
+            expiries: vec![1.0],
+            params: vec![params],
+            k_range: (-1.0, 1.0),
+            n_samples: 200,
+        };
+
+        assert!(check.check_butterfly_density().is_empty());
+    }
+
+    #[test]
+    fn butterfly_density_zero_samples_returns_no_violations() {
+        let check = SviArbitrageCheck {
+            expiries: vec![1.0],
+            params: vec![SviParams {
+                a: 0.04,
+                b: 0.20,
+                rho: -0.2,
+                m: 0.0,
+                sigma: 0.3,
+            }],
+            k_range: (-1.0, 1.0),
+            n_samples: 0,
+        };
+
+        assert!(check.check_butterfly_density().is_empty());
+    }
+}

@@ -322,7 +322,7 @@ fn calendar_metadata_override_is_respected() {
 }
 
 // ============================================
-// Joint business days T+0 behavior 
+// Joint business days T+0 behavior
 // ============================================
 
 #[test]

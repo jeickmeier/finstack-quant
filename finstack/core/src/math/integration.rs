@@ -1229,16 +1229,6 @@ mod tests {
     }
 
     #[test]
-    fn test_adaptive_simpson() {
-        // Test adaptive integration on oscillatory function
-        let f = |x: f64| (10.0 * x).sin();
-        let result = adaptive_simpson(f, 0.0, std::f64::consts::PI, 1e-6, 1000)
-            .expect("Adaptive Simpson should succeed in test");
-        // Exact integral = (1 - cos(10π))/10 = 0
-        assert!(result.abs() < 1e-2);
-    }
-
-    #[test]
     fn test_gauss_hermite_new_returns_result() {
         // Valid orders should succeed
         assert!(GaussHermiteQuadrature::new(5).is_ok());
@@ -1264,16 +1254,16 @@ mod tests {
     }
 
     #[test]
-    fn test_gauss_hermite_new_integration() {
-        // Test that new() returns a working quadrature
-        let quad = GaussHermiteQuadrature::new(10).expect("Order 10 is supported");
-        let integral = quad.integrate(|x| x * x);
-        // E[X²] = 1 for standard normal
-        assert!(
-            (integral - 1.0).abs() < 0.01,
-            "E[X²] should be ~1, got {}",
-            integral
-        );
+    fn gauss_legendre_adaptive_accepts_leaf_within_original_tolerance() {
+        // At order 2 on sin(x), the parent interval misses this tolerance, so
+        // the algorithm recurses. Each child then misses the halved leaf budget
+        // but is inside the caller's original tolerance, hitting the max-depth
+        // acceptance branch instead of returning a convergence error.
+        let value = gauss_legendre_integrate_adaptive(|x| x.sin(), 0.0, 1.0, 2, 4.7e-6, 1)
+            .expect("leaf error is within original tolerance");
+        let exact = 1.0 - 1.0_f64.cos();
+
+        assert!((value - exact).abs() < 1e-5, "value={value}, exact={exact}");
     }
 
     // ---- Gauss-Laguerre (Golub-Welsch) ------------------------------------

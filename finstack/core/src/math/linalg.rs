@@ -884,6 +884,52 @@ mod tests {
     }
 
     #[test]
+    fn symmetric_eigen_handles_empty_matrix() {
+        let (values, vectors) = symmetric_eigen(&[], 0).expect("empty matrix should succeed");
+        assert!(values.is_empty());
+        assert!(vectors.is_empty());
+    }
+
+    #[test]
+    fn symmetric_eigen_rejects_dimension_mismatch() {
+        let err = symmetric_eigen(&[1.0, 0.0, 0.0], 2).expect_err("wrong length should fail");
+        assert!(matches!(
+            err,
+            CholeskyError::DimensionMismatch {
+                expected: 2,
+                actual: 3
+            }
+        ));
+    }
+
+    #[test]
+    fn symmetric_eigen_diagonal_matrix_returns_diagonal_values() {
+        let matrix = vec![4.0, 0.0, 0.0, 0.0, 9.0, 0.0, 0.0, 0.0, 16.0];
+        let (mut values, vectors) = symmetric_eigen(&matrix, 3).expect("diagonal matrix");
+        values.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        assert_eq!(values, vec![4.0, 9.0, 16.0]);
+        assert_eq!(vectors.len(), 9);
+    }
+
+    #[test]
+    fn symmetric_eigen_vectors_satisfy_av_equals_lambda_v() {
+        let matrix = vec![2.0, 1.0, 1.0, 2.0];
+        let (values, vectors) = symmetric_eigen(&matrix, 2).expect("symmetric matrix");
+
+        for (k, &lambda) in values.iter().enumerate() {
+            let v = [vectors[k], vectors[2 + k]];
+            let av = [
+                matrix[0] * v[0] + matrix[1] * v[1],
+                matrix[2] * v[0] + matrix[3] * v[1],
+            ];
+
+            assert!((av[0] - lambda * v[0]).abs() < 1e-10);
+            assert!((av[1] - lambda * v[1]).abs() < 1e-10);
+        }
+    }
+
+    #[test]
     fn test_apply_correlation() {
         let corr = vec![1.0, 0.5, 0.5, 1.0];
         let chol = cholesky_decomposition(&corr, 2)
@@ -1253,6 +1299,52 @@ mod tests {
         let res1 = a[2] * x[0] + a[3] * x[1] - b[1];
         assert!(res0.abs() < 1e-12, "residual[0] = {res0}");
         assert!(res1.abs() < 1e-12, "residual[1] = {res1}");
+    }
+
+    #[test]
+    fn cholesky_decomposition_into_matches_allocating_variant() {
+        let a = vec![4.0_f64, 2.0, 2.0, 3.0];
+        let expected = cholesky_decomposition(&a, 2).expect("positive definite");
+        let mut out = vec![f64::NAN; 4];
+
+        cholesky_decomposition_into(&a, 2, &mut out).expect("positive definite");
+
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn cholesky_decomposition_into_rejects_bad_output_len() {
+        let a = vec![4.0_f64, 2.0, 2.0, 3.0];
+        let mut out = vec![0.0; 3];
+
+        match cholesky_decomposition_into(&a, 2, &mut out) {
+            Err(CholeskyError::DimensionMismatch { expected, actual }) => {
+                assert_eq!(expected, 2);
+                assert_eq!(actual, 4);
+            }
+            other => panic!("expected DimensionMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn cholesky_decomposition_into_rejects_non_positive_definite() {
+        let indefinite = vec![1.0_f64, 2.0, 2.0, 1.0];
+        let mut out = vec![0.0; 4];
+
+        assert!(matches!(
+            cholesky_decomposition_into(&indefinite, 2, &mut out),
+            Err(CholeskyError::NotPositiveDefinite { .. })
+        ));
+    }
+
+    #[test]
+    fn cholesky_solve_rejects_dimension_mismatch_and_singular_diagonal() {
+        let mut x = vec![0.0_f64; 2];
+        assert!(cholesky_solve(&[1.0, 0.0, 0.0, 1.0], &[1.0], &mut x).is_err());
+
+        let singular_chol = vec![1.0_f64, 0.0, 0.0, 0.0];
+        let mut x = vec![0.0_f64; 2];
+        assert!(cholesky_solve(&singular_chol, &[1.0, 1.0], &mut x).is_err());
     }
 
     #[test]

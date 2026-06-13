@@ -561,6 +561,31 @@ mod tests {
     }
 
     #[test]
+    fn linear_interpolation_after_last_date_uses_last_value() {
+        let d0 = time::Date::from_calendar_date(2025, time::Month::January, 1).expect("date");
+        let d1 = time::Date::from_calendar_date(2025, time::Month::February, 1).expect("date");
+        let series = ScalarTimeSeries::new("TS", vec![(d0, 10.0), (d1, 20.0)], None)
+            .expect("series")
+            .with_interpolation(SeriesInterpolation::Linear);
+
+        let after = time::Date::from_calendar_date(2025, time::Month::March, 1).expect("date");
+        assert_eq!(series.value_on(after).expect("past-end lookup"), 20.0);
+    }
+
+    #[test]
+    fn scalar_time_series_rejects_unknown_serde_field() {
+        let json = r#"{
+            "id":"TS",
+            "currency":null,
+            "observations":[["2025-01-01",10.0],["2025-02-01",20.0]],
+            "interpolation":"step",
+            "extra":true
+        }"#;
+
+        assert!(serde_json::from_str::<ScalarTimeSeries>(json).is_err());
+    }
+
+    #[test]
     fn test_scalar_time_series_empty_error() {
         // Test that empty series returns proper error
         let result = ScalarTimeSeries::new("TEST", vec![], None);
@@ -576,33 +601,14 @@ mod tests {
 
     #[test]
     fn test_scalar_time_series_single_point_error() {
-        // Test that single-point series returns proper error
         let single_obs = vec![(
             time::Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date"),
             100.0,
         )];
 
-        let result = ScalarTimeSeries::new("TEST", single_obs, None);
-        // Note: The current implementation might allow single points
-        // Let's test what it actually does
-        match result {
-            Ok(series) => {
-                // If it succeeds, that's also valid behavior
-                assert_eq!(series.observations().len(), 1);
-            }
-            Err(error) => {
-                // If it fails, it should be the expected error type
-                match error {
-                    crate::Error::Input(crate::error::InputError::TooFewPoints) => {
-                        // Expected error type
-                    }
-                    _ => panic!(
-                        "Expected TooFewPoints error for single point, got: {}",
-                        error
-                    ),
-                }
-            }
-        }
+        let series = ScalarTimeSeries::new("TEST", single_obs, None)
+            .expect("single-point series should be accepted");
+        assert_eq!(series.observations().len(), 1);
     }
 
     #[test]
@@ -632,16 +638,6 @@ mod tests {
         let series = result.expect("ScalarTimeSeries creation should succeed in test");
         assert_eq!(series.observations().len(), 3);
         assert_eq!(series.id.as_str(), "TEST");
-    }
-
-    #[test]
-    fn test_scalar_time_series_error_message_quality() {
-        let result = ScalarTimeSeries::new("TEST", vec![], None);
-        assert!(result.is_err());
-
-        let error_msg = format!("{}", result.expect_err("Should fail with invalid data"));
-        assert!(!error_msg.is_empty());
-        assert!(error_msg.len() > 10);
     }
 
     #[test]

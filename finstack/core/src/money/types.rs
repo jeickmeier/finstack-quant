@@ -878,6 +878,75 @@ mod tests {
     }
 
     #[test]
+    fn checked_mul_div_f64_accepts_finite_scalars() {
+        let money = Money::new(10.0, Currency::USD);
+
+        assert_eq!(
+            money
+                .checked_mul_f64(2.5)
+                .expect("finite multiplication")
+                .amount(),
+            25.0
+        );
+        assert_eq!(
+            money
+                .checked_div_f64(4.0)
+                .expect("finite division")
+                .amount(),
+            2.5
+        );
+    }
+
+    #[test]
+    fn checked_mul_div_f64_reject_invalid_scalars() {
+        let money = Money::new(10.0, Currency::USD);
+
+        assert!(money.checked_mul_f64(f64::NAN).is_err());
+        assert!(money.checked_mul_f64(f64::INFINITY).is_err());
+        assert!(money.checked_div_f64(0.0).is_err());
+        assert!(money.checked_div_f64(f64::NEG_INFINITY).is_err());
+    }
+
+    #[test]
+    fn money_operators_accept_finite_scalars() {
+        let money = Money::new(12.0, Currency::USD);
+
+        assert_eq!((money * 2.0).amount(), 24.0);
+        assert_eq!((money / 3.0).amount(), 4.0);
+    }
+
+    #[test]
+    fn money_assign_operators_accept_finite_scalars() {
+        let mut money = Money::new(12.0, Currency::USD);
+
+        money *= 2.5;
+        assert_eq!(money.amount(), 30.0);
+        assert_eq!(money.currency(), Currency::USD);
+
+        money /= 4.0;
+        assert_eq!(money.amount(), 7.5);
+        assert_eq!(money.currency(), Currency::USD);
+    }
+
+    #[test]
+    fn money_deserialize_rejects_unknown_fields() {
+        let json = r#"{"amount":10.0,"currency":"USD","unexpected":true}"#;
+        let result: std::result::Result<Money, _> = serde_json::from_str(json);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn money_json_field_names_are_stable() {
+        let json = serde_json::to_value(Money::new(10.25, Currency::USD)).expect("serializes");
+        let object = json.as_object().expect("money serializes as an object");
+
+        assert_eq!(object.len(), 2);
+        assert!(object.contains_key("amount"));
+        assert_eq!(object.get("currency"), Some(&serde_json::json!("USD")));
+    }
+
+    #[test]
     #[should_panic(expected = "Money multiplication requires finite")]
     fn multiply_by_nan_panics() {
         let _ = Money::new(10.0, Currency::USD) * f64::NAN;
@@ -1029,7 +1098,7 @@ mod tests {
     fn try_new_handles_large_finite_values() {
         let large = 1e15;
         let m = Money::try_new(large, Currency::USD).expect("Large finite value should succeed");
-        assert!(m.amount() > 0.0);
+        assert_eq!(m.amount(), large);
     }
 
     #[test]

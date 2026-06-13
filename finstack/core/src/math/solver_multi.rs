@@ -1060,6 +1060,17 @@ mod tests {
     }
 
     #[test]
+    fn test_minimize_errors_on_non_finite_initial_objective() {
+        let solver = LevenbergMarquardtSolver::new();
+        let objective = |_params: &[f64]| -> f64 { f64::NAN };
+
+        match solver.minimize(objective, &[0.0], None) {
+            Err(crate::Error::Input(InputError::SolverConvergenceFailed { .. })) => {}
+            other => panic!("expected SolverConvergenceFailed, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn test_minimize_with_derivatives_errors_on_max_iterations() {
         struct QuadraticDerivatives;
         impl AnalyticalDerivatives for QuadraticDerivatives {

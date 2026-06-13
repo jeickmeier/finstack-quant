@@ -19,13 +19,6 @@ fn hierarchy_node_stores_name_and_curves() {
 }
 
 #[test]
-fn node_path_is_vec_of_strings() {
-    let path: Vec<String> = vec!["Rates".into(), "USD".into()];
-    assert_eq!(path.len(), 2);
-    assert_eq!(path[0], "Rates");
-}
-
-#[test]
 fn builder_creates_hierarchy_with_slash_paths() {
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")

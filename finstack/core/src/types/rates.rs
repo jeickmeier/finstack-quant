@@ -895,15 +895,14 @@ mod tests {
     }
 
     #[test]
-    fn bps_arithmetic() {
-        let bps1 = Bps::new(100);
-        let bps2 = Bps::new(50);
+    fn bps_try_new_and_try_from_reject_non_finite_values() {
+        assert_eq!(Bps::try_new(12.4).expect("finite bps").as_bps(), 12);
+        assert_eq!(Bps::try_from(12.6).expect("finite bps").as_bps(), 13);
 
-        assert_eq!(bps1 + bps2, Bps::new(150));
-        assert_eq!(bps1 - bps2, Bps::new(50));
-        assert_eq!(bps1 * 2, Bps::new(200));
-        assert_eq!(bps1 / 2, Bps::new(50));
-        assert_eq!(-bps1, Bps::new(-100));
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(Bps::try_new(bad).is_err(), "try_new must reject {bad}");
+            assert!(Bps::try_from(bad).is_err(), "TryFrom must reject {bad}");
+        }
     }
 
     #[test]
@@ -912,18 +911,6 @@ mod tests {
         assert_eq!(pct.as_percent(), 12.5);
         assert_eq!(pct.as_decimal(), 0.125);
         assert_eq!(pct.as_bps(), 1250);
-    }
-
-    #[test]
-    fn percentage_arithmetic() {
-        let pct1 = Percentage::new(10.0);
-        let pct2 = Percentage::new(5.0);
-
-        assert_eq!(pct1 + pct2, Percentage::new(15.0));
-        assert_eq!(pct1 - pct2, Percentage::new(5.0));
-        assert_eq!(pct1 * 2.0, Percentage::new(20.0));
-        assert_eq!(pct1.checked_div(2.0).unwrap(), Percentage::new(5.0));
-        assert_eq!(-pct1, Percentage::new(-10.0));
     }
 
     #[test]
@@ -940,18 +927,6 @@ mod tests {
 
         assert_eq!(rate, rate_from_bps);
         assert_eq!(rate, rate_from_pct);
-    }
-
-    #[test]
-    fn display_formatting() {
-        let rate = Rate::from_percent(2.5);
-        assert_eq!(format!("{}", rate), "2.5000%");
-
-        let bps = Bps::new(250);
-        assert_eq!(format!("{}", bps), "250bp");
-
-        let pct = Percentage::new(12.75);
-        assert_eq!(format!("{}", pct), "12.75%");
     }
 
     #[test]

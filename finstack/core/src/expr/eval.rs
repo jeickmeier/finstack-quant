@@ -702,39 +702,6 @@ mod tests {
     }
 
     #[test]
-    fn eval_with_plan_and_cache_executes_rolling_functions() {
-        let (ctx, data) = sample_context();
-        let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();
-
-        let expr = Expr::call(
-            Function::RollingSum,
-            vec![Expr::column("x"), Expr::literal(2.0)],
-        );
-        let meta = crate::config::results_meta(&FinstackConfig::default());
-        let compiled = CompiledExpr::with_planning(expr, meta)
-            .unwrap()
-            .with_cache(1);
-
-        let result = compiled
-            .eval(
-                &ctx,
-                &cols,
-                EvalOpts {
-                    plan: None,
-                    cache_budget_mb: Some(1),
-                    max_arena_bytes: default_max_arena_bytes(),
-                },
-            )
-            .unwrap()
-            .values;
-
-        assert!(result[0].is_nan());
-        assert!((result[1] - 0.7).abs() < 1e-12);
-        assert!((result[2] - 3.5).abs() < 1e-12);
-        assert!((result[3] - 7.0).abs() < 1e-12);
-    }
-
-    #[test]
     fn eval_allows_external_plan_override() {
         let (ctx, data) = sample_context();
         let cols: Vec<&[f64]> = data.iter().map(|v| v.as_slice()).collect();

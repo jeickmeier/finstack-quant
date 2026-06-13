@@ -751,18 +751,6 @@ fn xirr_rejects_all_same_sign() {
 }
 
 #[test]
-fn irr_attempts_ambiguous_multi_root_cashflows() {
-    let amounts = [-100.0, 320.0, -320.0, 100.0];
-    let result = irr(&amounts, None);
-    if let Err(err) = result {
-        assert!(
-            !err.to_string().contains("multiple sign changes"),
-            "non-conventional cashflows should no longer be rejected explicitly: {err}"
-        );
-    }
-}
-
-#[test]
 fn xirr_attempts_unsorted_multi_sign_change_flows_after_sorting() {
     let flows = [
         (d(2026, 1, 1), 250.0),

@@ -364,6 +364,7 @@ pub fn map_dates_to_steps(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use time::macros::date;
 
     #[test]
     fn test_uniform_grid() {
@@ -456,5 +457,40 @@ mod tests {
         assert!(map_exercise_dates_to_steps(&[0.5], 0.0, 4).is_empty());
         assert!(map_exercise_dates_to_steps(&[0.5], 1.0, 0).is_empty());
         assert!(map_exercise_dates_to_steps(&[-0.5, f64::NAN], 1.0, 4).is_empty());
+    }
+
+    #[test]
+    fn test_map_date_to_step_clamps_and_handles_degenerate_grid() {
+        let base = date!(2024 - 01 - 01);
+        let mid = date!(2024 - 07 - 01);
+        let maturity = date!(2025 - 01 - 01);
+        let after_maturity = date!(2026 - 01 - 01);
+
+        let mid_step = map_date_to_step(base, mid, maturity, 12, DayCount::Act365F);
+        assert_eq!(mid_step, 6);
+        assert_eq!(
+            map_date_to_step(base, after_maturity, maturity, 12, DayCount::Act365F),
+            12
+        );
+        assert_eq!(map_date_to_step(base, mid, base, 12, DayCount::Act365F), 0);
+        assert_eq!(
+            map_date_to_step(base, mid, maturity, 0, DayCount::Act365F),
+            0
+        );
+    }
+
+    #[test]
+    fn test_map_dates_to_steps_preserves_input_order() {
+        let base = date!(2024 - 01 - 01);
+        let maturity = date!(2025 - 01 - 01);
+        let steps = map_dates_to_steps(
+            base,
+            &[date!(2025 - 01 - 01), date!(2024 - 01 - 01)],
+            maturity,
+            4,
+            DayCount::Act365F,
+        );
+
+        assert_eq!(steps, vec![4, 0]);
     }
 }

@@ -77,23 +77,6 @@ fn cashflow_floating_construction() {
     assert!(cf.validate().is_ok());
 }
 
-#[test]
-fn floating_cf_defaults_reset_date_to_payment() {
-    let payment = d(2025, 1, 10);
-    let amount = Money::new(50.0, Currency::USD);
-
-    let cf = CashFlow {
-        date: payment,
-        reset_date: Some(payment),
-        amount,
-        kind: CFKind::FloatReset,
-        accrual_factor: 0.0,
-        rate: None,
-    };
-
-    assert_eq!(cf.reset_date, Some(payment));
-}
-
 // =============================================================================
 // Amount Validation Tests
 // =============================================================================

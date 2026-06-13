@@ -260,7 +260,7 @@ impl WorkoutLgd {
         let df = (1.0 + self.discount_rate).powf(-self.workout_years);
         let total_costs = self.costs.total_rate() * ead;
         // Discount both recoveries and workout costs to the default date
-        // (Basel workout-LGD; 
+        // (Basel workout-LGD;
         // costs were previously left undiscounted).
         let net_recovery = ((gross_recovery - total_costs) * df).max(0.0);
 
@@ -359,12 +359,36 @@ impl WorkoutLgdBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn collateral_piece_liquidation_value() {
         let piece =
             CollateralPiece::new(CollateralType::RealEstate, 80.0, 0.30).expect("valid collateral");
         assert!((piece.liquidation_value() - 56.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn collateral_type_from_str_accepts_aliases_and_rejects_unknown() {
+        assert_eq!(
+            CollateralType::from_str("real estate").expect("alias"),
+            CollateralType::RealEstate
+        );
+        assert_eq!(
+            CollateralType::from_str("IP").expect("alias"),
+            CollateralType::IntellectualProperty
+        );
+        assert_eq!(
+            CollateralType::from_str("cash").expect("cash"),
+            CollateralType::Cash
+        );
+
+        let err = CollateralType::from_str("crypto")
+            .expect_err("unknown collateral type should be rejected");
+        assert!(
+            err.to_string().contains("unknown collateral type"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

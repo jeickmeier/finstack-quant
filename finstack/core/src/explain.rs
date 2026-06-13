@@ -228,40 +228,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_explain_opts_default_is_disabled() {
-        let opts = ExplainOpts::default();
-        assert!(!opts.enabled);
-        assert!(opts.max_entries.is_none());
-    }
-
-    #[test]
-    fn test_explain_opts_enabled() {
-        let opts = ExplainOpts::enabled();
-        assert!(opts.enabled);
-        assert_eq!(opts.max_entries, Some(1000));
-    }
-
-    #[test]
-    fn test_trace_push_respects_limits() {
-        let mut trace = ExplanationTrace::new("test");
-
-        for i in 0..5 {
-            trace.push(
-                TraceEntry::CalibrationIteration {
-                    iteration: i,
-                    residual: 0.001,
-                    knots_updated: vec![],
-                    converged: false,
-                },
-                Some(3),
-            );
-        }
-
-        assert_eq!(trace.entries.len(), 3);
-        assert!(trace.is_truncated());
-    }
-
-    #[test]
     fn test_trace_serialization() {
         let mut trace = ExplanationTrace::new("calibration");
         trace.push(

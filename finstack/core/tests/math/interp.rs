@@ -92,6 +92,18 @@ macro_rules! interp_basic_tests {
             }
 
             #[test]
+            fn rejects_nearly_duplicate_knots() {
+                let bad_knots = vec![0.0, 1.0e-12, 1.0, 2.0].into_boxed_slice();
+                let result = new_strict!(
+                    $ty,
+                    bad_knots,
+                    standard_dfs(),
+                    ExtrapolationPolicy::default()
+                );
+                assert!(result.is_err(), "Should reject nearly duplicate knots");
+            }
+
+            #[test]
             fn rejects_non_positive_dfs() {
                 let bad_dfs = vec![1.0, -0.95, 0.9, 0.85].into_boxed_slice();
                 let result = new_strict!(
@@ -179,13 +191,37 @@ macro_rules! interp_basic_tests {
 
 interp_basic_tests!(linear_df_basic, Interpolator<LinearStrategy>);
 interp_basic_tests!(log_linear_df_basic, Interpolator<LogLinearStrategy>);
-interp_basic_tests!(flat_fwd_basic, Interpolator<LogLinearStrategy>);
 interp_basic_tests!(cubic_hermite_basic, Interpolator<CubicHermiteStrategy>);
 interp_basic_tests!(monotone_convex_basic, Interpolator<MonotoneConvexStrategy>);
 interp_basic_tests!(
     piecewise_quadratic_forward_basic,
     Interpolator<PiecewiseQuadraticForwardStrategy>
 );
+
+mod monotone_convex_strategy {
+    use super::*;
+
+    #[test]
+    fn with_epsilon_accepts_reasonable_epsilon() {
+        let knots = standard_knots();
+        let dfs = standard_dfs();
+
+        let strategy =
+            MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 1e-12).expect("valid epsilon");
+
+        assert!(strategy.interp(1.5, &knots, &dfs, ExtrapolationPolicy::FlatZero) > 0.0);
+    }
+
+    #[test]
+    fn with_epsilon_rejects_invalid_epsilon() {
+        let knots = standard_knots();
+        let dfs = standard_dfs();
+
+        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 0.0).is_err());
+        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, -1.0e-12).is_err());
+        assert!(MonotoneConvexStrategy::with_epsilon(&knots, &dfs, 1.0e-5).is_err());
+    }
+}
 
 // ============================================================================
 // InterpStyle::build Tests
@@ -266,21 +302,6 @@ mod interp_style_build {
                 ValidationPolicy::Strict,
             )
             .expect("Should build piecewise quadratic forward interpolator");
-
-        assert!(approx_eq(interp.interp(0.0), 1.0, 1e-12));
-        assert!(approx_eq(interp.interp(1.0), 0.95, 1e-12));
-    }
-
-    #[test]
-    fn build_flat_fwd() {
-        let interp = InterpStyle::LogLinear
-            .build(
-                standard_knots(),
-                standard_dfs(),
-                ExtrapolationPolicy::FlatZero,
-                ValidationPolicy::Strict,
-            )
-            .expect("Should build flat forward interpolator");
 
         assert!(approx_eq(interp.interp(0.0), 1.0, 1e-12));
         assert!(approx_eq(interp.interp(1.0), 0.95, 1e-12));
@@ -426,9 +447,51 @@ macro_rules! extrapolation_tests {
 
 extrapolation_tests!(extrap_linear, Interpolator<LinearStrategy>);
 extrapolation_tests!(extrap_log_linear, Interpolator<LogLinearStrategy>);
-extrapolation_tests!(extrap_flat_fwd, Interpolator<LogLinearStrategy>);
 extrapolation_tests!(extrap_cubic_hermite, Interpolator<CubicHermiteStrategy>);
 extrapolation_tests!(extrap_monotone_convex, Interpolator<MonotoneConvexStrategy>);
+extrapolation_tests!(
+    extrap_piecewise_quadratic_forward,
+    Interpolator<PiecewiseQuadraticForwardStrategy>
+);
+
+macro_rules! no_extrapolation_tests {
+    ($mod_name:ident, $ty:ty) => {
+        mod $mod_name {
+            use super::*;
+
+            #[test]
+            fn out_of_bounds_value_and_derivative_are_nan() {
+                let interp = new_strict!(
+                    $ty,
+                    standard_knots(),
+                    standard_dfs(),
+                    ExtrapolationPolicy::None
+                )
+                .unwrap();
+
+                for x in [-0.25, 3.25] {
+                    assert!(interp.interp(x).is_nan(), "value at {x} should be NaN");
+                    assert!(
+                        interp.interp_prime(x).is_nan(),
+                        "derivative at {x} should be NaN"
+                    );
+                }
+
+                assert!(interp.interp(1.5).is_finite());
+                assert!(interp.interp_prime(1.5).is_finite());
+            }
+        }
+    };
+}
+
+no_extrapolation_tests!(none_linear, Interpolator<LinearStrategy>);
+no_extrapolation_tests!(none_log_linear, Interpolator<LogLinearStrategy>);
+no_extrapolation_tests!(none_cubic_hermite, Interpolator<CubicHermiteStrategy>);
+no_extrapolation_tests!(none_monotone_convex, Interpolator<MonotoneConvexStrategy>);
+no_extrapolation_tests!(
+    none_piecewise_quadratic_forward,
+    Interpolator<PiecewiseQuadraticForwardStrategy>
+);
 
 // ============================================================================
 // Derivative (interp_prime) Tests
@@ -583,9 +646,12 @@ macro_rules! derivative_tests {
 
 derivative_tests!(deriv_linear, Interpolator<LinearStrategy>);
 derivative_tests!(deriv_log_linear, Interpolator<LogLinearStrategy>);
-derivative_tests!(deriv_flat_fwd, Interpolator<LogLinearStrategy>);
 derivative_tests!(deriv_cubic_hermite, Interpolator<CubicHermiteStrategy>);
 derivative_tests!(deriv_monotone_convex, Interpolator<MonotoneConvexStrategy>);
+derivative_tests!(
+    deriv_piecewise_quadratic_forward,
+    Interpolator<PiecewiseQuadraticForwardStrategy>
+);
 
 // ============================================================================
 // Type-Specific Tests
@@ -643,7 +709,7 @@ mod linear_specific {
     }
 }
 
-mod log_linear_specific {
+mod log_linear_forward_rate_specific {
     use super::*;
 
     #[test]
@@ -696,34 +762,8 @@ mod log_linear_specific {
     }
 }
 
-mod flat_fwd_specific {
+mod log_linear_specific {
     use super::*;
-
-    #[test]
-    fn matches_log_linear_exactly() {
-        let flat = new_strict!(
-            Interpolator<LogLinearStrategy>,
-            standard_knots(),
-            standard_dfs(),
-            ExtrapolationPolicy::default()
-        )
-        .unwrap();
-        let log = new_strict!(
-            Interpolator<LogLinearStrategy>,
-            standard_knots(),
-            standard_dfs(),
-            ExtrapolationPolicy::default()
-        )
-        .unwrap();
-
-        for t in [0.1, 0.25, 0.5, 1.5, 2.5] {
-            assert!(
-                approx_eq(flat.interp(t), log.interp(t), 1e-15),
-                "LogLinear != LogLinear at t={}",
-                t
-            );
-        }
-    }
 
     #[test]
     fn constant_forward_rate_property() {
@@ -1632,16 +1672,6 @@ mod extrapolation_policy_tests {
     use super::*;
 
     #[test]
-    fn default_is_flat_zero() {
-        let default = ExtrapolationPolicy::default();
-        // FlatZero is the default
-        match default {
-            ExtrapolationPolicy::FlatZero => {}
-            _ => panic!("Default should be FlatZero"),
-        }
-    }
-
-    #[test]
     fn flat_zero_behavior() {
         let interp = InterpStyle::Linear
             .build(
@@ -1715,26 +1745,6 @@ mod derivative_epsilon_tests {
     fn derivative_epsilon_defined() {
         // Verify constant is accessible and has expected value
         assert_eq!(DERIVATIVE_EPSILON, 1e-6);
-    }
-
-    #[test]
-    fn derivative_epsilon_usage() {
-        // Test that DERIVATIVE_EPSILON is reasonable for finite differences
-        let epsilon = DERIVATIVE_EPSILON;
-
-        // Simple function: f(x) = x^2, f'(x) = 2x
-        let f = |x: f64| x * x;
-        let x = 2.0;
-        let true_deriv = 2.0 * x; // = 4.0
-
-        // Finite difference approximation
-        let approx_deriv = (f(x + epsilon) - f(x)) / epsilon;
-
-        // Should be close with this epsilon
-        assert!(
-            (approx_deriv - true_deriv).abs() < 1e-5,
-            "DERIVATIVE_EPSILON should give reasonable approximations"
-        );
     }
 }
 

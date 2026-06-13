@@ -3,8 +3,8 @@ use finstack_core::dates::{Date, DayCount};
 use finstack_core::market_data::context::MarketContext;
 use finstack_core::market_data::diff::{
     measure_discount_curve_shift, measure_fx_shift, measure_hazard_curve_shift,
-    measure_inflation_curve_shift, measure_scalar_shift, measure_vol_surface_shift,
-    TenorSamplingMethod, STANDARD_TENORS,
+    measure_inflation_curve_shift, measure_scalar_absolute_shift, measure_scalar_shift,
+    measure_vol_surface_shift, TenorSamplingMethod, STANDARD_TENORS,
 };
 use finstack_core::market_data::scalars::MarketScalar;
 use finstack_core::market_data::surfaces::VolSurface;
@@ -569,6 +569,35 @@ fn test_fx_shift_uses_valuation_dates() {
     );
 }
 
+#[test]
+fn test_fx_shift_zero_baseline_errors() {
+    struct ZeroFx;
+    impl FxProvider for ZeroFx {
+        fn rate(
+            &self,
+            _from: Currency,
+            _to: Currency,
+            _on: Date,
+            _policy: FxConversionPolicy,
+        ) -> finstack_core::Result<f64> {
+            Ok(0.0)
+        }
+    }
+
+    let market_t0 = market_with_fx(FxMatrix::new(Arc::new(ZeroFx)));
+    let market_t1 = market_with_fx(sample_fx_matrix());
+    let result = measure_fx_shift(
+        Currency::EUR,
+        Currency::USD,
+        &market_t0,
+        &market_t1,
+        sample_date(),
+        sample_date(),
+    );
+
+    assert!(result.is_err(), "zero t0 FX rate should be rejected");
+}
+
 // ===================================================================
 // Scalar Shift Tests
 // ===================================================================
@@ -634,6 +663,26 @@ fn test_scalar_zero_shift() {
     let shift = measure_scalar_shift("TEST", &market, &market).expect("Should measure shift");
 
     assert_eq!(shift, 0.0, "Same scalar should produce zero shift");
+}
+
+#[test]
+fn test_scalar_absolute_shift_returns_native_unit_difference() {
+    let market_t0 = market_with_price("EQUITY-SPX", MarketScalar::Unitless(100.0));
+    let market_t1 = market_with_price("EQUITY-SPX", MarketScalar::Unitless(112.5));
+
+    let shift = measure_scalar_absolute_shift("EQUITY-SPX", &market_t0, &market_t1)
+        .expect("Should measure absolute shift");
+
+    assert_eq!(shift, 12.5);
+}
+
+#[test]
+fn test_scalar_shift_non_finite_results_error() {
+    let market_t0 = market_with_price("BAD", MarketScalar::Unitless(1.0));
+    let market_t1 = market_with_price("BAD", MarketScalar::Unitless(f64::INFINITY));
+
+    assert!(measure_scalar_shift("BAD", &market_t0, &market_t1).is_err());
+    assert!(measure_scalar_absolute_shift("BAD", &market_t0, &market_t1).is_err());
 }
 
 // ===================================================================

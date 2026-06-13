@@ -1006,6 +1006,25 @@ mod tests {
     }
 
     #[test]
+    fn test_online_stats_merge_empty_accumulators() {
+        let mut stats = OnlineStats::new();
+        stats.update(1.0);
+        stats.update(3.0);
+        let before = stats.clone();
+
+        stats.merge(&OnlineStats::new());
+        assert_eq!(stats.count(), before.count());
+        assert_eq!(stats.mean(), before.mean());
+        assert_eq!(stats.variance(), before.variance());
+
+        let mut empty = OnlineStats::new();
+        empty.merge(&stats);
+        assert_eq!(empty.count(), stats.count());
+        assert_eq!(empty.mean(), stats.mean());
+        assert_eq!(empty.variance(), stats.variance());
+    }
+
+    #[test]
     fn test_confidence_intervals() {
         let mut stats = OnlineStats::new();
         for i in 1..=100 {

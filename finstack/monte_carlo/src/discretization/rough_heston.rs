@@ -16,7 +16,7 @@
 //! Construction logs a warning for grids above 200 steps because the
 //! quadratic Volterra cost can dominate large production runs.
 //!
-//! # Kernel Weights 
+//! # Kernel Weights
 //!
 //! The singular kernel `(t − s)^{α−1}` is handled with hybrid-scheme weights
 //! (Bennedsen-Lunde-Pakkanen style), with the drift and noise components of

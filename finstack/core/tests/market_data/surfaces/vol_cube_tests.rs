@@ -1,4 +1,4 @@
-use finstack_core::market_data::surfaces::VolCube;
+use finstack_core::market_data::surfaces::{VolCube, VolInterpolationMode};
 use finstack_core::math::volatility::sabr::SabrParams;
 
 #[test]
@@ -38,6 +38,72 @@ fn test_vol_cube_validation_rejects_bad_input() {
     // Unsorted expiries
     let result = VolCube::from_grid("BAD", &[5.0, 1.0], &[2.0, 10.0], &[p; 4], &[0.03; 4]);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_vol_cube_serde_roundtrips_interpolation_mode_and_grid_state() {
+    let p0 = SabrParams::new(0.030, 0.5, -0.2, 0.4).unwrap();
+    let p1 = SabrParams::new(0.040, 0.5, -0.1, 0.5).unwrap();
+    let cube = VolCube::from_grid(
+        "USD-SWAPTION",
+        &[1.0, 5.0],
+        &[2.0, 10.0],
+        &[p0, p1, p0, p1],
+        &[0.030, 0.035, 0.040, 0.045],
+    )
+    .unwrap()
+    .with_interpolation_mode(VolInterpolationMode::TotalVariance);
+
+    let json = serde_json::to_string(&cube).unwrap();
+    assert!(
+        json.contains("\"interpolation_mode\":\"total_variance\""),
+        "serialized cube should preserve the interpolation mode: {json}"
+    );
+
+    let roundtrip: VolCube = serde_json::from_str(&json).unwrap();
+    assert_eq!(roundtrip.id(), cube.id());
+    assert_eq!(roundtrip.expiries(), cube.expiries());
+    assert_eq!(roundtrip.tenors(), cube.tenors());
+    assert_eq!(roundtrip.grid_shape(), cube.grid_shape());
+    assert_eq!(roundtrip.params_at(0, 1), cube.params_at(0, 1));
+    assert_eq!(roundtrip.forward_at(1, 0), cube.forward_at(1, 0));
+
+    let serialized = serde_json::to_value(roundtrip).unwrap();
+    assert_eq!(serialized["interpolation_mode"], "total_variance");
+}
+
+#[test]
+fn test_vol_cube_serde_defaults_legacy_missing_interpolation_mode_to_vol() {
+    let json = r#"{
+        "id": "LEGACY-CUBE",
+        "expiries": [1.0],
+        "tenors": [5.0],
+        "params": [{"alpha": 0.035, "beta": 0.5, "rho": -0.2, "nu": 0.4}],
+        "forwards": [0.03]
+    }"#;
+
+    let cube: VolCube = serde_json::from_str(json).unwrap();
+    let serialized = serde_json::to_value(cube).unwrap();
+
+    assert_eq!(serialized["interpolation_mode"], "vol");
+}
+
+#[test]
+fn test_vol_cube_serde_rejects_unknown_fields() {
+    let json = r#"{
+        "id": "STRICT-CUBE",
+        "expiries": [1.0],
+        "tenors": [5.0],
+        "params": [{"alpha": 0.035, "beta": 0.5, "rho": -0.2, "nu": 0.4}],
+        "forwards": [0.03],
+        "unknown": true
+    }"#;
+
+    let result = serde_json::from_str::<VolCube>(json);
+    assert!(
+        result.is_err(),
+        "VolCube wire format should reject unknown fields"
+    );
 }
 
 #[test]
@@ -125,6 +191,32 @@ fn test_vol_cube_materialize_expiry_slice() {
     let surface = cube.materialize_expiry_slice(1.0, &strikes).unwrap();
     assert_eq!(surface.expiries(), &[5.0, 10.0]);
     assert_eq!(surface.strikes(), &strikes[..]);
+}
+
+#[test]
+fn test_vol_cube_materialize_grid_flattens_expiry_tenor_strike_order() {
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let cube = VolCube::from_grid(
+        "TEST",
+        &[1.0, 5.0],
+        &[5.0, 10.0],
+        &[p; 4],
+        &[0.03, 0.035, 0.04, 0.045],
+    )
+    .unwrap();
+    let strikes = [0.02, 0.03, 0.04];
+
+    let grid = cube.materialize_grid(&strikes).expect("materializes");
+
+    assert_eq!(grid.len(), 2 * 2 * strikes.len());
+    let expected_first = cube.vol(1.0, 5.0, strikes[0]).expect("cube vol");
+    let expected_second_strike = cube.vol(1.0, 5.0, strikes[1]).expect("cube vol");
+    let expected_next_tenor = cube.vol(1.0, 10.0, strikes[0]).expect("cube vol");
+    assert!((grid[0] - expected_first).abs() < 1e-14);
+    assert!((grid[1] - expected_second_strike).abs() < 1e-14);
+    assert!((grid[strikes.len()] - expected_next_tenor).abs() < 1e-14);
+
+    assert!(cube.materialize_grid(&[]).is_err());
 }
 
 // ---------------------------------------------------------------------------

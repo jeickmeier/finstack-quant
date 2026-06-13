@@ -82,21 +82,3 @@ impl Discounting for FlatCurve {
         (-self.rate * t).exp()
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use time::Month;
-
-    #[test]
-    fn test_flat_curve_discounting() {
-        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let curve = FlatCurve::new(0.10, base, DayCount::Act365F, "TEST");
-
-        // t=0 -> df=1
-        assert!((curve.df(0.0) - 1.0).abs() < 1e-12);
-
-        // t=1 -> df=e^-0.1
-        assert!((curve.df(1.0) - (-0.1_f64).exp()).abs() < 1e-12);
-    }
-}

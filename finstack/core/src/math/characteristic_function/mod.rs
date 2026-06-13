@@ -262,6 +262,71 @@ mod tests {
     }
 
     #[test]
+    fn cf_models_roundtrip_through_json() {
+        let bs = BlackScholesCf {
+            r: 0.05,
+            q: 0.01,
+            sigma: 0.2,
+        };
+        let bs_restored: BlackScholesCf =
+            serde_json::from_str(&serde_json::to_string(&bs).expect("serialize BS"))
+                .expect("deserialize BS");
+        assert_eq!(bs_restored.r, bs.r);
+        assert_eq!(bs_restored.q, bs.q);
+        assert_eq!(bs_restored.sigma, bs.sigma);
+
+        let merton = MertonJumpCf {
+            r: 0.04,
+            q: 0.01,
+            sigma: 0.2,
+            lambda: 0.7,
+            mu_j: -0.05,
+            sigma_j: 0.1,
+        };
+        let merton_restored: MertonJumpCf =
+            serde_json::from_str(&serde_json::to_string(&merton).expect("serialize Merton"))
+                .expect("deserialize Merton");
+        assert_eq!(merton_restored.r, merton.r);
+        assert_eq!(merton_restored.lambda, merton.lambda);
+        assert_eq!(merton_restored.mu_j, merton.mu_j);
+
+        let vg = VarianceGammaCf::new(0.05, 0.01, 0.12, 0.2, -0.14).expect("valid VG");
+        let vg_restored: VarianceGammaCf =
+            serde_json::from_str(&serde_json::to_string(&vg).expect("serialize VG"))
+                .expect("deserialize VG");
+        assert_eq!(vg_restored.r, vg.r);
+        assert_eq!(vg_restored.nu, vg.nu);
+        assert_eq!(vg_restored.theta, vg.theta);
+        assert!(vg_restored.validate().is_ok());
+    }
+
+    #[test]
+    fn vg_deserialized_invalid_parameters_fail_validate() {
+        let vg: VarianceGammaCf =
+            serde_json::from_str(r#"{"r":0.05,"q":0.0,"sigma":0.5,"nu":4.0,"theta":0.2}"#)
+                .expect("serde allows struct-literal compatibility");
+
+        assert!(vg.validate().is_err());
+    }
+
+    #[test]
+    fn merton_cumulants_match_numerical_cf_estimates() {
+        let merton = MertonJumpCf {
+            r: 0.04,
+            q: 0.01,
+            sigma: 0.2,
+            lambda: 0.35,
+            mu_j: -0.03,
+            sigma_j: 0.08,
+        };
+        let closed = merton.cumulants(1.25);
+        let numerical = cumulants_from_cf(&merton, 1.25);
+
+        assert!((closed.c1 - numerical.c1).abs() < 1e-6);
+        assert!((closed.c2 - numerical.c2).abs() < 1e-6);
+    }
+
+    #[test]
     fn log_forward_cf_shifts_mean() {
         let bs = BlackScholesCf {
             r: 0.05,

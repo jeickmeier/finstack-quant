@@ -421,11 +421,22 @@ mod tests {
 
         // At u=0, should get (1, 1)
         let (x1, x2) = dist.sample_from_uniform(0.0);
-        assert!(x1 == 1 || x2 == 1 || x1 == 0 || x2 == 0);
+        assert_eq!((x1, x2), (1, 1));
 
         // At u=0.99, should get (0, 0)
         let (x1, x2) = dist.sample_from_uniform(0.99);
         assert_eq!((x1, x2), (0, 0));
+    }
+
+    #[test]
+    fn test_sample_from_uniform_covers_all_joint_buckets() {
+        let dist = CorrelatedBernoulli::new(0.5, 0.5, 0.0);
+
+        assert_eq!(dist.joint_probabilities(), (0.25, 0.25, 0.25, 0.25));
+        assert_eq!(dist.sample_from_uniform(0.125), (1, 1));
+        assert_eq!(dist.sample_from_uniform(0.375), (1, 0));
+        assert_eq!(dist.sample_from_uniform(0.625), (0, 1));
+        assert_eq!(dist.sample_from_uniform(0.875), (0, 0));
     }
 
     #[test]

@@ -814,4 +814,25 @@ mod tests {
         assert_eq!(CreditRating::BPlus.warf().expect("B+"), 2220.0);
         assert_eq!(CreditRating::BBBMinus.warf().expect("BBB-"), 610.0);
     }
+
+    #[test]
+    fn credit_rating_serde_wire_name_is_stable() {
+        let json = serde_json::to_string(&CreditRating::BBBMinus).expect("rating serializes");
+
+        assert_eq!(json, r#""BBBMinus""#);
+        let restored: CreditRating = serde_json::from_str(&json).expect("rating deserializes");
+        assert_eq!(restored, CreditRating::BBBMinus);
+    }
+
+    #[test]
+    fn rating_factor_table_round_trips_through_json() {
+        let table = RatingFactorTable::moodys_standard().expect("registry table");
+        let json = serde_json::to_string(&table).expect("table serializes");
+        let restored: RatingFactorTable = serde_json::from_str(&json).expect("table deserializes");
+
+        assert_eq!(restored.agency(), table.agency());
+        assert_eq!(restored.methodology(), table.methodology());
+        assert_eq!(restored.default_factor(), table.default_factor());
+        assert_eq!(restored.get_factor(CreditRating::B).expect("B"), 2720.0);
+    }
 }

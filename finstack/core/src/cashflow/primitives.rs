@@ -593,6 +593,32 @@ mod tests {
     }
 
     #[test]
+    fn cfkind_is_interest_like_classifies_coupon_flows_only() {
+        for kind in [
+            CFKind::Fixed,
+            CFKind::FloatReset,
+            CFKind::InflationCoupon,
+            CFKind::Stub,
+        ] {
+            assert!(kind.is_interest_like(), "{kind:?} should be interest-like");
+        }
+
+        for kind in [
+            CFKind::Fee,
+            CFKind::Notional,
+            CFKind::PIK,
+            CFKind::Amortization,
+            CFKind::Recovery,
+            CFKind::MarginInterest,
+        ] {
+            assert!(
+                !kind.is_interest_like(),
+                "{kind:?} should not be interest-like"
+            );
+        }
+    }
+
+    #[test]
     fn margin_cashflow_kinds_construct_correctly() {
         let date = Date::from_calendar_date(2025, Month::March, 1).expect("Valid test date");
         let amt = Money::new(1_000_000.0, Currency::USD);

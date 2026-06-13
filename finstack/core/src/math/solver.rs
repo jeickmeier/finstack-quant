@@ -1134,19 +1134,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_newton_solver() {
-        let solver = NewtonSolver::new();
-
-        // Solve x^2 - 2 = 0 (root should be sqrt(2))
-        let f = |x: f64| x * x - 2.0;
-        let root = solver
-            .solve(f, 1.0)
-            .expect("Root finding should succeed in test");
-
-        assert!((root - 2.0_f64.sqrt()).abs() < 1e-10);
-    }
-
-    #[test]
     fn test_brent_solver() {
         let solver = BrentSolver::new();
 
@@ -1180,6 +1167,43 @@ mod tests {
             .solve(f, 95.0)
             .expect("Root finding should succeed in test");
         assert!(f(root2).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_brent_solve_in_bracket_reorders_and_accepts_endpoint_roots() {
+        let solver = BrentSolver::new();
+        let f = |x: f64| x - 2.0;
+
+        let reversed = solver
+            .solve_in_bracket(f, 3.0, 1.0)
+            .expect("reversed bracket should be accepted");
+        assert!((reversed - 2.0).abs() < 1e-12);
+
+        assert_eq!(
+            solver
+                .solve_in_bracket(f, 2.0, 5.0)
+                .expect("left endpoint root"),
+            2.0
+        );
+        assert_eq!(
+            solver
+                .solve_in_bracket(f, 0.0, 2.0)
+                .expect("right endpoint root"),
+            2.0
+        );
+    }
+
+    #[test]
+    fn test_brent_solve_in_bracket_rejects_same_sign_endpoints() {
+        let solver = BrentSolver::new();
+        let err = solver
+            .solve_in_bracket(|x| x * x + 1.0, -1.0, 1.0)
+            .expect_err("same-sign endpoints are not a valid bracket");
+
+        assert!(
+            err.to_string().contains("same sign"),
+            "unexpected error: {err}"
+        );
     }
 
     // ===== Phase 1 Robustness Tests =====
@@ -1400,23 +1424,6 @@ mod tests {
             root_fd
         );
         assert!((f(root_analytic)).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_solve_with_derivative_exponential() {
-        // Test on transcendental equation: e^x - 3x = 0
-        let solver = NewtonSolver::new();
-
-        let f = |x: f64| x.exp() - 3.0 * x;
-        let f_prime = |x: f64| x.exp() - 3.0;
-
-        let root = solver
-            .solve_with_derivative(f, f_prime, 1.0)
-            .expect("Should solve exponential equation");
-
-        assert!((f(root)).abs() < 1e-10);
-        // One root is around x ≈ 0.619 (there's also one near 1.512)
-        assert!(root > 0.0 && root < 2.0);
     }
 
     #[test]

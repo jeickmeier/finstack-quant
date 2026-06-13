@@ -507,6 +507,48 @@ mod tests {
     }
 
     #[test]
+    fn local_vol_smoothed_rejects_negative_sigma() {
+        let surface = test_surface();
+        let err = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.03, -1.0)
+            .expect_err("negative smoothing width should be rejected");
+
+        assert!(
+            err.to_string().contains("sigma_strikes"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn local_vol_smoothed_zero_sigma_matches_unsmoothed() {
+        let surface = test_surface();
+        let unsmoothed = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
+            .expect("extraction should succeed");
+        let smoothed = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.03, 0.0)
+            .expect("zero smoothing should delegate to unsmoothed extractor");
+
+        assert_eq!(smoothed.grid_shape(), unsmoothed.grid_shape());
+        for &t in unsmoothed.expiries() {
+            for &k in unsmoothed.strikes() {
+                assert_eq!(smoothed.value(t, k), unsmoothed.value(t, k));
+            }
+        }
+    }
+
+    #[test]
+    fn local_vol_smoothed_positive_sigma_is_positive_and_finite() {
+        let surface = test_surface();
+        let lv = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.03, 7.5)
+            .expect("positive smoothing should succeed");
+
+        for &t in lv.expiries() {
+            for &k in lv.strikes() {
+                let vol = lv.value(t, k);
+                assert!(vol > 0.0 && vol.is_finite(), "vol({t}, {k}) = {vol}");
+            }
+        }
+    }
+
+    #[test]
     fn local_vol_positive_and_finite() {
         let surface = test_surface();
         let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)

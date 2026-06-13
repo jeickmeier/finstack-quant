@@ -222,7 +222,15 @@ fn test_payment_delay_sensitivity() {
         "FIXING:FWD",
         vec![
             (
+                Date::from_calendar_date(2023, Month::December, 28).unwrap(),
+                0.05,
+            ),
+            (
                 Date::from_calendar_date(2024, Month::January, 1).unwrap(),
+                0.05,
+            ),
+            (
+                Date::from_calendar_date(2024, Month::March, 28).unwrap(),
                 0.05,
             ),
             (
@@ -230,7 +238,15 @@ fn test_payment_delay_sensitivity() {
                 0.05,
             ),
             (
+                Date::from_calendar_date(2024, Month::June, 28).unwrap(),
+                0.05,
+            ),
+            (
                 Date::from_calendar_date(2024, Month::July, 1).unwrap(),
+                0.05,
+            ),
+            (
+                Date::from_calendar_date(2024, Month::September, 30).unwrap(),
                 0.05,
             ),
             (

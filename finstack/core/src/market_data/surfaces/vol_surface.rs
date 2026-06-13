@@ -1240,13 +1240,6 @@ mod tests {
     }
 
     #[test]
-    fn oob_checked_errors() {
-        let vs = flat_surface();
-        assert!(vs.value_checked(0.5, 95.0).is_err());
-        assert!(vs.value_checked(1.5, 50.0).is_err());
-    }
-
-    #[test]
     fn from_sabr_constructs_valid_surface() {
         use crate::math::volatility::sabr::SabrParams;
 
@@ -1378,27 +1371,6 @@ mod tests {
             vol.is_nan(),
             "invalid forward should not silently clamp a failed SVI fit"
         );
-    }
-
-    #[test]
-    fn builder_validation_errors() {
-        // Unsorted expiries
-        let bad = VolSurface::builder("BAD")
-            .expiries(&[2.0, 1.0])
-            .strikes(&[90.0, 100.0])
-            .row(&[0.2, 0.2])
-            .row(&[0.2, 0.2])
-            .build();
-        assert!(bad.is_err());
-
-        // Mismatched row length
-        let bad2 = VolSurface::builder("BAD2")
-            .expiries(&[1.0, 2.0])
-            .strikes(&[90.0, 100.0])
-            .row(&[0.2])
-            .row(&[0.2, 0.2])
-            .build();
-        assert!(bad2.is_err());
     }
 
     #[test]

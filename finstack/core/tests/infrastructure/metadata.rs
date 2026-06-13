@@ -77,14 +77,6 @@ fn test_results_meta_timestamp_format() {
     assert!(timestamp.year() >= 2024);
 }
 
-#[test]
-fn test_results_meta_default_impl() {
-    let meta = ResultsMeta::default();
-    assert_eq!(meta.numeric_mode, NumericMode::F64);
-    assert!(meta.timestamp.is_none());
-    assert!(meta.version.is_some());
-}
-
 #[cfg(test)]
 mod property_tests {
     use super::*;

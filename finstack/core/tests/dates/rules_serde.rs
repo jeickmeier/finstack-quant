@@ -167,21 +167,9 @@ mod serde_tests {
         let deserialized: Vec<Rule> = serde_json::from_str(&json).unwrap();
 
         assert_eq!(rules.len(), deserialized.len());
-
-        // Note: We can't use direct equality comparison on Rule because
-        // it doesn't derive PartialEq. We'd need to check each field individually
-        // as done in the test_rule_serde_roundtrip test above.
-    }
-
-    #[test]
-    fn test_span_rule_skipped() {
-        // The Span variant should be skipped during serialization
-        // We can't easily create a Span rule in tests since it requires a &'static Rule,
-        // but we can verify the skip behavior doesn't break serialization of other variants
-
-        // If we had a way to create a Span rule, we'd test that it gets skipped:
-        // let rule = Rule::Span { start: &SOME_STATIC_RULE, len: 7 };
-        // let json = serde_json::to_string(&rule).unwrap();
-        // This should serialize as null or be omitted
+        assert_eq!(
+            serde_json::to_value(&rules).unwrap(),
+            serde_json::to_value(&deserialized).unwrap()
+        );
     }
 }

@@ -1242,6 +1242,21 @@ mod tests {
     }
 
     #[test]
+    fn require_feller_accepts_only_strict_feller_parameters() {
+        let ok = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
+        assert_eq!(ok.require_feller().expect("satisfies Feller"), ok);
+
+        let violates = HestonParams::new(0.04, 0.5, 0.04, 0.5, -0.5).expect("valid");
+        let err = violates
+            .require_feller()
+            .expect_err("violates Feller condition");
+        assert!(
+            err.to_string().contains("Feller condition violated"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
     fn call_price_positive_and_bounded() {
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
         let call = p.price_european(100.0, 100.0, 0.05, 0.0, 1.0, true);

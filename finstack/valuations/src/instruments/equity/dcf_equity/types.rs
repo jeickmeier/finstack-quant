@@ -1172,6 +1172,7 @@ mod tests {
     #[test]
     fn terminal_flow_override_uses_standard_half_year_terminal_discount_shift() {
         let mut dcf = build_simple_dcf_gordon();
+        dcf.mid_year_convention = true;
         dcf.terminal_flow_override = Some(400.0);
         dcf.flows = vec![
             (

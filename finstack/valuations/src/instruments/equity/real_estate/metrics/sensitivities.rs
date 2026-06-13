@@ -169,7 +169,7 @@ impl Default for DiscountRateSensitivity {
 }
 
 impl DiscountRateSensitivity {
-    /// DCF valuations always discount at `discount_rate` 
+    /// DCF valuations always discount at `discount_rate`
     /// DCF valuations always discount at `discount_rate`, so the only
     /// precondition is that the rate is set.
     fn ensure_dcf_rate_present(a: &RealEstateAsset) -> finstack_core::Result<()> {

@@ -702,32 +702,6 @@ mod tests {
         assert_eq!(DERIVATIVE_EPSILON, 1e-6);
     }
 
-    #[test]
-    fn derivative_epsilon_usage() {
-        let epsilon = DERIVATIVE_EPSILON;
-        let f = |x: f64| x * x;
-        let x = 2.0;
-        let true_deriv = 2.0 * x;
-        let approx_deriv = (f(x + epsilon) - f(x)) / epsilon;
-        assert!((approx_deriv - true_deriv).abs() < 1e-5);
-    }
-
-    // ========================================================================
-    // InterpStyle PartialEq Tests
-    // ========================================================================
-
-    #[test]
-    fn interp_style_equality() {
-        assert_eq!(InterpStyle::Linear, InterpStyle::Linear);
-        assert_eq!(InterpStyle::LogLinear, InterpStyle::LogLinear);
-    }
-
-    #[test]
-    fn interp_style_inequality() {
-        assert_ne!(InterpStyle::Linear, InterpStyle::LogLinear);
-        assert_ne!(InterpStyle::LogLinear, InterpStyle::MonotoneConvex);
-    }
-
     // ========================================================================
     // InterpStyle FromStr / Display roundtrip tests
     // ========================================================================

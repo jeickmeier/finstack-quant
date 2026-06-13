@@ -307,6 +307,28 @@ mod generator_tests {
             .expect("Kreinin-Sidenius should produce valid generator");
     }
 
+    #[test]
+    fn from_transition_matrix_rejects_negative_eigenvalue() {
+        let scale =
+            RatingScale::custom(vec!["A".to_string(), "B".to_string(), "D".to_string()]).unwrap();
+        #[rustfmt::skip]
+        let p = TransitionMatrix::new(
+            scale,
+            &[
+                0.0, 1.0, 0.0,
+                1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0,
+            ],
+            1.0,
+        )
+        .expect("valid stochastic matrix with absorbing default");
+
+        assert!(matches!(
+            GeneratorMatrix::from_transition_matrix(&p),
+            Err(MigrationError::NoValidGenerator { .. })
+        ));
+    }
+
     /// Policy-visibility stamping : a matrix
     /// whose log requires Kreinin-Sidenius clamping must report non-zero
     /// `regularization_l1`, and the round-trip error must be stamped.

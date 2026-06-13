@@ -775,6 +775,44 @@ mod tests {
     }
 
     #[test]
+    fn test_from_years_prefers_months_and_handles_invalid_values() {
+        assert_eq!(
+            Tenor::from_years(1.0, DayCount::Act365F),
+            Tenor::new(1, TenorUnit::Years)
+        );
+        assert_eq!(
+            Tenor::from_years(0.25, DayCount::Act365F),
+            Tenor::new(3, TenorUnit::Months)
+        );
+        assert_eq!(
+            Tenor::from_years(10.0 / 365.0, DayCount::Act365F),
+            Tenor::new(10, TenorUnit::Days)
+        );
+        assert_eq!(
+            Tenor::from_years(-1.0, DayCount::Act365F),
+            Tenor::new(0, TenorUnit::Days)
+        );
+        assert_eq!(
+            Tenor::from_years(f64::NAN, DayCount::Act365F),
+            Tenor::new(0, TenorUnit::Days)
+        );
+    }
+
+    #[test]
+    fn test_from_payments_per_year_validation() {
+        assert_eq!(
+            Tenor::from_payments_per_year(4).expect("quarterly"),
+            Tenor::new(3, TenorUnit::Months)
+        );
+        assert_eq!(
+            Tenor::from_payments_per_year(12).expect("monthly"),
+            Tenor::new(1, TenorUnit::Months)
+        );
+        assert!(Tenor::from_payments_per_year(0).is_err());
+        assert!(Tenor::from_payments_per_year(5).is_err());
+    }
+
+    #[test]
     fn test_to_days_approx() {
         // Days and weeks are exact
         assert_eq!(Tenor::parse("1D").expect("valid").to_days_approx(), 1);

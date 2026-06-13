@@ -523,6 +523,38 @@ mod hardening_tests {
     }
 
     #[test]
+    fn npv_amounts_rejects_empty_flows_and_invalid_discount_rates() {
+        let base = create_date(2024, Month::January, 1).expect("Valid test date");
+        let flows = vec![(base, 100.0)];
+
+        assert!(npv_amounts(&[], 0.05, Some(base), Some(DayCount::Act365F)).is_err());
+        assert!(npv_amounts(&flows, f64::NAN, Some(base), Some(DayCount::Act365F)).is_err());
+        assert!(npv_amounts(&flows, f64::INFINITY, Some(base), Some(DayCount::Act365F)).is_err());
+        assert!(npv_amounts(&flows, -1.0, Some(base), Some(DayCount::Act365F)).is_err());
+        assert!(npv_amounts(&flows, -1.01, Some(base), Some(DayCount::Act365F)).is_err());
+    }
+
+    #[test]
+    fn npv_amounts_with_ctx_propagates_day_count_context_errors() {
+        let base = create_date(2025, Month::January, 6).expect("Valid test date");
+        let pay = create_date(2025, Month::January, 13).expect("Valid test date");
+        let flows = vec![(pay, 100.0)];
+
+        let result = npv_amounts_with_ctx(
+            &flows,
+            0.05,
+            Some(base),
+            Some(DayCount::Bus252),
+            DayCountContext::default(),
+        );
+
+        assert!(
+            result.is_err(),
+            "Bus/252 scalar NPV requires a calendar in the day-count context"
+        );
+    }
+
+    #[test]
     fn npv_with_bus252_context_counts_business_days() {
         let base = create_date(2025, Month::January, 6).expect("Valid test date"); // Monday
         let pay = create_date(2025, Month::January, 13).expect("Valid test date"); // Next Monday
@@ -641,6 +673,29 @@ mod tests {
         }
     }
 
+    struct InvalidBaseDfCurve {
+        id: CurveId,
+    }
+
+    impl TermStructure for InvalidBaseDfCurve {
+        fn id(&self) -> &CurveId {
+            &self.id
+        }
+    }
+
+    impl Discounting for InvalidBaseDfCurve {
+        fn base_date(&self) -> Date {
+            Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
+        }
+        fn df(&self, t: f64) -> f64 {
+            if t.abs() < f64::EPSILON {
+                0.0
+            } else {
+                1.0
+            }
+        }
+    }
+
     #[test]
     fn tuples_discountable_paths_through() {
         let curve = ZeroRateCurve {
@@ -680,14 +735,48 @@ mod tests {
     }
 
     #[test]
-    fn npv_errors_on_empty_flows() {
-        let curve = ZeroRateCurve {
-            id: CurveId::new("USD-OIS"),
+    fn npv_with_options_rejects_invalid_valuation_date_discount_factor() {
+        let curve = InvalidBaseDfCurve {
+            id: CurveId::new("BAD-DF"),
         };
         let base = curve.base_date();
-        let flows: Vec<(Date, Money)> = vec![];
-        let err = npv(&curve, base, None, &flows).expect_err("Should fail with empty flows");
-        let _ = format!("{}", err);
+        let flows = vec![(
+            base + time::Duration::days(1),
+            Money::new(10.0, Currency::USD),
+        )];
+
+        let err = npv_with_options(
+            &curve,
+            base,
+            Some(DayCount::Act365F),
+            DayCountContext::default(),
+            NpvOptions::default(),
+            &flows,
+        )
+        .expect_err("df_base <= 0 should be rejected");
+
+        assert!(
+            err.to_string()
+                .contains("discount factor at the valuation date"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn npv_with_ctx_propagates_bus252_missing_calendar_error() {
+        let base = create_date(2025, Month::January, 6).expect("Valid test date");
+        let pay = create_date(2025, Month::January, 13).expect("Valid test date");
+        let curve = FlatCurve::new(0.10, base, DayCount::Bus252, "BRL-FLAT");
+        let flows = vec![(pay, Money::new(100.0, Currency::USD))];
+
+        assert!(npv_with_ctx(
+            &curve,
+            base,
+            Some(DayCount::Bus252),
+            DayCountContext::default(),
+            &flows
+        )
+        .is_err());
     }
 
     #[test]

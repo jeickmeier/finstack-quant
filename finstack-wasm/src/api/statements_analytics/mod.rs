@@ -434,10 +434,11 @@ mod tests {
     }
 
     #[test]
-    fn explain_formula_succeeds() {
+    fn explain_formula_text_succeeds() {
         let (model_json, results_json) = evaluated_results();
         let explanation =
-            explain_formula(&model_json, &results_json, "gross_profit", "2024Q1").expect("explain");
+            explain_formula_text(&model_json, &results_json, "gross_profit", "2024Q1")
+                .expect("explain");
         assert!(!explanation.is_empty());
     }
 
@@ -547,7 +548,7 @@ mod tests {
             }]
         })
         .to_string();
-        let report_json = run_checks(&model_json, &spec_json).expect("run checks");
+        let report_json = run_checks(&model_json, &spec_json, None).expect("run checks");
         let report: serde_json::Value = serde_json::from_str(&report_json).expect("parse report");
         // The formula check must appear in the report's executed results,
         // not be silently dropped.

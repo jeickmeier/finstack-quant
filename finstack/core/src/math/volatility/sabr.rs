@@ -1257,6 +1257,46 @@ mod tests {
     }
 
     #[test]
+    fn sabr_density_check_reports_negative_density() {
+        let forward = 0.05;
+        let strikes: Vec<f64> = (1..=80).map(|i| 0.0025 + i as f64 * 0.0025).collect();
+        let mut detected = None;
+
+        'search: for alpha in [0.005, 0.01, 0.02, 0.04] {
+            for beta in [0.0, 0.25, 0.5, 0.75] {
+                for rho in [-0.99, -0.9, 0.9, 0.99] {
+                    for nu in [1.0, 2.0, 3.0, 4.0] {
+                        for expiry in [1.0, 2.0, 5.0, 10.0] {
+                            let params =
+                                SabrParams::new(alpha, beta, rho, nu).expect("valid params");
+                            let warnings = params.check_density(&strikes, forward, expiry);
+                            if let Some(warning) =
+                                warnings.into_iter().find(|warning| warning.density < 0.0)
+                            {
+                                detected = Some((params, expiry, warning));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let (params, expiry, warning) =
+            detected.expect("expected extreme SABR grid to expose negative density branch");
+        assert!(warning.strike > 0.0);
+        assert!(warning.density < 0.0);
+        assert!(
+            params
+                .check_density(&[warning.strike], forward, expiry)
+                .iter()
+                .any(|repeat| repeat.density < 0.0),
+            "detected warning should be reproducible at strike {}",
+            warning.strike
+        );
+    }
+
+    #[test]
     fn test_sabr_density_check_normal_params() {
         let params = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid params");
         let forward = 0.05;

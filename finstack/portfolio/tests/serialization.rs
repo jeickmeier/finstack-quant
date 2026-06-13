@@ -5,7 +5,7 @@ mod common;
 use common::*;
 use finstack_core::currency::Currency;
 use finstack_core::money::Money;
-use finstack_portfolio::book::BookId;
+use finstack_portfolio::book::{Book, BookId};
 use finstack_portfolio::portfolio::PortfolioSpec;
 use finstack_portfolio::position::{Position, PositionSpec, PositionUnit};
 use finstack_portfolio::types::{AttributeValue, Entity};
@@ -262,7 +262,10 @@ fn test_portfolio_from_spec_preserves_position_metadata() {
             attributes,
             meta,
         }],
-        books: IndexMap::new(),
+        books: IndexMap::from([(
+            BookId::new("ig"),
+            Book::new("ig", Some("Investment Grade".to_string())),
+        )]),
         tags: IndexMap::new(),
         meta: IndexMap::new(),
     };

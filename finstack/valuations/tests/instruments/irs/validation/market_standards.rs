@@ -184,7 +184,9 @@ fn test_par_rate_discount_ratio_rejects_seasoned_swap() {
     let fixings = finstack_core::market_data::scalars::ScalarTimeSeries::new(
         "FIXING:USD-SOFR-3M",
         vec![
+            (date!(2023 - 12 - 29), 0.05), // Q1 T-2 reset at 5%
             (date!(2024 - 01 - 01), 0.05), // Q1 reset at 5%
+            (date!(2024 - 03 - 28), 0.05), // Q2 T-2 reset at 5%
             (date!(2024 - 04 - 01), 0.05), // Q2 reset at 5%
         ],
         None,

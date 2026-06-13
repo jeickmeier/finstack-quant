@@ -275,7 +275,7 @@ impl RealEstateAsset {
     ///   derive cap (sale_price + NOI) is set
     /// - `valuation_method == Dcf` without `discount_rate` (unless an
     ///   `appraisal_value` short-circuits pricing) — DCF always discounts at
-    ///   the property rate 
+    ///   the property rate
     /// - `sale_date` (when set) is on or before `valuation_date`
     pub fn validate(&self) -> finstack_core::Result<()> {
         if self.noi_schedule.is_empty() {

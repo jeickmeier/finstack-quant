@@ -704,6 +704,69 @@ mod tests {
     }
 
     #[test]
+    fn test_with_days_lag() {
+        let index = sample_cpi().with_lag(InflationLag::Days(31));
+
+        let value = index
+            .value_on(make_date(2023, 3, 31))
+            .expect("days-lagged lookup should succeed");
+
+        assert_eq!(value, 101.0);
+    }
+
+    #[test]
+    fn ref_cpi_months_lag_uses_settlement_month_day_count() {
+        let observations = vec![
+            (make_date(2025, 1, 1), 300.0),
+            (make_date(2025, 2, 1), 302.0),
+            (make_date(2025, 3, 1), 305.1),
+        ];
+        let index = InflationIndex::new("US-CPI", observations, Currency::USD)
+            .expect("index creation should succeed");
+
+        let apr_16 = index
+            .ref_cpi_months_lag(make_date(2025, 4, 16), 3)
+            .expect("reference CPI should have January/February anchors");
+        assert!((apr_16 - 301.0).abs() < 1e-12);
+
+        let may_31 = index
+            .ref_cpi_months_lag(make_date(2025, 5, 31), 3)
+            .expect("reference CPI should have February/March anchors");
+        let expected_may_31 = 302.0 + (30.0 / 31.0) * (305.1 - 302.0);
+        assert!((may_31 - expected_may_31).abs() < 1e-12);
+
+        let may_1 = index
+            .ref_cpi_months_lag(make_date(2025, 5, 1), 3)
+            .expect("first of settlement month should use the first lagged anchor");
+        assert_eq!(may_1, 302.0);
+    }
+
+    #[test]
+    fn seasonality_adjusts_values_and_survives_builder_path() {
+        let mut seasonality = [1.0; 12];
+        seasonality[2] = 1.10;
+
+        let index = InflationIndex::builder("US-CPI", Currency::USD)
+            .with_observations(vec![
+                (make_date(2025, 2, 1), 200.0),
+                (make_date(2025, 3, 1), 210.0),
+            ])
+            .with_interpolation(InflationInterpolation::Linear)
+            .with_seasonality(seasonality)
+            .build()
+            .expect("builder should apply seasonality");
+
+        let feb = index.value_on(make_date(2025, 2, 1)).unwrap();
+        let mar = index.value_on(make_date(2025, 3, 1)).unwrap();
+        assert_eq!(feb, 200.0);
+        assert!((mar - 231.0).abs() < 1e-12);
+
+        let json = serde_json::to_string(&index).unwrap();
+        let roundtrip: InflationIndex = serde_json::from_str(&json).unwrap();
+        assert!((roundtrip.value_on(make_date(2025, 3, 1)).unwrap() - 231.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn test_builder_pattern() {
         let index = InflationIndexBuilder::new("UK-RPI", Currency::GBP)
             .add_observation(make_date(2023, 1, 31), 300.0)
