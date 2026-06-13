@@ -131,6 +131,7 @@ impl FullRepricingEngine {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Vec<FactorPnlProfile>> {
+        super::traits::validate_single_currency(positions, market, as_of)?;
         let base_pvs: Vec<f64> = positions
             .iter()
             .map(|(_, instrument, _)| instrument.value_raw(market, as_of))

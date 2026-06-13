@@ -8,10 +8,15 @@
 //!   issuer is tagged for, with its calibrated `levels[idx]` beta.
 //!
 //! Unknown issuers (no row in `issuer_betas`) are treated as `BucketOnly`:
-//! every emitted factor carries beta = 1.0. Issuers tagged for some but not
-//! all hierarchy levels emit only the levels they are tagged for. A required
-//! tag missing for a level the issuer is *expected* to participate in returns
-//! [`FactorMatchError::MissingRequiredTag`].
+//! every emitted factor carries beta = 1.0. An unknown issuer with **no**
+//! hierarchy tags at all maps to the PC factor only (the documented
+//! index-proxy fallback); an unknown issuer with a *partial* tag set is a
+//! contract violation and returns
+//! [`FactorMatchError::MissingRequiredTag`] — silently truncating the
+//! hierarchy would under-map specific credit risk. Known issuers must carry a
+//! complete tag set and a beta vector matching the hierarchy depth
+//! ([`FactorMatchError::BetaShapeMismatch`] otherwise). Entries with the
+//! folded-level sentinel β = 0.0 are not emitted.
 //!
 //! The matcher delegates the dependency-side gating to the existing
 //! [`DependencyFilter`]; it does not duplicate the tree-walking semantics of
@@ -86,6 +91,13 @@ impl CreditHierarchicalConfig {
         ids.insert(FactorId::new(CREDIT_GENERIC_FACTOR_ID));
         for row in &self.issuer_betas {
             for level_idx in 0..self.hierarchy.levels.len() {
+                // β = 0.0 is the calibration sentinel for "level folded /
+                // skipped"; folded buckets have no factor definition or
+                // covariance row, so they are not enumerated (and the matcher
+                // emits no entry for them either).
+                if row.betas.levels.get(level_idx).copied().unwrap_or(0.0) == 0.0 {
+                    continue;
+                }
                 if let Some(id) = bucket_factor_id(&self.hierarchy, &row.tags, level_idx) {
                     ids.insert(id);
                 }
@@ -109,8 +121,16 @@ pub struct CreditHierarchicalMatcher {
 
 impl CreditHierarchicalMatcher {
     /// Creates a matcher from a calibrated config.
+    ///
+    /// `issuer_betas` is re-sorted by `issuer_id` defensively: row lookup uses
+    /// binary search, and an unsorted vector (e.g. from a hand-assembled
+    /// config) would otherwise silently miss calibrated rows and substitute
+    /// β = 1.0 for every factor.
     #[must_use]
-    pub fn new(config: CreditHierarchicalConfig) -> Self {
+    pub fn new(mut config: CreditHierarchicalConfig) -> Self {
+        config
+            .issuer_betas
+            .sort_by(|a, b| a.issuer_id.as_str().cmp(b.issuer_id.as_str()));
         Self { config }
     }
 
@@ -157,6 +177,19 @@ impl FactorMatcher for CreditHierarchicalMatcher {
             }
         };
 
+        // A calibrated row whose beta vector disagrees with the hierarchy
+        // depth is an inconsistent config; substituting β = 1.0 silently
+        // would misstate risk.
+        if let Some(r) = row {
+            if r.betas.levels.len() != self.config.hierarchy.levels.len() {
+                return Err(FactorMatchError::BetaShapeMismatch {
+                    issuer_id: r.issuer_id.as_str().to_owned(),
+                    actual: r.betas.levels.len(),
+                    expected: self.config.hierarchy.levels.len(),
+                });
+            }
+        }
+
         // Emit PC factor first.
         let mut entries = Vec::with_capacity(1 + self.config.hierarchy.levels.len());
         let pc_beta = row.map_or(1.0, |r| r.betas.pc);
@@ -165,16 +198,24 @@ impl FactorMatcher for CreditHierarchicalMatcher {
             beta: pc_beta,
         });
 
+        // Unknown issuers: tags come from instrument attributes. A complete
+        // absence of hierarchy tags is the documented PC-only proxy fallback;
+        // a *partial* tag set is treated as a contract violation just like a
+        // known issuer's missing tag — silently truncating the hierarchy
+        // would under-map specific credit risk without any signal a strict
+        // unmatched policy could observe.
+        let any_hierarchy_tag_present = self
+            .config
+            .hierarchy
+            .levels
+            .iter()
+            .any(|dim| tags.0.contains_key(&dimension_key(dim)));
+
         // Emit one entry per hierarchy level the issuer is tagged for.
         for (level_idx, dim) in self.config.hierarchy.levels.iter().enumerate() {
-            // For unknown issuers we proceed best-effort: a missing tag at a
-            // given level just stops level emission (we treat the issuer as
-            // tagged only down to the level we have data for). For *known*
-            // issuers (a row exists), we treat a missing tag as a contract
-            // violation.
             let tag_present = tags.0.contains_key(&dimension_key(dim));
             if !tag_present {
-                if row.is_some() {
+                if row.is_some() || any_hierarchy_tag_present {
                     return Err(FactorMatchError::MissingRequiredTag {
                         dimension: dimension_key(dim),
                     });
@@ -186,17 +227,20 @@ impl FactorMatcher for CreditHierarchicalMatcher {
             let Some(factor_id) = bucket_factor_id(&self.config.hierarchy, tags, level_idx) else {
                 // bucket_factor_id only fails if a deeper-level tag is missing,
                 // but we already checked the current level; treat as missing.
-                if row.is_some() {
-                    return Err(FactorMatchError::MissingRequiredTag {
-                        dimension: dimension_key(dim),
-                    });
-                }
-                break;
+                return Err(FactorMatchError::MissingRequiredTag {
+                    dimension: dimension_key(dim),
+                });
             };
 
             let beta = row
                 .and_then(|r| r.betas.levels.get(level_idx).copied())
                 .unwrap_or(1.0);
+            // β = 0.0 is the calibration sentinel for "level folded"; the
+            // bucket factor does not exist in the model, so emit no entry
+            // (the exposure would be identically zero anyway).
+            if beta == 0.0 {
+                continue;
+            }
             entries.push(FactorMatchEntry { factor_id, beta });
         }
 
@@ -404,6 +448,7 @@ mod tests {
             FactorMatchError::MissingRequiredTag { dimension } => {
                 assert_eq!(dimension, "region");
             }
+            other => panic!("unexpected error variant: {other:?}"),
         }
     }
 

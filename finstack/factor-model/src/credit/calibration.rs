@@ -145,6 +145,7 @@ pub enum BetaShrinkage {
 /// Per-level minimum-bucket-size thresholds used to gate fold-up of sparse
 /// hierarchy buckets.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BucketSizeThresholds {
     /// Threshold per hierarchy level. Levels beyond `per_level.len()` use the
     /// default of 5.
@@ -167,6 +168,7 @@ impl BucketSizeThresholds {
 
 /// Configuration for the calibrator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreditCalibrationConfig {
     /// Issuer-beta classification policy.
     pub policy: IssuerBetaPolicy,
@@ -211,6 +213,7 @@ impl Default for CreditCalibrationConfig {
 /// `dates.len()`; entries are `Some(spread)` when the issuer was observed at
 /// that date and `None` otherwise.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct HistoryPanel {
     /// Observation dates (sorted ascending).
     pub dates: Vec<Date>,
@@ -220,6 +223,7 @@ pub struct HistoryPanel {
 
 /// Point-in-time issuer tags at the calibration `as_of`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct IssuerTagPanel {
     /// Tag map keyed by issuer.
     pub tags: BTreeMap<IssuerId, IssuerTags>,
@@ -227,6 +231,7 @@ pub struct IssuerTagPanel {
 
 /// Generic (PC) factor reference and aligned values.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GenericFactorSeries {
     /// Reference (name + series_id) embedded into the artifact.
     pub spec: GenericFactorSpec,
@@ -236,6 +241,7 @@ pub struct GenericFactorSeries {
 
 /// All inputs the calibrator needs for a single calibration run.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CreditCalibrationInputs {
     /// Sparse issuer-spread history.
     pub history_panel: HistoryPanel,
@@ -347,7 +353,12 @@ impl CreditCalibrator {
         // -- 1. Mode classification. ----------------------------------------
         let mut modes: BTreeMap<IssuerId, IssuerBetaMode> = BTreeMap::new();
         for issuer in inputs.history_panel.spreads.keys() {
-            let mode = classify_mode(&self.config.policy, issuer, &inputs.history_panel.spreads);
+            let mode = classify_mode(
+                &self.config.policy,
+                issuer,
+                &inputs.history_panel.spreads,
+                &self.config.use_returns_or_levels,
+            );
             modes.insert(issuer.clone(), mode);
         }
 
@@ -431,7 +442,6 @@ impl CreditCalibrator {
             let adder_at_anchor = anchor.adder.get(issuer_id).copied().unwrap_or(0.0);
             let (adder_vol, adder_vol_source) = assign_adder_vol(
                 issuer_id,
-                mode,
                 &from_history_vols,
                 &peer_proxy_index,
                 &inventory.bucket_paths,
@@ -690,10 +700,17 @@ fn unit_betas(num_levels: usize) -> IssuerBetas {
 }
 
 /// Step 1: classify an issuer as `IssuerBeta` or `BucketOnly`.
+///
+/// Under `Dynamic { min_history, .. }` the gate counts the observations the
+/// regression will actually use in the configured panel space: raw `Some`
+/// levels for [`PanelSpace::Levels`], consecutive `Some` pairs (usable return
+/// observations) for [`PanelSpace::Returns`]. Counting raw levels under
+/// `Returns` would overstate the usable history on gappy panels.
 fn classify_mode(
     policy: &IssuerBetaPolicy,
     issuer: &IssuerId,
     spreads: &BTreeMap<IssuerId, Vec<Option<f64>>>,
+    space: &PanelSpace,
 ) -> IssuerBetaMode {
     match policy {
         IssuerBetaPolicy::GloballyOff => IssuerBetaMode::BucketOnly,
@@ -706,7 +723,13 @@ fn classify_mode(
             Some(IssuerBetaOverride::Auto) | None => {
                 let count = spreads
                     .get(issuer)
-                    .map(|s| s.iter().filter(|v| v.is_some()).count())
+                    .map(|s| match space {
+                        PanelSpace::Levels => s.iter().filter(|v| v.is_some()).count(),
+                        PanelSpace::Returns => s
+                            .windows(2)
+                            .filter(|w| w[0].is_some() && w[1].is_some())
+                            .count(),
+                    })
                     .unwrap_or(0);
                 if count >= *min_history {
                     IssuerBetaMode::IssuerBeta
@@ -1214,28 +1237,31 @@ fn compute_fit_quality(y: &[Option<f64>], x: &[f64], beta: f64) -> Option<FitQua
     })
 }
 
-/// Step 6 (part A): per-issuer adder annualized **vol** (std dev) for
-/// `IssuerBeta` issuers only, computed from the residual series after the last level.
+/// Step 6 (part A): per-issuer adder annualized **vol** (std dev) computed
+/// from the residual series after the last level, for every issuer with at
+/// least 2 valid residual observations (any [`IssuerBetaMode`]).
 ///
-/// Returns the annualized standard deviation `sqrt(var * annualization_factor)`
-/// for each `IssuerBeta` issuer that has at least 2 valid residual observations.
-/// `BucketOnly` issuers are excluded — they receive their vol via the cascade in
-/// [`assign_adder_vol`].
+/// Returns the annualized standard deviation `sqrt(var * annualization_factor)`.
+/// Issuers with fewer than 2 valid residuals are excluded — they receive their
+/// vol via the cascade in [`assign_adder_vol`].
 ///
-/// Variance is computed as the population variance (sums squared deviations from
-/// the sample mean and divides by `n`). Population variance is acceptable here
-/// because calibration windows are required to be ≥ 24 observations
-/// (`min_history` default = 24), keeping the bias negligible.
-fn issuer_beta_adder_vols(
+/// `BucketOnly` issuers are included deliberately: under
+/// [`IssuerBetaPolicy::GloballyOff`] every issuer is `BucketOnly`, and skipping
+/// them here would leave the whole model with 0.0 idiosyncratic vol. A
+/// `BucketOnly` issuer alone in its bucket has an identically-zero residual
+/// (its own residual is the bucket mean), so its from-history vol is 0.0 —
+/// which is the mathematically correct statement that the bucket factor
+/// already explains it fully.
+///
+/// Variance uses the unbiased sample estimator (`n − 1`, Bessel's correction),
+/// matching [`factor_variances`]; sparse adders can have short effective
+/// histories where the `n` vs `n − 1` distinction is material.
+fn adder_vols_from_history(
     adder_series: &BTreeMap<IssuerId, Vec<Option<f64>>>,
-    modes: &BTreeMap<IssuerId, IssuerBetaMode>,
     annualization_factor: f64,
 ) -> BTreeMap<IssuerId, f64> {
     let mut out = BTreeMap::new();
     for (issuer, series) in adder_series {
-        if !matches!(modes.get(issuer), Some(IssuerBetaMode::IssuerBeta)) {
-            continue;
-        }
         let valid: Vec<f64> = series.iter().filter_map(|v| *v).collect();
         let n = valid.len();
         if n < 2 {
@@ -1243,7 +1269,7 @@ fn issuer_beta_adder_vols(
         }
         let nf = n as f64;
         let mean = valid.iter().sum::<f64>() / nf;
-        let var = valid.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / nf;
+        let var = valid.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / (nf - 1.0);
         let ann_var = var * annualization_factor;
         out.insert(issuer.clone(), ann_var.max(0.0).sqrt());
     }
@@ -1254,12 +1280,11 @@ fn issuer_beta_adder_vols(
 ///
 /// Returns a `Vec` (indexed by hierarchy level `k`) of `BTreeMap` from
 /// `bucket_path_at_level_k` to the list of `FromHistory` adder vols of all
-/// `IssuerBeta` peers in that bucket.
+/// peers in that bucket.
 ///
 /// Only issuers present in `from_history_vols` (i.e., successful `FromHistory`
-/// fits) contribute to the index. `BucketOnly` issuers and `IssuerBeta` issuers
-/// with insufficient history are implicitly excluded because they have no entry
-/// in `from_history_vols`.
+/// fits) contribute to the index; issuers with insufficient history are
+/// implicitly excluded because they have no entry in `from_history_vols`.
 ///
 /// The returned structure is deterministic: `BTreeMap` key order and `Vec`
 /// element order both follow `BTreeMap` iteration (lexicographic).
@@ -1299,22 +1324,20 @@ fn build_peer_proxy_index(
 ///
 /// 1. **Caller override** (present in `idiosyncratic_overrides`): use it with
 ///    `AdderVolSource::CallerSupplied`. Wins for both `IssuerBeta` and `BucketOnly`.
-/// 2. **`IssuerBeta` with successful `FromHistory` fit**: use the history-derived
+/// 2. **Successful `FromHistory` fit** (any mode): use the history-derived
 ///    vol with `AdderVolSource::FromHistory`.
 /// 3. **Bucket-peer proxy** (deepest level first, then walking up): find the
 ///    deepest level `k` such that the issuer has a path at level `k` and there
-///    is at least one `IssuerBeta` peer with a `FromHistory` vol in that bucket.
+///    is at least one peer with a `FromHistory` vol in that bucket.
 ///    Use the mean of those peers' vols with
 ///    `AdderVolSource::BucketPeerProxy { peer_bucket }`.
 /// 4. **Global default**: if no peers exist anywhere up the hierarchy, use the
-///    mean of *all* `IssuerBeta` `FromHistory` vols across the entire model.
+///    mean of *all* `FromHistory` vols across the entire model.
 ///    `AdderVolSource::Default`.
 /// 5. **No data at all**: `(0.0, AdderVolSource::Default)` — applies when
-///    `from_history_vols` is completely empty (all-BucketOnly model).
-#[allow(clippy::too_many_arguments)]
+///    `from_history_vols` is completely empty (e.g. single-observation panel).
 fn assign_adder_vol(
     issuer_id: &IssuerId,
-    mode: IssuerBetaMode,
     from_history_vols: &BTreeMap<IssuerId, f64>,
     peer_proxy_index: &[BTreeMap<String, Vec<f64>>],
     bucket_paths: &BTreeMap<IssuerId, Vec<String>>,
@@ -1326,11 +1349,9 @@ fn assign_adder_vol(
         return (override_vol, AdderVolSource::CallerSupplied);
     }
 
-    // 2. IssuerBeta with successful FromHistory fit.
-    if matches!(mode, IssuerBetaMode::IssuerBeta) {
-        if let Some(&vol) = from_history_vols.get(issuer_id) {
-            return (vol, AdderVolSource::FromHistory);
-        }
+    // 2. Successful FromHistory fit (any mode).
+    if let Some(&vol) = from_history_vols.get(issuer_id) {
+        return (vol, AdderVolSource::FromHistory);
     }
 
     // 3. Bucket-peer proxy cascade: walk from deepest level to broadest.
@@ -1634,13 +1655,9 @@ fn assemble_factor_model_config(
 /// If a factor has fewer than 2 valid observations, all off-diagonal entries in
 /// its row/column are set to 0.0 (i.e. the factor is treated as uncorrelated).
 ///
-/// # Marginal-mean limitation
-///
-/// The mean subtracted before computing the covariance for each factor is its
-/// **marginal** mean — the mean over all dates where that factor individually
-/// has a valid observation, not the mean over the pairwise overlap. This is a
-/// deliberate simplification that avoids data-dependent conditioning but means
-/// the off-diagonal terms are not strictly centred on the joint distribution.
+/// Means, covariance, and both variances are all formed over the same
+/// pairwise-overlap window (see the inline comment in the loop body), so each
+/// entry is a proper sample correlation in `[-1, 1]`.
 ///
 /// # PSD guarantee
 ///

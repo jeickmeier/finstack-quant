@@ -30,6 +30,71 @@ fn parse_vol_horizon(s: &str) -> Result<finstack_portfolio::factor_model::VolHor
 }
 
 // ---------------------------------------------------------------------------
+// Output finiteness validation
+//
+// `serde_json` silently serializes NaN/Inf as `null`, so risk outputs are
+// checked for finiteness at the boundary and rejected with an error naming
+// the offending field instead of emitting `null`.
+// ---------------------------------------------------------------------------
+
+/// Reject a non-finite numeric output, naming the field in the error.
+fn ensure_finite(field: &str, v: f64) -> Result<(), JsValue> {
+    if v.is_finite() {
+        Ok(())
+    } else {
+        Err(JsValue::from_str(&format!(
+            "non-finite value ({v}) in output field '{field}'"
+        )))
+    }
+}
+
+/// Validate every entry of a factor covariance matrix is finite.
+fn ensure_covariance_finite(
+    cov: &finstack_factor_model::covariance::FactorCovarianceMatrix,
+) -> Result<(), JsValue> {
+    for (i, v) in cov.as_slice().iter().enumerate() {
+        ensure_finite(&format!("covariance.data[{i}]"), *v)?;
+    }
+    Ok(())
+}
+
+/// Validate every numeric field of a `LevelsAtDate` snapshot is finite.
+fn ensure_levels_finite(levels: &finstack_factor_model::LevelsAtDate) -> Result<(), JsValue> {
+    ensure_finite("generic", levels.generic)?;
+    for lev in &levels.by_level {
+        for (bucket, v) in &lev.values {
+            ensure_finite(
+                &format!("by_level[{}].values[{bucket}]", lev.level_index),
+                *v,
+            )?;
+        }
+    }
+    for (issuer, v) in &levels.adder {
+        ensure_finite(&format!("adder[{}]", issuer.as_str()), *v)?;
+    }
+    Ok(())
+}
+
+/// Validate every numeric field of a `PeriodDecomposition` is finite.
+fn ensure_period_finite(
+    period: &finstack_factor_model::PeriodDecomposition,
+) -> Result<(), JsValue> {
+    ensure_finite("d_generic", period.d_generic)?;
+    for lev in &period.by_level {
+        for (bucket, v) in &lev.deltas {
+            ensure_finite(
+                &format!("by_level[{}].deltas[{bucket}]", lev.level_index),
+                *v,
+            )?;
+        }
+    }
+    for (issuer, v) in &period.d_adder {
+        ensure_finite(&format!("d_adder[{}]", issuer.as_str()), *v)?;
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // CreditFactorModel
 // ---------------------------------------------------------------------------
 
@@ -41,7 +106,7 @@ fn parse_vol_horizon(s: &str) -> Result<finstack_portfolio::factor_model::VolHor
 pub struct WasmCreditFactorModel {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
-    pub inner: finstack_factor_model::credit::hierarchy::CreditFactorModel,
+    pub(crate) inner: finstack_factor_model::credit::hierarchy::CreditFactorModel,
 }
 
 #[wasm_bindgen(js_class = CreditFactorModel)]
@@ -120,14 +185,19 @@ impl WasmCreditCalibrator {
 pub struct WasmLevelsAtDate {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
-    pub inner: finstack_factor_model::LevelsAtDate,
+    pub(crate) inner: finstack_factor_model::LevelsAtDate,
 }
 
 #[wasm_bindgen(js_class = LevelsAtDate)]
 impl WasmLevelsAtDate {
     /// Serialize the snapshot to JSON.
+    ///
+    /// # Errors
+    /// Throws if any numeric output field is non-finite (NaN/Inf), naming
+    /// the offending field instead of silently serializing `null`.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
+        ensure_levels_finite(&self.inner)?;
         serde_json::to_string_pretty(&self.inner).map_err(to_js_err)
     }
 }
@@ -143,14 +213,19 @@ impl WasmLevelsAtDate {
 pub struct WasmPeriodDecomposition {
     #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
-    pub inner: finstack_factor_model::PeriodDecomposition,
+    pub(crate) inner: finstack_factor_model::PeriodDecomposition,
 }
 
 #[wasm_bindgen(js_class = PeriodDecomposition)]
 impl WasmPeriodDecomposition {
     /// Serialize the decomposition to JSON.
+    ///
+    /// # Errors
+    /// Throws if any numeric output field is non-finite (NaN/Inf), naming
+    /// the offending field instead of silently serializing `null`.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
+        ensure_period_finite(&self.inner)?;
         serde_json::to_string_pretty(&self.inner).map_err(to_js_err)
     }
 }
@@ -270,6 +345,7 @@ impl WasmFactorCovarianceForecast {
         let h = parse_vol_horizon(horizon_json)?;
         let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
         let cov = forecast.covariance_at(h).map_err(to_js_err)?;
+        ensure_covariance_finite(&cov)?;
         serde_json::to_string_pretty(&cov).map_err(to_js_err)
     }
 
@@ -284,7 +360,9 @@ impl WasmFactorCovarianceForecast {
         let h = parse_vol_horizon(horizon_json)?;
         let id = finstack_core::types::IssuerId::new(issuer_id);
         let forecast = finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
-        forecast.idiosyncratic_vol(&id, h).map_err(to_js_err)
+        let vol = forecast.idiosyncratic_vol(&id, h).map_err(to_js_err)?;
+        ensure_finite("idiosyncratic_vol", vol)?;
+        Ok(vol)
     }
 
     /// Build a portfolio-level `FactorModel` JSON using `Σ(t, h)` at the
@@ -308,6 +386,7 @@ impl WasmFactorCovarianceForecast {
         let config = forecast
             .factor_model_config_at(h, measure)
             .map_err(to_js_err)?;
+        ensure_covariance_finite(&config.covariance)?;
         serde_json::to_string_pretty(&config).map_err(to_js_err)
     }
 }

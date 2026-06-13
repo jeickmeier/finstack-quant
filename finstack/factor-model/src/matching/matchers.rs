@@ -36,27 +36,33 @@ pub struct FactorMatchEntry {
 /// Error returned by [`FactorMatcher::match_factor_with_betas`] when the
 /// matcher can determine the dependency is in scope but cannot produce
 /// a deterministic answer (e.g. a required issuer tag is missing).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum FactorMatchError {
     /// A required issuer tag is missing for hierarchy bucketing.
+    #[error(
+        "credit-hierarchical matcher: issuer tag for dimension '{dimension}' is required but missing"
+    )]
     MissingRequiredTag {
         /// Hierarchy dimension key that was not found.
         dimension: String,
     },
+    /// A calibrated issuer row is structurally inconsistent with the
+    /// hierarchy (e.g. `betas.levels` length disagrees with the number of
+    /// hierarchy levels). Silently substituting β = 1.0 would misstate risk.
+    #[error(
+        "credit-hierarchical matcher: issuer '{issuer_id}' has {actual} level betas, \
+         expected {expected}; the calibrated config is inconsistent"
+    )]
+    BetaShapeMismatch {
+        /// Issuer whose beta row is malformed.
+        issuer_id: String,
+        /// Number of betas found on the row.
+        actual: usize,
+        /// Number of hierarchy levels expected.
+        expected: usize,
+    },
 }
-
-impl std::fmt::Display for FactorMatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::MissingRequiredTag { dimension } => write!(
-                f,
-                "credit-hierarchical matcher: issuer tag for dimension '{dimension}' is required but missing"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for FactorMatchError {}
 
 /// Matches a market dependency and instrument attributes to factor identifiers.
 pub trait FactorMatcher: Send + Sync {

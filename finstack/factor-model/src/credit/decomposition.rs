@@ -140,10 +140,21 @@ pub enum DecompositionError {
     /// (`from.date > to.date`).
     #[error("decompose_period requires from.date <= to.date, got from={from:?} to={to:?}")]
     DateMismatchInPeriod {
-        /// Earlier-but-supplied-second date.
+        /// Date supplied as `from` (the later of the two).
         from: Date,
-        /// Later-but-supplied-first date.
+        /// Date supplied as `to` (the earlier of the two).
         to: Date,
+    },
+    /// An observed spread or the generic factor value was not finite.
+    ///
+    /// A single NaN spread would otherwise silently poison every bucket mean
+    /// it participates in and propagate through the whole peel cascade.
+    #[error("non-finite input: {label} = {value}")]
+    NonFiniteInput {
+        /// Which input was non-finite (issuer id or "observed_generic").
+        label: String,
+        /// The offending value.
+        value: f64,
     },
 }
 
@@ -193,7 +204,9 @@ fn unit_betas(num_levels: usize) -> IssuerBetas {
 ///
 /// - An issuer in `observed_spreads` but absent from `model.issuer_betas` is
 ///   accepted iff `runtime_tags` contains its tag map. Such an issuer is
-///   treated as `BucketOnly` (`β = 1`).
+///   treated as `BucketOnly` (`β = 1`). For issuers that *do* have a model
+///   row, the row's tags are authoritative and any `runtime_tags` entry for
+///   them is ignored.
 /// - An issuer in `model.issuer_betas` but absent from `observed_spreads` is
 ///   silently skipped.
 /// - A hierarchy bucket present in `model.anchor_state` but with no current
@@ -222,6 +235,23 @@ pub fn decompose_levels(
 ) -> Result<LevelsAtDate, DecompositionError> {
     let num_levels = model.hierarchy.levels.len();
     let beta_idx = index_issuer_betas(model);
+
+    // Reject non-finite inputs up front: one NaN spread silently poisons
+    // every bucket mean it participates in and the entire peel cascade.
+    if !observed_generic.is_finite() {
+        return Err(DecompositionError::NonFiniteInput {
+            label: "observed_generic".to_owned(),
+            value: observed_generic,
+        });
+    }
+    for (issuer, spread) in observed_spreads {
+        if !spread.is_finite() {
+            return Err(DecompositionError::NonFiniteInput {
+                label: issuer.as_str().to_owned(),
+                value: *spread,
+            });
+        }
+    }
 
     // ------------------------------------------------------------------
     // Step 0 — defensive shape check on model.issuer_betas. Cheap: O(N).
@@ -358,6 +388,18 @@ pub fn decompose_levels(
 /// snapshots — a one-sided entry would not satisfy the reconciliation
 /// invariant on `ΔS_i` and is therefore omitted rather than emitted with an
 /// implicit `0.0`.
+///
+/// # Reconciliation contract: same model, same tags
+///
+/// The per-issuer identity `ΔS_i = β_i^PC·Δgeneric + Σ_k β_i^k·ΔL_k + Δadder_i`
+/// holds only when both snapshots were produced by the **same model vintage**
+/// and the issuer's bucket paths are unchanged between them. If an issuer's
+/// tags migrate between snapshots (e.g. a rating change moves it from
+/// `IG.…` to `HY.…`), its deltas mix levels of different buckets and the
+/// identity does not hold for that issuer. Snapshots do not carry per-issuer
+/// bucket membership, so this function cannot detect migration itself;
+/// callers attributing across a re-tagging event must split the period at
+/// the migration date.
 ///
 /// # Errors
 ///

@@ -233,6 +233,7 @@ impl FactorSensitivityEngine for DeltaBasedEngine {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<SensitivityMatrix> {
+        super::traits::validate_single_currency(positions, market, as_of)?;
         let position_ids = positions.iter().map(|(id, _, _)| id.clone()).collect();
         let factor_ids = factors.iter().map(|factor| factor.id.clone()).collect();
         let mut matrix = SensitivityMatrix::zeros(position_ids, factor_ids);

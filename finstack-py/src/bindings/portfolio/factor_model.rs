@@ -1134,7 +1134,7 @@ impl PyStressAttribution {
 
 /// Matched factor assignments for a single portfolio position.
 ///
-/// The `mappings` field carries ``(MarketDependency, FactorId)`` pairs whose
+/// The `mappings` field carries ``(MarketDependency, FactorId, beta)`` triples whose
 /// dependency variant tree is wide enough that the binding exposes it as a
 /// JSON-serialized vector via :meth:`mappings_json` rather than a fully
 /// structured Python type.
@@ -1174,13 +1174,13 @@ impl PyPositionAssignment {
         self.inner.position_id.as_str().to_owned()
     }
 
-    /// Number of matched ``(dependency, factor_id)`` pairs.
+    /// Number of matched ``(dependency, factor_id, beta)`` triples.
     #[getter]
     fn n_mappings(&self) -> usize {
         self.inner.mappings.len()
     }
 
-    /// Matched ``(dependency, factor_id)`` pairs as a JSON string.
+    /// Matched ``(dependency, factor_id, beta)`` triples as a JSON string.
     #[pyo3(text_signature = "(self)")]
     fn mappings_json(&self) -> PyResult<String> {
         serialize_json(&self.inner.mappings)
@@ -1192,7 +1192,7 @@ impl PyPositionAssignment {
         self.inner
             .mappings
             .iter()
-            .map(|(_, fid)| fid.as_str().to_owned())
+            .map(|(_, fid, _)| fid.as_str().to_owned())
             .collect()
     }
 

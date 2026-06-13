@@ -651,6 +651,27 @@ mod tests {
     }
 
     #[test]
+    fn test_simulation_nan_sensitivity_errors_instead_of_zero_risk() -> TestResult {
+        let mut sensitivities =
+            SensitivityMatrix::zeros(vec!["pos-A".into()], vec![FactorId::new("Rates")]);
+        sensitivities.set_delta(0, 0, f64::NAN);
+
+        let covariance = FactorCovarianceMatrix::new(vec![FactorId::new("Rates")], vec![0.04])?;
+        let decomposer = SimulationDecomposer::new(1_000, 7);
+        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Volatility);
+
+        let Err(error) = result else {
+            return Err(finstack_core::Error::Validation(
+                "NaN sensitivity must produce an error, not zero risk".to_string(),
+            ));
+        };
+        let message = error.to_string();
+        assert!(message.contains("pos-A"), "error names position: {message}");
+        assert!(message.contains("Rates"), "error names factor: {message}");
+        Ok(())
+    }
+
+    #[test]
     fn test_simulation_variance_uses_already_weighted_exposures() -> TestResult {
         let mut sensitivities = SensitivityMatrix::zeros(
             vec!["pos-A".into(), "pos-B".into()],

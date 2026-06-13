@@ -248,7 +248,7 @@ impl FactorModel {
                 &dependencies,
                 position.instrument.attributes(),
                 self.matcher.as_ref(),
-            );
+            )?;
 
             if self.unmatched_policy == UnmatchedPolicy::Strict && !position_unmatched.is_empty() {
                 let first_unmatched = &position_unmatched[0];

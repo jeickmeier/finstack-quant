@@ -58,7 +58,7 @@ fn test_factor_model_report_types_roundtrip() {
     assert_roundtrip_value(&FactorAssignmentReport {
         assignments: vec![PositionAssignment {
             position_id: PositionId::new("POS_1"),
-            mappings: vec![(dependency, FactorId::new("Rates"))],
+            mappings: vec![(dependency, FactorId::new("Rates"), 1.0)],
         }],
         unmatched: vec![UnmatchedEntry {
             position_id: PositionId::new("POS_2"),

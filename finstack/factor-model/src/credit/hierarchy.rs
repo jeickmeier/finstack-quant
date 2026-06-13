@@ -590,6 +590,12 @@ pub struct CalibrationDiagnostics {
     /// issuers do not affect fold-up thresholds.
     pub bucket_sizes_per_level: Vec<BTreeMap<String, usize>>,
     /// Log of all fold-up events triggered by insufficient bucket coverage.
+    ///
+    /// **Load-bearing, not purely diagnostic:**
+    /// [`decompose_levels`][crate::credit::decomposition::decompose_levels]
+    /// reads these records to reconstruct which `(issuer, level)` pairs were
+    /// folded during calibration. Stripping or editing them changes
+    /// decomposition results.
     pub fold_ups: Vec<FoldUpRecord>,
     /// Optional histogram of per-issuer R² values (bucketed as string ranges).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -663,6 +669,13 @@ pub struct CreditFactorModel {
     /// Factor level values at the calibration anchor date.
     pub anchor_state: LevelsAtAnchor,
     /// Static factor correlation matrix `ρ` for `Σ(t) = D(t)·ρ·D(t)`.
+    ///
+    /// **Which matrix is authoritative:** vol forecasting rebuilds
+    /// `Σ(t, h) = D·ρ·D` from this matrix plus `vol_state`; point-in-time
+    /// risk uses `config.covariance` directly. Under
+    /// [`crate::CovarianceStrategy::Ridge`] the two deliberately differ —
+    /// `config.covariance = D·ρ·D + α·I`, so its implied correlations are
+    /// shrunk relative to `ρ` by `σᵢσⱼ/√((σᵢ²+α)(σⱼ²+α))`.
     pub static_correlation: FactorCorrelationMatrix,
     /// GARCH/EWMA/sample vol state at the anchor date.
     pub vol_state: VolState,
@@ -687,8 +700,15 @@ impl CreditFactorModel {
     /// - `schema_version` does not equal [`Self::SCHEMA_VERSION`].
     /// - `issuer_betas` contains duplicate `issuer_id` values.
     /// - `hierarchy.levels` contains duplicate dimension names.
+    /// - any issuer tag value used by a hierarchy dimension contains `'.'`
+    ///   (reserved as the bucket-path separator; a dotted value corrupts
+    ///   factor identity).
     /// - `factor_histories` has vectors of inconsistent length.
     /// - `static_correlation` fails structural checks (shape, diagonal, symmetry, duplicate IDs).
+    /// - the matching config can emit a factor ID not declared in
+    ///   `config.factors` (see
+    ///   [`crate::FactorModelConfig::validate_matching_factor_ids`]) — such a
+    ///   factor would silently contribute zero risk at lookup time.
     pub fn validate(&self) -> finstack_core::Result<()> {
         // Schema version
         if self.schema_version != Self::SCHEMA_VERSION {
@@ -726,8 +746,31 @@ impl CreditFactorModel {
             }
         }
 
+        // Tag values used by hierarchy dimensions must not contain the '.'
+        // bucket-path separator (it would mis-segment bucket paths and
+        // factor IDs in calibration, fold-up, and matching).
+        for row in &self.issuer_betas {
+            for dim in &self.hierarchy.levels {
+                let key = dimension_key(dim);
+                if let Some(v) = row.tags.0.get(&key) {
+                    if v.contains('.') {
+                        return Err(finstack_core::Error::Validation(format!(
+                            "CreditFactorModel: issuer {:?} tag {key:?} = {v:?} contains '.', \
+                             which is reserved as the bucket-path separator",
+                            row.issuer_id.as_str()
+                        )));
+                    }
+                }
+            }
+        }
+
         // Static correlation structural re-check (fields are pub, so bypass of new() is possible)
         self.static_correlation.check_structure()?;
+
+        // Every factor ID the matcher can emit must exist in config.factors;
+        // an undeclared factor would silently contribute zero risk at
+        // covariance-lookup time.
+        self.config.validate_matching_factor_ids()?;
 
         // Factor histories length consistency
         if let Some(hist) = &self.factor_histories {

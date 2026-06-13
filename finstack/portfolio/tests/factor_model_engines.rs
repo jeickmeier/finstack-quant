@@ -134,3 +134,85 @@ fn full_repricing_engine_matches_bond_dv01_metric() -> Result<()> {
     );
     Ok(())
 }
+
+fn create_eur_bond() -> Result<Bond> {
+    let issue = make_date(2025, Month::January, 15)?;
+    let maturity = make_date(2030, Month::January, 15)?;
+
+    Bond::fixed(
+        "BOND-FACTOR-MODEL-EUR",
+        Money::new(1_000_000.0, Currency::EUR),
+        0.04,
+        issue,
+        maturity,
+        "EUR-OIS",
+    )
+}
+
+fn create_two_currency_market(base_date: Date) -> Result<MarketContext> {
+    let eur_curve = DiscountCurve::builder("EUR-OIS")
+        .base_date(base_date)
+        .interp(InterpStyle::MonotoneConvex)
+        .knots([
+            (0.0, 1.0),
+            (1.0, 0.99),
+            (2.0, 0.97),
+            (5.0, 0.90),
+            (10.0, 0.75),
+        ])
+        .build()?;
+
+    Ok(create_test_market(base_date)?.insert(eur_curve))
+}
+
+#[test]
+fn delta_based_engine_rejects_mixed_currency_positions() -> Result<()> {
+    let usd_bond = create_test_bond()?;
+    let eur_bond = create_eur_bond()?;
+    let as_of = make_date(2025, Month::January, 15)?;
+    let market = create_two_currency_market(as_of)?;
+
+    let positions = vec![
+        ("usd-pos".to_string(), &usd_bond as &dyn Instrument, 1.0),
+        ("eur-pos".to_string(), &eur_bond as &dyn Instrument, 1.0),
+    ];
+    let factors = vec![rates_factor()];
+    let result = DeltaBasedEngine::new(BumpSizeConfig::default())
+        .compute_sensitivities(&positions, &factors, &market, as_of);
+
+    let Err(error) = result else {
+        panic!("mixed-currency positions must be rejected");
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains("single pricing currency"),
+        "unexpected error: {message}"
+    );
+    assert!(message.contains("usd-pos") && message.contains("eur-pos"));
+    Ok(())
+}
+
+#[test]
+fn full_repricing_engine_rejects_mixed_currency_positions() -> Result<()> {
+    let usd_bond = create_test_bond()?;
+    let eur_bond = create_eur_bond()?;
+    let as_of = make_date(2025, Month::January, 15)?;
+    let market = create_two_currency_market(as_of)?;
+
+    let positions = vec![
+        ("usd-pos".to_string(), &usd_bond as &dyn Instrument, 1.0),
+        ("eur-pos".to_string(), &eur_bond as &dyn Instrument, 1.0),
+    ];
+    let factors = vec![rates_factor()];
+    let result = FullRepricingEngine::new(BumpSizeConfig::default(), 5)
+        .compute_sensitivities(&positions, &factors, &market, as_of);
+
+    let Err(error) = result else {
+        panic!("mixed-currency positions must be rejected");
+    };
+    assert!(
+        error.to_string().contains("single pricing currency"),
+        "unexpected error: {error}"
+    );
+    Ok(())
+}

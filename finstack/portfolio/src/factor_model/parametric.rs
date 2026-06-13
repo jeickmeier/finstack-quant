@@ -361,6 +361,25 @@ mod tests {
     }
 
     #[test]
+    fn test_parametric_nan_sensitivity_errors_instead_of_zero_risk() -> TestResult {
+        let (mut sensitivities, covariance) = test_setup()?;
+        sensitivities.set_delta(0, 1, f64::NAN);
+
+        let result =
+            ParametricDecomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Volatility);
+
+        let Err(error) = result else {
+            return Err(finstack_core::Error::Validation(
+                "NaN sensitivity must produce an error, not zero risk".to_string(),
+            ));
+        };
+        let message = error.to_string();
+        assert!(message.contains("pos-A"), "error names position: {message}");
+        assert!(message.contains("Credit"), "error names factor: {message}");
+        Ok(())
+    }
+
+    #[test]
     fn test_parametric_variance_decomposition_uses_weighted_sensitivities_directly() -> TestResult {
         let (sensitivities, covariance) = test_setup()?;
         let decomposer = ParametricDecomposer;
