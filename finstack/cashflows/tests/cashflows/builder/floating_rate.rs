@@ -1612,7 +1612,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
 }
 
 // =============================================================================
-// M5: Empty overnight observation window must fail loudly
+// Empty overnight observation window must fail loudly
 // =============================================================================
 
 /// An accrual period containing no business-day fixings (Unadjusted BDC, stub
@@ -1677,7 +1677,7 @@ fn test_overnight_empty_fixing_window_errors() {
 }
 
 // =============================================================================
-// M3: Strictly-past observations route through the fallback policy
+// Strictly-past observations route through the fallback policy
 // =============================================================================
 
 /// With the default `Error` fallback, a coupon whose projection start is
@@ -1821,7 +1821,7 @@ fn test_overnight_sampling_uses_fixing_calendar() {
 }
 
 // =============================================================================
-// M3: Historical fixings for seasoned instruments (FIXING:{index} series)
+// Historical fixings for seasoned instruments (FIXING:{index} series)
 // =============================================================================
 
 use finstack_core::market_data::scalars::ScalarTimeSeries;

@@ -1,8 +1,8 @@
 """Behavioral tests for the attribution execution entry points.
 
-Quant review M11/M12/MO-B1/MO-B2/MO-B4: the execute path (JSON in → spec →
-execute → JSON out) previously had no behavioral coverage, which is how the
-bare-string method regression shipped despite a notebook exercising it.
+The execute path (JSON in → spec → execute → JSON out) previously had no
+behavioral coverage, which is how the bare-string method regression shipped
+despite a notebook exercising it.
 """
 
 from __future__ import annotations
@@ -123,7 +123,7 @@ def test_attribute_pnl_missing_market_data_raises_key_error() -> None:
 
 
 def test_validate_attribution_json_rejects_wrong_schema() -> None:
-    """Regression (MO-B1): validation applies the schema-version gate.
+    """Regression: validation applies the schema-version gate.
 
     The same gate execution applies — validation must not green-light
     payloads that execute would reject.
@@ -144,7 +144,7 @@ def test_validate_attribution_json_rejects_wrong_schema() -> None:
 
 
 def test_empty_detail_dataframes_keep_schema_columns() -> None:
-    """Regression (MO-B2): zero-row detail frames keep the column schema.
+    """Regression: zero-row detail frames keep the column schema.
 
     Cross-instrument pipelines filter/aggregate the documented columns, so
     instruments without detail blocks must not produce column-less frames.

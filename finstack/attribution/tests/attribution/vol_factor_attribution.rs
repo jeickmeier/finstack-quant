@@ -257,7 +257,7 @@ fn taylor_vol_factor_gamma_matches_full_revaluation() {
     );
 }
 
-/// MO-X4 (quant review): a pure SKEW change — wings move, ATM column fixed —
+/// A pure SKEW change — wings move, ATM column fixed —
 /// must not be misread as a parallel vol move. `measure_vol_surface_shift`
 /// averages the surface move, so an antisymmetric skew nets toward zero and
 /// the vol factor must attribute LESS P&L than a genuine 1-point parallel

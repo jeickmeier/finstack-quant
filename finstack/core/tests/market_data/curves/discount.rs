@@ -771,8 +771,7 @@ fn negative_rate_environment() {
 
 /// MonotoneConvex supports negative-rate (DF > 1) curves end-to-end.
 ///
-/// Per the 2026-06-11 decision resolving Open Question 10 of the core quant
-/// review, MonotoneConvex auto-detects negative discrete forwards and skips
+/// MonotoneConvex auto-detects negative discrete forwards and skips
 /// the Hagan-West positivity amelioration, so a flat -1% curve (EUR/CHF/JPY
 /// style) builds and interpolates faithfully.
 #[test]

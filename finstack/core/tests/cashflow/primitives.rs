@@ -123,7 +123,7 @@ fn money_new_rejects_negative_infinity() {
 fn cashflow_accepts_zero_amount() {
     // Zero amounts are legitimate (e.g. a floating coupon floored at 0% in a
     // negative-rate environment); previously rejected — fixed per the
-    // 2026-06-09 core quant review minor finding.
+    // convention.
     let cf = CashFlow {
         amount: Money::new(0.0, Currency::USD),
         ..valid_cashflow()

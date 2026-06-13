@@ -1,8 +1,8 @@
 //! FX delta-quoted volatility surface tests.
 //!
-//! Regression coverage for the merged-strike-grid finding in the 2026-06-09
-//! core quant review ("Merged global strike grid flattens short-expiry FX
-//! smiles"): each expiry's smile must be built from its *own* pillar strikes
+//! Regression coverage for merged-strike-grid behavior ("Merged global strike
+//! grid flattens short-expiry FX smiles"): each expiry's smile must be built
+//! from its *own* pillar strikes
 //! (derived from that expiry's forward and vol scale), and queries at a
 //! short expiry must reproduce that expiry's own 3/5-point smile exactly —
 //! never flat-extrapolated wing vol injected by long-expiry strikes.
@@ -103,7 +103,7 @@ fn lin_interp(xs: &[f64], ys: &[f64], x: f64) -> f64 {
 
 // ---------------------------------------------------------------------------
 // Regression: short-expiry smile is its own 3/5-point smile, not flattened
-// wing vol (core quant review 2026-06-09, "merged strike grid" Moderate).
+// wing vol from long-expiry strikes (merged strike grid).
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -280,7 +280,7 @@ fn implied_vol_rebuilds_smile_at_intermediate_expiry() {
     );
 
     // Documented limitation of the rectangular materialization (core quant
-    // review 2026-06-09): off-pillar queries blend rows at fixed strike, so
+    // convention): off-pillar queries blend rows at fixed strike, so
     // the intermediate ATM vol differs from the smile-faithful query path.
     let surface = built_surface_5pt();
     let grid_atm = surface.value_clamped(t, k_atm);

@@ -518,7 +518,7 @@ fn test_fx_spot_instrument_eur_usd_us_holiday_intermediate_2025() {
     assert_eq!(
         settlement, expected,
         "EUR/USD traded 2025-07-03 must settle Mon 2025-07-07; a US holiday at \
-         T+1 must not delay spot (2026-06-09 core quant review)"
+         T+1 must not delay spot"
     );
 }
 

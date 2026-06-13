@@ -232,7 +232,7 @@ fn run_analytical_parity_test(tc: &AnalyticalParityTestCase) {
         tc.name, rate_change_bp, expected_rates_pnl, actual_rates_pnl, rel_diff
     );
 
-    // Quant review MO-X5: any "skip for small values" gate must key on the
+    // Any "skip for small values" gate must key on the
     // INDEPENDENT analytical estimate, never on the value under test — the
     // old `|| actual_abs < 200.0` escape let a collapsed-magnitude rates P&L
     // (e.g. a 100× unit error shrinking $4,600 to $150) pass all three

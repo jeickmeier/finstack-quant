@@ -125,7 +125,7 @@ fn test_sabr_calibration() {
     let time_to_expiry = 1.0;
     let beta = 0.5; // Fixed beta
 
-    // Review 2026-06-09 (core math): minimize() now fails loudly instead of
+    // minimize() now fails loudly instead of
     // silently returning the best iterate on MaxIterations. This smile is not
     // SABR-exact (positive SSE minimum), so allow a realistic gradient
     // tolerance and iteration budget for formal convergence.
@@ -1008,7 +1008,7 @@ fn test_sabr_atm_pinning_interpolates_when_grid_lacks_forward() {
         "test setup: nearest-strike quote {nearest_vol} must be off true ATM {true_atm}"
     );
 
-    // Review 2026-06-09 (core math): non-convergence is now a hard error, and
+    // non-convergence is now a hard error, and
     // a 1e-10 gradient tolerance is unattainable for the scalar LM
     // formulation (the vega-weighted SSE stagnates around 6e-7); use an
     // attainable tolerance with a larger budget.
@@ -1098,7 +1098,7 @@ fn test_sabr_calibrate_with_derivatives_recovers_known_smile() {
         })
         .collect();
 
-    // Review 2026-06-09 (core math): non-convergence is now a hard error;
+    // non-convergence is now a hard error;
     // 1e-9 within 200 evals previously "passed" via the silent best-guess
     // fallback (the vega-weighted SSE stagnates around 2e-6). Use an
     // attainable tolerance and budget.
@@ -1197,7 +1197,7 @@ fn test_sabr_strike_from_delta_round_trip_at_25_delta() {
 }
 
 // ===================================================================
-// M1 Bug-Fix Tests: Hagan (1-beta) exponent in the vol denominator
+// Hagan (1-beta) exponent in the vol denominator
 // ===================================================================
 
 /// At β=1 (lognormal SABR), ν=0 (no vol-of-vol), ρ=0, the model reduces to
@@ -1328,7 +1328,7 @@ fn test_sabr_calibrate_and_calibrate_with_derivatives_agree() {
         })
         .collect();
 
-    // Review 2026-06-09 (core math): non-convergence is now a hard error;
+    // non-convergence is now a hard error;
     // 1e-10 previously "passed" via the silent best-guess fallback. Use an
     // attainable tolerance and budget.
     let calibrator = SABRCalibrator::new()

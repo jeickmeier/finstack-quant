@@ -640,7 +640,7 @@ fn parallel_credit_cascade_attributes_each_step_to_its_own_contribution() {
     );
 }
 
-/// M2 regression: with the discount curve drifting between T0 and T1, the
+/// Regression: with the discount curve drifting between T0 and T1, the
 /// linear-path CS01 (used by metrics-based / Taylor) must be measured at the
 /// SAME baseline as `credit_curves_pnl` — `market_t1` with the issuer's
 /// hazard curves restored to T0, priced at `as_of_t1`. Before the M2 fix the
@@ -721,7 +721,7 @@ fn metrics_based_credit_factor_detail_uses_t1_cs01_baseline() {
         "metrics-based reconciliation: attributed={m_attributed}, credit={m_total}"
     );
 
-    // M2 substantive check: the metrics-based CS01 (now measured against T1
+    // Substantive check: the metrics-based CS01 (now measured against T1
     // markets with T0 hazard) and the parallel cascade's CS01 (measured at
     // T1 markets natively) should agree on the per-factor split to a tight
     // tolerance. Before M2, the rate drift would have pushed an O(ΔDV01 ×

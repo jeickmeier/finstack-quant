@@ -1,9 +1,8 @@
 //! wasm-bindgen-test suite for `api::attribution`.
 //!
-//! Quant review MO-B4: the attribution execute path previously had no WASM
-//! test at all. Covers the full JSON pipeline (attributePnl /
-//! attributePnlFromSpec), the schema gate in validateAttributionJson, and the
-//! default helpers.
+//! The attribution execute path previously had no WASM test at all. Covers the
+//! full JSON pipeline (attributePnl / attributePnlFromSpec), the schema gate
+//! in validateAttributionJson, and the default helpers.
 
 #![cfg(target_arch = "wasm32")]
 

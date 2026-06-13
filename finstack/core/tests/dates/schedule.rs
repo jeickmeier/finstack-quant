@@ -797,8 +797,7 @@ fn test_schedule_error_policy_missing_calendar_warning() {
 fn test_no_roll_day_drift_backward_day30_anchor() {
     // Backward semi-annual generation from an Aug-30 maturity must
     // alternate Feb 28 / Aug 30 with the roll day (30th) preserved,
-    // instead of collapsing to the 28th after the first short February
-    // (B1, ).
+    // instead of collapsing to the 28th after the first short February.
     let start = make_date(2025, 8, 30);
     let end = make_date(2027, 8, 30);
 
@@ -856,7 +855,7 @@ fn test_stub_none_accepts_month_end_quarterly_schedule() {
 #[test]
 fn test_zero_count_tenor_rejected_at_generation() {
     // A zero-count tenor makes every roll a no-op; generation must fail
-    // loudly instead of looping forever (M10, 2026-06-09 review).
+    // loudly instead of looping forever.
     use finstack_core::dates::TenorUnit;
 
     let start = make_date(2025, 1, 1);

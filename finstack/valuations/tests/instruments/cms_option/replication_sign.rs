@@ -550,7 +550,7 @@ fn test_cms_replication_integrand_second_order_c12() {
          [2·g'(k)+(k-K)·g''(k)]·C_sw(k): v_prod={v_prod:.8} v_ref={v_ref:.8} \
          rel_diff={rel_diff:.6}. \
          A large gap (> 5%) indicates the integrand drops the factor-of-2 on g' \
-         and/or the (k-K)·g''(k) curvature term (Task C12 bug)."
+         and/or the (k-K)·g''(k) curvature term."
     );
 }
 

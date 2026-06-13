@@ -1,6 +1,6 @@
-//! Coverage for the scenario classes the quant review flagged as untested
-//! (MO-X1..X4): a coupon paying inside the attribution window, negative-rate
-//! regimes, discount-vs-forward basis moves, and vol smile/skew changes.
+//! Coverage for scenario classes previously untested: a coupon paying inside
+//! the attribution window, negative-rate regimes, discount-vs-forward basis
+//! moves, and vol smile/skew changes.
 
 use crate::attribution_support::TestInstrument;
 use finstack_attribution::{attribute_pnl_metrics_based, attribute_pnl_parallel, ExecutionPolicy};
@@ -39,7 +39,7 @@ fn flat_discount(id: &str, as_of: time::Date, rate: f64) -> DiscountCurve {
     builder.build().unwrap()
 }
 
-/// MO-X1: a coupon paying strictly inside `(T0, T1]` must satisfy the
+/// A coupon paying strictly inside `(T0, T1]` must satisfy the
 /// total-return identity — `total_pnl = mark_to_market_pnl + coupon` with the
 /// coupon visible in `carry_detail.coupon_income` — the classic
 /// dirty-price/total-return defect class.
@@ -110,7 +110,7 @@ fn coupon_payment_inside_window_keeps_total_return_identity() {
     );
 }
 
-/// MO-X2: negative-rate regimes (EUR/JPY/CHF history) must attribute cleanly:
+/// Negative-rate regimes (EUR/JPY/CHF history) must attribute cleanly:
 /// the sign convention holds (rates up → long bond loses) and nothing in the
 /// measurement chain clamps or NaNs on negative zero rates / DF > 1.
 #[test]
@@ -160,7 +160,7 @@ fn negative_rates_regime_attribution_succeeds() {
     );
 }
 
-/// MO-X3: a basis move (forward/projection curve moves, discount curve does
+/// A basis move (forward/projection curve moves, discount curve does
 /// not) must be attributed to the rates factor via the forward curve's
 /// key-rate DV01 — the metrics-based path previously measured discount curves
 /// only and sent the entire move to the residual.

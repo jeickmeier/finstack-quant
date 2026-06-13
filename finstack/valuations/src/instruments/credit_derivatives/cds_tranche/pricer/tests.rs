@@ -1834,9 +1834,9 @@ fn homogeneous_path_boundary_default_prob_does_not_panic() {
     // This is the precise condition that would be triggered in the unfixed pricer
     // when `sp > 1.0` (floating-point rounding near t = 0).
     //
-    // Review 2026-06-09 (core math): `standard_normal_inv_cdf` now guards the
+    // `standard_normal_inv_cdf` now guards the
     // raw `statrs` panic itself and saturates out-of-domain inputs
-    // (p <= 0 → −∞). The pricer-side clamp added by Task C2 remains
+    // (p <= 0 → −∞). The pricer-side clamp remains
     // load-bearing for *numerics* (−∞ would still poison the quadrature), but
     // the panic itself is gone by design.
     assert_eq!(

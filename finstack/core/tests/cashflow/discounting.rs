@@ -66,7 +66,7 @@ impl Discounting for FlatRateCurve {
     fn df(&self, t: f64) -> f64 {
         // The t <= 0 clamp only matters for direct df() property tests below
         // (and for npv_with_options with include_past_flows): since the
-        // 2026-06-09 review, the default npv excludes flows on/before the
+        // the default npv excludes flows on/before the
         // valuation date and never requests a non-positive abscissa relative
         // to the valuation date.
         if t <= 0.0 {
@@ -89,7 +89,7 @@ fn npv_100_cashflows_maintains_precision() {
     let ctx = DayCountContext::default();
 
     // 100 monthly cashflows of $1000 each, all strictly after the valuation
-    // date (npv excludes flows on/before base per the 2026-06-09 review).
+    // date (npv excludes flows on/before base by convention).
     let flows: Vec<(Date, Money)> = (1..=100)
         .map(|i| {
             let year = 2025 + (i / 12);
@@ -128,7 +128,7 @@ fn npv_500_cashflows_maintains_precision() {
     let ctx = DayCountContext::default();
 
     // 500 weekly cashflows of $100 each (~10 years), all strictly after the
-    // valuation date (npv excludes flows on/before base per the 2026-06-09 review).
+    // valuation date (npv excludes flows on/before base by convention).
     let flows: Vec<(Date, Money)> = (1..=500)
         .map(|i| {
             let days = i * 7;

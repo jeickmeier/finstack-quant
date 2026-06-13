@@ -424,8 +424,7 @@ fn act365l_spanning_non_leap_year_boundary() {
 #[test]
 fn act365l_single_day_feb29() {
     // (Feb 28, Feb 29] = 1 day; Feb 29 is the period END and so is included
-    // by the ICMA Rule 251 window -> 366 denom. (Updated per the 2026-06-09
-    // Moderate/Dates.)
+    // by the ICMA Rule 251 window -> 366 denom.
     let yf = DayCount::Act365L
         .year_fraction(d(2024, 2, 28), d(2024, 2, 29), DayCountContext::default())
         .unwrap();

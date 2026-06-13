@@ -881,9 +881,8 @@ mod cubic_hermite_specific {
 mod monotone_convex_specific {
     use super::*;
 
-    /// Increasing DFs (negative forward rates) are accepted: per the
-    /// 2026-06-11 decision resolving Open Question 10 of the core quant
-    /// review, MonotoneConvex must support negative-rate curves
+    /// Increasing DFs (negative forward rates) are accepted: MonotoneConvex
+    /// must support negative-rate curves
     /// (EUR/CHF/JPY) where DF > 1 is legitimate.
     #[test]
     fn accepts_increasing_dfs_negative_rates() {
@@ -1111,8 +1110,7 @@ mod monotone_convex_specific {
     }
 
     /// Non-monotone DFs (sign-changing forwards) now build successfully and
-    /// round-trip the knot values exactly. Updated per the 2026-06-11
-    /// negative-rate decision (core quant review Open Question 10).
+    /// round-trip the knot values exactly.
     #[test]
     fn sign_change_in_slopes() {
         let knots = vec![0.0, 1.0, 2.0, 3.0, 4.0].into_boxed_slice();
@@ -1840,7 +1838,7 @@ mod monotone_convex_positivity {
 }
 
 // ============================================================================
-// Negative-rate curve support (decision 2026-06-11, core quant review OQ 10)
+// Negative-rate curve support
 // ============================================================================
 //
 // Per Hagan & West (2006), forward-positivity enforcement is an optional

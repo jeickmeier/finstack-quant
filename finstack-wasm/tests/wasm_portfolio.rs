@@ -39,17 +39,17 @@ fn mo24_liquidity_estimators_return_none_for_missing_estimates() {
     assert_eq!(
         roll_effective_spread("[0.01]").unwrap(),
         None,
-        "MO-24: Roll estimator should map missing estimate to undefined"
+        "Roll estimator should map missing estimate to undefined"
     );
     assert_eq!(
         amihud_illiquidity("[0.01]", "[0.0]").unwrap(),
         None,
-        "MO-24: Amihud estimator should map missing estimate to undefined"
+        "Amihud estimator should map missing estimate to undefined"
     );
     assert_eq!(
         kyle_lambda("[0.0]", "[0.01]").unwrap(),
         None,
-        "MO-24: Kyle estimator should map missing estimate to undefined"
+        "Kyle estimator should map missing estimate to undefined"
     );
 }
 

@@ -189,8 +189,7 @@ fn base_correlation_curve_uses_percent_bumps() {
 }
 
 // =============================================================================
-// Metadata threading through rebuild paths (2026-06-09 core quant review,
-// "Major — market data" item 4): bumps and rolls must preserve fx_policy and
+// Metadata threading through rebuild paths (// "Major — market data" item 4): bumps and rolls must preserve fx_policy and
 // hazard issuer/seniority/currency metadata.
 // =============================================================================
 

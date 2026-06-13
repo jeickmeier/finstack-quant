@@ -725,7 +725,7 @@ mod master_scale_tests {
         assert_eq!(grades[7].label, "CC/C");
     }
 
-    /// 2026-06-09 core a NaN PD previously fell through
+    /// A NaN PD previously fell through
     /// every comparison and silently mapped to the worst grade; it must now
     /// be a validation error.
     #[test]

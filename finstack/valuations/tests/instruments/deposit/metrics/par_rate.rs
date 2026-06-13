@@ -34,8 +34,7 @@ fn test_par_rate_makes_pv_zero() {
     // Holder-view position value at par for a T+0 deposit: the start-date
     // outflow is excluded, so value = (1 + par·yf)·notional·DF(end)
     // = notional·DF(start) = notional exactly (DF(0)=1). Pins the
-    // pricing-view vs holder-view split adopted with the 2026-06-09 review
-    // NPV cutoff.
+    // pricing-view vs holder-view split for NPV cutoff.
     use finstack_valuations::instruments::Instrument;
     let value = dep_par.base_value(&ctx, base).unwrap();
     assert!(

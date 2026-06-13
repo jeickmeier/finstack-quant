@@ -504,8 +504,7 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
 
 #[test]
 fn attribution_dts_matches_json_pipeline_surface() {
-    // Quant review MO-B4: the attribution namespace previously had zero dts
-    // assertions.
+    // The attribution namespace previously had zero dts assertions.
     let dts = index_dts();
 
     assert!(dts.contains("export interface AttributionNamespace"));

@@ -516,8 +516,8 @@ fn irr_handles_very_high_return() {
         irr * 100.0
     );
 
-    // Flows are normalized by max |amount| inside the solver (2026-06-09
-    // scale-free acceptance tolerance), so the residual
+    // Flows are normalized by max |amount| inside the solver (scale-free
+    // acceptance tolerance), so the residual
     // bound is relative to the largest flow (1000), not absolute.
     let npv_at_irr = compute_periodic_npv(&amounts, irr);
     assert!(
