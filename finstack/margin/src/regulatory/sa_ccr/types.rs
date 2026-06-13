@@ -67,6 +67,7 @@ pub enum SaCcrOptionType {
 /// Captures the trade-level attributes required by the SA-CCR formula:
 /// notional, maturity dates, direction, underlier, and option characteristics.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SaCcrTrade {
     /// Unique trade identifier.
     pub trade_id: String,
@@ -102,7 +103,10 @@ pub struct SaCcrTrade {
 /// Captures the collateral terms that determine whether the margined
 /// or unmargined RC/PFE formulas apply.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SaCcrNettingSetConfig {
+    /// Valuation date used for forward-start and remaining-maturity calculations.
+    pub as_of: Date,
     /// Netting set identifier.
     pub netting_set_id: NettingSetId,
     /// Whether the netting set is subject to a margin agreement.
@@ -122,8 +126,9 @@ pub struct SaCcrNettingSetConfig {
 impl SaCcrNettingSetConfig {
     /// Create an unmargined netting set configuration.
     #[must_use]
-    pub fn unmargined(netting_set_id: NettingSetId, collateral: f64) -> Self {
+    pub fn unmargined(netting_set_id: NettingSetId, collateral: f64, as_of: Date) -> Self {
         Self {
+            as_of,
             netting_set_id,
             is_margined: false,
             collateral,
@@ -143,8 +148,10 @@ impl SaCcrNettingSetConfig {
         mta: f64,
         nica: f64,
         mpor_days: u32,
+        as_of: Date,
     ) -> Self {
         Self {
+            as_of,
             netting_set_id,
             is_margined: true,
             collateral,
@@ -479,6 +486,43 @@ mod validate_tests {
         assert!(
             err.to_string().contains("nonzero"),
             "expected nonzero message: {err}"
+        );
+    }
+
+    #[test]
+    fn strict_serde_rejects_unknown_trade_fields() {
+        let mut value = serde_json::to_value(linear_long()).expect("serialize trade");
+        value
+            .as_object_mut()
+            .expect("trade should serialize as object")
+            .insert("supervisory_factor".to_string(), serde_json::json!(0.05));
+
+        let err = serde_json::from_value::<SaCcrTrade>(value)
+            .expect_err("unknown SA-CCR trade field must be rejected");
+        assert!(
+            err.to_string().contains("unknown field"),
+            "expected unknown-field serde error: {err}"
+        );
+    }
+
+    #[test]
+    fn strict_serde_rejects_unknown_config_fields() {
+        let config = SaCcrNettingSetConfig::unmargined(
+            NettingSetId::bilateral("BANK_A", "CSA-001"),
+            0.0,
+            d(2025, 1, 15),
+        );
+        let mut value = serde_json::to_value(config).expect("serialize config");
+        value
+            .as_object_mut()
+            .expect("config should serialize as object")
+            .insert("collateral_typo".to_string(), serde_json::json!(1.0));
+
+        let err = serde_json::from_value::<SaCcrNettingSetConfig>(value)
+            .expect_err("unknown SA-CCR config field must be rejected");
+        assert!(
+            err.to_string().contains("unknown field"),
+            "expected unknown-field serde error: {err}"
         );
     }
 }

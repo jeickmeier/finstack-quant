@@ -58,7 +58,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "Haircut01",
             // Regulatory (FRTB SBA + SA-CCR)
             "FrtbSensitivities",
+            "FrtbSbaEngine",
             "SaCcrTrade",
+            "SaCcrNettingSetConfig",
+            "SaCcrEngine",
             "frtb_sba_charge",
             "saccr_ead",
         ],

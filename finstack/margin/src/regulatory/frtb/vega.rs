@@ -243,3 +243,51 @@ fn generic_bucketed_vega(
     let bucket_results = intra_bucket_uniform_map(&by_bucket, scaled_intra);
     inter_bucket(&bucket_results, scaled_inter)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_core::currency::Currency;
+
+    #[test]
+    fn girr_vega_uses_liquidity_horizon_scaled_weight() {
+        let mut sens = FrtbSensitivities::new(Currency::USD);
+        sens.add_girr_vega(Currency::USD, "1Y", "5Y", 100.0);
+
+        let charge = vega_charge(FrtbRiskClass::Girr, &sens, CorrelationScenario::Medium);
+
+        assert_eq!(charge, 100.0);
+    }
+
+    #[test]
+    fn csr_nonsec_vega_uses_liquidity_horizon_scaled_weight() {
+        let mut sens = FrtbSensitivities::new(Currency::USD);
+        sens.csr_nonsec_vega
+            .insert(("ACME".to_string(), 1, "1Y".to_string()), 100.0);
+
+        let charge = vega_charge(FrtbRiskClass::CsrNonSec, &sens, CorrelationScenario::Medium);
+
+        assert_eq!(charge, 100.0);
+    }
+
+    #[test]
+    fn commodity_vega_uses_liquidity_horizon_scaled_weight() {
+        let mut sens = FrtbSensitivities::new(Currency::USD);
+        sens.commodity_vega
+            .insert(("WTI".to_string(), 1, "1Y".to_string()), 100.0);
+
+        let charge = vega_charge(FrtbRiskClass::Commodity, &sens, CorrelationScenario::Medium);
+
+        assert_eq!(charge, 100.0);
+    }
+
+    #[test]
+    fn fx_vega_uses_liquidity_horizon_scaled_weight() {
+        let mut sens = FrtbSensitivities::new(Currency::USD);
+        sens.add_fx_vega(Currency::EUR, Currency::USD, "1Y", 100.0);
+
+        let charge = vega_charge(FrtbRiskClass::Fx, &sens, CorrelationScenario::Medium);
+
+        assert_eq!(charge, 100.0);
+    }
+}

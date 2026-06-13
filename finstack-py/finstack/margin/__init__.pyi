@@ -36,7 +36,10 @@ __all__ = [
     "MarginFundingCost",
     "Haircut01",
     "FrtbSensitivities",
+    "FrtbSbaEngine",
     "SaCcrTrade",
+    "SaCcrNettingSetConfig",
+    "SaCcrEngine",
     "frtb_sba_charge",
     "saccr_ead",
 ]
@@ -2926,6 +2929,14 @@ class FrtbSensitivities:
 
     def __repr__(self) -> str: ...
 
+class FrtbSbaEngine:
+    """FRTB SBA engine matching the canonical Rust API."""
+
+    def __init__(self, correlation_scenario: str | None = None) -> None: ...
+    def calculate(self, sensitivities: FrtbSensitivities) -> tuple[float, dict]:
+        """Calculate the FRTB SBA charge for a sensitivity portfolio."""
+        ...
+
 class SaCcrTrade:
     """A derivative trade for SA-CCR EAD computation per BCBS 279.
 
@@ -2985,6 +2996,53 @@ class SaCcrTrade:
     @property
     def mtm(self) -> float: ...
     def __repr__(self) -> str: ...
+
+class SaCcrNettingSetConfig:
+    """SA-CCR netting-set configuration with explicit valuation date."""
+
+    @staticmethod
+    def unmargined(
+        counterparty_id: str,
+        csa_id: str,
+        collateral: float,
+        as_of_year: int,
+        as_of_month: int,
+        as_of_day: int,
+    ) -> SaCcrNettingSetConfig: ...
+    @staticmethod
+    def margined(
+        counterparty_id: str,
+        csa_id: str,
+        collateral: float,
+        threshold: float,
+        mta: float,
+        nica: float,
+        mpor_days: int,
+        as_of_year: int,
+        as_of_month: int,
+        as_of_day: int,
+    ) -> SaCcrNettingSetConfig: ...
+    @staticmethod
+    def from_json(json: str) -> SaCcrNettingSetConfig:
+        """Construct from a JSON serialization."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize to a JSON string."""
+        ...
+
+    @property
+    def is_margined(self) -> bool: ...
+    @property
+    def collateral(self) -> float: ...
+
+class SaCcrEngine:
+    """SA-CCR EAD engine matching the canonical Rust API."""
+
+    def __init__(self, alpha: float | None = None, reporting_currency: str = "USD") -> None: ...
+    def calculate_ead(self, config: SaCcrNettingSetConfig, trades: list[SaCcrTrade]) -> dict:
+        """Calculate SA-CCR EAD for a netting set and trade list."""
+        ...
 
 def frtb_sba_charge(sensitivities: FrtbSensitivities, correlation_scenario: str | None = None) -> tuple[float, dict]:
     """Compute the FRTB SBA capital charge.

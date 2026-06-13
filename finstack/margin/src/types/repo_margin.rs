@@ -102,6 +102,7 @@ impl std::str::FromStr for RepoMarginType {
 /// - Paragraph 8: Substitution
 /// - Annex I: Margin Ratio and Haircut
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct RepoMarginSpec {
     /// Type of margin mechanism.
     pub margin_type: RepoMarginType,

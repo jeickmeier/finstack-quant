@@ -13,9 +13,8 @@ pulling the full instrument stack.
   IM, CCP proxy IM, and instrument-level margin metrics.
 - **Regulatory capital** — FRTB sensitivity-based approach and SA-CCR EAD
   (`regulatory::frtb`, `regulatory::sa_ccr`).
-- **XVA configuration** — serializable config and result types in `xva::types`.
-  Exposure roll-forward and CVA/DVA/FVA integration run inside this crate (see
-  `xva` module tests); bindings expose the type surface today.
+- **XVA** — deterministic exposure roll-forward, ISDA-style netting/collateral
+  helpers, and CVA/DVA/FVA integration (`xva::{exposure,cva,netting,types}`).
 
 ## Public modules
 
@@ -27,7 +26,7 @@ pulling the full instrument stack.
 | `metrics` | IM/VM metrics plus utilization, excess collateral, funding cost, Haircut01 |
 | `regulatory` | FRTB SBA and SA-CCR engines |
 | `constants` | Shared heuristics |
-| `xva` | Public: `types` (config, profiles, results). Engines are crate-internal. |
+| `xva` | Deterministic exposure, netting, CVA/DVA/FVA, and shared XVA types |
 
 Registry JSON is embedded at build time. Overlays use the Finstack config
 extension key `valuations.margin_registry.v1`; the name is legacy-compatible,

@@ -170,6 +170,7 @@ impl CollateralAssetClass {
 #[derive(
     Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub struct MaturityConstraints {
     /// Minimum remaining years to maturity (if any)
     pub min_remaining_years: Option<f64>,
@@ -219,6 +220,7 @@ impl MaturityConstraints {
 ///
 /// Defines eligibility criteria and haircut for a specific type of collateral.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct CollateralEligibility {
     /// Asset class
     pub asset_class: CollateralAssetClass,
@@ -303,6 +305,30 @@ impl CollateralEligibility {
     }
 }
 
+#[cfg(test)]
+mod collateral_maturity_tests {
+    use super::*;
+
+    #[test]
+    fn treasury_haircut_uses_remaining_maturity_bucket() {
+        let schedule =
+            EligibleCollateralSchedule::bcbs_standard().expect("registry schedule should load");
+
+        assert_eq!(
+            schedule.haircut_for_maturity(&CollateralAssetClass::GovernmentBonds, 0.5),
+            Some(0.005)
+        );
+        assert_eq!(
+            schedule.haircut_for_maturity(&CollateralAssetClass::GovernmentBonds, 3.0),
+            Some(0.02)
+        );
+        assert_eq!(
+            schedule.haircut_for_maturity(&CollateralAssetClass::GovernmentBonds, 30.0),
+            Some(0.04)
+        );
+    }
+}
+
 /// Eligible collateral schedule with haircuts.
 ///
 /// Defines the complete set of collateral types accepted under a CSA
@@ -319,6 +345,7 @@ impl CollateralEligibility {
 /// # Ok::<(), finstack_core::Error>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct EligibleCollateralSchedule {
     /// List of eligible collateral types with haircuts
     pub eligible: Vec<CollateralEligibility>,
@@ -416,6 +443,29 @@ impl EligibleCollateralSchedule {
         self.eligible
             .iter()
             .find(|e| &e.asset_class == asset_class)
+            .map(|e| e.haircut)
+            .or(self.default_haircut)
+    }
+
+    /// Find the applicable haircut for a given asset class and remaining maturity.
+    ///
+    /// Entries with maturity constraints are matched against `remaining_years`;
+    /// unconstrained entries for the asset class remain eligible. Returns the
+    /// schedule default only when no explicit entry for the asset class matches.
+    #[must_use]
+    pub fn haircut_for_maturity(
+        &self,
+        asset_class: &CollateralAssetClass,
+        remaining_years: f64,
+    ) -> Option<f64> {
+        self.eligible
+            .iter()
+            .find(|e| {
+                &e.asset_class == asset_class
+                    && e.maturity_constraints
+                        .as_ref()
+                        .is_none_or(|c| c.is_satisfied(remaining_years))
+            })
             .map(|e| e.haircut)
             .or(self.default_haircut)
     }

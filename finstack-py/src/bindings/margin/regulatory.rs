@@ -266,6 +266,46 @@ impl PyFrtbSensitivities {
     }
 }
 
+/// FRTB SBA engine.
+#[pyclass(
+    name = "FrtbSbaEngine",
+    module = "finstack.margin",
+    skip_from_py_object
+)]
+pub struct PyFrtbSbaEngine {
+    inner: FrtbSbaEngine,
+}
+
+#[pymethods]
+impl PyFrtbSbaEngine {
+    /// Create an FRTB SBA engine.
+    #[new]
+    #[pyo3(signature = (correlation_scenario = None))]
+    fn new(correlation_scenario: Option<&str>) -> PyResult<Self> {
+        let mut builder = FrtbSbaEngine::builder();
+        if let Some(s) = correlation_scenario {
+            let scenario = parse_correlation_scenario(s)?;
+            builder = builder.scenarios(vec![scenario]);
+        }
+        Ok(Self {
+            inner: builder.build().map_err(core_to_py)?,
+        })
+    }
+
+    /// Calculate the FRTB SBA charge for a sensitivity portfolio.
+    fn calculate(
+        &self,
+        py: Python<'_>,
+        sensitivities: &PyFrtbSensitivities,
+    ) -> PyResult<(f64, Py<PyDict>)> {
+        let result = self
+            .inner
+            .calculate(&sensitivities.inner)
+            .map_err(core_to_py)?;
+        frtb_result_to_py(py, &result)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // SaCcrTrade wrapper
 // ---------------------------------------------------------------------------
@@ -383,39 +423,157 @@ impl PySaCcrTrade {
     }
 }
 
+/// SA-CCR netting-set configuration.
+#[pyclass(
+    name = "SaCcrNettingSetConfig",
+    module = "finstack.margin",
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub struct PySaCcrNettingSetConfig {
+    inner: SaCcrNettingSetConfig,
+}
+
+#[pymethods]
+impl PySaCcrNettingSetConfig {
+    /// Create an unmargined netting set configuration.
+    #[staticmethod]
+    #[pyo3(signature = (
+        counterparty_id,
+        csa_id,
+        collateral,
+        as_of_year,
+        as_of_month,
+        as_of_day,
+    ))]
+    fn unmargined(
+        counterparty_id: &str,
+        csa_id: &str,
+        collateral: f64,
+        as_of_year: i32,
+        as_of_month: u8,
+        as_of_day: u8,
+    ) -> PyResult<Self> {
+        let as_of = parse_date(as_of_year, as_of_month, as_of_day)?;
+        Ok(Self {
+            inner: SaCcrNettingSetConfig::unmargined(
+                NettingSetId::bilateral(counterparty_id, csa_id),
+                collateral,
+                as_of,
+            ),
+        })
+    }
+
+    /// Create a margined netting set configuration.
+    #[staticmethod]
+    #[pyo3(signature = (
+        counterparty_id,
+        csa_id,
+        collateral,
+        threshold,
+        mta,
+        nica,
+        mpor_days,
+        as_of_year,
+        as_of_month,
+        as_of_day,
+    ))]
+    #[allow(clippy::too_many_arguments)]
+    fn margined(
+        counterparty_id: &str,
+        csa_id: &str,
+        collateral: f64,
+        threshold: f64,
+        mta: f64,
+        nica: f64,
+        mpor_days: u32,
+        as_of_year: i32,
+        as_of_month: u8,
+        as_of_day: u8,
+    ) -> PyResult<Self> {
+        let as_of = parse_date(as_of_year, as_of_month, as_of_day)?;
+        Ok(Self {
+            inner: SaCcrNettingSetConfig::margined(
+                NettingSetId::bilateral(counterparty_id, csa_id),
+                collateral,
+                threshold,
+                mta,
+                nica,
+                mpor_days,
+                as_of,
+            ),
+        })
+    }
+
+    /// Construct from a JSON serialization of `SaCcrNettingSetConfig`.
+    #[staticmethod]
+    fn from_json(json: &str) -> PyResult<Self> {
+        let inner: SaCcrNettingSetConfig = serde_json::from_str(json).map_err(display_to_py)?;
+        Ok(Self { inner })
+    }
+
+    /// Serialize to a JSON string.
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string_pretty(&self.inner).map_err(display_to_py)
+    }
+
+    #[getter]
+    fn is_margined(&self) -> bool {
+        self.inner.is_margined
+    }
+
+    #[getter]
+    fn collateral(&self) -> f64 {
+        self.inner.collateral
+    }
+}
+
+/// SA-CCR engine.
+#[pyclass(name = "SaCcrEngine", module = "finstack.margin", skip_from_py_object)]
+pub struct PySaCcrEngine {
+    inner: SaCcrEngine,
+}
+
+#[pymethods]
+impl PySaCcrEngine {
+    /// Create an SA-CCR engine.
+    #[new]
+    #[pyo3(signature = (alpha = None, reporting_currency = "USD"))]
+    fn new(alpha: Option<f64>, reporting_currency: &str) -> PyResult<Self> {
+        let mut builder =
+            SaCcrEngine::builder().reporting_currency(parse_currency(reporting_currency)?);
+        if let Some(a) = alpha {
+            builder = builder.alpha(a);
+        }
+        Ok(Self {
+            inner: builder.build().map_err(core_to_py)?,
+        })
+    }
+
+    /// Calculate SA-CCR EAD for a netting set and trade list.
+    fn calculate_ead(
+        &self,
+        py: Python<'_>,
+        config: &PySaCcrNettingSetConfig,
+        trades: Vec<PyRef<'_, PySaCcrTrade>>,
+    ) -> PyResult<Py<PyDict>> {
+        let trade_vec: Vec<SaCcrTrade> = trades.iter().map(|t| t.inner.clone()).collect();
+        let result = self
+            .inner
+            .calculate_ead(&config.inner, &trade_vec)
+            .map_err(core_to_py)?;
+        ead_result_to_py(py, &result)
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Module-level functions
 // ---------------------------------------------------------------------------
 
-/// Compute the FRTB SBA capital charge.
-///
-/// Returns ``(total_charge, breakdown)`` where ``breakdown`` is a dict with:
-/// - ``delta``: ``{risk_class: charge}``
-/// - ``vega``: ``{risk_class: charge}``
-/// - ``curvature``: ``{risk_class: charge}``
-/// - ``drc``: default risk charge (float)
-/// - ``rrao``: residual risk add-on (float)
-/// - ``binding_scenario``: scenario name selected as binding
-/// - ``scenario_charges``: ``{scenario_name: sba_charge}``
-///
-/// If ``correlation_scenario`` is provided (``"low"``, ``"medium"``, ``"high"``),
-/// only that scenario is evaluated. Otherwise all three are run and the
-/// max is taken per BCBS d457.
-#[pyfunction]
-#[pyo3(signature = (sensitivities, correlation_scenario = None))]
-pub fn frtb_sba_charge(
+fn frtb_result_to_py(
     py: Python<'_>,
-    sensitivities: &PyFrtbSensitivities,
-    correlation_scenario: Option<&str>,
+    result: &finstack_margin::regulatory::frtb::FrtbSbaResult,
 ) -> PyResult<(f64, Py<PyDict>)> {
-    let mut builder = FrtbSbaEngine::builder();
-    if let Some(s) = correlation_scenario {
-        let scenario = parse_correlation_scenario(s)?;
-        builder = builder.scenarios(vec![scenario]);
-    }
-    let engine = builder.build().map_err(core_to_py)?;
-    let result = engine.calculate(&sensitivities.inner).map_err(core_to_py)?;
-
     let dict = PyDict::new(py);
 
     let delta = PyDict::new(py);
@@ -460,6 +618,59 @@ pub fn frtb_sba_charge(
     Ok((result.total, dict.unbind()))
 }
 
+fn ead_result_to_py(
+    py: Python<'_>,
+    result: &finstack_margin::regulatory::sa_ccr::EadResult,
+) -> PyResult<Py<PyDict>> {
+    let dict = PyDict::new(py);
+    dict.set_item("ead", result.ead)?;
+    dict.set_item("rc", result.rc)?;
+    dict.set_item("pfe", result.pfe)?;
+    dict.set_item("multiplier", result.multiplier)?;
+    dict.set_item("add_on_aggregate", result.add_on_aggregate)?;
+    dict.set_item("alpha", result.alpha)?;
+    dict.set_item("maturity_factor", result.maturity_factor)?;
+
+    let by_class = PyDict::new(py);
+    for (asset_class, value) in &result.add_on_by_asset_class {
+        by_class.set_item(asset_class_label(*asset_class), *value)?;
+    }
+    dict.set_item("add_on_by_asset_class", by_class)?;
+    Ok(dict.unbind())
+}
+
+/// Compute the FRTB SBA capital charge.
+///
+/// Returns ``(total_charge, breakdown)`` where ``breakdown`` is a dict with:
+/// - ``delta``: ``{risk_class: charge}``
+/// - ``vega``: ``{risk_class: charge}``
+/// - ``curvature``: ``{risk_class: charge}``
+/// - ``drc``: default risk charge (float)
+/// - ``rrao``: residual risk add-on (float)
+/// - ``binding_scenario``: scenario name selected as binding
+/// - ``scenario_charges``: ``{scenario_name: sba_charge}``
+///
+/// If ``correlation_scenario`` is provided (``"low"``, ``"medium"``, ``"high"``),
+/// only that scenario is evaluated. Otherwise all three are run and the
+/// max is taken per BCBS d457.
+#[pyfunction]
+#[pyo3(signature = (sensitivities, correlation_scenario = None))]
+pub fn frtb_sba_charge(
+    py: Python<'_>,
+    sensitivities: &PyFrtbSensitivities,
+    correlation_scenario: Option<&str>,
+) -> PyResult<(f64, Py<PyDict>)> {
+    let mut builder = FrtbSbaEngine::builder();
+    if let Some(s) = correlation_scenario {
+        let scenario = parse_correlation_scenario(s)?;
+        builder = builder.scenarios(vec![scenario]);
+    }
+    let engine = builder.build().map_err(core_to_py)?;
+    let result = engine.calculate(&sensitivities.inner).map_err(core_to_py)?;
+
+    frtb_result_to_py(py, &result)
+}
+
 /// Compute SA-CCR Exposure at Default for a set of trades.
 ///
 /// Returns ``(rc, pfe, ead)`` per BCBS 279:
@@ -479,12 +690,17 @@ pub fn saccr_ead(
 ) -> PyResult<(f64, f64, f64)> {
     let engine = SaCcrEngine::builder().build().map_err(core_to_py)?;
     let netting_id = NettingSetId::bilateral("CPTY", "CSA");
-    let config = if margined {
-        SaCcrNettingSetConfig::margined(netting_id, collateral, 0.0, 0.0, 0.0, 10)
-    } else {
-        SaCcrNettingSetConfig::unmargined(netting_id, collateral)
-    };
     let trade_vec: Vec<SaCcrTrade> = trades.iter().map(|t| t.inner.clone()).collect();
+    let as_of = if let Some(date) = trade_vec.iter().map(|t| t.start_date).min() {
+        date
+    } else {
+        parse_date(1970, 1, 1)?
+    };
+    let config = if margined {
+        SaCcrNettingSetConfig::margined(netting_id, collateral, 0.0, 0.0, 0.0, 10, as_of)
+    } else {
+        SaCcrNettingSetConfig::unmargined(netting_id, collateral, as_of)
+    };
     let result = engine
         .calculate_ead(&config, &trade_vec)
         .map_err(core_to_py)?;
@@ -494,7 +710,10 @@ pub fn saccr_ead(
 /// Register FRTB / SA-CCR classes and functions on the margin module.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFrtbSensitivities>()?;
+    m.add_class::<PyFrtbSbaEngine>()?;
     m.add_class::<PySaCcrTrade>()?;
+    m.add_class::<PySaCcrNettingSetConfig>()?;
+    m.add_class::<PySaCcrEngine>()?;
     m.add_function(pyo3::wrap_pyfunction!(frtb_sba_charge, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(saccr_ead, m)?)?;
     Ok(())

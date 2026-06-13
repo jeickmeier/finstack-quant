@@ -15,17 +15,17 @@
 /// 10: Other commodity
 /// 11: Carbon trading
 pub const COMMODITY_RISK_WEIGHTS: &[(u8, f64)] = &[
-    (1, 19.0),
-    (2, 20.0),
-    (3, 17.0),
-    (4, 16.0),
-    (5, 15.0),
-    (6, 11.0),
-    (7, 22.0),
-    (8, 27.0),
-    (9, 24.0),
-    (10, 52.0),
-    (11, 16.0),
+    (1, 30.0),
+    (2, 35.0),
+    (3, 60.0),
+    (4, 80.0),
+    (5, 40.0),
+    (6, 45.0),
+    (7, 20.0),
+    (8, 35.0),
+    (9, 25.0),
+    (10, 35.0),
+    (11, 50.0),
 ];
 
 /// Commodity intra-bucket correlation.
@@ -34,8 +34,8 @@ pub const COMMODITY_INTRA_BUCKET_CORRELATION: f64 = 0.55;
 /// Commodity inter-bucket correlation.
 pub const COMMODITY_INTER_BUCKET_CORRELATION: f64 = 0.20;
 
-/// Commodity vega risk weight.
-pub const COMMODITY_VEGA_RISK_WEIGHT: f64 = 0.55;
+/// Commodity vega risk weight after liquidity-horizon scaling.
+pub const COMMODITY_VEGA_RISK_WEIGHT: f64 = 1.00;
 
 /// Commodity curvature risk weight scale.
 pub const COMMODITY_CURVATURE_RISK_WEIGHT: f64 = 0.5;

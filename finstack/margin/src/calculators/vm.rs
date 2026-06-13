@@ -210,7 +210,13 @@ impl VmCalculator {
 
         let net_call = vm_params.calculate_margin_call(exposure, posted_collateral)?;
         let (delivery, ret) = match net_call.amount().total_cmp(&0.0) {
-            std::cmp::Ordering::Greater => (net_call, Money::new(0.0, currency)),
+            std::cmp::Ordering::Greater => {
+                if exp >= 0.0 {
+                    (net_call, Money::new(0.0, currency))
+                } else {
+                    (Money::new(0.0, currency), net_call)
+                }
+            }
             std::cmp::Ordering::Less => {
                 let abs_amt = Money::new(net_call.amount().abs(), currency);
                 // Negative credit support: return excess collateral when exposure ≥ 0;
@@ -254,7 +260,6 @@ impl VmCalculator {
     ) -> Result<Vec<MarginCall>> {
         let mut calls = Vec::new();
         let mut current_collateral = initial_collateral;
-        let currency = self.csa.base_currency;
 
         for (date, exposure) in exposures {
             let result = self.calculate(*exposure, current_collateral, *date)?;
@@ -272,7 +277,13 @@ impl VmCalculator {
                         self.csa.vm_params.threshold,
                         self.csa.vm_params.mta,
                     ));
-                    current_collateral = current_collateral.checked_add(result.delivery_amount)?;
+                    current_collateral = if exposure.amount() < 0.0 {
+                        current_collateral
+                            .checked_sub(result.delivery_amount)
+                            .map_err(|e| finstack_core::Error::Validation(e.to_string()))?
+                    } else {
+                        current_collateral.checked_add(result.delivery_amount)?
+                    };
                 } else if result.return_amount.amount() > 0.0 {
                     debug!(date = %date, amount = result.return_amount.amount(), "VM return margin call");
                     calls.push(MarginCall::vm_return(
@@ -283,10 +294,13 @@ impl VmCalculator {
                         self.csa.vm_params.threshold,
                         self.csa.vm_params.mta,
                     ));
-                    current_collateral = Money::new(
-                        (current_collateral.amount() - result.return_amount.amount()).max(0.0),
-                        currency,
-                    );
+                    current_collateral = if exposure.amount() < 0.0 {
+                        current_collateral.checked_add(result.return_amount)?
+                    } else {
+                        current_collateral
+                            .checked_sub(result.return_amount)
+                            .map_err(|e| finstack_core::Error::Validation(e.to_string()))?
+                    };
                 }
             }
         }
@@ -298,6 +312,17 @@ impl VmCalculator {
     pub fn margin_call_dates(&self, start: Date, end: Date) -> Vec<Date> {
         let mut dates = Vec::new();
         let adjusted_start = self.adjust_to_business_day(start);
+        if matches!(self.csa.vm_params.frequency, MarginTenor::OnDemand) {
+            let adjusted_end = self.adjust_to_business_day(end);
+            if adjusted_start > adjusted_end {
+                return dates;
+            }
+            dates.push(adjusted_start);
+            if adjusted_end != adjusted_start {
+                dates.push(adjusted_end);
+            }
+            return dates;
+        }
         let mut current = adjusted_start;
 
         while current <= end {
@@ -306,14 +331,7 @@ impl VmCalculator {
                 MarginTenor::Daily => self.add_business_days(current, 1),
                 MarginTenor::Weekly => self.add_business_days(current, 5),
                 MarginTenor::Monthly => self.add_month_clamped(current),
-                MarginTenor::OnDemand => {
-                    // For on-demand, just return start and end
-                    if current == adjusted_start {
-                        self.adjust_to_business_day(end)
-                    } else {
-                        break;
-                    }
-                }
+                MarginTenor::OnDemand => break,
             };
         }
 
@@ -499,6 +517,51 @@ mod tests {
         assert_eq!(calls[0].call_type, MarginCallType::VariationMarginDelivery);
         assert_eq!(calls[1].call_type, MarginCallType::VariationMarginDelivery);
         assert_eq!(calls[2].call_type, MarginCallType::VariationMarginReturn);
+    }
+
+    #[test]
+    fn generate_margin_calls_tracks_negative_exposure_as_signed_collateral() {
+        let csa = CsaSpec::usd_regulatory().expect("registry should load");
+        let calc = VmCalculator::new(csa);
+
+        let exposures = vec![
+            (
+                test_date(2025, 1, 15),
+                Money::new(-2_000_000.0, Currency::USD),
+            ),
+            (
+                test_date(2025, 1, 16),
+                Money::new(-2_000_000.0, Currency::USD),
+            ),
+            (
+                test_date(2025, 1, 17),
+                Money::new(-2_000_000.0, Currency::USD),
+            ),
+        ];
+
+        let calls = calc
+            .generate_margin_calls(&exposures, Money::new(0.0, Currency::USD))
+            .expect("margin calls ok");
+
+        assert_eq!(
+            calls.len(),
+            1,
+            "persistent deficit should not be called repeatedly"
+        );
+        assert_eq!(calls[0].call_type, MarginCallType::VariationMarginDelivery);
+        assert_eq!(calls[0].amount, Money::new(2_000_000.0, Currency::USD));
+    }
+
+    #[test]
+    fn on_demand_margin_call_dates_do_not_loop_when_start_equals_end() {
+        let mut csa = CsaSpec::usd_regulatory().expect("registry should load");
+        csa.vm_params.frequency = MarginTenor::OnDemand;
+        let calc = VmCalculator::new(csa);
+
+        let date = test_date(2025, 1, 15);
+        let dates = calc.margin_call_dates(date, date);
+
+        assert_eq!(dates, vec![date]);
     }
 
     #[test]

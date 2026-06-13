@@ -3,8 +3,6 @@
 Bindings for the ``finstack-margin`` Rust crate.
 """
 
-from __future__ import annotations
-
 from finstack.finstack import margin as _margin
 
 ImMethodology = _margin.ImMethodology
@@ -31,7 +29,10 @@ ExcessCollateral = _margin.ExcessCollateral
 MarginFundingCost = _margin.MarginFundingCost
 Haircut01 = _margin.Haircut01
 FrtbSensitivities = _margin.FrtbSensitivities
+FrtbSbaEngine = _margin.FrtbSbaEngine
 SaCcrTrade = _margin.SaCcrTrade
+SaCcrNettingSetConfig = _margin.SaCcrNettingSetConfig
+SaCcrEngine = _margin.SaCcrEngine
 frtb_sba_charge = _margin.frtb_sba_charge
 saccr_ead = _margin.saccr_ead
 
@@ -45,6 +46,7 @@ __all__: list[str] = [
     "ExcessCollateral",
     "ExposureDiagnostics",
     "ExposureProfile",
+    "FrtbSbaEngine",
     "FrtbSensitivities",
     "FundingConfig",
     "Haircut01",
@@ -55,6 +57,8 @@ __all__: list[str] = [
     "MarginTenor",
     "MarginUtilization",
     "NettingSetId",
+    "SaCcrEngine",
+    "SaCcrNettingSetConfig",
     "SaCcrTrade",
     "VmCalculator",
     "VmResult",

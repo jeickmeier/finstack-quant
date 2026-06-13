@@ -15,7 +15,7 @@ use finstack_core::money::Money;
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum NettingSetId {
     /// A bilateral netting set scoped by counterparty + CSA.
     Bilateral {
@@ -100,6 +100,7 @@ impl std::fmt::Display for NettingSetId {
 
 /// Result of calculating margin for an instrument.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct InstrumentMarginResult {
     /// Instrument identifier
     pub instrument_id: String,

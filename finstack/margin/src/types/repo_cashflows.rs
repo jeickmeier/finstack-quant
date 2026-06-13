@@ -32,14 +32,15 @@ pub fn generate_margin_cashflows(
     }
 
     let mut cashflows = Vec::new();
-    let mut _current_collateral_posted = spec.required_collateral(cash_amount.amount());
+    let mut margin_balance = 0.0;
 
     for (i, (date, collateral_value)) in valuations.iter().enumerate() {
-        // Check if margin call needed
-        let deficit = spec.margin_deficit(cash_amount.amount(), *collateral_value);
-        let excess = spec.excess_collateral(cash_amount.amount(), *collateral_value);
+        let effective_collateral_value = collateral_value + margin_balance;
+        let required_collateral = spec.required_collateral(cash_amount.amount());
+        let call_trigger = spec.call_trigger_value(cash_amount.amount());
 
-        if deficit > 0.0 {
+        if effective_collateral_value < call_trigger {
+            let deficit = required_collateral - effective_collateral_value;
             // Need to deliver additional collateral
             cashflows.push(CashFlow {
                 date: *date,
@@ -49,8 +50,9 @@ pub fn generate_margin_cashflows(
                 accrual_factor: 0.0,
                 rate: None,
             });
-            _current_collateral_posted += deficit;
-        } else if excess > 0.0 && i > 0 {
+            margin_balance += deficit;
+        } else if effective_collateral_value > required_collateral && i > 0 {
+            let excess = effective_collateral_value - required_collateral;
             // Return excess collateral (not on first day)
             cashflows.push(CashFlow {
                 date: *date,
@@ -60,7 +62,7 @@ pub fn generate_margin_cashflows(
                 accrual_factor: 0.0,
                 rate: None,
             });
-            _current_collateral_posted -= excess;
+            margin_balance -= excess;
         }
     }
 
@@ -194,6 +196,40 @@ mod tests {
         let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
 
         // Should have one margin call for the 2M deficit
+        assert_eq!(cashflows.len(), 1);
+        assert_eq!(cashflows[0].kind, CFKind::VariationMarginPay);
+        assert_eq!(cashflows[0].amount.amount(), 2_000_000.0);
+    }
+
+    #[test]
+    fn margin_call_threshold_suppresses_small_repo_deficits() {
+        let spec = RepoMarginSpec::mark_to_market(1.02, 0.01).expect("registry should load");
+        let cash = Money::new(100_000_000.0, Currency::USD);
+        let valuations = vec![
+            (test_date(2025, 1, 15), 102_000_000.0),
+            // Required collateral is 102M, but the 1% threshold means calls
+            // should not fire until collateral drops below 100.98M.
+            (test_date(2025, 1, 16), 101_500_000.0),
+        ];
+
+        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
+
+        assert!(cashflows.is_empty());
+    }
+
+    #[test]
+    fn persistent_repo_deficit_is_not_called_repeatedly() {
+        let spec = RepoMarginSpec::mark_to_market(1.02, 0.01).expect("registry should load");
+        let cash = Money::new(100_000_000.0, Currency::USD);
+        let valuations = vec![
+            (test_date(2025, 1, 15), 102_000_000.0),
+            (test_date(2025, 1, 16), 100_000_000.0),
+            (test_date(2025, 1, 17), 100_000_000.0),
+            (test_date(2025, 1, 18), 100_000_000.0),
+        ];
+
+        let cashflows = generate_margin_cashflows(&spec, cash, &valuations, Currency::USD);
+
         assert_eq!(cashflows.len(), 1);
         assert_eq!(cashflows[0].kind, CFKind::VariationMarginPay);
         assert_eq!(cashflows[0].amount.amount(), 2_000_000.0);

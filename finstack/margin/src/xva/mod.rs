@@ -1,9 +1,9 @@
-//! XVA (valuation adjustments) types and crate-internal exposure engines.
+//! XVA (valuation adjustments) types and deterministic exposure engines.
 //!
-//! Public surface: [`types`] (configuration, exposure profiles, results) for
-//! bindings and downstream integration. Exposure roll-forward, netting,
-//! collateral reduction, and CVA/DVA/FVA formulas live in sibling modules and
-//! are exercised from this crate's tests.
+//! Public surface: [`types`] (configuration, exposure profiles, results),
+//! [`exposure::compute_exposure_profile`], [`cva::compute_cva`],
+//! [`cva::compute_dva`], [`cva::compute_fva`], [`cva::compute_bilateral_xva`],
+//! and the deterministic netting helpers.
 //!
 //! # Conventions
 //!
@@ -15,8 +15,8 @@
 //!
 //! # Stochastic exposure
 //!
-//! Pathwise exposure with quantile-based PFE uses `finstack-monte-carlo` via
-//! `exposure::compute_stochastic_exposure_profile` (crate-internal). Defaults
+//! Pathwise exposure with quantile-based PFE uses `finstack-monte-carlo` behind
+//! a crate-private helper. Defaults
 //! are in `data/margin/xva_defaults.v1.json`.
 //!
 //! # References
@@ -27,16 +27,12 @@
 //! - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
 
 /// CVA, DVA, FVA, and bilateral-XVA integration formulas.
-#[cfg(test)]
-pub(crate) mod cva;
+pub mod cva;
 /// Deterministic and stochastic exposure engines.
-#[cfg(test)]
-pub(crate) mod exposure;
+pub mod exposure;
 /// Netting and collateral-reduction helpers.
-#[cfg(test)]
-pub(crate) mod netting;
+pub mod netting;
 /// Minimal trait surface for XVA-compatible instruments.
-#[cfg(test)]
-pub(crate) mod traits;
+pub mod traits;
 /// Shared XVA configuration and result container types.
 pub mod types;

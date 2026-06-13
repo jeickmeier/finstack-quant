@@ -41,6 +41,7 @@ use finstack_core::config::FinstackConfig;
 /// };
 /// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct VmParameters {
     /// Threshold amount below which no margin is exchanged.
     ///
@@ -207,25 +208,36 @@ impl VmParameters {
         let required = self.required_credit_support(exposure)?;
         let currency = required.currency();
         let credit_support_amount = required.amount() - current_collateral.amount();
-
-        // Round first; MTA applies to the transfer amount after rounding (CSA convention).
-        let rounded = self.round_to_nearest(Money::new(credit_support_amount, currency));
         let mta_amount = self.mta.amount();
-        if rounded.amount().abs() < mta_amount {
+        if credit_support_amount.abs() < mta_amount {
             return Ok(Money::new(0.0, currency));
         }
 
+        let rounded = self.round_transfer_amount(
+            Money::new(credit_support_amount, currency),
+            exposure.amount(),
+        );
         Ok(rounded)
     }
 
-    /// Round an amount to the nearest rounding increment.
-    fn round_to_nearest(&self, amount: Money) -> Money {
+    /// Round a transfer amount according to ISDA delivery/return elections.
+    fn round_transfer_amount(&self, amount: Money, exposure_amount: f64) -> Money {
         let rounding = self.rounding.amount();
         if rounding <= 0.0 {
             return amount;
         }
-        let rounded = (amount.amount() / rounding).round() * rounding;
-        Money::new(rounded, amount.currency())
+        let raw = amount.amount();
+        if raw == 0.0 {
+            return amount;
+        }
+
+        let units = raw.abs() / rounding;
+        let rounded_abs = if raw > 0.0 || exposure_amount < 0.0 {
+            units.ceil() * rounding
+        } else {
+            units.floor() * rounding
+        };
+        Money::new(raw.signum() * rounded_abs, amount.currency())
     }
 
     /// Build from defaults resolved via a `FinstackConfig`.
@@ -275,6 +287,7 @@ impl Default for VmParameters {
 /// };
 /// ```
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ImParameters {
     /// IM calculation methodology.
     ///
@@ -458,7 +471,7 @@ mod tests {
     }
 
     #[test]
-    fn vm_margin_call_mta_applies_after_rounding() {
+    fn vm_margin_call_mta_applies_before_rounding() {
         let params = VmParameters {
             threshold: Money::new(0.0, Currency::USD),
             mta: Money::new(150_000.0, Currency::USD),
@@ -468,13 +481,50 @@ mod tests {
             settlement_lag: 1,
         };
 
-        // Raw excess 147k is below MTA, but nearest 10k increment is 150k → call stands.
+        // Raw excess 147k is below MTA, so no call should be made even
+        // though the rounded amount would reach the 150k threshold.
         let exposure = Money::new(147_000.0, Currency::USD);
         let collateral = Money::new(0.0, Currency::USD);
         let call = params
             .calculate_margin_call(exposure, collateral)
             .expect("matching currencies should succeed");
-        assert_eq!(call, Money::new(150_000.0, Currency::USD));
+        assert_eq!(call, Money::new(0.0, Currency::USD));
+    }
+
+    #[test]
+    fn vm_margin_call_rounds_delivery_up_and_return_down() {
+        let params = VmParameters {
+            threshold: Money::new(0.0, Currency::USD),
+            mta: Money::new(100_000.0, Currency::USD),
+            rounding: Money::new(10_000.0, Currency::USD),
+            independent_amount: Money::new(0.0, Currency::USD),
+            frequency: MarginTenor::Daily,
+            settlement_lag: 1,
+        };
+
+        let delivery_to_us = params
+            .calculate_margin_call(
+                Money::new(151_001.0, Currency::USD),
+                Money::new(0.0, Currency::USD),
+            )
+            .expect("delivery call should calculate");
+        assert_eq!(delivery_to_us, Money::new(160_000.0, Currency::USD));
+
+        let return_to_them = params
+            .calculate_margin_call(
+                Money::new(0.0, Currency::USD),
+                Money::new(151_001.0, Currency::USD),
+            )
+            .expect("return call should calculate");
+        assert_eq!(return_to_them, Money::new(-150_000.0, Currency::USD));
+
+        let delivery_to_them = params
+            .calculate_margin_call(
+                Money::new(-151_001.0, Currency::USD),
+                Money::new(0.0, Currency::USD),
+            )
+            .expect("negative exposure delivery call should calculate");
+        assert_eq!(delivery_to_them, Money::new(-160_000.0, Currency::USD));
     }
 
     #[test]

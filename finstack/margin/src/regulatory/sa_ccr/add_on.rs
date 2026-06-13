@@ -55,7 +55,7 @@ fn trade_maturity_factor(config: &SaCcrNettingSetConfig, trade: &SaCcrTrade) -> 
     if config.is_margined {
         maturity_factor_margined(config.mpor_days)
     } else {
-        let days = (trade.end_date - trade.start_date).whole_days().max(0) as f64;
+        let days = (trade.end_date - config.as_of).whole_days().max(0) as f64;
         let m_years = days / 365.0;
         maturity_factor_unmargined(m_years)
     }
@@ -112,10 +112,9 @@ fn ir_add_on(trades: &[SaCcrTrade], config: &SaCcrNettingSetConfig) -> f64 {
         .iter()
         .filter(|t| t.asset_class == SaCcrAssetClass::InterestRate)
     {
-        // Use trade duration as the end-offset; start-offset defaults to 0
-        // (trade considered in-flight as of the calculation date).
-        let end_years = ((trade.end_date - trade.start_date).whole_days().max(0) as f64) / 365.0;
-        let sd = supervisory_duration(0.0, end_years);
+        let start_years = ((trade.start_date - config.as_of).whole_days().max(0) as f64) / 365.0;
+        let end_years = ((trade.end_date - config.as_of).whole_days().max(0) as f64) / 365.0;
+        let sd = supervisory_duration(start_years, end_years);
         let mf = trade_maturity_factor(config, trade);
         let d_i = trade.supervisory_delta * trade.notional.abs() * sd * mf;
 
@@ -203,7 +202,13 @@ fn non_ir_add_on(
 
     let hedging_set_values: Vec<f64> = by_hedging_set.values().copied().collect();
 
-    // For FX (rho = 1) this reduces to `|sum d_HS|`.
+    // FX hedging sets are currency pairs. Offset within a pair, but do not
+    // let opposite deltas in different pairs collapse the total add-on.
+    if asset_class == SaCcrAssetClass::ForeignExchange {
+        let add_on_raw: f64 = hedging_set_values.iter().map(|hs| hs.abs()).sum();
+        return add_on_raw * sf;
+    }
+
     // For Credit / Equity / Commodity (rho < 1) each hedging set is the
     // systematic/idiosyncratic unit per the single-entity-per-HS caveat
     // in the module docs.
@@ -278,14 +283,34 @@ mod tests {
             }
         }
 
+        fn ir_trade(start: Date, end: Date, notional: f64) -> SaCcrTrade {
+            SaCcrTrade {
+                trade_id: "IR".into(),
+                asset_class: SaCcrAssetClass::InterestRate,
+                notional,
+                start_date: start,
+                end_date: end,
+                underlier: "USD-SOFR".into(),
+                hedging_set: "USD".into(),
+                direction: 1.0,
+                supervisory_delta: 1.0,
+                mtm: 0.0,
+                is_option: false,
+                option_type: None,
+            }
+        }
+
         /// Unmargined SA-CCR uses per-trade MF. A 6M trade must get a
         /// smaller MF than a 1Y trade, so adding a 6M trade alongside
         /// a 1Y trade should grow the add-on by strictly less than
         /// adding a second 1Y trade.
         #[test]
         fn unmargined_per_trade_mf_shrinks_short_tenor_contribution() {
-            let cfg =
-                SaCcrNettingSetConfig::unmargined(NettingSetId::bilateral("BANK_A", "CSA"), 0.0);
+            let cfg = SaCcrNettingSetConfig::unmargined(
+                NettingSetId::bilateral("BANK_A", "CSA"),
+                0.0,
+                d(2025, 1, 15),
+            );
 
             let one_year = d(2026, 1, 15);
             let six_months = d(2025, 7, 15);
@@ -324,6 +349,7 @@ mod tests {
                 0.0,
                 0.0,
                 10,
+                d(2025, 1, 15),
             );
 
             let t_short = fx_trade(d(2025, 3, 15), 50_000_000.0);
@@ -336,6 +362,78 @@ mod tests {
             assert!(
                 (mf_short - expected).abs() < 1e-12 && (mf_long - expected).abs() < 1e-12,
                 "margined MF must be constant = {expected}, got short={mf_short} long={mf_long}"
+            );
+        }
+
+        #[test]
+        fn unmargined_uses_remaining_maturity_from_as_of() {
+            let as_of = d(2026, 7, 15);
+            let cfg = SaCcrNettingSetConfig::unmargined(
+                NettingSetId::bilateral("BANK_A", "CSA"),
+                0.0,
+                as_of,
+            );
+
+            let aged_trade = fx_trade(d(2027, 1, 15), 100_000_000.0);
+            let add_on = asset_class_add_on(SaCcrAssetClass::ForeignExchange, &[aged_trade], &cfg);
+
+            let remaining_years = (d(2027, 1, 15) - as_of).whole_days() as f64 / 365.0;
+            let expected = 100_000_000.0 * maturity_factor_unmargined(remaining_years) * 0.04;
+            assert!(
+                (add_on - expected).abs() < 1.0,
+                "aged FX trade must use remaining maturity from as_of: expected {expected}, got {add_on}"
+            );
+        }
+
+        #[test]
+        fn ir_supervisory_duration_uses_forward_start_from_as_of() {
+            let as_of = d(2025, 1, 15);
+            let cfg = SaCcrNettingSetConfig::unmargined(
+                NettingSetId::bilateral("BANK_A", "CSA"),
+                0.0,
+                as_of,
+            );
+            let start = d(2026, 1, 15);
+            let end = d(2030, 1, 15);
+            let trade = ir_trade(start, end, 100_000_000.0);
+
+            let add_on = asset_class_add_on(SaCcrAssetClass::InterestRate, &[trade], &cfg);
+            let start_years = (start - as_of).whole_days() as f64 / 365.0;
+            let end_years = (end - as_of).whole_days() as f64 / 365.0;
+            let expected = 100_000_000.0
+                * supervisory_duration(start_years, end_years)
+                * maturity_factor_unmargined(end_years)
+                * 0.005;
+
+            assert!(
+                (add_on - expected).abs() < 1.0,
+                "forward-starting IR trade must use S/E offsets from as_of: expected {expected}, got {add_on}"
+            );
+        }
+
+        #[test]
+        fn fx_aggregation_does_not_offset_different_currency_pairs() {
+            let cfg = SaCcrNettingSetConfig::unmargined(
+                NettingSetId::bilateral("BANK_A", "CSA"),
+                0.0,
+                d(2025, 1, 15),
+            );
+            let mut eur_usd = fx_trade(d(2026, 1, 15), 100_000_000.0);
+            eur_usd.hedging_set = "EURUSD".into();
+            eur_usd.underlier = "EURUSD".into();
+
+            let mut usd_jpy = fx_trade(d(2026, 1, 15), 100_000_000.0);
+            usd_jpy.hedging_set = "USDJPY".into();
+            usd_jpy.underlier = "USDJPY".into();
+            usd_jpy.direction = -1.0;
+            usd_jpy.supervisory_delta = -1.0;
+
+            let add_on =
+                asset_class_add_on(SaCcrAssetClass::ForeignExchange, &[eur_usd, usd_jpy], &cfg);
+            let expected = 2.0 * 100_000_000.0 * 0.04;
+            assert!(
+                (add_on - expected).abs() < 1.0,
+                "different FX pairs should not offset: expected {expected}, got {add_on}"
             );
         }
     }

@@ -86,6 +86,7 @@ impl std::str::FromStr for MarginCallType {
 /// Represents a single margin call with all relevant details for
 /// processing and settlement.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct MarginCall {
     /// Date the margin call is issued
     #[schemars(with = "String")]

@@ -7,9 +7,9 @@
 /// 5-8: Large-cap emerging markets
 /// 9: Small-cap developed markets
 /// 10: Small-cap emerging markets
-/// 11: Indices, ETFs, and funds
-/// 12: Other equity (volatility indices, etc.)
-/// 13: Residual bucket
+/// 11: Other sector
+/// 12: Indices, ETFs, and funds
+/// 13: Other equity (volatility indices, etc.)
 pub const EQUITY_RISK_WEIGHTS: &[(u8, f64)] = &[
     (1, 55.0),
     (2, 60.0),
@@ -21,9 +21,9 @@ pub const EQUITY_RISK_WEIGHTS: &[(u8, f64)] = &[
     (8, 50.0),
     (9, 70.0),
     (10, 50.0),
-    (11, 15.0),
-    (12, 70.0),
-    (13, 70.0),
+    (11, 70.0),
+    (12, 15.0),
+    (13, 25.0),
 ];
 
 /// Equity intra-bucket correlation.

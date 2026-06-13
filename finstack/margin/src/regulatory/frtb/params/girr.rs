@@ -30,8 +30,8 @@ pub const GIRR_INFLATION_RISK_WEIGHT: f64 = 1.6;
 /// GIRR cross-currency basis risk weight.
 pub const GIRR_XCCY_BASIS_RISK_WEIGHT: f64 = 1.6;
 
-/// GIRR vega risk weight (uniform across tenors).
-pub const GIRR_VEGA_RISK_WEIGHT: f64 = 0.55;
+/// GIRR vega risk weight after liquidity-horizon scaling.
+pub const GIRR_VEGA_RISK_WEIGHT: f64 = 1.00;
 
 /// GIRR curvature risk weight scale factor.
 pub const GIRR_CURVATURE_RISK_WEIGHT: f64 = 0.5;

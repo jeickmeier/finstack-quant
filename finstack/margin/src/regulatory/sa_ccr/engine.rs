@@ -80,7 +80,7 @@ impl SaCcrEngine {
             let avg_maturity: f64 = trades
                 .iter()
                 .map(|t| {
-                    let days = (t.end_date - t.start_date).whole_days().max(0) as f64;
+                    let days = (t.end_date - config.as_of).whole_days().max(0) as f64;
                     days / 365.0
                 })
                 .sum::<f64>()
@@ -176,7 +176,11 @@ mod tests {
     }
 
     fn unmargined_config(collateral: f64) -> SaCcrNettingSetConfig {
-        SaCcrNettingSetConfig::unmargined(NettingSetId::bilateral("BANK_A", "CSA-001"), collateral)
+        SaCcrNettingSetConfig::unmargined(
+            NettingSetId::bilateral("BANK_A", "CSA-001"),
+            collateral,
+            make_date(2024, 1, 15),
+        )
     }
 
     fn margined_config(
@@ -192,6 +196,7 @@ mod tests {
             mta,
             nica,
             10,
+            make_date(2024, 1, 15),
         )
     }
 

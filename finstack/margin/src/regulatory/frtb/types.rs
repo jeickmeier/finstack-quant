@@ -67,11 +67,11 @@ impl std::fmt::Display for FrtbRiskClass {
 /// FRTB correlation scenario for capital charge aggregation.
 ///
 /// The final SBA capital charge is max(low, medium, high).
-/// Low and high scenarios scale prescribed correlations by (1 - x)
-/// and (1 + x) respectively, floored at -1 and capped at +1.
+/// Low and high scenarios scale prescribed correlations per BCBS d457,
+/// floored/capped by the scenario-specific Basel formulas.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum CorrelationScenario {
-    /// `rho_low = max(2 * rho_medium - 1, floor)`
+    /// `rho_low = max(2 * rho_medium - 1, 0.75 * rho_medium)`
     Low,
     /// Prescribed correlation (base case).
     Medium,
@@ -89,13 +89,13 @@ impl CorrelationScenario {
 
     /// Scale a base (medium) correlation for this scenario.
     ///
-    /// Low: `max(2 * rho - 1, -1)`
+    /// Low: `max(2 * rho - 1, 0.75 * rho)`
     /// Medium: `rho` (unchanged)
     /// High: `min(1.25 * rho, 1)`
     #[must_use]
     pub fn scale_correlation(self, rho: f64) -> f64 {
         match self {
-            Self::Low => f64::max(2.0 * rho - 1.0, -1.0),
+            Self::Low => f64::max(2.0 * rho - 1.0, 0.75 * rho),
             Self::Medium => rho,
             Self::High => f64::min(1.25 * rho, 1.0),
         }
@@ -109,6 +109,18 @@ impl std::fmt::Display for CorrelationScenario {
             Self::Medium => write!(f, "Medium"),
             Self::High => write!(f, "High"),
         }
+    }
+}
+
+#[cfg(test)]
+mod correlation_scenario_tests {
+    use super::CorrelationScenario;
+
+    #[test]
+    fn low_correlation_uses_basel_floor() {
+        assert_eq!(CorrelationScenario::Low.scale_correlation(0.5), 0.375);
+        assert_eq!(CorrelationScenario::Low.scale_correlation(0.0), 0.0);
+        assert!((CorrelationScenario::Low.scale_correlation(0.8) - 0.6).abs() < 1e-12);
     }
 }
 

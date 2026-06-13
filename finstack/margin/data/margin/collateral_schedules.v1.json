@@ -43,7 +43,7 @@
           {
             "asset_class": "government_bonds",
             "min_rating": "AA-",
-            "maturity_constraints": { "max_remaining_years": 10.0 },
+            "maturity_constraints": { "max_remaining_years": 1.0 },
             "haircut": 0.005,
             "fx_haircut_addon": 0.08
           },

@@ -43,13 +43,16 @@ use finstack_core::money::fx::FxQuery;
 use finstack_core::money::Money;
 
 use super::traits::Valuable;
+#[cfg(test)]
 use finstack_monte_carlo::rng::philox::PhiloxRng;
+#[cfg(test)]
 use finstack_monte_carlo::{
     state_keys, Discretization, PathState, RandomStream, StochasticProcess,
 };
 
 use super::netting::{apply_collateral, apply_netting};
 use super::types::{ExposureProfile, XvaConfig, XvaNettingSet};
+#[cfg(test)]
 use super::types::{StochasticExposureConfig, StochasticExposureProfile};
 
 /// Map a year fraction to a whole-day offset using ACT/365F-style scaling.
@@ -129,6 +132,7 @@ fn convert_to_reporting(
     Ok(value.amount() * rate)
 }
 
+#[cfg(test)]
 fn interpolate_quantile(samples: &mut [f64], quantile: f64) -> f64 {
     samples.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
     if samples.len() == 1 {
@@ -342,7 +346,7 @@ pub fn compute_exposure_profile(
 /// # Example
 ///
 /// ```ignore
-/// use crate::xva::exposure::compute_stochastic_exposure_profile;
+/// use finstack_margin::xva::types::{StochasticExposureConfig, XvaConfig};
 /// use finstack_margin::xva::types::{StochasticExposureConfig, XvaConfig};
 ///
 /// #
@@ -382,7 +386,8 @@ pub fn compute_exposure_profile(
 ///
 /// - Gregory XVA Challenge: `docs/REFERENCES.md#gregory-xva-challenge`
 /// - BCBS 279 SA-CCR: `docs/REFERENCES.md#bcbs-279-saccr`
-pub fn compute_stochastic_exposure_profile<P, D, V>(
+#[cfg(test)]
+pub(crate) fn compute_stochastic_exposure_profile<P, D, V>(
     process: &P,
     discretization: &D,
     initial_state: &[f64],

@@ -204,14 +204,58 @@ visibility = "pub"
 status = "exists"
 
 [crates.margin.modules]
-calculators = { python = "finstack.margin.calculators", status = "missing" }
-config      = { python = "finstack.margin.config",      status = "missing" }
-constants   = { python = "finstack.margin.constants",   status = "missing" }
-metrics     = { python = "finstack.margin.metrics",     status = "missing" }
+calculators = { python = "finstack.margin", status = "flattened", note = "VmCalculator, VmResult, and ImResult exposed flat on finstack.margin" }
+constants   = { python = "finstack.margin", status = "flattened", note = "CONSTANTS exposed flat on finstack.margin" }
+metrics     = { python = "finstack.margin", status = "flattened", note = "MarginUtilization, ExcessCollateral, MarginFundingCost, and Haircut01 exposed flat on finstack.margin" }
+regulatory  = { python = "finstack.margin", status = "flattened", note = "FRTB and SA-CCR regulatory classes/functions exposed flat on finstack.margin" }
 registry    = { python = "finstack.margin.registry",    status = "missing" }
 traits      = { python = "finstack.margin.traits",      status = "missing" }
-types       = { python = "finstack.margin.types",       status = "missing" }
-xva         = { python = "finstack.margin.xva",         status = "missing" }
+types       = { python = "finstack.margin", status = "flattened", note = "CSA, collateral, netting, and enum wrappers exposed flat on finstack.margin" }
+xva         = { python = "finstack.margin", status = "flattened", note = "XVA config/result/netting container wrappers exposed flat on finstack.margin" }
+
+[crates.margin.symbols]
+public = [
+  "CONSTANTS",
+  "ClearingStatus",
+  "CollateralAssetClass",
+  "CsaSpec",
+  "CsaTerms",
+  "EligibleCollateralSchedule",
+  "ExcessCollateral",
+  "ExposureDiagnostics",
+  "ExposureProfile",
+  "FrtbSensitivities",
+  "FrtbSbaEngine",
+  "FundingConfig",
+  "Haircut01",
+  "ImMethodology",
+  "ImResult",
+  "MarginCallType",
+  "MarginFundingCost",
+  "MarginTenor",
+  "MarginUtilization",
+  "NettingSetId",
+  "SaCcrEngine",
+  "SaCcrNettingSetConfig",
+  "SaCcrTrade",
+  "VmCalculator",
+  "VmResult",
+  "XvaConfig",
+  "XvaNettingSet",
+  "XvaResult",
+  "frtb_sba_charge",
+  "saccr_ead",
+]
+
+[wasm_margin_subset]
+status = "explicit_subset"
+note = "WASM margin remains a compact JSON/facade subset; full Rust/Python regulatory engines are not yet exposed in WASM."
+symbols = [
+  "csaUsdRegulatory",
+  "csaEurRegulatory",
+  "validateCsaJson",
+  "calculateVm",
+]
 
 # ---------------------------------------------------------------------------
 # finstack-monte-carlo  →  finstack.monte_carlo

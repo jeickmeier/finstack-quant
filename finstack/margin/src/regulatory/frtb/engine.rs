@@ -274,8 +274,8 @@ mod tests {
             .expect("build");
 
         let mut sens = FrtbSensitivities::new(Currency::USD);
-        // Bucket 11 (indices) has RW = 15.0.
-        sens.add_equity_delta("SPX", 11, 100_000.0);
+        // Bucket 12 (indices) has RW = 15.0.
+        sens.add_equity_delta("SPX", 12, 100_000.0);
 
         let result = engine.calculate(&sens).expect("calculate");
         // WS = 100K * 15.0 = 1.5M.
@@ -596,16 +596,19 @@ mod tests {
         let medium = CorrelationScenario::Medium.scale_correlation(0.5);
         let high = CorrelationScenario::High.scale_correlation(0.5);
 
-        assert!((low - 0.0).abs() < 1e-10, "Low(0.5) = 2*0.5-1 = 0.0");
+        assert!(
+            (low - 0.375).abs() < 1e-10,
+            "Low(0.5) = max(2*0.5-1, 0.75*0.5) = 0.375"
+        );
         assert!((medium - 0.5).abs() < 1e-10, "Medium(0.5) = 0.5");
         assert!((high - 0.625).abs() < 1e-10, "High(0.5) = 1.25*0.5 = 0.625");
     }
 
     #[test]
     fn correlation_scenario_clamping() {
-        // Low scenario: max(2*0.1 - 1, -1) = max(-0.8, -1) = -0.8.
+        // Low scenario: max(2*0.1 - 1, 0.75*0.1) = max(-0.8, 0.075) = 0.075.
         let low = CorrelationScenario::Low.scale_correlation(0.1);
-        assert!((low - (-0.8)).abs() < 1e-10);
+        assert!((low - 0.075).abs() < 1e-10);
 
         // High scenario: min(1.25 * 0.9, 1.0) = min(1.125, 1.0) = 1.0.
         let high = CorrelationScenario::High.scale_correlation(0.9);
@@ -628,8 +631,8 @@ mod tests {
         sens.add_girr_vega(Currency::USD, "1Y", "5Y", 500_000.0);
 
         let result = engine.calculate(&sens).expect("calculate");
-        // Vega RW = 0.55. Single factor: charge = 500K * 0.55 = 275K.
-        let expected = 500_000.0 * 0.55;
+        // Vega RW = 1.00 after liquidity-horizon scaling. Single factor: charge = 500K.
+        let expected = 500_000.0;
         let vega_charge = result
             .vega_by_risk_class
             .get(&FrtbRiskClass::Girr)

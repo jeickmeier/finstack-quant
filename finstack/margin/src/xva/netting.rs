@@ -43,7 +43,7 @@ use finstack_core::math::neumaier_sum;
 /// # Examples
 ///
 /// ```
-/// use crate::xva::netting::apply_netting;
+/// use finstack_margin::xva::netting::apply_netting;
 ///
 /// // Two offsetting trades: net exposure is reduced
 /// let values = [100.0, -80.0];
@@ -64,9 +64,8 @@ pub fn apply_netting(instrument_values: &[f64]) -> f64 {
 /// Models the collateral mechanics of a Credit Support Annex:
 ///
 /// ```text
-/// over_threshold = max(exposure - threshold, 0)
-/// collateral_call = if over_threshold > MTA { over_threshold } else { 0 }
-/// net_exposure = max(exposure - collateral_call - IA, 0)
+/// unsecured_exposure = min(exposure, threshold + MTA)
+/// net_exposure = max(unsecured_exposure - IA, 0)
 /// ```
 ///
 /// The independent amount (IA) is additional collateral posted by the
@@ -85,7 +84,7 @@ pub fn apply_netting(instrument_values: &[f64]) -> f64 {
 /// # Examples
 ///
 /// ```
-/// use crate::xva::netting::apply_collateral;
+/// use finstack_margin::xva::netting::apply_collateral;
 /// use finstack_margin::xva::types::CsaTerms;
 ///
 /// let csa = CsaTerms {
@@ -98,18 +97,17 @@ pub fn apply_netting(instrument_values: &[f64]) -> f64 {
 /// // Exposure below threshold: no collateral called
 /// assert!((apply_collateral(8.0, &csa) - 8.0).abs() < 1e-12);
 ///
-/// // Exposure above threshold + MTA: the call returns exposure to threshold
-/// assert!((apply_collateral(20.0, &csa) - 10.0).abs() < 1e-12);
+/// // Exposure above threshold + MTA: the residual exposure is threshold + MTA
+/// assert!((apply_collateral(20.0, &csa) - 11.0).abs() < 1e-12);
 /// ```
 #[inline]
 pub fn apply_collateral(gross_exposure: f64, csa: &CsaTerms) -> f64 {
-    let over_threshold = (gross_exposure - csa.threshold).max(0.0);
-    let collateral = if over_threshold > csa.mta {
-        over_threshold
+    let unsecured_exposure = if gross_exposure > csa.threshold + csa.mta {
+        csa.threshold + csa.mta
     } else {
-        0.0
+        gross_exposure
     };
-    (gross_exposure - collateral - csa.independent_amount).max(0.0)
+    (unsecured_exposure - csa.independent_amount).max(0.0)
 }
 
 #[cfg(test)]
@@ -192,27 +190,24 @@ mod tests {
     #[test]
     fn collateral_above_threshold_plus_mta() {
         // Exposure = 20, threshold = 10, MTA = 1
-        // over_threshold = 10 > MTA, so full 10 is called
-        // net = 20 - 10 = 10
+        // residual unsecured exposure = threshold + MTA = 11
         let csa = make_csa(10.0, 1.0, 0.0);
-        assert!((apply_collateral(20.0, &csa) - 10.0).abs() < 1e-12);
+        assert!((apply_collateral(20.0, &csa) - 11.0).abs() < 1e-12);
     }
 
     #[test]
     fn collateral_with_independent_amount() {
         // IA reduces the net exposure (additional collateral posted by counterparty)
         let csa = make_csa(10.0, 1.0, 5.0);
-        // Exposure = 20, over_threshold = 10, collateral = 10
-        // net = max(20 - 10 - 5, 0) = 5
-        assert!((apply_collateral(20.0, &csa) - 5.0).abs() < 1e-12);
+        // Residual exposure = threshold + MTA = 11; net = max(11 - 5, 0) = 6.
+        assert!((apply_collateral(20.0, &csa) - 6.0).abs() < 1e-12);
     }
 
     #[test]
     fn collateral_zero_threshold() {
-        // Zero threshold CSA (bilateral VM): all exposure is collateralized above MTA
+        // Zero threshold CSA (bilateral VM): MTA remains as unsecured residual.
         let csa = make_csa(0.0, 0.5, 0.0);
-        // Exposure = 100, over_threshold = 100 > MTA, so full 100 is called
-        assert!(apply_collateral(100.0, &csa).abs() < 1e-12);
+        assert!((apply_collateral(100.0, &csa) - 0.5).abs() < 1e-12);
     }
 
     #[test]

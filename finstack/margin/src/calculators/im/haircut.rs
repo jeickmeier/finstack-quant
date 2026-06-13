@@ -160,14 +160,20 @@ impl ImCalculator for HaircutImCalculator {
         context: &MarketContext,
         as_of: Date,
     ) -> Result<ImResult> {
-        let mtm = instrument.mtm_for_vm(context, as_of)?;
-        let collateral_value = Money::new(mtm.amount().abs(), mtm.currency());
+        let collateral_value = instrument
+            .im_exposure_base(context, as_of)?
+            .ok_or_else(|| {
+                finstack_core::Error::Validation(format!(
+                    "Haircut IM requires an explicit im_exposure_base for instrument '{}'",
+                    instrument.id()
+                ))
+            })?;
 
         // Derive the FX-addon flag from the actual currency pair instead
         // of carrying it as builder state.
         let currency_mismatch = self
             .posted_collateral_currency
-            .is_some_and(|c| c != mtm.currency());
+            .is_some_and(|c| c != collateral_value.currency());
 
         let im_amount = self.calculate_for_collateral(
             collateral_value,
@@ -259,6 +265,13 @@ mod tests {
             fn mtm_for_vm(&self, _m: &MarketContext, _a: Date) -> Result<Money> {
                 Ok(self.value)
             }
+            fn im_exposure_base(
+                &self,
+                _market: &MarketContext,
+                _as_of: Date,
+            ) -> Result<Option<Money>> {
+                Ok(Some(self.value))
+            }
         }
 
         let instrument = TestMarginable {
@@ -308,6 +321,57 @@ mod tests {
             800_000.0,
             "posted EUR ≠ MTM USD → 8% FX addon applied to cash"
         );
+    }
+
+    #[test]
+    fn calculate_uses_im_exposure_base_not_net_mtm() {
+        use crate::traits::Marginable;
+        use finstack_core::market_data::context::MarketContext;
+        use time::macros::date;
+
+        struct TestRepo {
+            mtm: Money,
+            exposure_base: Money,
+        }
+        impl Marginable for TestRepo {
+            fn id(&self) -> &str {
+                "REPO"
+            }
+            fn margin_spec(&self) -> Option<&crate::OtcMarginSpec> {
+                None
+            }
+            fn netting_set_id(&self) -> Option<crate::NettingSetId> {
+                None
+            }
+            fn simm_sensitivities(
+                &self,
+                _m: &MarketContext,
+                _a: Date,
+            ) -> Result<crate::SimmSensitivities> {
+                Ok(crate::SimmSensitivities::new(self.exposure_base.currency()))
+            }
+            fn mtm_for_vm(&self, _m: &MarketContext, _a: Date) -> Result<Money> {
+                Ok(self.mtm)
+            }
+            fn im_exposure_base(
+                &self,
+                _market: &MarketContext,
+                _as_of: Date,
+            ) -> Result<Option<Money>> {
+                Ok(Some(self.exposure_base))
+            }
+        }
+
+        let repo = TestRepo {
+            mtm: Money::new(0.0, Currency::USD),
+            exposure_base: Money::new(100_000_000.0, Currency::USD),
+        };
+        let calc = HaircutImCalculator::bcbs_standard().expect("registry should load");
+        let result = calc
+            .calculate(&repo, &MarketContext::new(), date!(2025 - 01 - 01))
+            .expect("haircut IM should calculate from exposure base");
+
+        assert_eq!(result.amount, Money::new(500_000.0, Currency::USD));
     }
 
     #[test]

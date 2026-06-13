@@ -388,7 +388,7 @@ impl ScheduleImCalculator {
     ///
     /// ```text
     /// IM = Gross_Notional × Rate × (0.4 + 0.6 × NGR)
-    /// NGR = |Σ MtM_i| / Σ |MtM_i|
+    /// NGR = max(0, Σ MtM_i) / Σ max(0, MtM_i)
     /// ```
     ///
     /// Reference: BCBS-IOSCO *Margin Requirements for Non-Centrally
@@ -446,11 +446,11 @@ impl ScheduleImCalculator {
         // cancellation in `signed_mtm_sum` when long/short MTMs nearly
         // offset across a large netting set: a naive f64 sum can leave
         // a residual far larger than the true cancellation error, which
-        // would skew the NGR ratio. `gross_mtm_sum` is a sum of
-        // non-negative `|mtm|` values, so it is always >= 0, but we
-        // still use compensated summation for numerical consistency.
+        // would skew the NGR ratio. The denominator follows the standard
+        // CEM/BCBS form: sum positive MtMs, not sum absolute MtMs.
         let signed_mtm_sum: f64 = neumaier_sum(positions.iter().map(|(mtm, _)| mtm.amount()));
-        let gross_mtm_sum: f64 = neumaier_sum(positions.iter().map(|(mtm, _)| mtm.amount().abs()));
+        let positive_mtm_sum: f64 =
+            neumaier_sum(positions.iter().map(|(mtm, _)| mtm.amount().max(0.0)));
         let gross_notional_sum: f64 = neumaier_sum(
             positions
                 .iter()
@@ -461,11 +461,15 @@ impl ScheduleImCalculator {
         // notionals are legitimate for low-denomination currencies
         // (e.g., JPY) and the NGR clamp `clamp(0.0, 1.0)` already caps
         // any spurious near-zero division.
-        if gross_mtm_sum <= 0.0 || gross_notional_sum <= 0.0 {
+        if gross_notional_sum <= 0.0 {
             return None;
         }
 
-        let ngr = (signed_mtm_sum.abs() / gross_mtm_sum).clamp(0.0, 1.0);
+        let ngr = if positive_mtm_sum <= 0.0 {
+            0.0
+        } else {
+            (signed_mtm_sum.max(0.0) / positive_mtm_sum).clamp(0.0, 1.0)
+        };
         let reduction = 0.4 + 0.6 * ngr;
         let rate = self.schedule.rate(asset_class, maturity_years);
         Some(Money::new(
@@ -713,7 +717,7 @@ mod tests {
     }
 
     /// Partially-offset book: NGR ∈ (0, 1); the reduction factor
-    /// interpolates linearly. For Σ MtM = 5M, Σ|MtM| = 15M → NGR = 1/3.
+    /// interpolates linearly. For Σ MtM = 5M, Σ positive MtM = 10M → NGR = 1/2.
     #[test]
     fn ngr_partial_offset_interpolates_reduction_factor() {
         let calc = ScheduleImCalculator::bcbs_standard()
@@ -734,12 +738,40 @@ mod tests {
             .calculate_netting_set_with_ngr(&positions, ScheduleAssetClass::InterestRate, 5.0)
             .expect("NGR computable");
 
-        let ngr = 5.0 / 15.0; // 1/3
-        let reduction = 0.4 + 0.6 * ngr; // 0.6
+        let ngr = 5.0 / 10.0; // 1/2
+        let reduction = 0.4 + 0.6 * ngr; // 0.7
         let expected = 150.0e6 * 0.04 * reduction;
         assert!(
             (im.amount() - expected).abs() < 1e-6,
-            "partial NGR = 1/3 → reduction 0.6, expected {expected}, got {}",
+            "partial NGR = 1/2 -> reduction 0.7, expected {expected}, got {}",
+            im.amount()
+        );
+    }
+
+    #[test]
+    fn ngr_all_negative_book_uses_zero_ngr_floor() {
+        let calc = ScheduleImCalculator::bcbs_standard()
+            .expect("bcbs_standard loads")
+            .with_asset_class(ScheduleAssetClass::InterestRate);
+
+        let positions = vec![
+            (
+                Money::new(-10.0e6, Currency::USD),
+                Money::new(100.0e6, Currency::USD),
+            ),
+            (
+                Money::new(-5.0e6, Currency::USD),
+                Money::new(50.0e6, Currency::USD),
+            ),
+        ];
+        let im = calc
+            .calculate_netting_set_with_ngr(&positions, ScheduleAssetClass::InterestRate, 5.0)
+            .expect("NGR computable");
+
+        let expected = 150.0e6 * 0.04 * 0.4;
+        assert!(
+            (im.amount() - expected).abs() < 1e-6,
+            "all-negative book should use NGR=0 floor, expected {expected}, got {}",
             im.amount()
         );
     }
