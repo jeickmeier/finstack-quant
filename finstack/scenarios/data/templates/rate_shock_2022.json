@@ -2,7 +2,7 @@
   "metadata": {
     "id": "rate_shock_2022",
     "name": "2022 Fed Hiking Cycle",
-    "description": "Inflation-driven 2022 hiking cycle. Sharp rate repricing, wider credit spreads, equity drawdowns, higher volatility, and a stronger USD.",
+    "description": "Inflation-driven 2022 hiking cycle. Sharp rate repricing, wider credit spreads, equity drawdowns, higher volatility, and a stronger USD. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
     "event_date": "2022-06-15",
     "asset_classes": [
       "rates",

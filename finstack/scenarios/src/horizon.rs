@@ -118,11 +118,16 @@ impl Default for HorizonAnalysis {
 
 impl HorizonAnalysis {
     /// Create a new analyzer with the given attribution method and config.
+    ///
+    /// The config is also threaded into the internal [`ScenarioEngine`] so the
+    /// rounding policy stamped into the scenario report reflects the active
+    /// configuration.
     pub fn new(attribution_method: AttributionMethod, config: FinstackConfig) -> Self {
+        let engine = ScenarioEngine::with_config(config.clone());
         Self {
             attribution_method,
             config,
-            engine: ScenarioEngine::new(),
+            engine,
         }
     }
 }
@@ -655,6 +660,7 @@ mod tests {
             expanded_operations: 0,
             warnings: vec![],
             rounding_context: None,
+            time_roll: None,
         }
     }
 

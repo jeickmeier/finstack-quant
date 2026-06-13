@@ -3,7 +3,7 @@
 //! Python bindings for horizon total return analysis.
 
 use crate::bindings::attribution::PyPnlAttribution;
-use crate::bindings::extract::extract_market_ref;
+use crate::bindings::extract::extract_market;
 use crate::errors::display_to_py;
 use pyo3::prelude::*;
 
@@ -31,10 +31,22 @@ use pyo3::prelude::*;
 /// -------
 /// HorizonResult
 ///     Decomposed total return with factor attribution.
+///
+/// Notes
+/// -----
+/// ``total_return_pct`` returns ``nan`` when the initial value and total P&L
+/// are denominated in different currencies (no implicit FX conversion is
+/// applied); ``annualized_return`` returns ``None`` in that case. The
+/// ``initial_value`` / ``terminal_value`` getters return bare amounts — use
+/// ``to_json()`` for the currency-qualified values.
+///
+/// The scenario is applied to an internal copy of the market context; the
+/// caller's ``market`` object is never mutated. The GIL is released while the
+/// scenario and attribution computations run.
 #[pyfunction]
 #[pyo3(signature = (instrument_json, market, as_of, scenario_json, method = "parallel", config = None))]
 pub(crate) fn compute_horizon_return<'py>(
-    _py: Python<'py>,
+    py: Python<'py>,
     instrument_json: &str,
     market: &Bound<'py, PyAny>,
     as_of: &str,
@@ -51,8 +63,8 @@ pub(crate) fn compute_horizon_return<'py>(
     let boxed = inst.into_boxed().map_err(display_to_py)?;
     let instrument: Arc<dyn finstack_valuations::instruments::Instrument> = Arc::from(boxed);
 
-    // Parse market
-    let market_ctx = extract_market_ref(market)?;
+    // Parse market (owned copy so the compute can run without the GIL).
+    let market_ctx = extract_market(market)?;
 
     // Parse date
     let date = super::parse_date(as_of)?;
@@ -84,11 +96,13 @@ pub(crate) fn compute_horizon_return<'py>(
         None => finstack_core::config::FinstackConfig::default(),
     };
 
-    // Run analysis
+    // Run analysis with the GIL released: horizon attribution revalues the
+    // instrument multiple times (potentially rayon-parallel) and can run for
+    // seconds on large books.
     let analyzer =
         finstack_scenarios::horizon::HorizonAnalysis::new(attribution_method, finstack_config);
-    let result = analyzer
-        .compute(&instrument, &market_ctx, date, &scenario)
+    let result = py
+        .detach(|| analyzer.compute(&instrument, &market_ctx, date, &scenario))
         .map_err(display_to_py)?;
 
     Ok(PyHorizonResult { inner: result })

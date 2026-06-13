@@ -175,7 +175,16 @@ pub fn build_scenario_spec(
 /// Apply a scenario to a market context and financial model.
 ///
 /// Returns a JSON object with `market_json`, `model_json`,
-/// `operations_applied`, `user_operations`, `expanded_operations`, and `warnings`.
+/// `operations_applied`, `user_operations`, `expanded_operations`,
+/// `rounding_context` (active rounding-mode stamp), `time_roll` (a
+/// `RollForwardReport`, only present when the scenario contained a
+/// `time_roll_forward` operation), and `warnings`.
+///
+/// This entry point supplies no instrument portfolio and no holiday calendar
+/// to the engine: instrument-scoped operations (`instrument_price_pct_by_*`,
+/// `instrument_spread_bp_by_*`, correlation shocks) are inert and produce a
+/// warning, and `time_roll_forward` in `business_days` mode adjusts without
+/// holiday information.
 #[wasm_bindgen(js_name = applyScenario)]
 pub fn apply_scenario(
     scenario_json: &str,
@@ -197,6 +206,9 @@ pub fn apply_scenario(
 }
 
 /// Apply a scenario to a market context only (no model mutations).
+///
+/// Returns the same envelope shape as [`apply_scenario`] minus `model_json`;
+/// the same caveats apply (no instrument portfolio, no holiday calendar).
 #[wasm_bindgen(js_name = applyScenarioToMarket)]
 pub fn apply_scenario_to_market(
     scenario_json: &str,

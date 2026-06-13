@@ -22,6 +22,11 @@ fn set_report_items(
     dict.set_item("operations_applied", report.operations_applied)?;
     dict.set_item("user_operations", report.user_operations)?;
     dict.set_item("expanded_operations", report.expanded_operations)?;
+    dict.set_item("rounding_context", report.rounding_context.as_deref())?;
+    if let Some(time_roll) = &report.time_roll {
+        let time_roll_json = serde_json::to_string(time_roll).map_err(display_to_py)?;
+        dict.set_item("time_roll_json", time_roll_json)?;
+    }
     set_warning_items(dict, &report.warnings)
 }
 
@@ -62,7 +67,19 @@ fn apply_with_context(
 ///     Dict with ``market_json`` (modified market), ``model_json`` (modified
 ///     model), ``operations_applied`` (int), ``user_operations`` (int, count of
 ///     user-provided operations before hierarchy expansion), ``expanded_operations``
-///     (int, count after expansion), and ``warnings`` (list[str]).
+///     (int, count after expansion), ``rounding_context`` (str | None, active
+///     rounding-mode stamp), ``time_roll_json`` (str, JSON ``RollForwardReport``;
+///     only present when the scenario contained a ``time_roll_forward``
+///     operation), and ``warnings`` (list[str]).
+///
+/// Notes
+/// -----
+/// This entry point supplies no instrument portfolio and no holiday calendar
+/// to the engine, so instrument-scoped operations
+/// (``instrument_price_pct_by_*``, ``instrument_spread_bp_by_*``,
+/// ``asset_correlation_pts``, ``prepay_default_correlation_pts``) are inert
+/// and produce a warning, and ``time_roll_forward`` in ``business_days`` mode
+/// adjusts without holiday information.
 #[pyfunction]
 fn apply_scenario<'py>(
     py: Python<'py>,
@@ -113,7 +130,15 @@ fn apply_scenario<'py>(
 /// -------
 /// dict
 ///     Dict with ``market_json`` (modified market), ``operations_applied``,
-///     ``user_operations``, ``expanded_operations``, and ``warnings``.
+///     ``user_operations``, ``expanded_operations``, ``rounding_context``,
+///     ``time_roll_json`` (only when a ``time_roll_forward`` operation ran),
+///     and ``warnings``.
+///
+/// Notes
+/// -----
+/// As with ``apply_scenario``, no instrument portfolio or holiday calendar is
+/// supplied: instrument-scoped operations are inert (with a warning) and
+/// business-day time rolls adjust without holiday information.
 #[pyfunction]
 fn apply_scenario_to_market<'py>(
     py: Python<'py>,

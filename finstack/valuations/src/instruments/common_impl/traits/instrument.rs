@@ -410,6 +410,26 @@ pub trait Instrument: CashflowProvider + Send + Sync {
             .map(|overrides| &overrides.scenario)
     }
 
+    /// Whether this instrument's pricer consumes
+    /// [`ScenarioPricingOverrides::scenario_spread_shock_bp`](crate::instruments::pricing_overrides::ScenarioPricingOverrides::scenario_spread_shock_bp)
+    /// in its current configuration.
+    ///
+    /// Scenario engines use this to route instrument-level spread shocks: when
+    /// `true`, the shock is accumulated into the scenario overrides and applied
+    /// as an additional flat Z-spread during valuation; when `false`, callers
+    /// must fall back to other mechanisms (e.g. metadata tagging or curve-level
+    /// shocks) because setting the override would either be ignored or rejected
+    /// at pricing time.
+    ///
+    /// The default implementation returns `false`. Implementations should
+    /// return `true` only when the shock is consumed exactly (no silent
+    /// no-ops): e.g. `Bond` returns `true` for bonds without embedded options,
+    /// without an assigned credit curve, and without a price-pinning quote
+    /// override other than `quoted_z_spread`.
+    fn scenario_spread_shock_supported(&self) -> bool {
+        false
+    }
+
     /// Clone this instrument as a boxed trait object.
     ///
     /// Enables cloning instruments behind trait objects. Required because

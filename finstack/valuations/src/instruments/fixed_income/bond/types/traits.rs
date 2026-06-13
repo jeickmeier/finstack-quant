@@ -17,6 +17,56 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
     ) -> finstack_core::Result<finstack_core::money::Money> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions;
 
+        // Scenario spread shock: applied as an additional flat Z-spread on top
+        // of either the quoted Z-spread or the curve-implied (zero-spread)
+        // price. Restricted to configurations where that is exact — vanilla
+        // discount-priced bonds — so the shock can never silently no-op:
+        // unsupported configurations error with guidance instead.
+        if let Some(shock_bp) = self.pricing_overrides.scenario.scenario_spread_shock_bp {
+            if self
+                .call_put
+                .as_ref()
+                .is_some_and(super::definitions::CallPutSchedule::has_options)
+            {
+                return Err(finstack_core::Error::Validation(format!(
+                    "scenario_spread_shock_bp is not supported for bond '{}' with embedded \
+                     options; shock the discount curve or use quoted_oas instead",
+                    self.id
+                )));
+            }
+            if self.credit_curve_id.is_some() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "scenario_spread_shock_bp is not supported for hazard-priced bond '{}' \
+                     (credit curve assigned); bump the hazard curve instead (e.g. a par-CDS \
+                     curve shock)",
+                    self.id
+                )));
+            }
+            if self
+                .pricing_overrides
+                .market_quotes
+                .has_non_z_price_driver()
+            {
+                return Err(finstack_core::Error::Validation(format!(
+                    "scenario_spread_shock_bp on bond '{}' conflicts with a price-pinning \
+                     quote override; remove the quote or quote via quoted_z_spread so the \
+                     shock can compose additively",
+                    self.id
+                )));
+            }
+            let z_eff = self
+                .pricing_overrides
+                .market_quotes
+                .quoted_z_spread
+                .unwrap_or(0.0)
+                + shock_bp * 1e-4;
+            let dirty_ccy = quote_conversions::price_from_z_spread(self, curves, as_of, z_eff)?;
+            return Ok(finstack_core::money::Money::new(
+                dirty_ccy,
+                self.notional.currency(),
+            ));
+        }
+
         // Honor any bond price-from-quote override (clean, dirty, YTM, YTW,
         // Z-spread, OAS, DM, I-spread, ASW). Mutual exclusivity is enforced by
         // `MarketQuoteOverrides::validate`.
@@ -65,6 +115,21 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
         Some(&mut self.pricing_overrides)
+    }
+
+    fn scenario_spread_shock_supported(&self) -> bool {
+        // Mirrors the guards in `base_value`: the shock is exact only for
+        // bonds without embedded options, without an assigned credit curve,
+        // and without a price-pinning quote other than `quoted_z_spread`.
+        !self
+            .call_put
+            .as_ref()
+            .is_some_and(super::definitions::CallPutSchedule::has_options)
+            && self.credit_curve_id.is_none()
+            && !self
+                .pricing_overrides
+                .market_quotes
+                .has_non_z_price_driver()
     }
 
     fn pricing_overrides(

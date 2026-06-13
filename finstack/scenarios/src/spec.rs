@@ -774,8 +774,14 @@ pub enum VolSurfaceKind {
 ///
 /// [`TenorMatchMode::Exact`] requires the requested tenor to coincide with an
 /// existing pillar. [`TenorMatchMode::Interpolate`] instead distributes the
-/// bump across adjacent knots using the interpolation policy implemented by the
-/// adapter.
+/// bump across the two adjacent knots, rescaled so the interpolated curve
+/// moves by **exactly the requested basis points at the requested tenor**
+/// (minimum-norm pillar perturbation). The adjacent pillars themselves move
+/// by `bp · w / Σw²`, which can slightly exceed `bp` (at most ~1.21×) for
+/// asymmetric placements; on-pillar requests reduce to a single full-size
+/// pillar bump. Delivery is exact for directly-bumped curves (forward,
+/// commodity, vol-index, hazard direct shift) and first-order accurate for
+/// solve-to-par recalibration paths (discount, par-CDS, inflation).
 ///
 /// # Examples
 /// ```rust

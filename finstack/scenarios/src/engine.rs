@@ -26,11 +26,8 @@ use finstack_statements::FinancialModelSpec;
 use finstack_valuations::instruments::Instrument;
 use indexmap::IndexMap;
 
-fn rounding_stamp() -> Option<String> {
-    Some(format!(
-        "{:?}",
-        finstack_core::config::RoundingMode::default()
-    ))
+fn rounding_stamp(config: &finstack_core::config::FinstackConfig) -> Option<String> {
+    Some(config.rounding.mode.to_string())
 }
 
 /// Execution context for scenario application.
@@ -107,6 +104,7 @@ pub struct ExecutionContext<'a> {
 ///     expanded_operations: 3,
 ///     warnings: vec![],
 ///     rounding_context: Some("default".into()),
+///     time_roll: None,
 /// };
 ///
 /// assert_eq!(report.operations_applied, 3);
@@ -138,6 +136,14 @@ pub struct ApplicationReport {
 
     /// Rounding context stamp (for determinism tracking).
     pub rounding_context: Option<String>,
+
+    /// Roll-forward report from the Phase 0 `TimeRollForward` operation,
+    /// when the scenario contained one. Carries the per-instrument carry
+    /// decomposition and the new valuation date; instruments whose valuation
+    /// failed during the roll are also surfaced as
+    /// [`Warning::TimeRollInstrumentFailed`] entries in `warnings`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_roll: Option<crate::adapters::RollForwardReport>,
 }
 
 /// JSON envelope returned after applying a scenario to market data and,
@@ -157,6 +163,12 @@ pub struct ApplicationEnvelope {
     pub expanded_operations: usize,
     /// Structured warnings produced while applying the scenario.
     pub warnings: Vec<Warning>,
+    /// Rounding context stamp from the report (active rounding mode).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rounding_context: Option<String>,
+    /// Roll-forward report, when the scenario contained a time-roll operation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_roll: Option<crate::adapters::RollForwardReport>,
 }
 
 impl ApplicationEnvelope {
@@ -178,6 +190,8 @@ impl ApplicationEnvelope {
             user_operations: report.user_operations,
             expanded_operations: report.expanded_operations,
             warnings: report.warnings,
+            rounding_context: report.rounding_context,
+            time_roll: report.time_roll,
         })
     }
 }
@@ -325,6 +339,51 @@ fn expand_matches(
         .collect()
 }
 
+/// Drop hierarchy-resolved identifiers that do not exist in the market
+/// collection the operation targets, emitting a
+/// [`Warning::HierarchyResolvedIdSkipped`] per dropped id.
+///
+/// Hierarchy nodes share a single `curve_ids` collection across curves, vol
+/// surfaces, equity prices, and base-correlation surfaces. Without this
+/// filter, a node grouping mixed content would expand into direct operations
+/// that hard-error with `MarketDataNotFound` mid-apply — the wrong failure
+/// mode for machine-derived ids the user never typed.
+fn retain_existing_targets(
+    matches: Vec<HierarchyResolvedMatch>,
+    op_kind: &str,
+    warnings: &mut Vec<Warning>,
+    exists: impl Fn(&CurveId) -> bool,
+) -> Vec<HierarchyResolvedMatch> {
+    let mut kept = Vec::with_capacity(matches.len());
+    for m in matches {
+        if exists(&m.curve_id) {
+            kept.push(m);
+        } else {
+            warnings.push(Warning::HierarchyResolvedIdSkipped {
+                curve_id: m.curve_id.as_str().to_string(),
+                op_kind: op_kind.to_string(),
+            });
+        }
+    }
+    kept
+}
+
+/// Whether `id` exists in the market collection corresponding to `curve_kind`.
+fn curve_kind_target_exists(
+    market: &finstack_core::market_data::context::MarketContext,
+    curve_kind: crate::spec::CurveKind,
+    id: &CurveId,
+) -> bool {
+    use crate::spec::CurveKind;
+    match curve_kind {
+        // Commodity curves are stored in the discount collection.
+        CurveKind::Discount | CurveKind::Commodity => market.get_discount(id.as_str()).is_ok(),
+        CurveKind::Forward => market.get_forward(id.as_str()).is_ok(),
+        CurveKind::ParCDS => market.get_hazard(id.as_str()).is_ok(),
+        CurveKind::Inflation => market.get_inflation_curve(id.as_str()).is_ok(),
+    }
+}
+
 /// Expand hierarchy-targeted operations into direct-targeted operations.
 ///
 /// Errors if the spec contains hierarchy operations but the market context has
@@ -334,7 +393,10 @@ fn expand_matches(
 ///
 /// When a hierarchy target resolves to zero curves the operation is dropped
 /// from the expanded list and a [`Warning::HierarchyNoMatch`] is emitted so
-/// the caller can detect the (likely-unintended) no-op.
+/// the caller can detect the (likely-unintended) no-op. Resolved identifiers
+/// that exist in the hierarchy but not in the market collection the operation
+/// targets are skipped with a [`Warning::HierarchyResolvedIdSkipped`] instead
+/// of aborting the scenario at apply time.
 ///
 /// Returns a borrowed slice equivalent (via `Cow`) when the input contains no
 /// hierarchy variants, avoiding an unnecessary clone of the operation list.
@@ -384,6 +446,12 @@ fn expand_hierarchy_operations<'a>(
                         op_kind: "HierarchyCurveParallelBp".to_string(),
                     });
                 }
+                let matches = retain_existing_targets(
+                    matches,
+                    "HierarchyCurveParallelBp",
+                    &mut warnings,
+                    |id| curve_kind_target_exists(market, *curve_kind, id),
+                );
                 let exps = expand_matches(matches, |curve_id| {
                     (
                         HierarchyExpansionKey::Curve {
@@ -412,6 +480,12 @@ fn expand_hierarchy_operations<'a>(
                         op_kind: "HierarchyVolSurfaceParallelPct".to_string(),
                     });
                 }
+                let matches = retain_existing_targets(
+                    matches,
+                    "HierarchyVolSurfaceParallelPct",
+                    &mut warnings,
+                    |id| market.get_surface(id.as_str()).is_ok(),
+                );
                 let exps = expand_matches(matches, |curve_id| {
                     (
                         HierarchyExpansionKey::VolSurface {
@@ -435,6 +509,12 @@ fn expand_hierarchy_operations<'a>(
                         op_kind: "HierarchyEquityPricePct".to_string(),
                     });
                 }
+                let matches = retain_existing_targets(
+                    matches,
+                    "HierarchyEquityPricePct",
+                    &mut warnings,
+                    |id| market.get_price(id.as_str()).is_ok(),
+                );
                 let exps = expand_matches(matches, |curve_id| {
                     (
                         HierarchyExpansionKey::EquityPrice {
@@ -456,6 +536,12 @@ fn expand_hierarchy_operations<'a>(
                         op_kind: "HierarchyBaseCorrParallelPts".to_string(),
                     });
                 }
+                let matches = retain_existing_targets(
+                    matches,
+                    "HierarchyBaseCorrParallelPts",
+                    &mut warnings,
+                    |id| market.get_base_correlation(id.as_str()).is_ok(),
+                );
                 let exps = expand_matches(matches, |curve_id| {
                     (
                         HierarchyExpansionKey::BaseCorrelation {
@@ -655,16 +741,19 @@ fn generate_effects(op: &OperationSpec, ctx: &ExecutionContext) -> Result<Vec<Sc
 
 /// Orchestrates the deterministic application of a [`ScenarioSpec`].
 ///
-/// The engine is intentionally lightweight: it does not own any state and can
-/// be cloned or reused freely. All mutable inputs are supplied via
-/// [`ExecutionContext`].
+/// The engine is intentionally lightweight: it owns only an immutable
+/// [`FinstackConfig`](finstack_core::config::FinstackConfig) (used to stamp
+/// the active rounding policy into reports) and can be cloned or reused
+/// freely. All mutable inputs are supplied via [`ExecutionContext`].
 #[derive(Debug, Default, Clone)]
 pub struct ScenarioEngine {
-    _private: (),
+    /// Active configuration; its rounding mode is stamped into
+    /// [`ApplicationReport::rounding_context`].
+    config: finstack_core::config::FinstackConfig,
 }
 
 impl ScenarioEngine {
-    /// Create a new scenario engine with default settings.
+    /// Create a new scenario engine with the default [`FinstackConfig`](finstack_core::config::FinstackConfig).
     ///
     /// # Examples
     /// ```rust
@@ -677,6 +766,16 @@ impl ScenarioEngine {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create a scenario engine carrying the caller's active configuration.
+    ///
+    /// The configuration's rounding mode is stamped into
+    /// [`ApplicationReport::rounding_context`] so reports reflect the policy
+    /// actually in force rather than the library default.
+    #[must_use]
+    pub fn with_config(config: finstack_core::config::FinstackConfig) -> Self {
+        Self { config }
     }
 
     pub(crate) fn compose_inner(&self, mut scenarios: Vec<ScenarioSpec>) -> ScenarioSpec {
@@ -771,6 +870,17 @@ impl ScenarioEngine {
     /// If a [`crate::spec::OperationSpec::TimeRollForward`] sets
     /// `apply_shocks = false`, the engine returns immediately after phase 0 and
     /// does not apply the remaining operations in `spec`.
+    ///
+    /// # Atomicity
+    ///
+    /// Application is **not atomic**: operations mutate `ctx.market` (and the
+    /// statement model) in place as they execute. If a later operation fails —
+    /// for example a curve id that does not exist in the market — the engine
+    /// returns `Err` with all earlier operations already applied and no
+    /// rollback. Callers that need all-or-nothing semantics should apply the
+    /// scenario to a clone of the market context and swap it in on success
+    /// (the Python and WASM bindings do exactly this by operating on
+    /// deserialized copies).
     #[tracing::instrument(skip_all, fields(scenario_id = %spec.id))]
     pub fn apply(
         &self,
@@ -801,6 +911,7 @@ impl ScenarioEngine {
 
         // Phase 0: Time Roll Forward (`spec.validate()` already enforced the
         // at-most-one invariant; no need to re-count here.)
+        let mut time_roll: Option<crate::adapters::RollForwardReport> = None;
         for op in expanded_ops.iter() {
             if let OperationSpec::TimeRollForward {
                 period,
@@ -809,16 +920,31 @@ impl ScenarioEngine {
             } = op
             {
                 let _span = tracing::info_span!("phase_0_time_roll", period = %period).entered();
-                crate::adapters::time_roll::apply_time_roll_forward(ctx, period, *roll_mode)?;
+                let roll_report =
+                    crate::adapters::time_roll::apply_time_roll_forward(ctx, period, *roll_mode)?;
                 applied += 1;
 
-                if !*apply_shocks {
+                // Valuation failures during the roll must not vanish: surface
+                // each as a structured warning so callers that only inspect
+                // the ApplicationReport still see them.
+                for (instrument_id, reason) in &roll_report.failed_instruments {
+                    warnings.push(Warning::TimeRollInstrumentFailed {
+                        instrument_id: instrument_id.clone(),
+                        reason: reason.clone(),
+                    });
+                }
+
+                let stop_after_roll = !*apply_shocks;
+                time_roll = Some(roll_report);
+
+                if stop_after_roll {
                     return Ok(ApplicationReport {
                         operations_applied: applied,
                         user_operations,
                         expanded_operations,
                         warnings,
-                        rounding_context: rounding_stamp(),
+                        rounding_context: rounding_stamp(&self.config),
+                        time_roll,
                     });
                 }
             }
@@ -1019,7 +1145,8 @@ impl ScenarioEngine {
             user_operations,
             expanded_operations,
             warnings,
-            rounding_context: rounding_stamp(),
+            rounding_context: rounding_stamp(&self.config),
+            time_roll,
         })
     }
 }

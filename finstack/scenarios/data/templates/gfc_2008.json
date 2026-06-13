@@ -2,7 +2,7 @@
   "metadata": {
     "id": "gfc_2008",
     "name": "Global Financial Crisis 2008",
-    "description": "Lehman Brothers collapse and ensuing global credit crisis. Severe flight-to-quality in rates, massive credit spread widening, equity crash, and volatility spike.",
+    "description": "Lehman Brothers collapse and ensuing global credit crisis. Severe flight-to-quality in rates, massive credit spread widening, equity crash, and volatility spike. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
     "event_date": "2008-09-15",
     "asset_classes": [
       "rates",

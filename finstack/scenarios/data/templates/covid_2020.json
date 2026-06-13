@@ -2,7 +2,7 @@
   "metadata": {
     "id": "covid_2020",
     "name": "COVID 2020 Market Shock",
-    "description": "Pandemic-driven market dislocation in March 2020. Emergency rate cuts, sharp credit widening, an equity crash, volatility spike, and broad USD strength.",
+    "description": "Pandemic-driven market dislocation in March 2020. Emergency rate cuts, sharp credit widening, an equity crash, volatility spike, and broad USD strength. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
     "event_date": "2020-03-16",
     "asset_classes": [
       "rates",

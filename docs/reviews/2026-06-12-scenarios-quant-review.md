@@ -3,7 +3,20 @@
 **Date:** 2026-06-12
 **Scope:** `finstack/scenarios` (spec, engine, all adapters, horizon, templates incl. embedded JSON data), `finstack-py/src/bindings/scenarios/` (mod, engine, horizon, operation_spec), `finstack-wasm/src/api/scenarios/`, parity contract section.
 **Method:** Full read of spec.rs, engine.rs, utils.rs, horizon.rs, warning.rs, traits.rs, all adapters (curves, vol, fx, time_roll, statements, instruments, basecorr, equity), templates/registry.rs + the five embedded template JSONs, and both binding surfaces. Cross-crate verification of shock consumers in `finstack-valuations` (pricing_overrides, calibration/bumps) via grep + targeted reads. Every finding cites file:line. No code changes; tests were not executed.
-**Status:** Findings reported, **remediation not started**.
+**Status:** Remediation **COMPLETE** (2026-06-12, same day). All findings fixed except the deliberate carve-outs noted below. Verified: `cargo nextest run -p finstack-scenarios` (258/258), targeted `finstack-valuations` bond/overrides tests, `mise run rust-lint`, `mise run wasm-lint`.
+
+## Remediation Summary
+
+- **M-1 — fixed.** `ScenarioPricingOverrides.scenario_spread_shock_bp` added (valuations); `Bond::base_value` consumes it as an additional flat Z-spread (additive on `quoted_z_spread`, exact vs. model price otherwise — pinned by test `bond_value_applies_scenario_spread_shock_as_flat_z_spread`). New `Instrument::scenario_spread_shock_supported()` capability flag routes the scenarios adapter: supported instruments get the typed override; everything else keeps the metadata fallback + warning. Unsupported configurations with the override set manually (callable, hazard-priced, price-pinned bonds) **error at pricing time** with guidance instead of silently no-opping. *Carve-out:* hazard-priced bonds and non-bond credit instruments still use the fallback path — shock the hazard curve (`par_cds` op) for those; the `svb_2023` template description now states the portfolio requirement.
+- **M-2 — fixed.** `resolve_bump_targets` rescales interpolation weights by `1/Σw²` (minimum-norm pillar perturbation), so the curve moves by exactly the requested bp at the requested tenor. Exact for directly-bumped curves, first-order for solve-to-par paths. Magnitude pinned by `test_tenor_interpolate_delivers_full_bump_at_requested_tenor`.
+- **M-3 — fixed.** `ApplicationReport.time_roll: Option<RollForwardReport>` (serde-additive) carries the carry decomposition; `failed_instruments` are surfaced as `Warning::TimeRollInstrumentFailed`. Exposed through `ApplicationEnvelope` (WASM) and as `time_roll_json` in the Python report dict.
+- **MO-1 — fixed.** `ScenarioEngine` now holds a `FinstackConfig` (`with_config`); the report stamps the *active* rounding mode. `HorizonAnalysis::new` threads its config into the engine.
+- **MO-2 — fixed (documented).** `apply` docs now state non-atomicity and the clone-and-swap pattern for all-or-nothing semantics.
+- **MO-3 — fixed.** Hierarchy expansion filters resolved ids by existence in the kind-appropriate market collection; mismatches emit `Warning::HierarchyResolvedIdSkipped` instead of aborting mid-apply.
+- **MO-4 — partially fixed.** Python report dict now includes `rounding_context` and `time_roll_json`; py/wasm docstrings state which operations are inert without a portfolio/calendar. *Carve-out:* bindings still do not accept instruments/calendar inputs (deliberate scope decision; revisit if Python-side instrument shocks are needed).
+- **MO-5 — fixed.** `compute_horizon_return` releases the GIL (`py.detach`, owned market copy); NaN sentinel and currency caveats documented.
+- **MI-1 — fixed** (spot positivity is now a hard error, same policy as knots). **MI-2 — fixed** (credit-triangle magnitude bias stated in the fallback warning). **MI-3 — fixed** (placeholder-id note appended to all five template descriptions). **MI-4/MI-5 — fixed** (naming-assumption and lookup-order docs).
+- *Drive-by:* fixed pre-existing `finstack-py` compile breakage (`allow_threads` → `detach` in `factor_model/credit.rs`, committed in f382e85d7) and a pre-existing unused import in `attribution/pnl_attribution.rs`.
 
 ---
 

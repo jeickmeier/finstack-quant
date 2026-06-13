@@ -111,6 +111,13 @@ pub fn apply_forecast_assign(
 }
 
 /// Update a statement rate node using a full [`RateBindingSpec`].
+///
+/// # Curve lookup order
+///
+/// The binding's `curve_id` is resolved against the **discount** collection
+/// first, then the **forward** collection. If the same identifier exists in
+/// both, the discount curve wins and the forward curve is never consulted —
+/// use distinct identifiers per collection when both must be addressable.
 pub fn update_rate_from_binding(
     binding: &RateBindingSpec,
     model: &mut FinancialModelSpec,

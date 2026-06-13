@@ -196,6 +196,28 @@ pub enum Warning {
         /// Operation kind name (e.g., `"HierarchyCurveParallelBp"`).
         op_kind: String,
     },
+
+    /// A hierarchy-resolved identifier was skipped because it does not exist
+    /// in the market collection targeted by the operation kind (e.g. a
+    /// `HierarchyCurveParallelBp { curve_kind: Discount }` matched an id that
+    /// is an equity price or vol surface, not a discount curve). The remaining
+    /// resolved identifiers are still applied.
+    HierarchyResolvedIdSkipped {
+        /// The resolved identifier that was skipped.
+        curve_id: String,
+        /// Operation kind name (e.g., `"HierarchyCurveParallelBp"`).
+        op_kind: String,
+    },
+
+    /// An instrument's valuation failed while computing carry during a
+    /// `TimeRollForward` operation. The instrument is excluded from the
+    /// roll-forward carry aggregation but the roll itself proceeds.
+    TimeRollInstrumentFailed {
+        /// Instrument identifier.
+        instrument_id: String,
+        /// Underlying valuation error message.
+        reason: String,
+    },
 }
 
 impl fmt::Display for Warning {
@@ -210,7 +232,10 @@ impl fmt::Display for Warning {
                 "Hazard curve '{curve_id}' {kind} shock: par-CDS recalibration failed ({reason}); \
                  applied direct hazard-rate shift instead. Risk-neutral default probabilities will be \
                  additively shifted by the requested bp amount {target} rather than re-solved from \
-                 par spreads, which can materially change CS01 for sharply sloped curves.",
+                 par spreads, which can materially change CS01 for sharply sloped curves. Note \
+                 the magnitude bias: by the credit triangle (dLambda ~ dSpread / (1 - R)), a \
+                 direct hazard shift of the par-spread bp under-shocks default intensities by \
+                 roughly the factor (1 - recovery).",
                 kind = if *node { "node" } else { "parallel" },
                 target = if *node { "at the targeted pillars" } else { "at each pillar" },
             ),
@@ -294,6 +319,20 @@ impl fmt::Display for Warning {
                 f,
                 "Hierarchy operation '{op_kind}' targeting '{target_path}' matched no curves; \
                  the target path may exist but be empty, or its tag filter excluded everything."
+            ),
+            Warning::HierarchyResolvedIdSkipped { curve_id, op_kind } => write!(
+                f,
+                "Hierarchy operation '{op_kind}' resolved id '{curve_id}', which does not exist \
+                 in the market collection that operation targets; skipped. Check that the \
+                 hierarchy node groups only identifiers of the targeted kind."
+            ),
+            Warning::TimeRollInstrumentFailed {
+                instrument_id,
+                reason,
+            } => write!(
+                f,
+                "Time roll-forward: valuation of instrument '{instrument_id}' failed ({reason}); \
+                 it was excluded from the roll-forward carry aggregation."
             ),
         }
     }

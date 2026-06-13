@@ -2,7 +2,7 @@
   "metadata": {
     "id": "svb_2023",
     "name": "SVB / Regional Banking Crisis 2023",
-    "description": "March 2023 regional banking stress after Silicon Valley Bank failed. Front-end rates rallied, regional bank spreads widened, equities sold off, volatility rose, and the USD strengthened modestly.",
+    "description": "March 2023 regional banking stress after Silicon Valley Bank failed. Front-end rates rallied, regional bank spreads widened, equities sold off, volatility rose, and the USD strengthened modestly. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data. The credit component is an instrument-level spread shock and requires a portfolio of instruments in the execution context to take effect.",
     "event_date": "2023-03-10",
     "asset_classes": [
       "rates",

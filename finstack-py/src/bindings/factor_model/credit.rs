@@ -223,7 +223,7 @@ impl PyCreditCalibrator {
         let inputs: finstack_factor_model::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(display_to_py)?;
         let model = py
-            .allow_threads(|| self.inner.calibrate(inputs))
+            .detach(|| self.inner.calibrate(inputs))
             .map_err(core_to_py)?;
         Ok(PyCreditFactorModel::from_inner(model))
     }
@@ -631,7 +631,7 @@ impl PyFactorCovarianceForecast {
     fn covariance_at(&self, py: Python<'_>, horizon: &str) -> PyResult<String> {
         let h = parse_vol_horizon(horizon)?;
         let cov = py
-            .allow_threads(|| {
+            .detach(|| {
                 let forecast =
                     finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
                 forecast.covariance_at(h)
@@ -655,7 +655,7 @@ impl PyFactorCovarianceForecast {
     fn idiosyncratic_vol(&self, py: Python<'_>, issuer_id: &str, horizon: &str) -> PyResult<f64> {
         let h = parse_vol_horizon(horizon)?;
         let id = finstack_core::types::IssuerId::new(issuer_id);
-        py.allow_threads(|| {
+        py.detach(|| {
             let forecast =
                 finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
             forecast.idiosyncratic_vol(&id, h)
@@ -690,7 +690,7 @@ impl PyFactorCovarianceForecast {
         let measure: finstack_factor_model::RiskMeasure =
             serde_json::from_str(risk_measure_json).map_err(display_to_py)?;
         let config = py
-            .allow_threads(|| {
+            .detach(|| {
                 let forecast =
                     finstack_portfolio::factor_model::FactorCovarianceForecast::new(&self.model);
                 forecast.factor_model_config_at(h, measure)

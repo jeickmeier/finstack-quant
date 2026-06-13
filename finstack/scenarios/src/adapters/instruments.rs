@@ -151,14 +151,31 @@ where
                 }
             }
             ShockKind::Spread => {
-                let label = instrument_label(instrument.attributes());
-                let type_name = format!("{:?}", instrument.key());
-                accumulate_meta_shock(instrument.attributes_mut(), kind.meta_key(), delta);
-                warnings.push(Warning::InstrumentShockFallback {
-                    shock_kind: kind.label().to_string(),
-                    inst_type: type_name,
-                    label,
-                });
+                // First-class path: pricers that consume the shock exactly
+                // (e.g. vanilla bonds via flat Z-spread repricing) accumulate
+                // it in the scenario overrides. Everything else falls back to
+                // metadata tagging with an explicit warning so the shock never
+                // silently no-ops.
+                let routed = instrument.scenario_spread_shock_supported()
+                    && instrument
+                        .scenario_overrides_mut()
+                        .map(|overrides| {
+                            overrides.scenario_spread_shock_bp = Some(accumulate_optional_shock(
+                                overrides.scenario_spread_shock_bp,
+                                delta,
+                            ));
+                        })
+                        .is_some();
+                if !routed {
+                    let label = instrument_label(instrument.attributes());
+                    let type_name = format!("{:?}", instrument.key());
+                    accumulate_meta_shock(instrument.attributes_mut(), kind.meta_key(), delta);
+                    warnings.push(Warning::InstrumentShockFallback {
+                        shock_kind: kind.label().to_string(),
+                        inst_type: type_name,
+                        label,
+                    });
+                }
             }
         }
         count += 1;

@@ -167,22 +167,111 @@ fn test_instrument_type_spread_shock_matching() {
     let report = engine.apply(&scenario, &mut ctx).unwrap();
     assert_eq!(report.operations_applied, 1);
 
-    // Spread shocks no longer have a typed override field; they are recorded as
-    // instrument metadata for downstream consumers (e.g., curve-bump adapters).
-    let meta = &instruments[0].attributes().meta;
-    assert!(
-        meta.contains_key("scenario_spread_shock_bp"),
-        "spread shock should be recorded in instrument metadata"
-    );
-    let stored: f64 = meta
-        .get("scenario_spread_shock_bp")
-        .expect("metadata key")
-        .parse()
-        .expect("finite f64");
+    // Vanilla bonds consume the spread shock via the typed scenario override
+    // (applied as an additional flat Z-spread at valuation); no metadata
+    // fallback and no fallback warning.
+    let overrides = instruments[0]
+        .scenario_overrides()
+        .expect("bond exposes scenario overrides");
+    let stored = overrides
+        .scenario_spread_shock_bp
+        .expect("spread shock should be stored in scenario overrides");
     assert!(
         (stored - 100.0).abs() < 1e-6,
-        "Expected 100.0 bp in metadata, got {}",
-        stored
+        "Expected 100.0 bp in scenario overrides, got {stored}"
+    );
+    assert!(
+        !instruments[0]
+            .attributes()
+            .meta
+            .contains_key("scenario_spread_shock_bp"),
+        "first-class path must not also write the metadata fallback"
+    );
+    assert!(
+        report.warnings.is_empty(),
+        "no fallback warning expected, got {:?}",
+        report.warnings
+    );
+}
+
+/// The spread shock must move PV: a +100bp flat Z-spread widening lowers a
+/// vanilla bond's value, and the magnitude is consistent with discounting at
+/// curve + 100bp.
+#[test]
+fn test_instrument_spread_shock_moves_bond_pv() {
+    use finstack_core::market_data::term_structures::DiscountCurve;
+    use finstack_valuations::instruments::fixed_income::bond::CashflowSpec;
+
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let curve = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .knots(vec![(0.0, 1.0), (1.0, 0.96), (5.0, 0.82)])
+        .build()
+        .unwrap();
+    let mut market = MarketContext::new().insert(curve);
+    let mut model = FinancialModelSpec::new("test", vec![]);
+
+    let bond = Bond::builder()
+        .id("BOND1".into())
+        .notional(finstack_core::money::Money::new(1_000_000.0, Currency::USD))
+        .issue_date(base_date)
+        .maturity(base_date + time::Duration::days(1825))
+        .cashflow_spec(
+            CashflowSpec::fixed(
+                0.05,
+                finstack_core::dates::Tenor::annual(),
+                finstack_core::dates::DayCount::Thirty360,
+            )
+            .expect("finite test coupon"),
+        )
+        .discount_curve_id(finstack_core::types::CurveId::new("USD-OIS"))
+        .credit_curve_id_opt(None)
+        .pricing_overrides(PricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .unwrap();
+
+    let pv_base = bond.value(&market, base_date).expect("base PV").amount();
+
+    let mut instruments: Vec<Box<dyn Instrument>> = vec![Box::new(bond)];
+    let scenario = ScenarioSpec {
+        id: "spread_widening".into(),
+        name: None,
+        description: None,
+        operations: vec![OperationSpec::InstrumentSpreadBpByType {
+            instrument_types: vec![InstrumentType::Bond],
+            bp: 100.0,
+        }],
+        priority: 0,
+        resolution_mode: Default::default(),
+    };
+
+    let engine = ScenarioEngine::new();
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: Some(&mut model),
+        instruments: Some(&mut instruments),
+        rate_bindings: None,
+        calendar: None,
+        as_of: base_date,
+    };
+    engine.apply(&scenario, &mut ctx).unwrap();
+
+    let pv_shocked = instruments[0]
+        .value(&market, base_date)
+        .expect("shocked PV")
+        .amount();
+
+    assert!(
+        pv_shocked < pv_base,
+        "+100bp spread widening must lower PV: base {pv_base}, shocked {pv_shocked}"
+    );
+    // ~5y bond: 100bp widening should move PV by roughly 4-5% of notional;
+    // assert a loose band so the test pins economics without overfitting.
+    let drop = pv_base - pv_shocked;
+    assert!(
+        drop > 20_000.0 && drop < 60_000.0,
+        "PV drop {drop} outside plausible 100bp spread-duration band"
     );
 }
 

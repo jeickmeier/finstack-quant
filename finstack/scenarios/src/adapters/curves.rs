@@ -124,9 +124,22 @@ fn resolve_bump_targets(
                     });
                 }
 
+                // Delivery correction: distributing `add` with raw linear
+                // weights (w0 + w1 = 1) realizes only add·(w0² + w1²) at the
+                // requested tenor under linear interpolation, since
+                // rate(t) = w0·r0 + w1·r1 — half the requested shock at a
+                // segment midpoint. Rescale by 1/Σw² (the minimum-norm pillar
+                // perturbation) so the interpolated curve moves by exactly
+                // `add` at the requested tenor. On-pillar requests have
+                // Σw² = 1 and are unchanged; the adjacent pillar can move by
+                // at most ~1.21·add (at w ≈ 0.72). Exact for directly-bumped
+                // curves (forward, commodity, vol-index, hazard direct shift);
+                // first-order for solve-to-par recalibration paths.
+                let norm: f64 = result.weights.iter().map(|(_, w)| w * w).sum();
+                let scale = if norm > 1e-12 { 1.0 / norm } else { 1.0 };
                 for (idx, weight) in result.weights {
-                    targets.push((knots[idx], add * weight));
-                    indexed_targets.push((idx, add * weight));
+                    targets.push((knots[idx], add * weight * scale));
+                    indexed_targets.push((idx, add * weight * scale));
                 }
             }
         }
@@ -172,17 +185,22 @@ fn commodity_node_shock_warning(curve_id: &CurveId, nodes: &[(String, f64)]) -> 
     })
 }
 
-/// Reject parallel VolIndex shocks that would drive any knot to a non-positive level.
+/// Reject parallel VolIndex shocks that would drive any knot — or the spot
+/// level — to a non-positive value. Spot is checked with the same hard-error
+/// policy as the knots: silently clamping spot to zero would leave the curve
+/// internally inconsistent with its term structure.
 fn check_vol_index_post_shock_positivity(
     curve_id: &CurveId,
     levels: &[f64],
+    spot_level: f64,
     pts: f64,
 ) -> Result<()> {
-    let base_min = levels.iter().copied().fold(f64::INFINITY, f64::min);
+    let base_min = levels.iter().copied().fold(spot_level, f64::min);
     if base_min.is_finite() && base_min + pts <= 0.0 {
         return Err(Error::Validation(format!(
             "VolIndex '{curve_id}' parallel shock would produce non-positive level \
-             (min knot {base_min:.4} + shift {pts:+.4} = {:.4}); volatility must stay positive",
+             (min of spot/knots {base_min:.4} + shift {pts:+.4} = {:.4}); volatility must stay \
+             positive",
             base_min + pts
         )));
     }
@@ -193,6 +211,16 @@ fn check_vol_index_post_shock_positivity(
 ///
 /// Walks the live `MarketContext` instead of materialising a serializable
 /// snapshot, so this is cheap to call repeatedly.
+///
+/// # Naming assumption
+///
+/// The currency heuristic matches on the **first three characters of the hint
+/// curve id, uppercase** (e.g. `USD_SOFR` → discount curves starting with
+/// `USD`). Curve ids that do not lead with an uppercase ISO currency code
+/// (e.g. `sofr-usd`, `OIS-USD`) bypass the heuristic and fall through to the
+/// single-curve fallback or an explicit-resolution error. Pass
+/// `discount_curve_id` explicitly when curve naming does not follow the
+/// `CCY...` convention.
 fn resolve_discount_curve_id(
     market: &finstack_core::market_data::context::MarketContext,
     explicit_discount_curve_id: Option<&CurveId>,
@@ -640,7 +668,12 @@ pub(crate) fn vol_index_parallel_effects(
         .get_vol_index_curve(curve_id.as_str())
         .map_err(|_| missing_market_err(curve_id.as_str()))?;
 
-    check_vol_index_post_shock_positivity(curve_id, base_curve.levels(), points)?;
+    check_vol_index_post_shock_positivity(
+        curve_id,
+        base_curve.levels(),
+        base_curve.spot_level(),
+        points,
+    )?;
 
     // Rebuild with the original ID so `MarketContext::insert` replaces the
     // existing entry rather than adding a parallel "VIX+...bp" copy.
@@ -652,7 +685,7 @@ pub(crate) fn vol_index_parallel_effects(
     )
     .base_date(base_curve.base_date())
     .day_count(base_curve.day_count())
-    .spot_level((base_curve.spot_level() + points).max(0.0))
+    .spot_level(base_curve.spot_level() + points)
     .knots(bumped_points)
     .build()?;
 

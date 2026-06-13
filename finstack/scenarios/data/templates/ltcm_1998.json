@@ -2,7 +2,7 @@
   "metadata": {
     "id": "ltcm_1998",
     "name": "LTCM / Russian Default 1998",
-    "description": "August 1998 LTCM crisis and Russian default. Flight-to-quality in rates, EM spread blowouts, an equity selloff, higher volatility, and sharp USD strength versus EM FX.",
+    "description": "August 1998 LTCM crisis and Russian default. Flight-to-quality in rates, EM spread blowouts, an equity selloff, higher volatility, and sharp USD strength versus EM FX. Market-data identifiers in this template (e.g. USD-SOFR, USD-IG, SPX_VOL) are modern placeholders, not historical instruments; override them via ScenarioSpecBuilder::override_curve to match your market data.",
     "event_date": "1998-08-17",
     "asset_classes": [
       "rates",

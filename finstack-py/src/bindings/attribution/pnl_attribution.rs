@@ -1,8 +1,7 @@
 //! PnlAttribution Python wrapper.
 
 use crate::bindings::pandas_utils::{
-    serde_object_to_single_row_dataframe, serde_rows_to_dataframe,
-    serde_rows_to_dataframe_with_schema,
+    serde_object_to_single_row_dataframe, serde_rows_to_dataframe_with_schema,
 };
 use crate::errors::display_to_py;
 use pyo3::prelude::*;

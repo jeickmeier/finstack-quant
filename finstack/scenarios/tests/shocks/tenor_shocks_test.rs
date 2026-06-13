@@ -187,6 +187,114 @@ fn test_tenor_interpolate_mode() {
     );
 }
 
+/// Off-pillar interpolated bumps must deliver the full requested shift at the
+/// requested tenor, not the `Σw²`-attenuated value (50% at a midpoint).
+///
+/// Uses a forward curve because its node path applies the additive shift
+/// directly to pillar forwards, making the linear-interpolation delivery math
+/// exact.
+#[test]
+fn test_tenor_interpolate_delivers_full_bump_at_requested_tenor() {
+    use finstack_core::market_data::term_structures::ForwardCurve;
+
+    let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let curve = ForwardCurve::builder("USD-FWD-3M", 0.25)
+        .base_date(base_date)
+        .knots(vec![(1.0, 0.040), (2.0, 0.042), (3.0, 0.045)])
+        .build()
+        .unwrap();
+    let mut market = MarketContext::new().insert(curve);
+    let mut model = FinancialModelSpec::new("test", vec![]);
+
+    // Resolve "30M" exactly the way the adapter does (calendar arithmetic +
+    // the curve's day count), so the delivery assertion targets the precise
+    // year fraction the bump was centered on.
+    let base_curve = market.get_forward("USD-FWD-3M").unwrap();
+    let target_date = finstack_core::dates::Tenor::parse("30M")
+        .unwrap()
+        .add_to_date(
+            base_date,
+            None,
+            finstack_core::dates::BusinessDayConvention::Unadjusted,
+        )
+        .unwrap();
+    let t_star = base_curve
+        .day_count()
+        .year_fraction(
+            base_date,
+            target_date,
+            finstack_core::dates::DayCountContext::default(),
+        )
+        .unwrap();
+    assert!(
+        t_star > 2.0 && t_star < 3.0,
+        "resolved tenor {t_star} must land inside the 2Y-3Y segment"
+    );
+    let original_at_t_star = base_curve.rate(t_star);
+    let original_mid = base_curve.rate(2.5); // midpoint of 2Y-3Y segment
+    let original_asym = base_curve.rate(1.25); // asymmetric point in 1Y-2Y
+    let original_1y = base_curve.rate(1.0);
+
+    let scenario = ScenarioSpec {
+        id: "full_delivery".into(),
+        name: None,
+        description: None,
+        operations: vec![OperationSpec::CurveNodeBp {
+            curve_kind: CurveKind::Forward,
+            curve_id: "USD-FWD-3M".into(),
+            discount_curve_id: None,
+            nodes: vec![("30M".into(), 50.0)], // +50bp at 2.5Y (segment midpoint)
+            match_mode: TenorMatchMode::Interpolate,
+        }],
+        priority: 0,
+        resolution_mode: Default::default(),
+    };
+
+    let engine = ScenarioEngine::new();
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: Some(&mut model),
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base_date,
+    };
+    engine.apply(&scenario, &mut ctx).unwrap();
+
+    let bumped = market.get_forward("USD-FWD-3M").unwrap();
+    // Exact delivery at the resolved tenor: the curve must move by the full
+    // requested 50bp there (the old Σw² attenuation delivered only ~25bp).
+    let realized = bumped.rate(t_star) - original_at_t_star;
+    assert!(
+        (realized - 0.0050).abs() < 1e-10,
+        "requested +50bp at the resolved 30M point ({t_star:.4}Y) must be fully delivered, \
+         realized {:.4}bp",
+        realized * 1e4
+    );
+    // Near the nominal 2.5Y midpoint the realized move differs only by the
+    // day-count basis between 2.5 and the resolved point — far above the 25bp
+    // the attenuated scheme would have delivered.
+    let realized_mid = bumped.rate(2.5) - original_mid;
+    assert!(
+        (realized_mid - 0.0050).abs() < 0.25e-4,
+        "realized move at 2.5Y ({:.4}bp) should be within 0.25bp of the request",
+        realized_mid * 1e4
+    );
+    // Pillars outside the bumped segment are untouched.
+    assert!(
+        (bumped.rate(1.0) - original_1y).abs() < 1e-12,
+        "1Y pillar should be unaffected"
+    );
+    // The 1Y-2Y segment interpolates toward the bumped 2Y pillar but the
+    // asymmetric point must not have received its own full bump.
+    let leak = bumped.rate(1.25) - original_asym;
+    assert!(
+        leak < 0.0050,
+        "off-segment leakage {:.4}bp should stay below the requested bump",
+        leak * 1e4
+    );
+}
+
 /// W1/W2 regression: `TenorNotFound` in `Exact` mode must identify the
 /// curve, not "unknown".
 #[test]

@@ -812,6 +812,89 @@ mod tests {
     }
 
     #[test]
+    fn bond_value_applies_scenario_spread_shock_as_flat_z_spread() {
+        let market = flat_discount_market(0.04);
+        let as_of = date!(2025 - 01 - 01);
+
+        let base_pv = build_test_bond(PricingOverrides::default())
+            .value(&market, as_of)
+            .expect("base")
+            .amount();
+        let shocked_pv = build_test_bond(PricingOverrides::default().with_spread_shock_bp(100.0))
+            .value(&market, as_of)
+            .expect("shocked")
+            .amount();
+        // The shock must reprice identically to a quoted Z-spread of 100bp.
+        let z_quoted_pv = build_test_bond(PricingOverrides::default().with_quoted_z_spread(0.01))
+            .value(&market, as_of)
+            .expect("z quoted")
+            .amount();
+
+        assert!(
+            shocked_pv < base_pv,
+            "+100bp widening must lower PV: base {base_pv}, shocked {shocked_pv}"
+        );
+        assert!(
+            (shocked_pv - z_quoted_pv).abs() < 1e-6,
+            "spread shock must match quoted Z-spread repricing: {shocked_pv} vs {z_quoted_pv}"
+        );
+    }
+
+    #[test]
+    fn bond_scenario_spread_shock_composes_with_quoted_z_spread() {
+        let market = flat_discount_market(0.04);
+        let as_of = date!(2025 - 01 - 01);
+
+        let combined_pv = build_test_bond(
+            PricingOverrides::default()
+                .with_quoted_z_spread(0.0050)
+                .with_spread_shock_bp(50.0),
+        )
+        .value(&market, as_of)
+        .expect("combined")
+        .amount();
+        let equivalent_pv = build_test_bond(PricingOverrides::default().with_quoted_z_spread(0.01))
+            .value(&market, as_of)
+            .expect("equivalent")
+            .amount();
+
+        assert!(
+            (combined_pv - equivalent_pv).abs() < 1e-6,
+            "50bp quoted + 50bp shock must equal 100bp quoted: {combined_pv} vs {equivalent_pv}"
+        );
+    }
+
+    #[test]
+    fn bond_scenario_spread_shock_rejects_price_pinning_quote() {
+        let market = flat_discount_market(0.04);
+        let bond = build_test_bond(
+            PricingOverrides::default()
+                .with_quoted_clean_price(98.5)
+                .with_spread_shock_bp(50.0),
+        );
+        let err = bond
+            .value(&market, date!(2025 - 01 - 01))
+            .expect_err("spread shock with a price-pinning quote must error, not silently no-op");
+        assert!(err.to_string().contains("price-pinning"), "got: {err}");
+        assert!(!bond.scenario_spread_shock_supported());
+    }
+
+    #[test]
+    fn bond_scenario_spread_shock_supported_reflects_configuration() {
+        assert!(build_test_bond(PricingOverrides::default()).scenario_spread_shock_supported());
+        assert!(
+            build_test_bond(PricingOverrides::default().with_quoted_z_spread(0.01))
+                .scenario_spread_shock_supported(),
+            "z-quoted bonds compose additively and remain supported"
+        );
+        assert!(
+            !build_test_bond(PricingOverrides::default().with_quoted_ytm(0.05))
+                .scenario_spread_shock_supported(),
+            "price-pinning quotes are unsupported"
+        );
+    }
+
+    #[test]
     fn market_quote_overrides_reject_mutually_exclusive_price_drivers() {
         let overrides = PricingOverrides::default()
             .with_quoted_clean_price(98.5)

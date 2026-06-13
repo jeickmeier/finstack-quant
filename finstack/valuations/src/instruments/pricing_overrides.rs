@@ -264,6 +264,15 @@ impl MarketQuoteOverrides {
         .count()
     }
 
+    /// Whether any price-driving quote other than `quoted_z_spread` is set.
+    ///
+    /// Used by scenario spread-shock routing: a shock composes additively with
+    /// a quoted Z-spread, but is ambiguous against price-pinning quotes
+    /// (clean/dirty price, YTM/YTW, OAS, DM, I-spread, ASW).
+    pub(crate) fn has_non_z_price_driver(&self) -> bool {
+        self.price_driver_count() > usize::from(self.quoted_z_spread.is_some())
+    }
+
     /// Whether any market quote field should drive bond quote-date economics.
     ///
     /// Bond market quotes are interpreted at the quote date (settlement date
@@ -736,6 +745,21 @@ pub struct ScenarioPricingOverrides {
     /// When set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scenario_price_shock_pct: Option<f64>,
+
+    /// Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).
+    ///
+    /// Applied as an additional flat Z-spread during valuation by pricers that
+    /// support spread-based revaluation. Currently consumed by `Bond::base_value`
+    /// for bonds without embedded options, without an assigned credit curve, and
+    /// without a price-pinning quote override other than `quoted_z_spread`
+    /// (where the shock is additive on the quoted spread). See
+    /// [`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).
+    ///
+    /// Setting this on an unsupported configuration produces a validation error
+    /// at pricing time rather than a silent no-op. For hazard-priced (credit
+    /// curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scenario_spread_shock_bp: Option<f64>,
 }
 
 impl ScenarioPricingOverrides {
@@ -746,8 +770,11 @@ impl ScenarioPricingOverrides {
 
     /// Validate scenario shocks for finiteness.
     pub fn validate(&self) -> finstack_core::Result<()> {
-        // A price shock may be negative (a downside scenario) but must be finite.
-        check_finite_fields(&[(self.scenario_price_shock_pct, false)])
+        // Shocks may be negative (downside / tightening scenarios) but must be finite.
+        check_finite_fields(&[
+            (self.scenario_price_shock_pct, false),
+            (self.scenario_spread_shock_bp, false),
+        ])
     }
 
     /// Apply the configured price shock to a present value.
@@ -1095,14 +1122,35 @@ impl PricingOverrides {
         self
     }
 
+    /// Apply a scenario spread shock in basis points.
+    ///
+    /// The shock is applied as an additional flat Z-spread by pricers that
+    /// support spread-based revaluation (see
+    /// [`ScenarioPricingOverrides::scenario_spread_shock_bp`]).
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_valuations::instruments::pricing_overrides::PricingOverrides;
+    ///
+    /// // Apply a +150 bp spread widening
+    /// let overrides = PricingOverrides::none().with_spread_shock_bp(150.0);
+    /// assert_eq!(overrides.scenario.scenario_spread_shock_bp, Some(150.0));
+    /// ```
+    pub fn with_spread_shock_bp(mut self, shock_bp: f64) -> Self {
+        self.scenario.scenario_spread_shock_bp = Some(shock_bp);
+        self
+    }
+
     /// Clear any scenario shocks applied to this override.
     pub fn clear_scenario_shocks(&mut self) {
         self.scenario.scenario_price_shock_pct = None;
+        self.scenario.scenario_spread_shock_bp = None;
     }
 
     /// Check if any scenario shock is applied.
     pub fn has_scenario_shock(&self) -> bool {
         self.scenario.scenario_price_shock_pct.is_some()
+            || self.scenario.scenario_spread_shock_bp.is_some()
     }
 
     /// Validate override values for finiteness and non-negativity; basic `theta_period` sanity.
