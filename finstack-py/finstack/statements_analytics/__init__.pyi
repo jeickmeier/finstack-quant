@@ -697,7 +697,10 @@ def score_relative_value(
     ``direction`` (``"higher_is_cheap"`` (default) or ``"higher_is_rich"``),
     and ``weight``. Metric selectors are metric names or
     ``"multiple:<id>"`` (e.g. ``"multiple:ev_ebitda"``) for canonical
-    valuation multiples. Positive composite = cheap, negative = rich.
+    valuation multiples. Positive composite = cheap, negative = rich. The
+    returned dict uses the canonical Rust/WASM shape:
+    ``company_id``, ``composite_score``, ``dimensions``, ``confidence``, and
+    ``peer_count``.
     """
     ...
 

@@ -11,8 +11,10 @@ import pytest
 from finstack.cashflows import (
     accrued_interest_json,
     bond_from_cashflows_json,
+    build_cashflow_schedule_envelope_json,
     build_cashflow_schedule_json,
     dated_flows_json,
+    validate_cashflow_schedule_envelope_json,
     validate_cashflow_schedule_json,
 )
 
@@ -131,6 +133,10 @@ def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
     assert schedule["meta"]["issue_date"] == "2024-08-31"
 
     assert json.loads(validate_cashflow_schedule_json(schedule_json)) == schedule
+    envelope = json.loads(build_cashflow_schedule_envelope_json(_cashflow_spec()))
+    assert envelope["schema_version"] == "finstack.cashflows.schedule/1"
+    assert envelope["schedule"] == schedule
+    assert json.loads(validate_cashflow_schedule_envelope_json(json.dumps(envelope))) == envelope
     flows = json.loads(dated_flows_json(schedule_json))
     assert len(flows) == len(schedule["flows"])
     assert accrued_interest_json(schedule_json, "2025-02-28") > 0.0
@@ -160,10 +166,21 @@ def test_cashflows_accrued_interest_accepts_config_json() -> None:
         "method": "Linear",
         "include_pik": True,
         "frequency": {"count": 12, "unit": "months"},
-        "strict_issue_date": True,
     })
 
     assert accrued_interest_json(schedule_json, "2025-02-28", config_json) > 0.0
+
+
+def test_cashflows_accrued_interest_rejects_unknown_config_json_fields() -> None:
+    schedule_json = build_cashflow_schedule_json(_cashflow_spec())
+    config_json = json.dumps({
+        "method": "Linear",
+        "include_pik": True,
+        "strict_issue_date": True,
+    })
+
+    with pytest.raises(ValueError, match="invalid accrual config JSON"):
+        accrued_interest_json(schedule_json, "2025-02-28", config_json)
 
 
 def test_cashflows_bond_from_cashflows_allows_missing_quoted_clean() -> None:

@@ -25,12 +25,17 @@ use super::payment_in_kind::is_pik_enabled;
 /// principal is also deducted from ECF before the sweep percentage is applied,
 /// per the standard LPA ECF definition. Without this deduction the sweep would
 /// double-spend the cash already consumed by scheduled amortization.
+///
+/// Fees paid ahead of the prepayment priority are likewise deducted here so the
+/// sweep amount is computed from post-fee excess cash instead of being reduced
+/// after the sweep percentage has already been applied.
 pub(super) fn calculate_ecf_sweep(
     context: &EvaluationContext,
     ecf_spec: &EcfSweepSpec,
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
     state: &CapitalStructureState,
     deduct_scheduled_principal: bool,
+    deduct_fees: bool,
 ) -> Result<Money> {
     if !(0.0..=1.0).contains(&ecf_spec.sweep_percentage) {
         return Err(crate::error::Error::capital_structure(format!(
@@ -82,7 +87,16 @@ pub(super) fn calculate_ecf_sweep(
         0.0
     };
 
-    let ecf = ebitda - taxes - capex - wc_change - cash_interest - scheduled_principal;
+    let fees = if deduct_fees {
+        contractual_flows
+            .values()
+            .map(|cf| cf.fees.amount().max(0.0))
+            .sum()
+    } else {
+        0.0
+    };
+
+    let ecf = ebitda - taxes - capex - wc_change - cash_interest - scheduled_principal - fees;
     let sweep_amount = ecf * ecf_spec.sweep_percentage;
     let currency = base_currency(contractual_flows)?;
 

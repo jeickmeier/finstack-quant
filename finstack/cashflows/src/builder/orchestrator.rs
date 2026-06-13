@@ -66,8 +66,8 @@ pub(super) struct AmortizationSetup {
     pub(super) amort_dates: finstack_core::HashSet<Date>,
     pub(super) step_remaining_map: Option<finstack_core::HashMap<Date, Money>>, // for StepRemaining
     pub(super) custom_principal_map: Option<finstack_core::HashMap<Date, Money>>,
-    pub(super) linear_delta: Option<f64>, // for LinearTo
-    pub(super) percent_per: Option<f64>,  // for PercentOfOriginalPerPeriod
+    pub(super) linear_delta: Option<Decimal>, // for LinearTo
+    pub(super) percent_per: Option<Decimal>,  // for PercentOfOriginalPerPeriod
 }
 
 /// Grouped inputs for collecting all relevant schedule dates.
@@ -166,14 +166,31 @@ fn derive_amortization_setup(
                     id: "amortization_base_schedule".to_string(),
                 })
             })?;
-            let steps = base.len() as f64;
+            let steps = Decimal::from(base.len() as u64);
+            let initial = f64_to_decimal(notional.initial.amount())?;
+            let final_notional = f64_to_decimal(final_notional.amount())?;
+            let delta = (initial - final_notional) / steps;
             (
-                Some(((notional.initial.amount() - final_notional.amount()) / steps).max(0.0)),
+                Some(if delta > Decimal::ZERO {
+                    delta
+                } else {
+                    Decimal::ZERO
+                }),
                 None,
             )
         }
         AmortizationSpec::PercentOfOriginalPerPeriod { pct } => {
-            (None, Some((notional.initial.amount() * *pct).max(0.0)))
+            let initial = f64_to_decimal(notional.initial.amount())?;
+            let pct = f64_to_decimal(*pct)?;
+            let per = initial * pct;
+            (
+                None,
+                Some(if per > Decimal::ZERO {
+                    per
+                } else {
+                    Decimal::ZERO
+                }),
+            )
         }
         _ => (None, None),
     };
@@ -463,6 +480,7 @@ impl CompiledCashFlowPlan {
 
         let ctx = BuildContext {
             ccy,
+            issue: self.issue,
             maturity: self.maturity,
             redemption_date,
             notional: &self.notional,
@@ -506,6 +524,7 @@ impl CompiledCashFlowPlan {
         // `self.dates` can never cause issue-dated flows to be emitted twice.
         let processor =
             DateProcessor::new(&ctx, &self.amort_setup, &resolved_curves, &resolved_fixings);
+        processor.process_issue_amortization(&mut state)?;
         for &d in self.dates.iter().filter(|&&d| d > self.issue) {
             state = processor.process(d, state)?;
         }

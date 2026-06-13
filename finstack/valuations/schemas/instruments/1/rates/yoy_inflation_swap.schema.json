@@ -1602,6 +1602,7 @@
               "type": "object"
             },
             "Tenor": {
+              "additionalProperties": false,
               "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months);\nassert_eq!(tenor.count, 3);\nassert_eq!(tenor.unit, TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count, 6);\nassert_eq!(parsed.unit, TenorUnit::Months);\n# Ok(())\n# }\n```",
               "properties": {
                 "count": {

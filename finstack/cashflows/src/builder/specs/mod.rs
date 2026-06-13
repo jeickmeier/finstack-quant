@@ -35,7 +35,7 @@ mod schedule;
 pub use amortization::{AmortizationSpec, Notional};
 pub use coupon::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
-    OvernightCompoundingMethod, StepUpCouponSpec,
+    OvernightCompoundingMethod, OvernightIndexConstraintApplication, StepUpCouponSpec,
 };
 pub use default::{DefaultCurve, DefaultEvent, DefaultModelSpec};
 pub use fees::{evaluate_fee_tiers, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier};

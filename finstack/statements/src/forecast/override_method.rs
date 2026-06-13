@@ -48,6 +48,14 @@ pub(super) fn apply_override(
                 period_str, value
             )));
         }
+        let parsed: PeriodId = period_str
+            .parse()
+            .map_err(|e| Error::forecast(format!("Invalid override period '{period_str}': {e}")))?;
+        if !forecast_periods.contains(&parsed) {
+            return Err(Error::forecast(format!(
+                "Override period '{period_str}' is not in the forecast periods"
+            )));
+        }
     }
 
     let mut results = IndexMap::new();
@@ -140,5 +148,20 @@ mod tests {
 
         let result = apply_override(100.0, &periods, &params);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_override_rejects_unmatched_period() {
+        let periods = vec![PeriodId::quarter(2025, 1)];
+
+        let mut params = IndexMap::new();
+        let overrides = serde_json::json!({
+            "2025Q2": 120.0,
+        });
+        params.insert("overrides".to_string(), overrides);
+
+        let err = apply_override(100.0, &periods, &params)
+            .expect_err("unmatched override period must be rejected");
+        assert!(err.to_string().contains("not in the forecast periods"));
     }
 }

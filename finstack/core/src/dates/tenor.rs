@@ -160,6 +160,7 @@ pub struct Tenor {
 /// loop forever, so inbound payloads (e.g. JSON) with `"count": 0` must
 /// fail loudly instead of constructing a degenerate `Tenor`.
 #[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 struct TenorDe {
     count: u32,
     unit: TenorUnit,
@@ -809,6 +810,13 @@ mod tests {
                 years
             );
         }
+    }
+
+    #[test]
+    fn tenor_rejects_unknown_json_fields() {
+        let err = serde_json::from_str::<Tenor>(r#"{"count":3,"unit":"months","extra":true}"#)
+            .expect_err("unknown tenor fields must be rejected");
+        assert!(err.to_string().contains("extra"));
     }
 
     #[test]

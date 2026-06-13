@@ -415,6 +415,9 @@ class TestCompsBindings:
             peers,
             [{"label": "Spread vs Leverage", "y": "oas_bps", "x": ["leverage"], "weight": 1.0}],
         )
+        assert result["company_id"] == "SUBJECT"
+        assert "by_dimension" not in result
+        assert result["dimensions"][0]["label"] == "Spread vs Leverage"
         assert result["composite_score"] > 0.0
 
     def test_peer_stats_uses_rust_field_names(self) -> None:
@@ -456,7 +459,7 @@ class TestCompsBindings:
         ]
         result = score_relative_value(subject, peers, [("multiple:ev_ebitda", 1.0)])
         assert result["peer_count"] == 3
-        assert "multiple:ev_ebitda" in result["by_dimension"]
+        assert result["dimensions"][0]["label"] == "multiple:ev_ebitda"
 
     def test_non_numeric_metric_raises_value_error(self) -> None:
         with pytest.raises(ValueError, match="oas_bps"):

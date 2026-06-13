@@ -52,6 +52,11 @@ pub struct CapitalStructureState {
     /// available-cash cap. Carried forward as a claim in the next period's
     /// interest category and re-recorded if it remains unpaid.
     pub interest_shortfall: IndexMap<String, Money>,
+
+    /// Unpaid scheduled-principal shortfall per instrument from the prior
+    /// period's available-cash cap. Carried forward as a claim in the next
+    /// period's amortization category and re-recorded if it remains unpaid.
+    pub principal_shortfall: IndexMap<String, Money>,
 }
 
 impl CapitalStructureState {

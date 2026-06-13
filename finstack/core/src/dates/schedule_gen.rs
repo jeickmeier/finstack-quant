@@ -15,6 +15,26 @@ use crate::dates::Tenor;
 /// Small helper alias when we need to pre-buffer (used only for `ShortFront`).
 type Buffer = SmallVec<[Date; 32]>;
 
+const MAX_SCHEDULE_ANCHORS: usize = 100_000;
+
+fn schedule_too_large_error() -> crate::Error {
+    crate::Error::Validation(format!(
+        "schedule generation exceeded {MAX_SCHEDULE_ANCHORS} anchors; \
+         check date range and tenor frequency"
+    ))
+}
+
+fn check_anchor_count(len: usize) -> crate::Result<()> {
+    if len > MAX_SCHEDULE_ANCHORS {
+        return Err(schedule_too_large_error());
+    }
+    Ok(())
+}
+
+fn next_roll_index(i: i32) -> crate::Result<i32> {
+    i.checked_add(1).ok_or_else(schedule_too_large_error)
+}
+
 /// Apply End-of-Month (EOM) convention to a date.
 fn apply_eom(date: Date) -> Date {
     date.end_of_month()
@@ -222,14 +242,33 @@ impl BuilderInternal {
                 tenor: tenor.to_string(),
                 reason: format!("count {} exceeds i32::MAX", tenor.count),
             })?;
+        let checked_mul_i32 = |lhs: i32, rhs: i32| -> crate::Result<i32> {
+            lhs.checked_mul(rhs).ok_or_else(|| {
+                crate::Error::from(crate::error::InputError::InvalidTenor {
+                    tenor: tenor.to_string(),
+                    reason: "tenor multiplication overflowed while generating schedule".to_string(),
+                })
+            })
+        };
+        let checked_mul_i64 = |lhs: i64, rhs: i64| -> crate::Result<i64> {
+            lhs.checked_mul(rhs).ok_or_else(|| {
+                crate::Error::from(crate::error::InputError::InvalidTenor {
+                    tenor: tenor.to_string(),
+                    reason: "tenor multiplication overflowed while generating schedule".to_string(),
+                })
+            })
+        };
         Ok(match tenor.unit {
-            crate::dates::TenorUnit::Months => anchor.add_months(n * count_i32),
-            crate::dates::TenorUnit::Years => anchor.add_months(n * count_i32 * 12),
+            crate::dates::TenorUnit::Months => anchor.add_months(checked_mul_i32(n, count_i32)?),
+            crate::dates::TenorUnit::Years => {
+                let years = checked_mul_i32(n, count_i32)?;
+                anchor.add_months(checked_mul_i32(years, 12)?)
+            }
             crate::dates::TenorUnit::Weeks => {
-                anchor + Duration::weeks(i64::from(n) * i64::from(tenor.count))
+                anchor + Duration::weeks(checked_mul_i64(i64::from(n), i64::from(tenor.count))?)
             }
             crate::dates::TenorUnit::Days => {
-                anchor + Duration::days(i64::from(n) * i64::from(tenor.count))
+                anchor + Duration::days(checked_mul_i64(i64::from(n), i64::from(tenor.count))?)
             }
         })
     }
@@ -253,6 +292,7 @@ impl BuilderInternal {
             let snapped = maybe_eom(self.eom, raw);
             if raw == self.end || (raw < self.end && self.end <= snapped) {
                 push_if_new(&mut buf, self.end);
+                check_anchor_count(buf.len())?;
                 break;
             }
             if raw > self.end {
@@ -260,8 +300,9 @@ impl BuilderInternal {
             }
             if snapped < self.end {
                 push_if_new(&mut buf, snapped);
+                check_anchor_count(buf.len())?;
             }
-            i += 1;
+            i = next_roll_index(i)?;
         }
         Ok(buf.into_vec())
     }
@@ -274,10 +315,12 @@ impl BuilderInternal {
             let dt = maybe_eom(self.eom, self.nth_tenor(self.start, i)?);
             if dt >= self.end {
                 push_if_new(&mut buf, self.end);
+                check_anchor_count(buf.len())?;
                 break;
             }
             push_if_new(&mut buf, dt);
-            i += 1;
+            check_anchor_count(buf.len())?;
+            i = next_roll_index(i)?;
         }
         Ok(buf.into_vec())
     }
@@ -291,13 +334,15 @@ impl BuilderInternal {
             let dt = self.nth_tenor(anchor, -i)?;
             if dt <= self.start {
                 push_if_new(&mut buf, self.start);
+                check_anchor_count(buf.len())?;
                 break;
             }
             let snapped = maybe_eom(self.eom, dt);
             if snapped > self.start && snapped < self.end {
                 push_if_new(&mut buf, snapped);
+                check_anchor_count(buf.len())?;
             }
-            i += 1;
+            i = next_roll_index(i)?;
         }
         buf.as_mut_slice().reverse();
         Ok(buf.into_vec())
@@ -314,7 +359,8 @@ impl BuilderInternal {
                 break dt == self.start;
             }
             anchors.push(dt);
-            i += 1;
+            check_anchor_count(anchors.len())?;
+            i = next_roll_index(i)?;
         };
         // Long front stub: merge the residual short stub with the first
         // regular period by dropping the lowest anchor. Skipping this merge
@@ -341,16 +387,18 @@ impl BuilderInternal {
         let mut i = 1;
         loop {
             let next = self.nth_tenor(anchor, i)?;
-            let next_after = self.nth_tenor(anchor, i + 1)?;
+            let next_after = self.nth_tenor(anchor, next_roll_index(i)?)?;
             if next_after > self.end {
                 push_if_new(&mut buf, self.end);
+                check_anchor_count(buf.len())?;
                 break;
             }
             let dt = maybe_eom(self.eom, next);
             if dt < self.end {
                 push_if_new(&mut buf, dt);
+                check_anchor_count(buf.len())?;
             }
-            i += 1;
+            i = next_roll_index(i)?;
         }
         Ok(buf.into_vec())
     }

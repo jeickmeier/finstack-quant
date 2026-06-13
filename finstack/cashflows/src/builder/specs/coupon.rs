@@ -291,6 +291,39 @@ impl FloatingRateFallback {
     }
 }
 
+/// Where overnight index floors/caps are applied for daily-compounded rates.
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub enum OvernightIndexConstraintApplication {
+    /// Apply index floors/caps to each sampled daily fixing before compounding.
+    ///
+    /// This matches common floored SOFR loan conventions.
+    #[default]
+    Daily,
+    /// Apply index floors/caps once to the compounded period index rate.
+    ///
+    /// This preserves the historical period-level behavior for contracts that
+    /// explicitly define floors/caps on the period index rate.
+    Period,
+}
+
+impl OvernightIndexConstraintApplication {
+    /// Returns true for the default daily application mode.
+    pub fn is_default(&self) -> bool {
+        matches!(self, Self::Daily)
+    }
+}
+
 /// Canonical floating rate specification for all instruments.
 ///
 /// Used by bonds, swaps, credit facilities, and structured products.
@@ -352,7 +385,7 @@ impl FloatingRateFallback {
 ///
 /// ```rust
 /// use finstack_core::dates::{DayCount, Tenor, BusinessDayConvention};
-/// use finstack_cashflows::builder::FloatingRateSpec;
+/// use finstack_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
 /// use rust_decimal_macros::dec;
 ///
 /// // 3M SOFR + 200bps with 0% floor
@@ -365,6 +398,7 @@ impl FloatingRateFallback {
 ///     all_in_floor_bp: None,
 ///     all_in_cap_bp: None,
 ///     index_cap_bp: None,
+///     overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
 ///     reset_freq: Tenor::quarterly(),
 ///     index_tenor: None,
 ///     reset_lag_days: 2,
@@ -426,6 +460,13 @@ pub struct FloatingRateSpec {
     /// Cap on index rate in basis points (applied to index component).
     #[serde(default)]
     pub index_cap_bp: Option<Decimal>,
+
+    /// Index floor/cap application policy for overnight-compounded coupons.
+    #[serde(
+        default,
+        skip_serializing_if = "OvernightIndexConstraintApplication::is_default"
+    )]
+    pub overnight_index_constraints: OvernightIndexConstraintApplication,
 
     /// Reset frequency for rate fixings.
     ///

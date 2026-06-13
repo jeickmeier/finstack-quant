@@ -181,18 +181,48 @@ pub(crate) fn index_period_schedule(
     period_map.reserve(periods.len());
     for period in &periods {
         if let Some(previous) = period_map.insert(period.payment_date, *period) {
-            return Err(finstack_core::Error::Validation(format!(
-                "two accrual periods adjust to the same payment date {}: [{}, {}) and [{}, {}); \
-                 use a coarser frequency or a different business-day convention",
+            return Err(duplicate_payment_date_error(
                 period.payment_date,
-                previous.accrual_start,
-                previous.accrual_end,
-                period.accrual_start,
-                period.accrual_end
-            )));
+                previous,
+                *period,
+            ));
         }
     }
     Ok((dates, period_map, first_or_last))
+}
+
+pub(crate) fn validate_unique_payment_dates(
+    periods: &[SchedulePeriod],
+) -> finstack_core::Result<()> {
+    let mut period_map: finstack_core::HashMap<Date, SchedulePeriod> =
+        finstack_core::HashMap::default();
+    period_map.reserve(periods.len());
+    for period in periods {
+        if let Some(previous) = period_map.insert(period.payment_date, *period) {
+            return Err(duplicate_payment_date_error(
+                period.payment_date,
+                previous,
+                *period,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn duplicate_payment_date_error(
+    payment_date: Date,
+    previous: SchedulePeriod,
+    period: SchedulePeriod,
+) -> finstack_core::Error {
+    finstack_core::Error::Validation(format!(
+        "two accrual periods adjust to the same payment date {}: [{}, {}) and [{}, {}); \
+         use a coarser frequency or a different business-day convention",
+        payment_date,
+        previous.accrual_start,
+        previous.accrual_end,
+        period.accrual_start,
+        period.accrual_end
+    ))
 }
 
 /// Build a schedule between start/end with strict error handling.

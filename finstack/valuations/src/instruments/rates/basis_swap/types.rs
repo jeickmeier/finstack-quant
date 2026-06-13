@@ -530,6 +530,7 @@ impl BasisSwap {
                     all_in_cap_bp: None,
                     all_in_floor_bp: None,
                     index_cap_bp: None,
+                    overnight_index_constraints: Default::default(),
                     reset_freq: leg.frequency,
                     index_tenor: None,
                     reset_lag_days: leg.reset_lag_days,

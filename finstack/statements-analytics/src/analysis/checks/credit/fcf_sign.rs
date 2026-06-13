@@ -35,6 +35,12 @@ impl Check for FcfSignCheck {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        if self.consecutive_negative_warning == 0 || self.consecutive_negative_error == 0 {
+            return Err(finstack_statements::error::Error::eval(
+                "FcfSignCheck thresholds must be positive".to_string(),
+            ));
+        }
+
         let mut findings = Vec::new();
         let mut consecutive_negative: usize = 0;
 

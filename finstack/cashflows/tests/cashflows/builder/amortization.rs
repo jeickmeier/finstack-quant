@@ -433,6 +433,48 @@ mod computation {
         );
     }
 
+    #[test]
+    fn custom_principal_on_issue_date_is_emitted_once() {
+        let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+        let maturity = Date::from_calendar_date(2025, Month::April, 15).unwrap();
+        let init = Money::new(1_000_000.0, Currency::USD);
+
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(init, issue, maturity)
+            .amortization(AmortizationSpec::CustomPrincipal {
+                items: vec![(issue, Money::new(100_000.0, Currency::USD))],
+            })
+            .fixed_cf(standard_fixed_spec());
+
+        let schedule = builder
+            .build_with_curves(None)
+            .expect("issue-dated amortization should build");
+        let issue_amort: Vec<_> = schedule
+            .flows
+            .iter()
+            .filter(|cf| cf.kind == CFKind::Amortization && cf.date == issue)
+            .collect();
+        assert_eq!(
+            issue_amort.len(),
+            1,
+            "issue amortization must emit exactly once"
+        );
+        assert_eq!(issue_amort[0].amount.amount(), 100_000.0);
+
+        let coupon = schedule
+            .flows
+            .iter()
+            .find(|cf| cf.kind == CFKind::Fixed)
+            .expect("coupon");
+        let expected_coupon = 900_000.0 * 0.05 * 90.0 / 365.0;
+        assert!(
+            (coupon.amount.amount() - expected_coupon).abs() < 1e-6,
+            "coupon should accrue on 900k after issue amortization, got {}",
+            coupon.amount.amount()
+        );
+    }
+
     /// Golden value test: Percent-per-period amortization
     ///
     /// For 25% per period on $1M:

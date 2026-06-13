@@ -230,7 +230,7 @@ impl Exposure {
     /// The ECL engine assumes:
     ///
     /// - `ead >= 0` (signed EAD is not a modelled concept here)
-    /// - `eir` is finite and `> -1` (discount factors must be well-defined)
+    /// - `eir` is finite and non-negative (discount factors must be well-defined)
     /// - `lgd` ∈ \[0, 1\]
     /// - `remaining_maturity_years >= 0` and finite
     ///
@@ -249,9 +249,9 @@ impl Exposure {
                 self.id, self.ead
             )));
         }
-        if !self.eir.is_finite() || self.eir <= -1.0 {
+        if !self.eir.is_finite() || self.eir < 0.0 {
             return Err(Error::Validation(format!(
-                "Exposure '{}': EIR must be finite and > -1 (got {})",
+                "Exposure '{}': EIR must be finite and non-negative (got {})",
                 self.id, self.eir
             )));
         }

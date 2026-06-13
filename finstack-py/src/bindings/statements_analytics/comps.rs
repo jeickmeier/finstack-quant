@@ -24,7 +24,7 @@ use finstack_statements_analytics::analysis::{
     Multiple, PeerSet, PeriodBasis, ScoreDirection, ScoringDimension,
 };
 use pyo3::prelude::*;
-use pyo3::types::{PyAny, PyDict};
+use pyo3::types::{PyAny, PyDict, PyList};
 
 use crate::errors::{core_to_py, display_to_py};
 
@@ -354,9 +354,10 @@ fn parse_scoring_dimension(obj: &Bound<'_, PyAny>) -> PyResult<ScoringDimension>
 ///         to score and their composite weights.
 ///
 /// Returns:
-///     Dict with keys ``{"composite_score", "confidence", "peer_count",
-///     "by_dimension"}`` where ``by_dimension`` is a dict mapping each
-///     metric name to ``{"percentile", "z_score", "weight"}``.
+///     Dict with canonical keys ``{"company_id", "composite_score",
+///     "dimensions", "confidence", "peer_count"}``. ``dimensions`` is a
+///     list of dicts with ``label``, ``percentile``, ``z_score``,
+///     ``regression_residual``, ``r_squared``, and ``weight``.
 #[pyfunction]
 #[pyo3(text_signature = "(subject_metrics, peer_metrics, dimensions)")]
 fn score_relative_value<'py>(
@@ -382,21 +383,23 @@ fn score_relative_value<'py>(
     let result = core_score(&peer_set, &scoring_dims).map_err(core_to_py)?;
 
     let out = PyDict::new(py);
+    out.set_item("company_id", result.company_id)?;
     out.set_item("composite_score", result.composite_score)?;
     out.set_item("confidence", result.confidence)?;
     out.set_item("peer_count", result.peer_count)?;
 
-    let by_dim = PyDict::new(py);
+    let dimensions = PyList::empty(py);
     for d in &result.dimensions {
         let dim_dict = PyDict::new(py);
+        dim_dict.set_item("label", &d.label)?;
         dim_dict.set_item("percentile", d.percentile)?;
         dim_dict.set_item("z_score", d.z_score)?;
         dim_dict.set_item("regression_residual", d.regression_residual)?;
         dim_dict.set_item("r_squared", d.r_squared)?;
         dim_dict.set_item("weight", d.weight)?;
-        by_dim.set_item(&d.label, dim_dict)?;
+        dimensions.append(dim_dict)?;
     }
-    out.set_item("by_dimension", by_dim)?;
+    out.set_item("dimensions", dimensions)?;
 
     Ok(out)
 }

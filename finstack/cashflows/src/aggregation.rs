@@ -113,7 +113,7 @@ fn iter_by_period<'a, T: HasDate>(
 /// Returns [`finstack_core::Error::Validation`] if periods are not sorted by
 /// start date, overlap (a period starts before the previous period ends), or
 /// share a `PeriodId`.
-fn validate_periods(periods: &[Period]) -> finstack_core::Result<()> {
+pub(crate) fn validate_periods(periods: &[Period]) -> finstack_core::Result<()> {
     for w in periods.windows(2) {
         if w[1].start < w[0].start {
             return Err(finstack_core::Error::Validation(format!(
@@ -498,7 +498,7 @@ impl<'a> DateContext<'a> {
 /// on liquid credit. For integrated / default-midpoint semantics use
 /// [`RecoveryTiming::AtDefaultIntegrated`] (see
 /// [`pv_by_period_credit_adjusted_detailed_with_timing`]).
-fn credit_adjusted_period_pv(
+pub(crate) fn credit_adjusted_period_pv(
     cf: &CashFlow,
     df: f64,
     sp: f64,

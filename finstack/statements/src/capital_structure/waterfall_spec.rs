@@ -73,6 +73,8 @@ impl WaterfallSpec {
     ///
     /// Enforces:
     /// - `priority_of_payments` contains no duplicate entries.
+    /// - All configured prepayment priorities appear before `Equity`.
+    /// - PIK toggles explicitly identify target instruments.
     /// - `ecf_sweep.sweep_percentage` (when configured) lies in `[0.0, 1.0]`.
     /// - When an ECF sweep with a positive `sweep_percentage` is configured,
     ///   at least one prepayment priority (`Sweep`, `MandatoryPrepayment`, or
@@ -86,6 +88,46 @@ impl WaterfallSpec {
                     "WaterfallSpec: duplicate entry {priority:?} in `priority_of_payments`. \
                      Each payment priority may appear at most once.",
                 )));
+            }
+        }
+
+        if let Some(pik) = &self.pik_toggle {
+            if pik
+                .target_instrument_ids
+                .as_ref()
+                .is_none_or(|targets| targets.is_empty())
+            {
+                return Err(Error::build(
+                    "WaterfallSpec: `pik_toggle.target_instrument_ids` must explicitly list \
+                     the instruments that can PIK. Instrument-level PIK capability is not \
+                     modeled yet, so implicit all-instrument PIK targets are rejected.",
+                ));
+            }
+        }
+
+        if let Some(equity_pos) = self
+            .priority_of_payments
+            .iter()
+            .position(|p| *p == PaymentPriority::Equity)
+        {
+            for prepayment in [
+                PaymentPriority::MandatoryPrepayment,
+                PaymentPriority::VoluntaryPrepayment,
+                PaymentPriority::Sweep,
+            ] {
+                if let Some(prepayment_pos) = self
+                    .priority_of_payments
+                    .iter()
+                    .position(|p| *p == prepayment)
+                {
+                    if prepayment_pos > equity_pos {
+                        return Err(Error::build(format!(
+                            "WaterfallSpec: `{prepayment:?}` must precede `Equity` in \
+                             `priority_of_payments`; otherwise prepayment cash would be \
+                             distributed to equity before debt paydown."
+                        )));
+                    }
+                }
             }
         }
 
@@ -117,23 +159,6 @@ impl WaterfallSpec {
                  can never be applied.",
             ));
         }
-        let sweep_pos = self
-            .priority_of_payments
-            .iter()
-            .position(|p| *p == PaymentPriority::Sweep);
-        let equity_pos = self
-            .priority_of_payments
-            .iter()
-            .position(|p| *p == PaymentPriority::Equity);
-        if let (Some(sweep), Some(equity)) = (sweep_pos, equity_pos) {
-            if sweep > equity {
-                return Err(Error::build(
-                    "WaterfallSpec: `Sweep` must precede `Equity` in \
-                     `priority_of_payments` when `ecf_sweep.sweep_percentage > 0`. \
-                     Reorder priorities so `Sweep` appears before `Equity`.",
-                ));
-            }
-        }
         Ok(())
     }
 }
@@ -164,10 +189,14 @@ pub enum PaymentPriority {
 ///
 /// # ECF Calculation
 ///
-/// The standard ECF formula deducts cash interest from EBITDA:
+/// The standard ECF formula deducts cash interest from EBITDA. Fees and
+/// scheduled principal are also deducted when those payment categories rank
+/// ahead of the prepayment priority:
 ///
 /// ```text
 /// ECF = EBITDA - Taxes - CapEx - ΔWC - Cash Interest Paid
+///       - Fees Paid Ahead of Prepayment
+///       - Scheduled Principal Paid Ahead of Prepayment
 /// ```
 ///
 /// Set `cash_interest_node` to override the cash-interest input. If omitted,
@@ -301,6 +330,40 @@ mod tests {
             .validate()
             .expect_err("positive sweep without a prepayment priority must be rejected");
         assert!(err.to_string().contains("prepayment priority"));
+    }
+
+    #[test]
+    fn validate_rejects_prepayment_after_equity() {
+        let spec = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Equity,
+                PaymentPriority::MandatoryPrepayment,
+            ],
+            ..WaterfallSpec::default()
+        };
+        let err = spec
+            .validate()
+            .expect_err("prepayment after equity must be rejected");
+        assert!(err.to_string().contains("must precede `Equity`"));
+    }
+
+    #[test]
+    fn validate_rejects_implicit_pik_targets() {
+        let spec = WaterfallSpec {
+            pik_toggle: Some(PikToggleSpec {
+                liquidity_metric: "liquidity".into(),
+                threshold: 100.0,
+                target_instrument_ids: None,
+                min_periods_in_pik: 0,
+            }),
+            ..WaterfallSpec::default()
+        };
+        let err = spec
+            .validate()
+            .expect_err("implicit PIK targets must be rejected");
+        assert!(err.to_string().contains("target_instrument_ids"));
     }
 
     #[test]

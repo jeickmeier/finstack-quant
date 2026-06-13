@@ -18,6 +18,21 @@ pub fn build_cashflow_schedule_json(
         .map_err(to_js_err)
 }
 
+/// Build a stamped cashflow schedule envelope from a JSON spec.
+///
+/// @param spec_json - JSON-encoded `CashflowScheduleBuildSpec`.
+/// @param market_json - Optional JSON-encoded market context for floating-rate lookups.
+/// @returns JSON-encoded `CashflowScheduleEnvelope`.
+/// @throws If the spec or market JSON is malformed, or schedule construction fails.
+#[wasm_bindgen(js_name = buildCashflowScheduleEnvelopeJson)]
+pub fn build_cashflow_schedule_envelope_json(
+    spec_json: &str,
+    market_json: Option<String>,
+) -> Result<String, JsValue> {
+    finstack_cashflows::build_cashflow_schedule_envelope_json(spec_json, market_json.as_deref())
+        .map_err(to_js_err)
+}
+
 /// Validate a cashflow schedule JSON string and return it canonicalized.
 ///
 /// @param schedule_json - JSON-encoded `CashFlowSchedule`.
@@ -26,6 +41,17 @@ pub fn build_cashflow_schedule_json(
 #[wasm_bindgen(js_name = validateCashflowScheduleJson)]
 pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String, JsValue> {
     finstack_cashflows::validate_cashflow_schedule_json(schedule_json).map_err(to_js_err)
+}
+
+/// Validate a stamped cashflow schedule envelope and return it canonicalized.
+///
+/// @param envelope_json - JSON-encoded `CashflowScheduleEnvelope`.
+/// @returns Canonicalized JSON-encoded `CashflowScheduleEnvelope`.
+/// @throws If the envelope JSON is malformed, has an unsupported schema version,
+///   or fails schedule validation.
+#[wasm_bindgen(js_name = validateCashflowScheduleEnvelopeJson)]
+pub fn validate_cashflow_schedule_envelope_json(envelope_json: &str) -> Result<String, JsValue> {
+    finstack_cashflows::validate_cashflow_schedule_envelope_json(envelope_json).map_err(to_js_err)
 }
 
 /// Extract dated flows from a cashflow schedule JSON string.

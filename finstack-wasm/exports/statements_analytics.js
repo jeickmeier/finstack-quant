@@ -10,6 +10,7 @@ export const statements_analytics = {
   goalSeek: wasm.goalSeek,
   traceDependencies: wasm.traceDependencies,
   explainFormula: wasm.explainFormula,
+  explainFormulaText: wasm.explainFormulaText,
   plSummaryReport: wasm.plSummaryReport,
   creditAssessmentReport: wasm.creditAssessmentReport,
   runChecks: wasm.runChecks,

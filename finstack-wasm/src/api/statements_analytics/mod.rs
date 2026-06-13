@@ -216,6 +216,25 @@ pub fn explain_formula(
     results_json: &str,
     node_id: &str,
     period: &str,
+) -> Result<JsValue, JsValue> {
+    let model: finstack_statements::FinancialModelSpec =
+        serde_json::from_str(model_json).map_err(to_js_err)?;
+    let results: finstack_statements::evaluator::StatementResult =
+        serde_json::from_str(results_json).map_err(to_js_err)?;
+    let pid: finstack_core::dates::PeriodId = period.parse().map_err(to_js_err)?;
+    let explainer =
+        finstack_statements_analytics::analysis::FormulaExplainer::new(&model, &results);
+    let explanation = explainer.explain(node_id, &pid).map_err(to_js_err)?;
+    to_js_value(&explanation)
+}
+
+/// Explain a formula for a specific node and period as formatted text.
+#[wasm_bindgen(js_name = explainFormulaText)]
+pub fn explain_formula_text(
+    model_json: &str,
+    results_json: &str,
+    node_id: &str,
+    period: &str,
 ) -> Result<String, JsValue> {
     let model: finstack_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
@@ -269,15 +288,18 @@ pub fn credit_assessment_report(results_json: &str, as_of: &str) -> Result<Strin
 /// (built-in **and** user-defined formula checks), and returns a JSON
 /// check report.
 #[wasm_bindgen(js_name = runChecks)]
-pub fn run_checks(model_json: &str, suite_spec_json: &str) -> Result<String, JsValue> {
+pub fn run_checks(
+    model_json: &str,
+    suite_spec_json: &str,
+    results_json: Option<String>,
+) -> Result<String, JsValue> {
     let model: finstack_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
     let spec: finstack_statements::checks::CheckSuiteSpec =
         serde_json::from_str(suite_spec_json).map_err(to_js_err)?;
     let suite =
         finstack_statements_analytics::analysis::resolve_check_suite(&spec).map_err(to_js_err)?;
-    let mut evaluator = finstack_statements::evaluator::Evaluator::new();
-    let results = evaluator.evaluate(&model).map_err(to_js_err)?;
+    let results = evaluate_or_parse_results(&model, results_json)?;
     let report = suite.run(&model, &results).map_err(to_js_err)?;
     serde_json::to_string(&report).map_err(to_js_err)
 }
@@ -287,14 +309,17 @@ pub fn run_checks(model_json: &str, suite_spec_json: &str) -> Result<String, JsV
 /// Accepts a model and a mapping JSON, builds the appropriate check
 /// suite, evaluates the model, runs the checks, and returns the report.
 #[wasm_bindgen(js_name = runThreeStatementChecks)]
-pub fn run_three_statement_checks(model_json: &str, mapping_json: &str) -> Result<String, JsValue> {
+pub fn run_three_statement_checks(
+    model_json: &str,
+    mapping_json: &str,
+    results_json: Option<String>,
+) -> Result<String, JsValue> {
     let model: finstack_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
     let mapping: finstack_statements_analytics::analysis::ThreeStatementMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
     let suite = finstack_statements_analytics::analysis::three_statement_checks(mapping);
-    let mut evaluator = finstack_statements::evaluator::Evaluator::new();
-    let results = evaluator.evaluate(&model).map_err(to_js_err)?;
+    let results = evaluate_or_parse_results(&model, results_json)?;
     let report = suite.run(&model, &results).map_err(to_js_err)?;
     serde_json::to_string(&report).map_err(to_js_err)
 }
@@ -304,16 +329,29 @@ pub fn run_three_statement_checks(model_json: &str, mapping_json: &str) -> Resul
 pub fn run_credit_underwriting_checks(
     model_json: &str,
     mapping_json: &str,
+    results_json: Option<String>,
 ) -> Result<String, JsValue> {
     let model: finstack_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
     let mapping: finstack_statements_analytics::analysis::CreditMapping =
         serde_json::from_str(mapping_json).map_err(to_js_err)?;
     let suite = finstack_statements_analytics::analysis::credit_underwriting_checks(mapping);
-    let mut evaluator = finstack_statements::evaluator::Evaluator::new();
-    let results = evaluator.evaluate(&model).map_err(to_js_err)?;
+    let results = evaluate_or_parse_results(&model, results_json)?;
     let report = suite.run(&model, &results).map_err(to_js_err)?;
     serde_json::to_string(&report).map_err(to_js_err)
+}
+
+fn evaluate_or_parse_results(
+    model: &finstack_statements::FinancialModelSpec,
+    results_json: Option<String>,
+) -> Result<finstack_statements::evaluator::StatementResult, JsValue> {
+    if let Some(results_json) = results_json {
+        if !results_json.trim().is_empty() {
+            return serde_json::from_str(&results_json).map_err(to_js_err);
+        }
+    }
+    let mut evaluator = finstack_statements::evaluator::Evaluator::new();
+    evaluator.evaluate(model).map_err(to_js_err)
 }
 
 /// Render a check report as plain text.

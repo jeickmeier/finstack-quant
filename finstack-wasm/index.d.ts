@@ -438,6 +438,23 @@ export interface RelativeValueResultJson {
   peer_count: number;
 }
 
+/** Structured formula explanation returned by `explainFormula`. */
+export interface FormulaExplanationJson {
+  node_id: string;
+  period_id: string;
+  final_value: number;
+  node_type: string;
+  formula_text?: string | null;
+  breakdown: FormulaExplanationStepJson[];
+}
+
+/** One component in a structured formula explanation. */
+export interface FormulaExplanationStepJson {
+  component: string;
+  value: number;
+  operation?: string | null;
+}
+
 /** A single drawdown episode returned by `drawdownDetails`. */
 export interface DrawdownEpisode {
   start: string;
@@ -1156,6 +1173,16 @@ export interface CashflowsNamespace {
   buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;
 
   /**
+   * Build a stamped cashflow schedule envelope from a `CashflowScheduleBuildSpec` JSON string.
+   *
+   * @param specJson    JSON-encoded `CashflowScheduleBuildSpec`.
+   * @param marketJson  Optional JSON-encoded market context for floating-rate lookups.
+   * @returns           JSON-encoded `CashflowScheduleEnvelope`.
+   * @throws            If the spec or market JSON is malformed, or schedule construction fails.
+   */
+  buildCashflowScheduleEnvelopeJson(specJson: string, marketJson?: string | null): string;
+
+  /**
    * Validate a cashflow schedule JSON string and return it canonicalized.
    *
    * @param scheduleJson JSON-encoded `CashFlowSchedule`.
@@ -1163,6 +1190,15 @@ export interface CashflowsNamespace {
    * @throws             If the schedule JSON is malformed or fails validation.
    */
   validateCashflowScheduleJson(scheduleJson: string): string;
+
+  /**
+   * Validate a cashflow schedule envelope JSON string and return it canonicalized.
+   *
+   * @param envelopeJson JSON-encoded `CashflowScheduleEnvelope`.
+   * @returns            Canonicalized JSON-encoded `CashflowScheduleEnvelope`.
+   * @throws             If the envelope JSON is malformed or fails validation.
+   */
+  validateCashflowScheduleEnvelopeJson(envelopeJson: string): string;
 
   /**
    * Extract dated flows from a cashflow schedule.
@@ -1796,12 +1832,13 @@ export interface StatementsAnalyticsNamespace {
     boundsHi?: number | null
   ): GoalSeekResult;
   traceDependencies(modelJson: string, nodeId: string): string;
-  explainFormula(modelJson: string, resultsJson: string, nodeId: string, period: string): string;
+  explainFormula(modelJson: string, resultsJson: string, nodeId: string, period: string): FormulaExplanationJson;
+  explainFormulaText(modelJson: string, resultsJson: string, nodeId: string, period: string): string;
   plSummaryReport(resultsJson: string, lineItems: string[], periods: string[]): string;
   creditAssessmentReport(resultsJson: string, asOf: string): string;
-  runChecks(modelJson: string, suiteSpecJson: string): string;
-  runThreeStatementChecks(modelJson: string, mappingJson: string): string;
-  runCreditUnderwritingChecks(modelJson: string, mappingJson: string): string;
+  runChecks(modelJson: string, suiteSpecJson: string, resultsJson?: string | null): string;
+  runThreeStatementChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;
+  runCreditUnderwritingChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;
   renderCheckReportText(reportJson: string): string;
   renderCheckReportHtml(reportJson: string): string;
   // Comps — comparable company analysis

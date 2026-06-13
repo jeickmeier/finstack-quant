@@ -10,7 +10,8 @@ use finstack_core::InputError;
 
 use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
-    adjust_period_accruals, build_dates, build_schedule_period, is_regular_period, PeriodSchedule,
+    adjust_period_accruals, build_dates, build_schedule_period, is_regular_period,
+    validate_unique_payment_dates, PeriodSchedule,
 };
 use super::emission::compute_reset_date;
 
@@ -88,6 +89,7 @@ fn enrich_period_schedule(
         .into_iter()
         .map(|period| enrich_period(period, params, cal))
         .collect::<finstack_core::Result<Vec<_>>>()?;
+    validate_unique_payment_dates(&periods)?;
     Ok(PeriodSchedule {
         periods,
         dates: schedule.dates,
@@ -308,5 +310,25 @@ mod tests {
             periods[0].accrual_end,
             Date::from_calendar_date(2030, Month::May, 4).expect("valid date")
         );
+    }
+
+    #[test]
+    fn build_periods_rejects_duplicate_adjusted_payment_dates() {
+        let params = BuildPeriodsParams {
+            start: Date::from_calendar_date(2025, Month::January, 3).expect("valid date"),
+            end: Date::from_calendar_date(2025, Month::January, 6).expect("valid date"),
+            frequency: Tenor::daily(),
+            stub: StubKind::None,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only",
+            end_of_month: false,
+            day_count: DayCount::Act360,
+            payment_lag_days: 0,
+            reset_lag_days: None,
+            adjust_accrual_dates: false,
+        };
+
+        let err = build_periods(params).expect_err("payment-date collision must be rejected");
+        assert!(err.to_string().contains("same payment date"));
     }
 }

@@ -87,8 +87,9 @@ fn trigger_reason(trigger: &rust_ecl::StagingTrigger) -> String {
 ///     Current lifetime PD in decimal (0..1). Used as the BBB-rated curve value.
 /// origination_pd : float
 ///     Lifetime PD at initial recognition, in decimal.
-/// dpd : int
-///     Current days past due.
+/// dpd : int | None
+///     Current days past due. If omitted, the binding uses the configured
+///     accounting-policy default.
 #[pyclass(
     name = "Exposure",
     module = "finstack.statements_analytics",

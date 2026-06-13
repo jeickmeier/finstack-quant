@@ -148,6 +148,7 @@ const MAX_EX_COUPON_DAYS: u32 = 366;
 
 /// Ex-coupon convention applied to coupon flows.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ExCouponRule {
     /// Number of days before coupon date that go ex.
     ///
@@ -202,6 +203,7 @@ impl ExCouponRule {
 
 /// Generic configuration for schedule-driven interest accrual.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AccrualConfig {
     /// Accrual method (Linear or Compounded).
     pub method: AccrualMethod,
@@ -395,7 +397,23 @@ fn build_coupon_periods(
     for &i in &coupon_idx {
         let cf = &schedule.flows[i];
 
-        let cf_af = (cf.accrual_factor > 0.0).then_some(cf.accrual_factor);
+        let cf_af = if cf.accrual_factor > 0.0 {
+            if !cf.accrual_factor.is_finite() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "accrual: non-finite accrual_factor {} for coupon flow dated {}",
+                    cf.accrual_factor, cf.date
+                )));
+            }
+            Some(cf.accrual_factor)
+        } else {
+            if !cf.accrual_factor.is_finite() {
+                return Err(finstack_core::Error::Validation(format!(
+                    "accrual: non-finite accrual_factor {} for coupon flow dated {}",
+                    cf.accrual_factor, cf.date
+                )));
+            }
+            None
+        };
 
         if let Some(last) = buckets.last_mut() {
             if last.date == cf.date {
@@ -514,7 +532,13 @@ fn build_period_inputs(
 
         // Prefer accrual_factor from builder when present; otherwise derive via day count.
         let total_yf = match p.bucket.accrual_factor {
-            Some(af) if af > 0.0 => af,
+            Some(af) if af.is_finite() && af > 0.0 => af,
+            Some(af) => {
+                return Err(finstack_core::Error::Validation(format!(
+                    "accrual: non-finite or non-positive accrual_factor {af} for period ending {}",
+                    p.end
+                )));
+            }
             _ => {
                 let ctx = DayCountContext {
                     frequency,
@@ -584,16 +608,12 @@ fn find_active_period_and_elapsed<'a>(
             };
             let dc_elapsed = dc.year_fraction(inputs.start, as_of, dc_ctx)?.max(0.0);
 
-            // Rescale onto the `total_yf` basis when the bases diverge (see
-            // the basis-consistency note in the function docs), then clamp so
-            // accrued never exceeds the full coupon.
-            let elapsed = if dc_elapsed > inputs.total_yf {
-                let dc_total = dc.year_fraction(inputs.start, inputs.end, dc_ctx)?;
-                if dc_total > 0.0 {
-                    inputs.total_yf * dc_elapsed / dc_total
-                } else {
-                    dc_elapsed
-                }
+            // Rescale onto the `total_yf` basis under a single day-count
+            // context so stub reference-period choices cancel instead of
+            // mixing builder and elapsed bases.
+            let dc_total = dc.year_fraction(inputs.start, inputs.end, dc_ctx)?;
+            let elapsed = if dc_total.is_finite() && dc_total > 0.0 {
+                inputs.total_yf * dc_elapsed / dc_total
             } else {
                 dc_elapsed
             };
@@ -605,6 +625,12 @@ fn find_active_period_and_elapsed<'a>(
             // even under residual basis mismatch.
             if let Some(ref ex) = cfg.ex_coupon {
                 let ex_date = ex.ex_date(inputs.end)?;
+                if ex_date <= inputs.start {
+                    return Err(finstack_core::Error::Validation(format!(
+                        "ex-coupon date {ex_date} must fall after active period start {}",
+                        inputs.start
+                    )));
+                }
                 if as_of >= ex_date && as_of < inputs.end {
                     return Ok(Some((inputs, (elapsed - inputs.total_yf).min(0.0))));
                 }
@@ -955,6 +981,34 @@ mod tests {
     }
 
     #[test]
+    fn elapsed_rescaled_even_when_raw_day_count_is_below_builder_accrual_factor() {
+        let inputs = PeriodInputs {
+            start: make_date(2025, 1, 1),
+            end: make_date(2025, 7, 1),
+            notional_start: 1_000_000.0,
+            coupon_total: 37_500.0,
+            total_yf: 0.75,
+        };
+        let periods = [inputs.clone()];
+        let cfg = AccrualConfig::default();
+
+        let (_active, elapsed) = find_active_period_and_elapsed(
+            &periods,
+            make_date(2025, 4, 1),
+            DayCount::Act365F,
+            &cfg,
+        )
+        .expect("ok")
+        .expect("active period");
+        let expected = inputs.total_yf * 90.0 / 181.0;
+
+        assert!(
+            (elapsed - expected).abs() < 1e-12,
+            "elapsed should be scaled from raw day count to builder accrual factor, got {elapsed}"
+        );
+    }
+
+    #[test]
     fn ex_window_stub_never_positive_under_payment_lag() {
         let inputs = lagged_period_inputs();
         let periods = [inputs];
@@ -1081,6 +1135,56 @@ mod tests {
         let err = build_period_inputs(&schedule, &periods, &[], None)
             .expect_err("NaN coupon total must be rejected");
         assert!(err.to_string().contains("non-finite"));
+    }
+
+    #[test]
+    fn infinite_builder_accrual_factor_is_rejected() {
+        let mut schedule = make_test_schedule(
+            &[(make_date(2025, 7, 1), f64::INFINITY)],
+            DayCount::Thirty360,
+        );
+        schedule.meta.issue_date = Some(make_date(2025, 1, 1));
+
+        let err = build_coupon_periods(&schedule, &AccrualConfig::default())
+            .expect_err("infinite accrual_factor must be rejected");
+        assert!(err.to_string().contains("non-finite"));
+    }
+
+    #[test]
+    fn ex_coupon_window_spanning_full_period_is_rejected() {
+        let inputs = PeriodInputs {
+            start: make_date(2025, 1, 1),
+            end: make_date(2025, 2, 1),
+            notional_start: 1_000_000.0,
+            coupon_total: 4_166.67,
+            total_yf: 1.0 / 12.0,
+        };
+        let periods = [inputs];
+        let cfg = ex_coupon_cfg(45);
+
+        let err = find_active_period_and_elapsed(
+            &periods,
+            make_date(2025, 1, 1),
+            DayCount::Act365F,
+            &cfg,
+        )
+        .expect_err("ex-coupon window before period start must be rejected");
+        assert!(err.to_string().contains("ex-coupon"));
+    }
+
+    #[test]
+    fn accrual_config_rejects_unknown_json_fields() {
+        let err = serde_json::from_str::<AccrualConfig>(
+            r#"{"method":"Linear","include_pik":true,"frequency":null,"strict_issue_date":true}"#,
+        )
+        .expect_err("unknown top-level accrual field must be rejected");
+        assert!(err.to_string().contains("strict_issue_date"));
+
+        let nested = serde_json::from_str::<AccrualConfig>(
+            r#"{"method":"Linear","include_pik":true,"frequency":null,"ex_coupon":{"days_before_coupon":7,"bogus":1}}"#,
+        )
+        .expect_err("unknown nested ex-coupon field must be rejected");
+        assert!(nested.to_string().contains("bogus"));
     }
 
     #[test]

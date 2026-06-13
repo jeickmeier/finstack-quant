@@ -317,6 +317,7 @@ impl CFKind {
 #[derive(
     Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
+#[serde(deny_unknown_fields)]
 pub struct CashFlow {
     /// Payment date (or payment date for principal/fee, or reset date for `CFKind::FloatReset`).
     #[schemars(with = "String")]
@@ -509,6 +510,23 @@ mod tests {
         assert!(cf.reset_date.is_none());
         assert_eq!(cf.accrual_factor, 0.0);
         assert!(cf.validate().is_ok());
+    }
+
+    #[test]
+    fn cashflow_rejects_unknown_json_fields() {
+        let json = serde_json::json!({
+            "date": Date::from_calendar_date(2025, Month::January, 15).expect("valid date"),
+            "reset_date": null,
+            "amount": Money::new(100.0, Currency::USD),
+            "kind": "Fixed",
+            "accrual_factor": 0.25,
+            "rate": 0.05,
+            "extra": true
+        });
+
+        let err = serde_json::from_value::<CashFlow>(json)
+            .expect_err("unknown cashflow fields must be rejected");
+        assert!(err.to_string().contains("extra"));
     }
 
     #[test]

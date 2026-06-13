@@ -88,11 +88,48 @@ pub struct CeclConfig {
     /// Historical long-run annual PD used after the R&S period.
     pub historical_annual_pd: f64,
 
+    /// DPD threshold at or above which an exposure is treated as
+    /// credit-impaired under CECL. Default: 90.
+    #[serde(default = "default_impaired_dpd_threshold")]
+    pub impaired_dpd_threshold: u32,
+
+    /// Whether objective qualitative default evidence triggers the
+    /// credit-impaired CECL shortcut. Default: true.
+    #[serde(default = "default_impaired_qualitative_triggers_enabled")]
+    pub impaired_qualitative_triggers_enabled: bool,
+
+    /// Expected time to recovery / resolution for credit-impaired exposures,
+    /// in years. Used as the discount timing for the impaired shortcut.
+    /// Default: 1.0.
+    #[serde(default = "default_impaired_time_to_recovery_years")]
+    pub impaired_time_to_recovery_years: f64,
+
+    /// Whether expected losses are discounted at the exposure EIR. Default:
+    /// true for continuity with the existing PD-LGD-EAD implementation.
+    #[serde(default = "default_discount_expected_losses")]
+    pub discount_expected_losses: bool,
+
     /// Macro scenario specifications (same structure as IFRS 9).
     pub scenarios: Vec<MacroScenario>,
 
     /// CECL methodology selection.
     pub methodology: CeclMethodology,
+}
+
+fn default_impaired_dpd_threshold() -> u32 {
+    90
+}
+
+fn default_impaired_qualitative_triggers_enabled() -> bool {
+    true
+}
+
+fn default_impaired_time_to_recovery_years() -> f64 {
+    1.0
+}
+
+fn default_discount_expected_losses() -> bool {
+    true
 }
 
 impl Default for CeclConfig {
@@ -117,6 +154,13 @@ impl CeclConfig {
         if self.historical_annual_pd < 0.0 || self.historical_annual_pd > 1.0 {
             return Err(Error::Validation(
                 "historical_annual_pd must be in [0, 1]".to_string(),
+            ));
+        }
+        if !self.impaired_time_to_recovery_years.is_finite()
+            || self.impaired_time_to_recovery_years < 0.0
+        {
+            return Err(Error::Validation(
+                "impaired_time_to_recovery_years must be finite and non-negative".to_string(),
             ));
         }
         let total_weight: f64 = self.scenarios.iter().map(|s| s.weight).sum();
@@ -213,6 +257,26 @@ impl<'a> CeclEngine<'a> {
         let n_buckets = (horizon / dt).ceil() as usize;
         let n_buckets = n_buckets.max(1);
 
+        for (_, pd_source) in &self.pd_sources {
+            pd_source.cumulative_pd(rating, 0.0)?;
+        }
+
+        if self.is_credit_impaired(exposure) {
+            let t_recovery = self.config.impaired_time_to_recovery_years;
+            let mut weighted_ecl = 0.0;
+            for (scenario, _) in &self.pd_sources {
+                let lgd = scenario.lgd_override.unwrap_or(exposure.lgd);
+                let df = self.discount_factor(exposure, t_recovery);
+                weighted_ecl += scenario.weight * lgd * exposure.ead_at(0.0) * df;
+            }
+            return Ok(CeclResult {
+                exposure_id: exposure.id.clone(),
+                ecl: weighted_ecl,
+                horizon: t_recovery,
+                methodology: self.config.methodology,
+            });
+        }
+
         let mut weighted_ecl = 0.0;
 
         for (scenario, pd_source) in &self.pd_sources {
@@ -237,7 +301,7 @@ impl<'a> CeclEngine<'a> {
                 survival = (survival * (1.0 - cond_mpd)).max(0.0);
 
                 let lgd = scenario.lgd_override.unwrap_or(exposure.lgd);
-                let df = 1.0 / (1.0 + exposure.eir).powf(t_mid);
+                let df = self.discount_factor(exposure, t_mid);
                 scenario_ecl += uncond_mpd * lgd * exposure.ead_at(t_mid) * df;
             }
             weighted_ecl += scenario.weight * scenario_ecl;
@@ -249,6 +313,20 @@ impl<'a> CeclEngine<'a> {
             horizon,
             methodology: self.config.methodology,
         })
+    }
+
+    fn is_credit_impaired(&self, exposure: &Exposure) -> bool {
+        exposure.days_past_due >= self.config.impaired_dpd_threshold
+            || (self.config.impaired_qualitative_triggers_enabled
+                && exposure.qualitative_flags.has_default_evidence())
+    }
+
+    fn discount_factor(&self, exposure: &Exposure, t: f64) -> f64 {
+        if self.config.discount_expected_losses {
+            1.0 / (1.0 + exposure.eir).powf(t)
+        } else {
+            1.0
+        }
     }
 
     /// Blended conditional marginal PD for `[t1, t2]` given survival to `t1`.
@@ -325,21 +403,43 @@ impl<'a> CeclEngine<'a> {
                 if t_mid >= reversion_end {
                     Ok(historical_mpd)
                 } else {
-                    // Convert forecast conditional mpd to a hazard, blend,
-                    // and convert back. This keeps the blend on the
-                    // hazard scale rather than on the survival scale.
+                    // Convert the forecast conditional MPD at the R&S
+                    // boundary to a hazard, blend toward the historical
+                    // hazard, and convert back. Do not query the forecast
+                    // curve over post-R&S buckets; after the supportable
+                    // horizon the forecast assumption is held at its boundary
+                    // hazard and then reverted.
                     let blend = ((t_mid - rs) / reversion_years).clamp(0.0, 1.0);
-                    let fcst_mpd = pd_source.marginal_pd(rating, t1, t2)?;
-                    let lambda_fcst = if fcst_mpd < 1.0 {
-                        -(1.0 - fcst_mpd).ln() / dt
-                    } else {
-                        f64::INFINITY
-                    };
+                    let lambda_fcst = self.forecast_boundary_hazard(pd_source, rating, dt)?;
                     let lambda_blend = (1.0 - blend) * lambda_fcst + blend * lambda_hist;
                     Ok(1.0 - (-lambda_blend * dt).exp())
                 }
             }
         }
+    }
+
+    fn forecast_boundary_hazard(
+        &self,
+        pd_source: &dyn PdTermStructure,
+        rating: &str,
+        bucket_width: f64,
+    ) -> Result<f64> {
+        let rs = self.config.forecast_horizon_years;
+        let (start, end) = if rs > f64::EPSILON {
+            ((rs - bucket_width).max(0.0), rs)
+        } else {
+            (0.0, bucket_width)
+        };
+        let dt = end - start;
+        if dt <= f64::EPSILON {
+            return Ok(0.0);
+        }
+        let fcst_mpd = pd_source.marginal_pd(rating, start, end)?;
+        Ok(if fcst_mpd < 1.0 {
+            -(1.0 - fcst_mpd).ln() / dt
+        } else {
+            f64::INFINITY
+        })
     }
 
     /// Access the engine's configuration.

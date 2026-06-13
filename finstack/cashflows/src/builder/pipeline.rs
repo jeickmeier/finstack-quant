@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use finstack_core::currency::Currency;
 use finstack_core::dates::Date;
-use finstack_core::decimal::{decimal_to_f64, f64_to_decimal};
+use finstack_core::decimal::f64_to_decimal;
 use finstack_core::market_data::scalars::ScalarTimeSeries;
 use finstack_core::market_data::term_structures::ForwardCurve;
 use finstack_core::money::Money;
@@ -22,6 +22,7 @@ use crate::primitives::{CFKind, CashFlow};
 #[derive(Clone, Copy)]
 pub(super) struct BuildContext<'a> {
     pub(super) ccy: Currency,
+    pub(super) issue: Date,
     pub(super) maturity: Date,
     /// Business-day-adjusted maturity on which the final principal redemption
     /// is paid. Adjusted with the calendar/BDC of the principal-paying leg
@@ -97,20 +98,26 @@ impl<'a> DateProcessor<'a> {
             step_remaining_map: &self.amort_setup.step_remaining_map,
             custom_principal_map: &self.amort_setup.custom_principal_map,
         };
-        let before = decimal_to_f64(state.outstanding)?;
-        let mut outstanding_f64 = before;
         emit_amortization_on(
             d,
             self.ctx.notional,
-            &mut outstanding_f64,
+            &mut state.outstanding,
             &amort_params,
             d == self.ctx.maturity,
             &mut state.flows,
         )?;
-        let delta = outstanding_f64 - before;
-        if delta != 0.0 {
-            state.outstanding += f64_to_decimal(delta)?;
-        }
+        Ok(())
+    }
+
+    /// Emit amortization scheduled exactly on the issue date.
+    pub(super) fn process_issue_amortization(
+        &self,
+        state: &mut BuildState,
+    ) -> finstack_core::Result<()> {
+        self.emit_amortization(self.ctx.issue, state)?;
+        state
+            .outstanding_after
+            .insert(self.ctx.issue, state.outstanding);
         Ok(())
     }
 
@@ -165,7 +172,7 @@ impl<'a> DateProcessor<'a> {
     /// the shifted date keeps the schedule ordered.
     fn handle_maturity(&self, d: Date, state: &mut BuildState) -> finstack_core::Result<()> {
         if d == self.ctx.maturity && state.outstanding > Decimal::ZERO {
-            let outstanding_f64 = decimal_to_f64(state.outstanding)?;
+            let outstanding_f64 = finstack_core::decimal::decimal_to_f64(state.outstanding)?;
             state.flows.push(CashFlow {
                 date: self.ctx.redemption_date,
                 reset_date: None,

@@ -27,6 +27,7 @@
 //!
 //! ```text
 //! ECF = EBITDA - Taxes - CapEx - Working_Capital_Change - Cash_Interest
+//!       - Fees                  (when Fees rank ahead of prepayment)
 //!       - Scheduled_Principal   (when Amortization ranks ahead of the
 //!                                prepayment priority in the waterfall)
 //! Sweep = max(0, ECF × sweep_percentage)
@@ -34,8 +35,9 @@
 //!
 //! The `cash_interest_node` is optional. Per S&P LCD / standard LPA definitions,
 //! ECF should include a cash interest deduction. Set it to include this deduction.
-//! Scheduled amortization paid ahead of the sweep is likewise deducted so the
-//! sweep cannot double-spend cash already consumed by scheduled debt service.
+//! Fees and scheduled amortization paid ahead of the sweep are likewise
+//! deducted so the sweep cannot double-spend cash already consumed by payment
+//! categories that rank ahead of debt prepayment.
 //!
 //! The sweep is floored at zero (cannot sweep negative cash flow) and then
 //! applied as additional principal prepayment to the target instrument.
@@ -145,6 +147,8 @@ pub fn execute_waterfall(
     state: &mut CapitalStructureState,
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
 ) -> Result<WaterfallPeriodResult> {
+    waterfall_spec.validate()?;
+
     let _span = tracing::info_span!(
         "statements.capital_structure.waterfall",
         period = _period_id.to_string(),
@@ -215,12 +219,14 @@ pub fn execute_waterfall(
         // consumes cash before the sweep, so it is deducted from ECF (per
         // standard LPA ECF definitions) to avoid double-spending that cash.
         let deduct_scheduled_principal = amortization_priority < extra_principal_priority;
+        let deduct_fees = fees_priority < extra_principal_priority;
         calculate_ecf_sweep(
             context,
             ecf_spec,
             contractual_flows,
             state,
             deduct_scheduled_principal,
+            deduct_fees,
         )?
     } else {
         Money::new(0.0, cash_currency)
@@ -258,12 +264,21 @@ pub fn execute_waterfall(
                     .checked_add(shortfall)?;
             }
         }
+        if let Some(shortfall) = state
+            .principal_shortfall
+            .shift_remove(instrument_id.as_str())
+        {
+            if shortfall.amount() > 0.0 && shortfall.currency() == currency {
+                staged_breakdown.principal_payment =
+                    staged_breakdown.principal_payment.checked_add(shortfall)?;
+            }
+        }
         staged.push(StagedInstrumentFlow {
             instrument_id: instrument_id.clone(),
             breakdown: staged_breakdown,
             opening_balance,
             extra_principal: Money::new(0.0, currency),
-            scheduled_principal: breakdown.principal_payment,
+            scheduled_principal: staged_breakdown.principal_payment,
             toggled_pik_moved: Money::new(0.0, currency),
         });
     }
@@ -275,22 +290,12 @@ pub fn execute_waterfall(
         sweep_amount
     };
 
-    if fees_priority < extra_principal_priority {
-        let total_fees = staged
-            .iter()
-            .map(|s| s.breakdown.fees.amount())
-            .sum::<f64>();
-        remaining_sweep = Money::new(
-            (remaining_sweep.amount() - total_fees).max(0.0),
-            remaining_sweep.currency(),
-        );
-    }
-    // Note: no separate interest-priority or amortization deduction from
+    // Note: no separate fee, interest-priority, or amortization deduction from
     // `remaining_sweep` here. When an ECF sweep is configured,
-    // `calculate_ecf_sweep` already deducts cash interest (and scheduled
-    // principal when amortization ranks ahead of the prepayment priority)
-    // from EBITDA. When no ECF sweep is configured, `sweep_amount` is zero,
-    // so `remaining_sweep` starts at zero and any subtraction is a no-op.
+    // `calculate_ecf_sweep` already deducts cash interest plus any fees and
+    // scheduled principal that rank ahead of the prepayment priority. When no
+    // ECF sweep is configured, `sweep_amount` is zero, so `remaining_sweep`
+    // starts at zero and any subtraction would be a no-op.
 
     let target_instrument_id = waterfall_spec
         .ecf_sweep
@@ -430,6 +435,10 @@ pub fn execute_waterfall(
             .iter()
             .map(|s| s.breakdown.fees.amount().max(0.0))
             .collect();
+        let planned_scheduled_principal: Vec<f64> = staged
+            .iter()
+            .map(|s| s.scheduled_principal.amount().max(0.0))
+            .collect();
         let mut extra_principal_capped = false;
         for priority in &waterfall_spec.priority_of_payments {
             match priority {
@@ -499,6 +508,31 @@ pub fn execute_waterfall(
                     period = _period_id.to_string(),
                     "Available cash insufficient for planned interest/fees; \
                      shortfall accrued and carried into the next period's interest claim."
+                );
+            }
+
+            let unpaid_principal =
+                planned_scheduled_principal[idx] - s.scheduled_principal.amount().max(0.0);
+            if unpaid_principal > f64::EPSILON {
+                let currency = s.scheduled_principal.currency();
+                shortfalls.insert(
+                    format!("principal::{}", s.instrument_id),
+                    Money::new(unpaid_principal, currency),
+                );
+                warnings.push(EvalWarning::CapitalStructureCashflowIgnored {
+                    period: *_period_id,
+                    kind: format!(
+                        "principal_shortfall(instrument={}, amount={unpaid_principal:.4})",
+                        s.instrument_id
+                    ),
+                    cashflow_date: _period_id.to_string(),
+                });
+                tracing::warn!(
+                    instrument = s.instrument_id.as_str(),
+                    shortfall = unpaid_principal,
+                    period = _period_id.to_string(),
+                    "Available cash insufficient for planned scheduled principal; \
+                     shortfall carried into the next period's amortization claim."
                 );
             }
         }
@@ -602,6 +636,11 @@ pub fn execute_waterfall(
             breakdown.accrued_interest = breakdown.accrued_interest.checked_add(*shortfall)?;
             state
                 .interest_shortfall
+                .insert(instrument_id.clone(), *shortfall);
+        }
+        if let Some(shortfall) = shortfalls.get(format!("principal::{instrument_id}").as_str()) {
+            state
+                .principal_shortfall
                 .insert(instrument_id.clone(), *shortfall);
         }
 
@@ -726,6 +765,58 @@ mod tests {
                 .expect("cumulative principal")
                 .amount(),
             425_000.0
+        );
+    }
+
+    #[test]
+    fn test_ecf_sweep_deducts_fees_before_sweep_percentage() {
+        let period = PeriodId::quarter(2025, 1);
+        let context = build_context(period, &[("ebitda", 1_000.0)]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.fees = Money::new(100.0, Currency::USD);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(10_000.0, Currency::USD));
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Sweep,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: None,
+            ecf_sweep: Some(EcfSweepSpec {
+                ebitda_node: "ebitda".into(),
+                taxes_node: None,
+                capex_node: None,
+                working_capital_node: None,
+                cash_interest_node: None,
+                sweep_percentage: 0.5,
+                target_instrument_id: Some("TL-1".into()),
+            }),
+            pik_toggle: None,
+        };
+
+        let result = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect("waterfall should execute");
+
+        let tl = result.flows.get("TL-1").expect("TL-1");
+        assert_eq!(
+            tl.principal_payment.amount(),
+            450.0,
+            "fees paid ahead of sweep reduce ECF before the sweep percentage: (1000 - 100) * 50%"
         );
     }
 
@@ -1377,6 +1468,91 @@ mod tests {
             "shortfall cleared once paid"
         );
         assert!(result_recovered.warnings.is_empty());
+        assert_eq!(
+            result_recovered
+                .equity_distribution
+                .expect("equity populated")
+                .amount(),
+            60.0
+        );
+    }
+
+    #[test]
+    fn test_principal_shortfall_carries_forward_as_amortization_claim() {
+        let period = PeriodId::quarter(2025, 1);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        breakdown.principal_payment = Money::new(100.0, Currency::USD);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(1_000.0, Currency::USD));
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Sweep,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: Some("cash_available".into()),
+            ecf_sweep: None,
+            pik_toggle: None,
+        };
+
+        let ctx_short = build_context(period, &[("cash_available", 60.0)]);
+        let result_short = execute_waterfall(
+            &period,
+            &ctx_short,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect("waterfall should execute");
+
+        let tl = result_short.flows.get("TL-1").expect("TL-1");
+        assert_eq!(tl.principal_payment.amount(), 60.0);
+        assert_eq!(
+            state
+                .principal_shortfall
+                .get("TL-1")
+                .expect("principal shortfall recorded")
+                .amount(),
+            40.0
+        );
+        assert!(
+            result_short
+                .warnings
+                .iter()
+                .any(|warning| matches!(warning, EvalWarning::CapitalStructureCashflowIgnored { kind, .. } if kind.starts_with("principal_shortfall"))),
+            "principal shortfall must surface a structured warning"
+        );
+
+        state.advance_period();
+        let ctx_recovered = build_context(period, &[("cash_available", 200.0)]);
+        let result_recovered = execute_waterfall(
+            &period,
+            &ctx_recovered,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect("waterfall should execute");
+
+        let tl = result_recovered.flows.get("TL-1").expect("TL-1");
+        assert_eq!(
+            tl.principal_payment.amount(),
+            140.0,
+            "carried principal claim is paid in the next period's amortization category"
+        );
+        assert!(
+            state.principal_shortfall.get("TL-1").is_none(),
+            "principal shortfall clears once paid"
+        );
         assert_eq!(
             result_recovered
                 .equity_distribution

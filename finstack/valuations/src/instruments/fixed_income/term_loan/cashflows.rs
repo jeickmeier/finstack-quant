@@ -345,6 +345,7 @@ pub(crate) fn generate_cashflows(
                     all_in_cap_bp: spec.all_in_cap_bp,
                     all_in_floor_bp: spec.all_in_floor_bp,
                     index_cap_bp: spec.index_cap_bp,
+                    overnight_index_constraints: Default::default(),
                     reset_freq: loan.frequency,
                     index_tenor: None,
                     reset_lag_days: spec.reset_lag_days,

@@ -108,6 +108,26 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
         serde_json::from_str::<serde_json::Value>(&schedule_json).unwrap(),
         serde_json::from_str::<serde_json::Value>(&validated).unwrap()
     );
+    let envelope_json =
+        cashflows::build_cashflow_schedule_envelope_json(&cashflow_spec_json(), None)
+            .expect("schedule envelope should build");
+    let envelope: serde_json::Value = serde_json::from_str(&envelope_json).unwrap();
+    assert_eq!(
+        envelope["schema_version"],
+        serde_json::Value::String("finstack.cashflows.schedule/1".to_string())
+    );
+    assert_eq!(
+        envelope["schedule"],
+        serde_json::from_str::<serde_json::Value>(&schedule_json).unwrap()
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(
+            &cashflows::validate_cashflow_schedule_envelope_json(&envelope_json)
+                .expect("valid envelope")
+        )
+        .unwrap(),
+        envelope
+    );
 
     let flows_json = cashflows::dated_flows_json(&schedule_json).expect("dated flows");
     let flows: Vec<serde_json::Value> = serde_json::from_str(&flows_json).unwrap();

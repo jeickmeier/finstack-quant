@@ -92,6 +92,8 @@ pub(crate) struct ResolvedFloatingRateSpec {
     pub params: FloatingRateParams,
     /// Runtime-resolved fallback policy.
     pub fallback: ResolvedFloatingRateFallback,
+    /// Index floor/cap policy for overnight daily sampling.
+    pub overnight_index_constraints: super::specs::OvernightIndexConstraintApplication,
 }
 
 impl Default for FloatingRateParams {
@@ -262,7 +264,11 @@ impl TryFrom<&crate::builder::specs::FloatingRateSpec> for ResolvedFloatingRateS
             ),
         };
 
-        Ok(Self { params, fallback })
+        Ok(Self {
+            params,
+            fallback,
+            overnight_index_constraints: spec.overnight_index_constraints,
+        })
     }
 }
 
@@ -1269,7 +1275,9 @@ mod tests {
 
     #[test]
     fn try_from_floating_rate_spec_round_trips_all_fields() {
-        use crate::builder::specs::{FloatingRateFallback, FloatingRateSpec};
+        use crate::builder::specs::{
+            FloatingRateFallback, FloatingRateSpec, OvernightIndexConstraintApplication,
+        };
         use finstack_core::dates::{BusinessDayConvention, DayCount, Tenor};
         use rust_decimal_macros::dec;
 
@@ -1282,6 +1290,7 @@ mod tests {
             all_in_floor_bp: Some(dec!(50.0)),
             all_in_cap_bp: Some(dec!(1500.0)),
             index_cap_bp: Some(dec!(1200.0)),
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,
@@ -1309,7 +1318,9 @@ mod tests {
 
     #[test]
     fn try_from_floating_rate_spec_maps_none_constraints() {
-        use crate::builder::specs::{FloatingRateFallback, FloatingRateSpec};
+        use crate::builder::specs::{
+            FloatingRateFallback, FloatingRateSpec, OvernightIndexConstraintApplication,
+        };
         use finstack_core::dates::{BusinessDayConvention, DayCount, Tenor};
         use rust_decimal_macros::dec;
 
@@ -1322,6 +1333,7 @@ mod tests {
             all_in_floor_bp: None,
             all_in_cap_bp: None,
             index_cap_bp: None,
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,
@@ -1345,7 +1357,9 @@ mod tests {
 
     #[test]
     fn try_from_floating_rate_spec_rejects_contradictory_caps_and_floors() {
-        use crate::builder::specs::{FloatingRateFallback, FloatingRateSpec};
+        use crate::builder::specs::{
+            FloatingRateFallback, FloatingRateSpec, OvernightIndexConstraintApplication,
+        };
         use finstack_core::dates::{BusinessDayConvention, DayCount, Tenor};
         use rust_decimal_macros::dec;
 
@@ -1358,6 +1372,7 @@ mod tests {
             all_in_floor_bp: Some(dec!(600.0)),
             all_in_cap_bp: Some(dec!(500.0)),
             index_cap_bp: Some(dec!(100.0)),
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,

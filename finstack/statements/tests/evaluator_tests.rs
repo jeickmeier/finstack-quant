@@ -1388,6 +1388,37 @@ fn test_lagged_rolling_mean_has_no_look_ahead() {
     );
 }
 
+/// The same look-ahead guard must apply when the rolling expression is not a
+/// bare column; expression collectors have their own period enumeration path.
+#[test]
+fn test_lagged_expression_rolling_mean_has_no_look_ahead() {
+    let model = ModelBuilder::new("lagged-expression-rolling")
+        .periods("2025Q1..Q4", None)
+        .unwrap()
+        .value(
+            "x",
+            &[
+                (PeriodId::quarter(2025, 1), AmountOrScalar::scalar(1.0)),
+                (PeriodId::quarter(2025, 2), AmountOrScalar::scalar(2.0)),
+                (PeriodId::quarter(2025, 3), AmountOrScalar::scalar(4.0)),
+                (PeriodId::quarter(2025, 4), AmountOrScalar::scalar(8.0)),
+            ],
+        )
+        .compute("y", "lag(rolling_mean(x * 1, 2), 2)")
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let mut evaluator = Evaluator::new();
+    let results = evaluator.evaluate(&model).unwrap();
+
+    let y_q4 = results.get("y", &PeriodId::quarter(2025, 4)).unwrap();
+    assert!(
+        (y_q4 - 1.5).abs() < 1e-12,
+        "lagged expression rolling mean must only see data up to the lagged period, got {y_q4}"
+    );
+}
+
 /// `lag`/`diff`/`pct_change` with expression (non-column) arguments must
 /// return NaN at period boundaries, matching the column path, instead of
 /// erroring against an empty historical context.

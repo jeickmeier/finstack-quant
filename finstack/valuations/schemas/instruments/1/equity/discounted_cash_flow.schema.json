@@ -1703,7 +1703,7 @@
               ]
             },
             "ValuationDiscounts": {
-              "description": "Valuation discounts for private company equity.\n\nApplied multiplicatively after the equity bridge:\n```text\nFMV = Equity Value × (1 - DLOC) × (1 - DLOM) × (1 - other_discount)\n```",
+              "description": "Valuation discounts for private company equity.\n\nApplied multiplicatively after the equity bridge:\n```text\nFMV = Equity Value × (1 - DLOC) × (1 - DLOM) × (1 - other_discount)\n```\n\nThe enterprise value reported by a DCF remains pre-discount. When discounts\nare present, `enterprise_value - net_debt` reconciles to pre-discount\nequity value, not to the discounted fair-market equity value.",
               "properties": {
                 "dloc": {
                   "description": "Discount for Lack of Control (0.0–1.0, e.g., 0.20 for 20%).",

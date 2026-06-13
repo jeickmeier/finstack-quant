@@ -203,7 +203,11 @@ fn cashflows_dts_matches_json_bridge_surface() {
     assert!(dts.contains(
         "buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;"
     ));
+    assert!(dts.contains(
+        "buildCashflowScheduleEnvelopeJson(specJson: string, marketJson?: string | null): string;"
+    ));
     assert!(dts.contains("validateCashflowScheduleJson(scheduleJson: string): string;"));
+    assert!(dts.contains("validateCashflowScheduleEnvelopeJson(envelopeJson: string): string;"));
     assert!(dts.contains("datedFlowsJson(scheduleJson: string): string;"));
     assert!(dts.contains("accruedInterestJson("));
     assert!(dts.contains("bondFromCashflowsJson("));
@@ -362,12 +366,22 @@ fn statements_analytics_dts_matches_runtime_exports() {
         &dts,
         "goalSeek(modelJson: string, targetNode: string, targetPeriod: string, targetValue: number, driverNode: string, driverPeriod: string, updateModel: boolean, boundsLo?: number | null, boundsHi?: number | null): GoalSeekResult;",
     ));
-    assert!(dts.contains("runChecks(modelJson: string, suiteSpecJson: string): string;"));
+    assert!(dts.contains("export interface FormulaExplanationJson"));
+    assert!(dts.contains("explainFormula(modelJson: string, resultsJson: string, nodeId: string, period: string): FormulaExplanationJson;"));
+    assert!(dts.contains(
+        "explainFormulaText(modelJson: string, resultsJson: string, nodeId: string, period: string): string;"
+    ));
+    assert!(dts.contains(
+        "runChecks(modelJson: string, suiteSpecJson: string, resultsJson?: string | null): string;"
+    ));
     assert!(
-        dts.contains("runThreeStatementChecks(modelJson: string, mappingJson: string): string;")
+        dts.contains(
+            "runThreeStatementChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;"
+        )
     );
-    assert!(dts
-        .contains("runCreditUnderwritingChecks(modelJson: string, mappingJson: string): string;"));
+    assert!(dts.contains(
+        "runCreditUnderwritingChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;"
+    ));
     assert!(dts.contains("renderCheckReportText(reportJson: string): string;"));
     assert!(dts.contains("renderCheckReportHtml(reportJson: string): string;"));
     assert!(

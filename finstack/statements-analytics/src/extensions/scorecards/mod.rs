@@ -249,6 +249,15 @@ impl CreditScorecardExtension {
             )));
         }
 
+        for metric in &config.metrics {
+            if !metric.weight.is_finite() || metric.weight < 0.0 {
+                return Err(finstack_statements::error::Error::invalid_input(format!(
+                    "Scorecard metric '{}' weight must be finite and non-negative, got {}",
+                    metric.name, metric.weight
+                )));
+            }
+        }
+
         let total_weight: f64 = config.metrics.iter().map(|m| m.weight).sum();
         if total_weight > 0.0 && !(0.01..=100.0).contains(&total_weight) {
             return Err(finstack_statements::error::Error::invalid_input(format!(

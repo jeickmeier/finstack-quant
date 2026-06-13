@@ -24,12 +24,8 @@
 //!   near zero. For most credit metrics that are expected to stay positive,
 //!   multiplicative is the safer default.
 //!
-//! * **`season_start`** — zero-based position within the seasonal cycle that
-//!   your first historical observation corresponds to (e.g. `1` if the fiscal
-//!   year starts in April and your first data point is Q2/July). The seasonal
-//!   decomposition keys factors by data position, so this parameter is
-//!   descriptive only — the projection continues the positional cycle
-//!   regardless of its value.
+//! Unsupported parameters such as `season_start` are rejected explicitly so
+//! schema typos and unsupported calendar shifts do not become silent no-ops.
 
 use crate::error::{Error, Result};
 use crate::types::SeasonalMode;
@@ -371,11 +367,9 @@ fn double_exponential_smoothing(data: &[f64], alpha: f64, beta: f64) -> (f64, f6
 ///   top of the historical trend slope—the decomposition already captures the
 ///   historical trajectory in the trend component.
 /// * `mode` - SeasonalMode enum: "additive" or "multiplicative" (required)
-/// * `season_start` - Zero-based offset indicating which calendar season
-///   position the first historical observation corresponds to (default: 0).
-///   Accepted for descriptive/schema purposes only: the decomposition keys
-///   seasonal factors by data position, so the projection continues the
-///   positional cycle and does not need (or apply) this offset.
+///
+/// Unsupported calendar-shift parameters such as `season_start` are rejected;
+/// the decomposition keys seasonal factors by data position.
 ///
 /// Note: `base_value` is provided for API parity with other forecast methods but
 /// is not used in the seasonal calculation—the historical series establishes
@@ -400,13 +394,7 @@ fn seasonal_forecast_with_decomposition(
 ) -> Result<IndexMap<PeriodId, f64>> {
     validate_param_keys(
         params,
-        &[
-            "historical",
-            "season_length",
-            "mode",
-            "growth",
-            "season_start",
-        ],
+        &["historical", "season_length", "mode", "growth"],
         "seasonal",
     )?;
 
@@ -838,40 +826,18 @@ mod tests {
     }
 
     #[test]
-    fn test_seasonal_forecast_season_start_does_not_rotate_pattern() {
-        // Alternating additive pattern: low, high, low, high, ... The data
-        // ends at position 5 (high), so the first forecast (position 6)
-        // continues the cycle with a *low* value and the second with a high
-        // one. Before the double-shift fix, season_start=1 rotated the
-        // pattern and applied the high factor first.
+    fn test_seasonal_forecast_rejects_unsupported_season_start() {
         let periods = vec![PeriodId::quarter(2025, 1), PeriodId::quarter(2025, 2)];
+        let params = indexmap! {
+            "historical".into() => serde_json::json!([0.0, 10.0, 0.0, 10.0, 0.0, 10.0]),
+            "season_length".into() => serde_json::json!(2),
+            "mode".into() => serde_json::json!("additive"),
+            "season_start".into() => serde_json::json!(1),
+        };
 
-        let mut baseline = None;
-        for season_start in [0u64, 1] {
-            let params = indexmap! {
-                "historical".into() => serde_json::json!([0.0, 10.0, 0.0, 10.0, 0.0, 10.0]),
-                "season_length".into() => serde_json::json!(2),
-                "mode".into() => serde_json::json!("additive"),
-                "season_start".into() => serde_json::json!(season_start),
-            };
-            let result = seasonal_forecast(0.0, &periods, &params)
-                .expect("seasonal_forecast should succeed");
-            let q1 = result[&PeriodId::quarter(2025, 1)];
-            let q2 = result[&PeriodId::quarter(2025, 2)];
-            assert!(
-                q1 < q2,
-                "season_start={season_start}: forecast must continue the positional \
-                 cycle (low then high), got q1={q1}, q2={q2}"
-            );
-            // The factors are keyed by data position, so season_start must
-            // not change the projection at all.
-            match baseline {
-                None => baseline = Some((q1, q2)),
-                Some((b1, b2)) => {
-                    assert_eq!((q1, q2), (b1, b2), "season_start must not shift values");
-                }
-            }
-        }
+        let err = seasonal_forecast(0.0, &periods, &params)
+            .expect_err("unsupported season_start must be rejected");
+        assert!(err.to_string().contains("season_start"));
     }
 
     #[test]

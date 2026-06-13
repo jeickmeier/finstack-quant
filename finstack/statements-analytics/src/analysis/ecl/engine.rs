@@ -509,8 +509,11 @@ pub fn compute_ecl_single(
 
     // Stage 3: credit-impaired, PD ≡ 1. The allowance is the discounted
     // expected shortfall LGD x EAD x DF(t_recovery) per IFRS 9 5.5.33 /
-    // B5.5.33; the performing PD curve is not consulted.
+    // B5.5.33. The PD curve is still validated for the exposure rating so
+    // invalid curve/rating mappings are not silently hidden by the shortcut.
     if stage == Stage::Stage3 {
+        let rating = exposure.current_rating.as_deref().unwrap_or("NR");
+        pd_source.cumulative_pd(rating, 0.0)?;
         let t_recovery = config.stage3_time_to_recovery_years;
         let lgd = exposure.lgd;
         let ead = exposure.ead_at(0.0);

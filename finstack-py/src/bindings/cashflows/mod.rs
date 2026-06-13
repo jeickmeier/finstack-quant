@@ -32,6 +32,35 @@ fn build_cashflow_schedule_json(
     })
 }
 
+/// Build a stamped cashflow schedule envelope from a JSON spec.
+///
+/// Parameters
+/// ----------
+/// spec_json : str
+///     JSON-encoded `CashflowScheduleBuildSpec`.
+/// market_json : str, optional
+///     JSON-encoded market context for floating-rate lookups.
+///
+/// Returns
+/// -------
+/// str
+///     JSON-encoded `CashflowScheduleEnvelope`.
+#[pyfunction]
+#[pyo3(
+    signature = (spec_json, market_json = None),
+    text_signature = "(spec_json, market_json=None)"
+)]
+fn build_cashflow_schedule_envelope_json(
+    py: Python<'_>,
+    spec_json: &str,
+    market_json: Option<&str>,
+) -> PyResult<String> {
+    py.detach(|| {
+        finstack_cashflows::build_cashflow_schedule_envelope_json(spec_json, market_json)
+            .map_err(crate::errors::core_to_py)
+    })
+}
+
 /// Validate a cashflow schedule JSON string and return it canonicalized.
 ///
 /// Parameters
@@ -48,6 +77,29 @@ fn build_cashflow_schedule_json(
 fn validate_cashflow_schedule_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
     py.detach(|| {
         finstack_cashflows::validate_cashflow_schedule_json(schedule_json)
+            .map_err(crate::errors::core_to_py)
+    })
+}
+
+/// Validate a stamped cashflow schedule envelope and return it canonicalized.
+///
+/// Parameters
+/// ----------
+/// envelope_json : str
+///     JSON-encoded `CashflowScheduleEnvelope`.
+///
+/// Returns
+/// -------
+/// str
+///     Canonicalized JSON-encoded `CashflowScheduleEnvelope`.
+#[pyfunction]
+#[pyo3(text_signature = "(envelope_json)")]
+fn validate_cashflow_schedule_envelope_json(
+    py: Python<'_>,
+    envelope_json: &str,
+) -> PyResult<String> {
+    py.detach(|| {
+        finstack_cashflows::validate_cashflow_schedule_envelope_json(envelope_json)
             .map_err(crate::errors::core_to_py)
     })
 }
@@ -161,20 +213,27 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Cashflow schedule JSON construction, validation, and bond conversion.",
     )?;
 
-    m.add_function(wrap_pyfunction!(build_cashflow_schedule_json, &m)?)?;
-    m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
-    m.add_function(wrap_pyfunction!(dated_flows_json, &m)?)?;
     m.add_function(wrap_pyfunction!(accrued_interest_json, &m)?)?;
     m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(build_cashflow_schedule_envelope_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(build_cashflow_schedule_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(dated_flows_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(
+        validate_cashflow_schedule_envelope_json,
+        &m
+    )?)?;
+    m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
 
     let all = PyList::new(
         py,
         [
-            "build_cashflow_schedule_json",
-            "validate_cashflow_schedule_json",
-            "dated_flows_json",
             "accrued_interest_json",
             "bond_from_cashflows_json",
+            "build_cashflow_schedule_envelope_json",
+            "build_cashflow_schedule_json",
+            "dated_flows_json",
+            "validate_cashflow_schedule_envelope_json",
+            "validate_cashflow_schedule_json",
         ],
     )?;
     m.setattr("__all__", all)?;

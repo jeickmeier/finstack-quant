@@ -498,6 +498,7 @@ impl CashflowProvider for EquityTotalReturnSwap {
                     all_in_cap_bp: None,
                     all_in_floor_bp: None,
                     index_cap_bp: None,
+                    overnight_index_constraints: Default::default(),
                     reset_freq: self.schedule.params.freq,
                     index_tenor: None,
                     reset_lag_days: 0,

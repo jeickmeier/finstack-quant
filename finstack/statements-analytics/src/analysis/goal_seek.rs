@@ -262,12 +262,29 @@ pub fn goal_seek(
         solver.bracket_max = 0.0;
     }
 
-    let solution = solver.solve(objective, initial_guess).map_err(|e| {
-        describe_failure(format!(
-            "Goal seek failed to find solution: target_node='{target_node}', \
-             target_value={target_value}, driver_node='{driver_node}'. {e}"
-        ))
-    })?;
+    let solution = match solver.solve(&objective, initial_guess) {
+        Ok(solution) => solution,
+        Err(first_error) if initial_guess != 0.0 => {
+            let mut widened = BrentSolver::new();
+            widened.initial_bracket_size = Some(abs_guess);
+            widened
+                .solve(&objective, initial_guess)
+                .map_err(|second_error| {
+                    describe_failure(format!(
+                        "Goal seek failed to find solution: target_node='{target_node}', \
+                     target_value={target_value}, driver_node='{driver_node}'. \
+                     Sign-constrained attempt failed with: {first_error}. \
+                     Widened attempt failed with: {second_error}"
+                    ))
+                })?
+        }
+        Err(e) => {
+            return Err(describe_failure(format!(
+                "Goal seek failed to find solution: target_node='{target_node}', \
+                 target_value={target_value}, driver_node='{driver_node}'. {e}"
+            )));
+        }
+    };
 
     apply_solution(model, driver_node, driver_period, update_model, solution)
 }

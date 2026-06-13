@@ -197,7 +197,7 @@ impl CashFlowBuilder {
     /// ```rust
     /// use finstack_cashflows::builder::{
     ///     CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingRateFallback,
-    ///     FloatingRateSpec,
+    ///     FloatingRateSpec, OvernightIndexConstraintApplication,
     /// };
     /// use finstack_core::currency::Currency;
     /// use finstack_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -223,6 +223,7 @@ impl CashFlowBuilder {
     ///             all_in_floor_bp: None,
     ///             all_in_cap_bp: None,
     ///             index_cap_bp: None,
+    ///             overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
     ///             reset_freq: Tenor::quarterly(),
     ///             index_tenor: None,
     ///             reset_lag_days: 2,
@@ -643,7 +644,7 @@ impl CashFlowBuilder {
     /// use finstack_core::types::CurveId;
     /// use finstack_cashflows::builder::{
     ///     CashFlowSchedule, CouponType, FixedWindow, FloatingCouponSpec, FloatingRateSpec,
-    ///     ScheduleParams,
+    ///     OvernightIndexConstraintApplication, ScheduleParams,
     /// };
     /// use rust_decimal_macros::dec;
     /// use time::Month;
@@ -670,6 +671,7 @@ impl CashFlowBuilder {
     ///         all_in_cap_bp: None,
     ///         all_in_floor_bp: None,
     ///         index_cap_bp: None,
+    ///         overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
     ///         reset_freq: Tenor::quarterly(),
     ///         index_tenor: None,
     ///         reset_lag_days: 2,

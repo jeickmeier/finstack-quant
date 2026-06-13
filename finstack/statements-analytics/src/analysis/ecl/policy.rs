@@ -170,6 +170,14 @@ struct CeclPolicyRecord {
     forecast_horizon_years: f64,
     reversion_method: ReversionMethod,
     historical_annual_pd: f64,
+    #[serde(default = "default_cecl_impaired_dpd_threshold")]
+    impaired_dpd_threshold: u32,
+    #[serde(default = "default_cecl_impaired_qualitative_triggers_enabled")]
+    impaired_qualitative_triggers_enabled: bool,
+    #[serde(default = "default_cecl_impaired_time_to_recovery_years")]
+    impaired_time_to_recovery_years: f64,
+    #[serde(default = "default_cecl_discount_expected_losses")]
+    discount_expected_losses: bool,
     base_scenario_id: String,
     base_scenario_weight: f64,
     base_scenario_lgd_override: Option<f64>,
@@ -183,6 +191,10 @@ impl CeclPolicyRecord {
         validate_positive(self.bucket_width_years, "CECL bucket width years")?;
         validate_nonnegative(self.forecast_horizon_years, "CECL forecast horizon years")?;
         validate_unit_interval(self.historical_annual_pd, "CECL historical annual PD")?;
+        validate_nonnegative(
+            self.impaired_time_to_recovery_years,
+            "CECL impaired time to recovery years",
+        )?;
         validate_nonblank("CECL base scenario id", &self.base_scenario_id)?;
         validate_unit_interval(self.base_scenario_weight, "CECL base scenario weight")?;
         if let Some(lgd) = self.base_scenario_lgd_override {
@@ -193,6 +205,22 @@ impl CeclPolicyRecord {
         }
         Ok(())
     }
+}
+
+fn default_cecl_impaired_dpd_threshold() -> u32 {
+    90
+}
+
+fn default_cecl_impaired_qualitative_triggers_enabled() -> bool {
+    true
+}
+
+fn default_cecl_impaired_time_to_recovery_years() -> f64 {
+    1.0
+}
+
+fn default_cecl_discount_expected_losses() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -279,6 +307,10 @@ fn cecl_config_from_policy(policy: &CeclPolicyRecord) -> CeclConfig {
         forecast_horizon_years: policy.forecast_horizon_years,
         reversion_method: policy.reversion_method,
         historical_annual_pd: policy.historical_annual_pd,
+        impaired_dpd_threshold: policy.impaired_dpd_threshold,
+        impaired_qualitative_triggers_enabled: policy.impaired_qualitative_triggers_enabled,
+        impaired_time_to_recovery_years: policy.impaired_time_to_recovery_years,
+        discount_expected_losses: policy.discount_expected_losses,
         scenarios: vec![MacroScenario {
             id: policy.base_scenario_id.clone(),
             weight: policy.base_scenario_weight,

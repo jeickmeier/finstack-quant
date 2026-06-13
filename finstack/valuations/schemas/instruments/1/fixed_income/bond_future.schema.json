@@ -736,6 +736,7 @@
               "type": "object"
             },
             "CashFlow": {
+              "additionalProperties": false,
               "description": "A single dated cash-flow (payment or reset).\n\nRepresents a monetary flow at a specific date with metadata\nfor proper classification and risk calculation.",
               "properties": {
                 "accrual_factor": {
@@ -1994,7 +1995,7 @@
             },
             "FloatingRateSpec": {
               "additionalProperties": false,
-              "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_cashflows::builder::FloatingRateSpec;\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+              "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
               "properties": {
                 "all_in_cap_bp": {
                   "default": null,
@@ -2116,6 +2117,10 @@
                     }
                   ],
                   "description": "Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).\n\nWhen set to `Some(method)`, the rate for each accrual period is computed\nby compounding daily overnight fixings according to the specified method,\nrather than looking up a single forward rate for the period.\n\nLeave as `None` for term rates (e.g., 3M EURIBOR, 6M LIBOR)."
+                },
+                "overnight_index_constraints": {
+                  "$ref": "#/$defs/OvernightIndexConstraintApplication",
+                  "description": "Index floor/cap application policy for overnight-compounded coupons."
                 },
                 "payment_lag_days": {
                   "default": 0,
@@ -2331,6 +2336,21 @@
                     "CompoundedWithObservationShift"
                   ],
                   "type": "object"
+                }
+              ]
+            },
+            "OvernightIndexConstraintApplication": {
+              "description": "Where overnight index floors/caps are applied for daily-compounded rates.",
+              "oneOf": [
+                {
+                  "const": "Daily",
+                  "description": "Apply index floors/caps to each sampled daily fixing before compounding.\n\nThis matches common floored SOFR loan conventions.",
+                  "type": "string"
+                },
+                {
+                  "const": "Period",
+                  "description": "Apply index floors/caps once to the compounded period index rate.\n\nThis preserves the historical period-level behavior for contracts that\nexplicitly define floors/caps on the period index rate.",
+                  "type": "string"
                 }
               ]
             },
@@ -2918,6 +2938,7 @@
               ]
             },
             "Tenor": {
+              "additionalProperties": false,
               "description": "A parsed tenor representing a time period.\n\nTenors are commonly used in financial markets to specify maturities,\npayment frequencies, and rate fixing periods.\n\n# Examples\n\n```rust\nuse finstack_core::dates::{Tenor, TenorUnit};\n# fn main() -> finstack_core::Result<()> {\n\nlet tenor = Tenor::new(3, TenorUnit::Months);\nassert_eq!(tenor.count, 3);\nassert_eq!(tenor.unit, TenorUnit::Months);\n\n// Parse from string\nlet parsed = Tenor::parse(\"6M\")?;\nassert_eq!(parsed.count, 6);\nassert_eq!(parsed.unit, TenorUnit::Months);\n# Ok(())\n# }\n```",
               "properties": {
                 "count": {

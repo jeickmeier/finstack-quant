@@ -1,9 +1,11 @@
 import * as wasm from '../pkg/finstack_wasm.js';
 
 export const cashflows = {
-  buildCashflowScheduleJson: wasm.buildCashflowScheduleJson,
-  validateCashflowScheduleJson: wasm.validateCashflowScheduleJson,
-  datedFlowsJson: wasm.datedFlowsJson,
   accruedInterestJson: wasm.accruedInterestJson,
   bondFromCashflowsJson: wasm.bondFromCashflowsJson,
+  buildCashflowScheduleEnvelopeJson: wasm.buildCashflowScheduleEnvelopeJson,
+  buildCashflowScheduleJson: wasm.buildCashflowScheduleJson,
+  datedFlowsJson: wasm.datedFlowsJson,
+  validateCashflowScheduleEnvelopeJson: wasm.validateCashflowScheduleEnvelopeJson,
+  validateCashflowScheduleJson: wasm.validateCashflowScheduleJson,
 };

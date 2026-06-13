@@ -17,7 +17,7 @@
 use crate::helpers::financial_tolerance;
 use finstack_cashflows::builder::specs::{
     CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec, FloatingRateFallback,
-    FloatingRateSpec,
+    FloatingRateSpec, OvernightIndexConstraintApplication,
 };
 use finstack_cashflows::builder::{AmortizationSpec, CashFlowSchedule};
 use finstack_core::cashflow::Discountable;
@@ -170,6 +170,7 @@ fn linear_amortization_uses_first_coupon_leg_cadence() {
             all_in_cap_bp: None,
             all_in_floor_bp: None,
             index_cap_bp: None,
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,

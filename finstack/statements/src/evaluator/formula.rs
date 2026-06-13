@@ -252,6 +252,9 @@ pub(crate) fn collect_expression_values_sorted(
         ExprNode::Literal(value) => {
             let mut values = BTreeMap::new();
             for period in context.historical_results.keys() {
+                if *period >= context.period_id {
+                    continue;
+                }
                 values.insert(*period, *value);
             }
             values.insert(context.period_id, *value);
@@ -263,6 +266,7 @@ pub(crate) fn collect_expression_values_sorted(
     let periods: Vec<PeriodId> = context
         .historical_results
         .keys()
+        .filter(|period| **period < context.period_id)
         .copied()
         .chain(std::iter::once(context.period_id))
         .collect();
@@ -348,7 +352,12 @@ pub(crate) fn collect_expression_window_values(
             return collect_rolling_window_values(name, context, window_size);
         }
         ExprNode::Literal(value) => {
-            let total = context.historical_results.len() + 1;
+            let visible_historical = context
+                .historical_results
+                .keys()
+                .filter(|period| **period < context.period_id)
+                .count();
+            let total = visible_historical + 1;
             return Ok(vec![*value; window_size.min(total)]);
         }
         _ => {}
@@ -358,6 +367,7 @@ pub(crate) fn collect_expression_window_values(
         let mut periods: Vec<PeriodId> = context
             .historical_results
             .keys()
+            .filter(|period| **period < context.period_id)
             .copied()
             .chain(std::iter::once(context.period_id))
             .collect();

@@ -47,6 +47,12 @@ impl Check for TrendCheck {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        if self.lookback_periods == 0 {
+            return Err(finstack_statements::error::Error::eval(
+                "TrendCheck lookback_periods must be positive".to_string(),
+            ));
+        }
+
         let mut findings = Vec::new();
         let periods = &context.model.periods;
         let mut consecutive_bad: usize = 0;

@@ -55,6 +55,10 @@ pub struct DcfOptions {
     /// Basic shares outstanding for per-share value.
     pub shares_outstanding: Option<f64>,
     /// Private company valuation discounts (DLOM, DLOC).
+    ///
+    /// Discounts apply after the DCF EV-to-equity bridge. The reported DCF
+    /// enterprise value remains pre-discount and will not reconcile to
+    /// discounted equity value plus net debt when discounts are present.
     pub valuation_discounts: Option<ValuationDiscounts>,
     /// WACC sensitivity bump, in decimal (default `0.01` = ±100 bp).
     ///

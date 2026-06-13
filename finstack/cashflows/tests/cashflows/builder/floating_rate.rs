@@ -7,6 +7,7 @@
 
 use finstack_cashflows::builder::specs::{
     CouponType, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
+    OvernightIndexConstraintApplication,
 };
 use finstack_cashflows::builder::CashFlowSchedule;
 use finstack_core::cashflow::CFKind;
@@ -31,6 +32,7 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
             all_in_cap_bp: None,
             all_in_floor_bp: None,
             index_cap_bp: None,
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
@@ -964,6 +966,7 @@ fn make_overnight_float_spec(
             all_in_cap_bp: None,
             all_in_floor_bp: None,
             index_cap_bp: None,
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
@@ -1530,6 +1533,7 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
             all_in_cap_bp: None,
             all_in_floor_bp: None,
             index_cap_bp: None,
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
@@ -1642,6 +1646,7 @@ fn test_overnight_empty_fixing_window_errors() {
             all_in_cap_bp: None,
             all_in_floor_bp: None,
             index_cap_bp: None,
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
@@ -2313,6 +2318,91 @@ fn test_seasoned_term_reset_resolves_from_exact_fixing_with_spread_and_gearing()
         (rates[3] - (0.03 + 0.01) * 2.0).abs() < 1e-6,
         "post-base reset should project from the curve: {}",
         rates[3]
+    );
+}
+
+#[test]
+fn test_term_reset_before_curve_base_uses_fixing_when_accrual_starts_on_base() {
+    let issue = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::September, 16).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+    let curve_base = issue;
+    let reset_date = Date::from_calendar_date(2025, Month::June, 12).unwrap();
+    let market = make_market_with_fixings(curve_base, 0.03, &[(reset_date, 0.0475)]);
+
+    let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(125.0));
+    spec.rate_spec.reset_lag_days = 2;
+
+    let mut b = CashFlowSchedule::builder();
+    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+    let schedule = b
+        .build_with_curves(Some(&market))
+        .expect("reset before curve base should use exact fixing");
+
+    let first_float = schedule
+        .flows
+        .iter()
+        .find(|cf| cf.kind == CFKind::FloatReset)
+        .expect("floating coupon");
+    assert_eq!(first_float.reset_date, Some(reset_date));
+    let rate = first_float.rate.expect("rate");
+    assert!(
+        (rate - 0.0600).abs() < RATE_TOLERANCE,
+        "expected fixed index 4.75% + 125bp spread, got {rate}"
+    );
+}
+
+#[test]
+fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
+    let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::June, 5).unwrap();
+    let curve_base = maturity;
+    let fixings = [
+        (
+            Date::from_calendar_date(2025, Month::June, 2).unwrap(),
+            -0.010,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 3).unwrap(),
+            0.020,
+        ),
+        (
+            Date::from_calendar_date(2025, Month::June, 4).unwrap(),
+            -0.010,
+        ),
+    ];
+    let market = make_market_with_fixings(curve_base, 0.00, &fixings);
+
+    let mut spec = make_overnight_float_spec(
+        OvernightCompoundingMethod::CompoundedInArrears,
+        FloatingRateFallback::Error,
+        dec!(0.0),
+    );
+    spec.rate_spec.index_floor_bp = Some(dec!(0.0));
+    spec.stub = StubKind::ShortFront;
+
+    let mut b = CashFlowSchedule::builder();
+    let _ = b
+        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .floating_cf(spec);
+    let schedule = b
+        .build_with_curves(Some(&market))
+        .expect("overnight coupon");
+    let rate = schedule
+        .flows
+        .iter()
+        .find(|cf| cf.kind == CFKind::FloatReset)
+        .and_then(|cf| cf.rate)
+        .expect("rate");
+
+    let expected_daily_floor = expected_compounded(&[(0.0, 1), (0.020, 1), (0.0, 1)], 3);
+    assert!(
+        (rate - expected_daily_floor).abs() < RATE_TOLERANCE,
+        "daily index floor expected {expected_daily_floor}, got {rate}"
+    );
+    assert!(
+        rate > 0.0,
+        "period-level floor would collapse this fixture to zero"
     );
 }
 

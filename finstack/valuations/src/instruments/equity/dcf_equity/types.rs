@@ -113,6 +113,10 @@ impl EquityBridge {
 /// ```text
 /// FMV = Equity Value × (1 - DLOC) × (1 - DLOM) × (1 - other_discount)
 /// ```
+///
+/// The enterprise value reported by a DCF remains pre-discount. When discounts
+/// are present, `enterprise_value - net_debt` reconciles to pre-discount
+/// equity value, not to the discounted fair-market equity value.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct ValuationDiscounts {
     /// Discount for Lack of Marketability (0.0–1.0, e.g., 0.25 for 25%).
@@ -200,7 +204,10 @@ pub struct DilutionSecurity {
 /// # Valuation Discounts
 ///
 /// Private company valuations can apply DLOM, DLOC, and other discounts via
-/// [`valuation_discounts`](Self::valuation_discounts).
+/// [`valuation_discounts`](Self::valuation_discounts). These discounts apply
+/// after the EV-to-equity bridge, so the reported enterprise value remains a
+/// pre-discount enterprise value and does not equal discounted equity value
+/// plus net debt.
 #[derive(
     Clone,
     Debug,
@@ -694,11 +701,15 @@ impl DiscountedCashFlow {
     ///
     /// Gordon-growth and H-model terminal values are flow-stream proxies
     /// (capitalized perpetuities of cash flows arriving throughout each
-    /// year), so they inherit the mid-year −0.5 shift when
-    /// [`mid_year_convention`](Self::mid_year_convention) is enabled. An
-    /// `ExitMultiple` terminal value is a *point-in-time* sale price realized
-    /// at the horizon date `t_n`, so it always discounts at the full `t_n`
-    /// regardless of the mid-year convention.
+    /// year), so they inherit the mid-year shift when
+    /// [`mid_year_convention`](Self::mid_year_convention) is enabled. When
+    /// [`terminal_flow_override`](Self::terminal_flow_override) is provided,
+    /// the override is treated as a normalized annual terminal flow and uses
+    /// the standard 0.5-year shift rather than the explicit projection grid's
+    /// sub-annual spacing. An `ExitMultiple` terminal value is a
+    /// *point-in-time* sale price realized at the horizon date `t_n`, so it
+    /// always discounts at the full `t_n` regardless of the mid-year
+    /// convention.
     ///
     /// Returns `Err` if flows are empty.
     pub fn discount_terminal_value(&self, terminal_value: f64) -> finstack_core::Result<f64> {
@@ -722,6 +733,8 @@ impl DiscountedCashFlow {
         Ok(
             if matches!(self.terminal_value, TerminalValueSpec::ExitMultiple { .. }) {
                 self.year_fraction(self.valuation_date, *terminal_date)
+            } else if self.mid_year_convention && self.terminal_flow_override.is_some() {
+                (self.year_fraction(self.valuation_date, *terminal_date) - 0.5).max(0.0)
             } else {
                 self.discount_years(self.valuation_date, *terminal_date)
             },
@@ -1154,6 +1167,37 @@ mod tests {
             100.0,
         )];
         assert!((dcf.mid_year_shift() - 0.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn terminal_flow_override_uses_standard_half_year_terminal_discount_shift() {
+        let mut dcf = build_simple_dcf_gordon();
+        dcf.terminal_flow_override = Some(400.0);
+        dcf.flows = vec![
+            (
+                Date::from_calendar_date(2025, Month::March, 31).unwrap(),
+                100.0,
+            ),
+            (
+                Date::from_calendar_date(2025, Month::June, 30).unwrap(),
+                100.0,
+            ),
+            (
+                Date::from_calendar_date(2025, Month::September, 30).unwrap(),
+                100.0,
+            ),
+            (
+                Date::from_calendar_date(2025, Month::December, 31).unwrap(),
+                100.0,
+            ),
+        ];
+
+        let raw_years = dcf.year_fraction(dcf.valuation_date, dcf.flows.last().unwrap().0);
+        let terminal_years = dcf.terminal_discount_years().unwrap();
+        assert!(
+            (terminal_years - (raw_years - 0.5)).abs() < 1e-12,
+            "terminal override should use the standard half-year terminal shift, got {terminal_years}"
+        );
     }
 
     #[test]
