@@ -40,12 +40,6 @@ let pv = cap.value(&market_context, Date::from_calendar_date(2024, Month::Januar
 - Volatility smile handled only through the supplied surface; no stochastic volatility or SABR inside the pricer.
 - Does not include convexity adjustments for futures-style margined underlyings.
 
-## Pricing Methodology
-
-- Projects forward rates on the specified forward curve and discounts on the chosen discount curve.
-- Routes by `vol_type`: Black (lognormal) for `Lognormal`, Bachelier for `Normal`, then aggregates caplets/floorlets across schedule.
-- Handles stubs/BDC/holiday adjustments via schedule parameters; supports cash settlement.
-
 ## Metrics
 
 - PV plus cap/floor par strike (implied volatility to match price), delta/vega/theta via bump-and-revalue.

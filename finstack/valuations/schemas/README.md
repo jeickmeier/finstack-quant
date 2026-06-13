@@ -1,6 +1,6 @@
 # Finstack JSON Schemas
 
-This directory contains JSON Schema (Draft 7) definitions for all Finstack data types. These schemas are **auto-generated from Rust types** via [schemars](https://github.com/GREsau/schemars) and should not be edited by hand.
+JSON Schema (Draft 7) definitions for all Finstack data types. These schemas are **auto-generated from Rust types** via [schemars](https://github.com/GREsau/schemars) and should not be edited by hand.
 
 ## Regenerating Schemas
 

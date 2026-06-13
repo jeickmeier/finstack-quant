@@ -303,7 +303,7 @@ mod tests {
         );
     }
 
-    /// Blocker B3 regression: a larger drop must *lower* the implied financing
+    /// Regression: a larger drop must *lower* the implied financing
     /// rate (the roll is special / cheap to finance) and therefore *raise*
     /// specialness vs a fixed repo rate. The pre-fix convention
     /// (`net_benefit = drop + coupon − paydown`) moved both the wrong way.

@@ -268,7 +268,7 @@ impl AttributionSpec {
                         .unwrap_or(self.as_of_t0)
                 })
         });
-        // MO-C1 (quant review): a failed curve lookup must be distinguishable
+        // a failed curve lookup must be distinguishable
         // from a genuinely zero-rate/zero-spread issuer — silently defaulting
         // to 0.0 mislabels the whole coupon as the other leg's carry.
         let mut lookup_warnings: Vec<String> = Vec::new();
@@ -308,7 +308,7 @@ impl AttributionSpec {
             Some(line) => line.total,
             None => return Ok(()),
         };
-        // Quant review M7: with negative rates (EUR/JPY books) `r + s` can be
+        // with negative rates (EUR/JPY books) `r + s` can be
         // arbitrarily close to zero while `s` is material, making the naive
         // share `s / (r + s)` explode (±10²–10⁶ × coupon into the two legs
         // with opposite signs, while still reconciling). Since the curve

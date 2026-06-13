@@ -1,6 +1,6 @@
 //! Metrics for term loan instruments.
 //!
-//! This module provides comprehensive risk and return metrics for term loans including:
+//! This module provides risk and return metrics for term loans including:
 //! - **Yield metrics**: YTM, YTC, YTW, YT2Y/3Y/4Y
 //! - **Spread metrics**: Discount Margin, All-In Rate
 //! - **Risk metrics**: DV01, CS01, Theta (bucketed and parallel)

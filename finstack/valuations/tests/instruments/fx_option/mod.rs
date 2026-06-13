@@ -1,6 +1,6 @@
 //! FX Option comprehensive test suite.
 //!
-//! This module provides comprehensive test coverage (>80%) for the FX option
+//! This module provides test coverage (>80%) for the FX option
 //! implementation, organized by concern:
 //!
 //! - `helpers`: Shared test utilities and fixtures

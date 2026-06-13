@@ -130,7 +130,7 @@ pub fn effective_dimension(eigenvalues: &[f64]) -> f64 {
 /// already indexed by original asset (only the *columns* were reordered by the
 /// eigenvalue sort), so the eigen-sort permutation must **not** be applied to
 /// the asset axis — doing so would scramble the output covariance to
-/// `P·ρ·Pᵀ ≠ ρ` (see `docs/reviews/2026-06-09-core-quant-review.md`,
+/// `P·ρ·Pᵀ ≠ ρ` (see ,
 /// "transform_pca_to_assets scrambles the asset axis"). The permutation
 /// argument is retained for API stability and dimension validation only.
 ///

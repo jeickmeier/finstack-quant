@@ -27,12 +27,6 @@ let pv = option.value(&market_context, as_of_date)?;
 - Monte Carlo path may need sufficient steps for barrier-like sensitivity.
 - European payoff only; no early exercise.
 
-## Pricing Methodology
-
-- Continuous-monitoring closed-form formulas under GBM for fixed/floating strike variants with optional observed min/max.
-- Monte Carlo GBM fallback for validation or discrete-monitoring approximations; discounting via instrument curve.
-- Dividends and vol sourced from market surfaces; deterministic carry assumptions.
-
 ## Metrics
 
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytic formulas; MC bump-and-revalue available when enabled.

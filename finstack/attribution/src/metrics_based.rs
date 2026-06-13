@@ -61,7 +61,7 @@
 //! | InflationConvexity  | $ / decimal²    | Dollar second derivative ∂²V/∂i² (inflation in decimal)   |
 //!
 //! **Important**: `Convexity` and `IrConvexity` have DIFFERENT producer
-//! conventions and are consumed with different formulas (quant review B4):
+//! conventions and are consumed with different formulas :
 //! the bond producer emits *street convexity* (`d²P/dy² / P / 100`,
 //! Bloomberg YAS), so `ΔP_convexity = ½ × P₀ × Convexity × 100 × (Δr_decimal)²`;
 //! the IRS producer emits the raw dollar second derivative `d²PV/dr²`, so
@@ -274,7 +274,7 @@ fn measure_per_tenor_discount_shift(
 /// Per-tenor rate shift (bp) for a rates curve that may be a discount curve
 /// (zero rates) **or** a forward/projection curve (forward rates).
 ///
-/// Quant review M1: the rates ladder must consume forward-curve DV01 too —
+/// the rates ladder must consume forward-curve DV01 too —
 /// `BucketedDv01` emits per-tenor series for projection curves, and a basis
 /// move (discount and forward moving differently) is mis-attributed when only
 /// discount curves are measured.
@@ -683,7 +683,7 @@ pub fn attribute_pnl_metrics_based(
     // `residual_within_tolerance` correctly refuses to report a clean result.
     let mut non_finite_detected = false;
 
-    // Total-return basis (quant review M2): `PnlAttribution::new` captured the
+    // Total-return basis : `PnlAttribution::new` captured the
     // raw MTM (`val_t1 − val_t0`) in `mark_to_market_pnl`; add cashflows paid
     // inside [T₀, T₁) so `total_pnl` matches the total-return convention the
     // carry metrics use (Theta / CarryTotal include period cashflows — see
@@ -735,7 +735,7 @@ pub fn attribute_pnl_metrics_based(
     let market_deps = instrument.market_dependencies()?;
 
     // All rates curves the instrument depends on: discount AND
-    // forward/projection (quant review M1 — multi-curve swaps carry a joint
+    // forward/projection (multi-curve swaps carry a joint
     // discount+forward DV01, and basis moves require measuring both
     // families). Order: discount first, then forward — deterministic.
     let rates_curve_ids: Vec<CurveId> = {
@@ -830,7 +830,7 @@ pub fn attribute_pnl_metrics_based(
     // are PERIOD TOTALS over the producer's `theta_period` (default 1D),
     // capped at expiry. When the producer stamped the realized horizon
     // (`theta_period_days`), normalize by it before rescaling to the
-    // attribution window; otherwise assume the 1D default (quant review M3 —
+    // attribution window; otherwise assume the 1D default (
     // multiplying a 1M carry total by the window's day count double-scales).
     let theta_horizon_days = val_t0
         .measures
@@ -962,7 +962,7 @@ pub fn attribute_pnl_metrics_based(
         // A steepener (+bp short / −bp long) is now attributed correctly
         // instead of collapsing to an average-shift × parallel-DV01 product.
         //
-        // MO-T1: curves WITHOUT per-tenor data fall down the ladder to their
+        // Note: curves WITHOUT per-tenor data fall down the ladder to their
         // per-curve bucketed DV01 (when present) instead of being silently
         // dropped — mixed-coverage books previously sent those curves' P&L to
         // residual with no note.
@@ -1096,7 +1096,7 @@ pub fn attribute_pnl_metrics_based(
     } else if avg_rate_shift_bp.is_some_and(|s| s.abs() > 0.0) {
         // No DV01 metric at all while the curves measurably moved: the rates
         // P&L stays zero and the move lands in the residual. Note it for
-        // symmetric diagnosability with the carry block (quant review minor).
+        // symmetric diagnosability with the carry block.
         note_warning(
             &mut attribution,
             "Rates attribution skipped: no Dv01/BucketedDv01 metric in the T0 valuation \
@@ -1141,7 +1141,7 @@ pub fn attribute_pnl_metrics_based(
     if let Some(avg_shift) = convexity_avg_shift_bp {
         let rc = RoundingContext::default();
         // The two convexity MetricIds have DIFFERENT producer units and must
-        // not be merged (quant review B4):
+        // not be merged :
         //
         // - `Convexity` (bond producer) is *street convexity*:
         //   `(1/P)·d²P/dy² / 100` (Bloomberg YAS convention, golden-verified
@@ -1404,7 +1404,7 @@ pub fn attribute_pnl_metrics_based(
             // Fx01 is the JOINT sensitivity to a simultaneous move of all the
             // instrument's FX pairs, but the shift above is measured on the
             // single `fx_exposure()` pair — approximate when the instrument
-            // declares more than one pair (quant review minor).
+            // declares more than one pair.
             if market_deps.fx_pairs.len() > 1 {
                 attribution.meta.notes.push(format!(
                     "FX attribution pairs the joint Fx01 sensitivity with the primary \
@@ -1501,7 +1501,7 @@ pub fn attribute_pnl_metrics_based(
                 "Delta metric must be finite for P&L attribution, got {delta}"
             );
 
-            // MO-T3 (quant review): `Delta` / `Gamma` are sensitivities to the
+            // Note: `Delta` / `Gamma` are sensitivities to the
             // instrument's PRIMARY spot driver, not a per-spot vector. The old
             // code multiplied the single Delta by EVERY spot's move and summed
             // (~N× overstatement for multi-spot instruments) while applying
@@ -1733,7 +1733,7 @@ pub fn attribute_pnl_metrics_based(
     // 7. Dividend attribution (accumulates into market_scalars_pnl alongside spot Delta/Gamma)
     if let Some(dividend01) = val_t0.measures.get(MetricId::Dividend01.as_str()) {
         if let Some(scalar_id) = instrument.dividend_schedule_id() {
-            // MO-T4 (quant review): the `Dividend01` producers emit **$ per
+            // Note: the `Dividend01` producers emit **$ per
             // 1bp** of absolute dividend-yield move (the central difference is
             // rescaled by `DIVIDEND_BUMP_BP`, see equity_option/convertible
             // `dividend_risk.rs`). `measure_scalar_absolute_shift` returns the
@@ -1763,7 +1763,7 @@ pub fn attribute_pnl_metrics_based(
         // ids so the float summation order is deterministic (the context map
         // is hash-ordered), and surface multi-curve averaging in the notes —
         // in a shared multi-instrument market, unrelated inflation curves
-        // contaminate this instrument's average Δi (quant review MO-T2).
+        // contaminate this instrument's average Δi (prior fix).
         let mut curve_ids = Vec::new();
         for curve_id in market_t1.curve_ids() {
             if market_t1.get_inflation_curve(curve_id).is_ok() {

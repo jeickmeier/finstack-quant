@@ -322,7 +322,7 @@ fn calendar_metadata_override_is_respected() {
 }
 
 // ============================================
-// Joint business days T+0 behavior (2026-06-09 core quant review, Minor/Dates)
+// Joint business days T+0 behavior 
 // ============================================
 
 #[test]

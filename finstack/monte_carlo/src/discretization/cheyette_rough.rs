@@ -19,7 +19,7 @@
 //!   drives the Volterra process. Also supplied by the fractional noise
 //!   integration.
 //!
-//! # Rate–Vol Correlation (review finding M2)
+//! # Rate–Vol Correlation 
 //!
 //! The model correlates the rate Brownian motion `W` with the Volterra
 //! *driver* `W̃` by `dW·dW̃ = ρ dt`. The correlated rate increment is built
@@ -36,7 +36,7 @@
 //! steps. The previous scheme rescaled `ΔỸ` by `dt^H`, leaving the rate
 //! driver with non-Brownian (autocorrelated, wrong-variance) increments.
 //!
-//! # Euler Steps (left-point scheme, review finding M1)
+//! # Euler Steps (left-point scheme)
 //!
 //! ```text
 //! σ(t) = σ₀(t) · exp(½·η · Ỹ(t) − ¼ · η² · t^{2H})
@@ -134,7 +134,7 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         // using rBergomi variance-lognormal semantics (E[σ²(t)] = σ₀²(t)):
         //   σ(t) = σ₀(t) · exp(½ η Ỹ_t − ¼ η² t^{2H})
         //
-        // The left endpoint is essential (review finding M1): σ(t) is built
+        // The left endpoint is essential : σ(t) is built
         // from driving normals strictly before this step, so it is
         // independent of this step's shock Z̃_k. Using the end-of-step σ(t+dt)
         // (which depends on ΔỸ_k, hence on Z̃_k) would correlate the diffusion
@@ -146,8 +146,8 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         let exponent = 0.5 * eta * y_t - 0.25 * eta * eta * t.powf(two_h);
         let sigma_t = (sigma_base * exponent.exp()).max(0.0);
 
-        // Correlate the rate noise with the Volterra *driver* (review finding
-        // M2): dW·dW̃ = ρ dt, so the correlated rate normal is built from the
+        // Correlate the rate noise with the Volterra driver: dW·dW̃ = ρ dt,
+        // so the correlated rate normal is built from the
         // unit-variance driving normal Z̃ — exact, with no dt^H rescaling.
         let z_correlated = rho * z_drive + (1.0 - rho * rho).max(0.0).sqrt() * z_indep;
 
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_sigma_uses_left_endpoint() {
-        // Review finding M1: σ for the step over [t, t+dt] must come from the
+        // σ for the step over [t, t+dt] must come from the
         // Volterra level *before* this step's increment. The step's own ΔỸ
         // (z[1]) must therefore have no effect on x or y in this step.
         let process = make_process();
@@ -521,7 +521,7 @@ mod tests {
         }
     }
 
-    /// The martingale part of x must have zero mean (review findings M1+M2).
+    /// The martingale part of x must have zero mean (prior fixes).
     ///
     /// The stochastic increment of x over a step is `σ(t_k)·√dt·Z_corr_k`.
     /// With the left-point σ (independent of this step's shock) and a genuine

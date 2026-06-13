@@ -154,7 +154,7 @@ pub struct RealEstateAsset {
     /// Discount curve identifier, used for risk attribution only.
     ///
     /// DCF valuation always discounts at [`discount_rate`](Self::discount_rate)
-    /// regardless of whether this curve is loaded (review finding M14); rate
+    /// regardless of whether this curve is loaded ; rate
     /// sensitivity (`Dv01`/`BucketedDv01`) bumps the risk-free component
     /// inside the rate.
     pub discount_curve_id: CurveId,
@@ -275,7 +275,7 @@ impl RealEstateAsset {
     ///   derive cap (sale_price + NOI) is set
     /// - `valuation_method == Dcf` without `discount_rate` (unless an
     ///   `appraisal_value` short-circuits pricing) — DCF always discounts at
-    ///   the property rate (review finding M14)
+    ///   the property rate 
     /// - `sale_date` (when set) is on or before `valuation_date`
     pub fn validate(&self) -> finstack_core::Result<()> {
         if self.noi_schedule.is_empty() {
@@ -378,7 +378,7 @@ impl RealEstateAsset {
                 self.id.as_str()
             )));
         }
-        // DCF always discounts at the property rate (review finding M14), so
+        // DCF always discounts at the property rate , so
         // the rate is required unless an appraisal value short-circuits
         // pricing entirely.
         if matches!(self.valuation_method, RealEstateValuationMethod::Dcf)

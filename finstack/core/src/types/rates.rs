@@ -534,7 +534,7 @@ impl From<Bps> for i32 {
 // `TryFrom<f64> for Bps` reads a basis-point *count* (25.0 → 25bp), so a
 // `From<Bps> for f64` returning the *decimal* (25bp → 0.0025) made the f64
 // conversions asymmetric: round-tripping 25bp through f64 yielded 0bp
-// (2026-06-09 core quant review, types/rates.rs finding). Use the explicit
+// . Use the explicit
 // accessors instead: [`Bps::as_decimal`], [`Bps::as_percent`], or
 // `f64::from(bps.as_bps())` for the raw bp count.
 
@@ -995,7 +995,7 @@ mod tests {
     /// Deserialization must route through the validating constructors so
     /// non-finite values cannot enter via formats that can encode them
     /// (JSON rejects NaN at the parser level, but binary formats do not).
-    /// 2026-06-09 core quant review, types/rates.rs minor finding.
+    /// .
     #[test]
     fn deserialize_rejects_non_finite() {
         use serde::de::value::Error as ValueError;

@@ -72,7 +72,7 @@ fn test_usd_eur_spot_new_year_2024() {
     let trade_date = create_date(2023, Month::December, 29).expect("Valid date");
 
     // CLS-consistent rule: USD calendar gates only the final value date
-    // (2026-06-09 core quant review, FX spot finding). Same result here since
+    // . Same result here since
     // Jan 1 is a joint closure.
     let spot = fx_spot_date(
         trade_date,
@@ -119,7 +119,7 @@ fn test_usd_eur_spot_new_year_2024() {
 fn test_usd_eur_spot_christmas_2024() {
     let trade_date = create_date(2024, Month::December, 23).expect("Valid date");
 
-    // CLS-consistent rule (2026-06-09 core quant review): same result here
+    // CLS-consistent rule : same result here
     // since the skipped days are TARGET2 (non-USD) closures.
     let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("target2"), Some("nyse"))
         .expect("Valid calendars");
@@ -245,7 +245,7 @@ fn test_gbp_jpy_spot_spring_bank_holiday_2025() {
 fn test_usd_gbp_spot_july_4th_2025() {
     let trade_date = create_date(2025, Month::July, 2).expect("Valid date");
 
-    // CLS-consistent rule (2026-06-09 core quant review, FX spot finding).
+    // CLS-consistent rule .
     let spot = fx_spot_date(trade_date, 2, Some("nyse"), Some("gblo"), Some("nyse"))
         .expect("Valid calendars");
 
@@ -316,7 +316,7 @@ fn test_add_joint_business_days_christmas_week_2024() {
 /// - Count: Tue Jan 21 (business day 2, good in all calendars) ← **Spot Date**
 ///
 /// Expectation updated from Jan 22 to Jan 21 per the CLS-consistent FX spot
-/// rule (2026-06-09 core quant review, "Major — schedules" FX spot finding):
+/// rule :
 /// a US holiday on an intermediate day must not delay a USD pair's spot date.
 #[test]
 fn test_usd_gbp_spot_mlk_day_2025() {
@@ -498,8 +498,7 @@ fn test_add_joint_business_days_iteration_limit() {
 /// first intermediate day and spot is Mon 2025-07-07 — not Tue 2025-07-08 as
 /// the old symmetric joint-calendar roll produced.
 ///
-/// Reference: docs/reviews/2026-06-09-core-quant-review.md,
-/// "Major — schedules" FX spot finding.
+/// /// "Major — schedules" FX spot finding.
 #[test]
 fn test_fx_spot_instrument_eur_usd_us_holiday_intermediate_2025() {
     let trade_date = create_date(2025, Month::July, 3).expect("Valid date");

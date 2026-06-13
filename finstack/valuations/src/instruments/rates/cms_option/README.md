@@ -30,12 +30,6 @@ let pv = opt.value(&market_context, as_of)?;
 - Volatility surface optional but required for market-consistent pricing; fallback uses a flat 20% if absent.
 - European style only; Bermudan CMS caps/floors are not modeled.
 
-## Pricing Methodology
-
-- Computes forward CMS rate from discount/forward curves, including annuity; applies convexity adjustment (Hull-style) scaled by `convexity_scale`.
-- Prices each fixing with Black–76 using supplied/fallback vol, then discounts cashflows; sums across periods and accrual fractions.
-- Optional vol surface for CMS rates; deterministic curves for discount/forward projection.
-
 ## Metrics
 
 - PV plus strike/vol sensitivity (delta/vega) via bump-and-revalue; forward CMS rate and annuity reported per period for attribution.

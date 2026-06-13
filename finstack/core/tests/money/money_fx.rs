@@ -684,7 +684,7 @@ fn fx_triangulated_flag_is_stable_across_repeat_queries() {
 
 #[test]
 fn with_bumped_rate_preserves_fx_term_structure() {
-    // 2026-06-09 core quant review: `with_bumped_rate` previously froze one
+    // `with_bumped_rate` previously froze one
     // absolute rate for every date, flattening a date-aware provider's term
     // structure. The bump must be relative and per-date.
     struct DateAwareFx;
@@ -795,7 +795,7 @@ fn pinned_quote_outranks_pair_global_reciprocal() {
 
 #[test]
 fn fx_matrix_state_round_trips_pinned_quotes() {
-    // 2026-06-09 core quant review: persistence previously dropped pinned
+    // persistence previously dropped pinned
     // (date/policy-scoped) quotes. After snapshot + restore, a pinned fixing
     // must still win over the provider for its (on, policy).
     let matrix = FxMatrix::new(Arc::new(StaticFx { rate: 1.10 }));
@@ -849,7 +849,7 @@ fn fx_matrix_state_round_trips_pinned_quotes() {
 
 #[test]
 fn reciprocal_of_subnormal_rate_is_rejected() {
-    // 2026-06-09 core quant review: a pinned 1e-320 passed input checks but
+    // a pinned 1e-320 passed input checks but
     // its reciprocal overflowed to +inf. The reciprocal OUTPUT must be
     // validated (finite, positive).
     struct MissingFx;

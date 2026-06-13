@@ -111,7 +111,7 @@ impl HolidayCalendar for CompositeCalendar<'_> {
     /// Combine the sub-calendars' own `is_business_day` per mode so that
     /// non-default weekend rules (e.g. Friday/Saturday Middle East calendars)
     /// are respected, instead of inheriting the trait's hardcoded Sat/Sun
-    /// default (2026-06-09 core quant review, Moderate/Dates).
+    /// default .
     ///
     /// - **Union**: business day only if a business day on **all** sub-calendars
     /// - **Intersection**: business day if a business day on **any** sub-calendar

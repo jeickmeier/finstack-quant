@@ -453,7 +453,7 @@ mod tests {
     }
 
     // --------------------------------------------------------------
-    // Quant-review M5: unsorted issuer_betas must not break lookup
+    // unsorted issuer_betas must not break lookup
     // --------------------------------------------------------------
     #[test]
     fn matcher_resorts_unsorted_issuer_betas_before_binary_search() {
@@ -483,7 +483,7 @@ mod tests {
     }
 
     // --------------------------------------------------------------
-    // Quant-review M7: short beta vector is a typed error, not β = 1.0
+    // short beta vector is a typed error, not β = 1.0
     // --------------------------------------------------------------
     #[test]
     fn matcher_errors_on_beta_shape_mismatch() {
@@ -517,7 +517,7 @@ mod tests {
     }
 
     // --------------------------------------------------------------
-    // Quant-review M6: unknown issuer with partial tags is an error;
+    // unknown issuer with partial tags is an error;
     // with no tags at all it stays the PC-only proxy fallback
     // --------------------------------------------------------------
     #[test]

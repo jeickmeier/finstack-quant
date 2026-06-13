@@ -1351,7 +1351,7 @@ fn test_ewm_var_insufficient_data() {
 }
 
 // ============================================================================
-// Quant-review regression tests (2026-06-09 statements review)
+// Regression tests
 // ============================================================================
 
 /// Nested aggregates under lagged evaluation must not look ahead: the

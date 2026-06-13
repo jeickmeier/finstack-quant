@@ -1,6 +1,6 @@
 //! Fixed and floating-rate bond instruments with embedded options.
 //!
-//! Provides comprehensive bond modeling including:
+//! bond modeling including:
 //! - Fixed-rate coupon bonds (bullet and amortizing)
 //! - Floating-rate notes (FRNs) with caps/floors
 //! - Callable and putable bonds (American/Bermudan exercise)

@@ -27,12 +27,6 @@ let pv = option.value(&market_context, as_of_date)?;
 - Monte Carlo path requires a compatible Monte Carlo pricer; otherwise use the analytic path.
 - No early exercise support; payoff is European.
 
-## Pricing Methodology
-
-- Quanto-adjusted Black–Scholes: modifies drift using equity/FX correlation and FX vol to neutralize FX risk in domestic currency.
-- Discounting on domestic curve; foreign curve used for equity carry; vol from equity surface, FX vol optional for adjustment.
-- Monte Carlo fallback (when enabled) for joint equity/FX GBM paths; otherwise analytic.
-
 ## Metrics
 
 - PV plus Greeks (delta/gamma/vega/theta/rho) to equity and FX via analytic or MC bump-and-revalue.

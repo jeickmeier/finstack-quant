@@ -1981,7 +1981,7 @@ fn within_period_default_fraction_is_survival_weighted() {
     );
 }
 
-/// Review Major 5: discounting must be RELATIVE to `as_of` on the discount
+/// discounting must be RELATIVE to `as_of` on the discount
 /// curve's own time axis, never an absolute `df(t)` with `t` measured on the
 /// hazard curve's axis. Pins this via re-basing invariance: two discount
 /// curves describing the SAME flat continuously-compounded rate but with
@@ -2080,7 +2080,7 @@ fn premium_leg_pv(pricer: &CDSTranchePricer, tranche: &CDSTranche, ctx: &MarketC
         .expect("premium PV")
 }
 
-/// Review Major 4: the accrual-on-default adjustment must be the COMPLEMENT
+/// the accrual-on-default adjustment must be the COMPLEMENT
 /// of the survival-weighted default fraction. A name defaulting at fraction
 /// `f` of the period pays accrued `f·Δ`, so the premium notional lost on the
 /// defaulted slice is `(1−f)·ΔEL` when AoD is enabled and the full `ΔEL`
@@ -2113,7 +2113,7 @@ fn aod_enabled_premium_exceeds_disabled_premium() {
     );
 }
 
-/// Review Major 4: rising index hazard must LOWER the premium-leg PV — more
+/// rising index hazard must LOWER the premium-leg PV — more
 /// defaults mean less premium notional. Before the fix the complement-swapped
 /// adjustment under-reduced (AoD on) or never reduced (AoD off) the premium,
 /// muting this direction.
@@ -2177,7 +2177,7 @@ fn rising_hazard_lowers_premium_leg_pv() {
     }
 }
 
-/// Review Major 6 helper: market context with configurable index recovery
+/// Helper: market context with configurable index recovery
 /// and hazard scale.
 fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("date");
@@ -2244,7 +2244,7 @@ fn super_senior_tranche(attach: f64, detach: f64) -> CDSTranche {
     .expect("Valid tranche parameters")
 }
 
-/// Review Major 6: with zero recovery there is NO recovered notional, so the
+/// with zero recovery there is NO recovered notional, so the
 /// senior-side writedown curve must be identically zero and the defaulted
 /// fraction equals the loss (`X = L`) — i.e. the pre-fix behavior is
 /// reproduced exactly at `R = 0`.
@@ -2279,7 +2279,7 @@ fn zero_recovery_has_no_senior_writedown() {
     assert!(recovered.abs() < 1e-15, "G must be zero at R=0");
 }
 
-/// Review Major 6 (headline symptom): a super-senior tranche has near-zero
+/// Regression: a super-senior tranche has near-zero
 /// expected LOSS, but rising hazard amortizes its notional from the top via
 /// recoveries — so its premium leg must FALL as hazard rises. Before the fix
 /// the detachment was never written down and the super-senior kept paying
@@ -2330,7 +2330,7 @@ fn super_senior_premium_falls_as_hazard_rises() {
     }
 }
 
-/// Review Major 6 (realized state): hand-computed seasoned case. With
+/// Regression: hand-computed seasoned case. With
 /// `accumulated_loss = 6%` and `R = 40%`: defaulted `X = 0.06/0.6 = 10%`,
 /// recovered `G = 4%`, pool factor `0.9`. A `[95%, 100%]` super-senior is
 /// written down from the top by `G = 4%` of the pool = 80% of its 5% width;

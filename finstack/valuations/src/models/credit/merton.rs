@@ -252,7 +252,7 @@ impl MertonModel {
     ///   process `X_t = ln(V_t / B(t))` is Brownian motion with drift
     ///   `nu = mu - g` (where `mu = r - q - sigma^2/2`) started at
     ///   `x0 = ln(V/B)`, and the first-passage probability to 0 is
-    ///   (review finding M4):
+    ///   :
     ///
     ///   PD = N(-(x0 + nu*T) / (sigma*sqrt(T)))
     ///      + exp(-2*nu*x0 / sigma^2) * N((-x0 + nu*T) / (sigma*sqrt(T)))
@@ -287,7 +287,7 @@ impl MertonModel {
                 let sqrt_t = horizon.sqrt();
                 let sigma_sqrt_t = sigma * sqrt_t;
 
-                // Reduce to a flat barrier at 0 (review finding M4): the
+                // Reduce to a flat barrier at 0 : the
                 // distance process X_t = ln(V_t / (B e^{g t})) is BM with
                 // drift nu = mu - g started at x0 = ln(V/B). The growing
                 // barrier shifts the *drift*, not the starting distance.
@@ -1087,7 +1087,7 @@ impl MertonModel {
                         // Jump multiplier e^J with J ~ N(mu_J, sigma_J^2): mean
                         // E[e^J] = exp(mu_J + sigma_J^2/2), matching the kappa
                         // compensator above. No Ito correction belongs on the
-                        // jump itself (review finding M3).
+                        // jump itself .
                         v *= (mu_j + sigma_j * jz).exp();
                     }
                 }
@@ -1108,7 +1108,7 @@ impl MertonModel {
                         let jump_step = &jd[step];
                         for &jz in jump_step.jump_normals.iter().take(jump_step.anti_count) {
                             let jz = -jz;
-                            // Same e^J law as the base path (review finding M3).
+                            // Same e^J law as the base path .
                             v_anti *= (mu_j + sigma_j * jz).exp();
                         }
                     }
@@ -1677,7 +1677,7 @@ mod tests {
         );
     }
 
-    /// Black-Cox (1976) growing-barrier regression (review finding M4).
+    /// Black-Cox (1976) growing-barrier regression .
     ///
     /// With V=120, B=80, sigma=0.25, r=0.06, q=0.01, g=0.03, T=5:
     ///   mu = 0.06 - 0.01 - 0.03125 = 0.01875, nu = mu - g = -0.01125,
@@ -1949,7 +1949,7 @@ mod tests {
         );
     }
 
-    /// Jump-diffusion martingale check (review finding M3): the compensated
+    /// Jump-diffusion martingale check : the compensated
     /// drift uses kappa = E[e^J] - 1 = exp(mu_J + sigma_J^2/2) - 1, so the
     /// simulated jump multiplier must be e^J with J ~ N(mu_J, sigma_J^2)
     /// (mean exp(mu_J + sigma_J^2/2)). With that pairing,

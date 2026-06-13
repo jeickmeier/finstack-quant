@@ -228,7 +228,7 @@ fn quantlib_parity_metrics_based_bond_attribution() {
         recon_err
     );
 
-    // Residual magnitude bound vs the QL fixture (quant review tests-12):
+    // Residual magnitude bound vs the QL fixture (parity tests):
     // finstack's metrics path includes the convexity term, so its residual
     // must be no larger than QL's first-order residual plus the factor
     // tolerance (scaled to face value).
@@ -374,7 +374,7 @@ fn build_irs(
     swap
 }
 
-/// Per-component IRS tolerances (quant review M14): a single $5k absolute
+/// Per-component IRS tolerances : a single $5k absolute
 /// tolerance was vacuous — the fixture's carry is $566 and rates P&L $4,198,
 /// so a zeroed or sign-flipped carry, and a fully dropped rates factor, all
 /// passed. Factor P&Ls are first differences, largely immune to the NPV-level
@@ -681,7 +681,7 @@ fn quantlib_parity_metrics_based_fx_forward_attribution() {
         attribution.total_pnl.amount()
     );
 
-    // Per-factor parity (quant review M13: these assertions were previously
+    // Per-factor parity (these assertions were previously
     // discarded with `let _ = (...)`, and the fixture itself carried a
     // sign-flipped rate P&L rationalized as a "structural second-order
     // residual" — false for a 1-day FX forward, whose true first-order

@@ -205,7 +205,7 @@ mod tests {
 
         // net = (gross − costs·EAD) · DF = (56 − 8) / 1.05² — workout costs
         // are discounted alongside recoveries per the Basel workout-LGD
-        // methodology (2026-06-09 core quant review; previously 56·DF − 8).
+        // methodology ().
         let expected_net = 48.0 / (1.05_f64 * 1.05);
         assert!((net_recovery - expected_net).abs() < 1e-12);
         assert!((lgd - (1.0 - expected_net / 100.0)).abs() < 1e-12);

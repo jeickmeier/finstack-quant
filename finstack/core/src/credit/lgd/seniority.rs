@@ -172,7 +172,7 @@ impl BetaRecovery {
     /// # Errors
     ///
     /// Propagates sampling errors instead of silently falling back to the
-    /// mean (2026-06-09 core quant review minor finding). With the shape
+    /// mean (). With the shape
     /// parameters validated by [`BetaRecovery::new`] this is near-unreachable,
     /// but a silent mean fallback would corrupt tail statistics undetected.
     pub fn sample(&self, rng: &mut dyn crate::math::RandomNumberGenerator) -> Result<f64> {
@@ -218,7 +218,7 @@ impl BetaRecovery {
     /// near-unreachable (the parameters are validated positive and finite by
     /// [`BetaRecovery::new`]); it previously fell back silently to the mean,
     /// which would corrupt quantile-based tail measures undetected
-    /// (2026-06-09 core quant review minor finding).
+    /// ().
     pub fn quantile(&self, p: f64) -> Result<f64> {
         use statrs::distribution::{Beta, ContinuousCDF};
         let p_clamped = p.clamp(1e-15, 1.0 - 1e-15);

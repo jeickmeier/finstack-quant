@@ -98,7 +98,7 @@ pub struct OhlsonOScoreInput {
 /// (O ≈ −3.23), which minimized total misclassification in Ohlson (1980,
 /// Table 6). The Safe/Grey boundary at P*/2 = 0.019 is a house convention
 /// creating a caution band below the cutoff. (Re-based per the 2026-06-09
-/// core quant review: the previous raw-O cutoffs {0.38, 0.50} labeled
+/// the previous raw-O cutoffs {0.38, 0.50} labeled
 /// PD ≈ 59% firms "Safe" and were unrelated to Ohlson's published cutoff.)
 ///
 /// # Errors

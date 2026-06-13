@@ -230,7 +230,7 @@ pub(crate) fn plan_credit_cascade(
     _as_of_t0: Date,
     _as_of_t1: Date,
 ) -> Result<Option<CreditCascade>> {
-    // Gate the model schema before consuming it (quant review minor): the
+    // Gate the model schema before consuming it: the
     // model's own docs require checking `SCHEMA_VERSION` before trusting
     // content, and a silently-accepted future schema could re-interpret beta
     // or factor semantics.
@@ -314,7 +314,7 @@ pub(crate) fn plan_credit_cascade(
         let mut steps: Vec<CreditCascadeStep> =
             Vec::with_capacity(model.hierarchy.levels.len() + 2);
         let mut explained_bp = 0.0;
-        // Quant review M5: the calibrated model identity is
+        // the calibrated model identity is
         // `S_i = β_PC·F_PC + Σ_k β_k·F_level_k + adder_i`, so each scalar
         // factor move must be scaled by the ISSUER's beta before it explains
         // any of ΔS_i (matching `CreditStepKind`'s documented `bp = β × ΔF`
@@ -352,7 +352,7 @@ pub(crate) fn plan_credit_cascade(
         };
 
         let mut matched_config_factor = false;
-        // Dedupe config factor ids (quant review minor): a duplicated id would
+        // Dedupe config factor ids: a duplicated id would
         // append two cascade steps for the same factor; the cumulative-bump
         // executor would double-apply the move and the detail builder's
         // last-wins assignment would silently break the detail-sum invariant.
@@ -394,7 +394,7 @@ pub(crate) fn plan_credit_cascade(
         }));
     }
 
-    // No market scalar series for any credit factor (quant review MO-C3):
+    // No market scalar series for any credit factor (prior fix):
     // without observed factor moves, NOTHING about the issuer's spread move
     // is identifiably systematic, so the entire ΔS_i is routed to the
     // idiosyncratic adder. The former approach synthesized a single-issuer
@@ -550,7 +550,7 @@ pub(crate) fn build_credit_factor_attribution(
     use super::credit_factor::credit_factor_model_id;
     use super::types::{CreditFactorAttribution, LevelPnl};
 
-    // Release-safe shape check (quant review minor): a silent zip truncation
+    // Release-safe shape check: a silent zip truncation
     // would break the detail-sum invariant with no signal in release builds.
     if step_pnls.len() != cascade.steps.len() {
         tracing::warn!(
@@ -860,7 +860,7 @@ mod tests {
             ]
         );
         assert_eq!(deltas.len(), 5);
-        // Each factor step is β_issuer × ΔF (quant review M5): the calibrated
+        // Each factor step is β_issuer × ΔF : the calibrated
         // identity is S_i = β_PC·F_PC + Σ β_k·L_k + adder_i, so with
         // β_pc = 2, β_levels = [3, 4]:
         //   generic = 2 × 25bp = 50bp; rating = 3 × 7bp = 21bp;
@@ -943,7 +943,7 @@ mod tests {
             ]
         );
         assert_eq!(deltas.len(), 5);
-        // β-scaled steps (quant review M5) with β_pc = 2, β_levels = [3, 4]:
+        // β-scaled steps  with β_pc = 2, β_levels = [3, 4]:
         // rating = 3 × 25 = 75bp, generic = 2 × 5 = 10bp,
         // region = 4 × (−2) = −8bp; adder = 30 − 77 = −47bp.
         assert!((deltas[0] - 75.0).abs() < 1e-10);

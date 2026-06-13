@@ -220,7 +220,7 @@ pub struct MarketSnapshot {
     /// family — see [`Self::fixing_series`].
     pub series: HashMap<CurveId, ScalarTimeSeries>,
     /// Historical rate fixing series (`FIXING:{forward_curve_id}` convention,
-    /// populated when the `FORWARD` flag is set). Quant review MO-E4: a
+    /// populated when the `FORWARD` flag is set). Quant review Note: a
     /// floating-rate reset observed between T0 and T1 is RATES P&L, so fixing
     /// series restore with the forward curves, not with market scalars —
     /// otherwise a single economic rate move is split across two factor lines
@@ -428,7 +428,7 @@ impl MarketSnapshot {
         // isolation correct for the attribution call paths.
         //
         // `FIXING:`-prefixed series are EXCLUDED from the scalars family: they
-        // belong to the rates (FORWARD) family below (quant review MO-E4).
+        // belong to the rates (FORWARD) family below (prior fix).
         if restore_flags.contains(MarketRestoreFlags::SCALARS) {
             let preserved_fixings: Vec<ScalarTimeSeries> = new_market
                 .series_iter()

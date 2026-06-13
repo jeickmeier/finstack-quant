@@ -48,7 +48,7 @@ fn test_complete_pricing_workflow() {
         .unwrap();
 
     // 7 requested metrics + the `theta_period_days` horizon stamp the theta
-    // producer always emits alongside Theta (quant review M3).
+    // producer always emits alongside Theta .
     assert_eq!(result_all.measures.len(), 8, "Step 3: All metrics computed");
     assert!(result_all.measures.contains_key("theta_period_days"));
 

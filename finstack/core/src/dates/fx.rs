@@ -39,7 +39,7 @@
 //! - Business-day conventions:
 //!   `docs/REFERENCES.md#isda-2006-definitions`
 //! - FX settlement / spot-lag conventions: CLS settlement rules; see also
-//!   `docs/reviews/2026-06-09-core-quant-review.md` (FX spot lag finding)
+//!    (FX spot lag finding)
 
 use crate::dates::calendar::registry::CalendarRegistry;
 use crate::dates::calendar::types::Calendar;
@@ -879,7 +879,7 @@ mod tests {
 
     #[test]
     fn fx_spot_date_usd_pair_intermediate_us_holiday_does_not_delay() {
-        // Review finding (2026-06-09 core quant review): EUR/USD traded Thu
+        // Review finding : EUR/USD traded Thu
         // 2025-07-03; Fri 2025-07-04 is a US holiday but a good EUR day, so it
         // counts as an intermediate day. Market spot is Mon 2025-07-07.
         let trade = create_date(2025, Month::July, 3).unwrap();

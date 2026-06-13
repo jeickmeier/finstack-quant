@@ -1,6 +1,6 @@
 //! Key-rate wing-bucket regression tests for Taylor attribution.
 //!
-//! REGRESSION (quant review B3): `key_rate_bump_spec` previously passed
+//! REGRESSION: `key_rate_bump_spec` previously passed
 //! `prev = 0.0` for the first bucket (understating sub-3M DV01 — a 1M knot
 //! got triangular weight 1/3 instead of the flat 1.0 of the left-wing half
 //! triangle, breaking the Σwᵢ(t)=1 partition) and `next = f64::INFINITY` for

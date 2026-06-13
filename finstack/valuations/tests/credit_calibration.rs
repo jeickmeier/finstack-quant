@@ -1822,7 +1822,7 @@ fn calibration_config_serialization_matches_schema() {
 }
 
 // ---------------------------------------------------------------------------
-// Quant-review M1: asof_spreads must cover exactly the calibrated universe
+// asof_spreads must cover exactly the calibrated universe
 // ---------------------------------------------------------------------------
 
 /// A history issuer missing from `asof_spreads` previously got a silent
@@ -1870,7 +1870,7 @@ fn calibration_rejects_asof_only_issuer() {
 }
 
 // ---------------------------------------------------------------------------
-// Quant-review M2: '.' in hierarchy tag values corrupts factor identity
+// '.' in hierarchy tag values corrupts factor identity
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -1901,7 +1901,7 @@ fn calibration_rejects_dotted_tag_values() {
 }
 
 // ---------------------------------------------------------------------------
-// Quant-review: unsorted/duplicated date grids are rejected
+// unsorted/duplicated date grids are rejected
 // ---------------------------------------------------------------------------
 
 #[test]

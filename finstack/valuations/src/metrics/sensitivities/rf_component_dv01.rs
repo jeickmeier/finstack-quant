@@ -2,7 +2,7 @@
 //! (WACC / property discount rate) rather than a market curve.
 //!
 //! DCF equity and real-estate DCF valuations always discount at their own
-//! rate (review finding M14); they have no direct curve sensitivity. Their
+//! rate ; they have no direct curve sensitivity. Their
 //! rate risk comes from the risk-free component embedded in that rate
 //! (`wacc = rf + risk_premium`). Because the decomposition is additive,
 //! `∂PV/∂rf = ∂PV/∂rate`, so DV01 is computed by central-difference bumps of
@@ -45,7 +45,7 @@ pub(crate) enum RfDv01Mode {
 }
 
 /// DV01 calculator bumping the risk-free component inside a flat discount
-/// rate (review finding M14).
+/// rate .
 pub(crate) struct RfComponentDv01Calculator<I> {
     mode: RfDv01Mode,
     _phantom: PhantomData<I>,

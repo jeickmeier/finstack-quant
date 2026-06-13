@@ -118,7 +118,7 @@ impl FractionalRiccatiSolver {
         // El Euch & Rosenbaum (2019): F(u, x) = −½u(u + i) + (iuρσ − κ)x + ½σ²x²
         //   = −½(u² + iu) + (iuρσ − κ)x + ½σ²x²
         // The constant term satisfies a(−i) = 0, which makes D(−i, ·) ≡ 0 and
-        // enforces the martingale condition ψ(−i) = 1 (review finding B1).
+        // enforces the martingale condition ψ(−i) = 1 .
         let iu = Complex64::i() * u;
         let a = -0.5 * (u * u + iu);
         let b = iu * rho * sigma - kappa;
@@ -201,7 +201,7 @@ impl FractionalRiccatiSolver {
     ///
     /// This is the coefficient of v₀ in the rough Heston characteristic
     /// function (El Euch & Rosenbaum 2019, Thm 4.1). Using `D(T)` instead is
-    /// correct only at α = 1 (classical Heston); see review finding M7.
+    /// correct only at α = 1 (classical Heston); see .
     ///
     /// The integral is evaluated by product integration: `D` is taken
     /// piecewise-linear on the solver grid and the kernel moments
@@ -404,7 +404,7 @@ impl RoughHestonFourierParams {
     /// ```
     ///
     /// The v₀ coefficient is the fractional integral `I^{1−α}D(T)`, not
-    /// `D(T)` (El Euch & Rosenbaum 2019, Thm 4.1; review finding M7).
+    /// `D(T)` (El Euch & Rosenbaum 2019, Thm 4.1; .
     ///
     /// # Arguments
     ///
@@ -443,7 +443,7 @@ impl RoughHestonFourierParams {
     /// where x = ln(F/K), F = S e^{(r−q)T}, w = u − i/2, and
     /// ψ(w) = exp(C(w) + I^{1−α}D(w)·v₀). The contour phase is e^{iwx}
     /// = e^{x/2}·e^{iux} — the e^{x/2} factor comes from evaluating on the
-    /// Lewis contour Im(w) = −½ (review finding B1). The drift terms cancel
+    /// Lewis contour Im(w) = −½ . The drift terms cancel
     /// analytically. Puts use put-call parity.
     ///
     /// # Arguments
@@ -708,7 +708,7 @@ mod tests {
         assert!(c.norm() < 1e-15, "C should be zero for zero D trajectory");
     }
 
-    /// B1 regression: the Riccati constant term must satisfy a(−i) = 0, so
+    /// Regression: the Riccati constant term must satisfy a(−i) = 0, so
     /// D(−i, ·) ≡ 0 along the whole trajectory. This is the martingale
     /// condition E[S_T/F] = 1; the old sign error gave a(−i) = 1.
     #[test]
@@ -772,7 +772,7 @@ mod tests {
         }
     }
 
-    /// B1 regression: φ(−i, T) = E[S_T/S_0] = e^{(r−q)T} (martingale
+    /// Regression: φ(−i, T) = E[S_T/S_0] = e^{(r−q)T} (martingale
     /// property of the discounted spot). With the correct Riccati constant
     /// term D(−i, ·) ≡ 0 so this holds essentially exactly.
     #[test]

@@ -664,7 +664,7 @@ mod tests {
         assert!("unknown".parse::<PricingMode>().is_err());
     }
 
-    // Quant-review M4: a vol bump of 1.0 vol point must convert to 0.01
+    // a vol bump of 1.0 vol point must convert to 0.01
     // absolute vol, not 1.0 (a 100x oversized bump).
     #[test]
     fn vol_point_unit_converts_one_point_to_one_percent() {

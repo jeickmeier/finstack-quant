@@ -629,7 +629,7 @@ mod tests {
         // unit vectors, then compare Cov = L·Lᵀ against the exact fBM
         // increment covariance. The removed far-field construction inflated
         // the variance of increments beyond the window by O(1) factors
-        // (quant review finding B4), which this test would have caught.
+        // (prior fix), which this test would have caught.
         for &h in &[0.1, 0.3, 0.7] {
             let n = 60;
             let b = 20;

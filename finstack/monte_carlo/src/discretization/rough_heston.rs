@@ -16,7 +16,7 @@
 //! Construction logs a warning for grids above 200 steps because the
 //! quadratic Volterra cost can dominate large production runs.
 //!
-//! # Kernel Weights (review finding M8)
+//! # Kernel Weights 
 //!
 //! The singular kernel `(t − s)^{α−1}` is handled with hybrid-scheme weights
 //! (Bennedsen-Lunde-Pakkanen style), with the drift and noise components of
@@ -203,7 +203,7 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         // with K(s) = (t_next − s)^{α−1}. The drift uses the exact
         // per-interval kernel integral; far-field noise uses the interval-
         // average kernel; the singular last interval uses the variance-exact
-        // near-field weight Δt^{α−1}/√(2α−1) (review finding M8).
+        // near-field weight Δt^{α−1}/√(2α−1) .
         let t_next = t + dt;
         let alpha = self.alpha;
         let alpha_m1 = alpha - 1.0;
@@ -457,7 +457,7 @@ mod tests {
     /// The singular last-interval noise weight must be variance-exact:
     /// the one-step noise contribution to V is `(1/Γ(α))·σᵥ√v₀·∫₀^Δt s^{α−1} dW`,
     /// whose standard deviation per unit normal is
-    /// `(1/Γ(α))·σᵥ√v₀·√(Δt^{2α−1}/(2α−1))` (review finding M8). A midpoint
+    /// `(1/Γ(α))·σᵥ√v₀·√(Δt^{2α−1}/(2α−1))` . A midpoint
     /// kernel `(Δt/2)^{α−1}·√Δt` understates this by `2^{1−α}√(2α−1)`.
     #[test]
     fn near_field_noise_weight_is_variance_exact() {

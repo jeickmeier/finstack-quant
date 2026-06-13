@@ -96,7 +96,7 @@ impl MetricCalculator for Prepayment01Calculator {
         // Near a 0 rate the down bump clamps and the move becomes one-sided,
         // so divide by the achieved width rather than the nominal 2·bump.
         //
-        // Quant review MO-T5: the slope `(ΔPV / achieved_bump)` is in dollars
+        // Quant review Note: the slope `(ΔPV / achieved_bump)` is in dollars
         // per UNIT of CPR; multiply by 1bp (0.0001) so the metric matches its
         // documented `$ per 1bp` convention — the unit the attribution layer's
         // `measure_prepayment_shift` (bp) pairs with directly.

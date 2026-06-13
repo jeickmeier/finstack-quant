@@ -50,12 +50,6 @@ let pv = swap.value(&market_context, Date::from_calendar_date(2024, Month::Janua
 - Assumes a single discount curve for both legs; CSA-specific multi-curve discounting must be modeled externally.
 - Does not include optional early termination or compounding conventions beyond the provided leg specs.
 
-## Pricing Methodology
-
-- Projects floating legs off their respective forward curves, applying spreads and reset/payment lags per leg schedule.
-- Discounts projected coupons on a chosen discount curve; stubs handled via shared schedule builder.
-- No convexity or CSA-specific adjustments baked in; parity with standard multi-curve deterministic valuation.
-
 ## Metrics
 
 - PV plus par basis spread, DV01 (parallel and key-rate) using generic DV01 calculators over the discount curve.

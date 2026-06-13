@@ -1,6 +1,6 @@
 # Finstack Core Benchmarks
 
-This directory contains Criterion benchmark suites for `finstack-core`.
+Criterion benchmark suites for `finstack-core`.
 
 The benchmark sources are the ground truth. This README explains what is
 measured and how to run the suites. It intentionally avoids hard latency,

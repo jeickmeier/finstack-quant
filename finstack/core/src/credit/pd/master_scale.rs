@@ -112,7 +112,7 @@ impl MasterScale {
     /// # Errors
     ///
     /// Returns [`PdCalibrationError::NonFiniteValue`] if `pd` is NaN or
-    /// infinite (2026-06-09 core quant review: NaN previously fell through
+    /// infinite (NaN previously fell through
     /// every comparison and silently mapped to the worst grade).
     pub fn map_pd(&self, pd: f64) -> Result<MasterScaleResult, PdCalibrationError> {
         if !pd.is_finite() {

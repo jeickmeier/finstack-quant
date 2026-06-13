@@ -559,7 +559,7 @@ mod tests {
         let im = metric.calculate(&instrument, &market, as_of).expect("im");
         let expected = gross_im - threshold;
         // Tolerance widened from 1e-9 to 1e-6 (still ~4e-13 relative on a
-        // ~2.3e6 value): per the 2026-06-09 core quant review (user decision),
+        // ~2.3e6 value): per the ),
         // Money f64 ingestion now uses shortest round-trip `Decimal::from_f64`
         // instead of `from_f64_retain`, so the Decimal-side subtraction can
         // differ from this f64 reference arithmetic by a few 1e-9 absolute.

@@ -33,7 +33,7 @@ pub(crate) fn register_real_estate_metrics(registry: &mut MetricRegistry) {
         instrument: InstrumentType::RealEstateAsset,
         metrics: [
             // Rate risk via rf-component bump inside the property discount
-            // rate (review finding M14): the asset always discounts at its
+            // rate : the asset always discounts at its
             // own rate, so DV01 bumps the additive risk-free component of
             // that rate rather than a market curve.
             (Dv01, crate::metrics::RfComponentDv01Calculator::<

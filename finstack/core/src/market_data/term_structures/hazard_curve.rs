@@ -1206,7 +1206,7 @@ mod tests {
         assert_eq!(hc.hazard_rate(10.0), 0.02);
     }
 
-    /// Regression test (2026-06-09 core quant review, "Major — market data"
+    /// Regression test (2026-06-09 "Major — market data"
     /// item 2): `build()` and `rebuild_interp` (the `MarketContext::bump` /
     /// CS01 path via `bump_in_place`) must share one λ-segment attribution
     /// convention. A zero-size bump must be an exact no-op even for curves

@@ -284,7 +284,7 @@ impl FxOption {
             adjust_joint_calendar, fx_spot_date_for_pair,
         };
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
-        // delay a USD pair's spot date (2026-06-09 core quant review, FX spot
+        // delay a USD pair's spot date (FX spot convention
         // finding).
         let spot_settle = fx_spot_date_for_pair(
             trade_date,

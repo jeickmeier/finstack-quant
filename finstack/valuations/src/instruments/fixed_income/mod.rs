@@ -1,6 +1,6 @@
 //! Fixed income instruments: bonds, loans, MBS, and structured products.
 //!
-//! This module provides comprehensive fixed income instrument modeling including
+//! This module provides fixed income instrument modeling including
 //! government and corporate bonds, mortgage-backed securities, and structured
 //! credit products. All instruments support cashflow generation, discounting,
 //! and standard risk metrics (duration, convexity, DV01).

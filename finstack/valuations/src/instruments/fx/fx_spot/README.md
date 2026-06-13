@@ -33,12 +33,6 @@ let pv = trade.value(&market_context, as_of)?;
 - Requires FX matrix in `MarketContext` when `spot_rate` is not set.
 - Does not model settlement risk, bid/ask spreads, or optionality.
 
-## Pricing Methodology
-
-- Converts base notional to quote currency using explicit `spot_rate` or FX matrix rate on cashflow date policy.
-- Optional settlement lag/BDC adjusts settlement date; no discounting or forward points applied.
-- Deterministic single-cashflow valuation.
-
 ## Metrics
 
 - PV in quote currency; FX delta equal to base notional in base currency and −PV in quote currency.

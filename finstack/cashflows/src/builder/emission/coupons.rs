@@ -526,8 +526,7 @@ fn sample_overnight_rates(
 
         if current.is_business_day(calendar) {
             // Pre-base observations are realized historical fixings resolved
-            // from the `FIXING:{index_id}` series (2026-06-09 quant review,
-            // M3); without a series the error routes through the spec's
+            // from the `FIXING:{index_id}` series; without a series the error routes through the spec's
             // fallback policy. T+0 prefers a published fixing, else projects
             // from t = 0; later dates project the overnight forward.
             let rate =

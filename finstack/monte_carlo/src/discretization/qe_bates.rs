@@ -212,7 +212,7 @@ mod tests {
     /// nonzero correlation, `E[S_T] = S₀·e^{(r−q)T}` must hold within the
     /// Monte Carlo standard error. This is the test whose absence let the
     /// original Bates wiring (compensated drift, no jumps) ship (quant
-    /// review finding M5).
+    /// .
     #[test]
     fn qe_bates_terminal_spot_is_martingale() {
         let bates = bates_process(1.0, -0.05, 0.15);

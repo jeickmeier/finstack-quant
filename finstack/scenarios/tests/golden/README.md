@@ -1,6 +1,6 @@
 # Golden Test Data - finstack-scenarios
 
-This directory contains golden test fixtures for validating scenario engine
+golden test fixtures for validating scenario engine
 implementations against known reference values.
 
 ## Framework

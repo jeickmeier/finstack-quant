@@ -1,6 +1,6 @@
 //! Term loan instruments with covenant and delayed-draw features.
 //!
-//! This module provides comprehensive modeling for institutional term loans including:
+//! This module provides modeling for institutional term loans including:
 //! - Standard term loans with fixed or floating rates
 //! - Delayed-draw term loans (DDTL) with commitment periods and fees
 //! - Payment-in-kind (PIK) interest with toggles

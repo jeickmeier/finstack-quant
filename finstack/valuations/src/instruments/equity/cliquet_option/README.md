@@ -30,12 +30,6 @@ let pv = option.value(&market_context, as_of)?;
 - Assumes GBM dynamics with deterministic dividend yield; no stochastic vol or jumps.
 - No early exercise; payoff is strictly European at final reset/payment.
 
-## Pricing Methodology
-
-- Monte Carlo GBM with piecewise parameters for term-structured rates/dividends/vols; exact discretization with Philox RNG.
-- Payoff aggregates local period returns (capped/floored) and global cap/floor based on additive or multiplicative rule.
-- Discounting via instrument curve; optional dividend yield and vol surface drive drift/vol inputs.
-
 ## Metrics
 
 - PV plus MC bump-and-revalue Greeks (delta/vega/theta) and path statistics (expected local/global payoffs).

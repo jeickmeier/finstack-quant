@@ -885,7 +885,7 @@ mod tests {
         );
     }
 
-    /// Blocker B2 regression: a coupon whose raw step index lands in (0, 1)
+    /// Regression: a coupon whose raw step index lands in (0, 1)
     /// (i.e. inside the first time step) must keep its `(1 - weight)` share at
     /// step 0. The old guard `step_idx > 0` silently dropped that share,
     /// leaking up to a full coupon of PV for any callable bond valued within

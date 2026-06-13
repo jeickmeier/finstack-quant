@@ -179,7 +179,7 @@ pub struct DayCountContextState {
     ///
     /// Previously this field was silently dropped on serialization, downgrading
     /// exact ICMA accrual to the drifting frequency-only path on round-trip
-    /// (2026-06-09 core quant review, Moderate/Dates). The `#[serde(default)]`
+    /// . The `#[serde(default)]`
     /// keeps the addition wire-compatible: payloads written before this field
     /// existed deserialize with `None`.
     #[serde(default)]
@@ -335,7 +335,7 @@ pub enum DayCount {
     /// Note: this is **not** ACT/ACT AFB (Association Française des Banques),
     /// which uses a different (sub-period splitting) algorithm. The former
     /// `act_365afb` parse alias was removed because it conflated the two
-    /// (2026-06-09 core quant review, Moderate/Dates).
+    /// .
     ///
     /// # Usage
     ///
@@ -1265,7 +1265,7 @@ fn year_fraction_act_act_isma(start: Date, end: Date, freq: Tenor) -> crate::Res
     // previous implementation) lost the roll day for month-end starts: a
     // regular EOM semi-annual period [2025-08-31, 2026-02-28) drifted to a
     // grid ending Aug 28 and returned 181/184 × 0.5 ≈ 0.49185 instead of
-    // exactly 0.5 (2026-06-09 core quant review).
+    // exactly 0.5 .
     let months_per_period = match freq.unit {
         TenorUnit::Months => freq.count as i32,
         TenorUnit::Years => freq.count as i32 * 12,
@@ -1342,7 +1342,7 @@ fn year_fraction_act_act_isma(start: Date, end: Date, freq: Tenor) -> crate::Res
 /// - **Non-annual**: 366 if the period END date falls in a leap year, else 365.
 ///
 /// Previously the Feb-29 window was `[start, end)` and the frequency rule was
-/// ignored (2026-06-09 core quant review, Moderate/Dates).
+/// ignored .
 fn year_fraction_act_365l(start: Date, end: Date, ctx: DayCountContext<'_>) -> f64 {
     if start == end {
         return 0.0;
@@ -1467,7 +1467,7 @@ impl crate::parse::NormalizedEnum for DayCount {
         ("act365l", Self::Act365L),
         ("actual_365l", Self::Act365L),
         // NOTE: the former "act_365afb" alias was removed: ACT/ACT AFB is a
-        // different convention from Act/365L (2026-06-09 core quant review).
+        // different convention from Act/365L .
         ("nl_365", Self::Nl365),
         ("nl365", Self::Nl365),
         ("act_365_nl", Self::Nl365),
@@ -1576,7 +1576,7 @@ mod tests {
         // Act365L
         assert_parses_to("actual_365l", DayCount::Act365L);
         // The "act_365afb" alias was removed: ACT/ACT AFB is a different
-        // convention from Act/365L (2026-06-09 core quant review).
+        // convention from Act/365L .
         assert!("act_365afb".parse::<DayCount>().is_err());
 
         // Nl365
@@ -1620,7 +1620,7 @@ mod tests {
     // -----------------------------------------------------------------------
     // Act/365L ICMA Rule 251 boundary tests
     //
-    // Updated per the 2026-06-09 core quant review (Moderate/Dates): the
+    // Updated the
     // Feb-29 window for the annual rule is (start, end] per ICMA Rule 251,
     // not [start, end), and a non-annual coupon frequency switches the
     // denominator rule to "366 iff the period END falls in a leap year".
@@ -1839,7 +1839,7 @@ mod tests {
         };
 
         // Context → state → JSON → state → context preserves coupon_period
-        // (previously silently dropped; 2026-06-09 core quant review).
+        // (previously silently dropped; ).
         let state: DayCountContextState = ctx.into();
         assert_eq!(state.coupon_period, Some(coupon));
 

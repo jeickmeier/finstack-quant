@@ -1220,7 +1220,7 @@ mod serde_tests {
 }
 
 mod roll_forward_realized_forward {
-    //! Realized-forward roll semantics (2026-06-09 core quant review):
+    //! Realized-forward roll semantics :
     //! `DF_new(T - dt) = DF_old(T) / DF_old(dt)`, so forwards realize and a
     //! flat curve stays flat under roll.
 

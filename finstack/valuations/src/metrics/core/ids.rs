@@ -1146,7 +1146,7 @@ impl MetricId {
 
     /// Total GP (General Partner) carry paid through the waterfall.
     ///
-    /// Units: currency (review finding M11 — formerly misregistered as
+    /// Units: currency (formerly misregistered as
     /// `gp_irr` despite returning a dollar amount).
     pub const GpCarryTotal: Self = Self(Cow::Borrowed("gp_carry_total"));
 

@@ -349,7 +349,7 @@ fn act365l_period_no_feb29_uses_365() {
 fn act365l_period_ending_on_feb29() {
     // ICMA Rule 251 window is (start, end]: a period ENDING on Feb 29
     // includes it -> 366 denom. (Updated from the incorrect [start, end)
-    // window per the 2026-06-09 core quant review, Moderate/Dates.)
+    // window per the )
     // 59 actual days, Feb 29 in (start, end] -> 366 denom
     let yf = DayCount::Act365L
         .year_fraction(d(2024, 1, 1), d(2024, 2, 29), DayCountContext::default())
@@ -425,7 +425,7 @@ fn act365l_spanning_non_leap_year_boundary() {
 fn act365l_single_day_feb29() {
     // (Feb 28, Feb 29] = 1 day; Feb 29 is the period END and so is included
     // by the ICMA Rule 251 window -> 366 denom. (Updated per the 2026-06-09
-    // core quant review, Moderate/Dates.)
+    // Moderate/Dates.)
     let yf = DayCount::Act365L
         .year_fraction(d(2024, 2, 28), d(2024, 2, 29), DayCountContext::default())
         .unwrap();
@@ -527,7 +527,7 @@ fn actact_isma_multiple_frequencies() {
 
 #[test]
 fn actact_isma_eom_regular_period_is_exactly_half() {
-    // Regression for the 2026-06-09 core quant review: the frequency-only
+    // Regression for the the frequency-only
     // quasi-coupon grid was anchored at `start.add_months(-freq)` and stepped
     // cumulatively, so month-end starts drifted (grid Aug 28 instead of
     // Aug 31) and a regular EOM semi-annual period returned
@@ -557,7 +557,7 @@ fn actact_isma_eom_regular_period_is_exactly_half() {
 fn actact_isma_eom_grid_preserves_roll_day_across_short_month() {
     // Multi-period span across a short month: grid anchored on Aug 31 must be
     // Aug 31 / Feb 28 / Aug 31 (roll-day preserved), so two regular
-    // semi-annual EOM periods sum to exactly 1.0 (2026-06-09 core quant review).
+    // semi-annual EOM periods sum to exactly 1.0 .
     let ctx = DayCountContext {
         calendar: None,
         frequency: Some(Tenor::new(6, TenorUnit::Months)),

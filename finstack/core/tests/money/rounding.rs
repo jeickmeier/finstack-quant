@@ -45,7 +45,7 @@ fn money_display_matches_format_bankers_rounding() {
         format!("{}", Money::new(10.006, Currency::USD)),
         "USD 10.01"
     );
-    // Updated per the 2026-06-09 core quant review (user decision): f64
+    // Updated f64
     // ingestion now uses shortest round-trip `Decimal::from_f64`, so `10.005`
     // ingests as exactly 10.005 — a true half tie — and banker's rounding
     // takes it to the even digit, 10.00. (Under the old `from_f64_retain`
@@ -66,7 +66,7 @@ fn money_display_matches_format_bankers_rounding() {
 
 #[test]
 fn money_f64_ingestion_uses_shortest_round_trip() {
-    // 2026-06-09 core quant review (user decision): f64 ingestion uses
+    // ): f64 ingestion uses
     // `Decimal::from_f64` (shortest round-trip) instead of
     // `from_f64_retain`, so the classic IEEE artifact disappears:
     // 0.1 + 0.2 == 0.3 exactly in the Decimal store.
@@ -85,7 +85,7 @@ fn money_f64_ingestion_uses_shortest_round_trip() {
 
 #[test]
 fn money_integer_tuple_conversion_is_exact_above_2_pow_53() {
-    // 2026-06-09 core quant review (minor): `From<(i64|u64, Currency)>` must
+    // ): `From<(i64|u64, Currency)>` must
     // route through `Decimal::from` (exact), not `as f64`, which cannot
     // represent 2^53 + 1 and would silently round it to 2^53.
     let v: i64 = (1_i64 << 53) + 1; // 9_007_199_254_740_993

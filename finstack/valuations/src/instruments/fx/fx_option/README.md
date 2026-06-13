@@ -27,12 +27,6 @@ let pv = option.value(&market_context, as_of_date)?;
 - Assumes log-normal FX dynamics; no support for local-vol or stochastic-vol pricing.
 - Quanto adjustments are not included; cross-currency risks handled via chosen curves only.
 
-## Pricing Methodology
-
-- Garman–Kohlhagen (Black–76) analytic pricing with domestic/foreign carry, vol from FX surface or override.
-- Time to expiry from instrument day-count; discounting via domestic curve, foreign curve used for carry.
-- **European exercise only**: Non-European styles are rejected with a validation error.
-
 ## Metrics
 
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytic formulas.

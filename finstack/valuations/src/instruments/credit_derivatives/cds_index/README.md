@@ -58,30 +58,6 @@ let par = idx.par_spread(&market_context, as_of)?;
 - Index roll mechanics beyond the provided schedule/series must be managed externally.
 - Relies on supplied hazard and discount curves; no calibration built into the pricer.
 
-## Pricing Methodology
-
-- All priced quantities (NPV, leg PVs, par spread, RPV01, CS01) delegate to
-  the single-name `CDSPricer` (ISDA Standard Model integration). In
-  `Constituents` mode, results are aggregated across surviving names with
-  per-name weights renormalized over the live constituents.
-- The index `index_factor` scales the synthetic / per-constituent notional
-  (after defaults). Validation always rejects an `index_factor` that
-  exceeds `1 - sum_defaulted_weights` (over-statement: would double-count
-  recoveries). When the constituent list declares any defaults
-  (`sum_defaulted_weights > 0`), the check is symmetric and also rejects
-  `index_factor < 1 - sum_defaulted_weights` (under-statement: silently
-  shrinks the surviving notional). With no declared defaults, an
-  `index_factor < 1` is permitted as a way to model externally-tracked
-  defaults (e.g. SingleCurve mode where there is no constituent list).
-- Par spread denominator is the risky annuity (`RiskyAnnuity` method); the
-  Bloomberg-CDSW alternative (`FullPremiumAoD`) is exposed via
-  `CDSPricerConfig` plumbed through `CDSIndexPricer::with_config` (test-only).
-- The `CashflowProvider` schedule is an *informational* mid-period Riemann
-  projection of expected default and premium flows. It is intentionally a
-  coarser approximation than the priced PV: discounting it will agree with
-  `npv()` only to within a few percent for benign curves. Treat it as a
-  cashflow listing, not a numerical equality check.
-
 ## Metrics
 
 - PV, par spread, index RPV01, upfront for given quote, and CS01 (parallel/bucketed) via constituent aggregation.

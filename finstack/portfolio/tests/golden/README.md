@@ -1,6 +1,6 @@
 # Golden Test Data - finstack-portfolio
 
-This directory contains golden test fixtures for validating portfolio
+golden test fixtures for validating portfolio
 attribution and valuation calculations.
 
 ## Framework

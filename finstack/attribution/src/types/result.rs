@@ -641,7 +641,7 @@ impl PnlAttribution {
     ///
     /// On error, sets residual to zero and adds a diagnostic note to metadata.
     pub fn compute_residual(&mut self) -> Result<()> {
-        // MO-C2 (quant review): payloads predating `fx_translation_pnl` /
+        // payloads predating `fx_translation_pnl` /
         // `curve_shape_pnl` deserialize those fields with the `zero_money_usd`
         // serde default. A zero-valued USD default on a non-USD attribution
         // must not hard-fail currency validation for an otherwise valid

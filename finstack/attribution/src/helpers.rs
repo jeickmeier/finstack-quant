@@ -208,7 +208,7 @@ pub(crate) fn total_return_carry_inputs(
     // A failed cashflow collection must be VISIBLE: coupon income feeds
     // `total_pnl` via `apply_total_return_carry`, so silently defaulting to
     // zero would flip the attribution from total-return to MTM-only with no
-    // observability (quant review M8).
+    // observability .
     let coupon_income = match collect_cashflows_in_period(
         instrument,
         cashflow_market,

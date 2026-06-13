@@ -1117,7 +1117,7 @@ fn market_context_apply_bumps_additional_branches_and_errors() {
         .unwrap();
     // Canonical VolBucketPct semantics are MULTIPLICATIVE (vol × (1 + pct/100)),
     // matching the filtered path and the scenarios adapter preview
-    // (2026-06-09 core quant review, Blocker #3).
+    // .
     assert!((bumped_vol - base_vol * 1.10).abs() < 1e-12);
 
     // VolBucketPct missing surface error branch

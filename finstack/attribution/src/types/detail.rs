@@ -407,7 +407,7 @@ impl<'de> Deserialize<'de> for SourceLine {
         if let Some(obj) = v.as_object() {
             if obj.contains_key("total") {
                 // New shape. `deny_unknown_fields` keeps this inbound surface
-                // as strict as the rest of the crate (quant review minor: a
+                // as strict as the rest of the crate (a
                 // typo'd key was previously dropped silently).
                 #[derive(Deserialize)]
                 #[serde(deny_unknown_fields)]

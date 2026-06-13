@@ -4,9 +4,9 @@
 //! value with respect to parallel inflation curve shifts (π in decimal) —
 //! the `InflationConvexity` MetricId convention shared with the inflation
 //! swap producer and consumed by P&L attribution as
-//! `½ × InflationConvexity × (Δi_decimal)²` with no P₀ factor (quant review
-//! M4: the former `(1/P)`-normalized figure understated ILB inflation
-//! convexity P&L by a factor of ~P₀).
+//! `½ × InflationConvexity × (Δi_decimal)²` with no P₀ factor. The former
+//! `(1/P)`-normalized figure understated ILB inflation convexity P&L by a
+//! factor of ~P₀.
 //!
 //! Uses numerical differentiation with 1bp bumps to the inflation curve.
 
@@ -105,7 +105,7 @@ mod tests {
         bond
     }
 
-    /// Quant review M4: the reported `InflationConvexity` is the **raw dollar
+    /// the reported `InflationConvexity` is the **raw dollar
     /// second derivative** `d²PV/dπ²` ($ per decimal²) — the same convention
     /// as the inflation swap producer and the attribution consumer. The
     /// former `(1/P)`-normalized figure understated ILB inflation convexity

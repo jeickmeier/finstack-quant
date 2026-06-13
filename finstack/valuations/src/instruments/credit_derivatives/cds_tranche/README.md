@@ -93,12 +93,6 @@ Smoothing methods available:
 - **Strict Monotonic**: Simple forward enforcement
 - **Weighted Smoothing**: Preserves curve shape while enforcing constraints
 
-## Pricing Methodology
-
-- Base-correlation copula: computes equity tranche EL curve, then derives [A,D] tranche EL via detachment/attachment differences.
-- Protection/premium legs discounted on quote curve; accrual-on-default handled mid-period with Gauss–Hermite integration for accuracy near extreme correlations.
-- Par spread solved via Newton-Raphson using tranche RPV01; supports accumulated loss input and IMM scheduling.
-
 ## Metrics
 
 - PV (buyer/seller), par spread, upfront, spread DV01, expected loss, jump-to-default, and correlation delta via finite differences.

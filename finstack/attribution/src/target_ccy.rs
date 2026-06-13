@@ -298,7 +298,7 @@ mod tests {
         translate_and_assert_eur_to_usd(attr, val_t0_native);
     }
 
-    /// Quant review M6: translation must preserve the total-return convention.
+    /// translation must preserve the total-return convention.
     /// When the native attribution carries coupon income (total_pnl = MTM +
     /// coupon, carry includes the coupon), the translated total must add the
     /// coupon back at T1 FX — the rate the translated carry contains it at —

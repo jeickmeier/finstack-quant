@@ -995,7 +995,7 @@ fn rule_multiple_rules_combine() {
 }
 
 // ============================================
-// Year-boundary observance (2026-06-09 core quant review, Moderate/Dates)
+// Year-boundary observance 
 // ============================================
 
 #[test]
@@ -1030,7 +1030,7 @@ fn rule_fixed_observance_crosses_year_boundary() {
 }
 
 // ============================================
-// Nth weekday occurrence overflow (2026-06-09 core quant review, Minor/Dates)
+// Nth weekday occurrence overflow 
 // ============================================
 
 #[test]

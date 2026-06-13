@@ -112,7 +112,7 @@ pub struct CommoditySwap {
     ///
     /// Floating-leg observations with date strictly before the valuation date
     /// read from this store; a missing past fixing is an error — no silent
-    /// substitution of today's spot (review finding M15). Observations on or
+    /// substitution of today's spot . Observations on or
     /// after the valuation date project from the price curve.
     #[builder(default)]
     #[serde(default)]
@@ -312,7 +312,7 @@ impl CommoditySwap {
     /// valid holiday calendar, exchange holidays are also excluded from the
     /// average. Otherwise, only weekends are filtered.
     ///
-    /// # Past vs future observations (review finding M15)
+    /// # Past vs future observations 
     ///
     /// Observation dates strictly before `as_of` read from
     /// [`realized_fixings`](Self::realized_fixings); a missing past fixing is
@@ -976,7 +976,7 @@ mod tests {
             .expect("should build")
     }
 
-    /// Review finding M15: past floating-leg observations read from the
+    /// past floating-leg observations read from the
     /// realized-fixings store. With flat fixings equal to a flat curve and a
     /// matching fixed price, the seasoned swap marks to ~0.
     #[test]
@@ -1012,7 +1012,7 @@ mod tests {
         );
     }
 
-    /// Review finding M15: a missing past fixing is an error naming the
+    /// a missing past fixing is an error naming the
     /// missing date — never silently substituted with spot.
     #[test]
     fn m15_missing_past_fixing_errors() {
@@ -1050,7 +1050,7 @@ mod tests {
         );
     }
 
-    /// Review finding M15: duplicate realized fixing dates are rejected.
+    /// duplicate realized fixing dates are rejected.
     #[test]
     fn m15_duplicate_fixing_errors() {
         let as_of = Date::from_calendar_date(2025, Month::February, 14).expect("date");

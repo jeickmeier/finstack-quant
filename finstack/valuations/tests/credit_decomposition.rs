@@ -652,7 +652,7 @@ fn decompose_levels_excludes_folded_issuers_from_bucket_means() {
 }
 
 // ---------------------------------------------------------------------------
-// Quant-review: non-finite inputs are rejected before they poison bucket means
+// non-finite inputs are rejected before they poison bucket means
 // ---------------------------------------------------------------------------
 
 #[test]

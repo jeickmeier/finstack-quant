@@ -27,12 +27,6 @@ let pv = equity.value(&market_context, as_of_date)?;
 - Assumes long-only positions; shorting effects (rehypothecation, margin) are not modeled.
 - Price resolution depends on provided market data IDs; missing data results in validation errors.
 
-## Pricing Methodology
-
-- Pulls spot price from market scalar or uses embedded quote; multiplies by shares (default 1) for position value.
-- Optional dividend yield/discount curve used for carry-aware valuations where required.
-- No optionality; deterministic spot-based valuation.
-
 ## Metrics
 
 - PV, share count, and currency exposure; simple delta = shares with respect to spot.

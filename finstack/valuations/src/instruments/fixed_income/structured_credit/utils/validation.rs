@@ -1,6 +1,6 @@
 //! Validation framework for waterfall specifications.
 //!
-//! This module provides comprehensive validation for waterfall specifications,
+//! This module provides validation for waterfall specifications,
 //! ensuring correctness before execution. It checks for:
 //! - Duplicate tier/recipient IDs
 //! - Invalid priority values

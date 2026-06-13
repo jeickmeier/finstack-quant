@@ -1,6 +1,6 @@
 //! Stochastic risk metrics for structured credit.
 //!
-//! This module provides comprehensive risk metrics for stochastic
+//! This module provides risk metrics for stochastic
 //! structured credit analysis including:
 //!
 //! - **Expected Loss (EL)**: Probability-weighted average loss

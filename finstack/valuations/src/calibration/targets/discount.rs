@@ -727,7 +727,7 @@ impl BootstrapTarget for DiscountCurveTarget {
 
         // Note: MonotoneConvex is now compatible with non-monotone (negative-rate)
         // discount factors — it auto-detects negative discrete forwards and skips
-        // its positivity amelioration (user decision 2026-06-11, core quant review
+        // its positivity amelioration (user decision
         // Open Question 10) — so no interpolation-style guard is needed here.
 
         let mut builder = DiscountCurve::builder(self.curve_id.clone())

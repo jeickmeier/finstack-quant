@@ -674,7 +674,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 ConvertibleTreeType::Trinomial(_) => 2 * step + 1,
             };
 
-            // M1: Per-step discount factors from full term structure
+            // Per-step discount factors from full term structure
             let df_rf = self.valuator.rf_step_dfs[step];
             let df_risky = self.valuator.risky_step_dfs[step];
 
@@ -752,7 +752,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 // (cash = 0) even at steps where conversion is not allowed,
                 // corrupting both the value and the cash component that feeds
                 // the next credit-risky discounting step.
-                // M3: Uses adjusted soft-call trigger with observation window correction.
+                // Uses adjusted soft-call trigger with observation window correction.
                 let call_allowed = self.valuator.soft_call_triggered(node_spot);
 
                 if call_allowed {
@@ -1198,7 +1198,7 @@ pub fn calculate_convertible_greeks(
                 // curve (discount curves renormalize by DF(1d), hazard
                 // curves preserve hazard rates via conditional survival), so
                 // theta = price(rolled, t+1d) - price(t) captures both carry
-                // and roll-down. See the 2026-06-09 core quant review
+                // and roll-down. See module documentation
                 // (realized-forward roll semantics).
                 //
                 // A roll can fail when a curve is too sparse to retain ≥ 2

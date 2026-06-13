@@ -414,7 +414,7 @@ impl FxMatrix {
         let quotes = self.quotes.lock();
         let observed_quotes = self.observed_quotes.lock();
         // Pinned (date/policy-scoped) quotes are included so diagnostics
-        // reflect every stored quote (2026-06-09 core quant review, minor).
+        // reflect every stored quote .
         let pinned_quotes = self.pinned_quotes.lock();
         quotes.len() + observed_quotes.len() + pinned_quotes.len()
     }
@@ -461,8 +461,7 @@ impl FxMatrix {
         }
 
         // Pinned (date/policy-scoped) fixings are authoritative state and must
-        // survive a snapshot/restore round-trip (2026-06-09 core quant review:
-        // persistence previously dropped pinned fixings).
+        // survive a snapshot/restore round-trip (        // persistence previously dropped pinned fixings).
         let mut pinned_vec: Vec<(
             Currency,
             Currency,
@@ -528,7 +527,7 @@ impl FxMatrix {
     /// **relative and term-structure preserving**: the wrapper provider applies
     /// `rate(query) * (1 + bump_pct)` to the delegated per-date rate, so a
     /// date-aware provider keeps its term structure under the bump
-    /// (2026-06-09 core quant review: the previous implementation froze one
+    /// (the previous implementation froze one
     /// absolute rate for every date/policy, flattening the FX term structure).
     ///
     /// Explicit pair-global quotes and pinned (date/policy-scoped) fixings for
@@ -658,7 +657,7 @@ impl FxMatrix {
         }
 
         // Deterministic iteration order so a violating cycle is reported
-        // identically across runs (2026-06-09 core quant review, minor).
+        // identically across runs .
         let mut currencies: Vec<Currency> = currencies.into_iter().collect();
         currencies.sort();
         for &a in &currencies {

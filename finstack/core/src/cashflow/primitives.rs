@@ -348,7 +348,7 @@ impl CashFlow {
     ///
     /// Zero amounts are valid: floored coupons (e.g. a floating coupon with
     /// a 0% floor in a negative-rate environment) legitimately produce
-    /// zero-amount cashflows (2026-06-09 core quant review minor finding —
+    /// zero-amount cashflows (
     /// zero amounts were previously rejected).
     ///
     /// # Errors
@@ -579,7 +579,7 @@ mod tests {
         assert!(amort.validate().is_ok());
 
         // Zero amounts validate (floored coupons are legitimate;
-        // 2026-06-09 core quant review minor finding).
+        // ).
         let zero = Money::new(0.0, Currency::EUR);
         let zero_cf = CashFlow {
             date,

@@ -44,13 +44,6 @@ let pv = cb.value(&market_context, as_of)?;
 | `UponEvent(ChangeOfControl)` | Conversion upon M&A (requires scenario analysis) |
 | `MandatoryVariable { .. }` | PERCS/DECS/ACES with variable delivery ratio |
 
-## Pricing Methodology
-
-- Cashflow schedule generated via bond builder (fixed/floating coupons, calls/puts) then priced on Tsiveriotis-Zhang binomial/trinomial tree.
-- Splits value into cash (credit-discounted) and equity (risk-free) components using per-step forward discount factors from the full term structure.
-- Conversion, call, and put events mapped to tree nodes; exercise periods span ranges of tree steps.
-- Variable delivery ratio (PERCS/DECS) computed per-node based on stock price vs upper/lower conversion prices.
-
 ## Metrics
 
 - PV plus tree-based Greeks (delta/gamma/vega/theta/rho) from full repricing with central differences.

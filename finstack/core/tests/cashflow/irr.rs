@@ -517,7 +517,7 @@ fn irr_handles_very_high_return() {
     );
 
     // Flows are normalized by max |amount| inside the solver (2026-06-09
-    // core quant review: scale-free acceptance tolerance), so the residual
+    // scale-free acceptance tolerance), so the residual
     // bound is relative to the largest flow (1000), not absolute.
     let npv_at_irr = compute_periodic_npv(&amounts, irr);
     assert!(
@@ -535,7 +535,7 @@ fn irr_handles_100x_return() {
 
     let irr = result.expect("100x return IRR should converge");
     // Rate tolerance is relative for extreme rates: the solver normalizes
-    // flows by max |amount| (2026-06-09 core quant review), so convergence
+    // flows by max |amount| , so convergence
     // is scale-free and the absolute rate error scales with (1 + r).
     assert!(
         ((irr - 99.0) / 99.0).abs() < 1e-6,

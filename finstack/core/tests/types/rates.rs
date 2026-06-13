@@ -152,7 +152,7 @@ fn bps_from_conversions() {
     let i: i32 = b.into();
     assert_eq!(i, 250);
 
-    // `From<Bps> for f64` was removed (2026-06-09 core quant review): the
+    // `From<Bps> for f64` was removed : the
     // implicit decimal-out direction was asymmetric with `TryFrom<f64>`
     // (which reads a bp count), so a 25bp round-trip through f64 became 0bp.
     // Use the explicit accessors instead.

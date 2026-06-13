@@ -1,6 +1,6 @@
 //! Bond Future instrument implementation.
 //!
-//! This module provides comprehensive support for bond futures (e.g., UST Treasury futures,
+//! This module provides support for bond futures (e.g., UST Treasury futures,
 //! German Bund futures, UK Gilt futures) with deliverable basket mechanics.
 //!
 //! # Features

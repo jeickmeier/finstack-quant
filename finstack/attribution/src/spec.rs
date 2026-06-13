@@ -255,8 +255,7 @@ where
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct AttributionResultEnvelope {
-    /// Schema version identifier. Validated on DESERIALIZE (quant review
-    /// minor): a result envelope read back from storage with an unknown
+    /// Schema version identifier. Validated on DESERIALIZE (    /// minor): a result envelope read back from storage with an unknown
     /// schema version is rejected instead of silently re-interpreted.
     #[serde(deserialize_with = "validate_result_schema")]
     pub schema: String,

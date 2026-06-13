@@ -51,7 +51,7 @@ impl MetricCalculator for Recovery01Calculator {
         // matching the documented convention AND the CDS-side Recovery01
         // producers (`slope * RECOVERY_BUMP`); the former per-unit figure was
         // 100× larger, giving the same MetricId two units across producers
-        // (quant review MO-T5). Pairs with `measure_recovery_shift` (pct-pt).
+        // (prior fix). Pairs with `measure_recovery_shift` (pct-pt).
         let recovery01 = if achieved_bump > 0.0 {
             (pv_up - pv_down) / achieved_bump * 0.01
         } else {

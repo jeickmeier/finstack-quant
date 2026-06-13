@@ -520,7 +520,7 @@ impl CalibrationResult {
 /// the edges, and per-node mean-reverting transition probabilities. The
 /// short rate at node (i, j) is `r = exp(a_i + (j − j_max_i)·dx)` where the
 /// per-step additive shift `a_i` is calibrated to the discount curve via
-/// Arrow-Debreu forward induction (review finding M5).
+/// Arrow-Debreu forward induction .
 #[derive(Debug, Clone)]
 struct BkTrinomialLattice {
     /// Width cap on |j| (Hull-White branch-switching boundary)
@@ -668,7 +668,7 @@ impl ShortRateTree {
                     self.calibrate_bdt(&mut rates, discount_curve, dt)?;
                 } else {
                     // κ ≠ 0: genuine trinomial Black-Karasinski lattice in
-                    // x = ln r (review finding M5).
+                    // x = ln r .
                     self.calibrate_bk_trinomial(&mut rates, discount_curve, dt, kappa)?;
                 }
             }
@@ -711,7 +711,7 @@ impl ShortRateTree {
 
         let sigma = self.config.volatility;
         // Calibration must use the same per-node discount convention as
-        // pricing (review finding M6): a tree calibrated with continuous
+        // pricing : a tree calibrated with continuous
         // `exp(-r*dt)` but priced with e.g. simple `1/(1+r*dt)` silently
         // fails to reprice the curve.
         let comp = self.config.compounding;
@@ -776,8 +776,8 @@ impl ShortRateTree {
             //
             // Under continuous compounding the θ-dependence factors out:
             // df(r+θ) = exp(-θ·dt)·df(r) ⇒ θ = -ln(P_target/P_model_base)/dt,
-            // which is exact. Other conventions do not factor (review finding
-            // M6), so θ is root-found with that closed form as the initial
+            // which is exact. Other conventions do not factor θ out of df(r),
+            // so θ is root-found with that closed form as the initial
             // guess.
             let theta = if next_next_time > 0.0 {
                 let p_target = discount_curve.df(next_next_time);
@@ -926,7 +926,7 @@ impl ShortRateTree {
     /// [`calibrate_bk_trinomial`](Self::calibrate_bk_trinomial), which builds
     /// a genuine trinomial lattice in x = ln r — a binomial lattice cannot
     /// represent the rate-dependent drift `−κ·ln r` while staying
-    /// recombining (review finding M5).
+    /// recombining .
     ///
     /// # Errors
     ///
@@ -1220,7 +1220,7 @@ impl ShortRateTree {
     }
 
     /// Calibrate a mean-reverting Black-Karasinski model on a trinomial
-    /// lattice in x = ln r (review finding M5).
+    /// lattice in x = ln r .
     ///
     /// # Model
     ///
@@ -1946,7 +1946,7 @@ mod tests {
         );
     }
 
-    /// Review finding M6: calibration must honor `config.compounding`. A
+    /// calibration must honor `config.compounding`. A
     /// Ho-Lee tree configured with non-continuous compounding must reprice
     /// the calibration curve to <0.1 bp, because `price()` discounts with the
     /// same convention.
@@ -1991,7 +1991,7 @@ mod tests {
         }
     }
 
-    /// Review finding M6: `rate_from_df` inverts `df` for every convention.
+    /// `rate_from_df` inverts `df` for every convention.
     #[test]
     fn tree_compounding_rate_from_df_inverts_df() {
         for compounding in [
@@ -2219,7 +2219,7 @@ mod tests {
         var.sqrt()
     }
 
-    /// Review finding M5: with κ ≠ 0 the BDT model routes to a genuine
+    /// with κ ≠ 0 the BDT model routes to a genuine
     /// trinomial Black-Karasinski lattice that still reprices the curve and
     /// tightens the (probability-weighted) terminal log-rate dispersion
     /// relative to κ = 0.
@@ -2277,7 +2277,7 @@ mod tests {
         );
     }
 
-    /// Review finding M5: the BK trinomial lattice reprices the calibration
+    /// the BK trinomial lattice reprices the calibration
     /// curve to <0.1 bp, both via Arrow-Debreu state prices and via the
     /// dedicated backward induction in `price()`.
     #[test]
@@ -2313,7 +2313,7 @@ mod tests {
         );
     }
 
-    /// Review finding M5: as Δt → 0 the terminal log-rate dispersion of the
+    /// as Δt → 0 the terminal log-rate dispersion of the
     /// BK lattice approaches the OU limit `σ√((1−e^{−2κT})/(2κ))` — about
     /// 13% below σ√T at κ = 0.03, T = 10y — instead of growing like σ√T.
     #[test]
@@ -2346,7 +2346,7 @@ mod tests {
         );
     }
 
-    /// Review finding M5: as κ → 0 the trinomial BK lattice converges to the
+    /// as κ → 0 the trinomial BK lattice converges to the
     /// binomial BDT lattice (same continuous model).
     #[test]
     fn bk_kappa_to_zero_converges_to_bdt() {

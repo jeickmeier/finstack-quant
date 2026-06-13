@@ -137,14 +137,6 @@ Equity = EV - Total Debt + Cash - Preferred Equity
 - Theta (time decay via date roll).
 - Duration-like sensitivity to WACC and growth via finite-difference bump scripts.
 
-## Pricing Methodology
-
-- Discounts explicit free cashflows and terminal value at WACC on ACT/365.25 basis; DV01 bumps the risk-free component inside the WACC.
-- Mid-year convention (optional): discounts at `(t - 0.5)` years.
-- Terminal value via Gordon Growth, Exit Multiple, or H-Model, discounted to valuation date.
-- Equity value = Enterprise Value − Bridge Amount; then DLOC/DLOM discounts applied.
-- Deterministic single-scenario valuation (compose multiple instances for scenario weighting).
-
 ## Optional Fields
 
 All new fields are optional with serde defaults:

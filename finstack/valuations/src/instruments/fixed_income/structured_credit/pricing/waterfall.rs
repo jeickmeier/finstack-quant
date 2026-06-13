@@ -936,7 +936,7 @@ fn calculate_payment_amount(
                 })
             })?;
             let tranche = &tranches.tranches[idx];
-            // B1 fix: use current tranche balance when available
+            // Use current tranche balance when available
             let balance = tranche_balances
                 .and_then(|b| b.get(tranche_id.as_str()))
                 .copied()
@@ -970,7 +970,7 @@ fn calculate_payment_amount(
                 })
             })?;
             let tranche = &tranches.tranches[idx];
-            // B1 fix: use current tranche balance when available
+            // Use current tranche balance when available
             let current = tranche_balances
                 .and_then(|b| b.get(tranche_id.as_str()))
                 .copied()

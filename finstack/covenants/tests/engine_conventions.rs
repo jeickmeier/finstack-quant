@@ -52,7 +52,7 @@ impl InstrumentMutator for MockInstrument {
     }
 }
 
-/// B3 regression: DSCR between the lockup threshold (1.25) and the primary
+/// Regression: DSCR between the lockup threshold (1.25) and the primary
 /// default threshold (1.05) must breach ONLY the lockup covenant
 /// (`BlockDistributions`), never the primary covenant's `Default`
 /// consequence, and both covenants must appear in the report map.

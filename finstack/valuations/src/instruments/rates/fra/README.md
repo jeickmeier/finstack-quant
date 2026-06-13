@@ -27,12 +27,6 @@ let pv = fra.value(&market_context, as_of_date)?;
 - Single-currency instrument; cross-currency FRAs require explicit FX handling outside this module.
 - Does not model compounding, multi-period averaging, or optionality.
 
-## Pricing Methodology
-
-- Forward rate from forward curve using its own day-count; payoff `(F - K) × Tau × Notional / (1 + F × Tau)` paid at period start.
-- Discount payoff to as-of using discount curve; reset lag handled in schedule.
-- Deterministic single-period valuation; no convexity adjustment for futures-style pricing.
-
 ## Metrics
 
 - PV, par FRA rate (solve K s.t. PV=0), and DV01 on discount/forward curves via bump calculators.

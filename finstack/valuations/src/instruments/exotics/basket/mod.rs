@@ -1,6 +1,6 @@
 //! Multi-asset basket instruments for ETFs, indices, and portfolios.
 //!
-//! Provides comprehensive basket modeling for:
+//! basket modeling for:
 //! - **ETFs**: Exchange-traded funds with equity/bond constituents
 //! - **Custom indices**: Proprietary index construction
 //! - **Portfolio instruments**: Multi-asset portfolios with rebalancing

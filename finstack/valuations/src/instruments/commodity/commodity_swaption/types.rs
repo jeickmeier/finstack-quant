@@ -246,7 +246,7 @@ impl CommoditySwaption {
     /// where `annuity = Σ DF_i`, so the fair swap rate must be averaged with
     /// the same `DF_i` weights. The underlying swap pays `quantity × price`
     /// per period with **no** year-fraction accrual, so the weights carry no
-    /// `τ_i` factor (review finding B3). The rate reduces to the
+    /// `τ_i` factor . The rate reduces to the
     /// equal-weighted mean when `DF_i` is constant across periods. If the
     /// annuity denominator is zero (degenerate schedule), the equal-weighted
     /// mean is returned.
@@ -329,7 +329,7 @@ impl CommoditySwaption {
     /// PV of receiving 1 unit per period. The underlying `CommoditySwap` pays
     /// `quantity × price` per period with no year-fraction accrual, and
     /// `notional` is a per-period quantity, so the annuity must not carry a
-    /// `τ_i` factor (review finding B3: the IR-swaption `Σ DF·τ` convention
+    /// `τ_i` factor (the IR-swaption `Σ DF·τ` convention
     /// understated a monthly-settling swaption ~12×).
     pub fn annuity(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
@@ -1228,7 +1228,7 @@ mod tests {
         );
     }
 
-    /// B3: the swaption annuity must be consistent with its own underlying.
+    /// The swaption annuity must be consistent with its own underlying.
     /// A `CommoditySwap` pays `quantity × price` per period with no
     /// year-fraction accrual, so a zero-vol ITM call swaption on a flat
     /// forward curve must equal `notional × (F − K) × Σ DF_i` — computed here

@@ -424,7 +424,7 @@ pub fn project_floating_rate(
     // base date (T+0) is projected from t = 0; a reset strictly before the
     // base date is a realized historical fixing that the curve cannot supply,
     // so it errors instead of being silently clamped to today's short end
-    // (2026-06-09 cashflows quant review, M3). The emission layer resolves
+    // . The emission layer resolves
     // seasoned resets from the `FIXING:{index_id}` series before projecting;
     // callers with a fallback policy (e.g. `FloatingRateFallback::FixedRate`)
     // handle this error upstream.

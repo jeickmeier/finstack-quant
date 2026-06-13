@@ -330,7 +330,7 @@ pub(crate) struct ExecutionPlan {
 /// Vestigial cache-strategy statistics carried by [`ExecutionPlan`].
 ///
 /// The cross-evaluation result cache these recommendations fed was removed
-/// (see `docs/reviews/2026-06-09-core-quant-review.md`, Blocker #2): nothing
+/// : nothing
 /// consults any of these fields at evaluation time. The type is retained only
 /// because `ExecutionPlan` remains part of the serialized form of
 /// [`super::eval::CompiledExpr`]; deleting the field would silently change

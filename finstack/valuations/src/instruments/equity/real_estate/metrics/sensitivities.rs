@@ -169,8 +169,9 @@ impl Default for DiscountRateSensitivity {
 }
 
 impl DiscountRateSensitivity {
-    /// DCF valuations always discount at `discount_rate` (review finding
-    /// M14), so the only precondition is that the rate is set.
+    /// DCF valuations always discount at `discount_rate` 
+    /// DCF valuations always discount at `discount_rate`, so the only
+    /// precondition is that the rate is set.
     fn ensure_dcf_rate_present(a: &RealEstateAsset) -> finstack_core::Result<()> {
         if a.valuation_method
             != crate::instruments::equity::real_estate::RealEstateValuationMethod::Dcf

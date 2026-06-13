@@ -36,7 +36,7 @@ fn downcast_dcf(context: &MetricContext) -> Result<&DiscountedCashFlow> {
 /// Calculator for Enterprise Value metric.
 ///
 /// Computes EV from PV components directly (before equity bridge / discounts).
-/// Always discounts at WACC (review finding M14), matching `compute_pv`.
+/// Always discounts at WACC , matching `compute_pv`.
 struct EnterpriseValueCalculator;
 
 impl MetricCalculator for EnterpriseValueCalculator {
@@ -65,7 +65,7 @@ impl MetricCalculator for EquityValueCalculator {
 
 /// Calculator for Terminal Value PV metric.
 ///
-/// Always discounts at WACC (review finding M14), matching `compute_pv`.
+/// Always discounts at WACC , matching `compute_pv`.
 struct TerminalValuePVCalculator;
 
 impl MetricCalculator for TerminalValuePVCalculator {
@@ -122,8 +122,8 @@ pub(crate) fn register_dcf_metrics(registry: &mut MetricRegistry) {
         registry: registry,
         instrument: InstrumentType::DCF,
         metrics: [
-            // Rate risk via rf-component bump inside the WACC (review finding
-            // M14): DCF always discounts at WACC, so DV01 bumps the additive
+            // Rate risk via rf-component bump inside the WACC: DCF always
+            // discounts at WACC, so DV01 bumps the additive
             // risk-free component of the rate rather than a market curve.
             (
                 Dv01,

@@ -24,7 +24,7 @@ pub(crate) fn lp_cashflows(
     Ok(ledger.lp_cashflows())
 }
 
-/// Holder-view present value of the fund position (review finding M13).
+/// Holder-view present value of the fund position .
 ///
 /// PV = PV of LP cashflows strictly after `as_of` + the fund's stated
 /// `unrealized_nav` (taken as of `as_of`, undiscounted). Realized flows on or
@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn fully_realized_fund_prices_to_zero() {
-        // Holder view (review finding M13): all flows are on or before the
+        // Holder view : all flows are on or before the
         // resolved valuation date, so the residual position value is zero.
         let fund = fully_realized_fund();
         let market = MarketContext::new();

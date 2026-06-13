@@ -16,7 +16,7 @@ pub(crate) struct DcfPricer;
 /// # Discounting basis
 ///
 /// Explicit cash flows and the terminal value always discount at the
-/// instrument's own `wacc` via `(1 + wacc)^{-t}` (review finding M14 — the
+/// instrument's own `wacc` via `(1 + wacc)^{-t}` (the
 /// previous behavior silently switched to risk-free curve discounting when
 /// the named curve happened to be loaded, changing the PV of risky cash
 /// flows with no spread adjustment). The PV is identical whether or not

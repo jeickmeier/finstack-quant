@@ -630,7 +630,7 @@ impl Ndf {
         };
 
         // CLS-consistent spot roll: a US holiday on an intermediate day does not
-        // delay a USD pair's spot date (2026-06-09 core quant review, FX spot
+        // delay a USD pair's spot date (FX spot convention
         // finding). For NDFs the settlement currency (typically USD) is the
         // quote side of the pair.
         let spot_date = fx_spot_date_for_pair(

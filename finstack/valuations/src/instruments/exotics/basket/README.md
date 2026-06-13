@@ -27,12 +27,6 @@ let pv = basket.value(&market_context, as_of_date)?;
 - Does not model constituent correlation or tracking error—relies on underlying instrument pricing.
 - Expense treatment is deterministic; performance-fee or hurdle-style fees are out of scope.
 
-## Pricing Methodology
-
-- Aggregates constituent PVs using `BasketCalculator` with per-share or total modes, applying expense drag to NAV.
-- Converts constituent values to basket currency via `FxProvider` when needed; deterministic weights/units.
-- Relies on underlying instrument pricing or market data prices; no correlation modeling inside the basket engine.
-
 ## Metrics
 
 - NAV and per-constituent contributions; expense drag impact.

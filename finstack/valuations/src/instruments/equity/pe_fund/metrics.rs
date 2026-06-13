@@ -40,7 +40,7 @@ impl MetricCalculator for LpIrrCalculator {
 ///
 /// A GP IRR is not well-defined here (the GP has no initial investment in
 /// the carry stream), so this metric reports the total carry dollars instead
-/// and is registered as `gp_carry_total` (review finding M11).
+/// and is registered as `gp_carry_total` .
 pub struct GpCarryTotalCalculator;
 
 impl MetricCalculator for GpCarryTotalCalculator {
@@ -62,7 +62,7 @@ impl MetricCalculator for GpCarryTotalCalculator {
 ///
 /// Realized LP multiple: ledger `to_lp` distributions over contributions.
 /// Gross fund events would overstate the LP multiple by the GP carry
-/// (review finding M12).
+/// .
 pub struct MoicLpCalculator;
 
 impl MetricCalculator for MoicLpCalculator {
@@ -426,7 +426,7 @@ mod tests {
     #[test]
     fn test_moic_calculation() {
         // 100% LP promote tier so the full distribution reaches the LP and
-        // the ledger-basis MOIC (review finding M12) equals the naive 2x.
+        // the ledger-basis MOIC  equals the naive 2x.
         let spec = WaterfallSpec::builder()
             .return_of_capital()
             .promote_tier(0.0, 1.0, 0.0)
@@ -462,7 +462,7 @@ mod tests {
         assert!((moic - 2.0).abs() < 1e-6); // 2x multiple
     }
 
-    /// Holder-view PV (review finding M13): a fully realized fund has
+    /// Holder-view PV : a fully realized fund has
     /// base_value ≈ 0, so TVPI collapses to DPI and LpIrr equals the
     /// realized IRR.
     #[test]

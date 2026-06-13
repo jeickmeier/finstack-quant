@@ -336,7 +336,7 @@ impl LevenbergMarquardtSolver {
     /// least-squares residual norms / sums of squared errors. Objectives with
     /// strictly positive minima may stall near the optimum, and objectives that
     /// can go negative may have improving steps rejected. See
-    /// `docs/reviews/2026-06-09-core-quant-review.md` ("Scalar-objective LM is
+    ///  ("Scalar-objective LM is
     /// a root-finder for f(x)=0").
     ///
     /// # Arguments

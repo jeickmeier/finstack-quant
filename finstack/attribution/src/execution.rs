@@ -235,7 +235,7 @@ impl AttributionSpec {
                     // val_t0 because it's not surfaced; the extra reprice is
                     // cheap relative to a full attribution run.
                     //
-                    // MO-E5 (quant review): when T0 model parameters were
+                    // Note: when T0 model parameters were
                     // supplied, the methods priced their val_t0 with the
                     // T0-PARAMETER instrument — the translation must use the
                     // same instrument or `fx_translation_pnl` and the
@@ -285,7 +285,7 @@ impl AttributionSpec {
 
         // The currency-detection probe at the top of `execute` performed one
         // full valuation; account for it so `num_repricings` reflects true
-        // pricing cost (quant review minor).
+        // pricing cost.
         if instrument_ccy.is_some() {
             attribution.meta.num_repricings += 1;
         }

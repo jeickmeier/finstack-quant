@@ -1,6 +1,6 @@
 //! Structured credit instruments: ABS, RMBS, CMBS, and CLO with waterfall modeling.
 //!
-//! Provides comprehensive modeling for asset-backed securities with:
+//! modeling for asset-backed securities with:
 //! - Collateral pool management (prepayment, default, recovery)
 //! - Multi-tranche capital structure with seniority
 //! - Sequential-pay and pro-rata waterfall logic

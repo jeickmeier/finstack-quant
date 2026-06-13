@@ -694,7 +694,7 @@ fn test_imm_schedule_year_rollover() {
 fn test_cds_imm_schedule_basic() {
     // CDS IMM schedule: 20th of Mar/Jun/Sep/Dec.
     //
-    // Post-Big-Bang convention (2026-06-09 core quant review, Moderate/Dates):
+    // Post-Big-Bang convention :
     // the schedule anchors at the CDS roll PRECEDING the start date, so the
     // first period carries the standard front accrual from 2024-12-20.
     let start = make_date(2025, 1, 15);
@@ -798,7 +798,7 @@ fn test_no_roll_day_drift_backward_day30_anchor() {
     // Backward semi-annual generation from an Aug-30 maturity must
     // alternate Feb 28 / Aug 30 with the roll day (30th) preserved,
     // instead of collapsing to the 28th after the first short February
-    // (B1, 2026-06-09 cashflows quant review).
+    // (B1, ).
     let start = make_date(2025, 8, 30);
     let end = make_date(2027, 8, 30);
 

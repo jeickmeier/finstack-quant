@@ -133,13 +133,6 @@ let mtm = cds.mtm_for_vm(&market, as_of)?;
 - Protection step-in follows the valuation convention (`CdsValuationConvention::protection_step_in_days`): T+1 calendar for the ISDA Standard Model convention, valuation-date start for QuantLib parity (QuantLib's `IsdaCdsEngine` integrates from the valuation date) and Bloomberg CDSW ("protection starts immediately"). An explicit per-trade step-in override, cash settlement date, and front-end protection toggles are not yet exposed.
 - Broader CDS-family ISDA remediation for index, tranche, option, and canonical hazard calibration is still in progress.
 
-## Pricing Methodology
-
-- Premium/protection legs projected using hazard and discount curves with accrual-on-default handled per config.
-- Accrual-on-default integrated analytically per piecewise-constant interval, discounted to default settlement date.
-- Protection leg uses ISDA Standard Model breakpoint integration over the union of hazard and discount curve knots.
-- Par spread computed analytically from `Protection_PV / Risky_Annuity` (or full premium leg per bp when CDSW-style is requested).
-
 ## Metrics
 
 - PV (buyer/seller), par spread, risky annuity (RPV01), PV01/CS01 (parallel and bucketed).

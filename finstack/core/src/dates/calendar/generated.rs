@@ -14,7 +14,7 @@ include!("../../generated/holiday_generated.rs");
 /// Returns `None` when the requested occurrence does not exist in the month
 /// (e.g. a 5th Monday in a month with only four Mondays). Previously the raw
 /// arithmetic result silently spilled into the adjacent month, which could
-/// mark phantom holiday dates (2026-06-09 core quant review, Minor/Dates).
+/// mark phantom holiday dates .
 #[inline]
 pub(crate) fn nth_weekday_of_month(
     year: i32,

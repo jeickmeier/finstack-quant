@@ -451,7 +451,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let num_steps = time_grid.num_steps();
 
         // Riemann-Liouville Volterra generator for the rough-vol driver
-        // (review finding M2): the BLP hybrid scheme draws 2 normals per step
+        // : the BLP hybrid scheme draws 2 normals per step
         // and exposes the driving Brownian normals the rate leg correlates
         // against.
         //

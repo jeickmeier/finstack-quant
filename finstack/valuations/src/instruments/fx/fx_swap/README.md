@@ -29,12 +29,6 @@ let pv = swap.value(&market_context, as_of_date)?;
 - No explicit CSA/basis handling beyond the chosen curves; funding adjustments must be modeled externally.
 - Does not model optional early termination or broken-date rollovers beyond supplied dates.
 
-## Pricing Methodology
-
-- Discounts near/far exchanges in each currency using domestic/foreign curves; converts foreign leg via spot/forward.
-- Forward derived from parity if `far_rate` absent: `F = S × DF_for / DF_dom`; near rate from FX matrix or override.
-- PV is sum of domestic leg and converted foreign leg; deterministic two-leg valuation.
-
 ## Metrics
 
 - PV plus forward points and par far rate implied from curves.

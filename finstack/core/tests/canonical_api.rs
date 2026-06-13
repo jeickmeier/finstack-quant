@@ -53,7 +53,7 @@ mod npv_tests {
         let curve = FlatCurve::new(continuous_rate, base, dc, "TEST");
         // Investment-NPV view: the day-0 outlay is intentional, so opt back in
         // (the default now excludes flows on/before the valuation date — see
-        // docs/reviews/2026-06-09-core-quant-review.md).
+        // ).
         let pv = npv_with_options(
             &curve,
             base,

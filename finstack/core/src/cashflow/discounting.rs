@@ -23,7 +23,7 @@
 //! **market-standard pricing semantics**: cashflows dated **on or before** the
 //! valuation date are excluded (only strictly-future flows are discounted).
 //! A flow that has already paid is not part of the instrument's present value.
-//! This default changed per the 2026-06-09 core quant review — previously,
+//! This default changed Previously,
 //! past flows were silently future-valued using curve extrapolation.
 //!
 //! To include flows on or before the valuation date (e.g. for project/
@@ -167,7 +167,7 @@ pub trait Discountable {
 /// # Valuation-Date Cutoff
 ///
 /// Flows dated **on or before** `base` are excluded (market-standard pricing
-/// semantics; default changed per the 2026-06-09 core quant review). If every
+/// semantics; default changed per the ). If every
 /// flow is on or before `base`, the result is zero in the flows' currency.
 /// Use [`npv_with_options`] with [`NpvOptions::include_past_flows`] for the
 /// legacy include-everything behavior.
@@ -365,7 +365,7 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
 
     let mut total = Money::new(0.0, ccy);
     for (d, amt) in flows {
-        // Market-standard pricing semantics (2026-06-09 core quant review):
+        // Market-standard pricing semantics :
         // flows on or before the valuation date have already paid and are
         // not part of present value. `include_past_flows` opts back in to
         // the legacy include-everything behavior.
@@ -648,7 +648,7 @@ mod tests {
         };
         let base = curve.base_date();
         // Flows must be strictly after the valuation date to be included
-        // (2026-06-09 core quant review: npv excludes flows on/before base).
+        // ().
         let pay = base + time::Duration::days(1);
         let flows = vec![
             (pay, Money::new(10.0, crate::currency::Currency::USD)),
@@ -707,7 +707,7 @@ mod tests {
         let continuous_rate = (1.0 + rate).ln();
         let curve = FlatCurve::new(continuous_rate, base, dc, "NPV-TEST");
 
-        // 2026-06-09 core quant review + user decision: the default npv now
+        //  the default npv now
         // excludes flows on or before the valuation date, so the time-0
         // outlay (-100000 at base) is NOT part of the pricing PV.
         let pv =
@@ -750,7 +750,7 @@ mod tests {
         // Scalar NPV via npv_amounts (investment convention: includes the
         // base-date flow). Compare against npv_with_options with
         // include_past_flows, since the default npv now excludes flows on
-        // or before the valuation date (2026-06-09 core quant review).
+        // or before the valuation date .
         let pv_amounts =
             npv_amounts(&amount_flows, rate, None, None).expect("npv_amounts should succeed");
 
@@ -792,7 +792,7 @@ mod tests {
         let curve = FlatCurve::new(0.0, base, dc, "ZERO-RATE");
 
         // Default pricing semantics exclude the base-date flow
-        // (2026-06-09 core quant review), so only the +100 remains.
+        // , so only the +100 remains.
         let pv =
             npv(&curve, base, Some(dc), &flows).expect("NPV calculation should succeed in test");
         assert_eq!(pv.amount(), 100.0);
@@ -812,7 +812,7 @@ mod tests {
 
     /// Default pricing semantics exclude flows on or before the valuation
     /// date; `include_past_flows` restores the legacy include-everything
-    /// behavior (2026-06-09 core quant review + user decision).
+    /// behavior ().
     #[test]
     fn test_npv_excludes_past_flows_by_default() {
         let base = create_date(2025, Month::January, 1).expect("Valid test date");

@@ -157,12 +157,6 @@ if repo.has_margin() {
 - Rehypothecation and reinvestment income not modeled.
 - Currency/funding bases handled only through supplied discount curve.
 
-## Pricing Methodology
-
-- Two-leg cashflow model: cash out at start, cash back at end with repo rate applied; haircut determines required collateral.
-- Discounts leg cashflows using chosen discount curve; collateral type may adjust effective rate if special.
-- Deterministic term/open/overnight handling based on start/end/notice settings.
-
 ## Metrics
 
 - PV, implied repo rate (solve for rate matching price), and haircut-adjusted collateral requirement.

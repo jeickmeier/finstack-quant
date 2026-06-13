@@ -4,7 +4,7 @@
 //! analytical geometric-Asian control mean. The control must be scaled to the
 //! same notional units before the adjustment; a per-unit control silently
 //! collapses the adjusted price by roughly `β·P_geo·(N−1)` for notional `N`
-//! (quant review finding B2, docs/reviews/2026-06-09-monte-carlo-quant-review.md).
+//! .
 //!
 //! With a shared deterministic seed the whole estimator is linear in notional,
 //! so `price(notional = N) / N` must match `price(notional = 1)` up to

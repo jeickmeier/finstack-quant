@@ -240,7 +240,7 @@ pub struct DiscountedCashFlow {
     /// Discount curve identifier, used for risk attribution only.
     ///
     /// Discounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`
-    /// regardless of whether this curve is loaded (review finding M14 — the
+    /// regardless of whether this curve is loaded (the
     /// previous behavior silently switched risky flows to risk-free curve
     /// discounting). Rate sensitivity (`Dv01`/`BucketedDv01`) bumps the
     /// risk-free component inside the WACC instead.
@@ -1361,7 +1361,7 @@ mod tests {
         MarketContext::new().insert(curve)
     }
 
-    /// Review finding M14: the PV must always discount at WACC; loading the
+    /// the PV must always discount at WACC; loading the
     /// named curve in the market context must not change the valuation.
     #[test]
     fn pv_identical_with_and_without_curve_loaded() {
@@ -1457,7 +1457,7 @@ mod tests {
             dv01
         );
 
-        // Review finding M14: DV01 bumps the rf component inside the WACC,
+        // DV01 bumps the rf component inside the WACC,
         // so it must equal the analytic dPV/d(rf) per 1bp. For the simple
         // one-flow Gordon DCF: PV(w) = F/(1+w)^t + F(1+g)/((w-g)(1+w)^t).
         let f = 100.0;
@@ -1999,7 +1999,7 @@ mod tests {
         );
     }
 
-    /// Review finding M14: the terminal value PV metric discounts at WACC
+    /// the terminal value PV metric discounts at WACC
     /// even when the named curve is loaded.
     #[test]
     fn terminal_value_pv_metric_uses_wacc_even_with_curve_present() {

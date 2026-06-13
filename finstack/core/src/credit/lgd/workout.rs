@@ -11,7 +11,7 @@
 //! Both recoveries and workout costs are realized during the workout period
 //! and are discounted back to the default date with the same discount factor,
 //! per the Basel workout-LGD methodology (costs were previously left
-//! undiscounted; fixed per the 2026-06-09 core quant review).
+//! undiscounted; fixed per the ).
 //!
 //! # References
 //!
@@ -260,7 +260,7 @@ impl WorkoutLgd {
         let df = (1.0 + self.discount_rate).powf(-self.workout_years);
         let total_costs = self.costs.total_rate() * ead;
         // Discount both recoveries and workout costs to the default date
-        // (Basel workout-LGD; 2026-06-09 core quant review minor finding —
+        // (Basel workout-LGD; 
         // costs were previously left undiscounted).
         let net_recovery = ((gross_recovery - total_costs) * df).max(0.0);
 
@@ -415,7 +415,7 @@ mod tests {
         // gross_recovery = 80 * 0.70 = 56.0 (capped at 100)
         // df = (1.05)^-2 = 0.907029...
         // Costs are discounted alongside recoveries (Basel workout-LGD;
-        // 2026-06-09 core quant review — previously net = 56*df − 8.0):
+        // ):
         // net = (56.0 - 8.0) * 0.907029 = 43.5374
         // LGD = 1 - 43.5374 / 100 = 0.564626
         let expected_gross = 56.0;

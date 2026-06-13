@@ -296,7 +296,7 @@ mod tests {
     /// `Ψ(x) = p + (1−p)(1−e^{−βx})` (Andersen 2008, eqs. (23)–(25)): for
     /// every shock z with `Φ(z) > p`, `Ψ(sample(z)) = Φ(z)`. The previous
     /// implementation used `ln((1−p)/(u−p))/β`, which has the same marginal
-    /// law but inverts the z → v coupling (quant review finding M3).
+    /// law but inverts the z → v coupling (prior fix).
     #[test]
     fn case_b_sample_inverts_exact_mixture_cdf() {
         // Parameters chosen so ψ > ψ_c = 1.5 forces Case B.

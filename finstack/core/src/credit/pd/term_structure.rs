@@ -253,7 +253,7 @@ impl PdTermStructureBuilder {
     /// `tenor = k·h` for some non-negative integer `k` (within `1e-9` on the
     /// step count `tenor / h`); tenors are **not** silently rounded. For example,
     /// a 6-month matrix (`h = 0.5`) supports tenors 0.5, 1.0, 1.5, …
-    /// (2026-06-09 core quant review: previously `tm.horizon()` was ignored
+    /// ()` was ignored
     /// and tenors were silently rounded to integer powers.)
     ///
     /// # Errors

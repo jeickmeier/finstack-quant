@@ -310,7 +310,7 @@ impl HullWhiteTree {
         // interval [t_step, t_{step+1}] (it matches P(0, t_{step+1}) given
         // the state prices at t_step), so it is stored at `alpha[step]` —
         // the index `backward_induction` uses to discount that interval
-        // (review finding B4).
+        // .
         for step in 0..n {
             let dt_i = dts[step];
             let dx_curr = dxs[step];
@@ -1152,7 +1152,7 @@ mod tests {
 
     #[test]
     fn test_tree_calibration_steep_curve() {
-        // B4 regression: on a steep curve the off-by-one drift placement
+        // Regression: on a steep curve the off-by-one drift placement
         // produced 20-40 bp of ZCB bias. The calibrated tree must reprice
         // the input curve at every pillar to well under 0.1 bp.
         let steep_curve = DiscountCurve::builder("USD-OIS-STEEP")

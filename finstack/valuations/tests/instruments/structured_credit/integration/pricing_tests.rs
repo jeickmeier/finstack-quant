@@ -446,7 +446,7 @@ fn test_structured_credit_registry_wal_matches_cashflow_wal() {
     // The benchmark is library-self-calculated (no external oracle), so the
     // golden-test policy permits a documented re-bless.
     //
-    // Re-blessed 2026-06-11 (cashflows quant review, valuations consumers):
+    // :
     // (1) default/prepay/scheduled ordering now follows the stated
     //     Intex/Moody's & SIFMA convention — MDR applied to the
     //     BEGINNING-of-period balance, scheduled principal on the survivor,
@@ -564,7 +564,7 @@ fn test_structured_credit_pool_balance_cleanup() {
 
 #[test]
 fn test_sensitivity01_units_reconcile_with_reprice() {
-    // Quant review MO-T5: pin the producer unit conventions —
+    // Quant review Note: pin the producer unit conventions —
     // `Prepayment01` is $ per 1bp of CPR, `Recovery01` is $ per 1% of
     // recovery — by reconciling `metric × shift` against a true reprice with
     // the shifted parameter. This is the multiplication the public

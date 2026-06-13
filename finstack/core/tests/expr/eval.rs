@@ -286,8 +286,8 @@ fn with_cache_configuration() {
 
 #[test]
 fn repeated_eval_on_different_same_length_inputs_returns_fresh_results() {
-    // Regression for the stale cross-eval cache (Blocker #2 in
-    // docs/reviews/2026-06-09-core-quant-review.md): the persistent cache
+    // Regression for the stale cross-eval cache (
+    // ): the persistent cache
     // keyed on (dag_node_id, len) with no input fingerprint, so re-evaluating
     // the same CompiledExpr on different same-length data returned the FIRST
     // dataset's values. The shared rolling_std sub-expression below was a
@@ -349,7 +349,7 @@ fn repeated_eval_on_different_same_length_inputs_returns_fresh_results() {
 fn eval_stamps_metadata_from_planning_meta() {
     // Regression: eval() previously stamped results_meta(&FinstackConfig::default()),
     // ignoring the caller's meta passed to with_planning
-    // (docs/reviews/2026-06-09-core-quant-review.md, "Major — expression engine").
+    // ( "Major — expression engine").
     use finstack_core::config::RoundingMode;
 
     let (ctx, data) = create_test_data();

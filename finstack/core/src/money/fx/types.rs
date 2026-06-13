@@ -181,7 +181,7 @@ pub struct FxMatrixState {
     pub quotes: Vec<(Currency, Currency, f64)>,
     /// Pinned, date/policy-scoped quotes as `(from, to, on, policy, rate)`.
     ///
-    /// Added per the 2026-06-09 core quant review: snapshots previously
+    /// Added snapshots previously
     /// dropped pinned fixings, so a restored matrix silently re-derived
     /// those dates from the provider. The field is serde-additive
     /// (`default`), so older payloads without it still deserialize.

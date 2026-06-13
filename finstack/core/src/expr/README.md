@@ -13,7 +13,7 @@ etc.) over plain `f64` slices. It provides:
 > results across `eval()` calls in an LRU cache keyed on `(dag_node_id, len)`.
 > Because the key carried no input fingerprint, re-evaluating the same
 > `CompiledExpr` on different same-length data returned stale results
-> (see `docs/reviews/2026-06-09-core-quant-review.md`, Blocker #2). The cache
+> . The cache
 > was removed; `CompiledExpr::with_cache` and `EvalOpts.cache_budget_mb`
 > remain as no-ops for API compatibility.
 
@@ -22,7 +22,7 @@ propagate as `NaN` instead of being silently zero-filled. Adjusted EWM mean also
 uses the standard weighted numerator/denominator form (`adjust=true`) rather than
 normalizing a recursive EMA after the fact.
 
-At a high level, you:
+Typical workflow:
 
 - **Build an AST** with `Expr`, `ExprNode`, `BinOp`, `UnaryOp`, and `Function`.
 - **Compile** it into a `CompiledExpr` (optionally with a DAG `ExecutionPlan`).

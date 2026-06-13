@@ -193,7 +193,7 @@ pub(crate) struct TaylorAttributionResult {
     /// Coupon income for the theta period, captured by `compute_theta_factor`.
     /// `None` when theta computation failed; otherwise lets `attribute_pnl_taylor`
     /// split theta into PV-only and coupon components without re-collecting
-    /// cashflows (audit MO3 fix).
+    /// cashflows (fix).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theta_coupon_income: Option<f64>,
 }

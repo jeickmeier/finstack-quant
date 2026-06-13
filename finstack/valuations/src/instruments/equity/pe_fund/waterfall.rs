@@ -484,7 +484,7 @@ struct AllocationParams<'e> {
     /// Ledger rows persisted before this distribution call. LP IRR and
     /// preferred-return solves are computed from contributions plus these
     /// rows' `to_lp` amounts — the LP's actual net receipts — not from gross
-    /// fund events (review finding M10).
+    /// fund events .
     prior_rows: &'e [AllocationRow],
     allocation_date: Date,
     currency: Currency,
@@ -726,7 +726,7 @@ impl<'a> EquityWaterfallEngine<'a> {
         let mut lp_allocated_in_call_so_far: f64 = 0.0;
 
         // LP-net cashflow history (contributions + ledger to_lp rows) used by
-        // every IRR-based solve in this call (review finding M10). Same-date
+        // every IRR-based solve in this call . Same-date
         // allocations from earlier tranches in this call are handled via
         // `lp_allocated_in_call_so_far`.
         let lp_history =
@@ -846,7 +846,7 @@ impl<'a> EquityWaterfallEngine<'a> {
                     hurdle,
                 } => {
                     // Gate the promote split on the LP actually reaching the
-                    // tier's hurdle IRR (review finding M9): pay the LP at
+                    // tier's hurdle IRR : pay the LP at
                     // 100% until the hurdle is met, then split at
                     // lp_share/gp_share, cascading to the next tier once the
                     // next hurdle is reached.
@@ -917,7 +917,7 @@ impl<'a> EquityWaterfallEngine<'a> {
             };
 
             // Calculate current LP IRR from the LP-net ledger history plus
-            // what this call has allocated to the LP so far (review finding M10).
+            // what this call has allocated to the LP so far .
             let lp_irr_to_date = {
                 let mut flows = lp_history.clone();
                 if lp_allocated_in_call_so_far > 1e-9 {
@@ -947,7 +947,7 @@ impl<'a> EquityWaterfallEngine<'a> {
     }
 
     /// Build the LP-net cashflow history from contributions and persisted
-    /// ledger `to_lp` rows (review finding M10).
+    /// ledger `to_lp` rows .
     ///
     /// Gross fund events overstate the LP's receipts by the GP carry, which
     /// inflates the LP IRR and deflates preferred-return entitlements.
@@ -1119,7 +1119,7 @@ impl<'a> EquityWaterfallEngine<'a> {
     }
 
     /// Calculate LP IRR to date from an LP-net cashflow history
-    /// (review finding M10).
+    /// .
     fn calculate_lp_irr_to_date(&self, lp_flows: &[(Date, Money)]) -> Option<f64> {
         if lp_flows.len() < 2 {
             return None;
@@ -1130,7 +1130,7 @@ impl<'a> EquityWaterfallEngine<'a> {
     }
 
     /// GP entitlement as of `as_of` under the fund's actual waterfall
-    /// economics (review finding: clawback assumed full-catch-up economics).
+    /// economics .
     ///
     /// Replays a from-scratch waterfall over the fund's *lifetime* economics
     /// to `as_of`: every contribution at its actual date (so IRR hurdles see
@@ -1594,7 +1594,7 @@ mod tests {
         assert!(!catchup_rows.is_empty());
     }
 
-    /// Review finding M9: a promote tier's hurdle must gate the GP split.
+    /// a promote tier's hurdle must gate the GP split.
     /// Until the LP-net IRR reaches the hurdle, the tier pays the LP at 100%;
     /// only the excess is split at lp/gp shares.
     #[test]
@@ -1634,7 +1634,7 @@ mod tests {
         assert!((total_lp + total_gp - 1400.0).abs() < 1e-6, "conservation");
     }
 
-    /// Review finding M9: when the distribution cannot bring the LP to the
+    /// when the distribution cannot bring the LP to the
     /// hurdle IRR, the GP receives nothing from the promote tier.
     #[test]
     fn promote_tier_below_hurdle_pays_lp_only() {
@@ -1661,7 +1661,7 @@ mod tests {
         assert!((total_lp - 1100.0).abs() < 1e-6, "LP receives everything");
     }
 
-    /// Review finding M9: multiple promote tiers cascade — each tier's split
+    /// multiple promote tiers cascade — each tier's split
     /// applies only between its own hurdle and the next tier's hurdle.
     #[test]
     fn promote_tiers_cascade_at_next_hurdle() {
@@ -1722,7 +1722,7 @@ mod tests {
         assert!((total - 2000.0).abs() < 1e-6, "conservation");
     }
 
-    /// Review finding M10: the ledger's `lp_irr_to_date` must be computed
+    /// the ledger's `lp_irr_to_date` must be computed
     /// from the LP-net history (contributions + ledger `to_lp`), not from
     /// gross fund events that include GP carry.
     #[test]

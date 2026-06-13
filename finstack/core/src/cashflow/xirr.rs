@@ -345,7 +345,7 @@ where
     // The IRR root is scale-invariant (NPV(r) = 0 ⇔ k·NPV(r) = 0), so the
     // result is identical; without this, a 1e9-notional stream could fail
     // the Newton acceptance check that a 1.0-notional stream passes
-    // (2026-06-09 core quant review, cashflow/xirr.rs finding).
+    // .
     let max_abs = data
         .iter()
         .map(|&(_, amt)| amt.abs())
@@ -768,7 +768,7 @@ mod tests {
     /// same rate as the identical stream scaled to 1.0. Before amounts were
     /// normalized by max |amount|, the absolute NPV acceptance tolerance was
     /// scale-dependent and large notionals could lose Newton roots
-    /// (2026-06-09 core quant review, cashflow/xirr.rs finding).
+    /// .
     #[test]
     fn test_xirr_scale_invariant_large_notional() {
         let d0 = create_date(2024, Month::January, 1).expect("Valid test date");

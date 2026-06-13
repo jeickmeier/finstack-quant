@@ -447,7 +447,7 @@ impl CompiledExpr {
         // Seed the recursion from the first non-NaN observation; leading NaNs
         // emit NaN and must not poison the state (previously a leading NaN
         // seeded `prev`/`weighted_sum` and every subsequent output was NaN —
-        // see docs/reviews/2026-06-09-core-quant-review.md). Interior NaNs
+        // see ). Interior NaNs
         // after the seed match `eval_ewm_variance_core`: the state is
         // unchanged and NaN is emitted for that position.
         let mut prev: f64 = 0.0;
@@ -950,7 +950,7 @@ impl CompiledExpr {
             // NaNs emit NaN and must not poison the recursion (previously a
             // leading NaN seeded `ema`/`ema_sq` and `.max(0.0)` silently
             // converted the resulting NaN variance to 0.0 — see
-            // docs/reviews/2026-06-09-core-quant-review.md). Interior NaNs
+            // ). Interior NaNs
             // after the seed keep the existing skip-NaN semantics: the state
             // is unchanged and NaN is emitted for that position.
             let mut ema = 0.0_f64;

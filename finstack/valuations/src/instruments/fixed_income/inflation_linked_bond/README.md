@@ -27,12 +27,6 @@ let pv = linker.value(&market_context, as_of_date)?;
 - No convexity adjustment for real/nominal conversion; relies on deterministic curves.
 - Callable/putable structures are not modeled; use bond module for optionality.
 
-## Pricing Methodology
-
-- Builds indexed cashflows using inflation index ratios with lag/interpolation per `IndexationMethod`; applies deflation protection per setting.
-- Coupons/principal scaled by CPI ratio and discounted on chosen curve; floors at par for protected structures.
-- Uses inflation curve/index for projected CPI; deterministic (no stochastic CPI).
-
 ## Metrics
 
 - PV, real yield/par real rate solving, break-even inflation (difference vs nominal curve), and DV01 on discount curve.

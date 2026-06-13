@@ -150,7 +150,7 @@ pub struct FinstackConfig {
 /// e.g. `valuations.calibration.v2` or
 /// `valuations.structured_credit.ytm.v1`). Deserialization rejects keys that
 /// do not match, so obvious typos fail loudly instead of being silently
-/// carried along (2026-06-09 core quant review, minor).
+/// carried along .
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct ConfigExtensions {
     #[serde(flatten)]
@@ -423,7 +423,7 @@ impl RoundingContext {
 /// f64 appearing only at ingest/accessor boundaries. Auditors reading
 /// `numeric_mode: F64` in [`ResultsMeta`] should therefore interpret it as
 /// "non-monetary numerics are f64", not "monetary amounts were accumulated
-/// in floating point". (Clarified per the 2026-06-09 core quant review.)
+/// in floating point". (Clarified .)
 ///
 /// [`Money`]: crate::money::Money
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -532,7 +532,7 @@ pub fn rounding_context_from(cfg: &FinstackConfig) -> RoundingContext {
 /// ingested, rounded, and combined in Decimal, with f64 used only at the
 /// `Money::amount()` accessor and f64-input constructors. See
 /// [`NumericMode`] for the full audit-stamp semantics (clarified per the
-/// 2026-06-09 core quant review).
+/// ).
 ///
 /// # Rationale
 ///
@@ -611,7 +611,7 @@ mod tests {
 
     #[test]
     fn config_extensions_accept_valid_versioned_keys() {
-        // 2026-06-09 core quant review (minor): extension keys are validated
+        // ): extension keys are validated
         // against `{crate}.{domain}.v{N}` at deserialization.
         for key in [
             "valuations.calibration.v2",

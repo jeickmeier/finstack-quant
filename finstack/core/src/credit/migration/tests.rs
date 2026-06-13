@@ -307,7 +307,7 @@ mod generator_tests {
             .expect("Kreinin-Sidenius should produce valid generator");
     }
 
-    /// Policy-visibility stamping (2026-06-09 core quant review): a matrix
+    /// Policy-visibility stamping : a matrix
     /// whose log requires Kreinin-Sidenius clamping must report non-zero
     /// `regularization_l1`, and the round-trip error must be stamped.
     #[test]

@@ -30,12 +30,6 @@ let pv = option.value(&market_context, as_of)?;
 - Assumes GBM dynamics with flat volatility; does not model stochastic rates or local volatility.
 - European-style payoff only; no early exercise or American-style averaging features.
 
-## Pricing Methodology
-
-- Geometric averaging: closed-form Kemna–Vorst under GBM with continuous dividend yield and deterministic rates.
-- Arithmetic averaging: Turnbull–Wakeman semi-analytic approximation; MC fallback uses GBM with configurable steps, fixing alignment, and control variates.
-- Discounting via instrument discount curve; spot/dividend/vol pulled from `MarketContext`, with past fixings folded into the average state.
-
 ## Metrics
 
 - PV (base) plus option Greeks (delta, gamma, vega, theta, rho) from analytic or MC paths.

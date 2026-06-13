@@ -140,7 +140,7 @@ impl SABRCalibrator {
     ///
     /// These defaults are attainable for typical market smiles under the
     /// strict non-convergence semantics of `core::math::solver_multi::
-    /// LevenbergMarquardtSolver::minimize` (2026-06-09 core quant review):
+    /// LevenbergMarquardtSolver::minimize` :
     /// the solver now errors instead of silently returning its best iterate,
     /// so the prior defaults (1e-6 / 100 iterations) failed loudly on smiles
     /// where `rho` is weakly identified.

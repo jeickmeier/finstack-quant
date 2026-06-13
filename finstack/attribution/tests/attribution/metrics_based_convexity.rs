@@ -148,7 +148,7 @@ fn test_convexity_formula_correctness() {
     // Verify the mathematical correctness of the convexity term calculation.
     //
     // The implementation in metrics_based.rs dispatches per MetricId
-    // (quant review B4):
+    // :
     //
     //   `Convexity` (bond producer, STREET convexity = (∂²P/∂y²)/P/100,
     //   Bloomberg YAS convention):

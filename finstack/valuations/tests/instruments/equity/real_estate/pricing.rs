@@ -161,7 +161,7 @@ fn test_real_estate_terminal_growth_applies_to_exit_value() {
     assert!((pv.amount() - expected).abs() < 0.01);
 }
 
-/// Review finding M14: DCF always discounts at the property `discount_rate`;
+/// DCF always discounts at the property `discount_rate`;
 /// loading the named curve in the market context must not change the PV.
 #[test]
 fn test_real_estate_dcf_pv_identical_with_and_without_curve() {

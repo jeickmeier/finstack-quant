@@ -159,7 +159,7 @@ pub fn apply_time_roll_forward(
         };
 
     // Roll all curves forward (adjusts base dates, shifts knots, filters expired).
-    // Realized-forward semantics (2026-06-09 core quant review): every curve
+    // Realized-forward semantics : every curve
     // realizes its forwards as the base date advances (discount curves
     // renormalize by DF(dt), hazard curves preserve hazard rates, forward
     // curves preserve forwards, inflation rebases CPI, price/vol-index curves
@@ -438,7 +438,7 @@ mod tests {
         assert!(theta.is_finite());
     }
 
-    /// Realized-forward roll semantics (2026-06-09 core quant review): after
+    /// Realized-forward roll semantics : after
     /// `TimeRollForward`, the rolled discount curve satisfies
     /// `DF_rolled(T - dt) = DF_old(T) / DF_old(dt)`, so the booked carry
     /// equals the PV move and the post-roll market state is consistent.

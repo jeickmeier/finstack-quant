@@ -71,8 +71,7 @@ pub struct EvalOpts {
     ///
     /// The cross-evaluation result cache was removed: it keyed entries on
     /// `(dag_node_id, len)` with no input fingerprint, so re-evaluating the
-    /// same expression on different same-length data returned stale results
-    /// (see `docs/reviews/2026-06-09-core-quant-review.md`, Blocker #2).
+    /// same expression on different same-length data returned stale results.
     /// Within a single `eval()` call each deduplicated DAG node already
     /// executes exactly once, so no per-evaluation cache is needed either.
     pub cache_budget_mb: Option<usize>,
@@ -215,8 +214,8 @@ impl CompiledExpr {
     /// The cross-evaluation result cache was removed because it keyed entries
     /// on `(dag_node_id, len)` without an input fingerprint, returning stale
     /// values when the same expression was re-evaluated on different
-    /// same-length data (see `docs/reviews/2026-06-09-core-quant-review.md`,
-    /// Blocker #2). Within one `eval()` call each deduplicated DAG node is
+    /// same-length data (see ,
+    /// ). Within one `eval()` call each deduplicated DAG node is
     /// already evaluated exactly once.
     pub fn with_cache(self, _budget_mb: usize) -> Self {
         self

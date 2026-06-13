@@ -226,7 +226,7 @@ fn npv_100_year_cashflow_is_tiny_but_positive() {
 
 #[test]
 fn npv_cashflow_at_base_date_is_excluded_by_default() {
-    // 2026-06-09 core quant review + user decision: npv follows
+    //  npv follows
     // market-standard pricing semantics — flows on or before the valuation
     // date are excluded. A flow on the base date therefore prices to zero;
     // NpvOptions::include_past_flows restores the legacy notional-at-par.

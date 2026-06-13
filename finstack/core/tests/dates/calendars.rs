@@ -401,7 +401,7 @@ fn test_cny_late_years_2100s() {
 
 // ============================================
 // Observance-convention regressions
-// (docs/reviews/2026-06-09-core-quant-review.md — Major: schedules/calendars)
+// ( — Major: schedules/calendars)
 // ============================================
 
 /// Federal Reserve convention (USNY): Sunday holidays move to Monday; Saturday

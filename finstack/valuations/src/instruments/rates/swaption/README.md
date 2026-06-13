@@ -59,20 +59,6 @@ let result = pricer.price_dyn(&swaption, &market_context, as_of_date)?;
 - Settlement type toggles payout only; actual underlying swap execution must be handled externally for physical settlement.
 - Hull-White parameters should be calibrated to co-terminal European swaptions for accurate Bermudan pricing.
 
-## Pricing Methodology
-
-### European Swaptions
-
-- Prices via Black–76 by default using forward swap rate/annuity; SABR-implied vol used when parameters provided; normal model available via pricer key.
-- Discounting on chosen curve; strike rate solved from spec.
-- Vol surface lookup with clamping; optional implied vol override in pricing overrides.
-
-### Bermudan Swaptions
-
-- **Hull-White Tree**: Industry-standard trinomial tree with backward induction and optimal exercise at each node.
-- **LSMC**: Longstaff-Schwartz Monte Carlo with polynomial basis functions.
-- Exercise boundary and risk-neutral exercise probabilities computed during pricing.
-
 ## Metrics
 
 ### European Swaption Metrics

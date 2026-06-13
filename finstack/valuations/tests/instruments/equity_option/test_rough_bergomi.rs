@@ -116,7 +116,7 @@ fn rbergomi_small_eta_converges_to_black_scholes() {
 /// payoff. In the η→0, ρ=0 limit the model collapses to Black-Scholes, so the
 /// price must match BS at r=10% — and in particular must NOT be high by the
 /// undiscounted factor e^{rT} ≈ 10.5% (regression for the missing
-/// `exp(-r*t)` discounting, review finding B2).
+/// `exp(-r*t)` discounting, .
 #[test]
 fn rbergomi_nonzero_rate_price_is_discounted() {
     let as_of = date!(2024 - 01 - 01);

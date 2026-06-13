@@ -51,7 +51,7 @@ flag for it currently.
 
 ## Core Workflow
 
-At a high level, pricing works like this:
+Pricing workflow:
 
 1. Build an `McEngine` with a time grid and runtime options.
 2. Choose an RNG, usually `PhiloxRng` for deterministic replay and parallel safety.

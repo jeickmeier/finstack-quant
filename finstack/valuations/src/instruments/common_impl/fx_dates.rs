@@ -17,7 +17,7 @@ pub use finstack_core::dates::fx::{
 /// intermediate day does not delay spot while the final value date must still
 /// be a good USD business day (e.g. EUR/USD traded Thu 2025-07-03 settles
 /// Mon 2025-07-07, not Tue 2025-07-08; see
-/// `docs/reviews/2026-06-09-core-quant-review.md`, FX spot finding).
+/// FX spot convention).
 ///
 /// For non-USD crosses the instruments do not carry a USD calendar ID, so we
 /// pass `usd_cal_id = None` and behavior remains the symmetric two-calendar

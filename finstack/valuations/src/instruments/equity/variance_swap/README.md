@@ -27,12 +27,6 @@ let pv = swap.value(&market_context, as_of_date)?;
 - Assumes continuous compounding approximation for variance; no corridor/conditional variance features.
 - Single-currency settlement; quanto or dispersion structures are out of scope.
 
-## Pricing Methodology
-
-- Payoff at maturity: `(RealizedVar - StrikeVar) × Notional`; realized variance computed from observed returns per selected method (e.g., Parkinson) and annualized.
-- Discount terminal payoff on chosen curve; deterministic path unless underlying return series provided from market context.
-- Side (pay/receive) sets sign; no continuous mark-to-market modeled inside instrument.
-
 ## Metrics
 
 - PV, implied variance/vol (solve strike for zero PV), and realized variance diagnostics from input series.

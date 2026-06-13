@@ -175,7 +175,7 @@ impl MarketContext {
                     // `None` filters mean "all buckets"; route through the same
                     // multiplicative `apply_bucket_bump` path as filtered bumps so
                     // semantics (vol × (1 + pct/100)) are identical with or without
-                    // filters (2026-06-09 core quant review, Blocker #3).
+                    // filters .
                     vol_bumps.push((surface_id, expiries, strikes, pct));
                 }
                 MarketBump::BaseCorrBucketPts {

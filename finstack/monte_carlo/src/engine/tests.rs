@@ -372,7 +372,7 @@ fn test_default_chunking_bit_identical_across_thread_pool_sizes() {
     // The DEFAULT chunk size must be a pure function of `num_paths` — never
     // of `rayon::current_num_threads()` — because the chunk partition fixes
     // the float reduction tree. This locks the cross-machine determinism
-    // guarantee for default configs (quant review finding M6): the same
+    // guarantee for default configs (prior fix): the same
     // (seed, paths, steps) must price bit-identically under 1-thread and
     // multi-thread rayon pools, in both serial and parallel mode.
     let price_in_pool = |threads: usize, parallel: bool| -> f64 {

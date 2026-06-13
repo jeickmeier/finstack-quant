@@ -30,12 +30,6 @@ let pv = note.value(&market_context, as_of)?;
 - Assumes GBM dynamics with discrete observation; no quanto/correlation or stochastic vol support.
 - Does not model secondary-market features like issuer call delays, partial redemption, or path-dependent fees beyond the configured schedule.
 
-## Pricing Methodology
-
-- Path-dependent GBM Monte Carlo with configurable steps/seed; uses per-observation barrier checks for autocall triggers and coupon accrual.
-- Final payoff handled via mapped payoff type (capital protection, participation, knock-in put) with discounting on the domestic curve.
-- Spot/dividend/vol from market surfaces; deterministic discounting with no correlation or jump modeling.
-
 ## Metrics
 
 - PV plus path-based Greeks (delta/vega/theta) via bump-and-revalue in the metrics registry when MC is enabled.

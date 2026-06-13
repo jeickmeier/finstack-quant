@@ -271,7 +271,7 @@ pub(crate) fn matrix_log(m: &DMatrix<f64>) -> Result<DMatrix<f64>, MigrationErro
 /// (Cross-term sign verified against `scipy.linalg.logm`; it was previously
 /// implemented negated, which produced spurious round-trip error and masked
 /// genuine negative off-diagonals from Kreinin-Sidenius clamping —
-/// 2026-06-09 core quant review follow-up.)
+/// )
 ///
 /// Reference: Higham, N. J. (2008). *Functions of Matrices: Theory and Computation*.
 /// SIAM. Equation (4.19).
@@ -303,7 +303,7 @@ fn upper_triangular_log(
                 // Degenerate (repeated eigenvalue): limit gives L_ij = T_ij / T_ii + cross.
                 //
                 // Limitations of this branch (doc-only note, 2026-06-09 core
-                // quant review):
+                //
                 // - It is exact only for the leading term of the log series.
                 //   For repeated eigenvalues with nontrivial nilpotent
                 //   structure (Jordan blocks of size > 2), higher-order terms

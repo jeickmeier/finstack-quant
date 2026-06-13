@@ -886,7 +886,7 @@ fn test_quantlib_parity_full_greeks_suite() {
 
     // Verify all metrics computed successfully: 7 requested + the
     // `theta_period_days` horizon stamp the theta producer always emits
-    // alongside Theta (quant review M3).
+    // alongside Theta .
     assert_eq!(result.measures.len(), 8, "All 7 metrics + horizon stamp");
     assert!(result.measures.contains_key("theta_period_days"));
 

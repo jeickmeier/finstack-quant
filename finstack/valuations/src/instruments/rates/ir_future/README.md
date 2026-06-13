@@ -27,12 +27,6 @@ let pv = fut.value(&market_context, as_of_date)?;
 - Assumes parallel shift sensitivity only; margining and daily settlement effects are not modeled.
 - No support for exchange-specific delivery options or cheapest-to-deliver mechanics.
 
-## Pricing Methodology
-
-- Implied rate from quoted price `100 - price`; model rate projected from forward curve with convexity adjustment.
-- PV = (ImpliedRate − AdjustedForward) × FaceValue × τ × contracts × position_sign; discounted implicitly via price quotation.
-- Convexity adjustment from vol surface when provided or simplified approximation/override.
-
 ## Metrics
 
 - PV, implied rate, convexity adjustment amount, and tick PV based on contract specs.

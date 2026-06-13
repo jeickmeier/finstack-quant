@@ -148,7 +148,7 @@ impl CommodityAsianOption {
 
     /// Validate the realized-fixing history against the fixing schedule.
     ///
-    /// Errors (review finding M17) when:
+    /// Errors  when:
     /// - `realized_fixings` contains duplicate dates (each would be
     ///   double-counted by [`accumulated_state`](Self::accumulated_state)), or
     /// - any scheduled `fixing_date <= as_of` has no realized fixing — a

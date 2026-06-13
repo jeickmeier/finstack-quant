@@ -30,15 +30,6 @@ let pv = option.value(&market_context, as_of_date)?;
 - Monte Carlo path does not model stochastic volatility or jumps.
 - European-style payoff only; no early exercise or windowed monitoring beyond the supplied schedule.
 
-## Pricing Methodology
-
-- Reiner–Rubinstein continuous barrier formulas adapted to Garman–Kohlhagen FX carry; optional Gobet–Miri shift for discrete monitoring.
-- Monte Carlo GBM fallback for complex cases; domestic/foreign discount curves supply carry, vol from FX surface.
-- Spot FX from market data or override; rebate handled at expiry.
-- Expired contracts require `observed_barrier_breached`; terminal FX spot alone cannot recover the realized barrier history.
-- Knock-in rebates pay on no-hit and knock-out rebates pay on hit, including expired-state settlement.
-- Zero-vol and very-low-vol analytical paths are resolved deterministically when the continuous formula becomes ill-conditioned.
-
 ## Metrics
 
 - PV plus Greeks (delta/gamma/vega/theta/rho) analytically; MC bump-and-revalue when enabled.

@@ -156,7 +156,7 @@ fn record_cross_pair(
     }
 }
 
-/// MO-E1 (quant review): surface factors that were skipped because T0 had no
+/// Note: surface factors that were skipped because T0 had no
 /// market data for the family while T1 does — e.g. a hazard curve first
 /// marked between T0 and T1, a vol surface introduced, an FX matrix attached.
 /// Without a note the entire move silently flows into the residual and
@@ -212,7 +212,7 @@ fn note_skipped_empty_t0_factors(
 
 fn restored_factor_has_data(factor: ParallelRestoredFactor, snapshot: &MarketSnapshot) -> bool {
     match factor {
-        // MO2 fix: gate Rates on the underlying snapshot so we don't burn a
+        // Fix: gate Rates on the underlying snapshot so we don't burn a
         // reprice — or, worse, *drop* T1 rate curves when T0 has none — when
         // neither market has rates. Aligns with the other restored-factor
         // variants' semantics.
@@ -521,7 +521,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
     // unchanged T₀ market context, so the T₀ context is used directly rather
     // than deep-cloned (the reprice and carry-input helpers only borrow it).
     //
-    // FIXINGS UNDER CARRY (quant review MO-E4): the frozen T₀ market has no
+    // FIXINGS UNDER CARRY (prior fix): the frozen T₀ market has no
     // fixing for the T₁ date, so seasoned floating-rate pricing falls back to
     // last-observation-carried-forward (`ScalarTimeSeries::value_on` LOCF) —
     // i.e. carry assumes the latest known fixing persists, the "unchanged
@@ -551,7 +551,7 @@ pub fn attribute_pnl_parallel_with_credit_model(
         attribution.result_invalid = true;
     }
     // `total_return_carry_inputs` performed one full `price_with_metrics`
-    // (RollDown) pricing — count it (quant review minor).
+    // (RollDown) pricing — count it.
     num_repricings += 1;
 
     apply_total_return_carry(

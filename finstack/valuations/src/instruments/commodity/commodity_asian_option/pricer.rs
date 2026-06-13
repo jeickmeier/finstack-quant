@@ -42,7 +42,7 @@ pub(crate) fn compute_pv(
 
     // Reject duplicate / date-mismatched / missing past fixings before they
     // can silently distort the average or the seasoned effective strike
-    // (review finding M17).
+    // .
     inst.validate_realized_fixings(as_of)?;
 
     let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
@@ -110,7 +110,7 @@ pub(crate) fn compute_pv(
     // With a validated fixing history, every scheduled date is either realized
     // (<= as_of) or projected (> as_of). A violation here means an internal
     // bookkeeping bug (e.g. day-count rounding dropped a future fixing), not
-    // bad user input (review finding M17).
+    // bad user input .
     if hist_count + future_count != total_fixings {
         return Err(finstack_core::Error::Validation(format!(
             "CommodityAsianOption '{}' fixing bookkeeping mismatch: {hist_count} realized \
@@ -181,7 +181,7 @@ pub(crate) fn compute_pv(
 /// distribution. We compute the adjusted forward and volatility from the
 /// forward prices directly.
 ///
-/// # Lognormal Moments (Kemna-Vorst drift correction, review finding M16)
+/// # Lognormal Moments (Kemna-Vorst drift correction)
 ///
 /// Each forward is a martingale under its own delivery measure, so
 /// `ln F_i(t_i) ~ N(ln F_i(0) − σ²t_i/2, σ²t_i)`. For the geometric average
@@ -325,7 +325,7 @@ fn price_seasoned_geometric_commodity(
     }
     let vol_adj_sq = var_sum / (m * m); // Var[ln G_fut]
 
-    // Kemna-Vorst mean-log drift (review finding M16): each forward is a
+    // Kemna-Vorst mean-log drift : each forward is a
     // martingale under its own measure, so
     //   E[ln G_fut] = ln(geo_mean_fwd) − (σ²/2m) Σ t_j.
     let sum_t: f64 = future_forwards.iter().map(|(t, _)| *t).sum();
@@ -732,7 +732,7 @@ mod tests {
         );
     }
 
-    /// Review finding M17: a scheduled fixing date on/before as_of with no
+    /// a scheduled fixing date on/before as_of with no
     /// realized value must be a hard error, not a silent distortion of the
     /// effective strike.
     #[test]
@@ -761,7 +761,7 @@ mod tests {
         );
     }
 
-    /// Review finding M17: duplicate realized fixings would be double-counted
+    /// duplicate realized fixings would be double-counted
     /// by `accumulated_state` and must be rejected.
     #[test]
     fn duplicate_realized_fixing_is_an_error() {
@@ -786,7 +786,7 @@ mod tests {
         );
     }
 
-    /// Review finding M17: a realized fixing whose date is not on the fixing
+    /// a realized fixing whose date is not on the fixing
     /// schedule is a date mismatch, not silently-ignorable data.
     #[test]
     fn date_mismatched_realized_fixing_is_an_error() {
@@ -895,7 +895,7 @@ mod tests {
 
     /// Fresh geometric Asian must match a direct numerical integration of
     /// `E[df·max(G − K, 0)]` under the Kemna-Vorst lognormal law for the
-    /// geometric average of martingale forwards (review finding M16):
+    /// geometric average of martingale forwards :
     /// `ln G ~ N(ln geo_mean − (σ²/2m)Σt_i, (σ²/m²)ΣΣmin(t_i,t_j))`.
     /// The pre-fix pricer used the raw geometric mean as the Black-76 forward,
     /// overstating `E[G]` by `exp((σ²/2)(Σt/m − ΣΣmin/m²))`.
@@ -1015,7 +1015,7 @@ mod tests {
         let r = m / n;
 
         // E[df·max(A·G_fut^r − K, 0)] via fine left-Riemann quadrature in z, with
-        // ln G_fut = mu + z·sd under the Kemna-Vorst law (review finding M16):
+        // ln G_fut = mu + z·sd under the Kemna-Vorst law :
         // mu = ln(geo_mean) − (σ²/2m) Σ t_j.
         let sum_t: f64 = fwds.iter().map(|(t, _)| *t).sum();
         let mu = geo_mean_fwd.ln() - 0.5 * sigma * sigma * sum_t / m;

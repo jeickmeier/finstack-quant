@@ -295,7 +295,7 @@ impl Money {
             round_f64(amount, dp as i32, mode)
         } else {
             // Shortest round-trip conversion (`Decimal::from_f64`) per the
-            // 2026-06-09 core quant review and user decision: `0.1_f64`
+            //  `0.1_f64`
             // ingests as `0.1`, not the 28-digit IEEE expansion that
             // `from_f64_retain` would embed. `from_f64` only fails on
             // non-finite inputs, which the caller contract already rejects.
@@ -671,7 +671,7 @@ impl Div<f64> for Money {
 //
 // Integer conversions route through `Decimal::from`, which is exact for the
 // full i64/u64 range; casting through `as f64` would silently lose precision
-// above 2^53 (2026-06-09 core quant review, minor).
+// above 2^53 .
 macro_rules! from_integer_tuple {
     ($($t:ty),+) => { $(
         impl From<($t, Currency)> for Money {

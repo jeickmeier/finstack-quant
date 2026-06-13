@@ -1,6 +1,6 @@
 //! Variance swap instrument tests.
 //!
-//! Organized following AAA (Arrange-Act-Assert) pattern with comprehensive coverage.
+//! Organized following Arrange-Act-Assert pattern with comprehensive coverage.
 
 mod common;
 mod construction;

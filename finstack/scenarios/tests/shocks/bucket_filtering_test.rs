@@ -146,7 +146,7 @@ fn test_vol_bucket_filtering_by_strike() {
 fn test_vol_bucket_unfiltered_is_multiplicative() {
     // No tenor/strike filters means "all buckets". Execution must match the
     // adapter's multiplicative preview: vol × (1 + pct/100)
-    // (2026-06-09 core quant review, Blocker #3).
+    // .
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
     let surface = VolSurface::builder("SPX")

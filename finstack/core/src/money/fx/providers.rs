@@ -212,7 +212,7 @@ impl FxProvider for SimpleFxProvider {
 /// bump is **term-structure preserving**: for the bumped pair the provider
 /// returns `original.rate(query) * (1 + bump_pct)`, so a date-aware
 /// provider keeps its date/policy structure under the bump (2026-06-09 core
-/// quant review: the previous implementation returned one frozen absolute
+/// the previous implementation returned one frozen absolute
 /// rate for every date/policy).
 pub struct BumpedFxProvider {
     /// Original provider to delegate to
@@ -458,7 +458,7 @@ mod tests {
 
     #[test]
     fn bumped_provider_preserves_term_structure() {
-        // 2026-06-09 core quant review: bumping must not flatten a date-aware
+        // bumping must not flatten a date-aware
         // provider's FX term structure. Both dates must move by the same
         // relative bump, not collapse to one frozen absolute rate.
         struct DateAwareFx;

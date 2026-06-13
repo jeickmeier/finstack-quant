@@ -596,7 +596,7 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         )?;
     }
 
-    // M15: drain lagged recoveries still pending at simulation end. When the
+    // Drain lagged recoveries still pending at simulation end. When the
     // simulation terminates via pool exhaustion or the final scheduled date,
     // recoveries from defaults within `recovery_lag` months of the end have
     // not yet matured out of the queue; without this drain that recovery cash
@@ -1388,7 +1388,7 @@ mod tests {
         // (prepaid-down) balance. With the bug the level payment would be
         // recomputed off the halved balance, roughly halving it.
         //
-        // Convention change (cashflows quant review, Moderate): the level-pay
+        // Convention: the level-pay
         // annuity uses the NOMINAL periodic rate `rate × months/12` (US
         // mortgage convention, matching mbs_passthrough/pricer.rs), not the
         // effective-compounding `(1+rate)^(months/12) − 1` previously pinned.
@@ -2077,7 +2077,7 @@ impl<'a> SimulationState<'a> {
                     });
                 }
             }
-            // M5: Include write-down flows in detailed_flows so NPV and
+            // Include write-down flows in detailed_flows so NPV and
             // risk analytics capture the full economic picture.
             // Write-downs represent permanent loss of notional and are
             // classified as DefaultedNotional (negative = loss to holder).
@@ -2950,7 +2950,7 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             continue;
         }
 
-        // M3: Check maturity -- if asset has matured, return the surviving
+        // Check maturity -- if asset has matured, return the surviving
         // (post-default) balance as a balloon payment and zero out the asset.
         // Interest was already computed above (capped at maturity date, with
         // the default haircut applied).
@@ -2961,7 +2961,7 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             continue;
         }
 
-        // M1: Scheduled amortization for amortizing assets, computed on the
+        // Scheduled amortization for amortizing assets, computed on the
         // SURVIVING (post-default) balance.
         //
         // Item 6 — a level-pay loan's scheduled payment is FIXED at

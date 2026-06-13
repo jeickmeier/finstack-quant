@@ -31,7 +31,7 @@ pub(crate) fn compute_pv(
 }
 
 /// Asset value with the risk-free component of the discount rate bumped per
-/// tenor (review finding M14).
+/// tenor .
 ///
 /// Appraisal-value and direct-cap valuations carry no discount-rate input,
 /// so they are constant under the bump (zero rf DV01).
@@ -59,7 +59,7 @@ pub(crate) fn pv_with_rf_bump(
 /// DCF NPV at the property discount rate.
 ///
 /// Always discounts at the asset's own `discount_rate` via `(1 + r)^{-t}`
-/// (review finding M14 — the previous behavior silently switched to
+/// (the previous behavior silently switched to
 /// risk-free curve discounting whenever `discount_curve_id` was loaded in
 /// the market context). The PV does not depend on the market context. Rate
 /// sensitivity comes from bumping the risk-free component inside the rate

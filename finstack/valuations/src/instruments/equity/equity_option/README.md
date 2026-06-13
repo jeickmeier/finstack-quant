@@ -84,12 +84,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - No stochastic volatility or jumps; relies on supplied vol surface or override.
 - Cash settlement vs. physical is parameterized via `settlement`; exotic payoffs (barrier/Asian) use dedicated modules.
 
-## Pricing Methodology
-
-- European: Black–Scholes with continuous dividend yield; American/Bermudan use Leisen–Reimer binomial tree.
-- Vol from surface or override; discounting via curve; time to expiry from instrument day-count.
-- Bermudan currently treated as American for conservative valuation.
-
 ## Metrics
 
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytic (Euro) or tree (Amer/Bermudan) methods.

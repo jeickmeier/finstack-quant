@@ -1060,7 +1060,7 @@ mod tests {
     }
 
     /// LRM Greeks must use the joint path-density score, not the terminal
-    /// marginal score (quant review finding B3). Discriminating case: a
+    /// marginal score (quant . Discriminating case: a
     /// single-fixing "Asian" at step n/2 is exactly a European call on
     /// `S_{T/2}` paid at T, with closed forms
     /// `delta = e^{-rT} e^{(r-q)τ} N(d₁)` and

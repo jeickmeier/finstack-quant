@@ -46,7 +46,7 @@ pub struct PrivateMarketsFund {
     /// Unrealized net asset value attributable to the LP, stated as of the
     /// fund's valuation date.
     ///
-    /// Holder-view residual value (review finding M13): the fund's present
+    /// Holder-view residual value : the fund's present
     /// value is the PV of LP cashflows strictly after the valuation date plus
     /// this NAV. When `None`, the residual value is zero — a fully realized
     /// fund prices to ~0.

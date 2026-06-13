@@ -54,7 +54,7 @@
 //!   [`VolSurface`] grid, not linear in total variance, so calendar
 //!   interpolation between pillars is only approximate.
 //! - **Per-expiry smiles** (merged-grid limitation resolved 2026-06-11, core
-//!   quant review): each expiry's smile is built independently from its own
+//!   Each expiry's smile is built independently from its own
 //!   3/5 pillar strikes (via the crate-internal `fx_smile_pillars` helper),
 //!   derived from *that expiry's* forward and vol scale.
 //!   The rectangular [`VolSurface`] materialization samples each expiry's own

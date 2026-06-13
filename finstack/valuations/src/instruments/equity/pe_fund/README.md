@@ -27,12 +27,6 @@ let pv = fund.value(&market_context, fund.events.last().unwrap().date)?;
 - Waterfall styles limited to implemented spec; bespoke clawbacks/escrow mechanics require extension.
 - Currency must match across events; cross-currency funds need explicit FX handling outside the module.
 
-## Pricing Methodology
-
-- Applies `EquityWaterfallEngine` to ordered fund events to allocate cash between LP/GP across return-of-capital, preferred return, catch-up, and promote tiers.
-- PV computed by discounting LP cashflows on provided curve (if any) from valuation as-of; otherwise uses last event date.
-- Deterministic event-driven model; no stochastic NAV or deal-level simulation inside the instrument.
-
 ## Metrics
 
 - LP/GP cashflow breakdown, distributed vs undistributed capital, and achieved IRR/MOIC per ledger outputs.

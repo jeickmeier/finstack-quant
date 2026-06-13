@@ -166,7 +166,7 @@ mod altman_tests {
 
     /// Z''-Score for a healthy non-manufacturer (constant-free non-EM model;
     /// the +3.25 EM-Score constant was removed per
-    /// docs/reviews/2026-06-09-core-quant-review.md, Major — credit).
+    ///  Major — credit).
     /// Z'' = 6.56(0.10) + 3.26(0.20) + 6.72(0.15) + 1.05(1.00)
     ///     = 0.656 + 0.652 + 1.008 + 1.05 = 3.366
     #[test]
@@ -202,7 +202,7 @@ mod altman_tests {
 
     /// Regression: a firm with all ratios at zero must NOT be classified
     /// Safe. Under the old +3.25-constant/non-EM-cutoff mix it scored
-    /// 3.25 -> Safe (docs/reviews/2026-06-09-core-quant-review.md).
+    /// 3.25 -> Safe ().
     #[test]
     fn z_double_prime_all_zero_ratios_is_distress() {
         let input = AltmanZDoublePrimeInput {
@@ -285,11 +285,11 @@ mod ohlson_tests {
         let result = ohlson_o_score(&input).unwrap();
         assert!(result.implied_pd > 0.50, "pd={}", result.implied_pd);
         // PD far above Ohlson's optimal cutoff P* = 0.038 → Distress
-        // (PD-based zones per the 2026-06-09 core quant review).
+        // (PD-based zones per the ).
         assert_eq!(result.zone, crate::credit::scoring::ScoringZone::Distress);
     }
 
-    /// Zone cutoffs are PD-based (2026-06-09 core quant review): Distress
+    /// Zone cutoffs are PD-based : Distress
     /// boundary at Ohlson's published optimal cutoff P* = 0.038 (O ≈ −3.23),
     /// Safe/Grey boundary at P*/2 = 0.019. The previous raw-O cutoffs
     /// {0.38, 0.50} labeled PD ≈ 59% firms "Safe".

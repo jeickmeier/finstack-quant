@@ -191,7 +191,7 @@ mod central_tendency_tests {
     fn arithmetic_mean() {
         // Arithmetic mean per Basel IRB / EBA GL/2017/16 (long-run average
         // default rate); previously pinned the geometric mean 0.02
-        // (see docs/reviews/2026-06-09-core-quant-review.md, Major — credit).
+        // (see  Major — credit).
         let result = central_tendency(&[0.01, 0.04]).unwrap();
         assert!(
             (result - 0.025).abs() < 1e-12,
@@ -204,7 +204,7 @@ mod central_tendency_tests {
     fn zero_rate_years_are_included() {
         // Zero-default years are valid observations in the arithmetic
         // long-run average (previously rejected under the geometric mean;
-        // see docs/reviews/2026-06-09-core-quant-review.md).
+        // see ).
         let result = central_tendency(&[0.0, 0.0, 0.0]).unwrap();
         assert!(result.abs() < 1e-15);
 
@@ -328,7 +328,7 @@ mod term_structure_tests {
     }
 
     /// Regression test for the broken pairwise-averaging "PAV"
-    /// (docs/reviews/2026-06-09-core-quant-review.md, Blocker #4): input
+    /// (): input
     /// [0.05, 0.03, 0.03] used to produce the *decreasing* output
     /// [0.0375, 0.0375, 0.035]. True weighted PAV pools all three points
     /// into one block with mean 0.11/3.
@@ -523,7 +523,7 @@ mod term_structure_from_matrix_tests {
         RatingScale::custom(vec!["AAA".to_string(), "BBB".to_string(), "D".to_string()]).unwrap()
     }
 
-    /// 2026-06-09 core quant review: `from_transition_matrix` must scale
+    /// `from_transition_matrix` must scale
     /// tenors by `tm.horizon()`. A 6-month matrix reaches the 1y tenor via
     /// P^2 and the 0.5y tenor via P^1.
     #[test]
@@ -552,7 +552,7 @@ mod term_structure_from_matrix_tests {
         assert!(ts.cumulative_pd(2.0) > ts.cumulative_pd(1.0));
     }
 
-    /// 2026-06-09 core quant review: tenors that are not integer multiples
+    /// tenors that are not integer multiples
     /// of the horizon must error (no silent rounding); the error suggests
     /// the generator-based `project` instead.
     #[test]
@@ -725,7 +725,7 @@ mod master_scale_tests {
         assert_eq!(grades[7].label, "CC/C");
     }
 
-    /// 2026-06-09 core quant review minor: a NaN PD previously fell through
+    /// 2026-06-09 core a NaN PD previously fell through
     /// every comparison and silently mapped to the worst grade; it must now
     /// be a validation error.
     #[test]

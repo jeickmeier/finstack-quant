@@ -299,7 +299,7 @@ pub fn build_dates(
         // Tag genuine stub periods only: a period is a stub when its accrual
         // span deviates from the schedule tenor. Positional first/last tagging
         // mislabeled every regular first/last coupon as `CFKind::Stub` in the
-        // wire format (2026-06-09 cashflows quant review, M8).
+        // wire format .
         if !is_regular_period(period.accrual_start, period.accrual_end, freq) {
             first_or_last.insert(period.payment_date);
         }

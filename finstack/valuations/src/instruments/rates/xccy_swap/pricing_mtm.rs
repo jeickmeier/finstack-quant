@@ -581,7 +581,7 @@ mod tests {
         );
     }
 
-    /// Blocker B1 regression: the resetting notional must use the CIP forward
+    /// Regression: the resetting notional must use the CIP forward
     /// `F = S · P_R / P_C` (low-yield currency trades at a forward premium),
     /// verified against a hand-computed value rather than the implementation's
     /// own DF lookups.

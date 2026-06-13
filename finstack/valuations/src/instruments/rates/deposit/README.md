@@ -31,12 +31,6 @@ let pv = dep.value(&market_context, as_of)?;
 - Does not model credit/funding adjustments; relies solely on the provided discount curve.
 - No support for callable or extendable deposits.
 
-## Pricing Methodology
-
-- Builds two cashflows: principal out at start, principal plus simple interest at end using instrument day-count.
-- Discounts cashflows using the curve’s own day-count to align with par-rate conventions; quote rate optional.
-- Deterministic, single-period valuation with no optionality.
-
 ## Metrics
 
 - PV and par/forward deposit rate solved from discount curve.

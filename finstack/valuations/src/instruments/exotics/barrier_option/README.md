@@ -33,14 +33,6 @@ let pv = option.value(&market_context, as_of)?;
 - Monte Carlo pricing does not model stochastic volatility or jumps.
 - No American-style early exercise; rebates are paid at expiry only.
 
-## Pricing Methodology
-
-- Reiner–Rubinstein continuous-monitoring closed forms under GBM with dividend yield for up/down, in/out structures.
-- Optional Gobet–Miri shift to approximate discrete monitoring; Monte Carlo GBM fallback for complex setups.
-- Discounting via domestic curve; vol/dividend from market surfaces with clamping at extreme strikes/tenors.
-- Expired contracts require `observed_barrier_breached`; terminal spot alone is not enough to reconstruct realized barrier state.
-- Zero-vol and very-low-vol analytical paths are resolved deterministically to avoid undefined touch-probability/rebate behavior.
-
 ## Metrics
 
 - PV plus Greeks (delta/gamma/vega/theta/rho) from analytical formulas; MC Greeks via bump-and-revalue when enabled.
