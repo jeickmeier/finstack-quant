@@ -13,6 +13,7 @@
 //! See: test_option_bounds.rs (property tests) and test_put_call_parity.rs (parity tests)
 
 mod helpers;
+mod test_alt_models;
 mod test_constructors;
 mod test_edge_cases;
 mod test_greeks;

@@ -472,3 +472,37 @@ fn test_metrics_near_expiry() {
     assert_finite(delta, "Near-expiry delta");
     assert_finite(vega, "Near-expiry vega");
 }
+
+/// `SpreadDv01` (spread sensitivity of the option's synthetic underlying CDS)
+/// is registered but previously only appeared inside an `#[ignore]`d Bloomberg
+/// diagnostic. A payer CDS option's underlying is a buy-protection CDS, whose
+/// value rises as spreads widen, so its spread DV01 is positive. This is a
+/// running (non-ignored) end-to-end check.
+#[test]
+fn test_spread_dv01_positive_for_payer() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = standard_market(as_of);
+    let option = CDSOptionBuilder::new().call().build(as_of);
+
+    let result = option
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::SpreadDv01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("SpreadDv01 should compute");
+    let spread_dv01 = *result
+        .measures
+        .get("spread_dv01")
+        .expect("spread_dv01 should be in measures");
+
+    assert!(
+        spread_dv01.is_finite(),
+        "SpreadDv01 should be finite, got {spread_dv01}"
+    );
+    assert!(
+        spread_dv01 > 0.0,
+        "payer CDS option underlying (buy protection) should have positive spread DV01, got {spread_dv01}"
+    );
+}

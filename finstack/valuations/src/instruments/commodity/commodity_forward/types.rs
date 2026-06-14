@@ -201,6 +201,12 @@ pub struct CommodityForward {
     #[serde(default)]
     #[builder(default)]
     pub attributes: Attributes,
+    /// Rejects unknown JSON fields (restores `deny_unknown_fields` despite the
+    /// `#[serde(flatten)]` on `underlying`). See [`UnknownFieldGuard`].
+    #[serde(flatten)]
+    #[schemars(skip)]
+    #[builder(default)]
+    pub(crate) unknown_fields: crate::instruments::common_impl::serde_guard::UnknownFieldGuard,
 }
 
 impl CommodityForward {

@@ -454,6 +454,15 @@ impl InflationCapFloor {
             // expectation, not the raw deterministic ratio. The convexity uses
             // the ATM inflation vol σ(F) (a property of the YoY distribution),
             // not the strike vol.
+            //
+            // NOTE: because this forward is itself vol-dependent, the
+            // Cap−Floor parity residual `Cap(K) − Floor(K) = DF·N·τ·(F − K)`
+            // is also vol-dependent — that is the YoY convexity, NOT a
+            // put-call-parity violation. Both legs share this same forward, so
+            // the option time value cancels exactly; see the
+            // `test_cap_floor_parity_strike_difference_is_vol_independent`
+            // regression test, which confirms the strike-difference (where `F`
+            // cancels) is vol-independent.
             let forward_rate = if t_fix > 0.0 {
                 let atm_sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
                     &self.pricing_overrides.market_quotes,

@@ -160,6 +160,11 @@ impl<'de> serde::Deserialize<'de> for CommoditySwap {
             #[serde(default)]
             pricing_overrides: crate::instruments::PricingOverrides,
             attributes: Attributes,
+            /// Rejects unknown JSON fields (restores `deny_unknown_fields`
+            /// despite the `#[serde(flatten)]` on `underlying`).
+            #[serde(flatten)]
+            #[allow(dead_code)]
+            unknown_fields: crate::instruments::common_impl::serde_guard::UnknownFieldGuard,
         }
 
         let helper = Helper::deserialize(deserializer)?;

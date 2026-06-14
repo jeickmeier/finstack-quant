@@ -200,6 +200,18 @@ mod commodity;
 #[path = "instruments/commodity_option/mod.rs"]
 mod commodity_option;
 
+/// Commodity Asian option tests
+#[path = "instruments/commodity_asian_option/mod.rs"]
+mod commodity_asian_option;
+
+/// Commodity spread option tests
+#[path = "instruments/commodity_spread_option/mod.rs"]
+mod commodity_spread_option;
+
+/// Commodity swaption tests
+#[path = "instruments/commodity_swaption/mod.rs"]
+mod commodity_swaption;
+
 // ============================================================================
 // Real Estate
 // ============================================================================
@@ -289,3 +301,12 @@ mod fx_dependency_completeness;
 /// Option bounds tests - arbitrage-free bounds for options
 #[path = "instruments/test_option_bounds.rs"]
 mod test_option_bounds;
+
+// ============================================================================
+// Serde Contract Tests
+// ============================================================================
+
+/// Cross-cutting serde contract tests - JSON round-trip and `deny_unknown_fields`
+/// rejection for every instrument with an `example()` constructor.
+#[path = "instruments/serde_contract.rs"]
+mod serde_contract;

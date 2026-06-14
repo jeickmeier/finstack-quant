@@ -650,3 +650,39 @@ fn test_metrics_scale_with_notional() {
         "JTD should scale with notional",
     );
 }
+
+/// `Recovery01` (PV sensitivity to a +1% recovery-rate bump) is registered for
+/// CDS tranches but was previously unexercised. The bump is *spread-preserving*:
+/// the hazard curve is recalibrated to hold par spreads (higher recovery ⇒
+/// higher implied hazard, since spread ≈ hazard·(1−R)), so the net tranche
+/// sensitivity is non-trivial — we assert it is finite and materially non-zero
+/// for a default-exposed mezzanine tranche.
+#[test]
+fn test_recovery01_metric_via_price_with_metrics() {
+    let tranche = mezzanine_tranche();
+    let market = standard_market_context();
+    let as_of = base_date();
+
+    let result = tranche
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Recovery01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("Recovery01 calculation should succeed");
+
+    let recovery01 = *result
+        .measures
+        .get("recovery_01")
+        .expect("recovery_01 should be in measures");
+
+    assert!(
+        recovery01.is_finite(),
+        "Recovery01 should be finite, got {recovery01}"
+    );
+    assert!(
+        recovery01.abs() > 1.0,
+        "Recovery01 should be materially non-zero for a default-exposed tranche, got {recovery01}"
+    );
+}

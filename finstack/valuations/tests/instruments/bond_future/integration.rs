@@ -1336,3 +1336,82 @@ fn test_determine_ctd_errors_without_valid_prices() {
         "all non-positive prices should yield an error"
     );
 }
+
+/// The registered `FuturesPrice` and `ConversionFactor` metrics dispatch through
+/// the registry but were previously only exercised via the direct pricer
+/// methods. These confirm the registry path returns exactly the direct-call
+/// values: `ConversionFactor` == the CTD's basket CF, and `FuturesPrice` ==
+/// `BondFuturePricer::calculate_model_price` for the embedded CTD.
+#[test]
+fn test_futures_price_and_conversion_factor_metrics_match_pricer() {
+    use finstack_valuations::instruments::Instrument;
+    use finstack_valuations::metrics::{standard_registry, MetricContext, MetricId};
+    use std::sync::Arc;
+
+    let market = create_realistic_market();
+    let (bonds, mut deliverable_bonds) = create_deliverable_basket();
+    let as_of = date!(2025 - 01 - 15);
+    for (i, bond) in bonds.iter().enumerate() {
+        deliverable_bonds[i].conversion_factor =
+            BondFuturePricer::calculate_conversion_factor(bond, 0.06, 10.0, as_of)
+                .expect("conversion factor");
+    }
+    let ctd_bond = bonds[0].clone();
+    let ctd_cf = deliverable_bonds[0].conversion_factor;
+
+    let future = create_ust_10y_future_with_ctd(
+        TestBondFutureConfig {
+            id: "TY-METRICS",
+            notional: 1_000_000.0,
+            expiry: date!(2025 - 03 - 20),
+            delivery_start: date!(2025 - 03 - 21),
+            delivery_end: date!(2025 - 03 - 31),
+            quoted_price: 125.50,
+            position: Position::Long,
+            deliverable_basket: deliverable_bonds,
+            ctd_bond_id: "US912828XG33",
+            discount_curve_id: "USD-TREASURY",
+        },
+        ctd_bond.clone(),
+    );
+
+    // Direct model price (same CTD, CF, market, valuation + delivery date the
+    // metric calculator uses) — computed before `future`/`market` are moved.
+    let direct = BondFuturePricer::calculate_model_price(
+        &ctd_bond,
+        ctd_cf,
+        &market,
+        as_of,
+        future.delivery_start,
+    )
+    .expect("direct model price");
+
+    let pv = future.value(&market, as_of).expect("future should value");
+    let mut ctx = MetricContext::new(
+        Arc::new(future),
+        Arc::new(market),
+        as_of,
+        pv,
+        MetricContext::default_config(),
+    );
+    let registry = standard_registry();
+    let results = registry
+        .compute(
+            &[MetricId::FuturesPrice, MetricId::ConversionFactor],
+            &mut ctx,
+        )
+        .expect("FuturesPrice/ConversionFactor metrics should compute");
+    let metric_cf = *results.get(&MetricId::ConversionFactor).unwrap();
+    let metric_price = *results.get(&MetricId::FuturesPrice).unwrap();
+
+    // ConversionFactor metric returns the CTD bond's basket conversion factor.
+    assert!(
+        (metric_cf - ctd_cf).abs() < 1e-12,
+        "ConversionFactor metric ({metric_cf}) should equal the CTD basket CF ({ctd_cf})"
+    );
+    // FuturesPrice metric must match the direct model-price calculation.
+    assert!(
+        (metric_price - direct).abs() < 1e-9,
+        "FuturesPrice metric ({metric_price}) should match calculate_model_price ({direct})"
+    );
+}

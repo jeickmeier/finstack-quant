@@ -601,3 +601,82 @@ fn test_metric_date_handling_uses_adjusted_dates() {
         pv_adjusted.amount()
     );
 }
+
+// ============================================================================
+// CollateralHaircut01 / CollateralPrice01
+//
+// Both are registered but were previously unexercised. In the current simple
+// repo model, neither the haircut nor the collateral market price enters the
+// repo's PV (which is the discounted cash repayment), so both sensitivities are
+// negligible — these tests pin that documented behavior and confirm the metrics
+// compute finite values rather than panicking or erroring.
+// ============================================================================
+
+#[test]
+fn test_collateral_haircut01_is_negligible_for_standard_repo() {
+    let repo = create_test_repo();
+    let context = create_standard_market_context();
+    let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
+
+    let registry = standard_registry();
+    let results = registry
+        .compute(&[MetricId::CollateralHaircut01], &mut mctx)
+        .unwrap();
+    let haircut01 = *results.get(&MetricId::CollateralHaircut01).unwrap();
+
+    assert!(
+        haircut01.is_finite(),
+        "Haircut01 should be finite, got {haircut01}"
+    );
+    // Repo PV does not depend on the haircut in the current model, so the
+    // sensitivity is effectively zero (≪ $1 per bp on a $1M notional).
+    assert!(
+        haircut01.abs() < 1.0,
+        "Haircut01 should be negligible for a standard repo, got {haircut01}"
+    );
+}
+
+#[test]
+fn test_collateral_haircut01_handles_zero_haircut_clamp() {
+    // With haircut < 1bp the down-bump clamps at zero; the metric must still
+    // produce a finite value (no degenerate-width error, no panic).
+    let mut repo = create_test_repo();
+    repo.haircut = 0.0;
+    let context = create_standard_market_context();
+    let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
+
+    let registry = standard_registry();
+    let results = registry
+        .compute(&[MetricId::CollateralHaircut01], &mut mctx)
+        .unwrap();
+    let haircut01 = *results.get(&MetricId::CollateralHaircut01).unwrap();
+
+    assert!(
+        haircut01.is_finite() && haircut01.abs() < 1.0,
+        "Haircut01 with a clamped zero-haircut down-bump should be finite and negligible, got {haircut01}"
+    );
+}
+
+#[test]
+fn test_collateral_price01_is_negligible_for_standard_repo() {
+    let repo = create_test_repo();
+    let context = create_standard_market_context();
+    let mut mctx = create_metric_context(repo, context, date(2025, 1, 10));
+
+    let registry = standard_registry();
+    let results = registry
+        .compute(&[MetricId::CollateralPrice01], &mut mctx)
+        .unwrap();
+    let price01 = *results.get(&MetricId::CollateralPrice01).unwrap();
+
+    assert!(
+        price01.is_finite(),
+        "CollateralPrice01 should be finite, got {price01}"
+    );
+    // Repo PV is independent of the collateral market price in the current
+    // model, so this sensitivity is effectively zero.
+    assert!(
+        price01.abs() < 1.0,
+        "CollateralPrice01 should be negligible for a standard repo, got {price01}"
+    );
+}

@@ -105,6 +105,12 @@ pub struct CommodityAsianOption {
     #[serde(default)]
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
+    /// Rejects unknown JSON fields (restores `deny_unknown_fields` despite the
+    /// `#[serde(flatten)]` on `underlying`).
+    #[serde(flatten)]
+    #[schemars(skip)]
+    #[builder(default)]
+    pub(crate) unknown_fields: crate::instruments::common_impl::serde_guard::UnknownFieldGuard,
 }
 
 impl CommodityAsianOption {
