@@ -63,45 +63,6 @@ fn test_fixed_coupon_cashflows() {
 }
 
 #[test]
-fn test_amortizing_principal_cashflows() {
-    // Arrange
-    let loan = TermLoan::builder()
-        .id("TL-CF-AMORT".into())
-        .currency(Currency::USD)
-        .notional_limit(Money::new(10_000_000.0, Currency::USD))
-        .issue_date(date!(2025 - 01 - 01))
-        .maturity(date!(2026 - 01 - 01))
-        .rate(RateSpec::Fixed { rate_bp: 600 })
-        .frequency(Tenor::quarterly())
-        .day_count(DayCount::Act360)
-        .bdc(BusinessDayConvention::ModifiedFollowing)
-        .calendar_id_opt(None)
-        .stub(StubKind::None)
-        .discount_curve_id(CurveId::from("USD-OIS"))
-        .amortization(AmortizationSpec::Linear {
-            start: date!(2025 - 01 - 01),
-            end: date!(2026 - 01 - 01),
-        })
-        .coupon_type(CouponType::Cash)
-        .upfront_fee_opt(None)
-        .ddtl_opt(None)
-        .covenants_opt(None)
-        .pricing_overrides(Default::default())
-        .attributes(Default::default())
-        .build()
-        .unwrap();
-
-    // Act
-    let market = build_market_context();
-    let as_of = date!(2025 - 01 - 01);
-    let cashflows = loan.dated_cashflows(&market, as_of).unwrap();
-
-    // Assert
-    assert!(!cashflows.is_empty());
-    // Should include principal amortization payments
-}
-
-#[test]
 fn test_pik_interest_capitalization() {
     // Arrange
     let loan = TermLoan::builder()

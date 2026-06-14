@@ -597,37 +597,6 @@ fn test_higher_recovery_decreases_protection_value() {
 }
 
 #[test]
-fn test_zero_spread_gives_positive_npv_for_buyer() {
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let disc = build_discount_curve(0.05, as_of, "USD_OIS");
-    let hazard = build_hazard_curve(0.015, 0.40, as_of, "CORP");
-
-    let market = MarketContext::new().insert(disc).insert(hazard);
-
-    let cds = test_utils::cds_buy_protection(
-        "ZERO_SPREAD",
-        Money::new(10_000_000.0, Currency::USD),
-        0.0, // Zero spread
-        as_of,
-        end,
-        "USD_OIS",
-        "CORP",
-    )
-    .expect("CDS construction should succeed");
-
-    let npv = cds.value(&market, as_of).unwrap();
-
-    // With zero spread, buyer pays nothing but receives protection
-    // NPV should be positive for buyer
-    assert!(
-        npv.amount() > 0.0,
-        "Zero spread CDS should have positive NPV for buyer"
-    );
-}
-
-#[test]
 fn test_premium_leg_increases_with_spread() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);

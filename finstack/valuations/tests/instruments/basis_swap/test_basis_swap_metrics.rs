@@ -152,19 +152,3 @@ fn dv01_metrics() {
     assert!(pv_p.is_finite() && pv_r.is_finite());
     assert!(spread.is_finite());
 }
-
-#[test]
-fn theta_defined_and_finite() {
-    let s = swap();
-    let ctx = market();
-    let as_of = d(2025, 1, 2);
-    let res = s
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Theta],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    assert!(res.measures[MetricId::Theta.as_str()].is_finite());
-}

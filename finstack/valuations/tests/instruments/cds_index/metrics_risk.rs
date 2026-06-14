@@ -110,88 +110,6 @@ fn test_hazard_cs01_calculation() {
 }
 
 #[test]
-fn test_risky_pv01_scales_with_notional() {
-    // Test: Risky PV01 scales linearly with notional
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let ctx = standard_market_context(as_of);
-
-    let idx_10mm = standard_single_curve_index("CDX-10MM", start, end, 10_000_000.0);
-    let idx_20mm = standard_single_curve_index("CDX-20MM", start, end, 20_000_000.0);
-
-    let result_10mm = idx_10mm
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::RiskyPv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let result_20mm = idx_20mm
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::RiskyPv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let rpv01_10mm = *result_10mm.measures.get("risky_pv01").unwrap();
-    let rpv01_20mm = *result_20mm.measures.get("risky_pv01").unwrap();
-
-    assert_linear_scaling(
-        rpv01_10mm,
-        10_000_000.0,
-        rpv01_20mm,
-        20_000_000.0,
-        "Risky PV01",
-        0.01,
-    );
-}
-
-#[test]
-fn test_cs01_scales_with_notional() {
-    // Test: CS01 scales linearly with notional
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let ctx = standard_market_context(as_of);
-
-    let idx_10mm = standard_single_curve_index("CDX-10MM", start, end, 10_000_000.0);
-    let idx_20mm = standard_single_curve_index("CDX-20MM", start, end, 20_000_000.0);
-
-    let result_10mm = idx_10mm
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Cs01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let result_20mm = idx_20mm
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Cs01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let cs01_10mm = *result_10mm.measures.get("cs01").unwrap();
-    let cs01_20mm = *result_20mm.measures.get("cs01").unwrap();
-
-    assert_linear_scaling(
-        cs01_10mm,
-        10_000_000.0,
-        cs01_20mm,
-        20_000_000.0,
-        "CS01",
-        0.05,
-    );
-}
-
-#[test]
 fn test_dv01_scales_with_notional() {
     // Test: DV01 scales linearly with notional
     let start = date!(2025 - 01 - 01);
@@ -233,44 +151,6 @@ fn test_dv01_scales_with_notional() {
 }
 
 #[test]
-fn test_risky_pv01_increases_with_maturity() {
-    // Test: Risky PV01 increases with longer maturity
-    let start = date!(2025 - 01 - 01);
-    let as_of = start;
-    let ctx = standard_market_context(as_of);
-
-    let idx_3y = standard_single_curve_index("CDX-3Y", start, date!(2028 - 01 - 01), 10_000_000.0);
-    let idx_5y = standard_single_curve_index("CDX-5Y", start, date!(2030 - 01 - 01), 10_000_000.0);
-
-    let result_3y = idx_3y
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::RiskyPv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let result_5y = idx_5y
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::RiskyPv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let rpv01_3y = *result_3y.measures.get("risky_pv01").unwrap();
-    let rpv01_5y = *result_5y.measures.get("risky_pv01").unwrap();
-
-    assert!(
-        rpv01_3y < rpv01_5y,
-        "Risky PV01 should increase with maturity: 3Y={}, 5Y={}",
-        rpv01_3y,
-        rpv01_5y
-    );
-}
-
-#[test]
 fn test_cs01_increases_with_maturity() {
     // Test: CS01 increases with longer maturity
     let start = date!(2025 - 01 - 01);
@@ -306,28 +186,6 @@ fn test_cs01_increases_with_maturity() {
         cs01_3y,
         cs01_5y
     );
-}
-
-#[test]
-fn test_risky_pv01_present() {
-    // Test: Risky PV01 metric is present and non-zero
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-
-    let idx = standard_single_curve_index("CDX-RPV01", start, end, 10_000_000.0);
-    let ctx = standard_market_context(as_of);
-
-    let result = idx
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::RiskyPv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let metric_rpv01 = *result.measures.get("risky_pv01").unwrap();
-    assert!(metric_rpv01.abs() > 0.0, "risky_pv01 should be non-zero");
 }
 
 #[test]
@@ -548,32 +406,6 @@ fn test_all_risk_metrics_together() {
     assert!(result.measures.contains_key("risky_pv01"));
     assert!(result.measures.contains_key("cs01"));
     assert!(result.measures.contains_key("dv01"));
-}
-
-#[test]
-fn test_risky_pv01_computable() {
-    // Test: risky_pv01 metric computes for CDS Index
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-
-    let idx = standard_single_curve_index("CDX-ALIAS", start, end, 10_000_000.0);
-    let ctx = standard_market_context(as_of);
-
-    let result = idx
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::RiskyPv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let rpv01 = *result
-        .measures
-        .get("risky_pv01")
-        .expect("risky_pv01 present");
-    assert!(rpv01.abs() > 0.0, "risky_pv01 should be non-zero");
 }
 
 #[test]

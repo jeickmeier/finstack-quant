@@ -47,13 +47,6 @@ fn test_position_clone() {
 }
 
 #[test]
-fn test_position_copy() {
-    let pos = Position::Long;
-    let copied = pos;
-    assert_eq!(pos, copied);
-}
-
-#[test]
 fn test_position_serde() {
     let long = Position::Long;
     let serialized = serde_json::to_string(&long).unwrap();

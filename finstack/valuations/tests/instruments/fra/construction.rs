@@ -169,12 +169,6 @@ fn test_high_rate_environment() {
 }
 
 #[test]
-fn test_instrument_trait_id() {
-    let fra = TestFraBuilder::new().id("TEST-FRA-123").build();
-    assert_eq!(fra.id(), "TEST-FRA-123");
-}
-
-#[test]
 fn test_instrument_trait_key() {
     use finstack_valuations::pricer::InstrumentType;
     let fra = create_standard_fra();

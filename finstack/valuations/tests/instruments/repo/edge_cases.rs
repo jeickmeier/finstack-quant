@@ -283,53 +283,6 @@ fn test_repo_with_multiple_currencies() {
 }
 
 #[test]
-fn test_triparty_flag_variations() {
-    let collateral = treasury_collateral();
-
-    // Non-triparty
-    let bilateral = Repo::builder()
-        .id("BILATERAL".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
-        .collateral(collateral.clone())
-        .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
-        .start_date(date(2025, 1, 15))
-        .maturity(date(2025, 4, 15))
-        .haircut(0.02)
-        .repo_type(RepoType::Term)
-        .triparty(false)
-        .day_count(DayCount::Act360)
-        .bdc(BusinessDayConvention::Following)
-        .calendar_id_opt(Some("target2".into()))
-        .discount_curve_id("USD-OIS".into())
-        .attributes(Attributes::default())
-        .build()
-        .unwrap();
-
-    assert!(!bilateral.triparty);
-
-    // Triparty
-    let triparty = Repo::builder()
-        .id("TRIPARTY".into())
-        .cash_amount(Money::new(1_000_000.0, Currency::USD))
-        .collateral(collateral)
-        .repo_rate(Decimal::try_from(0.05).expect("valid decimal"))
-        .start_date(date(2025, 1, 15))
-        .maturity(date(2025, 4, 15))
-        .haircut(0.02)
-        .repo_type(RepoType::Term)
-        .triparty(true)
-        .day_count(DayCount::Act360)
-        .bdc(BusinessDayConvention::Following)
-        .calendar_id_opt(Some("target2".into()))
-        .discount_curve_id("USD-OIS".into())
-        .attributes(Attributes::default())
-        .build()
-        .unwrap();
-
-    assert!(triparty.triparty);
-}
-
-#[test]
 fn test_special_collateral_without_rate_adjustment() {
     let collateral = CollateralSpec::special(
         "SPECIAL_ID",

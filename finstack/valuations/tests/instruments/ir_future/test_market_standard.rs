@@ -149,19 +149,6 @@ fn test_eurodollar_convention() {
 }
 
 #[test]
-fn test_sofr_convention() {
-    let (as_of, start, end) = standard_dates();
-    let market = build_standard_market(as_of, 0.05);
-
-    // SOFR specs
-    let sofr_specs = create_sofr_specs();
-    let future = create_standard_future(start, end).with_contract_specs(sofr_specs);
-
-    let pv = future.value(&market, as_of).unwrap();
-    assert!(pv.amount().is_finite());
-}
-
-#[test]
 fn test_convexity_increases_with_maturity() {
     let as_of = date!(2024 - 01 - 01);
 

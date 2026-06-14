@@ -26,26 +26,6 @@ fn test_delta_call_positive() {
 }
 
 #[test]
-fn test_delta_put_negative() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().put().build(as_of);
-
-    let result = option
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Delta],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let delta = *result.measures.get("delta").unwrap();
-
-    assert_finite(delta, "Put delta");
-    // Put delta can be negative (option to sell protection)
-}
-
-#[test]
 fn test_gamma_positive() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);

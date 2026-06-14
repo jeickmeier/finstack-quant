@@ -57,13 +57,6 @@ fn test_construction_with_settlement() {
 }
 
 #[test]
-fn test_construction_with_bdc() {
-    let fx = sample_eurusd().with_bdc(BusinessDayConvention::ModifiedFollowing);
-
-    assert_eq!(fx.bdc, BusinessDayConvention::ModifiedFollowing);
-}
-
-#[test]
 fn test_construction_with_calendar() {
     let fx = sample_eurusd()
         .with_base_calendar_id("target2")

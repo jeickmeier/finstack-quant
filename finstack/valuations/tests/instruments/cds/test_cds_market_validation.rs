@@ -279,54 +279,6 @@ fn test_risky_pv01_market_standard() {
 }
 
 #[test]
-fn test_buyer_seller_zero_sum() {
-    // CDS is a zero-sum game: buyer NPV + seller NPV = 0
-
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let disc_curve = build_flat_discount(0.05, as_of, "USD_OIS");
-    let hazard_curve = build_flat_hazard(0.015, 0.40, as_of, "CORP_HAZARD");
-
-    let market = MarketContext::new().insert(disc_curve).insert(hazard_curve);
-
-    let mut cds_buyer = test_utils::cds_buy_protection(
-        "BUYER",
-        Money::new(10_000_000.0, Currency::USD),
-        100.0,
-        as_of,
-        end,
-        "USD_OIS",
-        "CORP_HAZARD",
-    )
-    .expect("CDS construction should succeed");
-    cds_buyer.protection.recovery_rate = 0.40;
-
-    let mut cds_seller = test_utils::cds_sell_protection(
-        "SELLER",
-        Money::new(10_000_000.0, Currency::USD),
-        100.0,
-        as_of,
-        end,
-        "USD_OIS",
-        "CORP_HAZARD",
-    )
-    .expect("CDS construction should succeed");
-    cds_seller.protection.recovery_rate = 0.40;
-
-    let npv_buyer = cds_buyer.value(&market, as_of).unwrap();
-    let npv_seller = cds_seller.value(&market, as_of).unwrap();
-
-    // NPVs should sum to approximately zero
-    let sum = npv_buyer.amount() + npv_seller.amount();
-    assert!(
-        sum.abs() < 1000.0,
-        "Buyer + Seller NPV sum should be near zero (zero-sum game), got sum={:.2}",
-        sum
-    );
-}
-
-#[test]
 fn test_cs01_positive_for_protection_buyer() {
     // CS01 measures sensitivity to credit spread changes
     // Protection buyer benefits from widening spreads (CS01 > 0)

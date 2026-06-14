@@ -12,7 +12,6 @@ use finstack_core::dates::DayCount;
 use finstack_core::prelude::MarketContext;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
-use time::macros::date;
 
 #[test]
 fn test_settlement_adjustment_formula() {
@@ -67,45 +66,6 @@ fn test_settlement_adjustment_formula() {
         tau,
         df
     );
-}
-
-#[test]
-fn test_usd_market_convention_act360() {
-    // USD FRAs typically use ACT/360
-    let _fra = TestFraBuilder::new()
-        .notional(10_000_000.0, Currency::USD)
-        .day_count(DayCount::Act360)
-        .curves("USD_OIS", "USD_LIBOR_3M")
-        .build();
-
-    assert_eq!(_fra.notional.currency(), Currency::USD);
-    assert_eq!(_fra.day_count, DayCount::Act360);
-}
-
-#[test]
-fn test_gbp_market_convention_act365() {
-    // GBP FRAs typically use ACT/365
-    let fra = TestFraBuilder::new()
-        .notional(10_000_000.0, Currency::GBP)
-        .day_count(DayCount::Act365F)
-        .curves("GBP_OIS", "GBP_SONIA_3M")
-        .build();
-
-    assert_eq!(fra.notional.currency(), Currency::GBP);
-    assert_eq!(fra.day_count, DayCount::Act365F);
-}
-
-#[test]
-fn test_eur_market_convention_act360() {
-    // EUR FRAs typically use ACT/360
-    let _fra = TestFraBuilder::new()
-        .notional(10_000_000.0, Currency::EUR)
-        .day_count(DayCount::Act360)
-        .curves("EUR_OIS", "EUR_EURIBOR_3M")
-        .build();
-
-    assert_eq!(_fra.notional.currency(), Currency::EUR);
-    assert_eq!(_fra.day_count, DayCount::Act360);
 }
 
 #[test]
@@ -167,60 +127,6 @@ fn test_forward_rate_matches_par_rate() {
         0.05,
         0.001,
         "Par rate should match forward curve rate (market standard)",
-    );
-}
-
-#[test]
-fn test_standard_3x6_fra_convention() {
-    // 3x6 FRA: 3M forward, 3M tenor
-    let base = date!(2024 - 01 - 01);
-    let start = date!(2024 - 04 - 01); // 3M forward
-    let end = date!(2024 - 07 - 01); // 3M tenor
-
-    let _fra = TestFraBuilder::new()
-        .id("FRA-3x6-USD")
-        .dates(start, start, end)
-        .build();
-
-    // Validate convention
-    let days_forward = (start - base).whole_days();
-    let days_tenor = (end - start).whole_days();
-
-    assert_in_range(
-        days_forward as f64,
-        85.0,
-        95.0,
-        "3M forward should be ~90 days",
-    );
-    assert_in_range(days_tenor as f64, 85.0, 95.0, "3M tenor should be ~90 days");
-}
-
-#[test]
-fn test_standard_6x12_fra_convention() {
-    // 6x12 FRA: 6M forward, 6M tenor
-    let base = date!(2024 - 01 - 01);
-    let start = date!(2024 - 07 - 01); // 6M forward
-    let end = date!(2025 - 01 - 01); // 6M tenor
-
-    let _fra = TestFraBuilder::new()
-        .id("FRA-6x12-USD")
-        .dates(start, start, end)
-        .build();
-
-    let days_forward = (start - base).whole_days();
-    let days_tenor = (end - start).whole_days();
-
-    assert_in_range(
-        days_forward as f64,
-        175.0,
-        185.0,
-        "6M forward should be ~180 days",
-    );
-    assert_in_range(
-        days_tenor as f64,
-        175.0,
-        185.0,
-        "6M tenor should be ~180 days",
     );
 }
 

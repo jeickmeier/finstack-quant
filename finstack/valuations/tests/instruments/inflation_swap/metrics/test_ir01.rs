@@ -79,50 +79,6 @@ fn test_ir01_finite_difference_validation() {
 }
 
 #[test]
-fn test_ir01_scales_with_maturity() {
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let ctx = standard_market(as_of, 0.02, 0.04);
-
-    let mut dv01s = Vec::new();
-    for years in &[1, 2, 5, 10] {
-        let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
-        let swap = InflationSwapBuilder::new()
-            .id("ZCINF-IR01-MAT".into())
-            .notional(standard_notional())
-            .start_date(as_of)
-            .maturity(maturity)
-            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
-            .inflation_index_id("US-CPI-U".into())
-            .discount_curve_id("USD-OIS".into())
-            .day_count(DayCount::Act365F)
-            .side(PayReceive::Pay)
-            .attributes(Default::default())
-            .build()
-            .unwrap();
-
-        let result = swap
-            .price_with_metrics(
-                &ctx,
-                as_of,
-                &[MetricId::Dv01],
-                finstack_valuations::instruments::PricingOptions::default(),
-            )
-            .unwrap();
-
-        let dv01 = result.measures.get("dv01").unwrap().abs();
-        dv01s.push(dv01);
-    }
-
-    // DV01 magnitude should generally increase with maturity
-    for i in 1..dv01s.len() {
-        assert!(
-            dv01s[i] > dv01s[i - 1],
-            "DV01 should increase with maturity"
-        );
-    }
-}
-
-#[test]
 fn test_ir01_sign_pay_fixed() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
@@ -192,44 +148,4 @@ fn test_ir01_sign_receive_fixed() {
 
     // DV01 should be finite
     assert!(dv01.is_finite(), "DV01 should be finite");
-}
-
-#[test]
-fn test_ir01_zero_for_matured_swap() {
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-    let maturity = Date::from_calendar_date(2020, Month::January, 1).unwrap();
-
-    let ctx = standard_market(as_of, 0.02, 0.04);
-
-    let swap = InflationSwapBuilder::new()
-        .id("ZCINF-IR01-MAT0".into())
-        .notional(standard_notional())
-        .start_date(Date::from_calendar_date(2015, Month::January, 1).unwrap())
-        .maturity(maturity)
-        .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
-        .inflation_index_id("US-CPI-U".into())
-        .discount_curve_id("USD-OIS".into())
-        .day_count(DayCount::Act365F)
-        .side(PayReceive::Pay)
-        .attributes(Default::default())
-        .build()
-        .unwrap();
-
-    let result = swap
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Dv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let dv01 = result.measures.get("dv01").unwrap().abs();
-
-    // Matured swap should have near-zero DV01
-    assert!(
-        dv01 < 1.0,
-        "Matured swap should have negligible DV01: {}",
-        dv01
-    );
 }

@@ -10,64 +10,8 @@
 use super::fixtures::*;
 use finstack_core::currency::Currency;
 use finstack_valuations::instruments::fixed_income::convertible::{
-    calculate_parity as pricer_calculate_parity, price_convertible_bond, ConvertibleTreeType,
+    price_convertible_bond, ConvertibleTreeType,
 };
-
-#[test]
-fn test_parity_at_par() {
-    let bond = create_standard_convertible();
-    let spot = bond_params::NOTIONAL / bond_params::CONVERSION_RATIO; // $100
-
-    let parity = pricer_calculate_parity(&bond, spot);
-
-    // At par: conversion value equals notional
-    assert!(
-        (parity - 1.0).abs() < TOLERANCE,
-        "Parity should be 1.0 at par"
-    );
-}
-
-#[test]
-fn test_parity_in_the_money() {
-    let bond = create_standard_convertible();
-    let parity = pricer_calculate_parity(&bond, market_params::SPOT_PRICE);
-
-    // Conversion value = 150 * 10 = 1500
-    // Parity = 1500 / 1000 = 1.5
-    let expected = theoretical_parity(
-        market_params::SPOT_PRICE,
-        bond_params::CONVERSION_RATIO,
-        bond_params::NOTIONAL,
-    );
-
-    assert!(
-        (parity - expected).abs() < TOLERANCE,
-        "Parity mismatch: got {}, expected {}",
-        parity,
-        expected
-    );
-}
-
-#[test]
-fn test_parity_out_of_money() {
-    let bond = create_standard_convertible();
-    let parity = pricer_calculate_parity(&bond, market_params::SPOT_LOW);
-
-    // Conversion value = 50 * 10 = 500
-    // Parity = 500 / 1000 = 0.5
-    let expected = theoretical_parity(
-        market_params::SPOT_LOW,
-        bond_params::CONVERSION_RATIO,
-        bond_params::NOTIONAL,
-    );
-
-    assert!(
-        (parity - expected).abs() < TOLERANCE,
-        "Parity mismatch: got {}, expected {}",
-        parity,
-        expected
-    );
-}
 
 #[test]
 fn test_conversion_value_itm() {
@@ -308,22 +252,6 @@ fn test_currency_consistency() {
         Currency::USD,
         "Price currency should match bond currency"
     );
-}
-
-#[test]
-fn test_positive_price() {
-    let bond = create_standard_convertible();
-    let market = create_market_context();
-
-    let price = price_convertible_bond(
-        &bond,
-        &market,
-        ConvertibleTreeType::Binomial(50),
-        dates::base_date(),
-    )
-    .unwrap();
-
-    assert!(price.amount() > 0.0, "Price should always be positive");
 }
 
 #[test]

@@ -15,22 +15,6 @@ use finstack_valuations::instruments::fixed_income::convertible::{
 };
 
 #[test]
-fn test_greeks_calculation_success() {
-    let bond = create_standard_convertible();
-    let market = create_market_context();
-
-    let greeks = calculate_convertible_greeks(
-        &bond,
-        &market,
-        ConvertibleTreeType::Binomial(50),
-        Some(0.01),
-        dates::base_date(),
-    );
-
-    assert!(greeks.is_ok(), "Greeks calculation should succeed");
-}
-
-#[test]
 fn test_delta_positive_for_itm() {
     let bond = create_standard_convertible();
     let market = create_market_context();

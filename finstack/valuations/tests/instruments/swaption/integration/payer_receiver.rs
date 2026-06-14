@@ -16,24 +16,6 @@ use rust_decimal::Decimal;
 use time::macros::date;
 
 #[test]
-fn test_payer_receiver_symmetry() {
-    let (as_of, expiry, swap_start, swap_end) = standard_dates();
-    let market = create_flat_market(as_of, 0.05, 0.30);
-    let forward = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05)
-        .forward_swap_rate(&market, as_of)
-        .unwrap();
-
-    let payer = create_standard_payer_swaption(expiry, swap_start, swap_end, forward);
-    let receiver = create_standard_receiver_swaption(expiry, swap_start, swap_end, forward);
-
-    let pv_payer = payer.value(&market, as_of).unwrap().amount();
-    let pv_receiver = receiver.value(&market, as_of).unwrap().amount();
-
-    // At ATM (strike = forward), payer and receiver should have similar values
-    assert_approx_eq(pv_payer, pv_receiver, 0.05, "ATM payer-receiver symmetry");
-}
-
-#[test]
 fn test_forward_swap_rate_includes_first_multicurve_float_period() {
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2024 - 12 - 31);

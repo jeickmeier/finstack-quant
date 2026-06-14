@@ -210,17 +210,6 @@ fn expired_swap_returns_zero_pv() {
 // =============================================================================
 
 #[test]
-#[should_panic(expected = "finite")]
-fn rejects_non_finite_notional() {
-    // Money::new panics (via assert!) when given non-finite values
-    // This is the correct fail-fast behavior for programming errors
-    let mut leg_usd = leg_usd_receive(d(2025, 1, 2), d(2026, 1, 2));
-    leg_usd.notional = Money::new(f64::INFINITY, Currency::USD);
-    // This should panic before we even get to construct the swap
-    let _ = leg_usd.notional;
-}
-
-#[test]
 fn rejects_negative_notional() {
     let base = d(2025, 1, 2);
     let maturity = d(2026, 1, 2);

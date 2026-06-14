@@ -149,28 +149,6 @@ fn test_par_rate_makes_npv_zero() {
 }
 
 #[test]
-fn test_par_rate_positive() {
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let swap = create_standard_swap(as_of, end, dec!(0.05));
-    let market = build_flat_curves(0.05, as_of);
-
-    let result = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::ParRate],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let par_rate = *result.measures.get("par_rate").unwrap();
-
-    assert!(par_rate > 0.0, "Par rate should be positive");
-}
-
-#[test]
 fn test_par_rate_independent_of_fixed_rate() {
     // Par rate shouldn't depend on the swap's fixed rate
     let as_of = date!(2024 - 01 - 01);

@@ -77,23 +77,6 @@ fn test_senior_tranche_pricing() {
 }
 
 #[test]
-fn test_mezzanine_tranche_pricing() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.price_tranche(&tranche, &market, as_of);
-
-    // Assert
-    assert!(result.is_ok());
-    let pv = result.unwrap();
-    assert!(pv.amount().is_finite());
-}
-
-#[test]
 fn test_bespoke_seasoned_tranche_requires_effective_date_for_accrued_premium() {
     let market = standard_market_context();
     let as_of = date!(2025 - 02 - 01);

@@ -414,35 +414,6 @@ fn test_carry_pv_calculation() {
 }
 
 #[test]
-fn test_bucketed_dv01() {
-    // Test bucketed DV01 calculation
-    let dates = TestDates::standard();
-    let market = setup_standard_market(dates.as_of);
-
-    let swap = create_standard_fx_swap(
-        "BUCKETED_DV01",
-        dates.near_date,
-        dates.far_date_1y,
-        1_000_000.0,
-    );
-
-    let result = swap
-        .price_with_metrics(
-            &market,
-            dates.as_of,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    // Check that bucketed_dv01 is present
-    assert!(
-        result.measures.contains_key("bucketed_dv01"),
-        "Bucketed DV01 should be calculated"
-    );
-}
-
-#[test]
 fn test_multiple_metrics_together() {
     // Test calculating multiple metrics in one call
     let dates = TestDates::standard();

@@ -329,34 +329,6 @@ fn test_builder_validation() {
 }
 
 #[test]
-fn test_attributes_access() {
-    // Test that instrument attributes can be accessed and modified
-    let dates = TestDates::standard();
-
-    let mut swap = create_standard_fx_swap(
-        "ATTRIBUTES",
-        dates.near_date,
-        dates.far_date_1y,
-        1_000_000.0,
-    );
-
-    // Access attributes
-    let _attrs = swap.attributes();
-
-    // Modify attributes
-    let attrs_mut = swap.attributes_mut();
-    attrs_mut
-        .meta
-        .insert("trader".to_string(), "test_trader".to_string());
-
-    // Verify modification
-    assert_eq!(
-        swap.attributes().meta.get("trader"),
-        Some(&"test_trader".to_string())
-    );
-}
-
-#[test]
 fn test_metric_error_handling() {
     // Test that metrics handle missing data gracefully
     let dates = TestDates::standard();

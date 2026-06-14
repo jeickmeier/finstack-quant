@@ -227,24 +227,6 @@ fn test_high_rate_environment() {
 }
 
 #[test]
-fn test_value_trait_consistency() {
-    let (as_of, start, end) = standard_dates();
-    let future = create_standard_future(start, end);
-    let market = build_standard_market(as_of, 0.05);
-
-    // npv() and value() should match
-    let npv = future.value(&market, as_of).unwrap().amount();
-    let value = future.value(&market, as_of).unwrap().amount();
-
-    assert!(
-        (npv - value).abs() < 1e-10,
-        "npv() and value() should match: {} vs {}",
-        npv,
-        value
-    );
-}
-
-#[test]
 fn test_discount_curve_id() {
     let (_, start, end) = standard_dates();
     let future = create_standard_future(start, end);

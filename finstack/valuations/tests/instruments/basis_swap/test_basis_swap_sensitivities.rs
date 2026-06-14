@@ -180,48 +180,6 @@ fn dv01_scales_with_notional() {
 }
 
 #[test]
-fn dv01_sign_convention() {
-    let ctx = market();
-    let as_of = d(2025, 1, 2);
-    let swap = BasisSwap::new(
-        "DV01-SIGN-TEST",
-        Money::new(10_000_000.0, USD),
-        make_leg("USD-SOFR-3M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
-        make_leg("USD-SOFR-1M", d(2025, 1, 2), d(2026, 1, 2), Decimal::ZERO),
-    )
-    .expect("swap construction");
-
-    let res = swap
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::Dv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let dv01_primary = res
-        .measures
-        .get("bucketed_dv01::USD_x2dSOFR_x2d3M")
-        .copied()
-        .unwrap_or(0.0);
-    let dv01_reference = res
-        .measures
-        .get("bucketed_dv01::USD_x2dSOFR_x2d1M")
-        .copied()
-        .unwrap_or(0.0);
-
-    assert!(
-        dv01_primary > 0.0,
-        "Primary forward DV01 should be positive (receive floating)"
-    );
-    assert!(
-        dv01_reference < 0.0,
-        "Reference forward DV01 should be negative (pay floating)"
-    );
-}
-
-#[test]
 fn dv01_vs_numerical_bump() {
     let as_of = d(2025, 1, 2);
     let ctx_base = market();

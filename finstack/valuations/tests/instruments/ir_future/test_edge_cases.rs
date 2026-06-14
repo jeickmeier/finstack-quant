@@ -6,28 +6,6 @@ use finstack_valuations::instruments::rates::ir_future::{FutureContractSpecs, Po
 use time::macros::date;
 
 #[test]
-fn test_expired_future() {
-    let as_of = date!(2024 - 07 - 15);
-    let expiry = date!(2024 - 07 - 01); // Expired 2 weeks ago
-    let end = date!(2024 - 10 - 01);
-
-    let future = create_custom_future(
-        "EXPIRED",
-        1_000_000.0,
-        expiry,
-        expiry,
-        end,
-        97.50,
-        Position::Long,
-    );
-    let market = build_standard_market(expiry, 0.05); // Use expiry as base date to avoid validation errors
-
-    // Should still calculate (might be zero or small value)
-    let result = future.value(&market, as_of);
-    assert!(result.is_ok() || result.is_err()); // Either behavior is acceptable for expired
-}
-
-#[test]
 fn test_zero_tau() {
     let start = date!(2024 - 07 - 01);
     let end = date!(2024 - 07 - 02); // One day accrual (minimal but non-zero)
@@ -170,28 +148,6 @@ fn test_wrong_curve_ids() {
 
     let result = future.value(&market, as_of);
     assert!(result.is_err());
-}
-
-#[test]
-fn test_future_date_before_base_date() {
-    let as_of = date!(2023 - 01 - 01);
-    let past_start = date!(2023 - 01 - 01);
-    let past_end = date!(2023 - 04 - 01);
-
-    let future = create_custom_future(
-        "PAST",
-        1_000_000.0,
-        past_start,
-        past_start,
-        past_end,
-        97.50,
-        Position::Long,
-    );
-    let market = build_standard_market(past_start, 0.05); // Use past date as base
-
-    // Should handle historical dates
-    let result = future.value(&market, as_of);
-    assert!(result.is_ok() || result.is_err()); // Either behavior is acceptable
 }
 
 #[test]

@@ -167,21 +167,6 @@ fn test_fi_index_trs_npv_pay_vs_receive_symmetry() {
 }
 
 #[test]
-fn test_fi_index_trs_value_trait() {
-    // Arrange
-    let market = create_market_context();
-    let as_of = as_of_date();
-    let trs = TestFIIndexTrsBuilder::new().build();
-
-    // Act
-    let value = trs.value(&market, as_of).unwrap();
-
-    // Assert
-    assert_eq!(value.currency(), USD);
-    assert!(value.amount().is_finite());
-}
-
-#[test]
 fn test_fi_index_trs_pricing_with_different_spreads() {
     // Arrange
     let market = create_market_context();

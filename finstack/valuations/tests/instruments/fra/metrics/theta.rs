@@ -111,30 +111,6 @@ fn test_theta_scales_with_notional() {
 }
 
 #[test]
-fn test_theta_sign_convention() {
-    // Long position (receive fixed above market) loses value as time passes
-    let market = standard_market(); // 5%
-    let fra = TestFraBuilder::new()
-        .fixed_rate(0.06) // receive 6%
-        .receive_fixed(false)
-        .build();
-
-    let result = fra
-        .price_with_metrics(
-            &market,
-            BASE_DATE,
-            &[MetricId::Theta],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let theta = *result.measures.get("theta").unwrap();
-
-    // Theta convention: negative = value decays toward maturity
-    assert_finite(theta, "Theta should be finite");
-}
-
-#[test]
 fn test_theta_short_period() {
     let market = standard_market();
 

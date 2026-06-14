@@ -50,63 +50,6 @@ fn build_flat_vol_surface(vol: f64, _base_date: Date, surface_id: &str) -> VolSu
         .unwrap()
 }
 
-#[test]
-fn test_implied_vol_requires_market_price() {
-    let as_of = date!(2024 - 01 - 01);
-    let start = date!(2024 - 03 - 01); // Future start to get t_fix > 0
-    let end = date!(2024 - 06 - 01);
-
-    // Caplet without market price
-    let caplet = CapFloor {
-        id: "CAPLET_TEST".into(),
-        rate_option_type: RateOptionType::Caplet,
-        notional: Money::new(1_000_000.0, Currency::USD),
-        strike: Decimal::try_from(0.05).expect("valid decimal"),
-        start_date: start,
-        maturity: end,
-        frequency: Tenor::quarterly(),
-        day_count: DayCount::Act360,
-        stub: StubKind::None,
-        bdc: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: None,
-        exercise_style: ExerciseStyle::European,
-        settlement: SettlementType::Cash,
-        discount_curve_id: "USD_OIS".into(),
-        forward_curve_id: "USD_LIBOR_3M".into(),
-        vol_surface_id: "USD_CAP_VOL".into(),
-        vol_type: Default::default(),
-        vol_shift: 0.0,
-
-        pricing_overrides: finstack_valuations::instruments::PricingOverrides::default(),
-        attributes: Default::default(),
-    };
-
-    let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
-    let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
-
-    let market = MarketContext::new()
-        .insert(disc_curve)
-        .insert(fwd_curve)
-        .insert_surface(vol_surface);
-
-    let result = caplet.price_with_metrics(
-        &market,
-        as_of,
-        &[MetricId::ImpliedVol],
-        finstack_valuations::instruments::PricingOptions::default(),
-    );
-
-    // Should either fail or return zero without market price
-    if let Ok(res) = result {
-        let implied_vol = *res.measures.get("implied_vol").unwrap_or(&0.0);
-        assert_eq!(
-            implied_vol, 0.0,
-            "ImpliedVol without market price should be zero"
-        );
-    }
-}
-
 /// Round-trip: pricing a caplet with a known flat surface vol and then solving
 /// for the implied vol from that price must recover the input vol. This locks in
 /// the dating consistency between the pricer and the implied-vol metric (same

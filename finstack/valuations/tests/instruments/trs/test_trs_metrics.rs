@@ -591,28 +591,6 @@ fn test_fi_index_trs_theta_calculation() {
     assert!(theta.is_finite(), "Theta should be finite");
 }
 
-#[test]
-fn test_theta_is_finite() {
-    // Arrange
-    let market = create_market_context();
-    let as_of = as_of_date();
-    let trs = TestEquityTrsBuilder::new().build();
-
-    // Act - Calculate theta via metric
-    let result = trs
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Theta],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let theta_metric = *result.measures.get("theta").unwrap();
-
-    // Assert - Theta should be finite
-    assert!(theta_metric.is_finite(), "Theta should be finite");
-}
-
 // ================================================================================================
 // Bucketed DV01 Tests
 // ================================================================================================

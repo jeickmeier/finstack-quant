@@ -14,11 +14,10 @@ use finstack_core::market_data::context::MarketContext;
 use finstack_core::money::Money;
 use finstack_core::types::{Percentage, Rate};
 use finstack_valuations::instruments::fixed_income::structured_credit::{
-    standard_psa_speeds, AbsChargeOffCalculator, AbsCreditEnhancementCalculator,
-    AbsDelinquencyCalculator, AbsExcessSpreadCalculator, AbsSpeedCalculator, AssetPool,
-    CmbsDscrCalculator, DealType, PoolAsset, RmbsFicoCalculator, RmbsLtvCalculator,
-    RmbsWalCalculator, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
-    TrancheStructure,
+    AbsChargeOffCalculator, AbsCreditEnhancementCalculator, AbsDelinquencyCalculator,
+    AbsExcessSpreadCalculator, AbsSpeedCalculator, AssetPool, CmbsDscrCalculator, DealType,
+    PoolAsset, RmbsFicoCalculator, RmbsLtvCalculator, RmbsWalCalculator, StructuredCredit, Tranche,
+    TrancheCoupon, TrancheSeniority, TrancheStructure,
 };
 use finstack_valuations::metrics::{MetricCalculator, MetricContext};
 use std::sync::Arc;
@@ -237,56 +236,6 @@ fn test_abs_charge_off_and_credit_enhancement_handle_zero_balances() {
 }
 
 #[test]
-fn test_abs_metrics_require_abs_deal_type() {
-    // ABS metrics should only apply to ABS, Auto, or Card deals
-    let abs_family = [DealType::ABS, DealType::Auto, DealType::Card];
-    for deal in &abs_family {
-        assert!(
-            matches!(*deal, DealType::ABS | DealType::Auto | DealType::Card),
-            "ABS metrics should support {:?}",
-            deal
-        );
-    }
-
-    let non_abs = [DealType::CLO, DealType::CBO, DealType::CMBS, DealType::RMBS];
-    for deal in &non_abs {
-        assert!(
-            !matches!(*deal, DealType::ABS | DealType::Auto | DealType::Card),
-            "ABS metrics should not support {:?}",
-            deal
-        );
-    }
-}
-
-#[test]
-fn test_cmbs_metrics_require_cmbs_deal_type() {
-    // CMBS metrics (LTV, DSCR) should only apply to CMBS
-    let cmbs_types = [DealType::CMBS];
-    for deal in &cmbs_types {
-        assert!(
-            matches!(*deal, DealType::CMBS),
-            "CMBS metrics should support {:?}",
-            deal
-        );
-    }
-
-    let non_cmbs = [
-        DealType::CLO,
-        DealType::CBO,
-        DealType::ABS,
-        DealType::RMBS,
-        DealType::Auto,
-    ];
-    for deal in &non_cmbs {
-        assert!(
-            !matches!(*deal, DealType::CMBS),
-            "CMBS metrics should not support {:?}",
-            deal
-        );
-    }
-}
-
-#[test]
 fn test_cmbs_dscr_calculator_uses_typed_noi_and_debt_service() {
     let mut cmbs = cmbs_instrument();
     cmbs.credit_factors.annual_noi = Some(Money::new(1_350_000.0, Currency::USD));
@@ -326,19 +275,6 @@ fn test_cmbs_dscr_requires_typed_inputs_and_matching_currency() {
         .calculate(&mut metric_context(zero_service, as_of))
         .expect_err("zero debt service should be rejected");
     assert!(err.to_string().contains("annual_debt_service"));
-}
-
-#[test]
-fn test_rmbs_metrics_adjust_for_psa_speed() {
-    // RMBS metrics should consider PSA speeds above and below par
-    assert!(
-        standard_psa_speeds().iter().any(|&speed| speed > 1.0),
-        "PSA speed grid should include stressed scenarios above 100%"
-    );
-    assert!(
-        standard_psa_speeds().iter().any(|&speed| speed < 1.0),
-        "PSA speed grid should include benign scenarios below 100%"
-    );
 }
 
 #[test]

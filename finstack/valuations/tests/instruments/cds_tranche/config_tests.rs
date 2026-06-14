@@ -113,24 +113,6 @@ fn test_default_config_hetero_method() {
 // ==================== Heterogeneous Method Tests ====================
 
 #[test]
-fn test_hetero_method_spa() {
-    // Arrange & Act
-    let method = HeteroMethod::Spa;
-
-    // Assert
-    assert!(matches!(method, HeteroMethod::Spa));
-}
-
-#[test]
-fn test_hetero_method_exact_convolution() {
-    // Arrange & Act
-    let method = HeteroMethod::ExactConvolution;
-
-    // Assert
-    assert!(matches!(method, HeteroMethod::ExactConvolution));
-}
-
-#[test]
 fn test_hetero_method_equality() {
     // Arrange
     let spa1 = HeteroMethod::Spa;
@@ -143,21 +125,6 @@ fn test_hetero_method_equality() {
 }
 
 // ==================== Custom Configuration Tests ====================
-
-#[test]
-fn test_custom_config_quadrature_orders() {
-    // Test different valid quadrature orders
-    for order in [5u8, 7, 10] {
-        // Arrange
-        let config = CDSTranchePricerConfig {
-            quadrature_order: order,
-            ..Default::default()
-        };
-
-        // Assert
-        assert_eq!(config.quadrature_order, order);
-    }
-}
 
 #[test]
 fn test_pricer_config_builder_methods_wire_copula_and_numerical_settings() {
@@ -236,71 +203,6 @@ fn test_pricer_config_recovery_builders_populate_recovery_spec() {
     let constant_pct_debug = format!("{:?}", constant_pct.recovery_spec);
     assert!(constant_pct.recovery_spec.is_some());
     assert!(constant_pct_debug.contains("0.38"));
-}
-
-#[test]
-fn test_custom_config_correlation_bounds_modification() {
-    // Arrange & Act
-    let config = CDSTranchePricerConfig {
-        min_correlation: 0.05,
-        max_correlation: 0.95,
-        ..Default::default()
-    };
-
-    // Assert
-    assert_eq!(config.min_correlation, 0.05);
-    assert_eq!(config.max_correlation, 0.95);
-}
-
-#[test]
-fn test_custom_config_cs01_bump_size() {
-    // Arrange & Act
-    let config = CDSTranchePricerConfig {
-        cs01_bump_size: 0.5,
-        ..Default::default()
-    };
-
-    // Assert
-    assert_eq!(config.cs01_bump_size, 0.5);
-}
-
-#[test]
-fn test_custom_config_disable_accrual_on_default() {
-    // Arrange & Act
-    let config = CDSTranchePricerConfig {
-        accrual_on_default_enabled: false,
-        ..Default::default()
-    };
-
-    // Assert
-    assert!(!config.accrual_on_default_enabled);
-}
-
-#[test]
-fn test_custom_config_hetero_method_exact() {
-    // Arrange & Act
-    let config = CDSTranchePricerConfig {
-        hetero_method: HeteroMethod::ExactConvolution,
-        ..Default::default()
-    };
-
-    // Assert
-    assert!(matches!(
-        config.hetero_method,
-        HeteroMethod::ExactConvolution
-    ));
-}
-
-#[test]
-fn test_custom_config_grid_step() {
-    // Arrange & Act
-    let config = CDSTranchePricerConfig {
-        grid_step: 0.0005,
-        ..Default::default()
-    };
-
-    // Assert
-    assert_eq!(config.grid_step, 0.0005);
 }
 
 // ==================== Configuration Clone Tests ====================

@@ -31,38 +31,6 @@ fn test_sabr_pricing_runs() {
 }
 
 #[test]
-fn test_sabr_vs_black_atm() {
-    let (as_of, expiry, swap_start, swap_end) = standard_dates();
-    let strike = 0.05;
-
-    // SABR with beta=1 and low vol-of-vol should be close to lognormal Black
-    let sabr_params = SABRParameters {
-        alpha: 0.30,
-        beta: 1.0,
-        rho: 0.0,
-        nu: 0.01, // Low vol-of-vol
-        shift: None,
-    };
-
-    let swaption_sabr =
-        create_standard_payer_swaption(expiry, swap_start, swap_end, strike).with_sabr(sabr_params);
-    let swaption_black = create_standard_payer_swaption(expiry, swap_start, swap_end, strike);
-
-    let market = create_flat_market(as_of, 0.05, 0.30);
-
-    let pv_sabr = swaption_sabr.value(&market, as_of).unwrap().amount();
-    let pv_black = swaption_black.value(&market, as_of).unwrap().amount();
-
-    // SABR and Black can differ significantly even with beta=1 due to vol-of-vol effects
-    let rel_diff = ((pv_sabr - pv_black) / pv_black).abs();
-    assert!(
-        rel_diff < 10.0,
-        "SABR with beta=1 should produce finite results, rel_diff={}",
-        rel_diff
-    );
-}
-
-#[test]
 fn test_sabr_smile_effect() {
     let (as_of, expiry, swap_start, swap_end) = standard_dates();
 

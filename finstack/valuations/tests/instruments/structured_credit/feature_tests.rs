@@ -347,22 +347,6 @@ fn cleanup_call_does_not_trigger_for_low_cpr() {
 }
 
 // ============================================================================
-// Feature 2: Reserve Account RecipientType
-// ============================================================================
-
-#[test]
-fn reserve_account_recipient_type_exists() {
-    // Verify the ReserveAccount recipient type can be constructed.
-    use finstack_valuations::instruments::fixed_income::structured_credit::RecipientType;
-
-    let recipient = RecipientType::ReserveAccount("RESERVE_1".to_string());
-    match recipient {
-        RecipientType::ReserveAccount(id) => assert_eq!(id, "RESERVE_1"),
-        _ => panic!("Expected ReserveAccount variant"),
-    }
-}
-
-// ============================================================================
 // Feature 3: OC/IC Cure Amount (Integration-level)
 // ============================================================================
 

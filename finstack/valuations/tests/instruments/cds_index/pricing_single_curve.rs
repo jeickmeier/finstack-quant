@@ -376,20 +376,6 @@ fn test_single_curve_synthetic_cds_pricing_equivalence() {
 }
 
 #[test]
-fn test_single_curve_zero_notional() {
-    // Test: Zero notional produces zero NPV
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-    let ctx = standard_market_context(as_of);
-
-    let idx = standard_single_curve_index("CDX-ZERO", start, end, 0.0);
-    let npv = idx.value(&ctx, as_of).unwrap();
-
-    assert_eq!(npv.amount(), 0.0, "Zero notional should produce zero NPV");
-}
-
-#[test]
 fn test_single_curve_upfront_payment() {
     // Test: Upfront payment affects NPV
     let start = date!(2025 - 01 - 01);

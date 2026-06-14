@@ -48,19 +48,6 @@ fn context_for_tranche<'a>(
 }
 
 // ============================================================================
-// OC Test Creation Tests
-// ============================================================================
-
-#[test]
-fn test_oc_test_creation() {
-    // Arrange & Act
-    let test = CoverageTest::new_oc(1.25);
-
-    // Assert
-    assert_eq!(test.required_level(), 1.25);
-}
-
-// ============================================================================
 // OC Test Calculation Tests
 // ============================================================================
 
@@ -325,19 +312,6 @@ fn test_oc_test_cure_amount_calculation() {
     assert!(!result.is_passing);
     assert!(result.cure_amount.is_some());
     assert!((result.cure_amount.unwrap().amount() - 40_000_000.0).abs() < 1.0);
-}
-
-// ============================================================================
-// IC Test Creation Tests
-// ============================================================================
-
-#[test]
-fn test_ic_test_creation() {
-    // Arrange & Act
-    let test = CoverageTest::new_ic(1.20);
-
-    // Assert
-    assert_eq!(test.required_level(), 1.20);
 }
 
 // ============================================================================

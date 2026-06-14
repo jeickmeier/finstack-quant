@@ -192,38 +192,6 @@ fn test_irs_with_spread() {
 }
 
 #[test]
-fn test_irs_large_notional() {
-    // Test with large notional typical of institutional trades
-    let swap = test_utils::usd_irs_swap(
-        "IRS-LARGE",
-        Money::new(1_000_000_000.0, Currency::USD), // $1B
-        0.045,
-        date!(2024 - 01 - 01),
-        date!(2034 - 01 - 01),
-        PayReceive::Pay,
-    )
-    .unwrap();
-
-    assert_eq!(swap.notional.amount(), 1_000_000_000.0);
-}
-
-#[test]
-fn test_irs_small_notional() {
-    // Test with small notional
-    let swap = test_utils::usd_irs_swap(
-        "IRS-SMALL",
-        Money::new(10_000.0, Currency::USD),
-        0.05,
-        date!(2024 - 01 - 01),
-        date!(2029 - 01 - 01),
-        PayReceive::Receive,
-    )
-    .unwrap();
-
-    assert_eq!(swap.notional.amount(), 10_000.0);
-}
-
-#[test]
 fn test_irs_different_leg_frequencies() {
     // Fixed semiannual, float quarterly (standard)
     let swap = InterestRateSwap::builder()

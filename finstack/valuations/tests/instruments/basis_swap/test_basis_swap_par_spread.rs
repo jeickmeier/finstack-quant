@@ -398,60 +398,6 @@ fn par_spread_long_maturity() {
 }
 
 #[test]
-fn par_spread_different_frequencies() {
-    // Test par spread with different payment frequencies
-    let ctx = market();
-    let as_of = d(2025, 1, 2);
-
-    // Quarterly vs Monthly
-    let swap = BasisSwap::new(
-        "FREQ-TEST",
-        Money::new(10_000_000.0, USD),
-        BasisSwapLeg {
-            forward_curve_id: CurveId::new("USD-SOFR-3M"),
-            discount_curve_id: CurveId::new("USD-OIS"),
-            start: d(2025, 1, 2),
-            end: d(2026, 1, 2),
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some(CALENDAR_ID.to_string()),
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::ZERO,
-            payment_lag_days: 0,
-            reset_lag_days: 0,
-        },
-        BasisSwapLeg {
-            forward_curve_id: CurveId::new("USD-SOFR-1M"),
-            discount_curve_id: CurveId::new("USD-OIS"),
-            start: d(2025, 1, 2),
-            end: d(2026, 1, 2),
-            frequency: Tenor::quarterly(),
-            day_count: DayCount::Act360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some(CALENDAR_ID.to_string()),
-            stub: StubKind::ShortFront,
-            spread_bp: Decimal::ZERO,
-            payment_lag_days: 0,
-            reset_lag_days: 0,
-        },
-    )
-    .expect("valid basis swap");
-
-    let res = swap
-        .price_with_metrics(
-            &ctx,
-            as_of,
-            &[MetricId::BasisParSpread],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-    let par_spread = res.measures[MetricId::BasisParSpread.as_str()];
-
-    assert!(par_spread.is_finite());
-}
-
-#[test]
 fn par_spread_sign_convention() {
     // Verify par spread sign convention: positive spread added to primary leg
     let ctx = market();

@@ -192,28 +192,6 @@ fn test_schedule_calculator_exists() {
 }
 
 #[test]
-fn test_bilateral_vs_cleared_im_difference() {
-    let _swap = create_test_swap();
-    let bilateral_spec = create_bilateral_margin_spec();
-    let cleared_spec = create_cleared_margin_spec();
-
-    // Bilateral MPOR is typically 10 days
-    assert_eq!(
-        bilateral_spec.csa.im_params.as_ref().map(|p| p.mpor_days),
-        Some(10)
-    );
-
-    // Cleared MPOR is typically 5 days
-    assert_eq!(
-        cleared_spec.csa.im_params.as_ref().map(|p| p.mpor_days),
-        Some(5)
-    );
-
-    // This difference would result in lower IM for cleared trades
-    // (shorter MPOR = smaller potential loss = lower margin)
-}
-
-#[test]
 fn test_vm_threshold_behavior() {
     let margin_spec = create_bilateral_margin_spec();
     let vm_calc = VmCalculator::new(margin_spec.csa);

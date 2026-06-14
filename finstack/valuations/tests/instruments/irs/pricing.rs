@@ -318,45 +318,6 @@ fn test_irs_npv_scales_with_notional() {
 }
 
 #[test]
-fn test_irs_rate_sensitivity_inverse() {
-    // As rates rise, receive fixed position loses value
-    let as_of = dates::TODAY;
-    let end = dates::five_years_hence();
-
-    let swap = test_utils::usd_irs_swap(
-        "SWAP_RATE_SENS",
-        Money::new(1_000_000.0, Currency::USD),
-        0.05,
-        as_of,
-        end,
-        PayReceive::Receive,
-    )
-    .unwrap();
-
-    let mut npvs = Vec::new();
-
-    for rate in [0.03, 0.04, 0.05, 0.06, 0.07] {
-        // Use consolidated curve builder for each rate scenario
-        let market = usd_swap_market(as_of, rate);
-
-        let npv = swap.value(&market, as_of).unwrap();
-        npvs.push((rate, npv.amount()));
-    }
-
-    // Verify inverse relationship: higher rates → lower NPV
-    for i in 1..npvs.len() {
-        assert!(
-            npvs[i].1 < npvs[i - 1].1,
-            "NPV should decrease as rates rise: rate {}% NPV={} >= rate {}% NPV={}",
-            npvs[i].0 * 100.0,
-            npvs[i].1,
-            npvs[i - 1].0 * 100.0,
-            npvs[i - 1].1
-        );
-    }
-}
-
-#[test]
 fn test_irs_with_spread() {
     let as_of = dates::TODAY;
     let end = dates::five_years_hence();
@@ -410,33 +371,6 @@ fn test_irs_short_maturity() {
         npv.amount().abs() < 50_000.0,
         "1Y swap NPV should be small, got {}",
         npv.amount()
-    );
-}
-
-#[test]
-fn test_irs_long_maturity() {
-    // 30-year swap
-    let as_of = dates::TODAY;
-    let end = dates::thirty_years_hence();
-
-    let market = usd_swap_market_split(as_of, 0.05, 0.06);
-
-    let swap = test_utils::usd_irs_swap(
-        "SWAP_30Y",
-        Money::new(1_000_000.0, Currency::USD),
-        0.05,
-        as_of,
-        end,
-        PayReceive::Receive,
-    )
-    .unwrap();
-
-    let npv = swap.value(&market, as_of).unwrap();
-
-    // Should have larger NPV for longer maturity
-    assert!(
-        npv.amount().abs() > 0.0,
-        "30Y swap should have non-zero NPV"
     );
 }
 

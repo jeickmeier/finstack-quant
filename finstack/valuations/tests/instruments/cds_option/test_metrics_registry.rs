@@ -442,29 +442,6 @@ fn test_bucketed_cs01_reconciles_to_parallel() {
 }
 
 #[test]
-fn test_bucketed_dv01_registered() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().build(as_of);
-
-    let pv = option.value(&market, as_of).unwrap();
-    let mut ctx = MetricContext::new(
-        std::sync::Arc::new(option),
-        std::sync::Arc::new(market),
-        as_of,
-        pv,
-        MetricContext::default_config(),
-    );
-
-    let registry = standard_registry();
-    let results = registry.compute(&[MetricId::BucketedDv01], &mut ctx);
-
-    // Bucketed DV01 should be registered (may or may not compute successfully depending on market)
-    // Just verify it doesn't panic
-    assert!(results.is_ok() || results.is_err());
-}
-
-#[test]
 fn test_metrics_near_expiry() {
     // Test metrics for near-expiry option
     let as_of = date!(2025 - 01 - 01);

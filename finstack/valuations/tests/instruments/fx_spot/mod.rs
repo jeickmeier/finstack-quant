@@ -28,7 +28,6 @@ mod pricing;
 
 // Metrics tests
 mod metrics;
-mod test_bucketed_dv01;
 
 // Integration tests
 mod integration;

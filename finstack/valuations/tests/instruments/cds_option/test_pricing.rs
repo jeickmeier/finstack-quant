@@ -124,23 +124,6 @@ fn test_volatility_effect() {
 }
 
 #[test]
-fn test_near_expiry_option() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
-
-    // Very short time to expiry (1 week)
-    let option = CDSOptionBuilder::new()
-        .expiry_months(0) // Will be adjusted to very near-term
-        .build(as_of);
-
-    let result = option.value(&market, as_of);
-    assert!(
-        result.is_ok(),
-        "Near-expiry option should price successfully"
-    );
-}
-
-#[test]
 fn test_very_short_dated_option() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);

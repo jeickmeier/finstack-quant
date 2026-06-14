@@ -497,20 +497,6 @@ fn test_yield_compounding_equality() {
 }
 
 #[test]
-fn test_yield_compounding_clone() {
-    let comp = YieldCompounding::Periodic(2);
-    let cloned = comp; // Copy trait automatically clones
-    assert_eq!(comp, cloned);
-}
-
-#[test]
-fn test_yield_compounding_copy() {
-    let comp = YieldCompounding::Street;
-    let copied = comp;
-    assert_eq!(comp, copied);
-}
-
-#[test]
 fn test_df_from_yield_street_with_monthly() {
     // Street convention with monthly frequency
     let ytm = 0.12; // 12% annual

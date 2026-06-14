@@ -101,26 +101,6 @@ fn test_repo_margin_type_variations() {
 }
 
 #[test]
-fn test_margin_frequency_options() {
-    // Test different margin call frequencies
-    for frequency in [
-        MarginTenor::Daily,
-        MarginTenor::Weekly,
-        MarginTenor::Monthly,
-        MarginTenor::OnDemand,
-    ] {
-        let mut repo = create_test_repo();
-        repo.margin_spec = Some(RepoMarginSpec {
-            call_frequency: frequency,
-            ..Default::default()
-        });
-
-        let spec = repo.margin_spec.as_ref().expect("spec exists");
-        assert!(matches!(spec.call_frequency, _));
-    }
-}
-
-#[test]
 fn test_vm_calculator_with_repo_exposure() {
     // Create a CSA spec for testing VM calculations
     let csa = CsaSpec::usd_regulatory().expect("registry should load");

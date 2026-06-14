@@ -129,25 +129,6 @@ fn test_implied_vol_moneyness_independence() {
 }
 
 #[test]
-fn test_implied_vol_positive() {
-    let as_of = date!(2025 - 01 - 01);
-    let market = standard_market(as_of);
-    let option = CDSOptionBuilder::new().implied_vol(0.35).build(as_of);
-
-    let pv = option.value(&market, as_of).unwrap().amount();
-
-    let mut option_solve = option;
-    option_solve
-        .pricing_overrides
-        .market_quotes
-        .implied_volatility = None;
-    let iv = option_solve.implied_vol(&market, as_of, pv, None).unwrap();
-
-    assert_positive(iv, "Implied volatility");
-    assert_in_range(iv, 0.01, 2.0, "Implied volatility reasonableness");
-}
-
-#[test]
 fn test_implied_vol_with_initial_guess() {
     let as_of = date!(2025 - 01 - 01);
     let market = standard_market(as_of);

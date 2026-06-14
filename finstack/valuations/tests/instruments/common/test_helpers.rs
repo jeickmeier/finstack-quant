@@ -153,11 +153,6 @@ pub mod dates {
         date!(2034 - 01 - 01)
     }
 
-    /// Thirty years from TODAY (common for long-dated swaps)
-    pub fn thirty_years_hence() -> Date {
-        date!(2054 - 01 - 01)
-    }
-
     /// Create a date with explicit year offset from TODAY
     pub fn years_hence(years: i32) -> Date {
         Date::from_ordinal_date(2024 + years, 1).expect("valid date")

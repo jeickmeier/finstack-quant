@@ -326,19 +326,6 @@ fn test_instrument_type_display() {
 }
 
 #[test]
-fn test_instrument_type_as_str() {
-    assert_eq!(InstrumentType::Bond.as_str(), "Bond");
-    assert_eq!(InstrumentType::IRS.as_str(), "InterestRateSwap");
-    assert_eq!(InstrumentType::CapFloor.as_str(), "CapFloor");
-    assert_eq!(InstrumentType::CDSOption.as_str(), "CDSOption");
-    assert_eq!(InstrumentType::Convertible.as_str(), "ConvertibleBond");
-    assert_eq!(
-        InstrumentType::StructuredCredit.as_str(),
-        "StructuredCredit"
-    );
-}
-
-#[test]
 fn test_model_key_from_str_all_variants() {
     // Basic variants
     assert_eq!(
@@ -464,21 +451,23 @@ fn test_pricing_error_display() {
     assert!(msg2.contains("bond"));
     assert!(msg2.contains("irs"));
 
-    let err3 = PricingError::model_failure_with_context("test error", PricingErrorContext::default());
+    let err3 =
+        PricingError::model_failure_with_context("test error", PricingErrorContext::default());
     assert!(err3.to_string().contains("Model failure: test error"));
 }
 
 #[test]
 fn test_pricing_error_from_core_error() {
-    // Create a core error through a validation error
+    // `from_core` replaces the former blanket `From<finstack_core::Error>` impl;
+    // a core `Validation` error maps to `InvalidInput`.
     let core_err = finstack_core::Error::Validation("test error".to_string());
-    let pricing_err: PricingError = core_err.into();
+    let pricing_err = PricingError::from_core(core_err, PricingErrorContext::default());
 
     match pricing_err {
-        PricingError::ModelFailure { message, .. } => {
+        PricingError::InvalidInput { message, .. } => {
             assert!(message.contains("test"));
         }
-        _ => panic!("Expected ModelFailure"),
+        other => panic!("Expected InvalidInput, got {other:?}"),
     }
 }
 
@@ -744,8 +733,14 @@ fn test_standard_price_batch_with_metrics_matches_serial_results() {
     for (serial, batch) in serial_results.iter().zip(batch_results.iter()) {
         assert_pricing_result_eq(serial, batch);
         assert_eq!(
-            serial.as_ref().expect("serial pricing should succeed").measures,
-            batch.as_ref().expect("batch pricing should succeed").measures
+            serial
+                .as_ref()
+                .expect("serial pricing should succeed")
+                .measures,
+            batch
+                .as_ref()
+                .expect("batch pricing should succeed")
+                .measures
         );
     }
 }
@@ -794,28 +789,41 @@ fn test_standard_registry_has_all_options_pricers() {
     assert!(registry
         .get_pricer(PricerKey::new(InstrumentType::FxOption, ModelKey::Black76))
         .is_some());
+    // The misleading `Discounting` alias was removed (it pointed at the same
+    // Black76 impl); look FxOption up under its real model key.
     assert!(registry
         .get_pricer(PricerKey::new(
             InstrumentType::FxOption,
             ModelKey::Discounting
         ))
-        .is_some());
+        .is_none());
 
-    // CDS Option
+    // CDS Option — registered under BloombergCdso; the Black76 pricer was
+    // decommissioned and the Discounting alias removed.
+    assert!(registry
+        .get_pricer(PricerKey::new(
+            InstrumentType::CDSOption,
+            ModelKey::BloombergCdso
+        ))
+        .is_some());
     assert!(registry
         .get_pricer(PricerKey::new(InstrumentType::CDSOption, ModelKey::Black76))
-        .is_some());
+        .is_none());
     assert!(registry
         .get_pricer(PricerKey::new(
             InstrumentType::CDSOption,
             ModelKey::Discounting
         ))
-        .is_some());
+        .is_none());
 }
 
 #[test]
 fn test_standard_registry_has_all_credit_pricers() {
     let registry = standard_registry();
+
+    // CDS / CDSIndex / CDSTranche no longer register a `ModelKey::Discounting`
+    // alias (the earlier registrations pointed at the same hazard impl, falsely
+    // implying a pure-discounting alternative). Look them up under HazardRate.
 
     // CDS
     assert!(registry
@@ -823,7 +831,7 @@ fn test_standard_registry_has_all_credit_pricers() {
         .is_some());
     assert!(registry
         .get_pricer(PricerKey::new(InstrumentType::CDS, ModelKey::Discounting))
-        .is_some());
+        .is_none());
 
     // CDS Index
     assert!(registry
@@ -837,7 +845,7 @@ fn test_standard_registry_has_all_credit_pricers() {
             InstrumentType::CDSIndex,
             ModelKey::Discounting
         ))
-        .is_some());
+        .is_none());
 
     // CDS Tranche
     assert!(registry
@@ -851,7 +859,7 @@ fn test_standard_registry_has_all_credit_pricers() {
             InstrumentType::CDSTranche,
             ModelKey::Discounting
         ))
-        .is_some());
+        .is_none());
 }
 
 #[test]

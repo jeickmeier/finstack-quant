@@ -8,7 +8,6 @@ use crate::fra::common::*;
 use finstack_core::currency::Currency;
 use finstack_valuations::instruments::Instrument;
 use finstack_valuations::metrics::MetricId;
-use time::macros::date;
 
 fn sum_bucketed_dv01(result: &finstack_valuations::results::ValuationResult) -> f64 {
     result
@@ -50,64 +49,6 @@ fn test_bucketed_dv01_standard_fra() {
 }
 
 #[test]
-fn test_bucketed_dv01_finite() {
-    let market = standard_market();
-    let fra = create_standard_fra();
-
-    let result = fra
-        .price_with_metrics(
-            &market,
-            BASE_DATE,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let bucketed_dv01 = *result.measures.get("bucketed_dv01").unwrap();
-    assert_finite(bucketed_dv01, "Bucketed DV01 should be finite");
-}
-
-#[test]
-fn test_bucketed_dv01_short_period() {
-    let market = standard_market();
-
-    let start = date!(2024 - 02 - 01);
-    let end = date!(2024 - 03 - 01);
-    let fra = TestFraBuilder::new().dates(start, start, end).build();
-
-    let result = fra
-        .price_with_metrics(
-            &market,
-            BASE_DATE,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    assert!(result.measures.contains_key("bucketed_dv01"));
-}
-
-#[test]
-fn test_bucketed_dv01_long_period() {
-    let market = standard_market();
-
-    let start = date!(2024 - 07 - 01);
-    let end = date!(2025 - 01 - 01);
-    let fra = TestFraBuilder::new().dates(start, start, end).build();
-
-    let result = fra
-        .price_with_metrics(
-            &market,
-            BASE_DATE,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    assert!(result.measures.contains_key("bucketed_dv01"));
-}
-
-#[test]
 fn test_bucketed_dv01_scales_with_notional() {
     let market = standard_market();
 
@@ -140,22 +81,4 @@ fn test_bucketed_dv01_scales_with_notional() {
 
     assert_finite(bdv01_1m, "1M bucketed DV01 should be finite");
     assert_finite(bdv01_10m, "10M bucketed DV01 should be finite");
-}
-
-#[test]
-fn test_bucketed_dv01_with_other_metrics() {
-    let market = standard_market();
-    let fra = create_standard_fra();
-
-    let result = fra
-        .price_with_metrics(
-            &market,
-            BASE_DATE,
-            &[MetricId::BucketedDv01, MetricId::Dv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    assert!(result.measures.contains_key("bucketed_dv01"));
-    assert!(result.measures.contains_key("dv01"));
 }

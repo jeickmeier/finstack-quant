@@ -19,21 +19,6 @@ use finstack_valuations::instruments::credit_derivatives::cds_tranche::{
 // ==================== CS01 Tests ====================
 
 #[test]
-fn test_cs01_calculation_succeeds() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.calculate_cs01(&tranche, &market, as_of);
-
-    // Assert
-    assert!(result.is_ok(), "CS01 calculation should succeed");
-}
-
-#[test]
 fn test_cs01_is_finite() {
     // Arrange
     let pricer = CDSTranchePricer::new();
@@ -228,24 +213,6 @@ fn test_cs01_preserves_bespoke_index_structure_during_bumps() {
 // ==================== Correlation Delta Tests ====================
 
 #[test]
-fn test_correlation_delta_calculation_succeeds() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.calculate_correlation_delta(&tranche, &market, as_of);
-
-    // Assert
-    assert!(
-        result.is_ok(),
-        "Correlation delta calculation should succeed"
-    );
-}
-
-#[test]
 fn test_correlation_delta_is_finite() {
     // Arrange
     let pricer = CDSTranchePricer::new();
@@ -308,21 +275,6 @@ fn test_correlation_delta_with_custom_bump() {
 }
 
 // ==================== Jump-to-Default Tests ====================
-
-#[test]
-fn test_jump_to_default_calculation_succeeds() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.calculate_jump_to_default(&tranche, &market, as_of);
-
-    // Assert
-    assert!(result.is_ok(), "JTD calculation should succeed");
-}
 
 #[test]
 fn test_jump_to_default_is_non_negative() {
@@ -428,21 +380,6 @@ fn test_jump_to_default_scales_with_notional() {
 // ==================== Spread DV01 Tests ====================
 
 #[test]
-fn test_spread_dv01_calculation_succeeds() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.calculate_spread_dv01(&tranche, &market, as_of);
-
-    // Assert
-    assert!(result.is_ok(), "Spread DV01 calculation should succeed");
-}
-
-#[test]
 fn test_spread_dv01_is_finite() {
     // Arrange
     let pricer = CDSTranchePricer::new();
@@ -514,21 +451,6 @@ fn test_spread_dv01_scales_with_notional() {
 }
 
 // ==================== Par Spread Tests ====================
-
-#[test]
-fn test_par_spread_calculation_succeeds() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.calculate_par_spread(&tranche, &market, as_of);
-
-    // Assert
-    assert!(result.is_ok(), "Par spread calculation should succeed");
-}
 
 #[test]
 fn test_par_spread_is_positive() {
@@ -698,21 +620,6 @@ fn test_par_spread_positive_and_side_invariant() {
 }
 
 // ==================== Upfront Tests ====================
-
-#[test]
-fn test_upfront_calculation_succeeds() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-    let as_of = base_date();
-
-    // Act
-    let result = pricer.calculate_upfront(&tranche, &market, as_of);
-
-    // Assert
-    assert!(result.is_ok(), "Upfront calculation should succeed");
-}
 
 #[test]
 fn test_upfront_equals_pv() {

@@ -45,15 +45,6 @@ fn test_theta_settled_position() {
 }
 
 #[test]
-fn test_theta_with_future_settlement() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20).with_settlement(d(2025, 2, 15)); // 1 month out
-    let market = market_full();
-
-    // Should not panic
-    let _theta = theta_for(fx, &market, test_date());
-}
-
-#[test]
 fn test_theta_zero_notional() {
     let fx = sample_eurusd()
         .with_notional(Money::new(0.0, Currency::EUR))

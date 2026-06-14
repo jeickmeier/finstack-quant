@@ -56,30 +56,6 @@ fn test_standard_cdx_tranche_points() {
 }
 
 #[test]
-fn test_tranche_subordination_ordering() {
-    // Market Standard: Tranches have strict subordination order
-    // Equity < Mezzanine < Senior < Super Senior
-
-    let equity_lower = 0.0;
-    let mezzanine_lower = 3.0;
-    let senior_lower = 7.0;
-    let super_senior_lower = 10.0;
-
-    assert!(
-        equity_lower < mezzanine_lower,
-        "Equity must be subordinate to mezzanine"
-    );
-    assert!(
-        mezzanine_lower < senior_lower,
-        "Mezzanine must be subordinate to senior"
-    );
-    assert!(
-        senior_lower < super_senior_lower,
-        "Senior must be subordinate to super senior"
-    );
-}
-
-#[test]
 fn test_typical_tranche_widths() {
     // Market Standard: Typical CDX/iTraxx tranche widths
 
@@ -187,16 +163,6 @@ fn test_standard_tranche_derives_contractual_effective_date_for_seasoned_trade()
     );
 }
 
-// ==================== CS01 Methodology Tests ====================
-
-#[test]
-fn test_cs01_standard_bump_size() {
-    // Market Standard: CS01 is sensitivity to 1 basis point (0.01%) spread change
-
-    let standard_bump = 1.0; // 1 basis point
-    assert_absolute_eq(standard_bump, 1.0, 0.001, "Standard CS01 bump size");
-}
-
 // ==================== Correlation Methodology Tests ====================
 
 #[test]
@@ -220,29 +186,6 @@ fn test_base_correlation_approach() {
         corr_7 <= corr_10,
         "Base correlation typically increases with detachment"
     );
-}
-
-#[test]
-fn test_correlation_impact_direction() {
-    // Market Standard: Higher correlation impacts tranches differently
-    // Equity: negative correlation sensitivity (higher corr → lower value)
-    // Senior: positive correlation sensitivity (higher corr → higher value)
-    // Reference: Li (2000), "On Default Correlation: A Copula Function Approach"
-
-    let low_corr = 0.10;
-    let high_corr = 0.50;
-
-    assert!(
-        low_corr < high_corr,
-        "Test setup: low {} < high {} correlation",
-        low_corr,
-        high_corr
-    );
-
-    // Higher correlation means:
-    // - More synchronized defaults (all or nothing)
-    // - Equity tranche: less likely to hit "sweet spot" of 1-2 defaults
-    // - Senior tranche: more likely to be hit by systemic events
 }
 
 // ==================== Binomial Probability Tests ====================
@@ -303,15 +246,6 @@ fn test_log_factorial_accuracy() {
 }
 
 // ==================== Accrual-on-Default Methodology Tests ====================
-
-#[test]
-fn test_aod_default_fraction() {
-    // Market Standard: Accrual-on-default typically uses 50% of period accrual
-    // Reference: ISDA CDS conventions
-
-    let default_aod_fraction = 0.5;
-    assert_absolute_eq(default_aod_fraction, 0.5, 0.001, "Standard AoD allocation");
-}
 
 #[test]
 fn test_aod_enabled_by_default() {

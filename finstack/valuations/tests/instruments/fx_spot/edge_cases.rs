@@ -139,43 +139,6 @@ fn test_year_boundary_settlement() {
 }
 
 #[test]
-fn test_empty_instrument_id() {
-    let fx = FxSpot::new(InstrumentId::new(""), Currency::EUR, Currency::USD);
-
-    assert_eq!(fx.id(), "");
-}
-
-#[test]
-fn test_very_long_instrument_id() {
-    let long_id = "A".repeat(1000);
-    let fx = FxSpot::new(InstrumentId::new(&long_id), Currency::EUR, Currency::USD);
-
-    assert_eq!(fx.id(), long_id);
-}
-
-#[test]
-fn test_special_characters_in_id() {
-    let fx = FxSpot::new(
-        InstrumentId::new("EUR/USD.SPOT@2025"),
-        Currency::EUR,
-        Currency::USD,
-    );
-
-    assert_eq!(fx.id(), "EUR/USD.SPOT@2025");
-}
-
-#[test]
-fn test_multiple_clones() {
-    let fx = eurusd_with_notional(1_000_000.0, 1.20);
-
-    let clone1 = fx;
-    let clone2 = clone1;
-    let clone3 = clone2;
-
-    assert_eq!(clone3.effective_notional().amount(), 1_000_000.0);
-}
-
-#[test]
 fn test_attributes_modification() {
     let mut fx = eurusd_with_notional(1_000_000.0, 1.20);
 

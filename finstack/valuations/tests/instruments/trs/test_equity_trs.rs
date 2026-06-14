@@ -62,19 +62,6 @@ fn test_equity_trs_with_no_dividend_yield() {
     assert!(trs.underlying.div_yield_id.is_none());
 }
 
-#[test]
-fn test_equity_trs_different_contract_sizes() {
-    // Arrange & Act - Standard contract size
-    let trs1 = TestEquityTrsBuilder::new().build();
-
-    // Mini contract (0.1x)
-    let trs2 = TestEquityTrsBuilder::new().build();
-
-    // Assert
-    assert_eq!(trs1.underlying.contract_size, 1.0);
-    assert_eq!(trs2.underlying.contract_size, 1.0);
-}
-
 // ================================================================================================
 // NPV and Pricing Tests
 // ================================================================================================
@@ -142,21 +129,6 @@ fn test_equity_trs_npv_pay_vs_receive_symmetry() {
         1.0, // $1 tolerance
         "Receive and pay TRS NPVs should sum to zero",
     );
-}
-
-#[test]
-fn test_equity_trs_value_trait() {
-    // Arrange
-    let market = create_market_context();
-    let as_of = as_of_date();
-    let trs = TestEquityTrsBuilder::new().build();
-
-    // Act
-    let value = trs.value(&market, as_of).unwrap();
-
-    // Assert
-    assert_eq!(value.currency(), USD);
-    assert!(value.amount().is_finite());
 }
 
 #[test]

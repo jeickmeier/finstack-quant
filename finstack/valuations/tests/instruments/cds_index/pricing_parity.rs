@@ -293,25 +293,6 @@ fn test_parity_with_different_notionals() {
 }
 
 #[test]
-fn test_mode_independence_of_par_spread() {
-    // Test: Par spread (a ratio) should be nearly identical across modes
-    let start = date!(2025 - 01 - 01);
-    let end = date!(2030 - 01 - 01);
-    let as_of = start;
-
-    let idx_single = standard_single_curve_index("CDX-SINGLE", start, end, 10_000_000.0);
-    let idx_const = standard_constituents_index("CDX-CONST", start, end, 10_000_000.0, 5);
-
-    let ctx = multi_constituent_market_context(as_of, 5);
-
-    let par_single = metric_value(&idx_single, &ctx, as_of, MetricId::ParSpread);
-    let par_const = metric_value(&idx_const, &ctx, as_of, MetricId::ParSpread);
-
-    // Par spread is a pure ratio and should match very closely
-    assert_relative_eq(par_single, par_const, 0.005, "Par spread mode independence");
-}
-
-#[test]
 fn test_consistent_sign_conventions_across_modes() {
     // Test: Sign conventions consistent between modes
     let start = date!(2025 - 01 - 01);

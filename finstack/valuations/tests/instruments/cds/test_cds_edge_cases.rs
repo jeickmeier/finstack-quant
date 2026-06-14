@@ -547,34 +547,6 @@ fn test_numerical_stability_with_extreme_dates() {
 }
 
 #[test]
-fn test_integration_fallback_with_invalid_params() {
-    // Test that pricing remains stable under default settings
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-    let (disc, hazard) = build_curves(as_of);
-    let market = MarketContext::new().insert(disc).insert(hazard);
-
-    let cds = crate::finstack_test_utils::cds_buy_protection(
-        "FALLBACK_TEST",
-        Money::new(10_000_000.0, Currency::USD),
-        100.0,
-        as_of,
-        end,
-        "USD_OIS",
-        "CORP",
-    )
-    .expect("CDS construction should succeed");
-
-    let result = cds.price_with_metrics(
-        &market,
-        as_of,
-        &[MetricId::ProtectionLegPv],
-        finstack_valuations::instruments::PricingOptions::default(),
-    );
-    assert!(result.is_ok(), "Protection leg PV should compute");
-}
-
-#[test]
 fn test_very_small_notional() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);

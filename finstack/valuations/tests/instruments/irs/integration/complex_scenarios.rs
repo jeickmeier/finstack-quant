@@ -143,41 +143,6 @@ fn test_off_market_swap_all_metrics() {
 }
 
 #[test]
-fn test_multi_curve_environment() {
-    // Test with OIS discount and LIBOR projection
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let disc_curve = DiscountCurve::builder("USD-OIS")
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([
-            (0.0, 1.0),
-            (1.0, (-0.04_f64).exp()), // OIS at 4%
-            (5.0, (-0.04_f64 * 5.0).exp()),
-            (10.0, (-0.04_f64 * 10.0).exp()),
-        ])
-        .build()
-        .unwrap();
-
-    let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.045), (10.0, 0.045)]) // LIBOR at 4.5%
-        .build()
-        .unwrap();
-
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
-
-    let swap = create_swap(as_of, end, 0.045, PayReceive::Receive);
-
-    let npv = swap.value(&market, as_of).unwrap();
-
-    // Multi-curve pricing should work
-    assert!(npv.amount().is_finite());
-}
-
-#[test]
 fn test_forward_starting_swap() {
     // Swap starting in the future
     let as_of = date!(2024 - 01 - 01);
@@ -255,40 +220,6 @@ fn test_forward_starting_swap() {
         "Forward swap NPV at par: {}",
         npv.amount()
     );
-}
-
-#[test]
-fn test_swap_portfolio_aggregation() {
-    // Test portfolio of swaps
-    let as_of = date!(2024 - 01 - 01);
-    let market = build_flat_curves(0.05, 0.05, as_of);
-
-    let swaps = vec![
-        create_swap(as_of, date!(2026 - 01 - 01), 0.04, PayReceive::Receive),
-        create_swap(as_of, date!(2027 - 01 - 01), 0.045, PayReceive::Pay),
-        create_swap(as_of, date!(2029 - 01 - 01), 0.05, PayReceive::Receive),
-    ];
-
-    let mut total_npv = 0.0;
-    let mut total_dv01 = 0.0;
-
-    for swap in swaps {
-        let result = swap
-            .price_with_metrics(
-                &market,
-                as_of,
-                &[MetricId::Dv01],
-                finstack_valuations::instruments::PricingOptions::default(),
-            )
-            .unwrap();
-
-        total_npv += result.value.amount();
-        total_dv01 += result.measures.get("dv01").unwrap();
-    }
-
-    // Portfolio aggregation should work
-    assert!(total_npv.is_finite());
-    assert!(total_dv01.is_finite());
 }
 
 #[test]

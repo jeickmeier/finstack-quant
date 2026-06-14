@@ -165,46 +165,6 @@ fn test_recovery_rate_applied() {
 }
 
 #[test]
-fn test_notional_zero_allowed() {
-    // Zero notional should be constructible (useful for testing)
-    let start = test_date(2025, Month::January, 1);
-    let end = test_date(2030, Month::January, 1);
-
-    let cds = test_utils::cds_buy_protection(
-        "ZERO_NOTIONAL",
-        Money::new(0.0, Currency::USD),
-        100.0,
-        start,
-        end,
-        "USD-OIS",
-        "CORP",
-    )
-    .expect("CDS construction should succeed");
-
-    assert_eq!(cds.notional.amount(), 0.0);
-}
-
-#[test]
-fn test_spread_can_be_negative() {
-    // Negative spreads are theoretically possible (though rare)
-    let start = test_date(2025, Month::January, 1);
-    let end = test_date(2030, Month::January, 1);
-
-    let cds = test_utils::cds_buy_protection(
-        "NEG_SPREAD",
-        Money::new(10_000_000.0, Currency::USD),
-        -50.0,
-        start,
-        end,
-        "USD-OIS",
-        "CORP",
-    )
-    .expect("CDS construction should succeed");
-
-    assert_eq!(cds.premium.spread_bp, Decimal::from(-50));
-}
-
-#[test]
 fn test_different_currencies() {
     let start = test_date(2025, Month::January, 1);
     let end = test_date(2030, Month::January, 1);

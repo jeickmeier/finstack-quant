@@ -17,20 +17,6 @@ use finstack_valuations::instruments::credit_derivatives::cds_tranche::{
 // ==================== Basic Expected Loss Tests ====================
 
 #[test]
-fn test_expected_loss_calculation_succeeds() {
-    // Arrange
-    let pricer = CDSTranchePricer::new();
-    let tranche = mezzanine_tranche();
-    let market = standard_market_context();
-
-    // Act
-    let result = pricer.calculate_expected_loss(&tranche, &market);
-
-    // Assert
-    assert!(result.is_ok(), "Expected loss calculation should succeed");
-}
-
-#[test]
 fn test_expected_loss_is_non_negative() {
     // Arrange
     let pricer = CDSTranchePricer::new();

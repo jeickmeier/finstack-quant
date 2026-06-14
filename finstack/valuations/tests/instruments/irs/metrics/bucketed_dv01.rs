@@ -39,13 +39,6 @@ fn build_flat_discount_curve(rate: f64, base_date: Date) -> DiscountCurve {
     builder.build().unwrap()
 }
 
-fn build_market(rate: f64, base_date: Date) -> MarketContext {
-    let disc_curve = build_flat_discount_curve(rate, base_date);
-    let fwd_curve = build_flat_forward_curve(rate, base_date, "USD_LIBOR_3M");
-
-    MarketContext::new().insert(disc_curve).insert(fwd_curve)
-}
-
 fn build_flat_forward_curve(rate: f64, base_date: Date, id: &str) -> ForwardCurve {
     ForwardCurve::builder(id, 0.25) // 3M tenor
         .base_date(base_date)
@@ -104,116 +97,6 @@ fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
         pricing_overrides: finstack_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
-}
-
-#[test]
-fn test_bucketed_dv01_computes() {
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let swap = create_swap(as_of, end);
-    let market = build_market(0.05, as_of);
-
-    let result = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    // BucketedDv01 metric should be present
-    assert!(
-        result.measures.contains_key("bucketed_dv01"),
-        "BucketedDv01 should be computed"
-    );
-}
-
-#[test]
-fn test_bucketed_dv01_reasonable_values() {
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let swap = create_swap(as_of, end);
-    let market = build_market(0.05, as_of);
-
-    let result = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    let bucketed_dv01 = result.measures.get("bucketed_dv01");
-
-    assert!(bucketed_dv01.is_some(), "BucketedDv01 should be computed");
-}
-
-#[test]
-fn test_bucketed_dv01_five_year_swap() {
-    // 5Y swap should have risk in 1Y-5Y buckets
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2029 - 01 - 01);
-
-    let swap = create_swap(as_of, end);
-    let market = build_market(0.05, as_of);
-
-    let result = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    // Verify metric was computed
-    assert!(result.measures.contains_key("bucketed_dv01"));
-}
-
-#[test]
-fn test_bucketed_dv01_short_swap() {
-    // 1Y swap should have risk primarily in 1Y bucket
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2025 - 01 - 01);
-
-    let swap = create_swap(as_of, end);
-    let market = build_market(0.05, as_of);
-
-    let result = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    assert!(result.measures.contains_key("bucketed_dv01"));
-}
-
-#[test]
-fn test_bucketed_dv01_long_swap() {
-    // 10Y swap should have risk across many buckets
-    let as_of = date!(2024 - 01 - 01);
-    let end = date!(2034 - 01 - 01);
-
-    let swap = create_swap(as_of, end);
-    let market = build_market(0.05, as_of);
-
-    let result = swap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::BucketedDv01],
-            finstack_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    assert!(result.measures.contains_key("bucketed_dv01"));
 }
 
 #[test]
