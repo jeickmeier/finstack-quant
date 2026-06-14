@@ -151,9 +151,12 @@ impl CeclConfig {
                 "forecast_horizon_years must be non-negative".to_string(),
             ));
         }
-        if self.historical_annual_pd < 0.0 || self.historical_annual_pd > 1.0 {
+        if !self.historical_annual_pd.is_finite()
+            || self.historical_annual_pd < 0.0
+            || self.historical_annual_pd > 1.0
+        {
             return Err(Error::Validation(
-                "historical_annual_pd must be in [0, 1]".to_string(),
+                "historical_annual_pd must be a finite value in [0, 1]".to_string(),
             ));
         }
         if !self.impaired_time_to_recovery_years.is_finite()
@@ -559,6 +562,23 @@ mod tests {
             ..CeclConfig::default()
         };
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn cecl_config_rejects_nan_historical_pd() {
+        // A non-finite PD must be rejected rather than silently propagating a
+        // NaN allowance: `x < 0.0 || x > 1.0` is false for NaN, so the bare
+        // range check alone would accept it.
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let config = CeclConfig {
+                historical_annual_pd: bad,
+                ..CeclConfig::default()
+            };
+            assert!(
+                config.validate().is_err(),
+                "historical_annual_pd = {bad} must fail validation"
+            );
+        }
     }
 
     #[test]
