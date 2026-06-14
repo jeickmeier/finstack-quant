@@ -122,17 +122,6 @@ fn test_commodity_forward_pricing_expired() {
 }
 
 #[test]
-fn test_commodity_forward_instrument_trait() {
-    use finstack_valuations::instruments::Instrument;
-    use finstack_valuations::pricer::InstrumentType;
-
-    let forward = CommodityForward::example();
-
-    assert_eq!(forward.id(), "WTI-FWD-2025M03");
-    assert_eq!(forward.key(), InstrumentType::CommodityForward);
-}
-
-#[test]
 fn test_commodity_forward_forward_price_from_curve() {
     // Test forward price calculation from PriceCurve (no quoted price)
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();

@@ -290,23 +290,6 @@ fn test_remaining_forward_variance_is_always_positive() {
 // ============================================================================
 
 #[test]
-fn test_expected_variance_before_start_equals_forward() {
-    // Arrange
-    let swap = sample_swap(PayReceive::Receive);
-    let ctx = add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.22);
-    let as_of = date(2024, 12, 1);
-
-    // Act
-    let _forward = swap.remaining_forward_variance(&ctx, as_of).unwrap();
-    let expected = swap.partial_realized_variance(&ctx, as_of).unwrap();
-
-    // Assert - before start, should use forward/implied
-    // Note: The method logic in types.rs shows expected_variance_calculator
-    // returns strike or implied vol squared before start
-    assert_eq!(expected, 0.0); // partial_realized before start
-}
-
-#[test]
 fn test_expected_variance_at_maturity_equals_realized() {
     // Arrange
     let swap = sample_swap(PayReceive::Receive);

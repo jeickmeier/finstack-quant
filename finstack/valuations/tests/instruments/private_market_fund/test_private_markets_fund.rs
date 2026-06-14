@@ -88,22 +88,24 @@ fn test_preferred_return_calculation() {
         .filter(|r| r.tranche.contains("Preferred Return"))
         .collect();
 
-    if !pref_rows.is_empty() {
-        // With 8% hurdle over 5 years, LP should get additional return to meet IRR target
-        let total_pref: f64 = pref_rows.iter().map(|r| r.to_lp.amount()).sum();
+    assert!(
+        !pref_rows.is_empty(),
+        "Should have preferred return allocation rows"
+    );
 
-        assert!(
-            total_pref > 0.0,
-            "Should have some preferred return allocation"
-        );
+    // With 8% hurdle over 5 years, LP should get additional return to meet IRR target
+    let total_pref: f64 = pref_rows.iter().map(|r| r.to_lp.amount()).sum();
+    assert!(
+        total_pref > 0.0,
+        "Should have some preferred return allocation"
+    );
 
-        // All preferred return should go to LP
-        let total_gp_pref: f64 = pref_rows.iter().map(|r| r.to_gp.amount()).sum();
-        assert!(
-            (total_gp_pref).abs() < 1e-6,
-            "GP should get no preferred return"
-        );
-    }
+    // All preferred return should go to LP
+    let total_gp_pref: f64 = pref_rows.iter().map(|r| r.to_gp.amount()).sum();
+    assert!(
+        (total_gp_pref).abs() < 1e-6,
+        "GP should get no preferred return"
+    );
 }
 
 #[test]
@@ -119,19 +121,34 @@ fn test_promote_split() {
         .filter(|r| r.tranche.contains("Promote"))
         .collect();
 
-    if !promote_rows.is_empty() {
-        for row in &promote_rows {
-            let total_alloc = row.to_lp.amount() + row.to_gp.amount();
-            if total_alloc > 1e-6 {
-                let lp_pct = row.to_lp.amount() / total_alloc;
-                let gp_pct = row.to_gp.amount() / total_alloc;
+    assert!(
+        !promote_rows.is_empty(),
+        "Should have promote allocation rows"
+    );
 
-                // Should approximate 80/20 split
-                assert!((lp_pct - 0.8).abs() < 0.1, "LP should get ~80% in promote");
-                assert!((gp_pct - 0.2).abs() < 0.1, "GP should get ~20% in promote");
-            }
+    let mut checked_any = false;
+    for row in &promote_rows {
+        let total_alloc = row.to_lp.amount() + row.to_gp.amount();
+        if total_alloc > 1e-6 {
+            checked_any = true;
+            let lp_pct = row.to_lp.amount() / total_alloc;
+            let gp_pct = row.to_gp.amount() / total_alloc;
+
+            // Should approximate 80/20 split
+            assert!(
+                (lp_pct - 0.8).abs() < 0.01,
+                "LP should get ~80% in promote, got {lp_pct}"
+            );
+            assert!(
+                (gp_pct - 0.2).abs() < 0.01,
+                "GP should get ~20% in promote, got {gp_pct}"
+            );
         }
     }
+    assert!(
+        checked_any,
+        "At least one promote row should have a non-zero allocation"
+    );
 }
 
 #[test]

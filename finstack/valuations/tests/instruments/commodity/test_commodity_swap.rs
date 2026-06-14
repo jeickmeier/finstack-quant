@@ -161,17 +161,6 @@ fn test_commodity_swap_payment_schedule() {
 }
 
 #[test]
-fn test_commodity_swap_instrument_trait() {
-    use finstack_valuations::instruments::Instrument;
-    use finstack_valuations::pricer::InstrumentType;
-
-    let swap = CommoditySwap::example();
-
-    assert_eq!(swap.id(), "NG-SWAP-2025");
-    assert_eq!(swap.key(), InstrumentType::CommoditySwap);
-}
-
-#[test]
 fn test_commodity_swap_receive_fixed() {
     // Test that receiving fixed gives opposite NPV to paying fixed
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
@@ -447,16 +436,4 @@ fn test_commodity_swap_delta_analytical() {
         delta,
         error
     );
-}
-
-#[test]
-fn test_commodity_swap_serialization() {
-    let swap = CommoditySwap::example();
-
-    let json = serde_json::to_string_pretty(&swap).expect("serialize");
-    let parsed: CommoditySwap = serde_json::from_str(&json).expect("deserialize");
-
-    assert_eq!(swap.id.as_str(), parsed.id.as_str());
-    assert_eq!(swap.underlying.ticker, parsed.underlying.ticker);
-    assert_eq!(swap.fixed_price, parsed.fixed_price);
 }

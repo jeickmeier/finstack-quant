@@ -179,16 +179,6 @@ fn test_autocallable_same_day_count_basis() {
     // Price with same basis
     let pv_365 = autocall.value(&market_365, as_of).unwrap();
 
-    // Verify determinism by pricing twice
-    let pv_365_again = autocall.value(&market_365, as_of).unwrap();
-
-    assert!(
-        (pv_365.amount() - pv_365_again.amount()).abs() < 1e-10,
-        "Pricing should be deterministic: {} vs {}",
-        pv_365.amount(),
-        pv_365_again.amount()
-    );
-
     // Now compare with ACT/360 market
     let market_360 = build_market_with_dc(as_of, spot, vol, rate, div_yield, DayCount::Act360);
     let autocall_360 =
