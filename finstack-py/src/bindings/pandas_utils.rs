@@ -95,6 +95,17 @@ pub fn dates_to_pylist<'py>(
     dates.iter().map(|&d| date_to_py(py, d)).collect()
 }
 
+/// Convert a slice of `time::Date` into a pandas `DatetimeIndex`.
+pub fn dates_to_datetime_index<'py>(
+    py: Python<'py>,
+    dates: &[time::Date],
+) -> PyResult<Bound<'py, PyAny>> {
+    let dates = dates_to_pylist(py, dates)?;
+    py.import("pandas")?
+        .getattr("DatetimeIndex")?
+        .call1((dates,))
+}
+
 /// Convert a table column into a Python list suitable for pandas construction.
 pub fn table_column_to_pylist<'py>(
     py: Python<'py>,

@@ -2,7 +2,7 @@
 
 use super::types::*;
 use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
-use crate::bindings::pandas_utils::{dates_to_pylist, dict_to_dataframe};
+use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::analytics_to_py as core_to_py;
 use finstack_analytics as fa;
 use finstack_core::dates::{CalendarRegistry, FiscalConfig, HolidayCalendar, PeriodKind};
@@ -206,8 +206,7 @@ fn panel_to_dataframe<'py>(
         }
         data.set_item(name, vec_to_pyarray(py, padded))?;
     }
-    let dates = dates_to_pylist(py, dates)?;
-    let idx = dates.into_pyobject(py)?.into_any();
+    let idx = dates_to_datetime_index(py, dates)?;
     dict_to_dataframe(py, &data, Some(idx))
 }
 

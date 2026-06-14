@@ -167,8 +167,10 @@ js_export_file   = "../finstack-wasm/exports/cashflows.js"
 root_exports = [
     "accruedInterestJson",
     "bondFromCashflowsJson",
+    "buildCashflowScheduleEnvelopeJson",
     "buildCashflowScheduleJson",
     "datedFlowsJson",
+    "validateCashflowScheduleEnvelopeJson",
     "validateCashflowScheduleJson",
 ]
 

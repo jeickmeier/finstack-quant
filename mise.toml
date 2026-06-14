@@ -240,6 +240,7 @@ run = "wasm-pack build finstack-wasm --target web"
 description = "Run WASM package tests (wasm-bindgen + Node facade)"
 run = [
   "npm --prefix finstack-wasm run test",
+  "npm --prefix finstack-wasm run build",
   "npm --prefix finstack-wasm run build:node",
   "npm --prefix finstack-wasm run test:facade",
 ]

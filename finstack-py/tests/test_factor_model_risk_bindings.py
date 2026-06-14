@@ -1,7 +1,7 @@
 """Regression tests for factor-model risk binding edge-cases.
 
 Covers:
-- decompose_factor_risk raises ValueError (not abort) on zero-factor matrix.
+- decompose_factor_risk returns a clean zero-risk decomposition for zero factors.
 """
 
 from __future__ import annotations
@@ -10,7 +10,6 @@ from datetime import date
 import json
 
 from finstack.core.market_data import DiscountCurve, MarketContext
-import pytest
 
 from finstack.portfolio import (
     compute_factor_sensitivities,
@@ -62,18 +61,17 @@ def _market_and_positions() -> tuple[MarketContext, str]:
 
 
 # ---------------------------------------------------------------------------
-# C20 — zero-factor matrix must raise ValueError, not abort
+# C20 — zero-factor matrix must not abort
 # ---------------------------------------------------------------------------
 
 
-def test_decompose_factor_risk_zero_factors_raises_value_error() -> None:
-    """Regression: decompose_factor_risk must raise ValueError (not abort/panic).
+def test_decompose_factor_risk_zero_factors_returns_zero_risk() -> None:
+    """Regression: decompose_factor_risk must handle zero factors cleanly.
 
     when the sensitivity matrix has n_factors == 0.
 
-    Before the fix, chunks_exact(0) panicked across the PyO3 boundary, causing
-    an abort that cannot be caught by Python. After the fix, a clean ValueError
-    is raised.
+    Before the fix, chunks_exact(0) panicked across the PyO3 boundary. The
+    canonical Rust/WASM behavior is now an empty zero-risk decomposition.
     """
     market, positions_json = _market_and_positions()
 
@@ -89,5 +87,9 @@ def test_decompose_factor_risk_zero_factors_raises_value_error() -> None:
     # Dummy covariance for a zero-factor model.
     cov_json = json.dumps({"factor_ids": [], "n": 0, "data": []})
 
-    with pytest.raises(ValueError, match="no factors"):
-        decompose_factor_risk(zero_factor_matrix, cov_json)
+    decomposition = decompose_factor_risk(zero_factor_matrix, cov_json)
+
+    assert decomposition.total_risk == 0.0
+    assert decomposition.residual_risk == 0.0
+    assert decomposition.factor_contributions() == []
+    assert decomposition.position_factor_contributions() == []

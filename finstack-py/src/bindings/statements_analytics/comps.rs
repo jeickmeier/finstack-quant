@@ -383,7 +383,7 @@ fn score_relative_value<'py>(
     let result = core_score(&peer_set, &scoring_dims).map_err(core_to_py)?;
 
     let out = PyDict::new(py);
-    out.set_item("company_id", result.company_id)?;
+    out.set_item("company_id", result.company_id.as_str())?;
     out.set_item("composite_score", result.composite_score)?;
     out.set_item("confidence", result.confidence)?;
     out.set_item("peer_count", result.peer_count)?;
