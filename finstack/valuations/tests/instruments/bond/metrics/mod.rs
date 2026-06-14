@@ -29,5 +29,6 @@ mod prices;
 mod quote_engine;
 mod spreads;
 mod theta;
+mod wal;
 mod ytm;
 mod ytw;

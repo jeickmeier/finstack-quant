@@ -246,3 +246,132 @@ fn test_forward_based_greeks_with_both_spot_and_price_curve() -> finstack_core::
 
     Ok(())
 }
+
+/// Build a 1Y ATM commodity option (spot = forward = strike = 100, 20% flat
+/// vol) and its market, for exercising registered Greeks/risk metrics.
+fn atm_commodity_option(
+    option_type: OptionType,
+) -> (CommodityOption, MarketContext, finstack_core::dates::Date) {
+    let as_of = date(2025, 1, 1);
+    let expiry = date(2026, 1, 1);
+
+    let discount_curve = flat_discount_with_tenor("USD-OIS", as_of, 0.03, 2.0);
+    let forward_curve = flat_forward_with_tenor("CL-FWD", as_of, 0.0, 2.0);
+    let vol_surface = flat_vol_surface("CL-VOL", &[1.0], &[80.0, 100.0, 120.0], 0.20);
+    let market = MarketContext::new()
+        .insert(discount_curve)
+        .insert(forward_curve)
+        .insert_surface(vol_surface)
+        .insert_price("CL-SPOT", MarketScalar::Unitless(100.0));
+
+    let option = CommodityOption::builder()
+        .id(InstrumentId::new("CL-OPT-METRICS"))
+        .underlying(CommodityUnderlyingParams::new(
+            "Energy",
+            "CL",
+            "BBL",
+            Currency::USD,
+        ))
+        .strike(100.0)
+        .option_type(option_type)
+        .exercise_style(ExerciseStyle::European)
+        .expiry(expiry)
+        .quantity(1.0)
+        .multiplier(1.0)
+        .settlement(SettlementType::Cash)
+        .forward_curve_id(CurveId::new("CL-FWD"))
+        .discount_curve_id(CurveId::new("USD-OIS"))
+        .vol_surface_id(CurveId::new("CL-VOL"))
+        .spot_id_opt(Some("CL-SPOT".to_string()))
+        .day_count(finstack_core::dates::DayCount::Act365F)
+        .pricing_overrides(PricingOverrides::default())
+        .attributes(Attributes::new())
+        .build()
+        .expect("should build");
+    (option, market, as_of)
+}
+
+/// `Delta` and `Vega` are registered but were previously unexercised. A long
+/// call must have positive delta, a long put negative delta, and any long
+/// option positive vega.
+#[test]
+fn test_commodity_option_delta_and_vega_signs() -> finstack_core::Result<()> {
+    let registry = standard_registry();
+
+    // Call: positive delta, positive vega.
+    let (call, market, as_of) = atm_commodity_option(OptionType::Call);
+    let pv = call.value(&market, as_of)?;
+    let mut ctx = MetricContext::new(
+        Arc::new(call),
+        Arc::new(market),
+        as_of,
+        pv,
+        MetricContext::default_config(),
+    );
+    let res = registry.compute(&[MetricId::Delta, MetricId::Vega], &mut ctx)?;
+    let call_delta = *res.get(&MetricId::Delta).expect("delta");
+    let vega = *res.get(&MetricId::Vega).expect("vega");
+    assert!(
+        call_delta.is_finite() && call_delta > 0.0,
+        "long call delta should be positive, got {call_delta}"
+    );
+    assert!(
+        vega.is_finite() && vega > 0.0,
+        "long option vega should be positive, got {vega}"
+    );
+
+    // Put: negative delta.
+    let (put, market_p, as_of_p) = atm_commodity_option(OptionType::Put);
+    let pv_p = put.value(&market_p, as_of_p)?;
+    let mut ctx_p = MetricContext::new(
+        Arc::new(put),
+        Arc::new(market_p),
+        as_of_p,
+        pv_p,
+        MetricContext::default_config(),
+    );
+    let put_delta = *registry
+        .compute(&[MetricId::Delta], &mut ctx_p)?
+        .get(&MetricId::Delta)
+        .expect("delta");
+    assert!(
+        put_delta.is_finite() && put_delta < 0.0,
+        "long put delta should be negative, got {put_delta}"
+    );
+
+    Ok(())
+}
+
+/// `Dv01` and `BucketedDv01` are registered but were previously unexercised.
+/// Both must compute to finite values and the bucketed aggregate must reconcile
+/// with the parallel DV01.
+#[test]
+fn test_commodity_option_dv01_and_bucketed_dv01() -> finstack_core::Result<()> {
+    let registry = standard_registry();
+    let (call, market, as_of) = atm_commodity_option(OptionType::Call);
+    let pv = call.value(&market, as_of)?;
+    let mut ctx = MetricContext::new(
+        Arc::new(call),
+        Arc::new(market),
+        as_of,
+        pv,
+        MetricContext::default_config(),
+    );
+    let res = registry.compute(&[MetricId::Dv01, MetricId::BucketedDv01], &mut ctx)?;
+    let dv01 = *res.get(&MetricId::Dv01).expect("dv01");
+    let bucketed = *res.get(&MetricId::BucketedDv01).expect("bucketed_dv01");
+
+    assert!(dv01.is_finite(), "DV01 should be finite, got {dv01}");
+    assert!(
+        bucketed.is_finite(),
+        "BucketedDv01 aggregate should be finite, got {bucketed}"
+    );
+    // The bucketed key-rate DV01s sum to the parallel DV01 (within a small
+    // numerical tolerance, plus an absolute floor for near-zero rate exposure).
+    assert!(
+        (bucketed - dv01).abs() <= 1.0 + 0.05 * dv01.abs(),
+        "BucketedDv01 ({bucketed}) should reconcile with parallel DV01 ({dv01})"
+    );
+
+    Ok(())
+}

@@ -12,6 +12,7 @@
 mod annuity;
 mod bucketed_dv01;
 mod dv01;
+mod ir_convexity;
 mod par_rate;
 mod pv_fixed;
 mod pv_float;

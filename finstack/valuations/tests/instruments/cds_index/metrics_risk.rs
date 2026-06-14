@@ -467,3 +467,169 @@ fn test_risk_metrics_finite() {
         );
     }
 }
+
+// ============================================================================
+// Recovery01 and Cs01Hazard
+//
+// Both are registered on the CDS Index metric calculator but were previously
+// unexercised. Recovery01 is the PV sensitivity to a +1% recovery-rate bump;
+// Cs01Hazard is the central-difference sensitivity to a direct parallel hazard
+// shift (an alternative to the par-spread-rebootstrap `Cs01`). These tests
+// guard against either metric silently regressing to zero/NaN or losing its
+// linearity in notional.
+// ============================================================================
+
+#[test]
+fn test_recovery01_finite_and_nonzero() {
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    let ctx = standard_market_context(as_of);
+    let idx = standard_single_curve_index("CDX-REC01", start, end, 10_000_000.0);
+
+    let result = idx
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Recovery01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let recovery01 = *result.measures.get("recovery_01").unwrap();
+
+    assert!(
+        recovery01.is_finite(),
+        "Recovery01 should be finite, got {}",
+        recovery01
+    );
+    assert!(
+        recovery01.abs() > 0.0,
+        "Recovery01 should be non-zero for a live index, got {}",
+        recovery01
+    );
+}
+
+#[test]
+fn test_recovery01_scales_with_notional() {
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    let ctx = standard_market_context(as_of);
+
+    let idx_10mm = standard_single_curve_index("CDX-REC01-10", start, end, 10_000_000.0);
+    let idx_20mm = standard_single_curve_index("CDX-REC01-20", start, end, 20_000_000.0);
+
+    let rec01_10mm = *idx_10mm
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Recovery01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("recovery_01")
+        .unwrap();
+    let rec01_20mm = *idx_20mm
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Recovery01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("recovery_01")
+        .unwrap();
+
+    assert_linear_scaling(
+        rec01_10mm,
+        10_000_000.0,
+        rec01_20mm,
+        20_000_000.0,
+        "Recovery01",
+        0.05,
+    );
+}
+
+#[test]
+fn test_cs01_hazard_nonzero_and_same_sign_as_cs01() {
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    let ctx = standard_market_context(as_of);
+    let idx = standard_single_curve_index("CDX-CS01H", start, end, 10_000_000.0);
+
+    let result = idx
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Cs01Hazard, MetricId::Cs01],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap();
+    let cs01_hazard = *result.measures.get("cs01_hazard").unwrap();
+    let cs01 = *result.measures.get("cs01").unwrap();
+
+    assert!(
+        cs01_hazard.is_finite(),
+        "Cs01Hazard should be finite, got {}",
+        cs01_hazard
+    );
+    assert!(
+        cs01_hazard.abs() > 0.0,
+        "Cs01Hazard should be non-zero for a live index, got {}",
+        cs01_hazard
+    );
+    // Both measure credit-spread sensitivity (par-spread re-bootstrap vs direct
+    // hazard shift), so they must agree in sign.
+    assert!(
+        cs01_hazard.signum() == cs01.signum(),
+        "Cs01Hazard ({}) and Cs01 ({}) should share the same sign",
+        cs01_hazard,
+        cs01
+    );
+}
+
+#[test]
+fn test_cs01_hazard_scales_with_notional() {
+    let start = date!(2025 - 01 - 01);
+    let end = date!(2030 - 01 - 01);
+    let as_of = start;
+    let ctx = standard_market_context(as_of);
+
+    let idx_10mm = standard_single_curve_index("CDX-CS01H-10", start, end, 10_000_000.0);
+    let idx_20mm = standard_single_curve_index("CDX-CS01H-20", start, end, 20_000_000.0);
+
+    let cs01h_10mm = *idx_10mm
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Cs01Hazard],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("cs01_hazard")
+        .unwrap();
+    let cs01h_20mm = *idx_20mm
+        .price_with_metrics(
+            &ctx,
+            as_of,
+            &[MetricId::Cs01Hazard],
+            finstack_valuations::instruments::PricingOptions::default(),
+        )
+        .unwrap()
+        .measures
+        .get("cs01_hazard")
+        .unwrap();
+
+    assert_linear_scaling(
+        cs01h_10mm,
+        10_000_000.0,
+        cs01h_20mm,
+        20_000_000.0,
+        "Cs01Hazard",
+        0.05,
+    );
+}

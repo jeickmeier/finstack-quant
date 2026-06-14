@@ -6,6 +6,22 @@
 //! This metric reads cash flows directly from the full cashflow schedule,
 //! ensuring perfect consistency with the cashflow generator. PIK interest is
 //! excluded from the numerator (cash cost only) but affects outstanding.
+//!
+//! # Scope: running cash cost, not the fee-inclusive effective rate
+//!
+//! Only flows strictly **after** the valuation date enter the numerator (they
+//! must align with the post-`as_of` time-weighted outstanding denominator). A
+//! one-time origination / upfront fee is dated at the issue date, so for a
+//! freshly issued loan (`issue_date == as_of`) it is **excluded** here — this
+//! metric reports the ongoing cash running cost, which for a plain bullet loan
+//! equals the coupon.
+//!
+//! The fee-inclusive "all-in" borrower cost — the IFRS-9 effective interest
+//! rate that amortizes upfront fees and OID over the loan's life — is a
+//! separate metric, [`super::oid_eir::OidEirAmortizationCalculator`]
+//! (`"oid_eir_rate"`), which solves an XIRR over the full flow set (including
+//! the upfront fee when `OidEirSpec::include_fees`). Use that metric when the
+//! borrower's effective rate inclusive of origination economics is required.
 
 use crate::instruments::TermLoan;
 use crate::metrics::{MetricCalculator, MetricContext};

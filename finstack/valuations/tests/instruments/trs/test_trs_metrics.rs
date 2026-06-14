@@ -761,3 +761,77 @@ fn test_par_spread_annuity_relationship() {
         "Par spread should match formula: (TR_PV - float_PV) / annuity * 10000",
     );
 }
+
+// ============================================================================
+// Dividend01
+//
+// `MetricId::Dividend01` (PV sensitivity to a dividend-yield bump, $/bp) is
+// registered for equity TRS but was previously unexercised. It must be finite
+// and non-zero when a dividend-yield curve is present, exactly zero when none
+// is referenced, and flip sign between the receive-TR and pay-TR sides.
+// ============================================================================
+
+fn dividend01(trs: &finstack_valuations::instruments::EquityTotalReturnSwap) -> f64 {
+    let market = create_market_context();
+    let as_of = as_of_date();
+    *trs.price_with_metrics(
+        &market,
+        as_of,
+        &[MetricId::Dividend01],
+        finstack_valuations::instruments::PricingOptions::default(),
+    )
+    .unwrap()
+    .measures
+    .get("dividend01")
+    .unwrap()
+}
+
+#[test]
+fn test_dividend01_finite_and_nonzero_with_div_yield() {
+    let trs = TestEquityTrsBuilder::new().build();
+    let div01 = dividend01(&trs);
+
+    assert!(
+        div01.is_finite(),
+        "Dividend01 should be finite, got {div01}"
+    );
+    assert!(
+        div01.abs() > 0.0,
+        "Dividend01 should be non-zero when a dividend-yield curve is referenced, got {div01}"
+    );
+}
+
+#[test]
+fn test_dividend01_zero_without_div_yield_id() {
+    let trs = TestEquityTrsBuilder::new().div_yield_id(None).build();
+    let div01 = dividend01(&trs);
+
+    assert_eq!(
+        div01, 0.0,
+        "Dividend01 must be exactly zero when no dividend-yield curve is referenced"
+    );
+}
+
+#[test]
+fn test_dividend01_sign_flips_pay_vs_receive() {
+    let receive = TestEquityTrsBuilder::new()
+        .side(TrsSide::ReceiveTotalReturn)
+        .build();
+    let pay = TestEquityTrsBuilder::new()
+        .side(TrsSide::PayTotalReturn)
+        .build();
+
+    let div01_receive = dividend01(&receive);
+    let div01_pay = dividend01(&pay);
+
+    // Pay-TR is the mirror of receive-TR, so the dividend sensitivity flips sign
+    // and matches in magnitude.
+    assert!(
+        div01_receive.signum() != div01_pay.signum(),
+        "Dividend01 should flip sign between receive ({div01_receive}) and pay ({div01_pay})"
+    );
+    assert!(
+        (div01_receive + div01_pay).abs() <= 1e-6 + 1e-3 * div01_receive.abs(),
+        "Dividend01 magnitudes should match between sides: receive={div01_receive}, pay={div01_pay}"
+    );
+}

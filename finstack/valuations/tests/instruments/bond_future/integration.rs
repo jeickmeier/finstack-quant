@@ -1262,3 +1262,77 @@ fn test_bucketed_dv01_registration() {
     println!("  - Provides standard IR buckets: 3M, 6M, 1Y, 2Y, 3Y, 5Y, 7Y, 10Y, 15Y, 20Y, 30Y");
     println!("  - Conversion factor scaling is automatic via pricing formula");
 }
+
+/// Helper: build a UST 10Y future over a fixed two-bond basket with explicit
+/// conversion factors and quoted price, for exercising `determine_ctd`.
+fn ctd_test_future(quoted_price: f64) -> BondFuture {
+    create_ust_10y_future(TestBondFutureConfig {
+        id: "TY-CTD",
+        notional: 1_000_000.0,
+        expiry: date!(2025 - 03 - 20),
+        delivery_start: date!(2025 - 03 - 21),
+        delivery_end: date!(2025 - 03 - 31),
+        quoted_price,
+        position: Position::Long,
+        deliverable_basket: vec![
+            DeliverableBond {
+                bond_id: InstrumentId::new("BOND-A"),
+                conversion_factor: 0.90,
+            },
+            DeliverableBond {
+                bond_id: InstrumentId::new("BOND-B"),
+                conversion_factor: 0.95,
+            },
+        ],
+        ctd_bond_id: "BOND-A",
+        discount_curve_id: "USD-TREASURY",
+    })
+}
+
+/// `determine_ctd` selects the bond with the lowest gross basis
+/// (clean − quoted×CF). This is core CTD logic and was previously untested
+/// (only the implied-repo path was exercised).
+#[test]
+fn test_determine_ctd_picks_lowest_gross_basis() {
+    let future = ctd_test_future(110.0);
+
+    // Same clean price for both; the higher conversion factor (BOND-B, 0.95)
+    // yields the lower gross basis: 100 − 110×0.95 = −4.5 vs 100 − 110×0.90 = 1.0.
+    let prices = vec![
+        (InstrumentId::new("BOND-A"), 100.0),
+        (InstrumentId::new("BOND-B"), 100.0),
+    ];
+    let (ctd_id, gross_basis) = future
+        .determine_ctd(&prices)
+        .expect("CTD determination should succeed");
+
+    assert_eq!(
+        ctd_id.as_str(),
+        "BOND-B",
+        "CTD should be the lowest-gross-basis bond"
+    );
+    assert!(
+        (gross_basis - (100.0 - 110.0 * 0.95)).abs() < 1e-9,
+        "CTD gross basis should be 100 − 110×0.95 = −4.5, got {gross_basis}"
+    );
+}
+
+/// With no usable prices (empty, or all non-positive), `determine_ctd` must
+/// return a validation error rather than a bogus CTD.
+#[test]
+fn test_determine_ctd_errors_without_valid_prices() {
+    let future = ctd_test_future(110.0);
+
+    assert!(
+        future.determine_ctd(&[]).is_err(),
+        "empty price set should yield an error"
+    );
+    let non_positive = vec![
+        (InstrumentId::new("BOND-A"), 0.0),
+        (InstrumentId::new("BOND-B"), -1.0),
+    ];
+    assert!(
+        future.determine_ctd(&non_positive).is_err(),
+        "all non-positive prices should yield an error"
+    );
+}
