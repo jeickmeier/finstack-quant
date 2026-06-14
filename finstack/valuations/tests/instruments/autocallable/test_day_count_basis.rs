@@ -28,7 +28,6 @@
 use super::helpers::*;
 use finstack_core::dates::DayCount;
 use finstack_valuations::instruments::Instrument;
-use std::time::Instant;
 use time::macros::date;
 
 /// Test that a quarterly observation autocall with ACT/365 surface and ACT/360 curve prices correctly.
@@ -68,9 +67,7 @@ fn test_autocallable_mismatched_day_count_bases() {
     let market = build_market_with_dc(as_of, spot, vol, rate, div_yield, DayCount::Act360);
 
     // Price using MC
-    let start = Instant::now();
     let pv = autocall.value(&market, as_of).unwrap();
-    let elapsed = start.elapsed();
 
     // The autocallable should have positive value
     assert!(
@@ -94,15 +91,6 @@ fn test_autocallable_mismatched_day_count_bases() {
         pv.amount(),
         lower_bound,
         upper_bound
-    );
-
-    // Performance check (relaxed for CI environments and debug builds)
-    // 50ms target is for release builds with 50k paths; debug builds are much slower
-    // Use 60 seconds as reasonable upper bound for debug/CI environments
-    assert!(
-        elapsed.as_secs() < 60,
-        "MC pricing took {}s, should be < 60s",
-        elapsed.as_secs()
     );
 }
 

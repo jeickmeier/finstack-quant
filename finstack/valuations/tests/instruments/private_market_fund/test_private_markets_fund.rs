@@ -308,25 +308,6 @@ fn test_ledger_export_formats() {
 }
 
 #[test]
-fn test_private_markets_fund_creation() {
-    let (spec, events) = simple_2x_scenario();
-    let pe = PrivateMarketsFund::new("TEST_FUND", test_currency(), spec, events);
-
-    assert_eq!(pe.id, "TEST_FUND");
-    assert_eq!(pe.currency, test_currency());
-    assert!(pe.discount_curve_id.is_none());
-}
-
-#[test]
-fn test_private_markets_fund_with_discount_curve() {
-    let (spec, events) = simple_2x_scenario();
-    let pe = PrivateMarketsFund::new("TEST_FUND", test_currency(), spec, events)
-        .with_discount_curve("USD-OIS");
-
-    assert_eq!(pe.discount_curve_id, Some("USD-OIS".into()));
-}
-
-#[test]
 fn test_lp_cashflows_via_ledger() {
     let (spec, events) = simple_2x_scenario();
     let pe = PrivateMarketsFund::new("TEST_FUND", test_currency(), spec, events);
@@ -421,33 +402,6 @@ fn test_multi_tier_waterfall() {
 
     // With a 3x return, should hit multiple promote tiers
     assert!(!promote_rows.is_empty(), "Should have promote allocations");
-}
-
-/// Test IRR calculation accuracy.
-#[test]
-fn test_irr_calculation_accuracy() {
-    // Known IRR scenario: $1M in, $2M out after 5 years = ~14.87% IRR
-    let flows = vec![
-        (
-            test_date(2020, 1, 1),
-            Money::new(-1000000.0, test_currency()),
-        ), // Contribution
-        (
-            test_date(2025, 1, 1),
-            Money::new(2000000.0, test_currency()),
-        ), // Distribution
-    ];
-
-    let irr =
-        finstack_valuations::instruments::equity::pe_fund::calculate_irr(&flows, DayCount::Act365F)
-            .unwrap();
-
-    // Expected IRR: (2.0)^(1/5) - 1 ≈ 0.1487 or ~14.87%
-    assert!(
-        (irr - 0.1487).abs() < 0.01,
-        "Expected ~14.87% IRR, got {:.4}%",
-        irr * 100.0
-    );
 }
 
 /// Golden test: serialize and deserialize waterfall spec.

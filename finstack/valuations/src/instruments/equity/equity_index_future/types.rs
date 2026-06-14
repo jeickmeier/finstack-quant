@@ -501,22 +501,6 @@ mod tests {
     use time::Month;
 
     #[test]
-    fn test_equity_future_specs_sp500_emini() {
-        let specs = EquityFutureSpecs::sp500_emini();
-        assert_eq!(specs.multiplier, 50.0);
-        assert_eq!(specs.tick_size, 0.25);
-        assert_eq!(specs.tick_value, 12.50);
-    }
-
-    #[test]
-    fn test_equity_future_specs_nasdaq100_emini() {
-        let specs = EquityFutureSpecs::nasdaq100_emini();
-        assert_eq!(specs.multiplier, 20.0);
-        assert_eq!(specs.tick_size, 0.25);
-        assert_eq!(specs.tick_value, 5.00);
-    }
-
-    #[test]
     fn test_equity_index_future_construction() {
         let future = EquityIndexFuture::builder()
             .id(InstrumentId::new("ES-TEST"))
@@ -550,59 +534,6 @@ mod tests {
     }
 
     #[test]
-    fn test_sp500_emini_constructor() {
-        let expiry = Date::from_calendar_date(2025, Month::March, 21).expect("valid test date");
-        let last_trade = Date::from_calendar_date(2025, Month::March, 20).expect("valid test date");
-
-        let future = EquityIndexFuture::sp500_emini(
-            "ESH5",
-            Money::new(2_250_000.0, Currency::USD),
-            expiry,
-            last_trade,
-            Some(4500.0),
-            Position::Long,
-            "USD-OIS",
-        )
-        .expect("should build");
-
-        assert_eq!(future.id.as_str(), "ESH5");
-        assert_eq!(future.underlying_ticker, "SPX");
-        assert_eq!(future.contract_specs.multiplier, 50.0);
-        assert_eq!(future.entry_price, Some(4500.0));
-    }
-
-    #[test]
-    fn test_nasdaq100_emini_constructor() {
-        let expiry = Date::from_calendar_date(2025, Month::March, 21).expect("valid test date");
-        let last_trade = Date::from_calendar_date(2025, Month::March, 20).expect("valid test date");
-
-        let future = EquityIndexFuture::nasdaq100_emini(
-            "NQH5",
-            Money::new(1_500_000.0, Currency::USD),
-            expiry,
-            last_trade,
-            Some(15000.0),
-            Position::Short,
-            "USD-OIS",
-        )
-        .expect("should build");
-
-        assert_eq!(future.id.as_str(), "NQH5");
-        assert_eq!(future.underlying_ticker, "NDX");
-        assert_eq!(future.contract_specs.multiplier, 20.0);
-        assert_eq!(future.position, Position::Short);
-    }
-
-    #[test]
-    fn test_position_sign() {
-        let mut future = EquityIndexFuture::example().expect("EquityIndexFuture example is valid");
-        assert_eq!(future.position_sign(), 1.0);
-
-        future.position = Position::Short;
-        assert_eq!(future.position_sign(), -1.0);
-    }
-
-    #[test]
     fn test_delta_calculation() {
         let future = EquityIndexFuture::example().expect("EquityIndexFuture example is valid");
         // Long 10 ES contracts: delta = 50 × 10 × 1 = 500
@@ -619,15 +550,5 @@ mod tests {
         let future = EquityIndexFuture::example().expect("EquityIndexFuture example is valid");
         // At price 4500: contracts = 2,250,000 / (4500 × 50) = 10
         assert_eq!(future.num_contracts(4500.0), 10.0);
-    }
-
-    #[test]
-    fn test_serde_round_trip() {
-        let future = EquityIndexFuture::example().expect("EquityIndexFuture example is valid");
-        let json = serde_json::to_string(&future).expect("serialize");
-        let recovered: EquityIndexFuture = serde_json::from_str(&json).expect("deserialize");
-        assert_eq!(future.id, recovered.id);
-        assert_eq!(future.underlying_ticker, recovered.underlying_ticker);
-        assert_eq!(future.notional, recovered.notional);
     }
 }

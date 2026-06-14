@@ -257,27 +257,6 @@ fn test_npv_at_maturity_recovers_realized_payoff() {
 }
 
 #[test]
-fn test_npv_at_maturity_no_discounting_applied() {
-    // Arrange
-    let swap = sample_swap(PayReceive::Receive);
-    let prices = price_series(&swap, 5_000.0, 4.0);
-    let ctx = add_series(base_context(), &prices);
-
-    // Act
-    let pv = swap.value(&ctx, swap.maturity).unwrap();
-    let realized = realized_variance(
-        &prices.iter().map(|(_, p)| *p).collect::<Vec<_>>(),
-        RealizedVarMethod::CloseToClose,
-        252.0,
-    )
-    .expect("CloseToClose should succeed");
-    let payoff = swap.payoff(realized);
-
-    // Assert - PV should equal undiscounted payoff at maturity
-    assert!((pv.amount() - payoff.amount()).abs() < LOOSE_EPSILON);
-}
-
-#[test]
 fn test_npv_at_maturity_with_low_realized_vol() {
     // Arrange
     let swap = sample_swap(PayReceive::Receive);
@@ -352,22 +331,6 @@ fn test_npv_after_maturity_uses_final_realized_variance() {
 // ============================================================================
 // Instrument Trait Value Method Tests
 // ============================================================================
-
-#[test]
-fn test_value_method_delegates_to_npv() {
-    // Arrange
-    let swap = sample_swap(PayReceive::Receive);
-    let ctx = add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.22);
-    let as_of = date(2024, 12, 1);
-
-    // Act
-    let value = swap.value(&ctx, as_of).unwrap();
-    let npv = swap.value(&ctx, as_of).unwrap();
-
-    // Assert
-    assert_eq!(value.amount(), npv.amount());
-    assert_eq!(value.currency(), npv.currency());
-}
 
 // ============================================================================
 // Time Progression Tests

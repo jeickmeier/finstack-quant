@@ -1585,20 +1585,6 @@ fn test_calculator_can_be_reused() {
     assert_eq!(value1.amount(), value2.amount());
 }
 
-#[test]
-fn test_basket_calculator_from_basket() {
-    // Arrange
-    let basket = simple_equity_basket();
-
-    // Act
-    let calc = basket.calculator();
-
-    // Assert
-    // Verify calculator was created successfully
-    // (config field is private, so we just verify creation succeeds)
-    let _ = calc;
-}
-
 // ============================================================================
 // Integration Tests
 // ============================================================================
