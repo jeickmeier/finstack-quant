@@ -31,7 +31,11 @@ UV_PYTHON_DOWNLOADS = "{{ env.UV_PYTHON_DOWNLOADS | default(value='never') }}"
 
 [tasks.all]
 description = "Build, test, and lint everything (rust + python + wasm)"
-depends = ["all-build", "all-test", "all-lint"]
+run = [
+  { task = "all-build" },
+  { task = "all-test" },
+  { task = "all-lint" },
+]
 
 [tasks.all-build]
 description = "Build Rust workspace, Python bindings, and WASM package"

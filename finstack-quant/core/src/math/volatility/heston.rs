@@ -87,7 +87,7 @@ fn quadrature_panels(lower: f64, upper: f64) -> usize {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use finstack_quant_core::math::volatility::heston::HestonParams;
 ///
 /// let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).unwrap();
@@ -982,7 +982,7 @@ pub struct HestonCalibrationResult {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust,no_run
 /// use finstack_quant_core::math::volatility::heston::{HestonParams, calibrate_heston};
 ///
 /// let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).unwrap();

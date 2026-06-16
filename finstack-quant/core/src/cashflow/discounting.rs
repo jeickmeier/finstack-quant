@@ -414,7 +414,7 @@ pub fn sum_prediscounted_money(flows: &[Money]) -> crate::Result<Money> {
 /// Sum pre-discounted dated `Money` cashflows.
 ///
 /// Dates are ignored because amounts are already discounted. Prefer
-/// [`sum_prediscounted_money`] for new code when dates carry no meaning.
+/// `sum_prediscounted_money` for new code when dates carry no meaning.
 pub fn npv_prediscounted_money(flows: &[(Date, Money)]) -> crate::Result<Money> {
     let amounts = flows.iter().map(|(_, amt)| *amt).collect::<Vec<_>>();
     sum_prediscounted_money(&amounts)

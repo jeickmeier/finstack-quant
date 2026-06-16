@@ -57,6 +57,8 @@ decomposition live under :mod:`finstack_quant.portfolio`.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 from finstack_quant.core.market_data import MarketContext
@@ -603,7 +605,7 @@ def instrument_cashflows(
     as_of: str,
     *,
     model: str = "discounting",
-) -> tuple[dict, pd.DataFrame]:
+) -> tuple[dict[str, Any], pd.DataFrame]:
     """DataFrame-friendly wrapper around :func:`instrument_cashflows_json`.
 
     Parses the JSON envelope returned by the low-level binding and constructs
@@ -1073,7 +1075,7 @@ class SabrSmile:
         strikes: list[float],
         r: float = 0.0,
         q: float = 0.0,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Butterfly + monotonicity arbitrage diagnostics on ``strikes``.
 
         Returns a dict with ``arbitrage_free``, ``butterfly_violations``,
@@ -1171,7 +1173,7 @@ def tarn_coupon_profile(
     floating_fixings: list[float],
     target_coupon: float,
     day_count_fraction: float,
-) -> dict:
+) -> dict[str, Any]:
     """Simulate a TARN coupon profile along a deterministic rate path.
 
     Each period coupon is ``max(fixed_rate - L_i, coupon_floor) * dcf``;

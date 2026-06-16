@@ -245,7 +245,7 @@ pub struct ProvisionWaterfall {
 /// Matches exposures by ID across periods to track stage movements and
 /// identify new originations and derecognitions. All disappearing exposures
 /// are reported as derecognitions (`write_offs` stays 0.0); use
-/// [`compute_waterfall_with_write_offs`] to split write-offs onto their own
+/// `compute_waterfall_with_write_offs` to split write-offs onto their own
 /// line.
 ///
 /// # Arguments

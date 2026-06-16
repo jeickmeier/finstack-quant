@@ -27,7 +27,7 @@ Spot-verified directly in source before inclusion: all four Part 1 Blockers, and
 
 ---
 
-# Part 1 — First-pass findings
+## Part 1 — First-pass findings
 
 ## Findings
 
@@ -176,7 +176,7 @@ Mitigated in the production registry path by `enforce_calibration: true` (`price
   > **ADDRESSED 2026-06-10.** `HestonParams::deterministic_avg_variance(t)` (with κ→0 Taylor branch) added; every BS fallback site uses `√v̄(T)`. Test: the v₀=0.01/θ=0.09/κ=2/T=1 fallback uses v̄, not v₀.
 - **HW tree uniform dt grid with nearest-step rounding** — `hull_white_tree.rs:861-868`. Exercise/coupon dates land up to dt/2 off (±18 days at 100 steps/10y); no mechanism to align the grid with mandatory dates. Fix: construct the grid through mandatory dates (probabilities already support per-step dt).
   > **ADDRESSED 2026-06-10.** Full per-step-dt refactor: `calibrate_with_times` builds the grid through caller-supplied mandatory dates (targeting ~`config.steps`), storing per-step `dt_i`/`dx_i = σ√(3·dt_i)` with per-level widths and branch tables; calibration and backward induction consume per-step dt, and `step_at_time` provides exact (1e-10) lookup for mandatory dates. Consumers thread their dates: European swaption expiry, Bermudan exercise dates, callable-bond coupon/call dates (with a grid-aware `BondValuator::new_with_time_steps`), and the TARN harness fixing dates. Tests: mandatory dates land exactly on nodes; empty-mandatory matches the uniform calibrate; steep-curve recalibration with mandatory pillars stays <0.1bp.
-- **QE-Heston "martingale-corrected QE-M" label wrong** — `monte_carlo/src/discretization/qe_heston.rs:234-248`. Scheme is faithful plain Andersen (2008) with γ1=γ2=½; the K0* correction (Andersen §4.2) is absent. Fix docs or implement K0*.
+- **QE-Heston "martingale-corrected QE-M" label wrong** — `monte_carlo/src/discretization/qe_heston.rs:234-248`. Scheme is faithful plain Andersen (2008) with γ1=γ2=½; the K0*correction (Andersen §4.2) is absent. Fix docs or implement K0*.
   > **ADDRESSED 2026-06-10.** Andersen (2008) §4.2 K0* implemented: the drift constant is computed from the exact conditional moment of the QE variance step (branching on the ψ regime), with γ1=γ2=½ retained. Martingale test: `E[S_T] = S_0·e^{(r−q)T}` within MC error at high σ_v/ρ where plain QE drifts.
 - **rBergomi silent default parameters** — `rough_bergomi_mc_pricer.rs:223-225`. η=1.9/H=0.07/ρ=−0.9 via `get_unitless_scalar` when scalars missing, while Heston/rough-Heston MC were deliberately converted to strict resolvers. Fix: strict resolver for `RBERGOMI_*`.
   > **ADDRESSED 2026-06-10.** `RoughBergomiScalars::from_market_strict` (the `rough_heston_market.rs` pattern, `get_unitless_scalar_strict`) resolves `RBERGOMI_ETA/HURST/RHO`; the silent defaults were removed. Test: missing scalars produce a hard error.
@@ -280,7 +280,7 @@ The reviewed surface splits sharply. The mature paths are genuinely strong: LMM 
 
 ---
 
-# Part 2 — Second-pass findings
+## Part 2 — Second-pass findings
 
 No Blockers in this pass. Several Majors are blocker-adjacent depending on configuration reachability (noted inline).
 

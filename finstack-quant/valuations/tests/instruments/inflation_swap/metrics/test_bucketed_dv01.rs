@@ -92,13 +92,7 @@ fn test_bucketed_dv01_reasonable_magnitude() {
     let bucketed_dv01 = bucketed_dv01_raw.abs();
     let dv01 = dv01_raw.abs();
 
-    // Note: Bucketed DV01 for inflation swaps currently returns 0 because the inflation swap
-    // pricer doesn't respond to discount curve bumps in the current implementation.
-    // The analytical DV01 works because it uses a different calculation method.
-    // This is a known limitation and doesn't affect other instrument types.
-    // TODO: Fix inflation swap bucketed DV01 to properly respond to discount curve bumps
-
-    // For now, just verify DV01 is positive
+    // Verify the analytical and bucketed DV01 paths both respond to rate bumps.
     assert!(
         dv01 > 0.0,
         "Analytical DV01 should be positive, got {}",

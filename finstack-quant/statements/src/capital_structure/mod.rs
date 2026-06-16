@@ -24,7 +24,7 @@
 //!
 //! ## Limitations
 //! - Waterfall allocation within a payment category is single-class pro-rata;
-//!   there is no intra-category tranche seniority (see [`WaterfallSpec`]).
+//!   there is no intra-category tranche seniority (see `WaterfallSpec`).
 //! - Prepayment penalties, call premiums, and original issue discount (OID)
 //!   are not modeled: prepayments apply at par and no OID accretion occurs.
 //!

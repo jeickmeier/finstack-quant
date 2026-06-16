@@ -148,7 +148,7 @@ impl QeHeston {
     /// One QE step of the Heston variance process.
     ///
     /// Thin wrapper around [`qe_step_variance`] that plugs in the instance's
-    /// ψ threshold. See [`super::qe_common`] for the algorithm, references,
+    /// ψ threshold. See `qe_common` for the algorithm, references,
     /// and the numerical safeguards that are shared with `QeCir`.
     /// (Production stepping goes through [`qe_regime`] directly so the spot
     /// leg can reuse the regime for the K0* correction; this wrapper remains

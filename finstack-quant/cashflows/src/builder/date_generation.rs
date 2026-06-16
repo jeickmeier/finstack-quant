@@ -48,7 +48,7 @@ pub struct PeriodSchedule {
     /// accrual start (or backward from its accrual end) lands exactly on the
     /// other boundary; all other periods are stubs. A vanilla bullet schedule
     /// therefore has an empty set, while a short-front schedule contains only
-    /// the first payment date. See [`is_regular_period`].
+    /// the first payment date. See `is_regular_period`.
     pub first_or_last: finstack_quant_core::HashSet<Date>,
 }
 

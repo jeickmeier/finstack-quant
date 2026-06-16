@@ -113,7 +113,7 @@ pub fn workout_lgd(
 /// Apply a stressed downturn adjustment to base LGD.
 ///
 /// Uses the proprietary mean-plus-multiple-of-Bernoulli-stdev approximation
-/// (see [`DownturnMethod::FryeJacobs`](downturn::DownturnMethod::FryeJacobs)
+/// (see [`DownturnMethod::FryeJacobs`]
 /// for the formula and naming note — this is *not* the Frye-Jacobs (2012)
 /// model):
 ///

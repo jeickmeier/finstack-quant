@@ -32,31 +32,35 @@
 
 Each crate section lists **Tests to remove** (confirmed clean removals, plus a *Consolidate / strengthen* sub-list of verifier-downgraded near-duplicates) and **Coverage holes** (High → Medium → Low). Only verifier-confirmed or -downgraded items are included; rejected false positives are excluded.
 
-
 ## analytics
+
 Audit of `finstack-quant/analytics` (27 integration tests + ~179 inline tests across 23 source files).
 
 ### Tests to remove
 
 #### Consolidate / strengthen (not a blind delete)
+
 - **[unnecessary]** `rust_core_matches_api_invariants_fixture` (`finstack-quant/analytics/src/fixture_test.rs:67`) — This inline `#[cfg(test)]` module validates crate-internal building-block functions (`cagr`, `sharpe`, `sortino`, `value_at_risk`, `expected_shortfall`, `rolling_greeks`, `multi_factor_greeks`) against a JSON golden fixture, none of which are part of the public `Performance` API; integration tests in `performance_smoke.rs` and `correctness_regressions.rs` already exercise the same metrics through the public facade. *Verifier downgrade:* not entirely redundant — `Performance.cagr()`/`sharpe()` delegate to these same `pub(crate)` functions, but the separately-maintained JSON golden file can catch numeric drift the hand-coded integration expectations would miss if updated in sync. Treat as partial overlap, not dead code. *Action:* Rather than blind removal, consolidate the golden-file regression into the public `Performance` path (or strengthen the integration tests to cover the same metrics) before retiring `src/fixture_test.rs` and `api_invariants_data.json`.
 
 ### Coverage holes
 
 #### High
+
 - **multi_factor_greeks error handling** — `benchmark.rs:1034 pub(crate) fn multi_factor_greeks(...) -> crate::Result<MultiFactorResult>` — The validation at line 1039 checks `!ann_factor.is_finite() || ann_factor <= 0.0`, but the inline test `standalone_multi_factor_greeks_errors_on_non_positive_ann_factor` (line 1808) only covers `ann_factor = 0.0` and `-252.0`, never `f64::NAN`/`f64::INFINITY`. The non-finite returns path (line 1062) and non-finite factors path (line 1070) have zero coverage — critical for a financial library where malformed factor data must fail fast. suggested: `let result = multi_factor_greeks(&[0.01, 0.02, 0.03, 0.04, 0.05], &[&[0.01, 0.02, 0.03, f64::NAN, 0.05]], 252.0); assert!(result.is_err());` plus NAN-in-returns, and extend the ann_factor test with `f64::NAN` and `f64::INFINITY`.
 - **Performance construction validation** — `performance.rs:447 pub fn Performance::new(...) -> crate::Result<Self>` — Code at lines 458–468 validates `ticker_names.len() == prices.len()`, but no integration test in `performance_smoke.rs` or `correctness_regressions.rs` constructs a `Performance` with mismatched ticker count vs price panel width. Line 143 of the smoke test exercises a different error path (benchmark name `'missing'`) with matching dimensions. suggested: in `tests/correctness_regressions.rs`, build with 2 dates, a single price column, and 3 ticker names (`["A","B","C"]`) and assert the constructor returns `Err`.
 
 #### Medium
+
 - **Serde serialization stability** — `BetaResult, GreeksResult, RollingGreeks, MultiFactorResult, DrawdownEpisode, PeriodStats` (crate root) — `serde_roundtrip.rs` round-trips these types (lines 31–135) but never tests unknown-field injection; none of the derives use `#[serde(deny_unknown_fields)]`, so older JSON with extra fields deserializes silently. Medium risk for a serialization-heavy financial library: downstream consumers parsing old JSON could lose data when a field is added. suggested: in `serde_roundtrip.rs`, serialize a `BetaResult`, inject an unknown field (e.g. `"extra_field": 123`), deserialize, assert it is ignored, and add a comment flagging `deny_unknown_fields` for future strict versioning.
 
 #### Low
-- **Determinism and reproducibility** — `performance.rs` (all public methods) — No test verifies that a `Performance` object constructed twice with identical inputs yields bitwise-identical metrics. *Verifier downgrade (Medium → Low):* metric calculations use stable Neumaier accumulators, existing `correctness_regressions` tests repeatedly call the same methods and would catch non-determinism, and bitwise reproducibility is typically ensured by harness/CI stability — nice-to-have rather than a real gap. suggested: in `tests/correctness_regressions.rs`, construct the same `Performance` twice, call all metrics (`cagr`, `sharpe`, `drawdown_series`, `beta`, etc.) on both, and assert bitwise (or `1e-14` ULP) equality, with a comment guarding against future summation-order/quantile refactors.
 
+- **Determinism and reproducibility** — `performance.rs` (all public methods) — No test verifies that a `Performance` object constructed twice with identical inputs yields bitwise-identical metrics. *Verifier downgrade (Medium → Low):* metric calculations use stable Neumaier accumulators, existing `correctness_regressions` tests repeatedly call the same methods and would catch non-determinism, and bitwise reproducibility is typically ensured by harness/CI stability — nice-to-have rather than a real gap. suggested: in `tests/correctness_regressions.rs`, construct the same `Performance` twice, call all metrics (`cagr`, `sharpe`, `drawdown_series`, `beta`, etc.) on both, and assert bitwise (or `1e-14` ULP) equality, with a comment guarding against future summation-order/quantile refactors.
 
 ---
 
 ## attribution
+
 141 tests across 12 inline `src` modules and 2 integration files (~9233 lines); core methodologies (parallel, waterfall, taylor, metrics-based) well covered, JSON binding surface and the minimal bridge function under-tested.
 
 ### Tests to remove
@@ -85,10 +89,10 @@ Audit of `finstack-quant/analytics` (27 integration tests + ~179 inline tests ac
 
 - **Untested serde skip_serializing_if field behaviors** — `PnlAttribution` and related types (`src/types/result.rs`, `detail.rs`) with `#[serde(skip_serializing_if = "Option::is_none")]` and custom defaults — The inline `test_attribution_config_optional_fields` (`src/spec.rs:353`) verifies `None` fields are omitted on serialization, but no test verifies deserializing JSON with a missing optional field reconstructs the default. Suggested: `test_attribution_config_deserialize_missing_optional_field` constructing valid `AttributionConfig` JSON without the `metrics` field, asserting `config.metrics == None`.
 
-
 ---
 
 ## covenants
+
 Scope: covenants crate test suite (`tests/integration.rs`, `engine_conventions.rs`, `serialization.rs`, `src/forward.rs`); audit flagged 8 removals and 10 coverage holes.
 
 ### Tests to remove
@@ -123,14 +127,15 @@ Scope: covenants crate test suite (`tests/integration.rs`, `engine_conventions.r
 
 - **Determinism: random seed reproducibility in forecasts** — `forecast_covenant_generic` (`src/forward.rs:620+`), `CovenantForecastConfig.random_seed` — *Verifier downgraded (confirmed Low):* the `random_seed` field roundtrips in `serialization.rs:364` but no test runs two forecasts with identical config and asserts equal breach probabilities. Suggested: `test_stochastic_forecast_seed_reproducibility` — run `forecast_covenant_generic()` twice with the same config (seed=42, num_paths=1000) and assert the `breach_probability` vectors are equal element-by-element.
 
-
 ---
 
 ## factor-model
+
 Scope: error variants, covariance fallbacks, sensitivity-matrix bounds, and serde/round-trip coverage across `error.rs`, `covariance.rs`, `sensitivity_matrix.rs`, `config.rs`, and the matching/primitives modules.
 
 ### Tests to remove
-_None found._
+
+_None found.*
 
 ### Coverage holes
 
@@ -150,7 +155,6 @@ _None found._
 **Low**
 
 - **FactorCovarianceMatrix::correlation with zero variance** — `finstack-quant/factor-model/src/covariance.rs:125` — The correlation() method returns 0.0 if either factor has zero or negative variance. This edge case is untested; financial models may rely on correlation definitions in degenerate cases. *(Downgraded from Medium: the proptest at covariance.rs:269/194-209 exercises correlation() broadly and the zero-variance path is a single trivial conditional, so isolated coverage is valuable but not critical.)* suggested: Test correlation() when one or both factors have exactly 0.0 variance; verify 0.0 is returned and verify behavior is stable across multiple calls.
-
 
 ---
 
@@ -186,7 +190,6 @@ Two units audited: `cashflows-builder` (integration tests under `tests/cashflows
 
 - **Day count convention stability - Act/Act edge cases** — `date_generation::build_dates()` and coupon emission with `DayCount::ActActIsma` — Tests lean on Act365F and Act360; no full-schedule test verifies `ActActIsma` accrual factors. Verifier downgraded to Low: a dedicated `tests/cashflows/day_count.rs` module exists and likely covers the convention; a canonical ISDA-example bond test would be nice-to-have, not critical. suggested: Build a semi-annual `ActActIsma` schedule, verify coupon accrual factors sum to exactly 1.0 over the period, and pin a specific coupon amount against a known ISDA example.
 
-
 ---
 
 ## scenarios
@@ -220,7 +223,6 @@ Audit of `finstack-quant/scenarios` adapters (time_roll, asset_corr, statements,
 #### Low
 
 - **Edge case / zero / inverted ranges** — `utils.rs::parse_tenor_to_years` (line 56), `parse_period_to_days` (line 221) — verifier confirmed: tests (lines 338-393) cover valid tenors and invalid inputs but not `0Y`/`0D`/`0M` (should yield 0), negative tenors like `-1Y` (should reject), or large values like `999Y`; boundary behavior is unpinned and matters for time-roll no-ops. suggested: Assert `parse_tenor_to_years('0Y') == 0.0`, `parse_period_to_days('0D') == 0`, that `-1Y` is rejected/handled, that `999Y` parses to 999.0, and that a `0D` time-roll applies as a no-op.
-
 
 ---
 
@@ -292,10 +294,10 @@ Audit of the `statements` crate test suite across three units (evaluator, foreca
 
 - **Forecast: moving-average window vs single historical point** — src/forecast/timeseries.rs:90 timeseries_forecast — `hist_data.len() >= 2` is checked and the window-clamp at line 230 (`window.min(hist_data.len())`) is only reached after the line 222 check passes, so the behavior is sound but the `.min()` reads as confusingly defensive. (Verifier downgraded: logic is correct; no new test strictly required.) suggested: Optionally add a moving_average test with historical=[100.0,110.0] and window=5 to document the error-vs-clamp behavior explicitly.
 
-
 ---
 
 ## monte_carlo
+
 Three units (mc-process-rng, mc-discretization, mc-pricing); ~387 inline tests across `src/process`, `src/rng`, `src/discretization`, pricers, payoffs, greeks, and variance reduction.
 
 ### Tests to remove
@@ -345,7 +347,6 @@ Three units (mc-process-rng, mc-discretization, mc-pricing); ~387 inline tests a
 - **discretization/rough_bergomi** — `RoughBergomiEuler::step`, work buffer management (rough_bergomi.rs:95, 143) — `test_work_buffer_reset_across_paths` (rough_bergomi.rs:266) verifies correct accumulation after reset, but no negative test confirms a non-zero inherited work[0] corrupts variance (the reset contract is documented but not code-enforced). suggested: `test_rough_bergomi_work_buffer_non_zero_initial` initializing work[0]=0.5 and verifying the inherited accumulation diverges from a fresh path start.
 - **payoff/asian.rs** — `geometric_asian_call_closed_form()` (asian.rs:493) — Tested only with static range bounds (price > 0 && price < 10); no Monte Carlo convergence comparison. suggested: price a geometric Asian via `PathDependentPricer` with 100k paths and compare to the closed form within 3 standard errors.
 
-
 ---
 
 ## portfolio
@@ -372,7 +373,7 @@ Scope: three audit units across the `finstack-quant/portfolio` crate — factor-
 
 #### High
 
-- **Public API validation** — flatten_position_pnls (mod.rs:309) — Zero inline tests for this financial risk-engine helper, which validates n_positions, handles the empty case, and checks scenario-count consistency (lines 309-338). Dimension errors can silently corrupt risk aggregation. suggested: Test with (1) valid [2][3] matrix → (Vec, 3); (2) wrong row count → Validation error; (3) inconsistent scenario counts (rows [3,5]) → error naming row 1; (4) empty n_positions=0 → (Vec::new(), 0).
+- **Public API validation** — flatten_position_pnls (mod.rs:309) — Zero inline tests for this financial risk-engine helper, which validates n_positions, handles the empty case, and checks scenario-count consistency (lines 309-338). Dimension errors can silently corrupt risk aggregation. suggested: Test with (1) valid `2 x 3` matrix → (Vec, 3); (2) wrong row count → Validation error; (3) inconsistent scenario counts (rows [3,5]) → error naming row 1; (4) empty n_positions=0 → (Vec::new(), 0).
 - **Public API validation** — flatten_square_matrix (mod.rs:278) — Tests exist (lines 345-363) but only cover the 2x2 happy path, wrong row count, and a wrong column on row 0; missing empty (n=0), single-element (n=1), and wrong column on rows 1+. suggested: Add (1) valid 3x3 → flat 9-element vec; (2) empty matrix → Ok empty; (3) single element [5.0] → [5.0]; (4) wrong column on row 1 (e.g. `vec![[1,2],[3,4,5]]`) → error naming row 1.
 - **Error handling for non-finite inputs** — ParametricDecomposer::validate_factor_axes (parametric.rs:70) — Line 93 checks `!entry.is_finite()` for covariance entries, but no test injects a NaN covariance entry; the existing NaN test (line 374) only covers NaN sensitivities. NaN covariance silently underestimates risk. suggested: Replace covariance[0] with f64::NAN, call decompose(), expect a Validation error naming "finite".
 - **Determinism and seed reproducibility** — SimulationDecomposer::new (simulation.rs:176) and decompose (simulation.rs:557) — Tests use fixed seeds (42, 4_242) but none verify that two decomposers with the same seed produce bit-identical results, despite the design comment at line 306 ("RNG stream is exactly the same every run"). suggested: (1) two `SimulationDecomposer(10000, 123)` on identical inputs → all factor_contributions bit-identical; (2) seeds 123 vs 456 → at least one factor contribution differs.
@@ -398,7 +399,6 @@ Scope: three audit units across the `finstack-quant/portfolio` crate — factor-
 - **Percentage unit edge cases** — Position::new validation (position.rs:219) — Tests cover >100 and <-100 rejection but not exactly 100.0, -100.0, or floating-point boundaries (100.0+epsilon). suggested: test_percentage_quantity_boundary_100_and_negative_100 asserting 100.0 and -100.0 validate, 100.0+1e-15 rejected, 100.0-1e-15 accepted.
 - **Error propagation and diagnostics** — PortfolioBuilder.build() (builder.rs public fn) — Downgraded to Low: core_portfolio_and_builder.rs:156 (lines 181-186) asserts only `is_err()`, not message content; no test verifies the error names which field is missing when both base_ccy and as_of are absent. suggested: test_portfolio_builder_validation_error_message_is_helpful, building without both fields and asserting `error.to_string()` mentions at least one clearly.
 - **liquidity** — src/liquidity/kyle.rs:26-100 (Kyle lambda units convention) — The per-share (not per-contract) lambda convention is documented at kyle.rs:343-359 but not validated by a test that would fail under wrong units (`estimate_cost_consistent_with_amihud` preserves relative ratios and would still pass). suggested: construct a Kyle model with lambda=0.01, execute a 1000-share trade, verify impact P&L = 10 (= 0.01*1000, not 0.01*1), documenting the unit convention.
-
 
 ---
 
@@ -441,8 +441,7 @@ Scope: ECL/credit engine (IFRS 9 + CECL, staging, covenants, adjusted net debt, 
 
 **Low**
 
-_None found._
-
+*None found.*
 
 ---
 
@@ -486,8 +485,7 @@ Scope: SA-CCR/FRTB regulatory engine plus VM/IM (SIMM) calculators, XVA, and CSA
 
 - **parameterization** — `FrtbRevision::Custom` (finstack-quant/margin/src/regulatory/frtb/params/registry.rs:32) — Label generation is tested (registry.rs:475-481), but no test covers round-trip serialization of `Custom` with a non-empty label or its interaction with `FrtbParams::validate()`. Verifier downgraded to Low: `label()` is the critical public API and is covered, and the simple `String` wrapper would round-trip correctly. suggested: build `FrtbParams` with `revision=Custom("test-label")`, serialize→deserialize, assert label matches and `validate()` succeeds.
 
-_Note: the `low_correlation_uses_basel_floor` removal (types.rs:119) and the `NettingSetId` serde hole (netting.rs:103) were rejected by the verifier — the types.rs test uniquely covers the `0.0` floor input, and `NettingSetId` already has round-trip and missing-tag tests (netting.rs:183, :196) — and are excluded here._
-
+*Note: the `low_correlation_uses_basel_floor` removal (types.rs:119) and the `NettingSetId` serde hole (netting.rs:103) were rejected by the verifier — the types.rs test uniquely covers the `0.0` floor input, and `NettingSetId` already has round-trip and missing-tag tests (netting.rs:183, :196) — and are excluded here.*
 
 ---
 

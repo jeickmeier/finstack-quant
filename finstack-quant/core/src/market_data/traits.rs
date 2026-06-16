@@ -268,8 +268,8 @@ pub trait Forward: TermStructure {
     /// The instantaneous forward rate at time `t`.
     fn rate(&self, t: f64) -> f64;
 
-    // TODO: Concrete curve types (ForwardCurve, DiscountCurve) could override this with
-    // analytical integration for piecewise-flat/linear curves to avoid numerical quadrature.
+    // Concrete curve types can override this with analytical integration for
+    // piecewise-flat/linear curves to avoid numerical quadrature.
     /// Average rate over the period `[t1, t2]` using Simpson's rule.
     ///
     /// Uses 8-interval composite Simpson's rule for accurate integration

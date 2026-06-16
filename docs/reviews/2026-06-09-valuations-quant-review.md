@@ -115,10 +115,12 @@ Recurring failure patterns:
 ## Moderates
 
 ### Time/axis hygiene
+
 - **[FIXED 2026-06-09]** Option expiry measured with instrument *accrual* day count instead of ACT/365F: `swaption/types/swaption.rs:519,546,645,957`, `cap_floor/pricing/pricer.rs:98-100` (Act360 ⇒ T inflated ×365/360), CMS pricers. `ir_future_option/types.rs:99-104` and `inflation_cap_floor/types.rs:401-410` do it correctly — drift, ~+0.7% vol-equivalent bias. Goldens: `usd_swaption_5y_into_5y_receiver_25_otm` NPV tolerance widened (documented ~0.83% ACT/365F residual vs the Bloomberg SWPM screen); `usd_swaption_normal_vol_self_test` expected values regenerated.
 - **[FIXED 2026-06-09]** Axis-based `df(t)`/`zero(t)` instead of `df_between_dates`: equity variance swap Carr-Madan (`equity/variance_swap/pricer.rs:542`), autocallable df_ratios numerator, `equity_index_future/pricer.rs:120-151`, `equity_trs/pricer.rs:80-82`, convertible bond floor (`convertible/metrics/bond_floor.rs:51-69`, plus silent `unwrap_or(0.0)` on year fractions — also at `bond/metrics/wal.rs:59`, `bond_valuator.rs:228`), inflation swap (`inflation_swap/types.rs:309-318, 352-362`). All biased whenever curve base ≠ as_of.
 
 ### Convention drift
+
 - **[FIXED 2026-06-09]** OIS presets apply ARRC 2bd / BoE 5bd FRN lookbacks to cleared OIS swaps (`data/conventions/rate_index_conventions.json` + `irs/compounding.rs:211-235`); cleared OIS compounds plain in-arrears with payment delay only. Sub-bp to ~1bp basis; also disables the exact `1/DF` fast path. Goldens: envelope-bootstrapped self-test fixtures regenerated (`aapl_equity_vol/svi_self_test`, `usd_swaption_normal_vol_self_test`, `usd_5y_cds_self_test` dv01, `inflation_linked_bond_5y`); `cdx_ig_46_payer_atm_jun26` NPV band widened to $6 (documented -$5.32 bootstrapped-curve residual vs the Bloomberg screen).
 - **[FIXED 2026-06-09]** `CompoundedInArrears.observation_shift` has contradictory sign/DCF semantics between the two IRS pricing paths (`irs/cashflow.rs:52-62` vs `:163-184`); `{lookback:2, shift:2}` silently cancels on one path, errors on the other.
 - **[FIXED 2026-06-09]** Tranche IMM schedule path skips business-day adjustment (`cds_tranche/pricer/sensitivities.rs:237-251`).
@@ -127,6 +129,7 @@ Recurring failure patterns:
 - **[FIXED 2026-06-09]** Quanto `fx_rate_id`/`fx_vol_id` quote direction unenforced; shipped example inconsistent (`quanto_option/types.rs:189-215` vs `pricer.rs:67-119`). The drift-adjustment formula itself is correct and parity-tested.
 
 ### Sensitivity unit traps
+
 - **[FIXED 2026-06-09]** Tranche `calculate_cs01` bumps hazard λ while documented as a 1bp *spread* bump (≈1.67× mislabel at R=40%) — `cds_tranche/pricer/sensitivities.rs:449-481`; registered metric calculators are correct. Ensure its spread bump only. Make error if par spreads not available.
 - **[FIXED 2026-06-09]** Index CS01 silently falls back from par-spread re-bootstrap to hazard bump on error — `cds_index/pricer.rs:433-447`. Make it an error.
 - **[FIXED 2026-06-09]** `Correlation01` is per-unit-ρ while `Recovery01` is per-1% — 100× internal inconsistency (`cds_tranche/pricer/sensitivities.rs:485-526` vs `metrics/correlation01.rs`).
@@ -134,6 +137,7 @@ Recurring failure patterns:
 - **[FIXED 2026-06-09]** `SABRModel::implied_volatility` returns normal vol for β≈0 and Black vol otherwise from one untagged API (`sabr/model.rs:164-180`); generic vol target could store Bachelier vols in a Black surface.
 
 ### Silent failure modes
+
 - **[FIXED 2026-06-09]** OAS tree solver failure residual is `±1e6` keyed to `sign(oas)` (`bond/pricing/engine/tree/tree_pricer.rs:563-571`) — can hand Brent a fabricated bracket; the YTM/DM solvers fixed exactly this pattern.
 - **[FIXED 2026-06-09]** MBS/CMO spread solvers return `0.0, converged:false`; CMO metric layer consumes it as a real spread (`mbs_passthrough/metrics/oas.rs:105-117`, `cmo/metrics/oas.rs:114-127`).
 - **[FIXED 2026-06-09]** `solve_alpha_for_atm` returns unconverged alpha silently (`sabr/calibration.rs:695-696`) and the pinning objective skips ATM, so nothing catches it.
@@ -143,6 +147,7 @@ Recurring failure patterns:
 - **[FIXED 2026-06-09]** Tranche stochastic-recovery overrides not EL-consistent with the bootstrapped index curve (`cds_tranche/pricer/expected_loss.rs:339-411`) — 0–100% tranche sum ≠ index; renormalize or document loudly.
 
 ### Stochastic engines
+
 - **[FIXED 2026-06-09]** Structured-credit Tree mode (the default) exhausts base-`branch_count` digits, leaving a deterministic z ≈ −0.97 shock on trailing months (`structured_credit/pricing/stochastic/pricer/engine.rs:459-489, 714-729`).
 - **[FIXED 2026-06-09]** Recombining `ScenarioTree` factors don't diffuse with lattice position (`stochastic/tree/tree.rs:265-300`); period-N factor distribution equals period-1.
 - **[FIXED 2026-06-09]** CLO in-period diversion uses stale balances → possible principal over-payment / negative tranche balance accruing negative interest (`structured_credit/pricing/waterfall.rs:222-247` + `simulation_engine.rs:2185-2192`).
@@ -151,6 +156,7 @@ Recurring failure patterns:
 - **[FIXED 2026-06-09]** Term-loan tree lacks the DF timing correction for distributed cashflows (`term_loan/pricing/tree_engine.rs:152-200`) that the bond valuator has. Golden: `term_loan_b_5y_floating` cs01/discount_margin/ytm regenerated.
 
 ### Other moderates
+
 - **[FIXED 2026-06-09]** CMS has no negative-rate model — hard-errors on F≤0 (fail-loud; swaption/cap-floor have Bachelier/shifted fallbacks).
 - **[FIXED 2026-06-09]** SABR ρ≈1 fallback `χ ≈ z/(1+z/2)` is wrong (true limit `−ln(1−z)`; 10–70% vol error in branch, reachable only at |1−ρ|<1e-10 via direct `SABRParameters::new(…, 1.0)`) — `sabr/model.rs:309-312`.
 - **[FIXED 2026-06-09]** SABR Obloj attribution inverted; genuinely-Obloj z computed then discarded (dead code) — `sabr/model.rs:91-132`.
@@ -217,7 +223,6 @@ Recurring failure patterns:
 2. **Curve base = as_of**: several findings (tranche discounting, equity axis-based lookups, inflation swap) are zero-impact when curves are rebuilt at every as_of. Nothing enforces that invariant.
 3. Dollar-roll and call-window behaviors are pinned by tests and may be deliberate simplifications — but each contradicts its own module documentation.
 4. Reviews were read-only; no test executions. Numerical claims verified by derivation/recomputation.
-
 
 ## Recommended Regression Additions (highest leverage)
 

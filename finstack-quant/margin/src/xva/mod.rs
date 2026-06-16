@@ -1,8 +1,8 @@
 //! XVA (valuation adjustments) types and deterministic exposure engines.
 //!
 //! Public surface: [`types`] (configuration, exposure profiles, results),
-//! [`exposure::compute_exposure_profile`], [`cva::compute_cva`],
-//! [`cva::compute_dva`], [`cva::compute_fva`], [`cva::compute_bilateral_xva`],
+//! `exposure::compute_exposure_profile`, `cva::compute_cva`,
+//! `cva::compute_dva`, `cva::compute_fva`, `cva::compute_bilateral_xva`,
 //! and the deterministic netting helpers.
 //!
 //! # Conventions

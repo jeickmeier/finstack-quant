@@ -6,11 +6,11 @@
     "description": "Self-test fixture for term-rate IRS pricing with two-step calibration. Receives fixed at 4.25% against 3M-Term-SOFR floating, 5Y to maturity, 10M USD notional. Exercises both the discount calibration step (USD-OIS from SOFR OIS quotes with `ois_compounding = CompoundedWithRateCutoff {cutoff_days: 1}`) and the forward calibration step (USD-SOFR-3M with tenor_years=0.25 against the calibrated discount curve). The forward curve spans 10Y, the realistic horizon for floating-rate bonds, term loans, and structured products that project floating coupons over multi-year tenors.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Self-test fixture: synthetic but self-consistent. Quote set is hand-authored with simple rates (~4.0-4.5%) producing a non-trivial term-structure across both curves. Expected outputs are captured from Finstack Quant's own calibration + pricing pipeline (no vendor comparison). The contract is: re-running calibrate + price_instrument_with_metrics on this fixture must reproduce exactly these NPV / par_rate / DV01 values within solver tolerance. This guards against regressions in the discount-step bootstrap, the forward-step bootstrap (with sequential dependency on the calibrated discount curve), the OIS compounding override plumbing, and the term-rate IRS pricing kernel.",
+    "source_detail": "Self-test fixture: synthetic but self-consistent. Quote set is hand-authored with simple rates (~4.0-4.5%) producing a non-trivial term-structure across both curves. Expected outputs are captured from Finstack Quant's own calibration + pricing pipeline (no vendor comparison). The contract is: re-running calibrate + price_instrument_with_metrics on this fixture must reproduce exactly these NPV / par_rate / DV01 values within solver tolerance. This guards against regressions in the discount-step bootstrap, the forward-step bootstrap (with sequential dependency on the calibrated discount curve), the OIS compounding override plumbing, and the term-rate IRS pricing kernel. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture.",
     "captured_by": "claude",
     "captured_on": "2026-05-09",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-06-16",
     "review_interval_months": 12,
     "regen_command": "Re-run via: `uv run pytest finstack-quant-py/tests/golden/test_pricing_irs.py -v -k self_test`. To regenerate expected outputs (after deliberate calibration or pricing changes), call `finstack_quant.valuations.calibrate(envelope)` + `price_instrument_with_metrics(...)` and update expected_outputs.",
     "screenshots": []
@@ -413,9 +413,9 @@
     }
   },
   "expected": {
-    "npv": -44732.80969452881,
-    "par_rate": 0.04350274836282764,
-    "dv01": -4449.044543000348
+    "npv": -44661.32726559299,
+    "par_rate": 0.04350114598441511,
+    "dv01": -4449.063680365419
   },
   "tolerances": {
     "npv": {

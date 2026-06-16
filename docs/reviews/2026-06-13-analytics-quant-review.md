@@ -82,17 +82,20 @@ complete. Residual risk is concentrated in **convention alignment** and
 ### Minor
 
 #### 4. `greeks` / `multi_factor_greeks` alpha ignores the risk-free rate by design
+
 Same root as #3. Matches quantstats' "greeks" convention and is documented in
 the Rust source, so it is a convention note rather than a bug; ensure callers
 know `alpha` is not CAPM alpha.
 
 #### 5. Sortino `mar` (per-period) vs Sharpe `risk_free_rate` (annualized) unit asymmetry
+
 Thoroughly documented at `finstack-quant/analytics/src/performance/scalar.rs:119`, but
 `summary_to_dataframe` and the flat facade make it easy to pass an annualized
 target to `sortino` / `downside_deviation` by mistake. Consider a brief note in
 the Python/WASM method docs (currently silent on the per-period requirement).
 
 #### 6. `beta` CI uses the asymptotic 1.96 for `n−2 ≥ 240`
+
 `finstack-quant/analytics/src/benchmark.rs:287` — ~0.5% narrower than exact t(240).
 Documented and immaterial at that sample size.
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 __all__: list[str] = [
@@ -324,8 +326,8 @@ def attribute_pnl(
     market_t1_json: str,
     as_of_t0: str,
     as_of_t1: str,
-    method: str | dict,
-    config: dict | None = None,
+    method: str | dict[str, Any],
+    config: dict[str, Any] | None = None,
     full_cross_attribution: bool | None = None,
 ) -> str:
     """Run P&L attribution for a single instrument.

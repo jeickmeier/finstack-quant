@@ -161,7 +161,7 @@ impl Payoff for AsianCall {
     /// # Panics
     ///
     /// Panics if `SPOT` is missing or non-finite at a fixing step — see
-    /// [`super::require_finite_state`].
+    /// `require_finite_state`.
     fn on_event(&mut self, state: &mut PathState) {
         if self.fixing_set.contains(&state.step) {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step);
@@ -312,7 +312,7 @@ impl Payoff for AsianPut {
     /// # Panics
     ///
     /// Panics if `SPOT` is missing or non-finite at a fixing step — see
-    /// [`super::require_finite_state`].
+    /// `require_finite_state`.
     fn on_event(&mut self, state: &mut PathState) {
         if self.fixing_set.contains(&state.step) {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step);

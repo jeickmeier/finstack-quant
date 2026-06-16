@@ -133,7 +133,7 @@ impl Payoff for BasketCall {
     ///
     /// Panics if any asset's state key is missing or non-finite (e.g. the
     /// process `num_assets` does not match the basket) — see
-    /// [`super::require_finite_state`]. A silent 0.0 default would pin
+    /// `require_finite_state`. A silent 0.0 default would pin
     /// worst-of baskets to zero.
     fn on_event(&mut self, state: &mut PathState) {
         // Update terminal value if at maturity
@@ -245,7 +245,7 @@ impl Payoff for BasketPut {
     /// # Panics
     ///
     /// Panics if any asset's state key is missing or non-finite — see
-    /// [`super::require_finite_state`]. A silent 0.0 default would make a
+    /// `require_finite_state`. A silent 0.0 default would make a
     /// worst-of basket put pay the full strike.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
@@ -343,7 +343,7 @@ impl Payoff for ExchangeOption {
     /// # Panics
     ///
     /// Panics if either asset's state key is missing or non-finite — see
-    /// [`super::require_finite_state`].
+    /// `require_finite_state`.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
             self.terminal_s1 =

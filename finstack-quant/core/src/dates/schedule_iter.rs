@@ -66,8 +66,8 @@
 //!     .build()?;
 //!
 //! let dates: Vec<_> = sched.into_iter().collect();
-//! // Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays)
-//! assert_eq!(dates.len(), 4);
+//! // Jan-15 start plus Mar-19, Jun-18, Sep-17, Dec-17 (2025 third Wednesdays)
+//! assert_eq!(dates.len(), 5);
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!

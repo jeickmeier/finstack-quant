@@ -7,7 +7,7 @@ and results, and margin analytics helpers.
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
 import pandas as pd
 
@@ -2933,7 +2933,7 @@ class FrtbSbaEngine:
     """FRTB SBA engine matching the canonical Rust API."""
 
     def __init__(self, correlation_scenario: str | None = None) -> None: ...
-    def calculate(self, sensitivities: FrtbSensitivities) -> tuple[float, dict]:
+    def calculate(self, sensitivities: FrtbSensitivities) -> tuple[float, dict[str, Any]]:
         """Calculate the FRTB SBA charge for a sensitivity portfolio."""
         ...
 
@@ -3040,11 +3040,13 @@ class SaCcrEngine:
     """SA-CCR EAD engine matching the canonical Rust API."""
 
     def __init__(self, alpha: float | None = None, reporting_currency: str = "USD") -> None: ...
-    def calculate_ead(self, config: SaCcrNettingSetConfig, trades: list[SaCcrTrade]) -> dict:
+    def calculate_ead(self, config: SaCcrNettingSetConfig, trades: list[SaCcrTrade]) -> dict[str, Any]:
         """Calculate SA-CCR EAD for a netting set and trade list."""
         ...
 
-def frtb_sba_charge(sensitivities: FrtbSensitivities, correlation_scenario: str | None = None) -> tuple[float, dict]:
+def frtb_sba_charge(
+    sensitivities: FrtbSensitivities, correlation_scenario: str | None = None
+) -> tuple[float, dict[str, Any]]:
     """Compute the FRTB SBA capital charge.
 
     Parameters

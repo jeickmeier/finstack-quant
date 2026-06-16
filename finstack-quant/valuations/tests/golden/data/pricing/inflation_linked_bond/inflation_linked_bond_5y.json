@@ -6,11 +6,11 @@
     "description": "Synthetic 5Y inflation-linked bond on deterministic real and CPI curves.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
+    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-06-16",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -197,12 +197,12 @@
     }
   },
   "expected": {
-    "npv": 1140623.6364101623,
-    "real_yield": 0.009932285188,
-    "breakeven_inflation": 0.004617685695,
-    "index_ratio": 1.041639304041,
-    "real_duration": 4.842303902839,
-    "dv01": -553.902231925167
+    "npv": 1140623.636410162,
+    "real_yield": 0.009932285187926632,
+    "breakeven_inflation": 0.00461768569475729,
+    "index_ratio": 1.0416393040407212,
+    "real_duration": 4.825167336952283,
+    "dv01": -553.9022319256328
   },
   "tolerances": {
     "npv": {

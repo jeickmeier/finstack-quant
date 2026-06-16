@@ -30,9 +30,7 @@ js-sys = "0.3"
 serde = { workspace = true }
 serde-wasm-bindgen = "0.6"
 serde_json = { workspace = true }
-getrandom = { version = "0.2", features = ["js"] }
 indexmap = { workspace = true }
-ts-rs = { version = "12", optional = true, features = ["serde-compat"] }
 console_error_panic_hook = "0.1"
 
 # Month enum required by Date bindings
@@ -53,7 +51,7 @@ wasm-bindgen-test = "0.3"
 # - `ts_export`: Emit TypeScript type definitions at build time (opt-in, writes files to disk)
 [features]
 default = []
-ts_export = ["dep:ts-rs", "finstack-quant-valuations/ts_export"]
+ts_export = ["finstack-quant-valuations/ts_export"]
 
 [package.metadata.wasm-pack.profile.release]
 # Keep this feature allowlist in sync with the wasm features emitted by the

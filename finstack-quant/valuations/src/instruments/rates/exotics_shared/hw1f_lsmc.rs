@@ -6,7 +6,7 @@
 //!
 //! 1. **Forward pass.** For each path the harness runs the full simulation
 //!    (accumulating the pathwise money-market numeraire `B(t)`, exposed to
-//!    payoffs via [`StateKey::BankAccount`]) and records per-path the time-0
+//!    payoffs via `StateKey::BankAccount`) and records per-path the time-0
 //!    PV reported by [`finstack_quant_monte_carlo::traits::Payoff::value`], as well
 //!    as the short rate, undiscounted exercise value, bank factor, and
 //!    inactive flag at each exercise date.

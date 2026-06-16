@@ -11,6 +11,14 @@ stability contract and schema-version policy.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-16
+
+### Removed
+- **`finstack_quant_valuations::models::closed_form::heston::HestonParams::from_market` removed.**
+  Use `HestonParams::from_market_strict` and provide all five `HESTON_*`
+  unitless market scalars explicitly; missing or mistyped Heston parameters now
+  fail loudly instead of falling back to representative defaults.
+
 ## [0.5.0] - 2026-05-23
 
 ### `finstack-quant-wasm` — JS facade simplification (breaking)

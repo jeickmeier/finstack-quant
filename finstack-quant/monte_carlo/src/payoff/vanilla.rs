@@ -66,7 +66,7 @@ impl Payoff for EuropeanCall {
     /// # Panics
     ///
     /// Panics if the process did not populate a finite `SPOT` state variable
-    /// (process/payoff wiring bug) — see [`super::require_finite_state`].
+    /// (process/payoff wiring bug) — see `require_finite_state`.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
             self.terminal_spot = super::require_finite_state(state.spot(), "SPOT", state.step);
@@ -128,7 +128,7 @@ impl Payoff for EuropeanPut {
     /// # Panics
     ///
     /// Panics if the process did not populate a finite `SPOT` state variable
-    /// (process/payoff wiring bug) — see [`super::require_finite_state`]. A
+    /// (process/payoff wiring bug) — see `require_finite_state`. A
     /// silent 0.0 default would pay the full strike here.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
@@ -205,7 +205,7 @@ impl Payoff for Digital {
     /// # Panics
     ///
     /// Panics if the process did not populate a finite `SPOT` state variable
-    /// (process/payoff wiring bug) — see [`super::require_finite_state`]. A
+    /// (process/payoff wiring bug) — see `require_finite_state`. A
     /// silent 0.0 default would make digital puts always pay.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {
@@ -285,7 +285,7 @@ impl Payoff for Forward {
     /// # Panics
     ///
     /// Panics if the process did not populate a finite `SPOT` state variable
-    /// (process/payoff wiring bug) — see [`super::require_finite_state`]. A
+    /// (process/payoff wiring bug) — see `require_finite_state`. A
     /// silent 0.0 default would pay ±F × N.
     fn on_event(&mut self, state: &mut PathState) {
         if state.step == self.maturity_step {

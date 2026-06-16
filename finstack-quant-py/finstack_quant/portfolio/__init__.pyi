@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import pandas as pd
 
 from finstack_quant.core.market_data import MarketContext
@@ -1409,7 +1411,7 @@ class FactorRiskDecomposition:
 def decompose_factor_risk(
     sensitivities: SensitivityMatrix,
     covariance_json: str,
-    risk_measure: str | dict | None = None,
+    risk_measure: str | dict[str, Any] | None = None,
 ) -> FactorRiskDecomposition:
     """Decompose portfolio risk into factor and position contributions.
 

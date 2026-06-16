@@ -36,8 +36,8 @@ finstack-quant-statements-analytics = { path = "../finstack-quant/statements-ana
 finstack-quant-scenarios = { path = "../finstack-quant/scenarios" }
 finstack-quant-portfolio = { path = "../finstack-quant/portfolio" }
 nalgebra = "0.34"
-numpy = "0.28"
-pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
+numpy = "0.29"
+pyo3 = { version = "0.29", features = ["multiple-pymethods"] }
 rand = { version = "0.9.3", default-features = false, features = ["std"] }
 rand_pcg = { version = "0.9", features = ["serde"] }
 serde = { workspace = true }

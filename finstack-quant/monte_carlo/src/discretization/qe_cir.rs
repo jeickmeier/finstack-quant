@@ -51,7 +51,7 @@ impl QeCir {
     /// One QE step of the CIR process.
     ///
     /// Thin wrapper around [`qe_step_variance`]; see
-    /// [`super::qe_common`] for the algorithm, references, and numerical
+    /// `qe_common` for the algorithm, references, and numerical
     /// safeguards shared with `QeHeston`.
     #[inline]
     fn step_variance(&self, v_t: f64, kappa: f64, theta: f64, sigma: f64, dt: f64, z: f64) -> f64 {

@@ -198,7 +198,7 @@ Residual risk concentrates in three places:
 
 ---
 
-# Implementation Status — reconciled 2026-06-11
+## Implementation Status — reconciled 2026-06-11
 
 Full audit of every finding against the working tree (three independent verification passes, evidence at file:line confirmed for each item).
 

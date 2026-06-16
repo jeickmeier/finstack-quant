@@ -3,7 +3,7 @@
 //! Composes the three building blocks the Bates dynamics require:
 //!
 //! 1. **Variance leg** — Andersen's QE scheme (Case A / Case B switch with
-//!    safeguards), via the shared [`super::qe_common`] implementation inside
+//!    safeguards), via the shared `qe_common` implementation inside
 //!    the embedded [`QeHeston`] step.
 //! 2. **Diffusive spot leg** — the martingale-exact `K0*` log update from
 //!    [`QeHeston`] (Andersen 2008, §4.2), with the spot–variance correlation

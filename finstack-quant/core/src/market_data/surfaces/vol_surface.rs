@@ -143,7 +143,7 @@ pub enum VolInterpolationMode {
     /// arbitrage-free. For arbitrage-sensitive workflows (Dupire local vol,
     /// no-arb checks, term-structure interpolation) select
     /// [`TotalVariance`](Self::TotalVariance) via
-    /// [`VolSurfaceBuilder::with_interpolation_mode`]. The default is retained
+    /// [`VolSurface::with_interpolation_mode`]. The default is retained
     /// for backward compatibility and quote-space fidelity at the pillars.
     #[default]
     Vol,
@@ -697,7 +697,7 @@ impl VolSurface {
     /// Apply a filtered bucket bump (percentage) to matching expiry/strike cells.
     ///
     /// Filter values must equal the surface's own grid values (a tiny relative
-    /// tolerance of [`BUCKET_BUMP_MATCH_TOLERANCE`] absorbs floating-point
+    /// tolerance of `BUCKET_BUMP_MATCH_TOLERANCE` absorbs floating-point
     /// round-off only); values that fall between grid points match nothing.
     pub fn apply_bucket_bump(
         &self,

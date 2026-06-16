@@ -28,11 +28,12 @@
 //!
 //! # `decimals()` fallback
 //!
-//! [`Currency::decimals`] returns the ISO 4217 minor-unit count from the
-//! generated table (`data/iso_4217.csv`). If a currency's numeric code were
-//! ever missing from that table, the accessor falls back to **2 decimal
-//! places** rather than panicking; the table is generated from the full ISO
-//! list precisely so this fallback never fires in practice.
+//! `Currency::decimals()` returns the ISO 4217
+//! minor-unit count from the generated table (`data/iso_4217.csv`). If a
+//! currency's numeric code were ever missing from that table, the accessor
+//! falls back to **2 decimal places** rather than panicking; the table is
+//! generated from the full ISO list precisely so this fallback never fires in
+//! practice.
 //!
 //! # Examples
 //!

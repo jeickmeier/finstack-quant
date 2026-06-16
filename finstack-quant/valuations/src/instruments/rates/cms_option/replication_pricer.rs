@@ -104,9 +104,9 @@ const K_FLOOR: f64 = 1e-4; // 1 basis point
 /// for ATM long-dated CMS cases (e.g. 20Y tenor, T=5Y).  The old claim of
 /// "relative errors below 1e-8" no longer holds for this integrand shape.
 ///
-/// TODO: consider interval subdivision or adaptive quadrature near k=K to
-/// reduce the peaked-integrand error below 0.1% without increasing global
-/// node count.
+/// Future accuracy work can consider interval subdivision or adaptive
+/// quadrature near k=K to reduce the peaked-integrand error below 0.1%
+/// without increasing global node count.
 const QUAD_ORDER: usize = 16;
 
 // ========================= MATH HELPERS =========================

@@ -55,9 +55,11 @@ These patterns recur in nearly every bucket and are the best targets for a syste
 > Each bucket section is the verified, consolidated output for its slices. File references are `file:line` relative to the slice's directory unless otherwise noted. "remove" = safe per the adversarial verifier; "strengthen rather than delete" calls are noted explicitly.
 
 ## credit
+
 The credit instrument test suite carries substantial low-value bloat (positivity/Ok-only duplicates and tautological constant-vs-itself tests) and notable metric coverage gaps, most critically several registered risk metrics (Recovery01, Cs01Hazard, Dividend01) with zero test invocation.
 
 ### Duplicates to consolidate
+
 - `metrics_basic.rs:243 test_protection_pv_metric_positive`, `:266 test_premium_pv_metric_positive`, `:220 test_par_spread_metric_positive` (cds_index) — remove; `assert_positive`-only variants of `test_metric_protection_leg_pv:71`, `test_metric_premium_leg_pv:95`, `test_metric_par_spread:40`.
 - `metrics_risk.rs:312 test_risky_pv01_present` and `:554 test_risky_pv01_computable` (cds_index) — byte-identical `abs()>0` checks; remove both, `test_risky_pv01_positive:18` subsumes (adds range + positivity).
 - `metrics_risk.rs:113 test_risky_pv01_scales_with_notional`, `:154 test_cs01_scales_with_notional`, `:236 test_risky_pv01_increases_with_maturity` (cds_index) — remove; identical to `pricing_single_curve.rs:229/253/336`. Keep `test_cs01_increases_with_maturity:274` (no counterpart).
@@ -71,6 +73,7 @@ The credit instrument test suite carries substantial low-value bloat (positivity
 - `test_implied_vol.rs:131 test_implied_vol_positive` (cds_option) — remove; `test_implied_vol_round_trip:9` exercises vol=0.35 at tighter tolerance.
 
 ### Dead / unnecessary tests to remove
+
 - `market_standards_tests.rs:193/308/226/59` (cds_tranche) — remove four constant-vs-itself / setup-ordering tautologies (`1.0==1.0`, `0.5==0.5`, `low<high`, `0<3<7<10`); real behavior covered by config-default and correlation/subordination value tests.
 - `deal_specific_tests.rs:240/262/332`, `coverage_tests.rs:55/335`, `waterfall_tests.rs:267` (structured_credit) — remove `matches!` enum-identity tautologies, tautological getter constructions, and the PSA-grid-content test; behavior covered by the corresponding calculator/scenario tests in the same files.
 - `feature_tests.rs:354 reserve_account_recipient_type_exists`, `:321 cleanup_call_disabled_by_default`, `calendar_tests.rs:315 test_different_calendars_may_produce_different_dates` (structured_credit) — remove; variant-roundtrip/default-value/non-empty-only checks with no behavioral assertion.
@@ -78,6 +81,7 @@ The credit instrument test suite carries substantial low-value bloat (positivity
 - `test_equity_trs.rs:66 test_equity_trs_different_contract_sizes` (trs) — remove; both instruments use the hardcoded default `contract_size=1.0`, so it asserts the constant against itself.
 
 ### Coverage holes to add
+
 - **Recovery01 / Cs01Hazard untested (major, cds_index):** `MetricId::Recovery01` and `MetricId::Cs01Hazard` are registered but have zero test invocations. Add `metrics_risk.rs` cases asserting finite/expected-sign, notional linearity, SingleCurve-vs-Constituents consistency, recovery=0 boundary (no NaN), and Cs01Hazard≈Cs01 under flat hazards.
 - **Defaulted-constituent end-to-end pricing (major, cds_index):** no test sets `defaulted: true`. Add a `pricing_constituents.rs` test with 1-of-5 defaulted, `index_factor=0.8`; assert premium leg reduced by defaulted weight, live-weight sum <1.0, and `value()`/leg PVs succeed.
 - **Equity TRS Dividend01 metric (major, trs):** `MetricId::Dividend01` registered but unexercised. Add tests for finite/expected-sign with `div_yield_id` set, the `div_yield_id=None` case, and pay-TR side sign flip.
@@ -90,9 +94,11 @@ The credit instrument test suite carries substantial low-value bloat (positivity
 - **Z-spread off-par (moderate, structured_credit):** `risk_tests.rs:93` only covers the trivial zero case; add discount/premium tranche cases asserting positive/negative bps from `calculate_tranche_z_spread`.
 
 ## fixed-income-cash
+
 Strong existing coverage, but a recurring pattern of `is_ok()`/`is_finite()`-only assertions, hand-computed tautological DV01 tests, and large registered-but-untested metric/process surfaces (WAL, FRN z-spread, MC variants, repo collateral sensitivities, bond-future CTD selection) needs attention.
 
 ### Duplicates to consolidate
+
 - `tests/instruments/revolving_credit/revolving_credit.rs` (entire 10-test file) is undeclared in `mod.rs` and never compiles — delete it; `basic.rs` covers all 10 plus the unique `basic.rs:285 test_revolving_credit_cs01_z_spread_fallback_without_credit_curve`.
 - `tests/instruments/term_loan/metrics/callability.rs` is a byte-for-byte subset of `integration.rs` — delete the file and drop `mod callability;`; both tests survive verbatim in `integration.rs` (which also has the unique floating-rate DM test).
 - ILB `test_edge_cases.rs` duplicates the `test_pricing.rs`/`test_cashflows.rs` canonical homes — remove `test_cashflow_provider_trait:496`, `test_valuation_at_maturity:34`, `test_valuation_after_maturity:18`, `test_same_issue_and_maturity_date:265`; also remove `test_pricing.rs:341 test_npv_positive_for_positive_coupons` (subsumed by `test_npv_basic:16`) and `test_pricing.rs:34 test_value_via_instrument_trait` (calls `value()` twice, no real dyn dispatch).
@@ -102,6 +108,7 @@ Strong existing coverage, but a recurring pattern of `is_ok()`/`is_finite()`-onl
 - repo edge_cases — remove `edge_cases.rs:84 test_very_short_term` (subset of `construction.rs:189`) and `edge_cases.rs:126 test_zero_rate_repo` (fold its `total_repayment` assertion into `pricing.rs:121 test_zero_rate_interest`).
 
 ### Dead / unnecessary tests to remove
+
 - ILB `test_duration.rs:202–369` — seven DV01 tests (`test_dv01_positive_before_maturity`, `_zero_at_maturity`, `_zero_after_maturity`, `_scales_with_notional`, `_scales_with_time_to_maturity`, `_reasonable_magnitude`, `test_duration_and_dv01_relationship`) hand-compute `notional*yf*0.0001` and never invoke any ILB metric; remove or rewrite against `price_with_metrics(MetricId::Dv01)`. Real DV01 is already covered by `test_metrics.rs:118`.
 - revolving_credit no-assertion / wrong-direction tests — `construction.rs:138/159` assert invalid configs are *accepted* (rewrite to `.build().unwrap().validate()` and assert `Err`, or delete; `validate_method.rs` already covers rejection); strengthen `cashflows.rs:16/45/75` (only `!flows.is_empty()`), `metrics/commitment_fee.rs:16`, `metrics/utilization_fee.rs:16`, and `metrics/dv01.rs:17` (add `dv01 < 0.0` sign check) with the quantitative assertions their comments already promise.
 - repo no-assertion / tautological — fix `margin.rs:103 test_margin_frequency_options` (wildcard `matches!(_, _)` → `assert_eq!`); remove trivial getter round-trips `edge_cases.rs:286 test_triparty_flag_variations`, `edge_cases.rs:359 test_business_day_conventions`, `margin.rs:227`, `metrics.rs:371 test_metric_dependencies_resolved`; strengthen `edge_cases.rs:171/193` and `metrics.rs:332 test_bucketed_dv01_metric` (only `contains_key`) with PV/finiteness/sum-to-flat-DV01 bounds.
@@ -111,6 +118,7 @@ Strong existing coverage, but a recurring pattern of `is_ok()`/`is_finite()`-onl
 - inflation_swap dedupe/strengthen — dedupe the doubled `MetricId::Dv01` entries in `integration/test_full_pricing.rs:34/160` and `:319/321`; add a real sign assertion to `test_ir01.rs:126 test_ir01_sign_pay_fixed` (currently `is_finite` only); delete the stale TODO comment at `test_bucketed_dv01.rs:95-99` (contradicts the now-correct `>0.0` assertion).
 
 ### Coverage holes to add
+
 - bond_future CTD selection (major): `determine_ctd` (`types.rs:839`) and `determine_ctd_with_accrued` (`types.rs:942`) are untested (only implied-repo path is) — add tests selecting the cheapest gross/dirty-basis bond from a multi-bond basket plus the no-valid-prices `Err` path.
 - bond_future metric calculators (major): `metrics/pricing.rs` (`FuturesPriceCalculator`, `ConversionFactorCalculator`) has zero tests — add registry-dispatch tests asserting outputs match `BondFuturePricer::calculate_model_price` / `calculate_conversion_factor`.
 - bond WAL metric (major): `BondWalCalculator` (registered `metrics/mod.rs:194`) has no tests — add (1) bullet WAL == time-to-maturity, (2) amortizing WAL = Σ(Pᵢtᵢ)/ΣPᵢ < maturity, (3) WAL decreases as `as_of` advances.
@@ -126,9 +134,11 @@ Strong existing coverage, but a recurring pattern of `is_ok()`/`is_finite()`-onl
 - bond parallel/currency/FRN gaps (moderate): no `parallel:false` vs `parallel:true` bitwise-equal Decimal test, no USD-bond-vs-EUR-curve currency-mismatch `Err` test, and all eight `metrics/spreads.rs` z-spread tests use fixed-rate bonds — add an FRN (SOFR+150bp) z-spread round-trip and the two safety/determinism tests.
 
 ## rates-derivatives
+
 The rates-derivatives suite carries substantial redundancy (existence-only smoke tests, byte-identical spec/Greek duplicates, and a dead `cfg(any())` block) alongside material gaps in second-order/diagnostic metrics, serde stability, and shifted-lognormal/negative-rate pricing branches.
 
 ### Duplicates to consolidate
+
 - IRS rate-sensitivity sweep is tested twice with identical inputs — remove `pricing.rs:320 test_irs_rate_sensitivity_inverse`; `validation/market_standards.rs:454 test_irs_rate_sensitivity` is strictly richer (adds at-par NPV).
 - Cap/floor Bachelier-Greeks FD tests are near-identical across two files — merge `validation/normal_vol.rs` and `validation/normal_greeks.rs` into one file, keeping a single FD-delta and FD-vega plus the unique `normal_greeks_with_negative_forward` (line 378) and `normal_delta_increases_with_moneyness` (line 446).
 - IR-future spec/convention helpers are byte-for-byte identical, producing five subset duplicates — remove `test_market_standard.rs:375 test_standard_contract_specifications`, `:116 test_tick_value_exchange_standard`, `:152 test_sofr_convention`, and `test_construction.rs:64 test_eurodollar_specs`; either drop or make `create_eurodollar_specs`/`create_sofr_specs` genuinely distinct.
@@ -140,6 +150,7 @@ The rates-derivatives suite carries substantial redundancy (existence-only smoke
 - CMS-option vol-surface-missing is tested twice — remove `test_pricing.rs:422 test_cms_option_requires_vol_surface`; keep the realistic wrong-key `:464`.
 
 ### Dead / unnecessary tests to remove
+
 - CMS-option `vanna.rs:1-98` is gated by `#![cfg(any())]` (never compiles) and predates the Decimal migration — delete lines 1-98 and the dead-only imports at 99-108; live `test_cms_option_vanna` (line 110) covers it.
 - IRS bucketed-DV01 existence-only smoke tests assert only `contains_key`/`is_some` — remove all five: `metrics/bucketed_dv01.rs:109/133/155/177/198`; real coverage is in `test_bucketed_dv01_per_curve` and `test_bucketed_vs_parallel_dv01_sanity`.
 - Tautological getter/literal-echo tests — remove IRS `construction.rs:194 test_irs_large_notional` & `:210 test_irs_small_notional`, `integration/margin.rs:195 test_bilateral_vs_cleared_im_difference`, and IR-future `test_pricing.rs:229 test_value_trait_consistency` (both sides call `value()`).
@@ -150,6 +161,7 @@ The rates-derivatives suite carries substantial redundancy (existence-only smoke
 - Basis-swap `test_basis_swap_par_spread.rs:401 par_spread_different_frequencies` is mislabeled (both legs quarterly) and only `is_finite` — fix to use genuinely different frequencies with a sign assertion, or remove.
 
 ### Coverage holes to add
+
 - **IRS second-order/diagnostic metrics (major):** `IrConvexity`/`IrCrossGamma` (`metrics/ir_convexity.rs`) and the `schedule_diagnostics` calculators (payment counts, first/last payment dates, first accrual factor) have zero tests — add value-asserting tests for both.
 - **IRS serde stability (major):** no round-trip or `deny_unknown_fields` test for `InterestRateSwap` — add a serialize/deserialize equality test plus an unknown-field-rejection test.
 - **Cap/floor ShiftedLognormal branch (major):** every test sets `vol_shift: 0.0`; the distinct pricing/Greek branch is untested — add `validation/shifted_lognormal.rs` asserting positive PV under shift with negative forward, convergence to Black-76 as shift→0, and consistent F+shift/K+shift application.
@@ -162,9 +174,11 @@ The rates-derivatives suite carries substantial redundancy (existence-only smoke
 - **Cap/floor + CMS smaller branches (moderate):** add negative-strike pricing (Normal positive PV; Lognormal error/fallback), strengthen theta sign assertions (`theta.rs`) and make `test_short_maturity_higher_theta` actually compare magnitudes, exercise `CapFloor::example()`/`market_dependencies()`, and add CMS Delta/Rho/Volga smoke tests plus a put-call-parity check.
 
 ## equity-fx
+
 Heavy inline/integration test duplication and a large band of registered-but-unexercised metrics and alt-model pricers (Heston/rough-Heston/PDE MC, OHLC variance methods, FX delta/correlation metrics), plus pervasively missing serde `deny_unknown_fields` round-trip coverage across all FX instruments.
 
 ### Duplicates to consolidate
+
 - NDF inline unit tests fully subsumed by integration copies (strict supersets): remove `src/instruments/fx/ndf/types.rs` `test_ndf_value_at_market:1505`, `test_ndf_value_with_fixing_rate:1535`, `test_ndf_value_unfavorable_fixing:1564`, `test_ndf_value_expired:1592`, `test_ndf_with_fixing_rate:1031`, `test_ndf_serde_roundtrip:1095`, `test_ndf_curve_dependencies:1062`, `test_ndf_with_foreign_curve:1072`, `test_ndf_creation:998`, `test_ndf_example:1022`, `test_ndf_instrument_trait:1051`.
 - FxForward inline unit tests subsumed by integration supersets: remove `src/instruments/fx/fx_forward/types.rs` `test_fx_forward_creation:795`, `test_fx_forward_example:815`, `test_fx_forward_instrument_trait:844` (+ `test_fx_forward_pricing.rs:335 test_fx_forward_instrument_key`), `test_fx_forward_curve_dependencies:855`, `test_fx_forward_serde_roundtrip:865`, `test_fx_forward_with_forward_points:824`.
 - EquityIndexFuture inline unit tests subsumed by `test_types.rs`: remove `src/instruments/equity/equity_index_future/types.rs` `test_equity_future_specs_sp500_emini:504`, `test_equity_future_specs_nasdaq100_emini:512`, `test_sp500_emini_constructor:553`, `test_nasdaq100_emini_constructor:575`, `test_position_sign:597`, `test_serde_round_trip:625`.
@@ -175,6 +189,7 @@ Heavy inline/integration test duplication and a large band of registered-but-une
 - fx_swap dupes: remove `tests/instruments/fx_swap/edge_cases.rs:74 test_far_before_near` (subsumed by `types.rs:477`), `integration.rs:231 test_par_swap_construction`, `metrics.rs:416 test_bucketed_dv01`.
 
 ### Dead / unnecessary tests to remove
+
 - Tautological field-setter / enum-assignment tests exercising no library logic: `equity_option/test_constructors.rs:99 test_settlement_type_variations` and `:113 test_exercise_style_variations`; `fx_option/test_instrument.rs:437 test_exercise_styles` — **replace** this one with a `value()` call on an American-style FxOption asserting `Err` (otherwise the American-rejection path goes uncovered).
 - Helper/self-validation tests verifying test scaffolding, not production code: `equity_option/helpers.rs:221 test_assert_approx_eq_helper`, `:226 test_smile_surface_builder`, `:233 test_smile_market_builder`.
 - fx_spot tautological/no-assertion tests: `metrics/theta.rs:48 test_theta_with_future_settlement` (no assertion), `construction.rs:60 test_construction_with_bdc` (sets the existing default), `edge_cases.rs:168 test_multiple_clones` (moves, not clones), and the three id getter round-trips `edge_cases.rs:142/149/157` (`Id::new` does no validation).
@@ -184,6 +199,7 @@ Heavy inline/integration test duplication and a large band of registered-but-une
 - `fx_forward/test_fx_forward_types.rs:152 test_fx_forward_clone` — derived Clone, no behavior verified.
 
 ### Coverage holes to add
+
 - **(major) Alt-model MC/PDE pricers for equity_option have zero integration tests.** Add `test_heston_mc.rs` and `test_rough_heston_mc.rs` mirroring `test_rough_bergomi.rs` (ATM sanity, fixed-seed bit determinism, discrete-dividend W-31 rejection, missing-scalar error); add `PdeCrankNicolson1D` (matches BS European, American ≥ European) and a `PdeAdi2D` smoke test.
 - **(major) FX variance swap has no Pay-side, no matured-path, and no OHLC coverage.** Add Pay-vs-Receive sign test (`pv_pay == -pv_receive`); a matured case (`as_of >= maturity`) asserting undiscounted PV plus an empty-prices zero-PV case; and OHLC-method tests (e.g. Parkinson) covering populated series and the missing-`open_series_id` error. Add a `metrics.rs` driving all six untested secondary calculators (Vega/VarianceVega/RealizedVariance/VarianceNotional/StrikeVol/TimeToMaturity/DV01) through `MetricContext`.
 - **(major) Registered-but-unexercised metric values for fx_spot/fx_forward/quanto.** fx_spot: assert `FxDelta == notional` and `Fx01 == 12000` (1% of 1.2M USD) and DV01 sign. fx_forward: invoke `Dv01`/`Fx01` via the registry and assert against `fx_forward_1y_eurusd.json` (taking dPV/dy native signs as correct), optionally `BucketedDv01` sums to parallel `Dv01`. quanto: extend the finite-metrics test to request `Rho/ForeignRho/Dv01/BucketedDv01/Vanna/Volga`.
@@ -198,9 +214,11 @@ Heavy inline/integration test duplication and a large band of registered-but-une
 - **(moderate) fx_swap secondary metrics are `is_finite`-only.** Strengthen `Fx01/Theta/carry_pv/foreign IR01/steep/inverted PV` (`metrics.rs:183/370/393/115`, `pricing.rs:177/199`) with sign+magnitude bounds; add `FxDelta == Fx01` equivalence and `FxSwap::from_trade_date` (T+2 spot lag) coverage.
 
 ## exotics-commodity-misc
+
 Commodity-instrument duplicate tests and tautological getters dominate the cleanup; the highest-value gaps are entire untested calculators/pricers (weight-risk, NAV01/Carry01/Hurdle01, Heston barrier MC, commodity Asian/spread/swaption integration) plus broadly missing serde round-trips and golden references.
 
 ### Duplicates to consolidate
+
 - Commodity integration tests duplicate stronger inline unit tests — remove `test_commodity_forward.rs:125 test_commodity_forward_instrument_trait`, `:210 test_commodity_forward_long_short_symmetry`, `test_commodity_swap.rs:163 test_commodity_swap_instrument_trait`, `:452 test_commodity_swap_serialization`, `:174 test_commodity_swap_receive_fixed`; each is subsumed (often more tightly) by the inline unit test of the same/sibling name in `commodity_forward/types.rs` / `commodity_swap/types.rs`.
 - `variance_swap/valuation.rs:260 test_npv_at_maturity_no_discounting_applied` — remove; the PV==undiscounted-payoff identity is already verified with a different path by `:238 test_npv_at_maturity_recovers_realized_payoff`.
 - `private_market_fund/test_private_markets_fund.rs:427 test_irr_calculation_accuracy` — remove; exact copy of `pe_fund/metrics.rs:358 test_irr_calculation`, which is strictly stronger.
@@ -208,6 +226,7 @@ Commodity-instrument duplicate tests and tautological getters dominate the clean
 - `variance_swap/edge_cases.rs:588-618` (`test_time_elapsed_fraction_boundary_at_start`/`_at_maturity`) — removable (medium confidence); the four `observation.rs:223/236/248/260` boundary tests plus `:308 is_monotonic` cover the same assertions.
 
 ### Dead / unnecessary tests to remove
+
 - No-assertion / tautological constructors and getters — remove `basket/test_basket_comprehensive.rs:1589 test_basket_calculator_from_basket`, `private_market_fund/test_private_markets_fund.rs:310 test_private_markets_fund_creation` and `:320 test_private_markets_fund_with_discount_curve` (fold the latter into a real discount-curve PV test).
 - `variance_swap/variance_calculation.rs:293 test_expected_variance_before_start_equals_forward` — remove; the forward-variance comparison its name promises is bound to `_forward` and never asserted, and the lone live assertion duplicates two other tests.
 - `variance_swap/valuation.rs:357 test_value_method_delegates_to_npv` — remove; tautological 2-call determinism check already covered by `edge_cases.rs:395`.
@@ -216,6 +235,7 @@ Commodity-instrument duplicate tests and tautological getters dominate the clean
 - Strengthen rather than delete (conditionally-vacuous, only integration coverage): `private_market_fund/test_private_markets_fund.rs:79 test_preferred_return_calculation` and `:109 test_promote_split` — drop the `if !rows.is_empty()` guards, assert unconditionally, tighten the promote split to ~1e-4.
 
 ### Coverage holes to add
+
 - Entirely untested calculators — major: add MetricContext tests for `WeightRiskCalculator::calculate` (`basket/metrics/weight_risk.rs`, no test module at all: redistribution, clamp-to-1.0, single-constituent) and for `NAV01/Carry01/Hurdle01` (`pe_fund/metrics/{nav01,carry01,hurdle01}.rs`, zero tests: sign direction Carry01<0/Hurdle01>0, ~10% FD magnitude, no-promote-tier safe path).
 - Untested pricers — major: `BarrierOptionHestonMcPricer` (`heston_mc_pricer.rs`, no test module) needs a non-degenerate-Heston smoke price, a Feller-violation `Err`, and an `mc_stderr` measure check; lookback `use_gobet_miri=true` MC dispatch (`types.rs:244`) is never exercised — add an analytical-vs-MC convergence test.
 - Missing commodity integration files — major: add `tests/instruments/commodity/test_commodity_{asian_option,spread_option,swaption}.rs` exercising the full MarketContext pricing path (ordering/parity/zero-vol intrinsic/validation `Err`/serde), all currently inline-only.
@@ -232,9 +252,11 @@ Commodity-instrument duplicate tests and tautological getters dominate the clean
 - HW1F rebasing — moderate: a curve whose `base_date` precedes `as_of` to exercise `rebased_discount_fn`'s forward-rebasing branch (`hw1f_curve.rs:76-80`), never hit by current fixtures.
 
 ## non-instrument-and-cross-cutting
+
 Heavy duplication of put-call/parity and "smoke" invariants across the sanity_invariants and quantlib_parity layers, several mislabeled no-assertion tests, and systemic gaps in serde round-trip / schema-stability coverage plus ~120 orphaned test-infrastructure tests that never compile.
 
 ### Duplicates to consolidate
+
 - `tests/sanity_invariants/test_equity_option_parity.rs:129` (`test_put_call_parity`), `test_fx_option_parity.rs:161` (`test_fx_put_call_parity`), `test_bond_pricing_parity.rs:187` (`test_bond_price_yield_inverse_relationship`): remove all three — the per-instrument suites (`instruments/equity_option/test_put_call_parity.rs`, `instruments/fx_option/test_put_call_parity.rs`, `instruments/bond/pricing.rs:80`) cover the same invariants over far broader scenarios at tighter tolerances.
 - `tests/instruments/swaption/integration/bermudan_integration.rs:68-329`: delete the eight functions that are character-for-character identical to `bermudan_pricing.rs:106-367` (the superset); drop the file and its `pub mod` line if it empties.
 - `tests/instruments/swaption/integration/quantlib_parity.rs` implied-vol (546-611), `test_quantlib_parity_vega` (347), `test_quantlib_parity_vol_impact` (279), `payer_receiver.rs:19` (`test_payer_receiver_symmetry`), and `cross_validation.rs:8` (`test_all_greeks_run_together`): remove — each is a weaker/equal subset of `metrics/implied_vol.rs`, `metrics/vega.rs:31`, `invariants.rs:176`, `invariants.rs:39`, and the quantlib full-greeks suite respectively.
@@ -247,6 +269,7 @@ Heavy duplication of put-call/parity and "smoke" invariants across the sanity_in
 - `tests/calibration/builder.rs:62` (`plan_and_envelope_serde_roundtrip`), `src/schema.rs:287` (`test_all_schemas_parse_successfully`), `tests/integration/metrics/strict_mode.rs:201` (`test_strict_is_default`): remove — fully covered by `serialization.rs` round-trips, the `.expect()` loads in `test_schema_stubs`, and `test_unknown_metric_fails_strict_mode` respectively.
 
 ### Dead / unnecessary tests to remove
+
 - `tests/instruments/swaption/pricing/sabr_model.rs:34` (`test_sabr_vs_black_atm`): the only comparative assert is `rel_diff < 10.0` (1000% tolerance) — remove or replace with a real beta=1/nu→0 → Black76 convergence (≤5%) check.
 - `tests/instruments/swaption/metrics/gamma.rs:111` (`test_gamma_decreases_with_time_to_expiry`), `tests/instruments/fra/metrics/theta.rs:114` (`test_theta_sign_convention`), `tests/instruments/deposit/metrics/theta.rs:7/24/69` and `bucketed_dv01.rs:7`: names promise directional/sign checks but bodies only assert finiteness/non-negativity — add the missing directional assertion or remove.
 - `tests/instruments/fra/metrics/bucketed_dv01.rs:71/91/146` and `construction.rs:172/185`, plus `market_standards.rs:174/199`: no-effective-assertion (only `contains_key` / getter round-trip / calendar arithmetic on literals) — remove or add a value assertion.
@@ -258,6 +281,7 @@ Heavy duplication of put-call/parity and "smoke" invariants across the sanity_in
 - `tests/support/{attribution_test_utils.rs, convertible_fixtures.rs}` and `tests/instruments/common/{helpers,metrics}/mod.rs` (empty stubs) plus the unused `TestInstrument` structs in `tests/common/test_utils.rs:14` and `tests/support/test_utils.rs:102`: remove orphaned/never-compiled helper code.
 
 ### Coverage holes to add
+
 - **Serde round-trip / schema stability (systemic, multiple slices)** — no serialize→deserialize equality or `deny_unknown_fields` rejection test for `Swaption`/`BermudanSwaption`, `ConvertibleBond`, `Deposit`, `ForwardRateAgreement`, full `CreditDefaultSwap`, or a complete generated `CashFlowSchedule`; add per-type round-trip + unknown-field-rejection tests (major).
 - **Orphaned/uncompiled test infrastructure (~120 tests)** — add `pub mod pricer;` to `tests/instruments/common/mod.rs` to activate 27 registry tests incl. `test_price_batch_matches_serial_results`; triage `tests/support/` MC/asian/tree-barrier/bermudan files (`asian_option_analytical.rs`, `tree_barrier.rs`, `tree_bermudan_*.rs`, `mc_*`) — migrate the genuinely-uncovered ones, remove the rest; either complete or delete the broken `tests/instruments/common/mc/` module chain (major).
 - **Golden fixtures for registered pricing domains with zero coverage** — `exotics.lookback_option`, `rates.cms_swap`, `rates.cms_spread_option` have full pricers but no golden fixture; add one formula-source fixture each (degenerate lookback→vanilla, ATM CMS swap, ATM CMS spread option) (major).
