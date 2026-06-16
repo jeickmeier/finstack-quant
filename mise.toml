@@ -370,13 +370,13 @@ description = "List source files exceeding the LOC limit (default 1000); -- --ci
 run = "uv run python scripts/check_loc.py"
 
 [tasks.rust-bench]
-description = "Run Rust benchmarks (bench profile)"
-run = "cargo bench --profile bench"
+description = "Run Rust benchmarks with reduced Criterion samples (override: FQ_BENCH_SAMPLE_SIZE)"
+run = "cargo bench --profile bench --bench '*' -- --sample-size ${FQ_BENCH_SAMPLE_SIZE:-10}"
 
 [tasks.rust-bench-baseline]
 description = "Save benchmark baseline as 'main'"
-run = "cargo bench -- --save-baseline main"
+run = "cargo bench --bench '*' -- --save-baseline main"
 
 [tasks.rust-bench-compare]
 description = "Compare current benchmarks against 'main' baseline"
-run = "cargo bench -- --baseline main"
+run = "cargo bench --bench '*' -- --baseline main"
