@@ -144,6 +144,10 @@ run = ["cargo fmt --all -- --check", "cargo clippy --all-targets"]
 description = "Audit Rust dependencies via cargo-deny"
 run = "cargo deny check"
 
+[tasks.rust-semver-checks]
+description = "Compare the umbrella Rust crate against the normalized v0.5.0 baseline"
+run = "python3 scripts/semver_checks.py"
+
 [tasks.rust-update]
 description = "Update Rust dependencies"
 run = "cargo update"
