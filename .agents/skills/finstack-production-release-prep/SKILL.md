@@ -294,10 +294,29 @@ cargo publish -p finstack-quant-core --dry-run
 ### 6f. Binary size check
 
 ```bash
-cargo bloat --release --crates -p finstack-quant-py
+# Representative Rust executable/example targets. `cargo bloat` cannot inspect
+# the mixed `rlib`/PyO3 extension target in `finstack-quant-py`.
+cargo bloat --release --crates -p finstack-quant-valuations --bin gen_schemas
+cargo bloat --release --crates -p finstack-quant-portfolio --example portfolio_optimization
+
+# Python binding size: build the real PyO3 extension via maturin, then inspect
+# the native extension file stored in the wheel.
+mise run wheel-local
+uv run python - <<'PY'
+from pathlib import Path
+from zipfile import ZipFile
+
+for wheel in sorted(Path("target/wheels").glob("finstack_quant_py-*.whl")):
+    with ZipFile(wheel) as archive:
+        for member in archive.infolist():
+            is_native_extension = member.filename.endswith((".so", ".pyd", ".dll", ".dylib"))
+            if member.filename.startswith("finstack_quant/") and is_native_extension:
+                size_mib = member.file_size / (1024 * 1024)
+                print(f"{wheel.name} {member.filename} {size_mib:.2f} MiB")
+PY
 ```
 
-Review for unexpected size regressions from the previous release.
+Review the `cargo bloat` crate tables and Python native extension size for unexpected regressions from the previous release.
 
 ### 6g. API parity
 
