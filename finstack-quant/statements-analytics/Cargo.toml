@@ -9,10 +9,10 @@ authors.workspace = true
 description = "Credit covenant forecasting, alignment analysis, and reporting analytics over Finstack Quant statements"
 
 [dependencies]
-finstack-quant-core = { path = "../core" }
-finstack-quant-covenants = { path = "../covenants" }
-finstack-quant-statements = { path = "../statements" }
-finstack-quant-valuations = { path = "../valuations" }
+finstack-quant-core = { path = "../core", version = "0.6.0" }
+finstack-quant-covenants = { path = "../covenants", version = "0.6.0" }
+finstack-quant-statements = { path = "../statements", version = "0.6.0" }
+finstack-quant-valuations = { path = "../valuations", version = "0.6.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }

@@ -9,7 +9,7 @@ authors.workspace = true
 description = "Risk metrics and portfolio analytics for Finstack Quant: Sharpe, drawdown, correlation matrices, and nearest-correlation repair"
 
 [dependencies]
-finstack-quant-core = { path = "../core" }
+finstack-quant-core = { path = "../core", version = "0.6.0" }
 nalgebra = "0.34"
 serde = { workspace = true }
 thiserror = { workspace = true }

@@ -9,7 +9,6 @@ repository.workspace = true
 description = "Internal test fixtures and helpers shared across Finstack Quant crates (not intended for public consumption)"
 
 [dependencies]
-finstack-quant-core = { path = "../core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { version = "0.1", default-features = false }

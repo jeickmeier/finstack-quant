@@ -4,7 +4,7 @@
 //! various sources: files, strings, and directories.
 
 use crate::golden::types::{GoldenSuite, SuiteMeta};
-use finstack_quant_core::error::Error;
+use crate::Error;
 use serde::de::DeserializeOwned;
 use std::fs;
 use std::path::Path;

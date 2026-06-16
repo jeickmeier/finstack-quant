@@ -9,10 +9,10 @@ authors.workspace = true
 description = "P&L attribution for Finstack Quant portfolios: Brinson, Taylor, parallel, waterfall, and credit-factor decomposition"
 
 [dependencies]
-finstack-quant-core = { path = "../core" }
-finstack-quant-cashflows = { path = "../cashflows" }
-finstack-quant-factor-model = { path = "../factor-model" }
-finstack-quant-valuations = { path = "../valuations" }
+finstack-quant-core = { path = "../core", version = "0.6.0" }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.6.0" }
+finstack-quant-factor-model = { path = "../factor-model", version = "0.6.0" }
+finstack-quant-valuations = { path = "../valuations", version = "0.6.0" }
 indexmap = { workspace = true, features = ["serde"] }
 rayon = "1.11"
 schemars = { workspace = true }

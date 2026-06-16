@@ -9,18 +9,18 @@ authors.workspace = true
 description = "Finstack Quant umbrella crate: deterministic, cross-platform financial computation with currency-safe Decimal arithmetic"
 
 [dependencies]
-finstack_quant_core = { package = "finstack-quant-core", path = "core" }
-finstack_quant_analytics = { package = "finstack-quant-analytics", path = "analytics" }
-finstack_quant_cashflows = { package = "finstack-quant-cashflows", path = "cashflows" }
-finstack_quant_covenants = { package = "finstack-quant-covenants", path = "covenants" }
-finstack_quant_factor_model = { package = "finstack-quant-factor-model", path = "factor-model" }
-finstack_quant_margin = { package = "finstack-quant-margin", path = "margin" }
-finstack_quant_statements = { package = "finstack-quant-statements", path = "statements" }
-finstack_quant_statements_analytics = { package = "finstack-quant-statements-analytics", path = "statements-analytics" }
-finstack_quant_valuations = { package = "finstack-quant-valuations", path = "valuations" }
-finstack_quant_portfolio = { package = "finstack-quant-portfolio", path = "portfolio" }
-finstack_quant_scenarios = { package = "finstack-quant-scenarios", path = "scenarios" }
-finstack_quant_monte_carlo = { package = "finstack-quant-monte-carlo", path = "monte_carlo" }
+finstack_quant_core = { package = "finstack-quant-core", path = "core", version = "0.6.0" }
+finstack_quant_analytics = { package = "finstack-quant-analytics", path = "analytics", version = "0.6.0" }
+finstack_quant_cashflows = { package = "finstack-quant-cashflows", path = "cashflows", version = "0.6.0" }
+finstack_quant_covenants = { package = "finstack-quant-covenants", path = "covenants", version = "0.6.0" }
+finstack_quant_factor_model = { package = "finstack-quant-factor-model", path = "factor-model", version = "0.6.0" }
+finstack_quant_margin = { package = "finstack-quant-margin", path = "margin", version = "0.6.0" }
+finstack_quant_statements = { package = "finstack-quant-statements", path = "statements", version = "0.6.0" }
+finstack_quant_statements_analytics = { package = "finstack-quant-statements-analytics", path = "statements-analytics", version = "0.6.0" }
+finstack_quant_valuations = { package = "finstack-quant-valuations", path = "valuations", version = "0.6.0" }
+finstack_quant_portfolio = { package = "finstack-quant-portfolio", path = "portfolio", version = "0.6.0" }
+finstack_quant_scenarios = { package = "finstack-quant-scenarios", path = "scenarios", version = "0.6.0" }
+finstack_quant_monte_carlo = { package = "finstack-quant-monte-carlo", path = "monte_carlo", version = "0.6.0" }
 
 [dev-dependencies]
 time = { workspace = true, features = ["macros"] }

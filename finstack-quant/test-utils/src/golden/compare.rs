@@ -4,8 +4,7 @@
 //! messages including case identifiers, metric labels, and provenance.
 
 use crate::golden::types::{Expectation, ExpectedValue, SuiteMeta, Tolerance};
-use finstack_quant_core::error::Error;
-use finstack_quant_core::money::Money;
+use crate::Error;
 use std::collections::HashMap;
 
 // =============================================================================
@@ -35,6 +34,25 @@ pub struct ComparisonResult {
     pub error: Option<f64>,
     /// Error message if failed.
     pub message: Option<String>,
+}
+
+/// Currency-tagged amount used by golden money assertions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MoneyValue {
+    /// Numeric amount.
+    pub amount: f64,
+    /// Currency code or label.
+    pub currency: String,
+}
+
+impl MoneyValue {
+    /// Create a currency-tagged amount for assertion helpers.
+    pub fn new(amount: f64, currency: impl Into<String>) -> Self {
+        Self {
+            amount,
+            currency: currency.into(),
+        }
+    }
 }
 
 impl ComparisonResult {
@@ -305,23 +323,22 @@ pub fn assert_money(
     suite_id: &str,
     case_id: &str,
     metric: &str,
-    actual: Money,
-    expected: Money,
+    actual: &MoneyValue,
+    expected: &MoneyValue,
     tolerance: Tolerance,
 ) -> Result<(), Error> {
-    if actual.currency() != expected.currency() {
+    if actual.currency != expected.currency {
         return Err(Error::Validation(format!(
             "[{suite_id}/{case_id}] {metric} failed: actual currency={}, expected currency={}",
-            actual.currency(),
-            expected.currency()
+            actual.currency, expected.currency
         )));
     }
     assert_within_tolerance(
         suite_id,
         case_id,
         metric,
-        actual.amount(),
-        expected.amount(),
+        actual.amount,
+        expected.amount,
         tolerance,
     )
 }
@@ -331,24 +348,17 @@ pub fn assert_money_abs(
     suite_id: &str,
     case_id: &str,
     metric: &str,
-    actual: Money,
-    expected: Money,
+    actual: &MoneyValue,
+    expected: &MoneyValue,
     tolerance: f64,
 ) -> Result<(), Error> {
-    if actual.currency() != expected.currency() {
-        return Err(Error::Validation(format!(
-            "[{suite_id}/{case_id}] {metric} failed: actual currency={}, expected currency={}",
-            actual.currency(),
-            expected.currency()
-        )));
-    }
-    assert_abs(
+    assert_money(
         suite_id,
         case_id,
         metric,
-        actual.amount(),
-        expected.amount(),
-        tolerance,
+        actual,
+        expected,
+        Tolerance::Abs(tolerance),
     )
 }
 
@@ -594,8 +604,8 @@ impl<'a> GoldenAssert<'a> {
     pub fn money(
         &self,
         metric: &str,
-        actual: Money,
-        expected: Money,
+        actual: &MoneyValue,
+        expected: &MoneyValue,
         tolerance: f64,
     ) -> Result<(), Error> {
         assert_money_abs(
@@ -686,8 +696,8 @@ mod tests {
             "suite",
             "case",
             "money",
-            Money::new(100.0, finstack_quant_core::currency::Currency::USD),
-            Money::new(100.0, finstack_quant_core::currency::Currency::JPY),
+            &MoneyValue::new(100.0, "USD"),
+            &MoneyValue::new(100.0, "JPY"),
             0.0,
         );
 
@@ -811,8 +821,8 @@ mod tests {
         assert!(ga
             .money(
                 "pv",
-                Money::new(10.0, finstack_quant_core::currency::Currency::USD),
-                Money::new(10.0, finstack_quant_core::currency::Currency::USD),
+                &MoneyValue::new(10.0, "USD"),
+                &MoneyValue::new(10.0, "USD"),
                 0.01,
             )
             .is_ok());

@@ -9,10 +9,10 @@ authors.workspace = true
 description = "Deterministic scenario DSL for Finstack Quant with preview, composition, and phase-ordered apply across market/statements/valuations"
 
 [dependencies]
-finstack-quant-attribution = { path = "../attribution" }
-finstack-quant-core = { path = "../core" }
-finstack-quant-statements = { path = "../statements" }
-finstack-quant-valuations = { path = "../valuations" }
+finstack-quant-attribution = { path = "../attribution", version = "0.6.0" }
+finstack-quant-core = { path = "../core", version = "0.6.0" }
+finstack-quant-statements = { path = "../statements", version = "0.6.0" }
+finstack-quant-valuations = { path = "../valuations", version = "0.6.0" }
 indexmap = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -22,7 +22,7 @@ tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
 criterion = { workspace = true }
-finstack-quant-test-utils = { path = "../test-utils" }
+finstack-quant-test-utils = { path = "../test-utils", version = "0.6.0" }
 
 [[bench]]
 name = "scenarios"

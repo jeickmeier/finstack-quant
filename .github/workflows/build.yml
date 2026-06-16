@@ -275,6 +275,31 @@ jobs:
         run: cargo deny check
 
   # ============================================
+  # Rust publish packaging checks
+  # ============================================
+  rust-publish-checks:
+    name: Rust Publish Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: prime-cache
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Provision toolchain (mise)
+        uses: jdx/mise-action@v2
+        with:
+          cache: true
+          cache_save: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Validate Rust crate publish order
+        run: mise run rust-publish-checks
+
+  # ============================================
   # Supply-chain security (OSV-Scanner): cross-ecosystem CVE scan
   # Covers Cargo.lock, uv.lock, and package-lock.json against the OSV database.
   # Uses the PR-diff reusable workflow on pull_request (only reports newly

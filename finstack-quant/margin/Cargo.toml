@@ -9,8 +9,8 @@ authors.workspace = true
 description = "Margin, collateral, and XVA primitives for Finstack Quant"
 
 [dependencies]
-finstack-quant-core = { path = "../core" }
-finstack-quant-monte-carlo = { path = "../monte_carlo", default-features = false }
+finstack-quant-core = { path = "../core", version = "0.6.0" }
+finstack-quant-monte-carlo = { path = "../monte_carlo", version = "0.6.0", default-features = false }
 schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, features = ["raw_value"] }

@@ -12,19 +12,19 @@ description = "WebAssembly bindings for Finstack Quant - high-performance financ
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-finstack-quant-analytics = { path = "../finstack-quant/analytics" }
-finstack-quant-attribution = { path = "../finstack-quant/attribution" }
-finstack-quant-cashflows = { path = "../finstack-quant/cashflows" }
-finstack-quant-covenants = { path = "../finstack-quant/covenants" }
-finstack-quant-core = { path = "../finstack-quant/core" }
-finstack-quant-margin = { path = "../finstack-quant/margin" }
-finstack-quant-statements = { path = "../finstack-quant/statements" }
-finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics" }
-finstack-quant-valuations = { path = "../finstack-quant/valuations", default-features = false }
-finstack-quant-factor-model = { path = "../finstack-quant/factor-model" }
-finstack-quant-monte-carlo = { path = "../finstack-quant/monte_carlo", default-features = false }
-finstack-quant-scenarios = { path = "../finstack-quant/scenarios" }
-finstack-quant-portfolio = { path = "../finstack-quant/portfolio", default-features = false }
+finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.6.0" }
+finstack-quant-attribution = { path = "../finstack-quant/attribution", version = "0.6.0" }
+finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.6.0" }
+finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.6.0" }
+finstack-quant-core = { path = "../finstack-quant/core", version = "0.6.0" }
+finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.6.0" }
+finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.6.0" }
+finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.6.0" }
+finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.6.0", default-features = false }
+finstack-quant-factor-model = { path = "../finstack-quant/factor-model", version = "0.6.0" }
+finstack-quant-monte-carlo = { path = "../finstack-quant/monte_carlo", version = "0.6.0", default-features = false }
+finstack-quant-scenarios = { path = "../finstack-quant/scenarios", version = "0.6.0" }
+finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.6.0", default-features = false }
 wasm-bindgen = "0.2.114"
 js-sys = "0.3"
 serde = { workspace = true }

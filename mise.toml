@@ -148,6 +148,10 @@ run = "cargo deny check"
 description = "Compare the umbrella Rust crate against the normalized v0.5.0 baseline"
 run = "python3 scripts/semver_checks.py"
 
+[tasks.rust-publish-checks]
+description = "Validate Rust crate publish order and first-crate dry-run"
+run = "uv run --no-sync python scripts/cargo_publish_checks.py"
+
 [tasks.rust-update]
 description = "Update Rust dependencies"
 run = "cargo update"

@@ -9,14 +9,14 @@ authors.workspace = true
 description = "Instrument pricing, cashflows, and risk for Finstack Quant: fixed income, derivatives, structured credit, Monte Carlo, and PDE/tree methods"
 
 [dependencies]
-finstack-quant-core = { path = "../core" }
-finstack-quant-analytics = { path = "../analytics" }
-finstack-quant-cashflows = { path = "../cashflows" }
-finstack-quant-covenants = { path = "../covenants" }
-finstack-quant-margin = { path = "../margin" }
-finstack-quant-monte-carlo = { path = "../monte_carlo", default-features = false }
-finstack-quant-factor-model = { path = "../factor-model" }
-finstack-quant-valuations-macros = { path = "macros" }
+finstack-quant-core = { path = "../core", version = "0.6.0" }
+finstack-quant-analytics = { path = "../analytics", version = "0.6.0" }
+finstack-quant-cashflows = { path = "../cashflows", version = "0.6.0" }
+finstack-quant-covenants = { path = "../covenants", version = "0.6.0" }
+finstack-quant-margin = { path = "../margin", version = "0.6.0" }
+finstack-quant-monte-carlo = { path = "../monte_carlo", version = "0.6.0", default-features = false }
+finstack-quant-factor-model = { path = "../factor-model", version = "0.6.0" }
+finstack-quant-valuations-macros = { path = "macros", version = "0.6.0" }
 indexmap = { workspace = true, features = ["serde"] }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
 rayon = "1.11"
@@ -37,8 +37,8 @@ time = { workspace = true, features = ["macros"] }
 proptest = "1.11.0"
 criterion = { workspace = true }
 rust_decimal_macros = { workspace = true }
-finstack-quant-statements = { path = "../statements" }
-finstack-quant-statements-analytics = { path = "../statements-analytics" }
+finstack-quant-statements = { path = "../statements", version = "0.6.0" }
+finstack-quant-statements-analytics = { path = "../statements-analytics", version = "0.6.0" }
 
 
 
