@@ -1,0 +1,48 @@
+{
+  "schema": "finstack_quant.calibration/2",
+  "plan": {
+    "id": "usd-multi-curve",
+    "description": "Multi-curve calibration: OIS discount + 3M SOFR forward curve",
+    "quote_sets": {
+      "ois_quotes": [
+        { "Rates": { "type": "deposit", "id": "OIS-DEP-1M", "index": "USD-SOFR", "pillar": "1M", "rate": 0.0525 }},
+        { "Rates": { "type": "swap", "id": "OIS-SWP-1Y", "index": "USD-SOFR-OIS", "pillar": "1Y", "rate": 0.0540 }},
+        { "Rates": { "type": "swap", "id": "OIS-SWP-2Y", "index": "USD-SOFR-OIS", "pillar": "2Y", "rate": 0.0480 }},
+        { "Rates": { "type": "swap", "id": "OIS-SWP-5Y", "index": "USD-SOFR-OIS", "pillar": "5Y", "rate": 0.0420 }}
+      ],
+      "forward_quotes": [
+        { "Rates": { "type": "futures", "id": "SOFR-FUT-M1", "index": "USD-SOFR-3M", "pillar": "2025-03-19", "price": 94.75 }},
+        { "Rates": { "type": "futures", "id": "SOFR-FUT-M2", "index": "USD-SOFR-3M", "pillar": "2025-06-18", "price": 95.00 }},
+        { "Rates": { "type": "swap", "id": "FWD-SWP-1Y", "index": "USD-SOFR-3M", "pillar": "1Y", "rate": 0.0545 }},
+        { "Rates": { "type": "swap", "id": "FWD-SWP-2Y", "index": "USD-SOFR-3M", "pillar": "2Y", "rate": 0.0490 }}
+      ]
+    },
+    "steps": [
+      {
+        "id": "USD-OIS",
+        "quote_set": "ois_quotes",
+        "kind": "discount",
+        "curve_id": "USD-OIS",
+        "currency": "USD",
+        "base_date": "2025-01-15",
+        "method": "bootstrap",
+        "interpolation": "linear"
+      },
+      {
+        "id": "USD-SOFR-3M",
+        "quote_set": "forward_quotes",
+        "kind": "forward",
+        "curve_id": "USD-SOFR-3M",
+        "currency": "USD",
+        "base_date": "2025-01-15",
+        "tenor_years": 0.25,
+        "discount_curve_id": "USD-OIS",
+        "method": "bootstrap",
+        "interpolation": "linear"
+      }
+    ],
+    "settings": {
+      "use_parallel": false
+    }
+  }
+}

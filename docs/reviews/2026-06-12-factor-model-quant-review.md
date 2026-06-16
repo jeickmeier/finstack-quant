@@ -1,4 +1,4 @@
-# Quant Finance Review — `finstack/factor-model` Crate and Bindings
+# Quant Finance Review — `finstack-quant/factor-model` Crate and Bindings
 
 > **Remediation status (2026-06-12): COMPLETE for all Majors and the actionable
 > Moderates/Minors.** Highlights: M1 asof-coverage hard error (both directions) +
@@ -42,19 +42,19 @@
 
 Reviewed surface:
 
-- **Crate core** — all 24 `.rs` files under `finstack/factor-model/{src,tests,benches}`:
+- **Crate core** — all 24 `.rs` files under `finstack-quant/factor-model/{src,tests,benches}`:
   credit calibration / hierarchy / decomposition / peel, covariance, sensitivity
   matrix, config, matching (cascade / hierarchical / mapping-table / credit),
   primitives, parse, error.
-- **Python bindings** — `finstack-py/src/bindings/factor_model/{mod,credit}.rs`, the
-  flattened risk surface in `finstack-py/src/bindings/portfolio/factor_model.rs`,
+- **Python bindings** — `finstack-quant-py/src/bindings/factor_model/{mod,credit}.rs`, the
+  flattened risk surface in `finstack-quant-py/src/bindings/portfolio/factor_model.rs`,
   `.pyi` stubs, `parity_contract.toml` factor_model sections, and both Python test
   modules.
-- **WASM bindings** — `finstack-wasm/src/api/factor_model/mod.rs`,
+- **WASM bindings** — `finstack-quant-wasm/src/api/factor_model/mod.rs`,
   `exports/factor_model.js`, `index.js`/`index.d.ts` wiring, and the Rust-side WASM test.
-- **Consumers** — call sites in `finstack/portfolio` (delta engine, parametric
-  decomposer, assignment, serialization tests), `finstack/attribution`
-  (credit_factor, factors), and `finstack/valuations/src/correlation/factor_model.rs`
+- **Consumers** — call sites in `finstack-quant/portfolio` (delta engine, parametric
+  decomposer, assignment, serialization tests), `finstack-quant/attribution`
+  (credit_factor, factors), and `finstack-quant/valuations/src/correlation/factor_model.rs`
   (the separate copula factor structure; checked for semantic overlap).
 
 Method: 7 parallel deep-read reviewers over disjoint slices, each finding then
@@ -92,7 +92,7 @@ distinguish 'no data' from 'data, value 0'").
 
 ### M1 (Major) — Silent adder_at_anchor = 0.0 when a calibrated issuer is missing from asof_spreads
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:430`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:430`  
 **Area:** credit-calibration
 
 
@@ -114,7 +114,7 @@ let adder_at_anchor = anchor.adder.get(issuer_id).copied().unwrap_or(0.0);
 
 ### M2 (Major) — Tag values containing '.' silently corrupt factor IDs in the covariance and histories
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:1040`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:1040`  
 **Area:** credit-calibration
 
 
@@ -136,7 +136,7 @@ let segments: Vec<&str> = path.split('.').collect();
 
 ### M3 (Major) — Idiosyncratic vol is silently 0.0 for every issuer under the default GloballyOff policy
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:1160`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:1160`  
 **Area:** credit-calibration
 
 
@@ -160,11 +160,11 @@ if !matches!(modes.get(issuer), Some(IssuerBetaMode::IssuerBeta)) {
 
 ### M4 (Major) — vol_points default/unit contradiction yields a 100x oversized vol bump (negative vols on the down bump)
 
-**Location:** `finstack/factor-model/src/config.rs:163`  
+**Location:** `finstack-quant/factor-model/src/config.rs:163`  
 **Area:** risk-numerics
 
 
-**Issue.** BumpSizeConfig documents `vol_points` as "Default volatility bump in absolute vol points" with default 1.0 (lines 163-165, 182), i.e. one vol point. But FactorBumpUnit::Absolute (line 256-257) is documented as "`0.01` = one vol point", and `to_fraction` (line 302) passes Absolute values through unchanged. Both downstream engines (finstack/portfolio/src/sensitivity/delta_engine.rs:33-58 and repricing_engine.rs:141-153) feed this raw value into `mapping_to_market_bumps`, where the VolShift branch applies it as an Additive BumpUnits::Fraction shift (`value: bump_size`, delta_engine.rs:210-223, and BumpUnits::Fraction is a direct fraction per core/src/market_data/bumps.rs:107-108). So a Volatility factor under the default config gets a +/-1.00 absolute vol shift — 100 vol points — and the down-bumped market has implied vols of sigma - 1.0 (negative for any realistic surface). The default is also internally inconsistent: rates default 1.0 = 1bp = 1e-4 fractional, equity default 1.0 = 1% = 1e-2 fractional, vol default 1.0 = 1.0 fractional.
+**Issue.** BumpSizeConfig documents `vol_points` as "Default volatility bump in absolute vol points" with default 1.0 (lines 163-165, 182), i.e. one vol point. But FactorBumpUnit::Absolute (line 256-257) is documented as "`0.01` = one vol point", and `to_fraction` (line 302) passes Absolute values through unchanged. Both downstream engines (finstack-quant/portfolio/src/sensitivity/delta_engine.rs:33-58 and repricing_engine.rs:141-153) feed this raw value into `mapping_to_market_bumps`, where the VolShift branch applies it as an Additive BumpUnits::Fraction shift (`value: bump_size`, delta_engine.rs:210-223, and BumpUnits::Fraction is a direct fraction per core/src/market_data/bumps.rs:107-108). So a Volatility factor under the default config gets a +/-1.00 absolute vol shift — 100 vol points — and the down-bumped market has implied vols of sigma - 1.0 (negative for any realistic surface). The default is also internally inconsistent: rates default 1.0 = 1bp = 1e-4 fractional, equity default 1.0 = 1% = 1e-2 fractional, vol default 1.0 = 1.0 fractional.
 
 
 **Impact.** Any factor model containing a Volatility factor with default bump sizing produces garbage vega-style sensitivities: the central difference is a chord over a 200-vol-point range, the down leg prices off negative vols (repricing failure at best, silently wrong PV at worst), and every downstream x^T-Sigma-x risk number, Euler allocation, VaR/ES built on that column is wrong. Affects both DeltaBased and FullRepricing modes.
@@ -184,7 +184,7 @@ pub vol_points: f64,  ... vs line 257: /// Absolute dimensionless shift — e.g.
 
 ### M5 (Major) — Unsorted issuer_betas silently breaks binary search, dropping calibrated betas
 
-**Location:** `finstack/factor-model/src/matching/credit.rs:120`  
+**Location:** `finstack-quant/factor-model/src/matching/credit.rs:120`  
 **Area:** matching-primitives
 
 
@@ -208,7 +208,7 @@ pub vol_points: f64,  ... vs line 257: /// Absolute dimensionless shift — e.g.
 
 ### M6 (Major) — Unknown-issuer tag truncation is silent and invisible to UnmatchedPolicy::Strict
 
-**Location:** `finstack/factor-model/src/matching/credit.rs:182`  
+**Location:** `finstack-quant/factor-model/src/matching/credit.rs:182`  
 **Area:** matching-primitives
 
 
@@ -234,7 +234,7 @@ let tag_present = tags.0.contains_key(&dimension_key(dim));
 
 ### M7 (Major) — Known issuer with short betas.levels vector silently gets beta = 1.0
 
-**Location:** `finstack/factor-model/src/matching/credit.rs:199`  
+**Location:** `finstack-quant/factor-model/src/matching/credit.rs:199`  
 **Area:** matching-primitives
 
 
@@ -260,7 +260,7 @@ let beta = row
 
 > **Cross-reference:** distinct from, but adjacent to, the 2026-06-12 attribution review's B-class `credit_factor.rs` sign-inversion finding (`:215/229/239`) and its MO-B3 currency-mislabeling finding (`dataframe.rs`). Fixing the sign question (attribution OQ1) and this raw-sum issue together is the efficient path.
 
-**Location:** `finstack/attribution/src/credit_factor.rs:162`  
+**Location:** `finstack-quant/attribution/src/credit_factor.rs:162`  
 **Area:** consumers-integration
 
 
@@ -277,7 +277,7 @@ let beta = row
 let ccy = positions
     .first()
     .map(|p| p.cs01.currency())
-    .unwrap_or(finstack_core::currency::Currency::USD);
+    .unwrap_or(finstack_quant_core::currency::Currency::USD);
 ```
 
 
@@ -285,7 +285,7 @@ let ccy = positions
 
 ### M9 (Major) — Unknown issuers silently dropped from credit P&L attribution, contradicting documented hard-error contract
 
-**Location:** `finstack/attribution/src/credit_factor.rs:198`  
+**Location:** `finstack-quant/attribution/src/credit_factor.rs:198`  
 **Area:** consumers-integration
 
 
@@ -313,7 +313,7 @@ let Some(row) = beta_idx.get(&input.issuer_id) else {
 
 ### M10 (Major) — Unit contract between sensitivity deltas (per bp/%/vol-pt) and factor covariance ('factor returns') is undocumented and unvalidated
 
-**Location:** `finstack/factor-model/src/covariance.rs:7`  
+**Location:** `finstack-quant/factor-model/src/covariance.rs:7`  
 **Area:** consumers-integration
 
 
@@ -338,7 +338,7 @@ let Some(row) = beta_idx.get(&input.issuer_id) else {
 
 > **Cross-reference:** independently found by the 2026-06-12 portfolio quant review (`docs/reviews/2026-06-12-portfolio-quant-review.md`, `parametric.rs:200-208` / `simulation.rs:413`). Track remediation once, under whichever review is actioned first.
 
-**Location:** `finstack/portfolio/src/factor_model/parametric.rs:206`  
+**Location:** `finstack-quant/portfolio/src/factor_model/parametric.rs:206`  
 **Area:** consumers-integration
 
 
@@ -353,7 +353,7 @@ let Some(row) = beta_idx.get(&input.issuer_id) else {
 
 ```rust
 if variance < -Self::VARIANCE_TOLERANCE {
-    Err(finstack_core::Error::Validation(format!(
+    Err(finstack_quant_core::Error::Validation(format!(
         "Portfolio variance must be non-negative, got {variance}"
     )))
 } else {
@@ -366,7 +366,7 @@ if variance < -Self::VARIANCE_TOLERANCE {
 
 ### M12 (Major) — Factor sensitivity pipeline mixes native-currency PVs across positions with no FX conversion or currency check
 
-**Location:** `finstack/portfolio/src/sensitivity/delta_engine.rs:58`  
+**Location:** `finstack-quant/portfolio/src/sensitivity/delta_engine.rs:58`  
 **Area:** consumers-integration
 
 
@@ -390,7 +390,7 @@ Ok((pv_up - pv_down) / (2.0 * bump_size) * *weight)
 
 ### MD1 (Moderate) — Inbound calibration input/config types do not deny unknown fields
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:213`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:213`  
 **Area:** credit-calibration
 
 
@@ -413,7 +413,7 @@ pub struct HistoryPanel {
 
 ### MD2 (Moderate) — HistoryPanel.dates sortedness/uniqueness and minimum panel length never validated
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:574`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:574`  
 **Area:** credit-calibration
 
 
@@ -437,7 +437,7 @@ fn validate_calibration_inputs(inputs: &CreditCalibrationInputs) -> Result<()> {
 
 ### MD3 (Moderate) — Self-inclusion bias in per-level beta and bucket-factor construction
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:982`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:982`  
 **Area:** credit-calibration
 
 
@@ -459,7 +459,7 @@ let raw = ols_slope_owned(&r_series, factor_series).unwrap_or(1.0);
 
 ### MD4 (Moderate) — Adder vols use population variance (/n) while factor variances use n-1; the >=24-obs justification is not enforced
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:1170`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:1170`  
 **Area:** credit-calibration
 
 
@@ -481,7 +481,7 @@ let var = valid.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / nf;
 
 ### MD5 (Moderate) — Ridge alpha makes config.covariance inconsistent with static_correlation + vol_state
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:1501`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:1501`  
 **Area:** credit-calibration
 
 
@@ -506,7 +506,7 @@ let mut data = d_rho_d(&stds, &rho_flat, n);
 
 ### MD6 (Moderate) — fold_ups lives in 'diagnostics' but is load-bearing model state for decomposition
 
-**Location:** `finstack/factor-model/src/credit/hierarchy.rs:593`  
+**Location:** `finstack-quant/factor-model/src/credit/hierarchy.rs:593`  
 **Area:** credit-calibration
 
 
@@ -529,7 +529,7 @@ let mut data = d_rho_d(&stds, &rho_flat, n);
 
 ### MD7 (Moderate) — decompose_period silently violates its documented 1e-10 reconciliation invariant on tag migration or model-vintage change
 
-**Location:** `finstack/factor-model/src/credit/decomposition.rs:387`  
+**Location:** `finstack-quant/factor-model/src/credit/decomposition.rs:387`  
 **Area:** credit-decomposition
 
 
@@ -555,7 +555,7 @@ if a.level_index != b.level_index || a.dimension != b.dimension {
 
 ### MD8 (Moderate) — No finite-input validation: a single NaN spread silently poisons an entire bucket cascade
 
-**Location:** `finstack/factor-model/src/credit/peel.rs:34`  
+**Location:** `finstack-quant/factor-model/src/credit/peel.rs:34`  
 **Area:** credit-decomposition
 
 
@@ -581,7 +581,7 @@ residuals.insert(issuer.clone(), spread - beta_pc * observed_generic);
 
 ### MD9 (Moderate) — BumpSizeConfig accepts unknown fields while defaulting every field — typo'd key silently reverts bump to 1.0
 
-**Location:** `finstack/factor-model/src/config.rs:150`  
+**Location:** `finstack-quant/factor-model/src/config.rs:150`  
 **Area:** risk-numerics
 
 
@@ -607,7 +607,7 @@ pub struct BumpSizeConfig {
 
 ### MD10 (Moderate) — Covariance unit contract under-specified relative to per-canonical-unit sensitivities (1e8 mis-scaling trap)
 
-**Location:** `finstack/factor-model/src/covariance.rs:7`  
+**Location:** `finstack-quant/factor-model/src/covariance.rs:7`  
 **Area:** risk-numerics
 
 
@@ -630,7 +630,7 @@ pub struct BumpSizeConfig {
 
 ### MD11 (Moderate) — Absolute 1e-12 symmetry tolerance is not scale-invariant; rejects machine-symmetric bp^2 matrices
 
-**Location:** `finstack/factor-model/src/covariance.rs:40`  
+**Location:** `finstack-quant/factor-model/src/covariance.rs:40`  
 **Area:** risk-numerics
 
 
@@ -645,7 +645,7 @@ pub struct BumpSizeConfig {
 
 ```rust
 if (lhs - rhs).abs() > 1e-12 {
-    return Err(finstack_core::Error::Validation(format!(
+    return Err(finstack_quant_core::Error::Validation(format!(
         "Covariance matrix is not symmetric at ({i}, {j})"
 ```
 
@@ -654,7 +654,7 @@ if (lhs - rhs).abs() > 1e-12 {
 
 ### MD12 (Moderate) — Factor-universe validation hole for runtime BucketOnly bucket factors
 
-**Location:** `finstack/factor-model/src/matching/credit.rs:81`  
+**Location:** `finstack-quant/factor-model/src/matching/credit.rs:81`  
 **Area:** matching-primitives
 
 
@@ -678,7 +678,7 @@ if (lhs - rhs).abs() > 1e-12 {
 
 ### MD13 (Moderate) — Bucket factor IDs can alias when tag values contain the '.' separator
 
-**Location:** `finstack/factor-model/src/matching/credit.rs:241`  
+**Location:** `finstack-quant/factor-model/src/matching/credit.rs:241`  
 **Area:** matching-primitives
 
 
@@ -702,7 +702,7 @@ Some(FactorId::new(format!(
 
 ### MD14 (Moderate) — FactorDefinition, MarketMapping, and MarketDependency lack deny_unknown_fields
 
-**Location:** `finstack/factor-model/src/primitives/definition.rs:49`  
+**Location:** `finstack-quant/factor-model/src/primitives/definition.rs:49`  
 **Area:** matching-primitives
 
 
@@ -727,7 +727,7 @@ pub struct FactorDefinition {
 
 > **Cross-reference:** the discarded-factors half of this finding also appears in the 2026-06-12 portfolio quant review (item 20, `assignment.rs:44-49`). The swallowed-`FactorMatchError` half is new here.
 
-**Location:** `finstack/portfolio/src/factor_model/assignment.rs:46`  
+**Location:** `finstack-quant/portfolio/src/factor_model/assignment.rs:46`  
 **Area:** matching-primitives
 
 
@@ -752,11 +752,11 @@ pub struct FactorDefinition {
 
 ### MD16 (Moderate) — CreditCalibrator.calibrate holds the GIL through the full calibration pipeline
 
-**Location:** `finstack-py/src/bindings/factor_model/credit.rs:222`  
+**Location:** `finstack-quant-py/src/bindings/factor_model/credit.rs:222`  
 **Area:** py-bindings
 
 
-**Issue.** `calibrate` runs the entire Rust calibration (panel validation, per-issuer beta regressions, bucket peeling, covariance/vol estimation over the whole history panel — finstack/factor-model/src/credit/calibration.rs is 71.6K of pipeline code) inside the GIL. Every other heavy entry point in the same binding crate wraps the compute in `py.detach(...)` (e.g. parametric_var_decomposition_typed at portfolio/factor_model.rs:1697-1701, historical_var_decomposition at position_risk.rs:242), per the project rule that heavy compute releases the GIL. `decompose_levels` (per-issuer, per-level peel across the whole spread universe) has the same gap.
+**Issue.** `calibrate` runs the entire Rust calibration (panel validation, per-issuer beta regressions, bucket peeling, covariance/vol estimation over the whole history panel — finstack-quant/factor-model/src/credit/calibration.rs is 71.6K of pipeline code) inside the GIL. Every other heavy entry point in the same binding crate wraps the compute in `py.detach(...)` (e.g. parametric_var_decomposition_typed at portfolio/factor_model.rs:1697-1701, historical_var_decomposition at position_risk.rs:242), per the project rule that heavy compute releases the GIL. `decompose_levels` (per-issuer, per-level peel across the whole spread universe) has the same gap.
 
 
 **Impact.** On production-size panels (thousands of issuers x years of dates) a single calibrate call blocks all Python threads for the full calibration duration — stalls notebook kernels, web workers, and any multi-threaded risk service consuming the bindings.
@@ -767,7 +767,7 @@ pub struct FactorDefinition {
 
 ```rust
 fn calibrate(&self, inputs_json: &str) -> PyResult<PyCreditFactorModel> {
-    let inputs: finstack_factor_model::CreditCalibrationInputs =
+    let inputs: finstack_quant_factor_model::CreditCalibrationInputs =
         serde_json::from_str(inputs_json).map_err(display_to_py)?;
     let model = self.inner.calibrate(inputs).map_err(display_to_py)?;
 ```
@@ -777,11 +777,11 @@ fn calibrate(&self, inputs_json: &str) -> PyResult<PyCreditFactorModel> {
 
 ### MD17 (Moderate) — LevelVolContribution.by_bucket converts deterministic BTreeMap into std HashMap, leaking nondeterministic dict ordering
 
-**Location:** `finstack-py/src/bindings/portfolio/factor_model.rs:1359`  
+**Location:** `finstack-quant-py/src/bindings/portfolio/factor_model.rs:1359`  
 **Area:** py-bindings
 
 
-**Issue.** The Rust source field is `LevelVolContribution.by_bucket: BTreeMap<String, f64>` (finstack/portfolio/src/factor_model/credit_vol_forecast.rs:344), which guarantees stable sorted ordering. The binding getter collects it into `std::collections::HashMap<String, f64>` before PyO3 converts to a Python dict. Python dicts preserve insertion order, and HashMap iteration order is RandomState-seeded per process, so the bucket key order of the returned dict differs run-to-run. Every other map getter in this slice (LevelsAtDate.level_values, adder, PeriodDecomposition.level_deltas) builds the PyDict directly from BTreeMap iteration and stays deterministic; this one breaks the project's stable-ordering/determinism invariant for anyone iterating or serializing the report (e.g. JSON goldens of a CreditVolReport will be flaky).
+**Issue.** The Rust source field is `LevelVolContribution.by_bucket: BTreeMap<String, f64>` (finstack-quant/portfolio/src/factor_model/credit_vol_forecast.rs:344), which guarantees stable sorted ordering. The binding getter collects it into `std::collections::HashMap<String, f64>` before PyO3 converts to a Python dict. Python dicts preserve insertion order, and HashMap iteration order is RandomState-seeded per process, so the bucket key order of the returned dict differs run-to-run. Every other map getter in this slice (LevelsAtDate.level_values, adder, PeriodDecomposition.level_deltas) builds the PyDict directly from BTreeMap iteration and stays deterministic; this one breaks the project's stable-ordering/determinism invariant for anyone iterating or serializing the report (e.g. JSON goldens of a CreditVolReport will be flaky).
 
 
 **Impact.** Risk reports rendered or serialized from CreditVolReport.by_level[].by_bucket have nondeterministic bucket ordering across runs, breaking golden-file comparisons and audit reproducibility in a library that promises serial==parallel deterministic output.
@@ -805,11 +805,11 @@ fn by_bucket(&self) -> HashMap<String, f64> {
 
 ### MD18 (Moderate) — evaluate_risk_budget_typed silently collapses duplicate position_ids, shrinking the budget report without error
 
-**Location:** `finstack-py/src/bindings/portfolio/factor_model.rs:1788`  
+**Location:** `finstack-quant-py/src/bindings/portfolio/factor_model.rs:1788`  
 **Area:** py-bindings
 
 
-**Issue.** Targets are built by inserting into an IndexMap keyed by PositionId; a duplicate id in `position_ids` overwrites the earlier target (and the `actual_by_id` map built inside `RiskBudget::evaluate_components` at finstack/portfolio/src/factor_model/risk_budget.rs:164 collapses the same way, keeping only the last component VaR). The function validates list lengths but not uniqueness, so with duplicates the result has fewer `positions` entries than inputs and `total_overbudget`/`has_breach` are computed from a silently deduplicated subset. The legacy dict version (position_risk.rs:319-321, 340) has the same collapse and additionally mislabels `target_pct` by zipping the shortened `result.positions` against the original `target_var_pct` list.
+**Issue.** Targets are built by inserting into an IndexMap keyed by PositionId; a duplicate id in `position_ids` overwrites the earlier target (and the `actual_by_id` map built inside `RiskBudget::evaluate_components` at finstack-quant/portfolio/src/factor_model/risk_budget.rs:164 collapses the same way, keeping only the last component VaR). The function validates list lengths but not uniqueness, so with duplicates the result has fewer `positions` entries than inputs and `total_overbudget`/`has_breach` are computed from a silently deduplicated subset. The legacy dict version (position_risk.rs:319-321, 340) has the same collapse and additionally mislabels `target_pct` by zipping the shortened `result.positions` against the original `target_var_pct` list.
 
 
 **Impact.** A risk-budget breach report can silently drop positions and report wrong total_overbudget / has_breach=false when callers pass duplicated position ids (a common data-join error), i.e. a limit-monitoring false negative instead of a loud failure.
@@ -830,7 +830,7 @@ for (id, &pct) in shared_ids.iter().zip(target_var_pct.iter()) {
 
 ### MD19 (Moderate) — Binding tests are shape/smoke-level: known-beta fixture never asserts recovered betas, reconciliation invariant untested, and the entire typed portfolio risk surface has zero Python tests
 
-**Location:** `finstack-py/tests/test_credit_factor_model_bindings.py:77`  
+**Location:** `finstack-quant-py/tests/test_credit_factor_model_bindings.py:77`  
 **Area:** py-bindings
 
 
@@ -855,11 +855,11 @@ series: list[float | None] = [
 
 ### MD20 (Moderate) — Non-finite f64 crosses the WASM boundary unchecked and is silently serialized as JSON null in risk outputs
 
-**Location:** `finstack-wasm/src/api/factor_model/mod.rs:181`  
+**Location:** `finstack-quant-wasm/src/api/factor_model/mod.rs:181`  
 **Area:** wasm-bindings
 
 
-**Issue.** decompose_levels accepts `observed_generic: f64` with no finiteness guard, and neither core `finstack_factor_model::decompose_levels` (finstack/factor-model/src/credit/decomposition.rs:216-222) nor `peel_single_observation` (finstack/factor-model/src/credit/peel.rs:34, `spread - beta_pc * observed_generic`) validates it. A JS caller passing NaN (e.g. the result of a failed `Number(...)` parse) gets a fully 'successful' LevelsAtDate whose generic, every bucket value, and every issuer adder are NaN. All toJson methods in this module (`WasmLevelsAtDate::to_json` line 130-132, `WasmPeriodDecomposition::to_json` line 153-155, `WasmFactorCovarianceForecast::covariance_at` line 273) use serde_json, which serializes NaN/inf as `null` — so the JS consumer receives nulls in a spread-attribution/covariance payload with no error thrown. The same hole exists in the vol path: the variance guard in finstack/portfolio/src/factor_model/credit_vol_forecast.rs:195 (`if variance < 0.0`) is false for NaN, so a NaN calibrated variance flows through sqrt to a null covariance entry. The mirror Python binding (finstack-py/src/bindings/factor_model/credit.rs:485) has the identical gap, so fixing only the wasm layer would create parity drift — the guard belongs in core decompose_levels.
+**Issue.** decompose_levels accepts `observed_generic: f64` with no finiteness guard, and neither core `finstack_quant_factor_model::decompose_levels` (finstack-quant/factor-model/src/credit/decomposition.rs:216-222) nor `peel_single_observation` (finstack-quant/factor-model/src/credit/peel.rs:34, `spread - beta_pc * observed_generic`) validates it. A JS caller passing NaN (e.g. the result of a failed `Number(...)` parse) gets a fully 'successful' LevelsAtDate whose generic, every bucket value, and every issuer adder are NaN. All toJson methods in this module (`WasmLevelsAtDate::to_json` line 130-132, `WasmPeriodDecomposition::to_json` line 153-155, `WasmFactorCovarianceForecast::covariance_at` line 273) use serde_json, which serializes NaN/inf as `null` — so the JS consumer receives nulls in a spread-attribution/covariance payload with no error thrown. The same hole exists in the vol path: the variance guard in finstack-quant/portfolio/src/factor_model/credit_vol_forecast.rs:195 (`if variance < 0.0`) is false for NaN, so a NaN calibrated variance flows through sqrt to a null covariance entry. The mirror Python binding (finstack-quant-py/src/bindings/factor_model/credit.rs:485) has the identical gap, so fixing only the wasm layer would create parity drift — the guard belongs in core decompose_levels.
 
 
 **Impact.** Silent corruption of credit spread-attribution and factor-covariance results consumed in the browser/Node: nulls appear where risk numbers should be, downstream JS aggregation either throws far from the source or coerces null to 0, understating bucket moves and idiosyncratic risk with no audit trail. Violates the project's fail-loud production standard.
@@ -883,11 +883,11 @@ pub fn decompose_levels(
 
 ### MD21 (Moderate) — WASM test suite never executes the decompose/forecast wrappers and pins no numeric values
 
-**Location:** `finstack-wasm/tests/wasm_credit_factor_hierarchy.rs:111`  
+**Location:** `finstack-quant-wasm/tests/wasm_credit_factor_hierarchy.rs:111`  
 **Area:** wasm-bindings
 
 
-**Issue.** The wasm-bindgen test named `calibrate_then_decompose_round_trip` (lines 110-133) only calls `WasmCreditCalibrator::new`, `calibrate`, and `to_json`, then asserts the presence of `schema_version` — it never calls `decompose_levels`, `decompose_period`, or any `WasmFactorCovarianceForecast` method despite its name. The native tests in finstack-wasm/src/api/factor_model/mod.rs (lines 464-510) call `finstack_factor_model::decompose_levels` directly, bypassing the wrapper's JSON parsing wiring (observed_spreads_json/runtime_tags_json deserialization at mod.rs:185-198, date parsing at mod.rs:188), and the comment justifying this (mod.rs:317-320, js_sys only on wasm32) does not hold for success paths, which never construct a JsValue. There is also no facade test for the factor_model namespace under finstack-wasm/tests/facade/ (only cashflows, core_namespace, plain_object_returns exist). Net result: 5 of 9 public wasm entry points in this module (`decomposeLevels`, `decomposePeriod`, `covarianceAt`, `idiosyncraticVol`, `factorModelAt`) have zero execution coverage on any target, and no test on either target pins a numeric output value (only structure and schema_version are asserted).
+**Issue.** The wasm-bindgen test named `calibrate_then_decompose_round_trip` (lines 110-133) only calls `WasmCreditCalibrator::new`, `calibrate`, and `to_json`, then asserts the presence of `schema_version` — it never calls `decompose_levels`, `decompose_period`, or any `WasmFactorCovarianceForecast` method despite its name. The native tests in finstack-quant-wasm/src/api/factor_model/mod.rs (lines 464-510) call `finstack_quant_factor_model::decompose_levels` directly, bypassing the wrapper's JSON parsing wiring (observed_spreads_json/runtime_tags_json deserialization at mod.rs:185-198, date parsing at mod.rs:188), and the comment justifying this (mod.rs:317-320, js_sys only on wasm32) does not hold for success paths, which never construct a JsValue. There is also no facade test for the factor_model namespace under finstack-quant-wasm/tests/facade/ (only cashflows, core_namespace, plain_object_returns exist). Net result: 5 of 9 public wasm entry points in this module (`decomposeLevels`, `decomposePeriod`, `covarianceAt`, `idiosyncraticVol`, `factorModelAt`) have zero execution coverage on any target, and no test on either target pins a numeric output value (only structure and schema_version are asserted).
 
 
 **Impact.** A wiring regression in the wrappers — swapped from/to arguments in decomposePeriod (which would flip the sign of every reported delta), a wrong key type in the observed-spreads map parse, or a horizon mis-route — would ship undetected. Numeric drift between the wasm surface and the Rust crate would also go unnoticed since nothing compares values.
@@ -907,11 +907,11 @@ fn calibrate_then_decompose_round_trip() {
 
 ### MD22 (Moderate) — Inbound CreditCalibrationConfig/CreditCalibrationInputs accept unknown JSON fields, violating the strict-serde invariant at the WASM (and Python) boundary
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:169`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:169`  
 **Area:** wasm-bindings
 
 
-**Issue.** `WasmCreditCalibrator::new` (finstack-wasm/src/api/factor_model/mod.rs:89-95) and `calibrate` (mod.rs:103-108) deserialize user-supplied JSON into `CreditCalibrationConfig` and `CreditCalibrationInputs`, but neither struct carries `#[serde(deny_unknown_fields)]` (calibration.rs:169-170 and 238-239; `grep deny_unknown_fields calibration.rs` is empty). The workspace invariant is 'inbound types deny unknown fields', and the hierarchy.rs design note (lines 54-57) documents the forward-compat exception only for artifact sub-types like FactorVolModel/CalibrationDiagnostics — not for the calibration config/inputs, whose advertised contract in both bindings is 'pass plain dicts serialized via JSON'. A misplaced or misspelled extra key (e.g. nesting a shrinkage parameter at the top level, or carrying a key from a newer schema) is silently dropped instead of rejected.
+**Issue.** `WasmCreditCalibrator::new` (finstack-quant-wasm/src/api/factor_model/mod.rs:89-95) and `calibrate` (mod.rs:103-108) deserialize user-supplied JSON into `CreditCalibrationConfig` and `CreditCalibrationInputs`, but neither struct carries `#[serde(deny_unknown_fields)]` (calibration.rs:169-170 and 238-239; `grep deny_unknown_fields calibration.rs` is empty). The workspace invariant is 'inbound types deny unknown fields', and the hierarchy.rs design note (lines 54-57) documents the forward-compat exception only for artifact sub-types like FactorVolModel/CalibrationDiagnostics — not for the calibration config/inputs, whose advertised contract in both bindings is 'pass plain dicts serialized via JSON'. A misplaced or misspelled extra key (e.g. nesting a shrinkage parameter at the top level, or carrying a key from a newer schema) is silently dropped instead of rejected.
 
 
 **Impact.** Calibration silently runs with different parameters than the operator believes were supplied (e.g. an ignored override key), producing plausible-but-wrong factor vols and betas with no error and no audit trail. Schema drift between config writers and this reader is undetectable.
@@ -930,7 +930,7 @@ pub struct CreditCalibrationConfig {
 
 ### MD23 (Moderate) — Issuers missing from period.d_adder get silent partial attribution, breaking the documented reconciliation identity
 
-**Location:** `finstack/attribution/src/credit_factor.rs:237`  
+**Location:** `finstack-quant/attribution/src/credit_factor.rs:237`  
 **Area:** consumers-integration
 
 
@@ -953,7 +953,7 @@ if let Some(d_adder) = period.d_adder.get(&input.issuer_id) {
 
 ### MD24 (Moderate) — Single/Two-factor constructors silently clamp negative or out-of-range vols and correlation that the Multi-factor path explicitly rejects
 
-**Location:** `finstack/valuations/src/correlation/factor_model.rs:381`  
+**Location:** `finstack-quant/valuations/src/correlation/factor_model.rs:381`  
 **Area:** consumers-integration
 
 
@@ -976,21 +976,21 @@ pub fn new(volatility: f64, mean_reversion: f64) -> Self {
 
 ### MN1 (Minor) — FactorCorrelationMatrix validation never checks off-diagonals are in [-1, 1] (nor PSD)
 
-**Location:** `finstack/factor-model/src/credit/hierarchy.rs:436`  
+**Location:** `finstack-quant/factor-model/src/credit/hierarchy.rs:436`  
 **Area:** credit-calibration
 
 
-**Issue.** Both FactorCorrelationMatrix::new and check_structure validate shape, unit diagonal, symmetry, and duplicate IDs only. An inbound JSON artifact with off-diagonal entries of 5.0 (or NaN-free but wildly out-of-range values) passes CreditFactorModel::validate(), because check_structure has no bounds check and no PSD check — unlike finstack_analytics::validate_correlation_matrix which checks both. The calibrator's own output is clamped to [-1,1] and PSD-repaired, so this gap only bites on deserialized/hand-assembled artifacts — exactly the path validate() exists to guard (the doc at lines 423-427 says it exists to catch matrices 'constructed via direct field assignment').
+**Issue.** Both FactorCorrelationMatrix::new and check_structure validate shape, unit diagonal, symmetry, and duplicate IDs only. An inbound JSON artifact with off-diagonal entries of 5.0 (or NaN-free but wildly out-of-range values) passes CreditFactorModel::validate(), because check_structure has no bounds check and no PSD check — unlike finstack_quant_analytics::validate_correlation_matrix which checks both. The calibrator's own output is clamped to [-1,1] and PSD-repaired, so this gap only bites on deserialized/hand-assembled artifacts — exactly the path validate() exists to guard (the doc at lines 423-427 says it exists to catch matrices 'constructed via direct field assignment').
 
 
 **Impact.** A corrupted or hand-edited risk artifact with a mathematically invalid correlation matrix is accepted and flows into Sigma(t) = D(t)*rho*D(t), producing nonsensical or negative portfolio variances downstream with no error at load time.
 
 
-**Fix.** Add an off-diagonal |rho_ij| <= 1 + 1e-9 check to check_structure/new (cheap and unambiguous), and consider delegating the full check (including the Cholesky PSD test) to finstack_analytics::validate_correlation_matrix on the flattened data.
+**Fix.** Add an off-diagonal |rho_ij| <= 1 + 1e-9 check to check_structure/new (cheap and unambiguous), and consider delegating the full check (including the Cholesky PSD test) to finstack_quant_analytics::validate_correlation_matrix on the flattened data.
 
 
 ```rust
-pub fn check_structure(&self) -> finstack_core::Result<()> {
+pub fn check_structure(&self) -> finstack_quant_core::Result<()> {
 ```
 
 
@@ -1001,7 +1001,7 @@ pub fn check_structure(&self) -> finstack_core::Result<()> {
 
 ### MN2 (Minor) — variance/covariance/correlation accessors silently return 0.0 for unknown factor IDs
 
-**Location:** `finstack/factor-model/src/covariance.rs:83`  
+**Location:** `finstack-quant/factor-model/src/covariance.rs:83`  
 **Area:** risk-numerics
 
 
@@ -1011,7 +1011,7 @@ pub fn check_structure(&self) -> finstack_core::Result<()> {
 **Impact.** Latent silent under-statement of risk: any future ID-keyed consumer (bindings, what-if tooling, reporting) drops the variance contribution of misspelled/renamed factors to zero with no error, producing too-small portfolio vol/VaR.
 
 
-**Fix.** Return `Option<f64>` (or `finstack_core::Result` with FactorModelError::MissingFactor) from the ID-keyed accessors; if a 0.0-defaulting convenience is genuinely needed, name it explicitly (e.g. `variance_or_zero`).
+**Fix.** Return `Option<f64>` (or `finstack_quant_core::Result` with FactorModelError::MissingFactor) from the ID-keyed accessors; if a 0.0-defaulting convenience is genuinely needed, name it explicitly (e.g. `variance_or_zero`).
 
 
 ```rust
@@ -1028,7 +1028,7 @@ let Some(&idx) = self.index.get(factor) else {
 
 ### MN3 (Minor) — delta/set_delta bounds checks are debug_assert-only: out-of-range factor index silently aliases into the next position's row in release builds
 
-**Location:** `finstack/factor-model/src/sensitivity_matrix.rs:68`  
+**Location:** `finstack-quant/factor-model/src/sensitivity_matrix.rs:68`  
 **Area:** risk-numerics
 
 
@@ -1057,7 +1057,7 @@ self.data[position_idx * self.n_factors + factor_idx]
 
 ### MN4 (Minor) — FactorType::from_str silently parses 'Custom-Weather' / 'custom weather' as Custom("")
 
-**Location:** `finstack/factor-model/src/primitives/factor_types.rs:74`  
+**Location:** `finstack-quant/factor-model/src/primitives/factor_types.rs:74`  
 **Area:** matching-primitives
 
 
@@ -1086,7 +1086,7 @@ let name = s
 
 ### MN5 (Minor) — Dynamic min_history gates on level observations, not usable return pairs
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:644`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:644`  
 **Area:** credit-calibration
 
 
@@ -1108,7 +1108,7 @@ let name = s
 
 ### MN6 (Minor) — Stale 'Marginal-mean limitation' doc contradicts the pairwise-overlap implementation
 
-**Location:** `finstack/factor-model/src/credit/calibration.rs:1561`  
+**Location:** `finstack-quant/factor-model/src/credit/calibration.rs:1561`  
 **Area:** credit-calibration
 
 
@@ -1131,7 +1131,7 @@ let name = s
 
 ### MN7 (Minor) — DateMismatchInPeriod field doc comments are swapped
 
-**Location:** `finstack/factor-model/src/credit/decomposition.rs:143`  
+**Location:** `finstack-quant/factor-model/src/credit/decomposition.rs:143`  
 **Area:** credit-decomposition
 
 
@@ -1157,7 +1157,7 @@ DateMismatchInPeriod {
 
 ### MN8 (Minor) — runtime_tags silently ignored for model-resident issuers; precedence undocumented
 
-**Location:** `finstack/factor-model/src/credit/decomposition.rs:269`  
+**Location:** `finstack-quant/factor-model/src/credit/decomposition.rs:269`  
 **Area:** credit-decomposition
 
 
@@ -1184,7 +1184,7 @@ if let Some(row) = beta_idx.get(issuer) {
 
 ### MN9 (Minor) — is_psd swallows Cholesky error detail; NaN inputs reported as 'not positive semi-definite'
 
-**Location:** `finstack/factor-model/src/covariance.rs:134`  
+**Location:** `finstack-quant/factor-model/src/covariance.rs:134`  
 **Area:** risk-numerics
 
 
@@ -1199,7 +1199,7 @@ if let Some(row) = beta_idx.get(issuer) {
 
 ```rust
 fn is_psd(data: &[f64], n: usize) -> bool {
-    finstack_core::math::linalg::cholesky_correlation(data, n).is_ok()
+    finstack_quant_core::math::linalg::cholesky_correlation(data, n).is_ok()
 }
 ```
 
@@ -1208,7 +1208,7 @@ fn is_psd(data: &[f64], n: usize) -> bool {
 
 ### MN10 (Minor) — FactorCovarianceMatrix deserialize helper does not deny unknown fields
 
-**Location:** `finstack/factor-model/src/covariance.rs:145`  
+**Location:** `finstack-quant/factor-model/src/covariance.rs:145`  
 **Area:** risk-numerics
 
 
@@ -1235,7 +1235,7 @@ struct FactorCovarianceMatrixSerde {
 
 ### MN11 (Minor) — PSD rejection property is false at the small-variance corner (latent flaky proptest; marginally indefinite matrices accepted)
 
-**Location:** `finstack/factor-model/src/covariance.rs:205`  
+**Location:** `finstack-quant/factor-model/src/covariance.rs:205`  
 **Area:** risk-numerics
 
 
@@ -1259,11 +1259,11 @@ prop_assert!(result.is_err());
 
 ### MN12 (Minor) — FactorModelError is mostly dead, hand-rolled instead of thiserror, and not #[non_exhaustive]
 
-**Location:** `finstack/factor-model/src/error.rs:8`  
+**Location:** `finstack-quant/factor-model/src/error.rs:8`  
 **Area:** risk-numerics
 
 
-**Issue.** Of the five variants, only UnmatchedDependency is ever constructed (once, to format a message string in portfolio/src/factor_model/model.rs:255). MissingFactor, InvalidCovariance, RepricingFailed, and AmbiguousMatch are dead — covariance validation returns stringly-typed `finstack_core::Error::Validation` instead of InvalidCovariance, and matching/repricing paths use their own error types. The enum also hand-implements Display/Error rather than using thiserror (the project's stated standard for library crates) and lacks `#[non_exhaustive]` despite being a public, growable error enum.
+**Issue.** Of the five variants, only UnmatchedDependency is ever constructed (once, to format a message string in portfolio/src/factor_model/model.rs:255). MissingFactor, InvalidCovariance, RepricingFailed, and AmbiguousMatch are dead — covariance validation returns stringly-typed `finstack_quant_core::Error::Validation` instead of InvalidCovariance, and matching/repricing paths use their own error types. The enum also hand-implements Display/Error rather than using thiserror (the project's stated standard for library crates) and lacks `#[non_exhaustive]` despite being a public, growable error enum.
 
 
 **Impact.** Misleading public API surface: consumers writing match arms against these variants will never see them fire; error-handling code paths are untestable dead weight; adding a variant later is a semver break without non_exhaustive.
@@ -1284,7 +1284,7 @@ pub enum FactorModelError {
 
 ### MN13 (Minor) — UnmatchedPolicy serde wire format is PascalCase, inconsistent with its own Display/FromStr and the crate's snake_case convention
 
-**Location:** `finstack/factor-model/src/error.rs:89`  
+**Location:** `finstack-quant/factor-model/src/error.rs:89`  
 **Area:** risk-numerics
 
 
@@ -1308,7 +1308,7 @@ pub enum UnmatchedPolicy {
 
 ### MN14 (Minor) — FactorMatchError hand-rolls Display/Error instead of using thiserror
 
-**Location:** `finstack/factor-model/src/matching/matchers.rs:40`  
+**Location:** `finstack-quant/factor-model/src/matching/matchers.rs:40`  
 **Area:** matching-primitives
 
 
@@ -1332,11 +1332,11 @@ pub enum FactorMatchError {
 
 ### MN15 (Minor) — Parse failures discard the offending label and helper message
 
-**Location:** `finstack/factor-model/src/primitives/factor_types.rs:86`  
+**Location:** `finstack-quant/factor-model/src/primitives/factor_types.rs:86`  
 **Area:** matching-primitives
 
 
-**Issue.** FactorType::from_str maps any unrecognized label to the context-free `finstack_core::InputError::Invalid`, and CurveType/DependencyType::from_str (dependency.rs:50-52, 110-113) likewise drop the `Err(String)` from parse_normalized_enum, which already carries a useful "unknown variant '{key}'" message (parse.rs:34).
+**Issue.** FactorType::from_str maps any unrecognized label to the context-free `finstack_quant_core::InputError::Invalid`, and CurveType/DependencyType::from_str (dependency.rs:50-52, 110-113) likewise drop the `Err(String)` from parse_normalized_enum, which already carries a useful "unknown variant '{key}'" message (parse.rs:34).
 
 
 **Impact.** Config-ingestion errors report only a generic 'Invalid' with no indication of which label or which enum failed, hurting diagnosability of malformed ids in larger configs.
@@ -1346,7 +1346,7 @@ pub enum FactorMatchError {
 
 
 ```rust
-_ => Err(finstack_core::InputError::Invalid.into()),
+_ => Err(finstack_quant_core::InputError::Invalid.into()),
 ```
 
 
@@ -1354,11 +1354,11 @@ _ => Err(finstack_core::InputError::Invalid.into()),
 
 ### MN16 (Minor) — factor_model module inventory in parity contract does not match the Rust crate tree
 
-**Location:** `finstack-py/parity_contract.toml:90`  
+**Location:** `finstack-quant-py/parity_contract.toml:90`  
 **Area:** py-bindings
 
 
-**Issue.** `[crates.factor_model.modules]` tracks `primitives`, `matching`, `credit`, and `calibration`. The actual top-level public modules of finstack-factor-model (finstack/factor-model/src/lib.rs:10-23) are `config`, `covariance`, `credit`, `error`, `matching`, `primitives`, `sensitivity_matrix` — there is no top-level `calibration` module (calibration lives under `credit::calibration`), and `config`, `covariance`, `error`, `sensitivity_matrix` are untracked. The Python-side claims are correct (only `credit` is registered in bindings/factor_model/mod.rs, matching status="exists"; the topology test only validates importability of python paths), so this is a documentation-of-record gap on the Rust axis, not a failing test.
+**Issue.** `[crates.factor_model.modules]` tracks `primitives`, `matching`, `credit`, and `calibration`. The actual top-level public modules of finstack-quant-factor-model (finstack-quant/factor-model/src/lib.rs:10-23) are `config`, `covariance`, `credit`, `error`, `matching`, `primitives`, `sensitivity_matrix` — there is no top-level `calibration` module (calibration lives under `credit::calibration`), and `config`, `covariance`, `error`, `sensitivity_matrix` are untracked. The Python-side claims are correct (only `credit` is registered in bindings/factor_model/mod.rs, matching status="exists"; the topology test only validates importability of python paths), so this is a documentation-of-record gap on the Rust axis, not a failing test.
 
 
 **Impact.** The contract is the audit document for binding coverage decisions; reviewers consulting it will conclude RiskMeasure/FactorCovarianceMatrix/SensitivityMatrix surfaces were never considered for binding rather than deliberately deferred, and the phantom `calibration` entry can never transition to exists.
@@ -1368,7 +1368,7 @@ _ => Err(finstack_core::InputError::Invalid.into()),
 
 
 ```rust
-calibration = { python = "finstack.factor_model.calibration", status = "missing", note = "Generic FactorCalibrator is a Rust trait and not directly host-language constructible." }
+calibration = { python = "finstack_quant.factor_model.calibration", status = "missing", note = "Generic FactorCalibrator is a Rust trait and not directly host-language constructible." }
 ```
 
 
@@ -1376,11 +1376,11 @@ calibration = { python = "finstack.factor_model.calibration", status = "missing"
 
 ### MN17 (Minor) — Calibrator errors mapped via display_to_py instead of core_to_py, flattening the documented exception taxonomy
 
-**Location:** `finstack-py/src/bindings/factor_model/credit.rs:225`  
+**Location:** `finstack-quant-py/src/bindings/factor_model/credit.rs:225`  
 **Area:** py-bindings
 
 
-**Issue.** `CreditCalibrator::calibrate` returns `finstack_core::Result` (calibration.rs:297, `use finstack_core::{Error, Result}` at line 72), but the binding maps failures with `display_to_py`, which is unconditionally `PyValueError` (errors.rs:178). The project's error-mapping convention (errors.rs:75-79 and the binding standards) routes `Error::Calibration`/`Error::Internal`/solver failures to RuntimeError and missing-id lookups to KeyError via `core_to_py`. Today calibrate only emits `Error::Validation` so behavior coincides, but the mapping is latent drift: any future Calibration/Internal variant from this path will surface as ValueError instead of RuntimeError, diverging from every other finstack_core::Error site in the bindings.
+**Issue.** `CreditCalibrator::calibrate` returns `finstack_quant_core::Result` (calibration.rs:297, `use finstack_quant_core::{Error, Result}` at line 72), but the binding maps failures with `display_to_py`, which is unconditionally `PyValueError` (errors.rs:178). The project's error-mapping convention (errors.rs:75-79 and the binding standards) routes `Error::Calibration`/`Error::Internal`/solver failures to RuntimeError and missing-id lookups to KeyError via `core_to_py`. Today calibrate only emits `Error::Validation` so behavior coincides, but the mapping is latent drift: any future Calibration/Internal variant from this path will surface as ValueError instead of RuntimeError, diverging from every other finstack_quant_core::Error site in the bindings.
 
 
 **Impact.** Exception-type contract divergence between domains; downstream retry/alerting logic keyed on RuntimeError-vs-ValueError would misclassify calibration failures if the Rust error surface grows.
@@ -1398,7 +1398,7 @@ let model = self.inner.calibrate(inputs).map_err(display_to_py)?;
 
 ### MN18 (Minor) — decompose_levels docstring example passes a Python dict where the binding requires a JSON string; Args names don't match parameters
 
-**Location:** `finstack-py/src/bindings/factor_model/credit.rs:479`  
+**Location:** `finstack-quant-py/src/bindings/factor_model/credit.rs:479`  
 **Area:** py-bindings
 
 
@@ -1420,14 +1420,14 @@ let model = self.inner.calibrate(inputs).map_err(display_to_py)?;
 
 ### MN19 (Minor) — `pub inner` fields deviate from the wasm code-standard `pub(crate) inner` pattern
 
-**Location:** `finstack-wasm/src/api/factor_model/mod.rs:44`  
+**Location:** `finstack-quant-wasm/src/api/factor_model/mod.rs:44`  
 **Area:** wasm-bindings
 
 
-**Issue.** `WasmCreditFactorModel.inner` (line 44), `WasmLevelsAtDate.inner` (line 123), and `WasmPeriodDecomposition.inner` (line 146) are declared `pub` with `#[wasm_bindgen(skip)]`, while the project wasm standard mandates named structs with `pub(crate) inner`. The same file already follows the standard inconsistently: `WasmCreditCalibrator.inner` (line 79) and `WasmFactorCovarianceForecast.model` (line 245) are private. `pub` needlessly re-exports the raw core types through finstack-wasm's Rust public API and requires the `skip` attribute that `pub(crate)` would make unnecessary; all intra-crate consumers (decompose_levels at line 201, the forecast constructor at line 254) only need crate visibility.
+**Issue.** `WasmCreditFactorModel.inner` (line 44), `WasmLevelsAtDate.inner` (line 123), and `WasmPeriodDecomposition.inner` (line 146) are declared `pub` with `#[wasm_bindgen(skip)]`, while the project wasm standard mandates named structs with `pub(crate) inner`. The same file already follows the standard inconsistently: `WasmCreditCalibrator.inner` (line 79) and `WasmFactorCovarianceForecast.model` (line 245) are private. `pub` needlessly re-exports the raw core types through finstack-quant-wasm's Rust public API and requires the `skip` attribute that `pub(crate)` would make unnecessary; all intra-crate consumers (decompose_levels at line 201, the forecast constructor at line 254) only need crate visibility.
 
 
-**Impact.** API-surface leakage and pattern drift in the bindings crate; no runtime effect. Future refactors of the core types become semver-visible through finstack-wasm.
+**Impact.** API-surface leakage and pattern drift in the bindings crate; no runtime effect. Future refactors of the core types become semver-visible through finstack-quant-wasm.
 
 
 **Fix.** Change the three fields to `pub(crate) inner` and drop the now-redundant `#[wasm_bindgen(skip)]` attributes, matching the wasm code-standards struct pattern used elsewhere in the file.
@@ -1436,7 +1436,7 @@ let model = self.inner.calibrate(inputs).map_err(display_to_py)?;
 ```rust
 #[wasm_bindgen(skip)]
     /// Underlying Rust value (not exposed to JS).
-    pub inner: finstack_factor_model::credit::hierarchy::CreditFactorModel,
+    pub inner: finstack_quant_factor_model::credit::hierarchy::CreditFactorModel,
 ```
 
 
@@ -1444,11 +1444,11 @@ let model = self.inner.calibrate(inputs).map_err(display_to_py)?;
 
 ### MN20 (Minor) — WASM handles are toJson-only while Python exposes typed accessors; the asymmetry is not recorded in the parity contract
 
-**Location:** `finstack-wasm/src/api/factor_model/mod.rs:127`  
+**Location:** `finstack-quant-wasm/src/api/factor_model/mod.rs:127`  
 **Area:** wasm-bindings
 
 
-**Issue.** The Python bindings (finstack-py/src/bindings/factor_model/credit.rs) expose typed accessors on every handle — CreditFactorModel.{schema_version, as_of, n_levels, n_issuers, n_factors, level_names, issuer_ids, factor_ids}, LevelsAtDate.{date, generic, n_levels, level_values, adder}, PeriodDecomposition.{from_date, to_date, d_generic, n_levels, level_deltas, d_adder} — all present in the .pyi stub. The WASM wrappers expose only `toJson()` on the corresponding classes (WasmLevelsAtDate impl at lines 126-133 contains a single method). The opaque-handle design is documented in code comments ('The full data is available via toJson'), but parity_contract.toml's factor_model credit note (line 89) lists only the type names and, unlike the `[wasm_core_subset]` block (lines 753-789) which explicitly documents the agreed WASM subset for core, nothing records this accessor asymmetry as intentional — so reviewers and the parity tooling cannot distinguish deliberate subset from drift. Additionally, since LevelsAtDate derives only Serialize (decomposition.rs:53), toJson is strictly one-way: JS callers cannot persist a snapshot and rehydrate it later for decomposePeriod across sessions.
+**Issue.** The Python bindings (finstack-quant-py/src/bindings/factor_model/credit.rs) expose typed accessors on every handle — CreditFactorModel.{schema_version, as_of, n_levels, n_issuers, n_factors, level_names, issuer_ids, factor_ids}, LevelsAtDate.{date, generic, n_levels, level_values, adder}, PeriodDecomposition.{from_date, to_date, d_generic, n_levels, level_deltas, d_adder} — all present in the .pyi stub. The WASM wrappers expose only `toJson()` on the corresponding classes (WasmLevelsAtDate impl at lines 126-133 contains a single method). The opaque-handle design is documented in code comments ('The full data is available via toJson'), but parity_contract.toml's factor_model credit note (line 89) lists only the type names and, unlike the `[wasm_core_subset]` block (lines 753-789) which explicitly documents the agreed WASM subset for core, nothing records this accessor asymmetry as intentional — so reviewers and the parity tooling cannot distinguish deliberate subset from drift. Additionally, since LevelsAtDate derives only Serialize (decomposition.rs:53), toJson is strictly one-way: JS callers cannot persist a snapshot and rehydrate it later for decomposePeriod across sessions.
 
 
 **Impact.** JS callers must JSON.parse full pretty-printed payloads to read a single scalar (extra boundary copies for large issuer universes), and the undocumented asymmetry invites either accidental divergence or unnecessary 'fix the drift' churn in future parity reviews.
@@ -1469,7 +1469,7 @@ impl WasmLevelsAtDate {
 
 ### MN21 (Minor) — Round-trip serialization tests are self-referential and pin no wire format for the report types
 
-**Location:** `finstack/portfolio/tests/factor_model_serialization.rs:24`  
+**Location:** `finstack-quant/portfolio/tests/factor_model_serialization.rs:24`  
 **Area:** consumers-integration
 
 
@@ -1495,7 +1495,7 @@ assert_eq!(
 
 ### MN22 (Minor) — diagonal_factor_contribution reads the pivoted factor's diagonal as if it were the unpivoted Cholesky L[i,i]
 
-**Location:** `finstack/valuations/src/correlation/factor_model.rs:205`  
+**Location:** `finstack-quant/valuations/src/correlation/factor_model.rs:205`  
 **Area:** consumers-integration
 
 
@@ -1518,7 +1518,7 @@ z * l_ii * m.volatilities[factor_index]
 
 ### MN23 (Minor) — generate_correlated_factors_into discards the Result of CorrelationFactor::apply
 
-**Location:** `finstack/valuations/src/correlation/factor_model.rs:880`  
+**Location:** `finstack-quant/valuations/src/correlation/factor_model.rs:880`  
 **Area:** consumers-integration
 
 
@@ -1543,16 +1543,16 @@ Two candidate findings were killed by the adversarial verification pass; recorde
 here so future reviews do not re-raise them:
 
 - **"Parity test is degenerate; the reconciliation invariant is untested anywhere
-  in the workspace"** (`finstack/factor-model/tests/credit_peel_parity.rs:18`,
+  in the workspace"** (`finstack-quant/factor-model/tests/credit_peel_parity.rs:18`,
   originally Major). The narrow facts about `credit_peel_parity.rs` are accurate
   (1 issuer, 1 level, `GloballyOff`, adder unasserted), but the headline is false:
   the reconciliation invariant and multi-issuer/multi-level decomposition behavior
-  are exercised end-to-end in `finstack/valuations/tests/credit_decomposition.rs`
-  and `finstack/valuations/tests/credit_calibration.rs`, which the original finder
+  are exercised end-to-end in `finstack-quant/valuations/tests/credit_decomposition.rs`
+  and `finstack-quant/valuations/tests/credit_calibration.rs`, which the original finder
   did not read. The local test's narrowness is folded into MN-class test-hygiene
   notes instead.
 - **"`LevelsAtDate`/`PeriodDecomposition` are Serialize-only; persisted snapshots
-  cannot be reloaded"** (`finstack/factor-model/src/credit/decomposition.rs:53`,
+  cannot be reloaded"** (`finstack-quant/factor-model/src/credit/decomposition.rs:53`,
   originally Moderate). Verifiers found no production workflow that persists and
   reloads snapshots through the Rust API; both bindings intentionally expose
   JSON-out-only result views, and recomputing the `from` snapshot is the
@@ -1642,22 +1642,22 @@ data quality".
 
 From the completeness critic, confirmed by spot-checks:
 
-1. `finstack-py/src/bindings/portfolio/sensitivity.rs` and
-   `finstack-wasm/src/api/portfolio/sensitivity.rs` (user-JSON →
+1. `finstack-quant-py/src/bindings/portfolio/sensitivity.rs` and
+   `finstack-quant-wasm/src/api/portfolio/sensitivity.rs` (user-JSON →
    `ParametricDecomposer` paths) were outside every slice; the WASM non-finite
    finding class likely applies there too.
-2. `finstack/portfolio/src/factor_model/` engine internals reachable from the
+2. `finstack-quant/portfolio/src/factor_model/` engine internals reachable from the
    reviewed bindings: `position_risk.rs` (ES truncated-normal moments,
    historical tail quantiles), `whatif.rs`, `simulation.rs`,
    `credit_vol_forecast.rs`, `math.rs` (Beasley–Springer–Moro probit constants —
    unverified), ~60% of `model.rs`. **A dedicated portfolio-factor-risk-engine
    review is the natural follow-up.**
-3. `finstack/attribution/src/credit_decomposition.rs`, most of
+3. `finstack-quant/attribution/src/credit_decomposition.rs`, most of
    `credit_cascade.rs`, and the ~1.9k lines of attribution integration tests.
-4. `finstack/valuations/tests/credit_calibration.rs` (1,740 ln) and
+4. `finstack-quant/valuations/tests/credit_calibration.rs` (1,740 ln) and
    `credit_decomposition.rs` (652 ln) were used to refute one finding but not
    themselves line-reviewed.
-5. `finstack/analytics/src/correlation/nearest_correlation.rs` (Higham repair) —
+5. `finstack-quant/analytics/src/correlation/nearest_correlation.rs` (Higham repair) —
    load-bearing for `FullSampleRepaired`/`Ridge`, unreviewed.
 6. No property tests exist for peel sum-to-total, anchor identity, or
    period additivity; no golden calibration fixture pins exact betas/vols bytes.

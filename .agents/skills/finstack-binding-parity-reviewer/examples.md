@@ -6,7 +6,7 @@
 
 ```rust
 // GOOD: Wrapper with flexible argument extraction
-#[pyclass(name = "Money", module = "finstack.core.money", frozen)]
+#[pyclass(name = "Money", module = "finstack_quant.core.money", frozen)]
 pub struct PyMoney {
     pub(crate) inner: Money,
 }
@@ -91,7 +91,7 @@ pub fn map_error(e: CoreError) -> PyErr {
 ### Example 4: Ergonomic Python Helper (Acceptable)
 
 ```python
-# finstack/core/expr_helpers.py
+# finstack-quant/core/expr_helpers.py
 # ACCEPTABLE: Operator overloading for ergonomics only
 
 class ExprWrapper:
@@ -142,7 +142,7 @@ impl PyBond {
 **FIX**: Move to Rust core:
 
 ```rust
-// In finstack_valuations/src/instruments/bond.rs
+// In finstack_quant_valuations/src/instruments/bond.rs
 impl Bond {
     pub fn yield_to_maturity(&self, price: f64) -> Result<f64, Error> {
         // Newton-Raphson solver in Rust core
@@ -150,7 +150,7 @@ impl Bond {
     }
 }
 
-// In finstack-py/src/valuations/bond.rs
+// In finstack-quant-py/src/valuations/bond.rs
 #[pymethods]
 impl PyBond {
     fn yield_to_maturity(&self, price: f64) -> PyResult<f64> {
@@ -188,7 +188,7 @@ impl PySwap {
 **FIX**: Move validation to Rust constructor:
 
 ```rust
-// In finstack_valuations/src/instruments/swap.rs
+// In finstack_quant_valuations/src/instruments/swap.rs
 impl Swap {
     pub fn new(notional: f64, fixed_rate: f64, tenor: Tenor) -> Result<Self, Error> {
         if notional <= 0.0 {
@@ -201,7 +201,7 @@ impl Swap {
     }
 }
 
-// In finstack-py/src/valuations/swap.rs
+// In finstack-quant-py/src/valuations/swap.rs
 #[pymethods]
 impl PySwap {
     #[new]
@@ -236,7 +236,7 @@ impl PyPortfolio {
 **FIX**: Add method to Rust core:
 
 ```rust
-// In finstack_portfolio/src/portfolio.rs
+// In finstack_quant_portfolio/src/portfolio.rs
 impl Portfolio {
     pub fn exposure_by_currency(&self) -> HashMap<Currency, f64> {
         self.positions
@@ -248,7 +248,7 @@ impl Portfolio {
     }
 }
 
-// In finstack-py/src/portfolio/portfolio.rs
+// In finstack-quant-py/src/portfolio/portfolio.rs
 #[pymethods]
 impl PyPortfolio {
     fn exposure_by_currency(&self) -> HashMap<String, f64> {
@@ -295,14 +295,14 @@ impl PyCurve {
 **FIX**: Use Rust interpolation:
 
 ```rust
-// In finstack_core/src/market_data/curve.rs
+// In finstack_quant_core/src/market_data/curve.rs
 impl Curve {
     pub fn rate_at(&self, tenor: f64) -> Result<f64, Error> {
         self.interpolator.interpolate(tenor)
     }
 }
 
-// In finstack-py/src/bindings/core/market_data/curve.rs
+// In finstack-quant-py/src/bindings/core/market_data/curve.rs
 #[pymethods]
 impl PyCurve {
     fn rate_at(&self, tenor: f64) -> PyResult<f64> {
@@ -342,14 +342,14 @@ impl PyPricer {
 **FIX**: Use Rust pricer with trait dispatch:
 
 ```rust
-// In finstack_valuations/src/pricer.rs
+// In finstack_quant_valuations/src/pricer.rs
 impl Pricer {
     pub fn price(&self, instrument: &dyn Priceable) -> Result<f64, Error> {
         instrument.price(self.market_data())
     }
 }
 
-// In finstack-py/src/valuations/pricer.rs
+// In finstack-quant-py/src/valuations/pricer.rs
 #[pymethods]
 impl PyPricer {
     fn price_bond(&self, bond: &PyBond) -> PyResult<f64> {

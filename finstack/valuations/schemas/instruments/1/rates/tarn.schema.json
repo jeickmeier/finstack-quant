@@ -1,7 +1,0 @@
-{
-  "$id": "https://finstack.dev/schemas/instrument/1/rates/tarn.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "TARN",
-  "description": "Target redemption note instrument schema",
-  "type": "object"
-}

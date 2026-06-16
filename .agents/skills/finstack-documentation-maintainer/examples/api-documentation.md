@@ -25,7 +25,7 @@
 /// # Examples
 ///
 /// ```rust
-/// use finstack_valuations::pricer::ModelKey;
+/// use finstack_quant_valuations::pricer::ModelKey;
 ///
 /// // Select appropriate model for instrument type
 /// let model = ModelKey::Discounting;  // For bonds
@@ -90,8 +90,8 @@ pub enum ModelKey {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_core::OptionType;
-/// use finstack_valuations::models::black76_price;
+/// use finstack_quant_core::OptionType;
+/// use finstack_quant_valuations::models::black76_price;
 ///
 /// // Price a 1-year ATM call with 20% vol
 /// let price = black76_price(
@@ -188,7 +188,7 @@ class Bond:
 
     Examples
     --------
-    >>> from finstack import Bond, Currency, DayCount
+    >>> from finstack_quant import Bond, Currency, DayCount
     >>> bond = Bond(
     ...     id="BOND-001",
     ...     currency=Currency.USD,
@@ -320,7 +320,7 @@ impl BondPricer {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_valuations::{BondPricer, Bond, MarketContext};
+/// use finstack_quant_valuations::{BondPricer, Bond, MarketContext};
 ///
 /// let pricer = BondPricer;
 /// let bond = Bond::new(/* ... */);

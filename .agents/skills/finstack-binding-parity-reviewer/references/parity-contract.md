@@ -1,4 +1,4 @@
-# Finstack Binding Parity Contract
+# Finstack Quant Binding Parity Contract
 
 Use this reference when a Rust public API is intended to appear in Python or WASM.
 
@@ -6,14 +6,14 @@ Use this reference when a Rust public API is intended to appear in Python or WAS
 
 | Surface | Files |
 | --- | --- |
-| Canonical Rust API | `finstack/*/src/**/*.rs` |
-| Python bindings | `finstack-py/src/bindings/**` |
-| Python stubs | `finstack-py/finstack/**/*.pyi` |
-| Python exports | `finstack-py/finstack/**/__init__.py`, PyO3 `register()` functions |
-| WASM bindings | `finstack-wasm/src/api/**` |
-| JS facade | `finstack-wasm/index.js`, `finstack-wasm/exports/**` |
-| Parity contract | `finstack-py/parity_contract.toml` |
-| Parity tests | `finstack-py/tests/parity/**` |
+| Canonical Rust API | `finstack-quant/*/src/**/*.rs` |
+| Python bindings | `finstack-quant-py/src/bindings/**` |
+| Python stubs | `finstack-quant-py/finstack_quant/**/*.pyi` |
+| Python exports | `finstack-quant-py/finstack_quant/**/__init__.py`, PyO3 `register()` functions |
+| WASM bindings | `finstack-quant-wasm/src/api/**` |
+| JS facade | `finstack-quant-wasm/index.js`, `finstack-quant-wasm/exports/**` |
+| Parity contract | `finstack-quant-py/parity_contract.toml` |
+| Parity tests | `finstack-quant-py/tests/parity/**` |
 
 ## Required Invariants
 

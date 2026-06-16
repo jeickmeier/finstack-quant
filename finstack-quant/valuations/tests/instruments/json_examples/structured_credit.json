@@ -1,0 +1,218 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "structured_credit",
+    "spec": {
+      "id": "CLO-EXAMPLE",
+      "deal_type": "CLO",
+      "pool": {
+        "id": "POOL-1",
+        "deal_type": "CLO",
+        "assets": [],
+        "cumulative_defaults": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_recoveries": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_prepayments": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "reinvestment_period": null,
+        "collection_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "reserve_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "excess_spread_account": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      },
+      "tranches": {
+        "tranches": [
+          {
+            "id": "CLONOTES-A",
+            "attachment_point": 0.0,
+            "detachment_point": 100.0,
+            "behavior_type": "Standard",
+            "seniority": "Senior",
+            "rating": null,
+            "original_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "current_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "target_balance": null,
+            "coupon": {
+              "Fixed": {
+                "rate": 0.06
+              }
+            },
+            "oc_trigger": null,
+            "ic_trigger": null,
+            "credit_enhancement": {
+              "subordination": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "overcollateralization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread": 0.0,
+              "cash_trap_active": false
+            },
+            "frequency": {"count": 3, "unit": "months"},
+            "day_count": "Act360",
+            "deferred_interest": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "is_revolving": false,
+            "can_reinvest": false,
+            "maturity": "2034-01-01",
+            "expected_maturity": null,
+            "payment_priority": 1,
+            "attributes": {
+              "tags": [],
+              "meta": {}
+            }
+          }
+        ],
+        "total_size": {
+          "amount": "100000000",
+          "currency": "USD"
+        }
+      },
+      "waterfall": {
+        "tiers": [
+          {
+            "id": "Tier1-Interest",
+            "priority": 1,
+            "recipients": [
+              {
+                "id": "A-INT",
+                "recipient_type": {
+                  "Tranche": "CLONOTES-A"
+                },
+                "calculation": {
+                  "TrancheInterest": {
+                    "tranche_id": "CLONOTES-A"
+                  }
+                },
+                "weight": null
+              }
+            ],
+            "payment_type": "Interest",
+            "allocation_mode": "Sequential",
+            "divertible": false
+          },
+          {
+            "id": "Tier2-Principal",
+            "priority": 2,
+            "recipients": [
+              {
+                "id": "A-PRIN",
+                "recipient_type": {
+                  "Tranche": "CLONOTES-A"
+                },
+                "calculation": {
+                  "TranchePrincipal": {
+                    "tranche_id": "CLONOTES-A",
+                    "target_balance": null
+                  }
+                },
+                "weight": null
+              }
+            ],
+            "payment_type": "Principal",
+            "allocation_mode": "Sequential",
+            "divertible": false
+          }
+        ],
+        "coverage_triggers": [],
+        "base_currency": "USD"
+      },
+      "closing_date": "2024-01-01",
+      "first_payment_date": "2025-04-01",
+      "reinvestment_end_date": null,
+      "maturity": "2034-01-01",
+      "frequency": {"count": 3, "unit": "months"},
+      "discount_curve_id": "USD-OIS",
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      },
+      "prepayment_spec": {
+        "cpr": 0.15,
+        "curve": null
+      },
+      "default_spec": {
+        "cdr": 0.025,
+        "curve": null
+      },
+      "recovery_spec": {
+        "rate": 0.4,
+        "recovery_lag": 18
+      },
+      "market_conditions": {
+        "refi_rate": 0.04,
+        "original_rate": null,
+        "hpa": null,
+        "unemployment": null,
+        "seasonal_factor": 1.0,
+        "custom_factors": {}
+      },
+      "credit_factors": {
+        "credit_score": null,
+        "dti": null,
+        "ltv": null,
+        "delinquency_days": 0,
+        "unemployment_rate": null,
+        "custom_factors": {}
+      },
+      "deal_metadata": {
+        "manager_id": null,
+        "servicer_id": null,
+        "master_servicer_id": null,
+        "special_servicer_id": null,
+        "trustee_id": null
+      },
+      "behavior_overrides": {
+        "cpr_annual": null,
+        "abs_speed": null,
+        "psa_speed_multiplier": null,
+        "cdr_annual": null,
+        "sda_speed_multiplier": null,
+        "recovery_rate": null,
+        "recovery_lag_months": null,
+        "reinvestment_price": null
+      },
+      "default_assumptions": {
+        "base_cdr_annual": 0.02,
+        "base_recovery_rate": 0.4,
+        "base_cpr_annual": 0.15,
+        "psa_speed": null,
+        "sda_speed": null,
+        "abs_speed_monthly": null,
+        "cpr_by_asset_type": {},
+        "cdr_by_asset_type": {},
+        "recovery_by_asset_type": {}
+      }
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "finstack_quant.margin.schedule_im.v1",
+  "version": 1,
+  "entries": [
+    {
+      "ids": ["bcbs_iosco"],
+      "record": {
+        "bucket_boundaries_years": {
+          "short_to_medium": 2.0,
+          "medium_to_long": 5.0
+        },
+        "default_rate": 0.15,
+        "default_asset_class": "interest_rate",
+        "default_maturity_years": 5.0,
+        "mpor_days": 10,
+        "rates": [
+          { "asset_class": "interest_rate", "bucket": "short", "rate": 0.01 },
+          { "asset_class": "interest_rate", "bucket": "medium", "rate": 0.02 },
+          { "asset_class": "interest_rate", "bucket": "long", "rate": 0.04 },
+          { "asset_class": "credit", "bucket": "short", "rate": 0.02 },
+          { "asset_class": "credit", "bucket": "medium", "rate": 0.05 },
+          { "asset_class": "credit", "bucket": "long", "rate": 0.10 },
+          { "asset_class": "equity", "bucket": "short", "rate": 0.15 },
+          { "asset_class": "equity", "bucket": "medium", "rate": 0.15 },
+          { "asset_class": "equity", "bucket": "long", "rate": 0.15 },
+          { "asset_class": "commodity", "bucket": "short", "rate": 0.15 },
+          { "asset_class": "commodity", "bucket": "medium", "rate": 0.15 },
+          { "asset_class": "commodity", "bucket": "long", "rate": 0.15 },
+          { "asset_class": "fx", "bucket": "short", "rate": 0.06 },
+          { "asset_class": "fx", "bucket": "medium", "rate": 0.06 },
+          { "asset_class": "fx", "bucket": "long", "rate": 0.06 },
+          { "asset_class": "other", "bucket": "short", "rate": 0.15 },
+          { "asset_class": "other", "bucket": "medium", "rate": 0.15 },
+          { "asset_class": "other", "bucket": "long", "rate": 0.15 }
+        ]
+      }
+    }
+  ]
+}

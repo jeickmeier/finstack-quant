@@ -1,0 +1,114 @@
+{
+  "meta": {
+    "suite_id": "portfolio_attribution",
+    "description": "Golden tests for portfolio P&L attribution (rates, FX, carry/theta)",
+    "reference_source": {
+      "name": "finstack-quant implementation",
+      "extra": {
+        "methodology": "Parallel attribution method decomposing P&L into rates, FX, and carry components"
+      }
+    },
+    "generated": {
+      "at": "2026-01-27T00:00:00Z",
+      "by": "finstack_quant_portfolio::attribution",
+      "command": "cargo test --test golden_tests"
+    },
+    "status": "certified",
+    "schema_version": 1
+  },
+  "cases": [
+    {
+      "id": "rates_parallel_shock_long_bond",
+      "case_meta": {
+        "notes": "Long 5Y USD bond with +100bp parallel rate shock. Positive rate shock should produce negative rates P&L."
+      },
+      "inputs": {
+        "instrument": {
+          "type": "bond",
+          "notional": 1000000,
+          "currency": "USD",
+          "coupon_rate": 0.05,
+          "maturity_years": 5
+        },
+        "market_t0": {
+          "usd_flat_rate_bp": 0
+        },
+        "market_t1": {
+          "usd_flat_rate_bp": 100
+        }
+      },
+      "expected": {
+        "rates_pnl_direction": {
+          "min": null,
+          "max": 0.0,
+          "notes": "Positive rate shock -> negative P&L for long bond"
+        },
+        "rates_pnl_magnitude": {
+          "min": -100000.0,
+          "max": 0.0,
+          "notes": "Reasonable magnitude for 5Y bond with ~4.5 duration on 1M notional with 100bp shock"
+        }
+      }
+    },
+    {
+      "id": "fx_translation_eur_appreciation",
+      "case_meta": {
+        "notes": "EUR bond with EUR/USD appreciation (1.10 -> 1.12). Translation P&L should be positive."
+      },
+      "inputs": {
+        "instrument": {
+          "type": "bond",
+          "notional": 1000000,
+          "currency": "EUR",
+          "coupon_rate": 0.03,
+          "maturity_years": 1
+        },
+        "market_t0": {
+          "eurusd_rate": 1.10
+        },
+        "market_t1": {
+          "eurusd_rate": 1.12
+        }
+      },
+      "expected": {
+        "fx_translation_direction": {
+          "min": 0.0,
+          "max": null,
+          "notes": "EUR appreciation -> positive translation P&L in USD"
+        },
+        "fx_translation_magnitude": {
+          "min": 0.0,
+          "max": 50000.0,
+          "notes": "~20k expected for 1M EUR * 0.02 rate move"
+        }
+      }
+    },
+    {
+      "id": "carry_theta_one_day",
+      "case_meta": {
+        "notes": "1-day carry/theta on 1Y bond at 5% coupon/discount. Should be finite and reasonable."
+      },
+      "inputs": {
+        "instrument": {
+          "type": "bond",
+          "notional": 1000000,
+          "currency": "USD",
+          "coupon_rate": 0.05,
+          "maturity_years": 1
+        },
+        "hold_period_days": 1,
+        "flat_rate_bp": 500
+      },
+      "expected": {
+        "carry_finite": {
+          "notes": "Carry must be a finite value"
+        },
+        "carry_magnitude": {
+          "min": -1000.0,
+          "max": 1000.0,
+          "notes": "1-day carry on ~1M bond should be < $1000 in magnitude"
+        }
+      }
+    }
+  ]
+}

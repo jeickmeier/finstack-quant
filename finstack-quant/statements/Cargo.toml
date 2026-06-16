@@ -1,0 +1,50 @@
+[package]
+name = "finstack-quant-statements"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Financial-statements modeling for Finstack Quant with deterministic Value > Forecast > Formula precedence and corkscrew schedules"
+
+[dependencies]
+finstack-quant-core = { path = "../core" }
+finstack-quant-cashflows = { path = "../cashflows" }
+finstack-quant-valuations = { path = "../valuations", optional = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
+thiserror = { workspace = true }
+nom = "8.0"
+tracing = { version = "0.1", default-features = false }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+strsim = "0.11.1"
+
+[features]
+default = ["valuation-integration"]
+valuation-integration = ["dep:finstack-quant-valuations"]
+
+# rayon has no working thread pool on single-threaded wasm32; parallel
+# code paths are cfg-gated to native targets, so the dependency is too.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rayon = "1.11"
+
+[dev-dependencies]
+time = { workspace = true, features = ["macros"] }
+criterion = { workspace = true }
+proptest = "1.11.0"
+finstack-quant-test-utils = { path = "../test-utils" }
+smallvec = { version = "1.15", default-features = false }
+
+[[bench]]
+name = "statements_operations"
+harness = false
+
+[[bench]]
+name = "statements_scale"
+harness = false
+
+[lints]
+workspace = true

@@ -1,4 +1,4 @@
-# Finstack developer environment & tasks
+# Finstack Quant developer environment & tasks
 # ---------------------------------------
 # Single source of truth for managed tool versions and developer tasks.
 # Run `mise install` once to provision all tools, then `mise run <task>`
@@ -44,18 +44,18 @@ depends = ["rust-test", "python-test-all", "wasm-test"]
 [tasks.goldens-test]
 description = "Run golden tests (Rust + Python layers)"
 run = """
-cargo test -p finstack-valuations --test golden -- --include-ignored &&
+cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
 mise run python-build -- --release &&
-uv run pytest finstack-py/tests/golden -v
+uv run pytest finstack-quant-py/tests/golden -v
 """
 
 [tasks.goldens-test-strict]
 description = "Run golden tests ignoring known_non_executable.json (surface every failure)"
 env = { GOLDEN_IGNORE_NON_EXECUTABLE = "1" }
 run = """
-cargo test -p finstack-valuations --test golden -- --include-ignored &&
+cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
 mise run python-build -- --release &&
-uv run pytest finstack-py/tests/golden -v
+uv run pytest finstack-quant-py/tests/golden -v
 """
 
 [tasks.all-fmt]
@@ -91,36 +91,36 @@ depends = ["wasm-build", "pre-commit-run", "all-test"]
 # ─────────────────────────────────────────────────────────────────
 
 [tasks.rust-build]
-description = "Build all core Rust crates (excludes finstack-py, finstack-wasm)"
-run = "cargo build --workspace --exclude finstack-py --exclude finstack-wasm"
+description = "Build all core Rust crates (excludes finstack-quant-py, finstack-quant-wasm)"
+run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm"
 
 [tasks.rust-build-prod]
 description = "Release build without debug info"
 env = { RUSTFLAGS = "-C debuginfo=0" }
-run = "cargo build --workspace --exclude finstack-py --exclude finstack-wasm --release"
+run = "cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --release"
 
 [tasks.rust-test]
 description = "Run Rust tests via cargo-nextest"
-run = "cargo nextest run --workspace --exclude finstack-py --lib --test '*' --no-fail-fast"
+run = "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --no-fail-fast"
 
 [tasks.rust-doc]
 description = "Build workspace docs with strict rustdoc and run core doctests"
 run = [
-  "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-py --exclude finstack-wasm --no-deps",
-  "cargo test -p finstack-core --doc",
+  "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps",
+  "cargo test -p finstack-quant-core --doc",
 ]
 
 [tasks.rust-test-slow]
 description = "Run Rust tests including ignored/slow ones"
-run = "cargo nextest run --workspace --exclude finstack-py --lib --test '*' --run-ignored all --no-fail-fast -- --skip vendor_golden"
+run = "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --run-ignored all --no-fail-fast -- --skip vendor_golden"
 
 [tasks.rust-test-cov]
 description = "Run Rust tests with HTML coverage report"
 run = """
 mkdir -p target/llvm-cov/profraw
 LLVM_PROFILE_FILE="$PWD/target/llvm-cov/profraw/default_%m_%p.profraw" \
-  cargo llvm-cov --workspace --exclude finstack-py --exclude finstack-wasm \
-    --ignore-filename-regex '(tests?/|target/|\\.cargo/|.*finstack-py/.*|.*finstack-wasm/.*)' \
+  cargo llvm-cov --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm \
+    --ignore-filename-regex '(tests?/|target/|\\.cargo/|.*finstack-quant-py/.*|.*finstack-quant-wasm/.*)' \
     --html --output-dir target/llvm-cov
 echo "HTML report: target/llvm-cov/html/index.html"
 """
@@ -161,7 +161,7 @@ description = "Build Python bindings in-place (pass --release for optimized buil
 usage = '''
 flag "--release" help="Build with release profile (slower compile, faster runtime)"
 '''
-run = 'uv run --project finstack-py maturin develop --manifest-path finstack-py/Cargo.toml{% if usage.release %} --release{% endif %}'
+run = 'uv run maturin develop{% if usage.release %} --release{% endif %}'
 
 [tasks.python-test]
 description = "Build release Python bindings, then run fast Python tests"
@@ -188,7 +188,7 @@ uv run pytest -v
 description = "Build release Python bindings, then run Python tests with HTML coverage report"
 run = """
 mise run python-build -- --release
-uv run pytest -v --cov=finstack-py/finstack --cov-report=term-missing --cov-report=html:target/python-cov
+uv run pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov
 """
 
 [tasks.python-fmt]
@@ -208,17 +208,17 @@ run = [
 [tasks.python-typecheck]
 description = "Type-check Python bindings with ty + pyright"
 run = [
-  "uv run --no-sync ty check finstack-py/finstack",
+  "uv run --no-sync ty check finstack-quant-py/finstack_quant",
   "uv run --no-sync pyright",
 ]
 
 [tasks.python-verifytypes]
 description = "Verify Python type completeness"
-run = "uv run --no-sync pyright --verifytypes finstack --ignoreexternal"
+run = "uv run --no-sync pyright --verifytypes finstack_quant --ignoreexternal"
 
 [tasks.python-audit]
 description = "Audit Python dependencies via bandit"
-run = "uv run bandit -r finstack-py -c pyproject.toml"
+run = "uv run bandit -r finstack-quant-py -c pyproject.toml"
 
 [tasks.python-update]
 description = "Update Python dependencies"
@@ -226,7 +226,7 @@ run = "uv lock --upgrade"
 
 [tasks.python-examples]
 description = "Run Python example notebooks"
-run = "uv run python finstack-py/examples/notebooks/run_all_notebooks.py"
+run = "uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py"
 
 # ─────────────────────────────────────────────────────────────────
 # WASM
@@ -234,15 +234,15 @@ run = "uv run python finstack-py/examples/notebooks/run_all_notebooks.py"
 
 [tasks.wasm-build]
 description = "Build WASM package (web target)"
-run = "wasm-pack build finstack-wasm --target web"
+run = "wasm-pack build finstack-quant-wasm --target web"
 
 [tasks.wasm-test]
 description = "Run WASM package tests (wasm-bindgen + Node facade)"
 run = [
-  "npm --prefix finstack-wasm run test",
-  "npm --prefix finstack-wasm run build",
-  "npm --prefix finstack-wasm run build:node",
-  "npm --prefix finstack-wasm run test:facade",
+  "npm --prefix finstack-quant-wasm run test",
+  "npm --prefix finstack-quant-wasm run build",
+  "npm --prefix finstack-quant-wasm run build:node",
+  "npm --prefix finstack-quant-wasm run test:facade",
 ]
 
 [tasks.wasm-test-cov]
@@ -250,7 +250,7 @@ description = "Run WASM binding tests with HTML coverage report"
 run = """
 mkdir -p target/wasm-cov/profraw
 LLVM_PROFILE_FILE="$PWD/target/wasm-cov/profraw/default_%m_%p.profraw" \
-  cargo llvm-cov -p finstack-wasm --lib \
+  cargo llvm-cov -p finstack-quant-wasm --lib \
     --ignore-filename-regex '(tests?/|target/|\\.cargo/)' \
     --html --output-dir target/wasm-cov
 echo "HTML report: target/wasm-cov/html/index.html"
@@ -259,28 +259,28 @@ echo "HTML report: target/wasm-cov/html/index.html"
 [tasks.wasm-fmt]
 description = "Format + auto-fix WASM/TS code (prettier + eslint --fix, mutating)"
 run = [
-  "npm --prefix finstack-wasm run format:fix",
-  "npm --prefix finstack-wasm run lint:fix",
+  "npm --prefix finstack-quant-wasm run format:fix",
+  "npm --prefix finstack-quant-wasm run lint:fix",
 ]
 
 [tasks.wasm-lint]
 description = "Lint WASM/TS code (prettier --check + eslint, check-only)"
 run = [
-  "npm --prefix finstack-wasm run format",
-  "npm --prefix finstack-wasm run lint",
+  "npm --prefix finstack-quant-wasm run format",
+  "npm --prefix finstack-quant-wasm run lint",
 ]
 
 [tasks.wasm-pkg]
 description = "Build WASM package (web + node targets)"
 run = [
-  "wasm-pack build finstack-wasm --target web --release --out-dir pkg",
-  "wasm-pack build finstack-wasm --target nodejs --release --out-dir pkg-node",
-  '''python -c "from pathlib import Path; [Path(p).touch() for p in ('finstack-wasm/pkg/.npmignore', 'finstack-wasm/pkg-node/.npmignore')]"''',
+  "wasm-pack build finstack-quant-wasm --target web --release --out-dir pkg",
+  "wasm-pack build finstack-quant-wasm --target nodejs --release --out-dir pkg-node",
+  '''python -c "from pathlib import Path; [Path(p).touch() for p in ('finstack-quant-wasm/pkg/.npmignore', 'finstack-quant-wasm/pkg-node/.npmignore')]"''',
 ]
 
 [tasks.wasm-gen-bindings]
-description = "Export TypeScript types from Rust (writes finstack-wasm/types/generated/)"
-run = "cargo test -p finstack-valuations --test integration --features ts_export -- schema::ts_export"
+description = "Export TypeScript types from Rust (writes finstack-quant-wasm/types/generated/)"
+run = "cargo test -p finstack-quant-valuations --test integration --features ts_export -- schema::ts_export"
 
 # ─────────────────────────────────────────────────────────────────
 # Packaging (wheels)
@@ -288,11 +288,11 @@ run = "cargo test -p finstack-valuations --test integration --features ts_export
 
 [tasks.wheel-local]
 description = "Build wheel for current platform + Python"
-run = "uv run maturin build --release --manifest-path finstack-py/Cargo.toml -o target/wheels"
+run = "uv run maturin build --release -o target/wheels"
 
 [tasks.wheel-all]
 description = "Build wheels for all locally-available Python versions"
-run = "uv run maturin build --release --manifest-path finstack-py/Cargo.toml --find-interpreter -o target/wheels"
+run = "uv run maturin build --release --find-interpreter -o target/wheels"
 
 # ─────────────────────────────────────────────────────────────────
 # Schemas
@@ -302,16 +302,16 @@ run = "uv run maturin build --release --manifest-path finstack-py/Cargo.toml --f
 description = "Verify JSON schemas match Rust types"
 run = [
   "uv run python scripts/sync_instrument_schema_overrides.py",
-  "cargo nextest run -p finstack-valuations schema_parity --no-fail-fast",
-  "cargo test -p finstack-valuations test_instrument_schema_enum_parity --no-fail-fast",
-  "cargo test -p finstack-valuations --test schema_audit --no-fail-fast",
+  "cargo nextest run -p finstack-quant-valuations schema_parity --no-fail-fast",
+  "cargo test -p finstack-quant-valuations test_instrument_schema_enum_parity --no-fail-fast",
+  "cargo test -p finstack-quant-valuations --test schema_audit --no-fail-fast",
 ]
 
 [tasks.rust-gen-schemas]
 description = "Regenerate typed JSON schemas from Rust types"
 run = [
   "uv run python scripts/sync_instrument_schema_overrides.py",
-  "cargo run -p finstack-valuations --bin gen_schemas",
+  "cargo run -p finstack-quant-valuations --bin gen_schemas",
 ]
 
 [tasks.rust-sync-schemas]
@@ -321,9 +321,9 @@ run = "uv run python scripts/sync_instrument_schema_overrides.py"
 [tasks.gen-check]
 description = "Regenerate JSON Schema + ts-rs bindings; fail on diff"
 run = """
-cargo run --quiet -p finstack-valuations --bin gen_schemas
-cargo test --quiet -p finstack-valuations --test integration --features ts_export -- --test-threads=1 schema::ts_export
-git diff --quiet finstack/valuations/schemas/ finstack-wasm/types/generated/ \
+cargo run --quiet -p finstack-quant-valuations --bin gen_schemas
+cargo test --quiet -p finstack-quant-valuations --test integration --features ts_export -- --test-threads=1 schema::ts_export
+git diff --quiet finstack-quant/valuations/schemas/ finstack-quant-wasm/types/generated/ \
   || (echo 'Generated artifacts out of date. Run: mise run rust-gen-schemas && mise run wasm-gen-bindings'; exit 1)
 """
 

@@ -6,10 +6,10 @@ Use this format verbatim. The user will read many of these; consistency matters.
 
 # Audit Report: `<crate>::<module>`
 
-**Scope:** `<relative path, e.g. finstack/statements/src/checks/>`
+**Scope:** `<relative path, e.g. finstack-quant/statements/src/checks/>`
 **Bindings in scope:**
-- `finstack-py/src/bindings/statements/checks.rs` (exists / missing)
-- `finstack-wasm/src/api/statements/checks.rs` (exists / missing)
+- `finstack-quant-py/src/bindings/statements/checks.rs` (exists / missing)
+- `finstack-quant-wasm/src/api/statements/checks.rs` (exists / missing)
 **Date:** YYYY-MM-DD
 **Auditor:** finstack-simplify / Phase 1 (read-only)
 
@@ -41,7 +41,7 @@ One H2 per finding. Sort by (Impact desc, Risk asc).
 
 **Files:**
 - `path/to/file.rs:L123-L160`
-- `finstack-py/src/bindings/.../file.rs:L12-L28`
+- `finstack-quant-py/src/bindings/.../file.rs:L12-L28`
 
 **What:** One or two sentences. The reader should understand the issue without having to open the files.
 

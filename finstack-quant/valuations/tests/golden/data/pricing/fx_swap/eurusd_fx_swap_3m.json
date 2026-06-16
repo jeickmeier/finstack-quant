@@ -1,0 +1,151 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "eurusd_fx_swap_3m",
+    "domain": "fx.fx_swap",
+    "description": "Synthetic EUR/USD 3M FX swap with explicit FX matrix and discount curves.",
+    "valuation_date": "2026-04-30",
+    "source": "formula",
+    "source_detail": "Finstack Quant canonical FX swap discounting calculation on deterministic synthetic EUR/USD market data Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-04-30",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-09",
+    "review_interval_months": 6,
+    "regen_command": "manual formula fixture; values captured from canonical pricing runner",
+    "screenshots": []
+  },
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "eurusd_fx_swap_3m_tier_a_wrap",
+        "description": "Tier-A wrap (Phase-2 envelope migration, 2026-05-09): the original market snapshot is preserved in initial_market with empty plan.steps. Routes through engine::execute_with_diagnostics without changing pricing math.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [
+        {
+          "kind": "fx_spot",
+          "id": "EUR/USD",
+          "from": "EUR",
+          "to": "USD",
+          "rate": 1.1
+        }
+      ],
+      "prior_market": [
+        {
+          "kind": "discount_curve",
+          "id": "EUR-OIS",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.992
+            ],
+            [
+              1.0,
+              0.95232
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-OIS",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.99
+            ],
+            [
+              1.0,
+              0.9504
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "fx_swap",
+      "spec": {
+        "id": "EURUSD-FXSWAP-3M-GOLDEN",
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "near_date": "2026-05-04",
+        "far_date": "2026-08-04",
+        "base_notional": {
+          "amount": "10000000",
+          "currency": "EUR"
+        },
+        "domestic_discount_curve_id": "USD-OIS",
+        "foreign_discount_curve_id": "EUR-OIS",
+        "near_rate": 1.1,
+        "far_rate": 1.105,
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        }
+      }
+    }
+  },
+  "expected": {
+    "npv": 28453.284469692793,
+    "dv01_domestic": -275.47062049712986,
+    "dv01_foreign": 274.74677893445187
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "dv01_domestic": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "dv01_foreign": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    }
+  }
+}

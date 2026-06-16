@@ -82,7 +82,6 @@ jobs:
           args: >-
             --release
             --out dist
-            --manifest-path finstack-py/Cargo.toml
             --interpreter python${{ matrix.python }}
           manylinux: "2_28"
           # Windows wheel builds have hit rustc-version skew from cached artifacts
@@ -92,8 +91,8 @@ jobs:
       - name: Smoke test wheel
         if: matrix.target != 'aarch64' || runner.os != 'Linux'
         run: |
-          python -c "from pathlib import Path; import subprocess, sys; wheels = sorted(Path('dist').glob('finstack-*.whl')); assert len(wheels) == 1, f'Expected exactly one wheel in dist/, found: {wheels}'; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
-          python -c "from finstack.core.money import Money; from finstack.core.currency import Currency; m = Money(100.0, Currency('USD')); print(f'OK: {m}')"
+          python -c "from pathlib import Path; import subprocess, sys; wheels = sorted(Path('dist').glob('finstack_quant_py-*.whl')); assert len(wheels) == 1, f'Expected exactly one wheel in dist/, found: {wheels}'; subprocess.run([sys.executable, '-m', 'pip', 'install', str(wheels[0])], check=True)"
+          python -c "from finstack_quant.core.money import Money; from finstack_quant.core.currency import Currency; m = Money(100.0, Currency('USD')); print(f'OK: {m}')"
 
       - uses: actions/upload-artifact@v6
         with:
@@ -118,7 +117,7 @@ jobs:
       - uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --out dist --manifest-path finstack-py/Cargo.toml
+          args: --out dist
       - uses: actions/upload-artifact@v6
         with:
           name: sdist
@@ -157,36 +156,36 @@ jobs:
 
           workspace = tomllib.loads(Path("Cargo.toml").read_text())
           version = workspace["workspace"]["package"]["version"]
-          package_path = Path("finstack-wasm/package.json")
+          package_path = Path("finstack-quant-wasm/package.json")
           package = json.loads(package_path.read_text())
           package["version"] = version
           package_path.write_text(json.dumps(package, indent=2) + "\n")
-          print(f"finstack-wasm package version set to {version}")
+          print(f"finstack-quant-wasm package version set to {version}")
           PY
 
       - name: Build WASM targets
-        working-directory: finstack-wasm
+        working-directory: finstack-quant-wasm
         run: |
           mkdir -p ../dist
           wasm-pack build --target web --release --out-dir pkg
           wasm-pack build --target nodejs --release --out-dir pkg-node
           touch pkg/.npmignore pkg-node/.npmignore
-          tar -czf ../dist/finstack-wasm-web.tar.gz pkg
-          tar -czf ../dist/finstack-wasm-nodejs.tar.gz pkg-node
+          tar -czf ../dist/finstack-quant-wasm-web.tar.gz pkg
+          tar -czf ../dist/finstack-quant-wasm-nodejs.tar.gz pkg-node
 
       - name: Package npm tarball
-        working-directory: finstack-wasm
+        working-directory: finstack-quant-wasm
         run: |
           npm pack --ignore-scripts
-          mv finstack-wasm-*.tgz ../dist/
+          mv finstack-quant-wasm-*.tgz ../dist/
 
       - uses: actions/upload-artifact@v6
         with:
           name: wasm-builds
           path: |
-            dist/finstack-wasm-*.tgz
-            dist/finstack-wasm-web.tar.gz
-            dist/finstack-wasm-nodejs.tar.gz
+            dist/finstack-quant-wasm-*.tgz
+            dist/finstack-quant-wasm-web.tar.gz
+            dist/finstack-quant-wasm-nodejs.tar.gz
 
   # ── Publish ─────────────────────────────────────────────────────
   publish:

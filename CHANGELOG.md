@@ -13,7 +13,7 @@ stability contract and schema-version policy.
 
 ## [0.5.0] - 2026-05-23
 
-### `finstack-wasm` — JS facade simplification (breaking)
+### `finstack-quant-wasm` — JS facade simplification (breaking)
 
 Several wasm-bindgen JS names were trimmed/aligned for clarity. The Rust internals
 keep the same behaviour; only the JS-facing names change.
@@ -40,7 +40,7 @@ keep the same behaviour; only the JS-facing names change.
   nested-array overload incurred a JS-side copy for every call.
 
 JavaScript/TypeScript consumers must update call sites accordingly. The
-`finstack-wasm/index.d.ts` declarations and `finstack-py/parity_contract.toml`
+`finstack-quant-wasm/index.d.ts` declarations and `finstack-quant-py/parity_contract.toml`
 WASM-only export list were updated to match.
 
 ### Added — Credit factor hierarchy decomposition (opt-in, non-breaking)
@@ -58,7 +58,7 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
 - `MarketMapping`: new `CreditHierarchical` matcher variant.
 - `AttributionSpec`: adds `credit_factor_model`, `credit_factor_detail_options`.
 
-**New schemas:** `factor_model/credit_factor_model.schema.json` (`finstack.credit_factor_model/1`), `factor_model/credit_calibration_inputs.schema.json`, `factor_model/credit_calibration_config.schema.json`. Attribution schemas extended additively — old payloads still validate.
+**New schemas:** `factor_model/credit_factor_model.schema.json` (`finstack_quant.credit_factor_model/1`), `factor_model/credit_calibration_inputs.schema.json`, `factor_model/credit_calibration_config.schema.json`. Attribution schemas extended additively — old payloads still validate.
 
 **`CreditFactorModelRef` semantics:** Currently only the `Inline(Box<CreditFactorModel>)` variant is implemented. A path-based variant (`FilePath(PathBuf)`) is documented as a future v2 enhancement; callers that need to avoid embedding large artifacts in the spec should pre-load and pass the inline form.
 
@@ -66,8 +66,8 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
 
 **PR-12 final hardening (this entry):**
 - Jupyter notebook `05_portfolio_and_scenarios/credit_factor_hierarchy.ipynb`: end-to-end synthetic demo covering calibration, artifact save/reload, period decomposition, portfolio attribution, and vol forecast.
-- Benchmarks: `finstack/valuations/benches/credit_factor_calibration.rs` (500 issuers × 60 months × 3 levels); `attribution_scale.rs` extended with a 200-position parallel-attribution-with-credit-model group.
-- Compatibility sweep: `no_model_compatibility.rs` tests that (1) pre-PR-7 `AttributionEnvelope` JSON deserializes with `credit_factor_model = None`, (2) pre-PR-7 `PnlAttribution` JSON deserializes with new fields defaulting to `None`, and (3) all four attribution methods (MetricsBased, Taylor, Parallel, Waterfall) produce finite, non-NaN totals when no credit model is supplied. `factor_model_serialization.rs` in `finstack-portfolio` adds a test confirming pre-PR-6 `RiskDecomposition` JSON (no `position_residual_contributions` key) deserializes with the field defaulting to empty.
+- Benchmarks: `finstack-quant/valuations/benches/credit_factor_calibration.rs` (500 issuers × 60 months × 3 levels); `attribution_scale.rs` extended with a 200-position parallel-attribution-with-credit-model group.
+- Compatibility sweep: `no_model_compatibility.rs` tests that (1) pre-PR-7 `AttributionEnvelope` JSON deserializes with `credit_factor_model = None`, (2) pre-PR-7 `PnlAttribution` JSON deserializes with new fields defaulting to `None`, and (3) all four attribution methods (MetricsBased, Taylor, Parallel, Waterfall) produce finite, non-NaN totals when no credit model is supplied. `factor_model_serialization.rs` in `finstack-quant-portfolio` adds a test confirming pre-PR-6 `RiskDecomposition` JSON (no `position_residual_contributions` key) deserializes with the field defaulting to empty.
 
 **v1 shipped API surface:**
 - `CreditFactorModel` / `CreditCalibrator` — artifact type and offline calibration pipeline.
@@ -75,7 +75,7 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
 - `FactorCovarianceForecast` — horizon-scaled covariance and idiosyncratic vol forecasting.
 - `compute_credit_factor_attribution` — P&L attribution with credit hierarchy detail.
 - `CreditCarryDecomposition` / `LevelCarry` — carry split by generic + level + adder.
-- Python bindings: `finstack.valuations.{CreditCalibrator, CreditFactorModel, FactorCovarianceForecast, decompose_levels, decompose_period}`.
+- Python bindings: `finstack_quant.valuations.{CreditCalibrator, CreditFactorModel, FactorCovarianceForecast, decompose_levels, decompose_period}`.
 
 **v2 deferred items:**
 - Term-structure level factors (separate beta per tenor bucket).
@@ -86,13 +86,13 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
 - FRTB P&L attribution regulatory adapter.
 - `CreditFactorModelRef::FilePath` variant for artifact-path-based dispatch.
 
-### `finstack_scenarios` — production-readiness audit follow-ups
+### `finstack_quant_scenarios` — production-readiness audit follow-ups
 
 **Breaking changes:**
 
 - **`OperationSpec::CurveParallelBp`**, `CurveNodeBp`, and the `Hierarchy*`
   curve variants now type `curve_id` and `discount_curve_id` as
-  `finstack_core::types::CurveId` instead of `String`. JSON wire format is
+  `finstack_quant_core::types::CurveId` instead of `String`. JSON wire format is
   unchanged (`CurveId` is `#[serde(transparent)]`), but Rust callers
   constructing these literals must use `"USD-OIS".into()` rather than
   `"USD-OIS".to_string()`. Same change applies to `surface_id` in
@@ -106,7 +106,7 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
   1.0 vol points). The old `bp/100` rescaling shim that overloaded
   `CurveParallelBp` for vol-index curves is gone; migrate callers to the new
   variants.
-- **`ApplicationReport::warnings`** is now `Vec<finstack_scenarios::Warning>`
+- **`ApplicationReport::warnings`** is now `Vec<finstack_quant_scenarios::Warning>`
   rather than `Vec<String>`. The structured enum lets ops alerting pipelines
   pattern-match on warning categories (`HazardRecalibrationFallback`,
   `FxTriangulationInconsistent`, `VolSurfaceArbitrage`, …) without parsing
@@ -146,7 +146,7 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
 - **Typed errors propagate end-to-end.** Adapter functions that previously
   wrapped underlying errors as `Error::Internal(format!("…: {e}"))` now use
   `?` propagation through the new `Error::Valuations(#[from]
-  finstack_valuations::Error)` variant.
+  finstack_quant_valuations::Error)` variant.
 
 **Performance:**
 
@@ -172,42 +172,42 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
 
 **FFI:**
 
-- `finstack-py` `apply_scenario` / `apply_scenario_to_market` results gain a
+- `finstack-quant-py` `apply_scenario` / `apply_scenario_to_market` results gain a
   `warnings_json: str` key (JSON-encoded list of structured `Warning`
   records, mirroring the WASM binding); `warnings: list[str]` is preserved
   for backwards compatibility.
-- `finstack.scenarios.HorizonResult` gains a `warnings_json` property with
+- `finstack_quant.scenarios.HorizonResult` gains a `warnings_json` property with
   the same semantics.
-- `finstack-wasm` already returned structured warnings; consistency between
+- `finstack-quant-wasm` already returned structured warnings; consistency between
   the two FFIs is now explicit.
 
 ### Added
 - `schema_version: u32` field on the following persisted result types, with
   `#[serde(default)]` for backward-compatible deserialization of pre-versioning
   payloads:
-  - `finstack_valuations::results::ValuationResult`
+  - `finstack_quant_valuations::results::ValuationResult`
     (`VALUATION_RESULT_SCHEMA_VERSION = 1`)
-  - `finstack_statements::evaluator::StatementResult`
+  - `finstack_quant_statements::evaluator::StatementResult`
     (`STATEMENT_RESULT_SCHEMA_VERSION = 1`)
-  - `finstack_portfolio::results::PortfolioResult`
+  - `finstack_quant_portfolio::results::PortfolioResult`
     (`PORTFOLIO_RESULT_SCHEMA_VERSION = 1`)
-  - `finstack_portfolio::optimization::PortfolioOptimizationResult`
+  - `finstack_quant_portfolio::optimization::PortfolioOptimizationResult`
     (`PORTFOLIO_OPTIMIZATION_RESULT_SCHEMA_VERSION = 1`)
-- `finstack_py` binding-layer error helpers now flatten the full
+- `finstack_quant` binding-layer error helpers now flatten the full
   `std::error::Error::source()` chain into the Python exception message, so
   calibration / solver failures retain inner context that was previously
   dropped at the FFI boundary.
-- `finstack_py::errors::error_to_py` helper for bindings that want to pass a
+- `finstack_quant::errors::display_to_py` helper for bindings that want to pass a
   `&dyn std::error::Error` and get the full source chain preserved.
 
 ### Changed
 - PyO3 entry points that hold the GIL across long-running Rust work now
   release it via `py.detach(...)` (PyO3 0.28 API):
-  - `finstack.valuations.calibrate`
-  - `finstack.monte_carlo.McEngine.price_european_call` / `price_european_put`
-  - `finstack.monte_carlo.price_european_call` / `price_european_put`
+  - `finstack_quant.valuations.calibrate`
+  - `finstack_quant.monte_carlo.McEngine.price_european_call` / `price_european_put`
+  - `finstack_quant.monte_carlo.price_european_call` / `price_european_put`
     (module-level)
-  - `finstack.scenarios.apply_scenario` / `apply_scenario_to_market`
+  - `finstack_quant.scenarios.apply_scenario` / `apply_scenario_to_market`
 - WASM `Money.mulScalar` now routes through `Money::checked_mul_f64` for
   consistency with `divScalar`; previously it did a manual finiteness check
   and then unchecked multiplication, which could diverge in edge cases.
@@ -217,32 +217,32 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
   pattern-matching for JS callers.
 - Binding-layer `.map_err(|e| PyValueError::new_err(e.to_string()))` patterns
   have been replaced with centralized `crate::errors::display_to_py` /
-  `core_to_py` helpers across 13 files in `finstack-py/src/bindings/`.
+  `core_to_py` helpers across 13 files in `finstack-quant-py/src/bindings/`.
 - `eprintln!` fallback logging in production code has been migrated to
   `tracing` (structured fields, standard subscriber routing):
-  - `finstack-core/src/dates/calendar/types.rs` (bitset-range fallback)
-  - `finstack-core/src/golden/loader.rs` (non-certified suite skip)
-  - `finstack-valuations/src/instruments/.../revolving_credit/.../path_generator.rs`
+  - `finstack-quant-core/src/dates/calendar/types.rs` (bitset-range fallback)
+  - `finstack-quant-core/src/golden/loader.rs` (non-certified suite skip)
+  - `finstack-quant-valuations/src/instruments/.../revolving_credit/.../path_generator.rs`
     (CIR Feller-condition violation)
-  - `finstack-valuations/src/instruments/common/models/trees/binomial_tree.rs`
+  - `finstack-quant-valuations/src/instruments/common/models/trees/binomial_tree.rs`
     (Leisen-Reimer even-step warning)
-- Python binding `finstack.core.money.Money` is now `frozen`; `__iadd__` /
+- Python binding `finstack_quant.core.money.Money` is now `frozen`; `__iadd__` /
   `__isub__` / `__imul__` / `__itruediv__` have been removed. Python `+=` etc.
   now fall back to the non-mutating dunders (`__add__` etc.) and rebind the
   variable. This matches the Rust `Money: Copy` semantics.
-- Python binding `finstack.core.dates.CalendarMetadata.weekend_rule` now
+- Python binding `finstack_quant.core.dates.CalendarMetadata.weekend_rule` now
   returns the stable snake_case serde name (`"saturday_sunday"`,
   `"friday_saturday"`, `"friday_only"`, `"none"`) instead of the `Debug` repr.
 
 ### Removed
 - Unused wall-clock `last_access: std::time::Instant` field on the expression
-  cache entry (`finstack_core::expr::cache`). LRU ordering is handled by the
+  cache entry (`finstack_quant_core::expr::cache`). LRU ordering is handled by the
   `lru` crate's insertion/access order — no wall-clock read was ever consumed,
   but removing it also removes a cross-run non-determinism risk.
 
 ### Fixed
-- `finstack_core::credit::migration::scale::RatingScale` and
-  `finstack_core::market_data::arbitrage` now use the deterministic
+- `finstack_quant_core::credit::migration::scale::RatingScale` and
+  `finstack_quant_core::market_data::arbitrage` now use the deterministic
   `rustc_hash::FxHashMap` (via the `crate::HashMap` alias) instead of the
   hash-randomized `std::collections::HashMap`. The former sites would otherwise
   produce non-reproducible serialized iteration order across runs.

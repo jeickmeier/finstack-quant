@@ -6,11 +6,11 @@ Use this reference when deciding where code should live and what surfaces must r
 
 Business logic, valuation rules, validation rules, pricing behavior, and domain invariants belong in the Rust core crates:
 
-- `finstack/core`
-- `finstack/valuations`
-- `finstack/statements`
-- `finstack/scenarios`
-- `finstack/portfolio`
+- `finstack-quant/core`
+- `finstack-quant/valuations`
+- `finstack-quant/statements`
+- `finstack-quant/scenarios`
+- `finstack-quant/portfolio`
 
 Move logic into core when any of these are true:
 
@@ -21,7 +21,7 @@ Move logic into core when any of these are true:
 
 ## Binding ownership
 
-`finstack-py` and `finstack-wasm` should stay thin. They should primarily do:
+`finstack-quant-py` and `finstack-quant-wasm` should stay thin. They should primarily do:
 
 - type conversion
 - wrapper construction
@@ -42,12 +42,12 @@ Do not leave domain logic in bindings just because the binding currently owns th
 
 Treat these as public surfaces even if the Rust refactor is internal:
 
-- Python extension exports in `finstack-py/src/lib.rs`
-- per-module `register()` wiring in `finstack-py/src/**`
-- Python package re-exports such as `finstack-py/finstack/valuations/__init__.py`
-- manually maintained `.pyi` stubs under `finstack-py/finstack/`
+- Python extension exports in `finstack-quant-py/src/lib.rs`
+- per-module `register()` wiring in `finstack-quant-py/src/**`
+- Python package re-exports such as `finstack-quant-py/finstack_quant/valuations/__init__.py`
+- manually maintained `.pyi` stubs under `finstack-quant-py/finstack_quant/`
 - WASM bindings if the API shape is shared
-- parity tests under `finstack-py/tests/parity`
+- parity tests under `finstack-quant-py/tests/parity`
 
 ## Good boundary moves
 

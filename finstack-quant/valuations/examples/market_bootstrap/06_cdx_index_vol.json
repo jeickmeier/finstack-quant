@@ -1,0 +1,376 @@
+{
+  "$schema": "../../schemas/calibration/3/calibration.schema.json",
+  "schema": "finstack_quant.calibration",
+  "plan": {
+    "id": "cdx_ig_46_cdso_vol",
+    "description": "CDX.NA.IG.46 CDS index option (CDSO) volatility surface calibrated from a 3\u00d73 (expiry \u00d7 strike) grid of lognormal spread-vol quotes, chained on a USD-OIS discount curve and CDX-NA-IG-46 hazard curve that are bootstrapped in the same plan. Step 1 produces the USD-OIS discount curve from deposit and IRS quotes; step 2 calibrates the CDX-NA-IG-46 index hazard curve from realistic par-spread CDS quotes (50/75/100/110/120 bp); step 3 fits the CDSO vol surface. The envelope is fully self-bootstrapping from quotes \u2014 no hand-entered curves in initial_market. The vol_surface step uses OptionVol quotes where underlying='CDX-NA-IG-46' and strikes are CDS spread levels in decimal (e.g., 0.0075 = 75bp). The SABR model is calibrated per-expiry with \u03b2=1.0 (lognormal) and spot_override = 0.01 (~100bp), matching the 5y par spread implied by the chained hazard curve (realistic CDX-IG-46 levels). The produced VolSurface is keyed as 'CDX-NA-IG-46-CDSO-VOL' and is retrievable via MarketContext::get_surface(). Note: settings.fail_on_bad_fit is set to false because the input grid is flat in the strike dimension; SABR (\u03b2=1) cannot pin a near-flat smile to engine tolerance (1e-12) when \u03bd is bounded away from zero. The produced surface is queryable but does not pin to the input quotes at solver tolerance \u2014 replace with a non-flat smile (e.g., +/- 50bps of vol on the 0.0075 / 0.0125 bp wings) to exercise SABR with strict fit.",
+    "quote_sets": {
+      "usd_rate_quotes": [
+        "USD-SOFR-DEP-1M",
+        "USD-SOFR-DEP-3M",
+        "USD-OIS-SWAP-1Y",
+        "USD-OIS-SWAP-2Y",
+        "USD-OIS-SWAP-5Y",
+        "USD-OIS-SWAP-10Y"
+      ],
+      "cdx_ig_46_cds_quotes": [
+        "CDX-IG-46-1Y",
+        "CDX-IG-46-3Y",
+        "CDX-IG-46-5Y",
+        "CDX-IG-46-7Y",
+        "CDX-IG-46-10Y"
+      ],
+      "cdx_ig_46_cdso_vol_quotes": [
+        "CDX-NA-IG-46-VOL-20260617-0.004",
+        "CDX-NA-IG-46-VOL-20260617-0.0100",
+        "CDX-NA-IG-46-VOL-20260617-0.0125",
+        "CDX-NA-IG-46-VOL-20260917-0.004",
+        "CDX-NA-IG-46-VOL-20260917-0.0100",
+        "CDX-NA-IG-46-VOL-20260917-0.0125",
+        "CDX-NA-IG-46-VOL-20261217-0.004",
+        "CDX-NA-IG-46-VOL-20261217-0.0100",
+        "CDX-NA-IG-46-VOL-20261217-0.0125"
+      ]
+    },
+    "steps": [
+      {
+        "id": "USD-OIS",
+        "quote_set": "usd_rate_quotes",
+        "kind": "discount",
+        "curve_id": "USD-OIS",
+        "currency": "USD",
+        "base_date": "2026-05-08",
+        "method": "Bootstrap",
+        "interpolation": "linear",
+        "extrapolation": "flat_forward",
+        "pricing_discount_id": null,
+        "pricing_forward_id": null,
+        "conventions": {
+          "curve_day_count": null
+        }
+      },
+      {
+        "id": "CDX-NA-IG-46",
+        "quote_set": "cdx_ig_46_cds_quotes",
+        "kind": "hazard",
+        "curve_id": "CDX-NA-IG-46",
+        "entity": "CDX.NA.IG.46",
+        "seniority": "senior",
+        "currency": "USD",
+        "base_date": "2026-05-08",
+        "discount_curve_id": "USD-OIS",
+        "recovery_rate": 0.4,
+        "notional": 1.0,
+        "method": "Bootstrap",
+        "interpolation": "linear",
+        "par_interp": "Linear"
+      },
+      {
+        "id": "CDX-NA-IG-46-CDSO-VOL-STEP",
+        "quote_set": "cdx_ig_46_cdso_vol_quotes",
+        "kind": "vol_surface",
+        "surface_id": "CDX-NA-IG-46-CDSO-VOL",
+        "base_date": "2026-05-08",
+        "underlying_ticker": "CDX-NA-IG-46",
+        "model": "SABR",
+        "discount_curve_id": "USD-OIS",
+        "beta": 1.0,
+        "target_expiries": [
+          0.10958904,
+          0.36164384,
+          0.6109589
+        ],
+        "target_strikes": [
+          0.004,
+          0.01,
+          0.0125
+        ],
+        "spot_override": 0.01,
+        "dividend_yield_override": 0.0,
+        "expiry_extrapolation": "clamp"
+      }
+    ],
+    "settings": {
+      "fail_on_bad_fit": false
+    }
+  },
+  "market_data": [
+    {
+      "kind": "rate_quote",
+      "type": "deposit",
+      "id": "USD-SOFR-DEP-1M",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 1,
+          "unit": "months"
+        }
+      },
+      "rate": 0.0525
+    },
+    {
+      "kind": "rate_quote",
+      "type": "deposit",
+      "id": "USD-SOFR-DEP-3M",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 3,
+          "unit": "months"
+        }
+      },
+      "rate": 0.052
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-1Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 1,
+          "unit": "years"
+        }
+      },
+      "rate": 0.051
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-2Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 2,
+          "unit": "years"
+        }
+      },
+      "rate": 0.049
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-5Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "rate": 0.045
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-10Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 10,
+          "unit": "years"
+        }
+      },
+      "rate": 0.041
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "CDX-IG-46-1Y",
+      "entity": "CDX.NA.IG.46",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 1,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 50.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "CDX-IG-46-3Y",
+      "entity": "CDX.NA.IG.46",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 3,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 75.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "CDX-IG-46-5Y",
+      "entity": "CDX.NA.IG.46",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 100.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "CDX-IG-46-7Y",
+      "entity": "CDX.NA.IG.46",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 7,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 110.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "CDX-IG-46-10Y",
+      "entity": "CDX.NA.IG.46",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 10,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 120.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20260617-0.004",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-06-17",
+        "strike": 0.004,
+        "vol": 0.3603,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20260617-0.0100",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-06-17",
+        "strike": 0.01,
+        "vol": 0.3603,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20260617-0.0125",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-06-17",
+        "strike": 0.0125,
+        "vol": 0.3603,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20260917-0.004",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-09-17",
+        "strike": 0.004,
+        "vol": 0.37,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20260917-0.0100",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-09-17",
+        "strike": 0.01,
+        "vol": 0.37,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20260917-0.0125",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-09-17",
+        "strike": 0.0125,
+        "vol": 0.37,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20261217-0.004",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-12-17",
+        "strike": 0.004,
+        "vol": 0.38,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20261217-0.0100",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-12-17",
+        "strike": 0.01,
+        "vol": 0.38,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    },
+    {
+      "kind": "vol_quote",
+      "option_vol": {
+        "id": "CDX-NA-IG-46-VOL-20261217-0.0125",
+        "underlying": "CDX-NA-IG-46",
+        "expiry": "2026-12-17",
+        "strike": 0.0125,
+        "vol": 0.38,
+        "option_type": "call",
+        "convention": "USD-CDSO"
+      }
+    }
+  ],
+  "prior_market": []
+}

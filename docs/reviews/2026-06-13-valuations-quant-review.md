@@ -1,7 +1,7 @@
-# Quant Finance Review — `finstack/valuations` + Python/WASM Bindings (follow-up pass)
+# Quant Finance Review — `finstack-quant/valuations` + Python/WASM Bindings (follow-up pass)
 
 - **Date:** 2026-06-13
-- **Scope:** `finstack/valuations` (all instrument families, models, calibration, metrics, market conventions, pricer registry/JSON) plus `finstack-py/src/bindings/valuations/` and `finstack-wasm/src/api/valuations/` with stubs, facades, and `parity_contract.toml`.
+- **Scope:** `finstack-quant/valuations` (all instrument families, models, calibration, metrics, market conventions, pricer registry/JSON) plus `finstack-quant-py/src/bindings/valuations/` and `finstack-quant-wasm/src/api/valuations/` with stubs, facades, and `parity_contract.toml`.
 - **Method:** Six parallel read-only review agents (rates; credit/structured credit; cash fixed income; FX/equity/commodity/exotics; models/calibration/correlation; metrics/pricer/results/bindings), each instructed to re-derive the math and find issues the 2026-06-09 review **missed** or that **remediation introduced**. The Blocker and the two Major findings were independently re-verified at the source by the orchestrator (✅).
 - **Relationship to prior review:** The 2026-06-09 review (`docs/reviews/2026-06-09-valuations-quant-review.md`) found 5 blockers + ~24 majors. **All** of them — including the FX/equity/exotics majors 18–22 whose `[FIXED]` markers were never updated in that file — have since been remediated (verified). This pass looks only for **new** defects.
 - **Known intentional convention (not flagged):** DV01/CS01 are dPV/dy native sign — negative for long bonds/receivers is intentional.
@@ -20,8 +20,8 @@ The crate is in very good shape; the prior remediation holds up under re-derivat
 
 #### B1 ✅ — FX barrier Monte Carlo discounts by the year-fraction `t` instead of the domestic discount factor
 
-- **Location:** `finstack/valuations/src/instruments/fx/fx_barrier_option/pricer.rs:67-68` (destructure) and `:129-137` (call site); helper `collect_fx_barrier_inputs` at `:318-356`.
-- **Issue:** `collect_fx_barrier_inputs` returns `(spot, r_domestic, r_foreign, sigma, inputs.t)`. The 5th element is `FxOptionInputs.t` — documented as *"Time to expiry on the vol basis"* (`fx/shared.rs:72-73`), i.e. a **year fraction**. At the call site it is destructured into a variable named `discount_factor` and passed verbatim as the `discount_factor` argument to `PathDependentPricer::price(...)`. The MC engine applies it as the PV multiplier directly: `discounted_value = payoff_value * discount_factor` (`finstack/monte_carlo/src/engine/pricing.rs:100`). The engine's only guard is finite-and-non-negative (`pricing.rs:242`), which a year fraction passes.
+- **Location:** `finstack-quant/valuations/src/instruments/fx/fx_barrier_option/pricer.rs:67-68` (destructure) and `:129-137` (call site); helper `collect_fx_barrier_inputs` at `:318-356`.
+- **Issue:** `collect_fx_barrier_inputs` returns `(spot, r_domestic, r_foreign, sigma, inputs.t)`. The 5th element is `FxOptionInputs.t` — documented as *"Time to expiry on the vol basis"* (`fx/shared.rs:72-73`), i.e. a **year fraction**. At the call site it is destructured into a variable named `discount_factor` and passed verbatim as the `discount_factor` argument to `PathDependentPricer::price(...)`. The MC engine applies it as the PV multiplier directly: `discounted_value = payoff_value * discount_factor` (`finstack-quant/monte_carlo/src/engine/pricing.rs:100`). The engine's only guard is finite-and-non-negative (`pricing.rs:242`), which a year fraction passes.
 - **Impact:** The simulated payoff is multiplied by `t` instead of `e^{-r_d·t}`. PV error scales with maturity:
   - 0.5y → ×0.5 instead of ~0.985 → PV ≈ **halved**
   - 1.0y → ×1.0 instead of ~0.97 → ~3% overstated (this is why the 1y regression test misses it)
@@ -37,14 +37,14 @@ The crate is in very good shape; the prior remediation holds up under re-derivat
 
 #### M1 ✅ — CMS swap cashflow-provider path re-projects seasoned coupons from the live curve (phantom P&L; twin of an already-"fixed" PV bug)
 
-- **Location:** `finstack/valuations/src/instruments/rates/cms_swap/types.rs:413-496` (`cms_leg_flows`), feeding `cashflow_schedule` (`:639`) → the public `dated_cashflows` / cashflow-provider surface.
+- **Location:** `finstack-quant/valuations/src/instruments/rates/cms_swap/types.rs:413-496` (`cms_leg_flows`), feeding `cashflow_schedule` (`:639`) → the public `dated_cashflows` / cashflow-provider surface.
 - **Issue:** The 2026-06-09 remediation *"seasoned CMS coupons re-projected instead of using FIXING: lookups (FIXED)"* was applied only to `CmsSwapPricer::pv_cms_leg` (`pricer.rs:93,102-122` — it skips `payment_date <= as_of` and uses `historical_cms_fixing` for `fixing_date < as_of`). The cashflow-provider twin `cms_leg_flows` was **not** fixed: it has neither the `payment_date <= as_of` skip nor any seasoned branch, and unconditionally re-projects every coupon via `calculate_forward_swap_rate` from the live curve (`types.rs:431-445`).
 - **Impact:** For any seasoned (mid-life) CMS swap the **reported cashflows diverge from the PV**. A fixed-but-unpaid coupon is re-projected from today's curve instead of its recorded fixing (the exact phantom-P&L the review claimed remediated). Worse, for `fixing_date < as_of` the helper sets `swap_start = fixing_date` (in the past), so the annuity discounts over past payment dates (DF > 1) → a numerically degenerate forward swap rate, and on a negative forward it then hard-errors (`:446-451`), failing the whole cashflow schedule. The reconciliation test (`types.rs` `~:795`) only exercises forward-starting coupons, so it does not catch this.
 - **Fix:** mirror `pv_cms_leg`: skip `payment_date <= as_of`; for `fixing_date < as_of` use `historical_cms_fixing(...)` with `time_to_fixing = 0.0` and no convexity adjustment. Factor the per-coupon logic into one shared helper used by both paths so they cannot drift again.
 
 #### M2 ✅ — CMS swap leg cannot price negative forward swap rates (regime gap; the "negative-rate fallback (FIXED)" covered only the CMS option)
 
-- **Location:** `finstack/valuations/src/instruments/rates/cms_swap/pricer.rs:144-149` (PV path) and `cms_swap/types.rs:446-451` (cashflow path).
+- **Location:** `finstack-quant/valuations/src/instruments/rates/cms_swap/pricer.rs:144-149` (PV path) and `cms_swap/types.rs:446-451` (cashflow path).
 - **Issue:** Both CMS-swap paths hard-error when `forward_swap_rate <= 0.0`, *before* any cap/floor handling. The 2026-06-09 *"CMS negative-rate Bachelier fallback (FIXED)"* lives only in the CMS **option** pricer (`cms_option/pricer.rs:131-169`) and the embedded-option helper (`cms_swap/pricer.rs:388-399`, which itself handles `adjusted_forward <= 0`). The swap leg rejects the negative forward before it can reach that helper, and `convexity_adjustment` also returns 0 for `F <= 0`.
 - **Impact:** A CMS swap in any negative-rate regime (EUR/JPY/CHF — precisely where CMS trades) cannot be priced at all; its sibling CMS option prices fine in the same market. Fail-loud (errors rather than silently mispricing), which limits the danger, but it is a real coverage gap and contradicts the "fixed" marking.
 - **Fix:** on the swap leg, when `forward_swap_rate <= 0.0`, drop the lognormal Hagan convexity term (→ 0 anyway) and let the coupon use the Bachelier-capable `cms_embedded_option_value`; the uncapped/unfloored linear coupon is simply `forward_swap_rate + spread` (no error).
@@ -55,7 +55,7 @@ The crate is in very good shape; the prior remediation holds up under re-derivat
 
 #### Mo1 — Inflation-linked bond `real_duration` divides a dirty-price derivative by the clean price
 
-- **Location:** `finstack/valuations/src/instruments/fixed_income/inflation_linked_bond/types.rs:1017-1053`.
+- **Location:** `finstack-quant/valuations/src/instruments/fixed_income/inflation_linked_bond/types.rs:1017-1053`.
 - **Issue:** `dp_dy = (p_up − p_dn)/(2·bp)` uses `price_from_ytm_compounded_params(...)`, which discounts all future flows from `as_of` and returns the **dirty** PV. The duration is then `−(dp_dy / p0)` with `p0 = base_clean` (the **clean** quoted price). Modified duration must use the dirty price in the denominator: `D = −(1/P_dirty)·dP_dirty/dy`.
 - **Impact:** Real duration is biased by `accrued / P_dirty`. Small for low-coupon TIPS, but ~0.5–1% mid-period for a 2% real coupon, and inconsistent with the bond/term-loan paths, which all use the dirty price as the base.
 - **Fix:** `let p0 = price_from_yield(y0)?;` (dirty model price at the solved real yield) instead of `base_clean`.
@@ -83,8 +83,8 @@ The crate is in very good shape; the prior remediation holds up under re-derivat
 - **Credit: mid-period loss discount fraction uses base-date origin for the first coupon** — `cds_tranche/pricer/engine.rs:252,267-271,385-399`. For `i==0`, `prior_time = 0.0` (curve base date) but the fraction is applied over `[contractual_effective_date, payment]`; when base ≠ effective date the interpolated default date for the first within-period loss increment is slightly mis-placed (second-order DF effect). Use `t(period_start)` as `prior_time` for `i==0`.
 - **Credit: stochastic-recovery factor uses `Z`, not the systematic `M`, for the Student-t copula** — `cds_tranche/pricer/expected_loss.rs:541-554` and `heterogeneous.rs:179-207`. Recovery is evaluated at `z = factors.first()`; for Student-t the systematic driver is `M = Z/√W`. Exact for Gaussian; mildly mis-specifies recovery/default co-movement for stochastic-recovery + Student-t tranches (renormalization preserves total index EL, so the bias is in tranche allocation only). Pass `M` to `exposure_at` for mixing-variable copulas.
 - **Dollar-roll pricer header doc contradicts the (correct) code** — `fixed_income/dollar_roll/pricer.rs:13-39` says "Net value = Front − Back" while the code correctly computes `back_value − front_value`. Doc-only.
-- **Bindings: FX/exotics `priceWithMetrics` argument-order drift Python vs WASM** — Python `(market, as_of, model="default", metrics, …)` vs WASM `(marketJson, asOf, metrics, model?, …)` (`finstack-py/.../valuations/fx.rs:65-79` vs `finstack-wasm/.../valuations/fx.rs:138-156`, `index.d.ts:1282-1289`). Forced by wasm-bindgen trailing-`Option` rules; internally consistent and matches stubs, but a positional port silently swaps `model`/`metrics`. Also WASM is internally inconsistent: the free `priceInstrumentWithMetrics` uses model-before-metrics. Document the seam.
-- **Bindings: wrong doc comment on WASM FX `greeks`** — `finstack-wasm/src/api/valuations/fx.rs:248` reads "Benchmark regression alpha/beta statistics per asset" (copy-pasted from analytics). Doc-only.
+- **Bindings: FX/exotics `priceWithMetrics` argument-order drift Python vs WASM** — Python `(market, as_of, model="default", metrics, …)` vs WASM `(marketJson, asOf, metrics, model?, …)` (`finstack-quant-py/.../valuations/fx.rs:65-79` vs `finstack-quant-wasm/.../valuations/fx.rs:138-156`, `index.d.ts:1282-1289`). Forced by wasm-bindgen trailing-`Option` rules; internally consistent and matches stubs, but a positional port silently swaps `model`/`metrics`. Also WASM is internally inconsistent: the free `priceInstrumentWithMetrics` uses model-before-metrics. Document the seam.
+- **Bindings: wrong doc comment on WASM FX `greeks`** — `finstack-quant-wasm/src/api/valuations/fx.rs:248` reads "Benchmark regression alpha/beta statistics per asset" (copy-pasted from analytics). Doc-only.
 
 ---
 

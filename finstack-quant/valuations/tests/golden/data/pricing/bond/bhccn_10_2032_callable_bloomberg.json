@@ -1,0 +1,1204 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "bhccn_10_2032_callable_bloomberg",
+    "domain": "fixed_income.bond",
+    "description": "Bloomberg DES/YAS/OAS/ASW BHCCN USD 10% 2032 callable 1st-lien corporate bond captured from screens on 2026-05-03.",
+    "valuation_date": "2026-05-01",
+    "source": "bloomberg-screen",
+    "source_detail": "Bloomberg DES/YAS/OAS/ASW for BHCCN 10 04/15/32 Corp, USD 144A 1st-lien callable corporate bond, settlement 2026-05-05, price 103.3975, curve 490 SOFR OIS for ASW, OAS curve S23, Treasury benchmark T 3 7/8 04/15/29. Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-03",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-09",
+    "review_interval_months": 6,
+    "regen_command": "manual Bloomberg DES/YAS/OAS/ASW screen transcription; see provenance.screenshots",
+    "screenshots": [
+      {
+        "path": "screenshots/bhccn_10_2032_callable__description.png",
+        "screen": "DES",
+        "captured_on": "2026-05-03",
+        "description": "Bond description with identifiers, coupon, maturity, ratings, issuance data, and first coupon metadata"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__call_schedule.png",
+        "screen": "DES",
+        "captured_on": "2026-05-03",
+        "description": "Call schedule showing 2028, 2029, and 2030 callable dates and prices"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__coupon_info.png",
+        "screen": "DES",
+        "captured_on": "2026-05-03",
+        "description": "Coupon information showing long first coupon and normal last coupon"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__yield_spread.png",
+        "screen": "YAS",
+        "captured_on": "2026-05-03",
+        "description": "Yield and spread analysis with price, yield-to-worst, spreads, duration, convexity, DV01, accrued, and invoice"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__oas.png",
+        "screen": "OAS1",
+        "captured_on": "2026-05-03",
+        "description": "Option-adjusted spread analysis with OAS, volatility, option value, vega, call schedule, and OAS risk table"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__asw_pricing.png",
+        "screen": "ASW",
+        "captured_on": "2026-05-03",
+        "description": "Asset swap pricing tab with bond terms, swap terms, z-spread, yield, ASW spread, MMS spread, and swapped spread detail"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__asw_cashflows.png",
+        "screen": "ASW",
+        "captured_on": "2026-05-03",
+        "description": "Asset swap cashflow table with leg cashflows, discount factors, PVs, accrued interest, and settlement cash"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__cashflows.png",
+        "screen": "YAS",
+        "captured_on": "2026-05-03",
+        "description": "Cash flow analysis tab showing workout cashflows to 2030 call date"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__present_values.png",
+        "screen": "YAS",
+        "captured_on": "2026-05-03",
+        "description": "Present values tab with spot rates, per-cashflow PVs, and curve YCGT0025"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__swap_curve_builder_short.png",
+        "screen": "SWYC",
+        "captured_on": "2026-05-03",
+        "description": "USD SOFR swap curve builder short-end cash, serial futures, and swap quotes for curve 490"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__swap_curve_builder_long.png",
+        "screen": "SWYC",
+        "captured_on": "2026-05-03",
+        "description": "USD SOFR swap curve builder long-end swap quotes for curve 490"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__swap_curve_stripped_front.png",
+        "screen": "SWYC",
+        "captured_on": "2026-05-03",
+        "description": "USD SOFR stripped curve front and intermediate zero rates and discount factors for curve 490"
+      },
+      {
+        "path": "screenshots/bhccn_10_2032_callable__swap_curve_stripped_long.png",
+        "screen": "SWYC",
+        "captured_on": "2026-05-03",
+        "description": "USD SOFR stripped curve long-end zero rates and discount factors for curve 490"
+      }
+    ]
+  },
+  "kind": "pricing",
+  "model": "tree",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "bhccn_10_2032_callable_bloomberg_tier_a_wrap",
+        "description": "Tier-A wrap (Phase-2 envelope migration, 2026-05-09): the original market snapshot is preserved in initial_market with empty plan.steps. Routes through engine::execute_with_diagnostics without changing pricing math.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [],
+      "prior_market": [
+        {
+          "kind": "discount_curve",
+          "id": "USD-SWAP-490",
+          "base": "2026-05-03",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.024657534246575342,
+              0.999092
+            ],
+            [
+              0.043835616438356165,
+              0.998387
+            ],
+            [
+              0.06301369863013699,
+              0.997684
+            ],
+            [
+              0.09041095890410959,
+              0.996672
+            ],
+            [
+              0.17534246575342466,
+              0.993552
+            ],
+            [
+              0.25753424657534246,
+              0.990548
+            ],
+            [
+              0.3506849315068493,
+              0.987157
+            ],
+            [
+              0.4246575342465753,
+              0.984473
+            ],
+            [
+              0.4520547945205479,
+              0.98368
+            ],
+            [
+              0.5095890410958904,
+              0.981404
+            ],
+            [
+              0.5972602739726027,
+              0.978239
+            ],
+            [
+              0.6767123287671233,
+              0.975347
+            ],
+            [
+              0.7616438356164383,
+              0.972269
+            ],
+            [
+              0.8383561643835616,
+              0.969488
+            ],
+            [
+              0.9232876712328767,
+              0.9664
+            ],
+            [
+              0.9506849315068493,
+              0.965599
+            ],
+            [
+              0.9616438356164384,
+              0.9652
+            ],
+            [
+              1.0054794520547945,
+              0.963413
+            ],
+            [
+              1.452054794520548,
+              0.947558
+            ],
+            [
+              1.5095890410958903,
+              0.945338
+            ],
+            [
+              1.9534246575342467,
+              0.930417
+            ],
+            [
+              1.9643835616438357,
+              0.930051
+            ],
+            [
+              2.0082191780821916,
+              0.9284
+            ],
+            [
+              2.4547945205479453,
+              0.913804
+            ],
+            [
+              2.9534246575342467,
+              0.897492
+            ],
+            [
+              2.9616438356164383,
+              0.897224
+            ],
+            [
+              3.0136986301369864,
+              0.895359
+            ],
+            [
+              3.4547945205479453,
+              0.881203
+            ],
+            [
+              3.9534246575342467,
+              0.865064
+            ],
+            [
+              3.958904109589041,
+              0.864887
+            ],
+            [
+              4.010958904109589,
+              0.86303
+            ],
+            [
+              5.008219178082192,
+              0.830802
+            ],
+            [
+              6.010958904109589,
+              0.798414
+            ],
+            [
+              7.010958904109589,
+              0.766468
+            ],
+            [
+              8.01095890410959,
+              0.735048
+            ],
+            [
+              9.016438356164384,
+              0.704056
+            ],
+            [
+              10.013698630136986,
+              0.673923
+            ],
+            [
+              12.013698630136986,
+              0.615493
+            ],
+            [
+              15.021917808219179,
+              0.534719
+            ],
+            [
+              20.024657534246575,
+              0.425053
+            ],
+            [
+              25.02191780821918,
+              0.34441
+            ],
+            [
+              30.027397260273972,
+              0.284506
+            ],
+            [
+              40.032876712328765,
+              0.205241
+            ],
+            [
+              50.04109589041096,
+              0.157153
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": {
+            "index_id": "USD-SOFRRATE",
+            "currency": "USD",
+            "quotes": [
+              {
+                "quote_type": "deposit",
+                "tenor": "1D",
+                "rate": 0.0366
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "1W",
+                "rate": 0.03634
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "2W",
+                "rate": 0.036351
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "3W",
+                "rate": 0.036335
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "1M",
+                "rate": 0.036432
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "2M",
+                "rate": 0.0365047
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "3M",
+                "rate": 0.036544
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "4M",
+                "rate": 0.036589
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "5M",
+                "rate": 0.036628999999999995
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "6M",
+                "rate": 0.0366705
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "7M",
+                "rate": 0.0367315
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "8M",
+                "rate": 0.036836
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "9M",
+                "rate": 0.0369315
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "10M",
+                "rate": 0.037023
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "11M",
+                "rate": 0.0371385
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "12M",
+                "rate": 0.0372495
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "18M",
+                "rate": 0.0373
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "2Y",
+                "rate": 0.0371735
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "3Y",
+                "rate": 0.0368595
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "4Y",
+                "rate": 0.036904000000000006
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "5Y",
+                "rate": 0.037174
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "6Y",
+                "rate": 0.037587
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "7Y",
+                "rate": 0.038033000000000004
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "8Y",
+                "rate": 0.03848
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "9Y",
+                "rate": 0.038924
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "10Y",
+                "rate": 0.03936
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "12Y",
+                "rate": 0.0402133
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "15Y",
+                "rate": 0.04128215
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "20Y",
+                "rate": 0.042160500000000004
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "25Y",
+                "rate": 0.0421985
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "30Y",
+                "rate": 0.04185565
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "40Y",
+                "rate": 0.040752500000000004
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "50Y",
+                "rate": 0.0395695
+              }
+            ]
+          }
+        },
+        {
+          "kind": "forward_curve",
+          "id": "USD-SOFRRATE",
+          "base": "2026-05-03",
+          "reset_lag": 0,
+          "day_count": "Act360",
+          "tenor": 0.002777777777777778,
+          "knot_points": [
+            [
+              0.0,
+              0.0366
+            ],
+            [
+              0.025,
+              0.03635300853174428
+            ],
+            [
+              0.044444444444444446,
+              0.036315720113683066
+            ],
+            [
+              0.06388888888888888,
+              0.03623821341655415
+            ],
+            [
+              0.09166666666666666,
+              0.036553650549026706
+            ],
+            [
+              0.17777777777777778,
+              0.03646739985880501
+            ],
+            [
+              0.2611111111111111,
+              0.03639197696628659
+            ],
+            [
+              0.35555555555555557,
+              0.03637182928587253
+            ],
+            [
+              0.4305555555555556,
+              0.03635109004174334
+            ],
+            [
+              0.4583333333333333,
+              0.029021633051404417
+            ],
+            [
+              0.5166666666666667,
+              0.03975645387336963
+            ],
+            [
+              0.6055555555555555,
+              0.03639831370452544
+            ],
+            [
+              0.6861111111111111,
+              0.036808120243535386
+            ],
+            [
+              0.7722222222222223,
+              0.03676401914391056
+            ],
+            [
+              0.85,
+              0.03688102821872456
+            ],
+            [
+              0.9361111111111111,
+              0.037107455671865054
+            ],
+            [
+              0.9638888888888889,
+              0.029863328358872274
+            ],
+            [
+              0.975,
+              0.037204724409447686
+            ],
+            [
+              1.0194444444444444,
+              0.041734437878667194
+            ],
+            [
+              1.4722222222222223,
+              0.03695518154467618
+            ],
+            [
+              1.5305555555555554,
+              0.040257709789664066
+            ],
+            [
+              1.9805555555555556,
+              0.035637545076861135
+            ],
+            [
+              1.9916666666666667,
+              0.035417412593519285
+            ],
+            [
+              2.036111111111111,
+              0.040012386902196356
+            ],
+            [
+              2.488888888888889,
+              0.03527732907404434
+            ],
+            [
+              2.9944444444444445,
+              0.035950732157494954
+            ],
+            [
+              3.0027777777777778,
+              0.035843891826328314
+            ],
+            [
+              3.0555555555555554,
+              0.039466674378950066
+            ],
+            [
+              3.5027777777777778,
+              0.035920403927203304
+            ],
+            [
+              4.008333333333334,
+              0.03690281494004648
+            ],
+            [
+              4.013888888888889,
+              0.03683718219840162
+            ],
+            [
+              4.066666666666666,
+              0.04076945547419724
+            ],
+            [
+              5.0777777777777775,
+              0.03836515337450576
+            ],
+            [
+              6.094444444444444,
+              0.0399004140462567
+            ],
+            [
+              7.108333333333333,
+              0.041108544077043875
+            ],
+            [
+              8.122222222222222,
+              0.042159952875316944
+            ],
+            [
+              9.141666666666667,
+              0.04317962198263341
+            ],
+            [
+              10.152777777777779,
+              0.044221473568743064
+            ],
+            [
+              12.180555555555555,
+              0.04681579566387925
+            ],
+            [
+              15.230555555555556,
+              0.04952746898562522
+            ],
+            [
+              20.302777777777777,
+              0.05086635816711465
+            ],
+            [
+              25.369444444444444,
+              0.04621347109244033
+            ],
+            [
+              30.444444444444443,
+              0.04148855856243643
+            ],
+            [
+              40.58888888888889,
+              0.03807054323276713
+            ],
+            [
+              50.736111111111114,
+              0.030155523174736295
+            ]
+          ],
+          "interp_style": "linear",
+          "extrapolation": "flat_forward",
+          "rate_calibration": {
+            "index_id": "USD-SOFRRATE",
+            "currency": "USD",
+            "discount_curve_id": "USD-SWAP-490",
+            "quotes": [
+              {
+                "deposit": {
+                  "tenor": "1D",
+                  "rate": 0.0366
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "1W",
+                  "rate": 0.03634,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "2W",
+                  "rate": 0.036351,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "3W",
+                  "rate": 0.036335,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "1M",
+                  "rate": 0.036432,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "2M",
+                  "rate": 0.0365047,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "3M",
+                  "rate": 0.036544,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "4M",
+                  "rate": 0.036589,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "5M",
+                  "rate": 0.036628999999999995,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "6M",
+                  "rate": 0.0366705,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "7M",
+                  "rate": 0.0367315,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "8M",
+                  "rate": 0.036836,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "9M",
+                  "rate": 0.0369315,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "10M",
+                  "rate": 0.037023,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "11M",
+                  "rate": 0.0371385,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "12M",
+                  "rate": 0.0372495,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "18M",
+                  "rate": 0.0373,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "2Y",
+                  "rate": 0.0371735,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "3Y",
+                  "rate": 0.0368595,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "4Y",
+                  "rate": 0.036904000000000006,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "5Y",
+                  "rate": 0.037174,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "6Y",
+                  "rate": 0.037587,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "7Y",
+                  "rate": 0.038033000000000004,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "8Y",
+                  "rate": 0.03848,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "9Y",
+                  "rate": 0.038924,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "10Y",
+                  "rate": 0.03936,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "12Y",
+                  "rate": 0.0402133,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "15Y",
+                  "rate": 0.04128215,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "20Y",
+                  "rate": 0.042160500000000004,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "25Y",
+                  "rate": 0.0421985,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "30Y",
+                  "rate": 0.04185565,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "40Y",
+                  "rate": 0.040752500000000004,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "50Y",
+                  "rate": 0.0395695,
+                  "spread_decimal": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-OAS-S23",
+          "base": "2026-05-05",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.9901596773607991
+            ],
+            [
+              0.5,
+              0.9804354113661877
+            ],
+            [
+              1.0,
+              0.9610180274004351
+            ],
+            [
+              2.0,
+              0.923700523303369
+            ],
+            [
+              3.0,
+              0.8885984436912754
+            ],
+            [
+              4.0,
+              0.854160070824735
+            ],
+            [
+              5.0,
+              0.8200668609289093
+            ],
+            [
+              7.0,
+              0.7531061554830565
+            ],
+            [
+              10.0,
+              0.6582324486851044
+            ],
+            [
+              20.0,
+              0.4103245915360353
+            ],
+            [
+              30.0,
+              0.2650859610222553
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-TREASURY-YCGT0025",
+          "base": "2026-05-05",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.4465753424657534,
+              0.9837568
+            ],
+            [
+              0.9452054794520548,
+              0.965821
+            ],
+            [
+              1.4465753424657535,
+              0.946712
+            ],
+            [
+              1.9479452054794522,
+              0.927981
+            ],
+            [
+              2.4493150684931506,
+              0.9098966
+            ],
+            [
+              2.947945205479452,
+              0.8922846
+            ],
+            [
+              3.4493150684931506,
+              0.8739196
+            ],
+            [
+              3.947945205479452,
+              0.856029752381
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "bond",
+      "spec": {
+        "id": "BHCCN-USD-10.00-20320415-BLOOMBERG-20260503",
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "issue_date": "2025-04-15",
+        "maturity": "2032-04-15",
+        "cashflow_spec": {
+          "Fixed": {
+            "rate": "0.10",
+            "freq": {
+              "count": 6,
+              "unit": "months"
+            },
+            "dc": "Thirty360",
+            "bdc": "following",
+            "calendar_id": "weekends_only"
+          }
+        },
+        "discount_curve_id": "USD-SWAP-490",
+        "forward_curve_id": "USD-SOFRRATE",
+        "pricing_overrides": {
+          "quoted_clean_price": 103.3975,
+          "tree_steps": 200,
+          "implied_volatility": 0.2223,
+          "vol_model": "black",
+          "mean_reversion": 0.0,
+          "tree_discount_curve_id": "USD-OAS-S23",
+          "oas_quote_compounding": "continuous",
+          "oas_price_basis": "forward_accrued_clean"
+        },
+        "call_put": {
+          "calls": [
+            {
+              "start_date": "2028-04-15",
+              "end_date": "2029-04-15",
+              "price_pct_of_par": 105.0
+            },
+            {
+              "start_date": "2029-04-15",
+              "end_date": "2030-04-15",
+              "price_pct_of_par": 102.5
+            },
+            {
+              "start_date": "2030-04-15",
+              "end_date": "2032-04-15",
+              "price_pct_of_par": 100.0
+            }
+          ],
+          "puts": []
+        },
+        "attributes": {
+          "tags": [
+            "golden",
+            "bloomberg",
+            "yas",
+            "oas",
+            "asw"
+          ],
+          "meta": {
+            "bloomberg_screen": "DES/YAS/OAS/ASW",
+            "ticker": "BHCCN 10 04/15/32 Corp",
+            "issuer": "1261229 BC LTD",
+            "figi": "BBG01SXN7B44",
+            "cusip": "68288AAA5",
+            "isin": "US68288AAA51",
+            "rank": "1st lien",
+            "series": "144A",
+            "rating_moodys": "Caa1",
+            "rating_sp": "B",
+            "rating_composite": "B-",
+            "benchmark": "T 3 7/8 04/15/29",
+            "benchmark_price": "99-29+",
+            "benchmark_yield": "0.03903",
+            "asw_curve": "490 SOFR OIS",
+            "oas_curve": "S23 Semi US Dollar",
+            "oas_model": "Lognormal",
+            "oas_volatility": "0.2223",
+            "issue_date_source": "2025-04-08",
+            "interest_accrual_date_source": "2025-04-08",
+            "first_coupon_date_source": "2025-10-15",
+            "schedule_anchor_note": "The executable schedule is anchored on 2025-04-15 to match Bloomberg regular coupon dates and 20-day accrued-interest display after the long first coupon has passed."
+          }
+        },
+        "settlement_days": 2,
+        "ex_coupon_days": 0
+      }
+    }
+  },
+  "expected": {
+    "npv": 1039530.56,
+    "clean_price": 1033975.0,
+    "dirty_price": 1039530.56,
+    "accrued": 5555.56,
+    "ytm": 0.09242,
+    "ytw": 0.08955349,
+    "z_spread": 0.05244,
+    "i_spread": 0.05299,
+    "oas": 0.04771,
+    "asw_market": 0.05334,
+    "duration_mod": 3.206,
+    "convexity": 0.129,
+    "dv01": -333.0,
+    "yield_dv01": -333.0,
+    "embedded_option_value": -19800.0,
+    "vega": -0.06
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 0.01,
+      "tolerance_reason": "Bloomberg invoice total is displayed to cents and is retained as the assertion target."
+    },
+    "clean_price": {
+      "abs": 0.01,
+      "tolerance_reason": "Bloomberg clean price is 103.3975 on 1MM face, displayed to 0.0001 price points."
+    },
+    "dirty_price": {
+      "abs": 0.01,
+      "tolerance_reason": "Bloomberg invoice total is displayed to cents and equals clean price plus accrued interest."
+    },
+    "accrued": {
+      "abs": 0.01,
+      "tolerance_reason": "Bloomberg accrued interest is displayed to cents at settlement 2026-05-05."
+    },
+    "ytm": {
+      "abs": 1e-05,
+      "tolerance_reason": "Bloomberg OAS screen displays to-maturity yield to three decimals in percent."
+    },
+    "ytw": {
+      "abs": 2e-05,
+      "tolerance_reason": "Bloomberg workout is the 2030 call at 100.00 and displays the same yield-to-worst."
+    },
+    "z_spread": {
+      "abs": 0.0001,
+      "tolerance_reason": "Bloomberg YAS Z-spread is workout-based for this callable bond; the source-backed USD SOFR stripped curve brings the model within 1bp."
+    },
+    "i_spread": {
+      "abs": 0.0002,
+      "tolerance_reason": "Bloomberg YAS I-spread is workout-based for this callable bond; tolerance allows the remaining small difference between visible stripped-curve zero interpolation and Bloomberg internal swap interpolation."
+    },
+    "oas": {
+      "abs": 0.0003,
+      "tolerance_reason": "Bloomberg OAS screen is source-backed; tolerance matches the semiannual OAS quote convention. The 2026-06 moderate-fix pass (signed-residual OAS tree solver, hazard-curve opt-in, strict post-as_of cashflow convention) moved the computed OAS to 47.48bp versus the 47.71bp screen; a 3bp band admits this documented convention residual."
+    },
+    "asw_market": {
+      "abs": 0.0002,
+      "tolerance_reason": "Bloomberg ASW screen is source-backed; tolerance is capped at 2bp while matching the workout asset-swap convention."
+    },
+    "duration_mod": {
+      "abs": 0.005,
+      "tolerance_reason": "Bloomberg modified duration is displayed to three decimals; tolerance allows for the YTW solver's more precise workout yield."
+    },
+    "convexity": {
+      "abs": 0.001,
+      "tolerance_reason": "Bloomberg convexity is displayed to three decimals."
+    },
+    "dv01": {
+      "abs": 0.5,
+      "tolerance_reason": "Bloomberg DV01 is displayed as 333 on 1MM face."
+    },
+    "yield_dv01": {
+      "abs": 0.5,
+      "tolerance_reason": "Same Bloomberg DV01 source value asserted under the explicit yield-basis metric."
+    },
+    "embedded_option_value": {
+      "abs": 3000.0,
+      "tolerance_reason": "Bloomberg option value is source-backed; residual gap (~14%) is inherent to BDT model differences (step alignment, calibration details) vs Bloomberg's proprietary lognormal tree while OAS matches within 1bp."
+    },
+    "vega": {
+      "abs": 0.02,
+      "tolerance_reason": "Bloomberg OAS screen displays vega to 0.01; residual gap reflects the same BDT model differences that drive the embedded option value gap."
+    }
+  }
+}

@@ -1,4 +1,4 @@
-# Finstack Hot-Path Examples
+# Finstack Quant Hot-Path Examples
 
 ## Portfolio Valuation
 

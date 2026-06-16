@@ -3,7 +3,7 @@
 ## Codebase Structure
 
 ```
-finstack-py/
+finstack-quant-py/
 ├── src/                    # Rust binding code (PyO3)
 │   ├── lib.rs             # Main entry, module registration
 │   ├── errors.rs          # Exception hierarchy, error mapping
@@ -18,7 +18,7 @@ finstack-py/
 │   │   ├── statements/    # Statement evaluation
 │   │   ├── scenarios/     # Scenario engine
 │   │   └── portfolio/     # Portfolio management
-└── finstack/              # Python package
+└── finstack-quant/              # Python package
     ├── __init__.py        # Package initialization
     ├── *.pyi              # Type stubs (auto-generated)
     └── core/
@@ -33,9 +33,9 @@ Every Rust type exposed to Python follows this pattern:
 
 ```rust
 use pyo3::prelude::*;
-use finstack_core::money::Money;
+use finstack_quant_core::money::Money;
 
-#[pyclass(name = "Money", module = "finstack.core.money", frozen)]
+#[pyclass(name = "Money", module = "finstack_quant.core.money", frozen)]
 pub struct PyMoney {
     pub(crate) inner: Money,  // Always named "inner"
 }
@@ -122,7 +122,7 @@ Centralized error conversion in `errors.rs`:
 ```rust
 use pyo3::prelude::*;
 use pyo3::exceptions::*;
-use finstack_core::error::Error as CoreError;
+use finstack_quant_core::error::Error as CoreError;
 
 // Custom exception hierarchy
 pyo3::create_exception!(finstack, FinstackError, PyException);
@@ -185,7 +185,7 @@ pub fn register(parent: &Bound<'_, PyModule>) -> PyResult<()> {
 For complex objects with many optional parameters:
 
 ```rust
-#[pyclass(name = "BondBuilder", module = "finstack.valuations.bond", unsendable)]
+#[pyclass(name = "BondBuilder", module = "finstack_quant.valuations.bond", unsendable)]
 pub struct PyBondBuilder {
     inner: BondBuilder,
 }
@@ -265,10 +265,10 @@ Bindings wrap these core crates:
 
 | Crate | Purpose |
 |-------|---------|
-| `finstack_core` | Dates, money, currency, market data, math |
-| `finstack_valuations` | Instruments, pricers, metrics, Greeks |
-| `finstack_portfolio` | Portfolio management, aggregation |
-| `finstack_statements` | Financial statement modeling |
-| `finstack_scenarios` | Scenario engine, stress testing |
+| `finstack_quant_core` | Dates, money, currency, market data, math |
+| `finstack_quant_valuations` | Instruments, pricers, metrics, Greeks |
+| `finstack_quant_portfolio` | Portfolio management, aggregation |
+| `finstack_quant_statements` | Financial statement modeling |
+| `finstack_quant_scenarios` | Scenario engine, stress testing |
 
 All computation lives in these crates. Bindings only wrap and expose.

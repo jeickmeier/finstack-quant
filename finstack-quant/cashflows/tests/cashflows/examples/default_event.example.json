@@ -1,0 +1,9 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "default_event": {
+    "default_date": "2025-03-15",
+    "defaulted_amount": 500000.0,
+    "recovery_rate": 0.40,
+    "recovery_lag": 6
+  }
+}

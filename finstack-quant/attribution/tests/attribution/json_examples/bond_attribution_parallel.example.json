@@ -1,0 +1,77 @@
+{
+  "schema": "finstack_quant.attribution/1",
+  "attribution": {
+    "instrument": {
+      "type": "bond",
+      "spec": {
+        "id": "CORP-BOND-001",
+        "notional": {
+          "amount": "1000000",
+          "currency": "USD"
+        },
+        "issue_date": "2024-01-01",
+        "maturity": "2029-01-01",
+        "cashflow_spec": {
+          "Fixed": {
+            "coupon_type": "Cash",
+            "rate": 0.045,
+            "freq": {"count": 6, "unit": "months"},
+            "dc": "Thirty360",
+            "bdc": "following",
+            "calendar_id": "weekends_only",
+            "stub": "None",
+            "end_of_month": false,
+            "payment_lag_days": 0
+          }
+        },
+        "discount_curve_id": "USD-OIS",
+        "credit_curve_id": null,
+        "pricing_overrides": {
+          "quoted_clean_price": null,
+          "implied_volatility": null,
+          "cds_quote_bp": null,
+          "upfront_payment": null,
+          "ytm_bump_decimal": null,
+          "theta_period": null,
+          "mc_seed_scenario": null,
+          "adaptive_bumps": false,
+          "spot_bump_pct": null,
+          "vol_bump_pct": null,
+          "rate_bump_bp": null
+        },
+        "call_put": null,
+        "attributes": {
+          "tags": [],
+          "meta": {}
+        },
+        "settlement_days": null,
+        "ex_coupon_days": null
+      }
+    },
+    "market_t0": {
+      "curves": [],
+      "fx": null,
+      "surfaces": [],
+      "prices": {},
+      "series": [],
+      "inflation_indices": [],
+      "dividends": [],
+      "credit_indices": [],
+      "collateral": {}
+    },
+    "market_t1": {
+      "curves": [],
+      "fx": null,
+      "surfaces": [],
+      "prices": {},
+      "series": [],
+      "inflation_indices": [],
+      "dividends": [],
+      "credit_indices": [],
+      "collateral": {}
+    },
+    "as_of_t0": "2025-01-15",
+    "as_of_t1": "2025-01-16",
+    "method": "Parallel"
+  }
+}

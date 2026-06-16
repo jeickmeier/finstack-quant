@@ -1,11 +1,11 @@
 ---
 trigger: model_decision
-description: This document defines documentation standards for all public APIs in the Finstack Rust crates. Following these standards ensures consistency, maintainability, and excellent developer experience for both internal development and external users.
+description: This document defines documentation standards for all public APIs in the Finstack Quant Rust crates. Following these standards ensures consistency, maintainability, and excellent developer experience for both internal development and external users.
 globs:
 ---
-# Rust Documentation Standards for Finstack
+# Rust Documentation Standards for Finstack Quant
 
-This document defines documentation standards for all public APIs in the Finstack Rust crates. Following these standards ensures consistency, maintainability, and excellent developer experience for both internal development and external users.
+This document defines documentation standards for all public APIs in the Finstack Quant Rust crates. Following these standards ensures consistency, maintainability, and excellent developer experience for both internal development and external users.
 
 ## Guiding Principles
 
@@ -68,8 +68,8 @@ Every module (`mod.rs` or standalone file) must have a module-level doc comment 
 //!
 //! # Examples
 //! ```rust
-//! use finstack_core::math::{Solver, mean, variance};
-//! use finstack_core::math::solver::NewtonSolver;
+//! use finstack_quant_core::math::{Solver, mean, variance};
+//! use finstack_quant_core::math::solver::NewtonSolver;
 //!
 //! // Root finding with Newton's method
 //! let solver = NewtonSolver::new();
@@ -186,8 +186,8 @@ pub enum EnumName {
 ///
 /// # Examples
 /// ```rust
-/// use finstack_core::money::Money;
-/// use finstack_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_core::currency::Currency;
 ///
 /// let notional = Money::new(1_000_000.0, Currency::EUR);
 /// assert_eq!(notional.currency(), Currency::EUR);
@@ -339,8 +339,8 @@ pub fn method(&self, param: Type) -> ReturnType {
 /// # Examples
 ///
 /// ```
-/// use finstack_core::money::Money;
-/// use finstack_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_core::currency::Currency;
 ///
 /// let amount = Money::new(1_042_315.67, Currency::USD);
 /// assert_eq!(amount.format(2, true), "1042315.67 USD");
@@ -442,8 +442,8 @@ pub trait TraitName {
 ```rust
 /// # Examples
 /// ```rust
-/// use finstack_core::money::Money;
-/// # use finstack_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// # use finstack_quant_core::currency::Currency;
 ///
 /// let amount = Money::new(100.0, Currency::USD);
 /// # assert_eq!(amount.amount(), 100.0);
@@ -455,7 +455,7 @@ pub trait TraitName {
 ```rust
 /// # Examples
 /// ```rust
-/// use finstack_core::function_name;
+/// use finstack_quant_core::function_name;
 ///
 /// let result = function_name(args)?;
 /// assert!(result > 0.0);
@@ -468,7 +468,7 @@ pub trait TraitName {
 ```rust
 /// # Examples
 /// ```rust,no_run
-/// use finstack_core::expensive_operation;
+/// use finstack_quant_core::expensive_operation;
 ///
 /// // This example demonstrates the API but won't run in tests
 /// let result = expensive_operation();
@@ -481,7 +481,7 @@ pub trait TraitName {
 /// # Examples
 /// This will not compile:
 /// ```rust,compile_fail
-/// use finstack_core::TypeName;
+/// use finstack_quant_core::TypeName;
 ///
 /// let instance = TypeName::new();
 /// instance.method_that_doesnt_exist(); // Compilation error
@@ -493,7 +493,7 @@ pub trait TraitName {
 ```rust
 /// # Examples
 /// ```should_panic
-/// use finstack_core::function_name;
+/// use finstack_quant_core::function_name;
 ///
 /// function_name(invalid_arg); // Will panic
 /// ```
@@ -633,7 +633,7 @@ Use `cfg_attr` and document feature requirements:
 ///
 /// ```rust
 /// # #[cfg(feature = "mc")]
-/// use finstack_valuations::instruments::common::mc::prelude::*;
+/// use finstack_quant_valuations::instruments::common::mc::prelude::*;
 ///
 /// # #[cfg(feature = "mc")]
 /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
@@ -996,7 +996,7 @@ pub fn black_scholes_call(
 cargo test --doc
 
 # Test specific crate
-cargo test --doc -p finstack-core
+cargo test --doc -p finstack-quant-core
 
 # Test with features
 cargo test --doc --all-features
@@ -1010,7 +1010,7 @@ cargo test --doc --all-features
 4. **Keep examples focused**: One concept per example
 5. **Update docs with code**: Treat documentation failures as code failures
 
-## Common Patterns for Finstack
+## Common Patterns for Finstack Quant
 
 ### Currency-Safe Operations
 
@@ -1032,8 +1032,8 @@ cargo test --doc --all-features
 /// # Examples
 ///
 /// ```rust
-/// use finstack_core::money::Money;
-/// use finstack_core::currency::Currency;
+/// use finstack_quant_core::money::Money;
+/// use finstack_quant_core::currency::Currency;
 ///
 /// let a = Money::new(100.0, Currency::USD);
 /// let b = Money::new(50.0, Currency::USD);
@@ -1054,8 +1054,8 @@ pub fn checked_add(&self, other: Money) -> Result<Money, Error> {
 /// # Examples
 ///
 /// ```rust
-/// use finstack_core::market_data::term_structures::DiscountCurve;
-/// use finstack_core::dates::Date;
+/// use finstack_quant_core::market_data::term_structures::DiscountCurve;
+/// use finstack_quant_core::dates::Date;
 /// # use time::Month;
 ///
 /// let curve = DiscountCurve::builder("USD-OIS")
@@ -1089,7 +1089,7 @@ pub fn builder(id: impl Into<CurveId>) -> DiscountCurveBuilder {
 /// # Examples
 ///
 /// ```rust
-/// # use finstack_valuations::instruments::common::mc::prelude::*;
+/// # use finstack_quant_valuations::instruments::common::mc::prelude::*;
 /// # fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let config = EuropeanPricerConfig::new(10_000)
 ///     .with_seed(42); // Deterministic seed
@@ -1150,4 +1150,4 @@ Before marking documentation as complete, verify:
 
 ---
 
-**Remember**: Documentation is not just about explaining what the code does—it's about teaching users how to use the API effectively, helping them avoid pitfalls, and showcasing the power and safety of the Finstack library.
+**Remember**: Documentation is not just about explaining what the code does—it's about teaching users how to use the API effectively, helping them avoid pitfalls, and showcasing the power and safety of the Finstack Quant library.

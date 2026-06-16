@@ -1,6 +1,6 @@
 ---
 name: finstack-binding-parity-reviewer
-description: Reviews finstack cross-language API parity across canonical Rust crates, PyO3 bindings, WASM bindings, Python stubs, package exports, JS facades, parity_contract.toml, tests, and examples. Use when touching finstack-py, finstack-wasm, public Rust APIs exposed through bindings, .pyi files, binding parity tests, or when the user mentions binding drift, Python/WASM parity, or Rust canonical API alignment.
+description: Reviews finstack cross-language API parity across canonical Rust crates, PyO3 bindings, WASM bindings, Python stubs, package exports, JS facades, parity_contract.toml, tests, and examples. Use when touching finstack-quant-py, finstack-quant-wasm, public Rust APIs exposed through bindings, .pyi files, binding parity tests, or when the user mentions binding drift, Python/WASM parity, or Rust canonical API alignment.
 ---
 
 # Binding Parity Reviewer
@@ -11,13 +11,13 @@ Use this skill to keep Rust as the canonical API while ensuring Python and WASM 
 
 Use this instead of generic refactor or code review when the task touches:
 
-- `finstack-py/src/bindings/`
-- `finstack-wasm/src/api/`
-- `finstack-py/finstack/**/*.pyi`
+- `finstack-quant-py/src/bindings/`
+- `finstack-quant-wasm/src/api/`
+- `finstack-quant-py/finstack_quant/**/*.pyi`
 - Python `__init__.py` exports
-- `finstack-wasm/index.js` or generated TypeScript declarations
-- `finstack-py/parity_contract.toml`
-- parity tests under `finstack-py/tests/parity`
+- `finstack-quant-wasm/index.js` or generated TypeScript declarations
+- `finstack-quant-py/parity_contract.toml`
+- parity tests under `finstack-quant-py/tests/parity`
 
 Use `finstack-quant-finance-review` first when the main risk is pricing or risk correctness. Use `finstack-refactor` first when the change is purely internal and no public binding surface changes.
 

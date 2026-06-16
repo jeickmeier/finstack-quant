@@ -1,6 +1,6 @@
 # Benchmark Regression Workflow
 
-Use when reviewing runtime or allocation changes in performance-sensitive finstack code.
+Use when reviewing runtime or allocation changes in performance-sensitive finstack-quant code.
 
 ## Default Evidence
 

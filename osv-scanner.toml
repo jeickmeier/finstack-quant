@@ -1,4 +1,4 @@
-# OSV-Scanner configuration for finstack workspace.
+# OSV-Scanner configuration for finstack-quant workspace.
 # See https://google.github.io/osv-scanner/configuration/
 
 # Ignored advisories. Each entry MUST include a reason and a reviewDate so we

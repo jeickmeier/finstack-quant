@@ -1,0 +1,12 @@
+{
+  "schema": "finstack_quant.portfolio.liquidity_defaults.v1",
+  "version": 1,
+  "default_config": {
+    "participation_rate": 0.10,
+    "tier_thresholds": [1.0, 5.0, 20.0, 60.0],
+    "risk_aversion": 0.000001,
+    "holding_period": 1.0,
+    "confidence_level": 0.99,
+    "endogenous_spread_coef": 0.10
+  }
+}

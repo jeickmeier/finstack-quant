@@ -1,0 +1,115 @@
+{
+  "schema_version": "finstack_quant.credit_assumptions/1",
+  "default_rating_factor_table_id": "moodys_standard",
+  "default_seniority_calibration_id": "moodys_recovery_1982_2023",
+  "default_pd_master_scale_id": "sp_empirical",
+  "default_downturn_lgd_id": "basel_secured",
+  "default_workout_lgd_id": "standard_workout",
+  "default_market_recovery_rate": 0.40,
+  "rating_factor_tables": [
+    {
+      "ids": ["moodys_standard", "moodys_idealized_default_rates_2024_09"],
+      "agency": "Moody's",
+      "methodology": "IDEALIZED DEFAULT RATES",
+      "source": "Moody's Approach to Rating Collateralized Loan Obligations",
+      "source_version": "2024-09",
+      "effective_date": "2024-09-01",
+      "default_factor": 3650.0,
+      "factors": [
+        { "rating": "AAA", "factor": 1.0 },
+        { "rating": "AAPlus", "factor": 10.0 },
+        { "rating": "AA", "factor": 20.0 },
+        { "rating": "AAMinus", "factor": 40.0 },
+        { "rating": "APlus", "factor": 70.0 },
+        { "rating": "A", "factor": 120.0 },
+        { "rating": "AMinus", "factor": 180.0 },
+        { "rating": "BBBPlus", "factor": 260.0 },
+        { "rating": "BBB", "factor": 360.0 },
+        { "rating": "BBBMinus", "factor": 610.0 },
+        { "rating": "BBPlus", "factor": 940.0 },
+        { "rating": "BB", "factor": 1350.0 },
+        { "rating": "BBMinus", "factor": 1766.0 },
+        { "rating": "BPlus", "factor": 2220.0 },
+        { "rating": "B", "factor": 2720.0 },
+        { "rating": "BMinus", "factor": 3490.0 },
+        { "rating": "CCCPlus", "factor": 4770.0 },
+        { "rating": "CCC", "factor": 6500.0 },
+        { "rating": "CCCMinus", "factor": 8070.0 },
+        { "rating": "CC", "factor": 10000.0 },
+        { "rating": "C", "factor": 10000.0 },
+        { "rating": "D", "factor": 10000.0 },
+        { "rating": "NR", "factor": 3650.0 }
+      ]
+    }
+  ],
+  "seniority_calibrations": [
+    {
+      "ids": ["moodys_recovery_1982_2023", "moodys", "moody", "moody_s"],
+      "source": "Moody's 1982-2023 (approximate)",
+      "study_period": { "start_year": 1982, "end_year": 2023 },
+      "classes": [
+        { "seniority": "1st_lien_secured", "mean": 0.70, "std_dev": 0.20 },
+        { "seniority": "2nd_lien_secured", "mean": 0.40, "std_dev": 0.15 },
+        { "seniority": "SeniorSecured", "mean": 0.52, "std_dev": 0.25 },
+        { "seniority": "SeniorUnsecured", "mean": 0.37, "std_dev": 0.24 },
+        { "seniority": "Subordinated", "mean": 0.28, "std_dev": 0.2 },
+        { "seniority": "JuniorSubordinated", "mean": 0.17, "std_dev": 0.15 }
+      ]
+    },
+    {
+      "ids": ["sp_recovery_historical", "sp", "s_p", "standard_and_poors", "standardandpoors"],
+      "source": "S&P Historical (approximate)",
+      "classes": [
+        { "seniority": "SeniorSecured", "mean": 0.53, "std_dev": 0.24 },
+        { "seniority": "SeniorUnsecured", "mean": 0.36, "std_dev": 0.23 },
+        { "seniority": "Subordinated", "mean": 0.27, "std_dev": 0.2 },
+        { "seniority": "JuniorSubordinated", "mean": 0.15, "std_dev": 0.13 }
+      ]
+    }
+  ],
+  "pd_master_scales": [
+    {
+      "ids": ["sp_empirical", "sp_corporate_default_1981_2023"],
+      "source": "S&P Global Ratings 1981-2023 one-year corporate default rate study",
+      "study_period": { "start_year": 1981, "end_year": 2023 },
+      "grades": [
+        { "label": "AAA", "upper_pd": 0.0001, "central_pd": 0.00004 },
+        { "label": "AA", "upper_pd": 0.0005, "central_pd": 0.0002 },
+        { "label": "A", "upper_pd": 0.001, "central_pd": 0.0007 },
+        { "label": "BBB", "upper_pd": 0.005, "central_pd": 0.002 },
+        { "label": "BB", "upper_pd": 0.02, "central_pd": 0.01 },
+        { "label": "B", "upper_pd": 0.07, "central_pd": 0.04 },
+        { "label": "CCC", "upper_pd": 0.25, "central_pd": 0.12 },
+        { "label": "CC/C", "upper_pd": 1.0, "central_pd": 0.4 }
+      ]
+    },
+    {
+      "ids": ["moodys_empirical", "moodys_default_1983_2023"],
+      "source": "Moody's 1983-2023 one-year issuer-weighted default study",
+      "study_period": { "start_year": 1983, "end_year": 2023 },
+      "grades": [
+        { "label": "Aaa", "upper_pd": 0.0001, "central_pd": 0.00003 },
+        { "label": "Aa", "upper_pd": 0.0005, "central_pd": 0.0002 },
+        { "label": "A", "upper_pd": 0.001, "central_pd": 0.0007 },
+        { "label": "Baa", "upper_pd": 0.005, "central_pd": 0.002 },
+        { "label": "Ba", "upper_pd": 0.02, "central_pd": 0.01 },
+        { "label": "B", "upper_pd": 0.08, "central_pd": 0.04 },
+        { "label": "Caa", "upper_pd": 0.25, "central_pd": 0.13 },
+        { "label": "Ca/C", "upper_pd": 1.0, "central_pd": 0.45 }
+      ]
+    }
+  ],
+  "downturn_lgd_presets": [
+    { "ids": ["basel_secured"], "method": "regulatory_floor", "add_on": 0.08, "floor": 0.1 },
+    { "ids": ["basel_unsecured"], "method": "regulatory_floor", "add_on": 0.05, "floor": 0.25 }
+  ],
+  "workout_lgd_defaults": [
+    {
+      "ids": ["standard_workout", "default"],
+      "workout_years": 2.0,
+      "discount_rate": 0.05,
+      "direct_cost_rate": 0.05,
+      "indirect_cost_rate": 0.03
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "fx_option",
+    "spec": {
+      "id": "FXOPT-EURUSD-CALL",
+      "base_currency": "EUR",
+      "quote_currency": "USD",
+      "strike": 1.12,
+      "option_type": "call",
+      "exercise_style": "european",
+      "expiry": "2024-06-21",
+      "day_count": "Act365F",
+      "notional": {
+        "amount": "1000000",
+        "currency": "EUR"
+      },
+      "settlement": "cash",
+      "domestic_discount_curve_id": "USD-OIS",
+      "foreign_discount_curve_id": "EUR-OIS",
+      "vol_surface_id": "EURUSD-VOL",
+      "pricing_overrides": {
+        "quoted_clean_price": null,
+        "rho_bump_decimal": null,
+        "vega_bump_decimal": null,
+        "implied_volatility": null,
+        "cds_quote_bp": null,
+        "upfront_payment": null,
+        "ytm_bump_decimal": null,
+        "theta_period": null,
+        "mc_seed_scenario": null,
+        "adaptive_bumps": false,
+        "spot_bump_pct": null,
+        "vol_bump_pct": null,
+        "rate_bump_bp": null
+      },
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

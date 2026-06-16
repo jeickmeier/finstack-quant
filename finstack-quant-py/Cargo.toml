@@ -1,0 +1,53 @@
+[package]
+name = "finstack-quant-py"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "PyO3 Python bindings for the Finstack Quant financial computation library"
+
+[lib]
+name = "finstack_quant"
+crate-type = ["cdylib", "rlib"]
+# `pyo3` extension modules are meant to be loaded by a Python interpreter.
+# Running Rust unit tests directly (`cargo test`) produces a standalone binary
+# that fails to resolve Python symbols on macOS.
+test = false
+doctest = false
+
+[features]
+default = []
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+finstack-quant-attribution = { path = "../finstack-quant/attribution" }
+finstack-quant-core = { path = "../finstack-quant/core" }
+finstack-quant-analytics = { path = "../finstack-quant/analytics" }
+finstack-quant-cashflows = { path = "../finstack-quant/cashflows" }
+finstack-quant-covenants = { path = "../finstack-quant/covenants" }
+finstack-quant-margin = { path = "../finstack-quant/margin" }
+finstack-quant-monte-carlo = { path = "../finstack-quant/monte_carlo" }
+finstack-quant-valuations = { path = "../finstack-quant/valuations" }
+finstack-quant-factor-model = { path = "../finstack-quant/factor-model" }
+finstack-quant-statements = { path = "../finstack-quant/statements" }
+finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics" }
+finstack-quant-scenarios = { path = "../finstack-quant/scenarios" }
+finstack-quant-portfolio = { path = "../finstack-quant/portfolio" }
+nalgebra = "0.34"
+numpy = "0.28"
+pyo3 = { version = "0.28", features = ["multiple-pymethods"] }
+rand = { version = "0.9.3", default-features = false, features = ["std"] }
+rand_pcg = { version = "0.9", features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true }
+
+# Needed for Month enum used in Date bindings
+time = { workspace = true }
+strum = { workspace = true }
+rust_decimal = { workspace = true }
+
+[lints]
+workspace = true

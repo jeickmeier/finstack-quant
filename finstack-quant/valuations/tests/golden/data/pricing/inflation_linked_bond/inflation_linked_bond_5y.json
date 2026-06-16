@@ -1,0 +1,239 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "inflation_linked_bond_5y",
+    "domain": "fixed_income.inflation_linked_bond",
+    "description": "Synthetic 5Y inflation-linked bond on deterministic real and CPI curves.",
+    "valuation_date": "2026-04-30",
+    "source": "formula",
+    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-01",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-09",
+    "review_interval_months": 6,
+    "regen_command": "manual formula fixture; values captured from canonical pricing runner",
+    "screenshots": []
+  },
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "inflation_linked_bond_5y_tier_a_wrap",
+        "description": "Tier-A wrap (Phase-2 envelope migration, 2026-05-09): the original market snapshot is preserved in initial_market with empty plan.steps. Routes through engine::execute_with_diagnostics without changing pricing math.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [],
+      "prior_market": [
+        {
+          "kind": "inflation_curve",
+          "id": "US-CPI",
+          "base_cpi": 300.0,
+          "base_date": "2024-01-15",
+          "day_count": "Act365F",
+          "indexation_lag_months": 3,
+          "knot_points": [
+            [
+              0.0,
+              300.0
+            ],
+            [
+              1.0,
+              306.0
+            ],
+            [
+              2.0,
+              312.2
+            ],
+            [
+              5.0,
+              331.6
+            ],
+            [
+              10.0,
+              366.2
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_zero"
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-OIS",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.99
+            ],
+            [
+              0.5,
+              0.9802
+            ],
+            [
+              1.0,
+              0.9608
+            ],
+            [
+              2.0,
+              0.9231
+            ],
+            [
+              5.0,
+              0.8187
+            ],
+            [
+              10.0,
+              0.6703
+            ],
+            [
+              30.0,
+              0.301
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-TIPS",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.9975
+            ],
+            [
+              0.5,
+              0.995
+            ],
+            [
+              1.0,
+              0.99
+            ],
+            [
+              2.0,
+              0.975
+            ],
+            [
+              5.0,
+              0.93
+            ],
+            [
+              10.0,
+              0.86
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "type": "inflation_linked_bond",
+    "spec": {
+      "id": "INFLATION-LINKED-BOND-5Y-GOLDEN",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "real_coupon": 0.0125,
+      "frequency": {
+        "count": 6,
+        "unit": "months"
+      },
+      "issue_date": "2024-01-15",
+      "maturity": "2031-04-30",
+      "base_index": 300.0,
+      "base_date": "2024-01-15",
+      "indexation_method": "TIPS",
+      "lag": {
+        "months": 3
+      },
+      "deflation_protection": "MaturityOnly",
+      "bdc": "following",
+      "stub": "ShortBack",
+      "calendar_id": "nyse",
+      "discount_curve_id": "USD-TIPS",
+      "inflation_index_id": "US-CPI",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      },
+      "quoted_clean": 101.25,
+      "day_count": "Act365F"
+    }
+  },
+  "expected": {
+    "npv": 1140623.6364101623,
+    "real_yield": 0.009932285188,
+    "breakeven_inflation": 0.004617685695,
+    "index_ratio": 1.041639304041,
+    "real_duration": 4.842303902839,
+    "dv01": -553.902231925167
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "real_yield": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "breakeven_inflation": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "index_ratio": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "real_duration": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "dv01": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    }
+  }
+}

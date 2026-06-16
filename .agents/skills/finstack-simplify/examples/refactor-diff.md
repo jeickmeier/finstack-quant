@@ -15,7 +15,7 @@ One of these per slice. Short. The code is the source of truth; this note explai
 
 Bullet list of things deleted. Each bullet: **what** and **why it was redundant**.
 
-- `finstack/statements/src/checks/runner.rs` (186 lines) — orphaned `LegacyCheckRunner`, zero callers. Pattern: dead code (slop-patterns §11).
+- `finstack-quant/statements/src/checks/runner.rs` (186 lines) — orphaned `LegacyCheckRunner`, zero callers. Pattern: dead code (slop-patterns §11).
 - `CheckRunner` trait in `traits.rs` (22 lines) — single-impl trait, inlined into `CheckSuite`. Pattern: single-impl trait (slop-patterns §5).
 - `pub use checks::runner::*` in `prelude.rs` — re-export of deleted module.
 

@@ -1,4 +1,4 @@
-# cargo-deny configuration for finstack workspace
+# cargo-deny configuration for finstack-quant workspace
 # See https://embarkstudios.github.io/cargo-deny/ for full documentation
 
 [graph]
@@ -58,10 +58,10 @@ deny = []
 
 # Skip duplicate version check for transitive dependencies we don't control.
 skip = [
-    # finstack-wasm pins getrandom 0.2 (with `js` feature) for its own wasm RNG path,
+    # finstack-quant-wasm pins getrandom 0.2 (with `js` feature) for its own wasm RNG path,
     # while ahash/rand_core on modern versions pull in getrandom 0.3 (`wasm_js`). Both
     # are required simultaneously until the 0.2 consumers upgrade. See
-    # finstack-wasm/Cargo.toml for the explicit dual-dependency note.
+    # finstack-quant-wasm/Cargo.toml for the explicit dual-dependency note.
     { name = "getrandom", version = "=0.2.17" },
     # `lru 0.16.4` still uses hashbrown 0.16, while indexmap/schemars moved to
     # hashbrown 0.17. Remove once `lru` upgrades.

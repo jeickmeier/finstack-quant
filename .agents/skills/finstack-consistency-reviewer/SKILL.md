@@ -1,6 +1,6 @@
 ---
 name: finstack-consistency-reviewer
-description: Reviews finstack code for cross-module consistency: naming conventions, pattern drift, Rust/Python/WASM naming triplets, builder/error/module conventions, and convention inventory updates. Use when the user asks to make patterns consistent, unify naming, check conventions, or find pattern drift. Prefer finstack-simplify for dedupe/API-surface consolidation and finstack-refactor for implementation changes.
+description: Reviews finstack-quant code for cross-module consistency: naming conventions, pattern drift, Rust/Python/WASM naming triplets, builder/error/module conventions, and convention inventory updates. Use when the user asks to make patterns consistent, unify naming, check conventions, or find pattern drift. Prefer finstack-simplify for dedupe/API-surface consolidation and finstack-refactor for implementation changes.
 ---
 
 # Consistency Reviewer

@@ -1,0 +1,7 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "recovery_model_spec": {
+    "rate": 0.40,
+    "recovery_lag": 0
+  }
+}

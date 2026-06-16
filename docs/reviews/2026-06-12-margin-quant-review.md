@@ -1,7 +1,7 @@
-# Quant Finance Review — `finstack/margin` Crate and Bindings
+# Quant Finance Review — `finstack-quant/margin` Crate and Bindings
 
 **Date:** 2026-06-12
-**Scope:** `finstack/margin` (~21k lines: SIMM IM, schedule/clearing/haircut/internal IM, VM, CSA/collateral/repo types, SA-CCR, FRTB SBA, XVA, metrics, parameter registry), `finstack-py/src/bindings/margin/`, `finstack-wasm/src/api/margin/`, `parity_contract.toml`.
+**Scope:** `finstack-quant/margin` (~21k lines: SIMM IM, schedule/clearing/haircut/internal IM, VM, CSA/collateral/repo types, SA-CCR, FRTB SBA, XVA, metrics, parameter registry), `finstack-quant-py/src/bindings/margin/`, `finstack-quant-wasm/src/api/margin/`, `parity_contract.toml`.
 **Method:** Seven parallel subsystem reviews (SIMM, VM/schedule-IM/clearing/haircuts, SA-CCR, FRTB, XVA, domain types/metrics, bindings parity). SIMM parameters were verified against the official ISDA SIMM v2.6 methodology PDF; FRTB against BCBS MAR21/MAR22/MAR23 (d457); SA-CCR against BCBS CRE52/279. All Blocker-level findings were independently re-verified against source before inclusion.
 
 **Headline:** the margin crate's structural skeletons (aggregation shapes, EAD formula, CVA discretization, CSA formula plumbing) are largely correct, but the **embedded regulatory parameter tables are substantially not the published calibrations** — the SIMM v2.6 data file disagrees with the ISDA PDF on the risk-class correlation matrix (14/15 entries), IR risk weights (10/12 tenors), and the IR tenor-correlation matrix; FRTB has wrong commodity/equity/CSR risk-weight tables and a wrong low-correlation-scenario formula. The parity test suite pins the wrong values with false ISDA citations, so nothing catches it. Separately there is a runaway-margin-call ledger bug in VM, a maturity-blind collateral haircut lookup, and an XVA engine that is compiled out of production builds while its config types are exposed through bindings.
@@ -13,7 +13,7 @@
 ### Blockers — wrong margin/capital numbers or broken market standard
 
 **B1. SIMM risk-class correlation matrix ψ is wrong (14 of 15 off-diagonals).**
-`finstack/margin/data/margin/simm.v1.json:46-62` + `calculators/im/simm.rs:1261-1276`. Embedded `{IR-CQ 0.10, IR-CNQ 0.14, IR-EQ 0.12, IR-CM 0.30, IR-FX 0.10, CQ-CNQ 0.60, CQ-EQ 0.66, CQ-CM 0.25, CQ-FX 0.22, CNQ-EQ 0.52, CNQ-CM 0.27, EQ-CM 0.33, EQ-FX 0.24, CM-FX 0.23}` vs ISDA v2.6 ¶88 `{0.04, 0.04, 0.07, 0.37, 0.14, 0.54, 0.70, 0.27, 0.37, 0.46, 0.24, 0.35, 0.39, 0.35}` (only CNQ-FX 0.15 matches). Every multi-risk-class IM is wrong. **Fix:** replace the `risk_class_correlations` block (v2_6 and v2_5 entries) with the published tables.
+`finstack-quant/margin/data/margin/simm.v1.json:46-62` + `calculators/im/simm.rs:1261-1276`. Embedded `{IR-CQ 0.10, IR-CNQ 0.14, IR-EQ 0.12, IR-CM 0.30, IR-FX 0.10, CQ-CNQ 0.60, CQ-EQ 0.66, CQ-CM 0.25, CQ-FX 0.22, CNQ-EQ 0.52, CNQ-CM 0.27, EQ-CM 0.33, EQ-FX 0.24, CM-FX 0.23}` vs ISDA v2.6 ¶88 `{0.04, 0.04, 0.07, 0.37, 0.14, 0.54, 0.70, 0.27, 0.37, 0.46, 0.24, 0.35, 0.39, 0.35}` (only CNQ-FX 0.15 matches). Every multi-risk-class IM is wrong. **Fix:** replace the `risk_class_correlations` block (v2_6 and v2_5 entries) with the published tables.
 
 **B2. SIMM IR delta risk weights wrong for 10 of 12 tenors; no low/high-vol currency tables.**
 `simm.v1.json:9-22` (and the v2_5 entry at 233-246). Embedded `3m 80, 6m 67, 1y 61, 2y 52, 3y 49, 5y 51, 10y 51, 15y 51, 20y 54, 30y 62` vs ISDA v2.6 Table 1 (regular vol) `90, 71, 66, 66, 64, 60, 60, 61, 61, 67`. Only 2w 109 and 1m 105 match. Low-vol (JPY) and high-vol currency tables are absent entirely. **Fix:** transcribe Tables 1–3 and key by currency volatility group.
@@ -127,13 +127,13 @@
 
 **M30.** No `#[serde(deny_unknown_fields)]` on any public inbound wire type (`CsaSpec`, `VmParameters`, `ImParameters`, `EligibleCollateralSchedule`, `MarginCall`, `OtcMarginSpec`, `RepoMarginSpec`, `NettingSetId`, `InstrumentMarginResult`; only `registry/wire.rs` complies) — violates the workspace strict-serde invariant; typo'd fields silently dropped, e.g. `fx_haircut_addon` defaulting to 0 — `types/csa.rs:98` et al. SA-CCR inbound types same issue (`sa_ccr/types.rs:69,104`).
 
-**M31.** `saccr_ead` is a Python-only invented function with CSA policy hardcoded in the binding: `NettingSetId::bilateral("CPTY", "CSA")`, threshold/MTA/NICA fixed at 0, MPOR 10 — `finstack-py/src/bindings/margin/regulatory.rs:475-486`. Users with real CSA terms get a wrong EAD with no way to express them. `frtb_sba_charge` (regulatory.rs:406) similarly replaces the Rust engine API. Violates the canonical-API rule. **Fix:** bind `SaCcrEngine`/`SaCcrNettingSetConfig`/`FrtbSbaEngine` as classes matching Rust names.
+**M31.** `saccr_ead` is a Python-only invented function with CSA policy hardcoded in the binding: `NettingSetId::bilateral("CPTY", "CSA")`, threshold/MTA/NICA fixed at 0, MPOR 10 — `finstack-quant-py/src/bindings/margin/regulatory.rs:475-486`. Users with real CSA terms get a wrong EAD with no way to express them. `frtb_sba_charge` (regulatory.rs:406) similarly replaces the Rust engine API. Violates the canonical-API rule. **Fix:** bind `SaCcrEngine`/`SaCcrNettingSetConfig`/`FrtbSbaEngine` as classes matching Rust names.
 
-**M32.** Margin section of `parity_contract.toml:203-211` is stale: all modules `status = "missing"` while 27 symbols are bound flat on `finstack.margin`; no `[crates.margin.symbols]`; phantom `config` module; the bound `regulatory` module absent — the contract test cannot catch margin drift.
+**M32.** Margin section of `parity_contract.toml:203-211` is stale: all modules `status = "missing"` while 27 symbols are bound flat on `finstack_quant.margin`; no `[crates.margin.symbols]`; phantom `config` module; the bound `regulatory` module absent — the contract test cannot catch margin drift.
 
-**M33.** `ImResult` is bound but unconstructable: none of the five Rust IM calculators are bound, there is no `#[new]`/`from_json`, and the Rust `as_of` field is dropped — `finstack-py/src/bindings/margin/calculators.rs:122-174`. The "VM/IM calculators" module docstring is half false.
+**M33.** `ImResult` is bound but unconstructable: none of the five Rust IM calculators are bound, there is no `#[new]`/`from_json`, and the Rust `as_of` field is dropped — `finstack-quant-py/src/bindings/margin/calculators.rs:122-174`. The "VM/IM calculators" module docstring is half false.
 
-**M34.** Python XVA surface (7 classes) has no compute path (consequence of M28); `PyExposureProfile` hardcodes `diagnostics: None` with no getter, so the registered `ExposureDiagnostics` class has zero producers — `finstack-py/src/bindings/margin/xva.rs:219, 537-545`.
+**M34.** Python XVA surface (7 classes) has no compute path (consequence of M28); `PyExposureProfile` hardcodes `diagnostics: None` with no getter, so the registered `ExposureDiagnostics` class has zero producers — `finstack-quant-py/src/bindings/margin/xva.rs:219, 537-545`.
 
 ---
 

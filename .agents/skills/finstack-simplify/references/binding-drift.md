@@ -16,14 +16,14 @@ Both flavors are simplification opportunities. This reference tells you how to d
 
 ## Map the triplet
 
-For any Rust type or function `Foo` in `finstack/<crate>/src/...`:
+For any Rust type or function `Foo` in `finstack-quant/<crate>/src/...`:
 
-- **Python binding** lives under `finstack-py/src/bindings/<crate>/` (mirrors Rust crate tree exactly).
-- **WASM binding** lives under `finstack-wasm/src/api/<crate_ns>/` where `<crate_ns>` is e.g. `core_ns`, `analytics`, `margin`, etc.
-- **Python type stubs** are at `finstack-py/finstack/*.pyi` — derived from the binding code and the parity contract.
-- **JS facade** is at `finstack-wasm/index.js` — hand-written, not auto-generated from pkg/.
-- **Parity contract** is at `finstack-py/parity_contract.toml`.
-- **Parity tests** are in `finstack-py/tests/parity/`.
+- **Python binding** lives under `finstack-quant-py/src/bindings/<crate>/` (mirrors Rust crate tree exactly).
+- **WASM binding** lives under `finstack-quant-wasm/src/api/<crate_ns>/` where `<crate_ns>` is e.g. `core_ns`, `analytics`, `margin`, etc.
+- **Python type stubs** are at `finstack-quant-py/finstack_quant/*.pyi` — derived from the binding code and the parity contract.
+- **JS facade** is at `finstack-quant-wasm/index.js` — hand-written, not auto-generated from pkg/.
+- **Parity contract** is at `finstack-quant-py/parity_contract.toml`.
+- **Parity tests** are in `finstack-quant-py/tests/parity/`.
 
 Before doing any binding-touching work, list these paths for the scope you're auditing. Put the list in the audit report.
 
@@ -35,8 +35,8 @@ Before doing any binding-touching work, list these paths for the scope you're au
 
 1. Enumerate Rust `pub struct`/`pub enum` in the target module.
 2. For each, check whether it has a counterpart:
-   - `finstack-py/src/bindings/<crate>/<module>.rs` — typically a `#[pyclass] pub struct PyFoo { pub(crate) inner: Foo }`
-   - `finstack-wasm/src/api/<crate_ns>/<module>.rs` — typically `#[wasm_bindgen] pub struct Foo { inner: RustFoo }` or similar
+   - `finstack-quant-py/src/bindings/<crate>/<module>.rs` — typically a `#[pyclass] pub struct PyFoo { pub(crate) inner: Foo }`
+   - `finstack-quant-wasm/src/api/<crate_ns>/<module>.rs` — typically `#[wasm_bindgen] pub struct Foo { inner: RustFoo }` or similar
 3. Flag each missing binding. Flag each binding without a Rust source. Flag name mismatches (e.g., Rust `VolSurface` but Python `VolatilitySurface`).
 
 ### Functions
@@ -72,7 +72,7 @@ Binding code should read like this:
 ```rust
 #[pyfunction]
 fn sharpe(returns: Vec<f64>, rf: f64) -> PyResult<f64> {
-    finstack_analytics::sharpe(&returns, rf).map_err(core_to_py)
+    finstack_quant_analytics::sharpe(&returns, rf).map_err(core_to_py)
 }
 ```
 
@@ -98,7 +98,7 @@ When you find these, the refactor is:
 
 ## Parity contract and parity tests
 
-`finstack-py/parity_contract.toml` is the source of truth for what must be equal across Rust / Python / WASM. Treat it like an API contract file.
+`finstack-quant-py/parity_contract.toml` is the source of truth for what must be equal across Rust / Python / WASM. Treat it like an API contract file.
 
 During a refactor:
 
@@ -109,7 +109,7 @@ During a refactor:
 Run the parity tests with:
 
 ```bash
-uv run pytest finstack-py/tests/parity -x
+uv run pytest finstack-quant-py/tests/parity -x
 ```
 
 If you added a new canonical API, add it to the parity contract in the same slice.
@@ -118,7 +118,7 @@ If you added a new canonical API, add it to the parity contract in the same slic
 
 ## The .pyi stub layer
 
-`finstack-py/finstack/*.pyi` is derived from the binding code and the parity contract. If you change binding shapes, regenerate or update the stubs in the same slice. Don't leave `.pyi` lying about types that no longer exist — type-checker consumers will catch it later and you'll own the bug.
+`finstack-quant-py/finstack_quant/*.pyi` is derived from the binding code and the parity contract. If you change binding shapes, regenerate or update the stubs in the same slice. Don't leave `.pyi` lying about types that no longer exist — type-checker consumers will catch it later and you'll own the bug.
 
 ---
 

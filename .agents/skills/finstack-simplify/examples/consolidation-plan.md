@@ -23,10 +23,10 @@ Use this format verbatim.
 **Tier:** 1 (delete-only)
 **Estimated net LOC:** −180
 **Files touched:**
-- `finstack/statements/src/checks/runner.rs` (DELETE)
-- `finstack/statements/src/checks/mod.rs` (remove `pub mod runner;`)
-- `finstack/statements/src/prelude.rs` (remove re-export)
-- `finstack/statements/tests/spec/registry_tests.rs` (remove one unreferenced test)
+- `finstack-quant/statements/src/checks/runner.rs` (DELETE)
+- `finstack-quant/statements/src/checks/mod.rs` (remove `pub mod runner;`)
+- `finstack-quant/statements/src/prelude.rs` (remove re-export)
+- `finstack-quant/statements/tests/spec/registry_tests.rs` (remove one unreferenced test)
 
 **Addresses findings:** F1, F2
 
@@ -48,9 +48,9 @@ mise run rust-lint && mise run rust-test
 **Tier:** 2 (internal collapse)
 **Estimated net LOC:** −95
 **Files touched:**
-- `finstack/statements/src/checks/suite.rs`
-- `finstack/statements/src/checks/traits.rs` (single-impl trait deleted)
-- `finstack/statements/src/checks/builtins/*.rs` (update to use concrete type)
+- `finstack-quant/statements/src/checks/suite.rs`
+- `finstack-quant/statements/src/checks/traits.rs` (single-impl trait deleted)
+- `finstack-quant/statements/src/checks/builtins/*.rs` (update to use concrete type)
 
 **Addresses findings:** F3
 
@@ -74,11 +74,11 @@ mise run rust-lint && mise run rust-test
 **Tier:** 3 (public surface change)
 **Estimated net LOC:** −160
 **Files touched:**
-- `finstack/core/src/market_data/surfaces/vol_surface.rs`
-- `finstack/core/src/market_data/surfaces/mod.rs`
-- `finstack-py/src/bindings/core/market_data/surfaces.rs`
-- `finstack-wasm/src/api/core_ns/market_data/surfaces.rs`
-- `finstack-py/finstack/core.pyi`
+- `finstack-quant/core/src/market_data/surfaces/vol_surface.rs`
+- `finstack-quant/core/src/market_data/surfaces/mod.rs`
+- `finstack-quant-py/src/bindings/core/market_data/surfaces.rs`
+- `finstack-quant-wasm/src/api/core_ns/market_data/surfaces.rs`
+- `finstack-quant-py/finstack_quant/core.pyi`
 - `parity_contract.toml`
 
 **Addresses findings:** F4, F5 (cluster A)
@@ -94,7 +94,7 @@ mise run python-build
 mise run python-lint && mise run python-test
 mise run wasm-build
 mise run wasm-lint && mise run wasm-test
-uv run pytest finstack-py/tests/parity -x
+uv run pytest finstack-quant-py/tests/parity -x
 ```
 
 **Bindings touched:** Python + WASM both updated. Parity contract updated.
@@ -108,12 +108,12 @@ uv run pytest finstack-py/tests/parity -x
 **Tier:** 4 (invariant-sensitive)
 **Estimated net LOC:** −50 (but high diff surface)
 **Files touched:**
-- `finstack/analytics/src/drawdown.rs`
-- `finstack/portfolio/src/drawdown.rs` (DELETE — merges into analytics)
+- `finstack-quant/analytics/src/drawdown.rs`
+- `finstack-quant/portfolio/src/drawdown.rs` (DELETE — merges into analytics)
 - Various call-sites in `valuations/`, `statements-analytics/`
 - Python + WASM bindings for both `analytics.drawdown` and `portfolio.drawdown`
 - `parity_contract.toml`
-- `finstack-py/finstack/*.pyi`
+- `finstack-quant-py/finstack_quant/*.pyi`
 
 **Addresses findings:** F6
 
@@ -129,7 +129,7 @@ mise run rust-test  # serial
 RAYON_NUM_THREADS=1 mise run rust-test  # explicit serial
 mise run python-build && mise run python-lint && mise run python-test
 mise run wasm-build && mise run wasm-lint && mise run wasm-test
-uv run pytest finstack-py/tests/parity -x
+uv run pytest finstack-quant-py/tests/parity -x
 # Review golden diffs for all drawdown tests in analytics/ and portfolio/.
 ```
 

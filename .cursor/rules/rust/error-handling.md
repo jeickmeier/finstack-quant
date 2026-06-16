@@ -1,16 +1,16 @@
 ---
 trigger: model_decision
-description: Information about the error handling framework for the finstack workspace.
+description: Information about the error handling framework for the finstack-quant workspace.
 globs:
 ---
 # Rust Error Handling Framework
 
 ## Overview
 
-To ensure consistency and maintainability across the `finstack` workspace, we are adopting a dual-crate approach for error handling:
+To ensure consistency and maintainability across the `finstack-quant` workspace, we are adopting a dual-crate approach for error handling:
 
 1. **`thiserror`** for **library crates** (`core`, `statements`, `valuations`, etc.).
-2. **`anyhow`** for **application-level crates** (binaries, examples, and language bindings like `finstack-py` and `finstack-wasm`).
+2. **`anyhow`** for **application-level crates** (binaries, examples, and language bindings like `finstack-quant-py` and `finstack-quant-wasm`).
 
 This approach provides the best of both worlds: structured, specific error types for libraries, and convenient, easy-to-manage error propagation for applications. It avoids over-engineering by using simple, popular, and well-understood crates.
 
@@ -20,11 +20,11 @@ All library crates **MUST** define a crate-specific, public `Error` enum. This a
 
 ### Guidelines
 
-- Each library crate (e.g., `finstack/core`, `finstack/valuations`) must have a `src/errors.rs` or similar module containing its public `Error` type.
+- Each library crate (e.g., `finstack-quant/core`, `finstack-quant/valuations`) must have a `src/errors.rs` or similar module containing its public `Error` type.
 - The `Error` enum should be comprehensive, covering all possible failure modes for that crate.
 - When a library function calls a function from another library crate within our workspace, it should wrap the error in its own `Error` type.
 
-### Example: `finstack/core/src/errors.rs`
+### Example: `finstack-quant/core/src/errors.rs`
 
 ```rust
 use thiserror::Error;
@@ -70,7 +70,7 @@ pub fn do_something(currency_code: &str) -> Result<()> {
 
 ## 2. Application & Binding Crates: `anyhow`
 
-Application-level crates (anything with a `main.rs`, examples, and the `finstack-py`/`finstack-wasm` binding crates) **SHOULD** use `anyhow` for error handling. `anyhow::Error` is a dynamic error type that can wrap any error that implements `std::error::Error`, which includes all of our library errors derived with `thiserror`.
+Application-level crates (anything with a `main.rs`, examples, and the `finstack-quant-py`/`finstack-quant-wasm` binding crates) **SHOULD** use `anyhow` for error handling. `anyhow::Error` is a dynamic error type that can wrap any error that implements `std::error::Error`, which includes all of our library errors derived with `thiserror`.
 
 ### Guidelines
 
@@ -79,11 +79,11 @@ Application-level crates (anything with a `main.rs`, examples, and the `finstack
 - Use `anyhow::Context` to add explanatory context to errors as they propagate up the call stack.
 - Use `anyhow::bail!` or `anyhow::ensure!` for new errors within application-level code.
 
-### Example: `finstack/examples/some_example.rs`
+### Example: `finstack-quant/examples/some_example.rs`
 
 ```rust
 use anyhow::{Context, Result};
-use finstack_core::some_module; // Assuming this has functions returning `finstack_core::errors::Result`
+use finstack_quant_core::some_module; // Assuming this has functions returning `finstack_quant_core::errors::Result`
 
 fn main() -> Result<()> {
     run_example().context("Failed to run example")?;
@@ -91,7 +91,7 @@ fn main() -> Result<()> {
 }
 
 fn run_example() -> Result<()> {
-    // The `?` operator converts `finstack_core::errors::Error` into `anyhow::Error`
+    // The `?` operator converts `finstack_quant_core::errors::Error` into `anyhow::Error`
     some_module::do_something("USD")
         .context("Initial operation failed")?;
 

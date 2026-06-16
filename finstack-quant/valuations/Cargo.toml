@@ -1,0 +1,180 @@
+[package]
+name = "finstack-quant-valuations"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Instrument pricing, cashflows, and risk for Finstack Quant: fixed income, derivatives, structured credit, Monte Carlo, and PDE/tree methods"
+
+[dependencies]
+finstack-quant-core = { path = "../core" }
+finstack-quant-analytics = { path = "../analytics" }
+finstack-quant-cashflows = { path = "../cashflows" }
+finstack-quant-covenants = { path = "../covenants" }
+finstack-quant-margin = { path = "../margin" }
+finstack-quant-monte-carlo = { path = "../monte_carlo", default-features = false }
+finstack-quant-factor-model = { path = "../factor-model" }
+finstack-quant-valuations-macros = { path = "macros" }
+indexmap = { workspace = true, features = ["serde"] }
+smallvec = { version = "1.15", default-features = false, features = ["serde"] }
+rayon = "1.11"
+serde = { workspace = true }
+serde_json = { workspace = true, features = ["raw_value"] }
+time = { workspace = true }
+rust_decimal = { workspace = true }
+schemars = { workspace = true }
+jsonschema = { version = "0.28", default-features = false }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+thiserror = { workspace = true }
+num-complex = "0.4"
+strum = { workspace = true, features = ["derive"] }
+ts-rs = { version = "12", optional = true, features = ["serde-compat", "no-serde-warnings"] }
+
+[dev-dependencies]
+time = { workspace = true, features = ["macros"] }
+proptest = "1.11.0"
+criterion = { workspace = true }
+rust_decimal_macros = { workspace = true }
+finstack-quant-statements = { path = "../statements" }
+finstack-quant-statements-analytics = { path = "../statements-analytics" }
+
+
+
+[features]
+default = []
+ts_export = ["dep:ts-rs"]
+# Vanna-Volga smile-correction pricer for FX barrier options. Aspirational —
+# unregistered until per-trade smile quotes are part of the market-data
+# contract. Enable to pull the analytics into builds for research/calibration.
+# Review by 2026-11-20. If still unactivated, move this implementation to a
+# finstack-quant-valuations-research crate instead of carrying a dormant prod feature.
+fx-vanna-volga = []
+
+[[bench]]
+name = "bond_pricing"
+harness = false
+
+[[bench]]
+name = "swap_pricing"
+harness = false
+
+[[bench]]
+name = "option_pricing"
+harness = false
+
+[[bench]]
+name = "cds_pricing"
+harness = false
+
+[[bench]]
+name = "cashflow_generation"
+harness = false
+
+[[bench]]
+name = "cds_option_pricing"
+harness = false
+
+[[bench]]
+name = "cds_tranche_pricing"
+harness = false
+
+[[bench]]
+name = "swaption_pricing"
+harness = false
+
+[[bench]]
+name = "cds_index_pricing"
+harness = false
+
+[[bench]]
+name = "structured_credit_pricing"
+harness = false
+
+[[bench]]
+name = "convertible_pricing"
+harness = false
+
+[[bench]]
+name = "calibration"
+harness = false
+
+[[bench]]
+name = "mc_pricing"
+harness = false
+
+[[bench]]
+name = "merton_mc_pricing"
+harness = false
+
+[[bench]]
+name = "fi_misc_pricing"
+harness = false
+
+[[bench]]
+name = "mc_exotics_pricing"
+harness = false
+
+[[bench]]
+name = "bucketed_risk"
+harness = false
+
+[[bench]]
+name = "structured_credit_pool"
+harness = false
+
+[[bench]]
+name = "df_bootstrap"
+harness = false
+
+[[bench]]
+name = "fwd_curve"
+harness = false
+
+[[bench]]
+name = "sabr_slice"
+harness = false
+
+[[bench]]
+name = "bond_future_bench"
+harness = false
+
+[[bench]]
+name = "metrics"
+harness = false
+
+[[bench]]
+name = "equity_pricing"
+harness = false
+
+[[bench]]
+name = "fx_dates"
+harness = false
+
+[[bench]]
+name = "inflation_pricing"
+harness = false
+
+[[bench]]
+name = "credit_factor_calibration"
+harness = false
+
+[[bench]]
+name = "linear_rates"
+harness = false
+
+[[bench]]
+name = "fx_pricing"
+harness = false
+
+[[bench]]
+name = "commodity_pricing"
+harness = false
+
+[[bin]]
+name = "gen_schemas"
+path = "src/bin/gen_schemas.rs"
+
+[lints]
+workspace = true

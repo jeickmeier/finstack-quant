@@ -1,4 +1,4 @@
-# Finstack Quality Gate Tools
+# Finstack Quant Quality Gate Tools
 
 Use repo-native checks first. External scanners are optional only when installed and relevant.
 

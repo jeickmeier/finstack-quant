@@ -1,0 +1,134 @@
+{
+  "schema": "finstack_quant.instruments.cds.conventions.registry.v2",
+  "namespace": "instruments.cds.market_conventions",
+  "version": 3,
+  "entries": [
+    {
+      "ids": [
+        "ANY:isda_na",
+        "USD:isda_na",
+        "CAD:isda_na",
+        "MXN:isda_na"
+      ],
+      "record": {
+        "doc_clause": "isda_na",
+        "day_count": "Act360",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 3,
+        "calendar_id": "nyse"
+      }
+    },
+    {
+      "ids": [
+        "ANY:isda_eu",
+        "EUR:isda_eu",
+        "GBP:isda_eu",
+        "CHF:isda_eu",
+        "SEK:isda_eu",
+        "NOK:isda_eu",
+        "DKK:isda_eu"
+      ],
+      "record": {
+        "doc_clause": "isda_eu",
+        "day_count": "Act360",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 1,
+        "calendar_id": "target2"
+      }
+    },
+    {
+      "ids": [
+        "ANY:isda_as",
+        "JPY:isda_as",
+        "KRW:isda_as"
+      ],
+      "record": {
+        "doc_clause": "isda_as",
+        "day_count": "Act365F",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 3,
+        "calendar_id": "jpto"
+      }
+    },
+    {
+      "ids": [
+        "AUD:isda_as"
+      ],
+      "record": {
+        "doc_clause": "isda_as",
+        "day_count": "Act365F",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 3,
+        "calendar_id": "auce"
+      }
+    },
+    {
+      "ids": [
+        "NZD:isda_as"
+      ],
+      "record": {
+        "doc_clause": "isda_as",
+        "day_count": "Act365F",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 3,
+        "calendar_id": "nzau"
+      }
+    },
+    {
+      "ids": [
+        "HKD:isda_as"
+      ],
+      "record": {
+        "doc_clause": "isda_as",
+        "day_count": "Act365F",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 3,
+        "calendar_id": "hkhk"
+      }
+    },
+    {
+      "ids": [
+        "SGD:isda_as"
+      ],
+      "record": {
+        "doc_clause": "isda_as",
+        "day_count": "Act365F",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 3,
+        "calendar_id": "sgsi"
+      }
+    },
+    {
+      "ids": [
+        "ANY:custom",
+        "USD:custom",
+        "EUR:custom",
+        "GBP:custom",
+        "JPY:custom"
+      ],
+      "record": {
+        "doc_clause": "custom",
+        "day_count": "Act360",
+        "payment_frequency": "3M",
+        "bdc": "modified_following",
+        "stub_convention": "ShortFront",
+        "settlement_days": 3,
+        "calendar_id": "nyse"
+      }
+    }
+  ]
+}

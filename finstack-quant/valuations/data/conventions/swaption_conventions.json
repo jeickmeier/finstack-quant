@@ -1,0 +1,46 @@
+{
+    "schema": "finstack_quant.instruments.swaption.conventions.registry.v1",
+    "namespace": "instruments.swaption.market_conventions",
+    "version": 1,
+    "entries": [
+        {
+            "ids": [
+                "USD"
+            ],
+            "record": {
+                "calendar_id": "nyse",
+                "settlement_days": 2,
+                "business_day_convention": "modified_following",
+                "fixed_leg_frequency": "1Y",
+                "fixed_leg_day_count": "Act360",
+                "float_leg_index": "USD-SOFR-OIS"
+            }
+        },
+        {
+            "ids": [
+                "USD-Annual"
+            ],
+            "record": {
+                "calendar_id": "nyse",
+                "settlement_days": 2,
+                "business_day_convention": "modified_following",
+                "fixed_leg_frequency": "1Y",
+                "fixed_leg_day_count": "Thirty360",
+                "float_leg_index": "USD-SOFR"
+            }
+        },
+        {
+            "ids": [
+                "EUR"
+            ],
+            "record": {
+                "calendar_id": "target2",
+                "settlement_days": 2,
+                "business_day_convention": "modified_following",
+                "fixed_leg_frequency": "1Y",
+                "fixed_leg_day_count": "Thirty360",
+                "float_leg_index": "EUR-EURIBOR-6M"
+            }
+        }
+    ]
+}

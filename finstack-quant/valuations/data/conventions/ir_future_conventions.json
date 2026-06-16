@@ -1,0 +1,56 @@
+{
+  "schema": "finstack_quant.calibration.conventions.registry.v1",
+  "namespace": "calibration.ir_future",
+  "version": 1,
+  "entries": [
+    {
+      "ids": [
+        "CME:SR3",
+        "SR3"
+      ],
+      "record": {
+        "index_id": "USD-SOFR-3M",
+        "calendar_id": "usny",
+        "settlement_days": 0,
+        "delivery_months": 3,
+        "face_value": 1000000.0,
+        "tick_size": 0.0025,
+        "tick_value": 6.25,
+        "convexity_adjustment": null
+      }
+    },
+    {
+      "ids": [
+        "CME:ED",
+        "ED"
+      ],
+      "record": {
+        "index_id": "USD-LIBOR-3M",
+        "calendar_id": "usny",
+        "settlement_days": 2,
+        "delivery_months": 3,
+        "face_value": 1000000.0,
+        "tick_size": 0.0025,
+        "tick_value": 6.25,
+        "convexity_adjustment": null
+      }
+    },
+    {
+      "ids": [
+        "ICE:ER",
+        "ER",
+        "EURIBOR3M"
+      ],
+      "record": {
+        "index_id": "EUR-EURIBOR-3M",
+        "calendar_id": "target2",
+        "settlement_days": 2,
+        "delivery_months": 3,
+        "face_value": 1000000.0,
+        "tick_size": 0.005,
+        "tick_value": 12.5,
+        "convexity_adjustment": null
+      }
+    }
+  ]
+}

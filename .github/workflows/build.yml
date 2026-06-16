@@ -75,7 +75,7 @@ jobs:
 
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
-        working-directory: finstack-wasm
+        working-directory: finstack-quant-wasm
 
       - name: Set up Python environment
         run: |
@@ -125,11 +125,11 @@ jobs:
       - name: Run Rust lib and integration tests
         # Do not run Rust doctests in CI; they are long-running and not
         # supported by nextest. Keep target selection explicit here.
-        run: cargo nextest run --workspace --exclude finstack-py --lib --tests --no-fail-fast
+        run: cargo nextest run --workspace --exclude finstack-quant-py --lib --tests --no-fail-fast
 
       - name: Run workspace rustdoc
         run: |
-          RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude finstack-py --exclude finstack-wasm --no-deps
+          RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps
 
   # ============================================
   # Test Python — maturin build + pytest
@@ -170,8 +170,7 @@ jobs:
           uv sync --no-install-project
 
       - name: Build Python extension
-        working-directory: finstack-py
-        run: python -m maturin develop
+        run: uv run maturin develop
 
       - name: Run Python tests
         run: uv run pytest -v
@@ -206,10 +205,10 @@ jobs:
 
       - name: Install WASM dependencies
         run: npm ci --ignore-scripts
-        working-directory: finstack-wasm
+        working-directory: finstack-quant-wasm
 
       - name: Run WASM tests
-        run: npm --prefix finstack-wasm run test
+        run: npm --prefix finstack-quant-wasm run test
 
   # ============================================
   # Fuzzing — short smoke run of the DSL parser fuzz target
@@ -250,7 +249,7 @@ jobs:
         run: cargo install cargo-fuzz --locked
 
       - name: Run parse_formula fuzz target (60s smoke)
-        working-directory: finstack/statements
+        working-directory: finstack-quant/statements
         run: cargo +nightly fuzz run parse_formula -- -max_total_time=60 -max_len=4096
 
   # ============================================
@@ -294,7 +293,7 @@ jobs:
       scan-args: |-
         --lockfile=Cargo.lock
         --lockfile=uv.lock
-        --lockfile=finstack-wasm/package-lock.json
+        --lockfile=finstack-quant-wasm/package-lock.json
 
   osv-scan-full:
     name: Supply-chain Security (OSV-Scanner, full)
@@ -308,7 +307,7 @@ jobs:
       scan-args: |-
         --lockfile=Cargo.lock
         --lockfile=uv.lock
-        --lockfile=finstack-wasm/package-lock.json
+        --lockfile=finstack-quant-wasm/package-lock.json
 
   # ============================================
   # Semver checks for API stability
@@ -349,7 +348,7 @@ jobs:
         run: |
           git fetch origin master --tags
           cargo semver-checks check-release \
-            -p finstack-core \
-            -p finstack-valuations \
-            -p finstack-portfolio \
+            -p finstack-quant-core \
+            -p finstack-quant-valuations \
+            -p finstack-quant-portfolio \
             --baseline-rev origin/master

@@ -20,17 +20,17 @@ and migrations can be tracked per-crate.
 
 | Crate | Convention | Status |
 |-------|-----------|--------|
-| `finstack-core::money` | `Decimal` internally, `f64` API surface | Intentional: ergonomic f64 surface, Decimal storage |
-| `finstack-core` (everything else) | `f64` | By design — core math and types |
-| `finstack-cashflows` | `Decimal` for `money × rate × yf` products | Enforced per-commit |
-| `finstack-monte-carlo` | `f64` | By design — MC path simulation |
-| `finstack-analytics` | `f64` | By design — statistical analytics |
-| `finstack-margin` | `f64` at aggregation; `Money` at boundaries | Mixed; aggregation migration deferred |
-| `finstack-statements` | `f64` via `AmountOrScalar` | Decimal migration deferred |
-| `finstack-statements-analytics` | `f64` | Inherits from statements |
-| `finstack-portfolio` | `f64` via `Money::new(f64, …)` | Decimal migration deferred |
-| `finstack-scenarios` | `f64` at scenario-apply | Fine |
-| `finstack-valuations` | `f64` internals, `Money`/`Decimal` at boundaries | Fine |
+| `finstack-quant-core::money` | `Decimal` internally, `f64` API surface | Intentional: ergonomic f64 surface, Decimal storage |
+| `finstack-quant-core` (everything else) | `f64` | By design — core math and types |
+| `finstack-quant-cashflows` | `Decimal` for `money × rate × yf` products | Enforced per-commit |
+| `finstack-quant-monte-carlo` | `f64` | By design — MC path simulation |
+| `finstack-quant-analytics` | `f64` | By design — statistical analytics |
+| `finstack-quant-margin` | `f64` at aggregation; `Money` at boundaries | Mixed; aggregation migration deferred |
+| `finstack-quant-statements` | `f64` via `AmountOrScalar` | Decimal migration deferred |
+| `finstack-quant-statements-analytics` | `f64` | Inherits from statements |
+| `finstack-quant-portfolio` | `f64` via `Money::new(f64, …)` | Decimal migration deferred |
+| `finstack-quant-scenarios` | `f64` at scenario-apply | Fine |
+| `finstack-quant-valuations` | `f64` internals, `Money`/`Decimal` at boundaries | Fine |
 
 **Rule for new code:**
 * Money values that flow to accounting, settlement, regulatory capital,
@@ -48,12 +48,12 @@ and migrations can be tracked per-crate.
 
 * All stochastic code MUST use a seeded RNG. No `thread_rng()` /
   `rand::random()` in library code.
-* Monte Carlo paths use `finstack_monte_carlo::rng::PhiloxRng` with
+* Monte Carlo paths use `finstack_quant_monte_carlo::rng::PhiloxRng` with
   explicit `split(path_id)` for per-path streams. This guarantees
   bit-identical results across serial and rayon-parallel executions.
 * Halton low-discrepancy sequences (e.g. multi-start calibration) are
   deterministic by construction; see
-  `finstack_valuations::calibration::solver::multi_start` for the shared
+  `finstack_quant_valuations::calibration::solver::multi_start` for the shared
   implementation.
 
 ### 2.2 Hash-map iteration
@@ -70,7 +70,7 @@ and migrations can be tracked per-crate.
 
 * Summations over `f64` MUST use Neumaier/Kahan compensation for any
   accumulator that sees > 1000 terms or large dynamic range. See
-  `finstack_core::math::neumaier_sum`.
+  `finstack_quant_core::math::neumaier_sum`.
 * Parallel reductions (rayon) MUST use an associative + commutative
   combiner — always true for `+` on `f64`, but Neumaier's
   compensation is NOT associative; use `OnlineStats::merge` (Welford)
@@ -80,7 +80,7 @@ and migrations can be tracked per-crate.
 ### 2.4 Floating-point comparisons
 
 * NEVER compare `f64` with `==` or `!=`. Use
-  `finstack_core::util::approx_eq` or a documented tolerance.
+  `finstack_quant_core::util::approx_eq` or a documented tolerance.
 * When tolerance is a percentage of the value, spell it out: a `2%`
   tolerance on an FEP value is different from a `1e-6` absolute
   tolerance on a probability.
@@ -94,8 +94,8 @@ convention refactor deferred). Document what each interface expects:
 
 | Context | Convention |
 |---------|-----------|
-| `finstack-portfolio` Dietz flow | **positive = contribution in** (capital added by client) |
-| `finstack-core::cashflow::xirr` flow | **negative = contribution in** (PV-zero solver convention) |
+| `finstack-quant-portfolio` Dietz flow | **positive = contribution in** (capital added by client) |
+| `finstack-quant-core::cashflow::xirr` flow | **negative = contribution in** (PV-zero solver convention) |
 | CDS option payoff | Call = payer protection; Put = receiver protection |
 | SA-CCR replacement cost `margin_term` | NICA sign per BCBS 279 ¶135; unsigned today (follow-up) |
 | CapEx on balance-sheet roll-forward | positive (additions to PPE) |
@@ -115,7 +115,7 @@ Full remediation is tracked separately.
 * Multi-curve pricing MUST keep these two clocks separate. Single-clock
   shortcuts drift by 2–15 bp on steep cross-currency curves; the
   two-clock plumbing lives in
-  `finstack_valuations::instruments::common::two_clock` and is being
+  `finstack_quant_valuations::instruments::common::two_clock` and is being
   migrated into pricer paths incrementally.
 
 ---
@@ -151,8 +151,8 @@ Full remediation is tracked separately.
 
 ## 7. Binding updates
 
-* Any public API change on a core crate MUST update `finstack-py` and
-  `finstack-wasm` in the same commit. "API-break-carry" is denied.
+* Any public API change on a core crate MUST update `finstack-quant-py` and
+  `finstack-quant-wasm` in the same commit. "API-break-carry" is denied.
 * Deprecation is preferred over removal when the API is still
   meaningful. Outright removal is reserved for APIs that are known-
   broken and have no salvageable contract (e.g. the Lewis Fourier
@@ -180,7 +180,7 @@ Standard cadence:
   `0.x.y` numbering that means the API stays callable across at least
   two `0.x` cycles after the warning lands.
 * **Major-version bump (`1.0`, `2.0` …)**: bulk-removes anything still
-  marked deprecated. Bindings (`finstack-py`, `finstack-wasm`) are
+  marked deprecated. Bindings (`finstack-quant-py`, `finstack-quant-wasm`) are
   rebuilt against the new surface in the same release.
 
 Exceptions (smaller window) require a brief note in the relevant
@@ -201,17 +201,17 @@ the `u32` pattern used by result types (see `docs/SERDE_STABILITY.md`). The
 canonical version is:
 
 ```
-finstack.credit_factor_model/1
+finstack_quant.credit_factor_model/1
 ```
 
 It is stored as `CreditFactorModel::SCHEMA_VERSION` in
-`finstack_factor_model::credit::hierarchy`. Rules:
+`finstack_quant_factor_model::credit::hierarchy`. Rules:
 
 * Consumers **must** check `schema_version == CreditFactorModel::SCHEMA_VERSION`
   before trusting any other field; `CreditFactorModel::validate()` enforces
   this automatically.
 * The JSON schema file (`schemas/factor_model/1/credit_factor_model.schema.json`)
-  uses `"const": "finstack.credit_factor_model/1"` to enforce the version at
+  uses `"const": "finstack_quant.credit_factor_model/1"` to enforce the version at
   schema-validation time.
 * **Additive-only additions** (new `#[serde(default)]` fields, new optional
   keys in `CalibrationDiagnostics`) do NOT require a version bump. The `v1`
@@ -219,7 +219,7 @@ It is stored as `CreditFactorModel::SCHEMA_VERSION` in
   that older readers can deserialize newer artifacts safely.
 * **Breaking changes** (field removal, type change, semantic change to
   required fields) require a new version string (e.g.
-  `"finstack.credit_factor_model/2"`) and a corresponding schema file under
+  `"finstack_quant.credit_factor_model/2"`) and a corresponding schema file under
   `schemas/factor_model/2/`.
 
 ## 9. References

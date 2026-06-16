@@ -1,18 +1,18 @@
-# Finstack Workspace Architecture Map
+# Finstack Quant Workspace Architecture Map
 
 Use this reference before broad Rust architecture reviews.
 
 ## Crate Roles
 
-- `finstack/core`: foundational dates, market data, math, money, identifiers, and shared domain primitives.
-- `finstack/valuations`: pricing, instruments, sensitivities, attribution, and valuation integration API.
-- `finstack/scenarios`: scenario specs, engines, market-data transformations, and stress workflows.
-- `finstack/portfolio`: portfolio aggregation, performance, and attribution-facing workflows.
-- `finstack/margin`: SIMM, margin calculators, XVA-related types, and collateral terms.
-- `finstack/monte_carlo`: stochastic engines and payoff evaluation.
-- `finstack/statements*`: financial statement modeling and analytics.
-- `finstack-py`: PyO3 bindings and Python package/stub surface.
-- `finstack-wasm`: wasm-bindgen bindings and JS facade.
+- `finstack-quant/core`: foundational dates, market data, math, money, identifiers, and shared domain primitives.
+- `finstack-quant/valuations`: pricing, instruments, sensitivities, attribution, and valuation integration API.
+- `finstack-quant/scenarios`: scenario specs, engines, market-data transformations, and stress workflows.
+- `finstack-quant/portfolio`: portfolio aggregation, performance, and attribution-facing workflows.
+- `finstack-quant/margin`: SIMM, margin calculators, XVA-related types, and collateral terms.
+- `finstack-quant/monte_carlo`: stochastic engines and payoff evaluation.
+- `finstack-quant/statements*`: financial statement modeling and analytics.
+- `finstack-quant-py`: PyO3 bindings and Python package/stub surface.
+- `finstack-quant-wasm`: wasm-bindgen bindings and JS facade.
 
 ## Dependency Direction
 
@@ -20,7 +20,7 @@ Domain logic should flow from lower-level crates toward higher-level workflows. 
 
 Watch for:
 
-- valuation logic leaking into `finstack-py` or `finstack-wasm`,
+- valuation logic leaking into `finstack-quant-py` or `finstack-quant-wasm`,
 - scenario/portfolio crates reimplementing valuation math instead of calling `valuations`,
 - public APIs exposing internal builder stages or registry plumbing,
 - serde or metric-key names changing without compatibility review,

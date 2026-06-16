@@ -1,0 +1,76 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "beta0_normal_smile",
+    "domain": "volatility.sabr",
+    "description": "Normal SABR (beta=0) smile across five strikes ITM/ATM/OTM. Beta=0 is a separate code branch (z = nu/alpha * (F-K), f_mid_beta=1, no log-moneyness correction) and must be guarded independently.",
+    "valuation_date": "2026-05-16",
+    "source": "formula",
+    "source_detail": "Hagan et al. (2002) 'Managing Smile Risk', Wilmott Magazine, eq. 2.17b beta->0 limit and eq. 2.18c ATM. For beta=0: z = (nu/alpha)*(F-K); chi(z) = ln((sqrt(1-2*rho*z+z^2)+z-rho)/(1-rho)); factor1 = alpha (f_mid_beta=1, correction_term=1 since (1-beta)^2 terms vanish at beta=0); factor2 = z/chi(z); time_correction = (2-3*rho^2)*nu^2/24 (alpha and rho terms vanish at beta=0); vol = factor1*factor2*(1+T*time_correction). Derived independently in Python; NOT copied from SABRModel output. Parameters: alpha=0.006, beta=0.0, nu=0.30, rho=0.10, F=0.03, T=1.0. Manual derivation for K=0.02: z=(0.30/0.006)*(0.03-0.02)=0.5, chi(z)=0.492241014428602, factor1=0.006, factor2=1.015762574316171, time_correction=(2-3*0.01)/24*0.09=0.007387500, factor3=1.007387500, vol=0.006139599122004.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-16",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-16",
+    "review_interval_months": 6,
+    "regen_command": "",
+    "screenshots": []
+  },
+  "kind": "sabr_smile",
+  "alpha": 0.006,
+  "beta": 0.0,
+  "nu": 0.3,
+  "rho": 0.1,
+  "forward": 0.03,
+  "time_to_expiry": 1.0,
+  "strikes": [
+    {
+      "key": "vol_k0010",
+      "strike": 0.01
+    },
+    {
+      "key": "vol_k0020",
+      "strike": 0.02
+    },
+    {
+      "key": "vol_k0030",
+      "strike": 0.03
+    },
+    {
+      "key": "vol_k0040",
+      "strike": 0.04
+    },
+    {
+      "key": "vol_k0050",
+      "strike": 0.05
+    }
+  ],
+  "expected": {
+    "vol_k0010": 0.006623419818832,
+    "vol_k0020": 0.006139599122004,
+    "vol_k0030": 0.006044325,
+    "vol_k0040": 0.006415394541325,
+    "vol_k0050": 0.00707986807746
+  },
+  "tolerances": {
+    "vol_k0010": {
+      "abs": 1e-12,
+      "tolerance_reason": "Normal SABR closed-form; purely algebraic computation"
+    },
+    "vol_k0020": {
+      "abs": 1e-12,
+      "tolerance_reason": "Normal SABR closed-form; manual derivation verified to 15 digits"
+    },
+    "vol_k0030": {
+      "abs": 1e-12,
+      "tolerance_reason": "ATM case uses eq. 2.18c directly; alpha*(1+(2-3*rho^2)*nu^2/24*T)"
+    },
+    "vol_k0040": {
+      "abs": 1e-12,
+      "tolerance_reason": "Normal SABR closed-form; purely algebraic computation"
+    },
+    "vol_k0050": {
+      "abs": 1e-12,
+      "tolerance_reason": "Normal SABR closed-form; purely algebraic computation"
+    }
+  }
+}

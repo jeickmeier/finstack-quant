@@ -167,4 +167,4 @@ Explicitly flag these anti-patterns:
 - For detailed patterns and Rust-specific guidance, see [reference.md](reference.md).
 - For code examples of common issues, see [examples.md](examples.md).
 - For benchmark regression workflow, see [benchmark-regression.md](benchmark-regression.md).
-- For finstack hot-path examples, see [examples/finstack-hot-paths.md](examples/finstack-hot-paths.md).
+- For finstack-quant hot-path examples, see [examples/finstack-hot-paths.md](examples/finstack-hot-paths.md).

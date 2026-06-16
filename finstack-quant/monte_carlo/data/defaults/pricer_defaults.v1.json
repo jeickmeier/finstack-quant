@@ -1,0 +1,106 @@
+{
+  "schema": "finstack_quant.monte_carlo.pricer_defaults.v1",
+  "version": 1,
+  "rust": {
+    "engine": {
+      "use_parallel": true,
+      "chunk_size": 1000,
+      "antithetic": false
+    },
+    "engine_builder": {
+      "num_paths": 100000,
+      "use_parallel": true,
+      "chunk_size": 1000,
+      "antithetic": false
+    },
+    "european_pricer": {
+      "num_paths": 100000,
+      "seed": 42,
+      "use_parallel": true
+    },
+    "path_dependent_pricer": {
+      "num_paths": 100000,
+      "seed": 42,
+      "use_parallel": true,
+      "chunk_size": 1000,
+      "steps_per_year": 252.0,
+      "min_steps": 8,
+      "use_sobol": false,
+      "antithetic": false,
+      "use_brownian_bridge": false
+    },
+    "lsmc": {
+      "seed": 42,
+      "use_parallel": false
+    },
+    "rate_exotics": {
+      "num_paths": 20000,
+      "seed": 42,
+      "antithetic": true,
+      "min_steps_between_events": 4,
+      "basis_degree": 2
+    },
+    "swaption_lsmc": {
+      "num_paths": 50000,
+      "seed": 42,
+      "basis_degree": 3,
+      "antithetic": true
+    },
+    "lmm_bermudan": {
+      "num_paths": 50000,
+      "seed": 42,
+      "basis_degree": 3,
+      "antithetic": true,
+      "min_steps_between_exercises": 4
+    },
+    "cheyette_rough": {
+      "num_paths": 50000,
+      "num_steps": 100,
+      "basis_degree": 3
+    },
+    "merton_pik_bond": {
+      "num_paths": 10000,
+      "seed": 42,
+      "antithetic": true,
+      "time_steps_per_year": 12
+    }
+  },
+  "python_bindings": {
+    "default_currency": "USD",
+    "engine": {
+      "seed": 42,
+      "use_parallel": false,
+      "antithetic": false
+    },
+    "european_pricer": {
+      "num_paths": 100000,
+      "seed": 42,
+      "use_parallel": false,
+      "num_steps": 252
+    },
+    "path_dependent_pricer": {
+      "num_paths": 100000,
+      "seed": 42,
+      "use_parallel": false,
+      "num_steps": 252
+    },
+    "lsmc": {
+      "num_paths": 100000,
+      "seed": 42,
+      "use_parallel": false,
+      "basis": "laguerre",
+      "basis_degree": 3,
+      "num_steps": 50
+    },
+    "greeks": {
+      "num_paths": 10000,
+      "seed": 42,
+      "num_steps": 50,
+      "bump_size": 0.01,
+      "option_type": "call",
+      "use_parallel": false,
+      "chunk_size": 1000,
+      "antithetic": false
+    }
+  }
+}

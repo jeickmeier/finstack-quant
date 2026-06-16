@@ -1,0 +1,17 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "fee_spec": {
+    "PeriodicBps": {
+      "base": "Drawn",
+      "bps": "50.0",
+      "freq": {
+        "count": 3,
+        "unit": "months"
+      },
+      "dc": "Act360",
+      "bdc": "modified_following",
+      "calendar_id": "USD",
+      "stub": "None"
+    }
+  }
+}

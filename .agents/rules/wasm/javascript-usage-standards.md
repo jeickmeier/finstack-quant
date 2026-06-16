@@ -4,18 +4,18 @@ description:
 globs: *.tsx,*.ts,*.js
 ---
 
-# JavaScript/TypeScript Usage Standards for finstack-wasm
+# JavaScript/TypeScript Usage Standards for finstack-quant-wasm
 
 ## Overview
 
-Standards for JavaScript and TypeScript code that uses the finstack-wasm module.
+Standards for JavaScript and TypeScript code that uses the finstack-quant-wasm module.
 
 ## Setup and Initialization
 
 ### Browser Setup
 
 ```javascript
-import init, { core, analytics, valuations, margin } from "finstack-wasm";
+import init, { core, analytics, valuations, margin } from "finstack-quant-wasm";
 
 async function initialize() {
   await init();
@@ -42,7 +42,7 @@ import init, {
   statements,
   statements_analytics,
   valuations,
-} from "finstack-wasm";
+} from "finstack-quant-wasm";
 
 async function example(): Promise<void> {
   await init();
@@ -69,7 +69,7 @@ import init, {
   scenarios,
   correlation,
   monte_carlo,
-} from "finstack-wasm";
+} from "finstack-quant-wasm";
 ```
 
 ### Usage via Namespaces
@@ -103,10 +103,10 @@ const grid = new monte_carlo.TimeGrid([0.0, 0.5, 1.0]);
 
 ```javascript
 // WRONG: importing from internal raw output
-import { Currency, Money } from "./pkg/finstack_wasm.js";
+import { Currency, Money } from "./pkg/finstack_quant_wasm.js";
 
 // CORRECT: import from the facade
-import init, { core } from "finstack-wasm";
+import init, { core } from "finstack-quant-wasm";
 const usd = new core.Currency("USD");
 ```
 
@@ -160,7 +160,7 @@ try {
 ```javascript
 import test from "node:test";
 import assert from "node:assert/strict";
-import init, { core, analytics } from "finstack-wasm";
+import init, { core, analytics } from "finstack-quant-wasm";
 
 await init();
 

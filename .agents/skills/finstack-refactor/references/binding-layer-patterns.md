@@ -1,6 +1,6 @@
 # Binding-layer patterns
 
-Use this reference when refactoring `finstack-py` code or anything that changes Python-facing API shape.
+Use this reference when refactoring `finstack-quant-py` code or anything that changes Python-facing API shape.
 
 ## Thin-binding rule
 
@@ -12,7 +12,7 @@ The binding crate should not accumulate financial logic or policy decisions. The
 - map core errors into Python exceptions
 - register Python modules, docs, and exports
 
-The module docs in `finstack-py/src/lib.rs` already state this boundary explicitly.
+The module docs in `finstack-quant-py/src/lib.rs` already state this boundary explicitly.
 
 ## Wrapper pattern
 
@@ -46,7 +46,7 @@ Keep this pattern stable when splitting modules internally. Internal reorganizat
 
 ## Error mapping pattern
 
-Prefer the centralized conversion functions in `finstack-py/src/errors.rs`, especially `core_to_py`, rather than ad hoc mapping at each call site.
+Prefer the centralized conversion functions in `finstack-quant-py/src/errors.rs`, especially `core_to_py`, rather than ad hoc mapping at each call site.
 
 Good refactor:
 
@@ -66,16 +66,16 @@ The central mapping preserves the Python exception hierarchy and keeps behavior 
 
 Two export surfaces matter:
 
-- the PyO3 module tree in `finstack-py/src/lib.rs`
-- Python package re-export files such as `finstack-py/finstack/valuations/__init__.py`
+- the PyO3 module tree in `finstack-quant-py/src/lib.rs`
+- Python package re-export files such as `finstack-quant-py/finstack_quant/valuations/__init__.py`
 
 A refactor may be internal in Rust but still require export updates if names or module layout move.
 
 ## Binding-specific examples from this repo
 
-- `finstack-py/src/lib.rs` registers core and package-level exports through explicit `register()` calls and `__all__` lists.
-- `finstack-py/src/bindings/core/currency.rs` shows the thin wrapper pattern, local extraction helper, and module registration flow.
-- `finstack-py/finstack/valuations/__init__.py` shows the Python-side re-export surface that can drift if a Rust module layout changes.
+- `finstack-quant-py/src/lib.rs` registers core and package-level exports through explicit `register()` calls and `__all__` lists.
+- `finstack-quant-py/src/bindings/core/currency.rs` shows the thin wrapper pattern, local extraction helper, and module registration flow.
+- `finstack-quant-py/finstack_quant/valuations/__init__.py` shows the Python-side re-export surface that can drift if a Rust module layout changes.
 
 ## Common mistakes during refactor
 

@@ -41,7 +41,7 @@ cargo build --workspace 2>&1 | grep "never used\|never read"
 **Python** - Check for unused imports and variables:
 
 ```bash
-uv run ruff check finstack-py --select F401,F841 --no-fix
+uv run ruff check finstack-quant-py --select F401,F841 --no-fix
 ```
 
 **TypeScript/UI** - Unused exports and variables:
@@ -75,7 +75,7 @@ rg -n "TODO|FIXME|HACK|XXX" --type rust --type python --type ts -g '!target/' -g
 cargo install cargo-machete 2>/dev/null; cargo machete
 
 # Python — check for unused requirements
-uv run ruff check finstack-py --select F401
+uv run ruff check finstack-quant-py --select F401
 
 # UI
 cd finstack-ui && npx depcheck
@@ -138,10 +138,10 @@ Quick automated check:
 
 ```bash
 # Rust — build docs and check for missing doc warnings
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude finstack-py --exclude finstack-wasm --no-deps 2>&1 | head -50
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps 2>&1 | head -50
 
 # Python — check stub completeness
-uv run pyright --verifytypes finstack --ignoreexternal
+uv run pyright --verifytypes finstack_quant --ignoreexternal
 ```
 
 ### 3b. README and high-level docs
@@ -161,9 +161,9 @@ All examples must compile and produce correct output:
 
 ```bash
 # Python notebook examples
-uv run python finstack-py/examples/notebooks/run_all_notebooks.py
+uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py
 # Check for examples referencing deprecated/removed APIs
-rg -l 'deprecated_function_name' finstack/examples/ finstack-py/examples/
+rg -l 'deprecated_function_name' finstack-quant/examples/ finstack-quant-py/examples/
 ```
 
 ### 3d. Migration guides
@@ -183,7 +183,7 @@ Determines the correct version bump (patch / minor / major).
 ```bash
 # Compare current branch against the last release tag
 cargo install cargo-semver-checks --locked 2>/dev/null
-cargo semver-checks check-release -p finstack-core --baseline-rev <last-release-tag>
+cargo semver-checks check-release -p finstack-quant-core --baseline-rev <last-release-tag>
 ```
 
 If semver-checks reports breaking changes, the release must be a **major** bump. If new public API was added, at least **minor**. Otherwise **patch**.
@@ -203,14 +203,14 @@ Verify the crate builds under key feature combinations:
 
 ```bash
 # Default features only
-cargo build --workspace --exclude finstack-py --exclude finstack-wasm
+cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm
 
 # All features
-cargo build --workspace --exclude finstack-py --exclude finstack-wasm --all-features
+cargo build --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --all-features
 
 # Key individual feature flags
-cargo build -p finstack-valuations --features mc
-cargo build -p finstack-valuations --features test-utils
+cargo build -p finstack-quant-valuations --features mc
+cargo build -p finstack-quant-valuations --features test-utils
 ```
 
 ## Phase 5: Performance regression check
@@ -274,7 +274,7 @@ Confirm the crate compiles on the declared minimum supported Rust version:
 
 ```bash
 # rust-version = "1.90" declared in Cargo.toml
-rustup run 1.90.0 cargo check --workspace --exclude finstack-py --exclude finstack-wasm
+rustup run 1.90.0 cargo check --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm
 ```
 
 ### 6d. Publish dry-run
@@ -282,7 +282,7 @@ rustup run 1.90.0 cargo check --workspace --exclude finstack-py --exclude finsta
 Verify crate packaging is correct (metadata, included files, no missing deps):
 
 ```bash
-cargo publish -p finstack-core --dry-run
+cargo publish -p finstack-quant-core --dry-run
 ```
 
 ### 6e. Lock file hygiene
@@ -294,7 +294,7 @@ cargo publish -p finstack-core --dry-run
 ### 6f. Binary size check
 
 ```bash
-cargo bloat --release --crates -p finstack-py
+cargo bloat --release --crates -p finstack-quant-py
 ```
 
 Review for unexpected size regressions from the previous release.
@@ -415,4 +415,4 @@ After completing the audit, produce a release readiness report:
 - Dead code and simplification: see [finstack-simplify](../finstack-simplify/SKILL.md)
 - API documentation standards: see [finstack-documentation-maintainer](../finstack-documentation-maintainer/SKILL.md)
 - Naming and pattern consistency: see [finstack-consistency-reviewer](../finstack-consistency-reviewer/SKILL.md)
-- Release checklist: see [release-checklist-rfin.md](references/release-checklist-rfin.md)
+- Release checklist: see [release-checklist-finstack-quant.md](references/release-checklist-finstack-quant.md)

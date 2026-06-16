@@ -1,16 +1,11 @@
-# Development environment configuration for RFin project
+# Development environment configuration for the finstack-quant project
 # This file provides tool configuration and dependency management via uv
-
-[build-system]
-requires = ["maturin>=1.0,<2.0"]
-build-backend = "maturin"
-
 [project]
-name = "finstack"
+name = "finstack-quant-py"
 # Let maturin derive version from Cargo.toml
 dynamic = ["version"]
-description = "Python bindings for the Finstack financial computation library"
-readme = "finstack-py/README.md"
+description = "Python bindings for the Finstack Quant financial computation library"
+readme = "finstack-quant-py/README.md"
 requires-python = ">=3.12"
 license = "MIT OR Apache-2.0"
 classifiers = [
@@ -22,6 +17,11 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
 dependencies = [
     "matplotlib>=3.10.7",
     "numpy>=2.3.5",
@@ -32,16 +32,18 @@ dependencies = [
 
 [tool.maturin]
 # Path to the Cargo manifest of the bindings crate
-manifest-path = "finstack-py/Cargo.toml"
-# Build finstack-py with extension-module linkage when packaging Python wheels.
+manifest-path = "finstack-quant-py/Cargo.toml"
+# Install the native extension as a nested module under the Python import root.
+module-name = "finstack_quant.finstack_quant"
+# Build finstack-quant-py with extension-module linkage when packaging Python wheels.
 features = ["extension-module"]
 # Source directory that contains the Python package files (.pyi, py.typed)
-python-source = "finstack-py"
+python-source = "finstack-quant-py"
 include = [
-    { path = "finstack-py/finstack/__init__.py", format = ["wheel"] },
-    { path = "finstack-py/finstack/**/*.py", format = ["wheel"] },
-    { path = "finstack-py/finstack/**/*.pyi", format = ["wheel"] },
-    { path = "finstack-py/finstack/py.typed", format = ["wheel"] },
+    { path = "finstack-quant-py/finstack_quant/__init__.py", format = ["wheel"] },
+    { path = "finstack-quant-py/finstack_quant/**/*.py", format = ["wheel"] },
+    { path = "finstack-quant-py/finstack_quant/**/*.pyi", format = ["wheel"] },
+    { path = "finstack-quant-py/finstack_quant/py.typed", format = ["wheel"] },
 ]
 
 
@@ -50,8 +52,8 @@ include = [
 #######################
 
 [tool.coverage.run]
-source = ["finstack-py/finstack"]
-omit = ["finstack-py/tests/*"]
+source = ["finstack-quant-py/finstack_quant"]
+omit = ["finstack-quant-py/tests/*"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -65,7 +67,7 @@ exclude_lines = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["finstack-py/tests"]
+testpaths = ["finstack-quant-py/tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
 python_classes = ["Test*"]
@@ -124,7 +126,7 @@ exclude = [
     ".coverage",
     "dist/**",
     ".venv/**",
-    "finstack-py/examples/**",
+    "finstack-quant-py/examples/**",
     "**/*.ipynb",
 ]
 
@@ -189,16 +191,16 @@ ignore = [
 "**/*.pyi" = ["ALL"]
 "**/test_*.py" = ["S101"]
 "**/*_test.py" = ["S101"]
-"finstack-py/tests/**/*.py" = ["S101", "S110", "S102", "C901", "PLR0915", "D100", "D101", "D102", "D103", "RUF001"]
-"finstack-py/finstack/statements/__init__.py" = ["F821"]
-"finstack-py/benches/**/*.py" = ["PLR0915"]
-"finstack-py/benchmarks/**/*.py" = ["T201", "D100", "D101", "D102", "D103", "ANN", "S101"]
+"finstack-quant-py/tests/**/*.py" = ["S101", "S110", "S102", "C901", "PLR0915", "D100", "D101", "D102", "D103", "RUF001"]
+"finstack-quant-py/finstack_quant/statements/__init__.py" = ["F821"]
+"finstack-quant-py/benches/**/*.py" = ["PLR0915"]
+"finstack-quant-py/benchmarks/**/*.py" = ["T201", "D100", "D101", "D102", "D103", "ANN", "S101"]
 "scripts/**/*.py" = ["T201", "C901", "PLR0915", "PERF401", "ANN", "BLE001", "S112", "PTH", "G004", "TRY401"]
 # Golden-fixture generation tooling (committed for provenance/regeneration, not library code).
 # N813: `import QuantLib as ql` is the universal QuantLib idiom.
-"finstack/core/tests/golden/data/*.py" = ["T201", "ANN", "D103", "S101", "ERA001", "E402", "EXE001", "N813", "RUF046", "C408", "PLR0915", "C901"]
+"finstack-quant/core/tests/golden/data/*.py" = ["T201", "ANN", "D103", "S101", "ERA001", "E402", "EXE001", "N813", "RUF046", "C408", "PLR0915", "C901"]
 ".windsurf/skills/**/scripts/**/*.py" = ["T201"]
-"finstack-py/examples/**/*.py" = [
+"finstack-quant-py/examples/**/*.py" = [
     "D100", "D101", "D103", "D205",  # Missing docstrings - examples are self-documenting
     "ANN",  # Type annotations - examples prioritize readability
     "T201",  # print() is expected in examples
@@ -242,7 +244,7 @@ max-complexity = 15
 #  isort settings (for "I" rules)
 # ---------------------------------
 [tool.ruff.lint.isort]
-known-first-party = ["finstack-py"]   # add your own modules here
+known-first-party = ["finstack_quant"]   # add your own modules here
 combine-as-imports = true
 force-sort-within-sections = true
 
@@ -251,14 +253,14 @@ force-sort-within-sections = true
 #######################
 [tool.ty.environment]
 python-version = "3.12"
-root = ["./finstack-py"]
+root = ["./finstack-quant-py"]
 
 [tool.ty.src]
-include = ["finstack-py/finstack"]
+include = ["finstack-quant-py/finstack_quant"]
 exclude = [
     "examples",
-    "finstack-py/examples",
-    "finstack-py/tests",
+    "finstack-quant-py/examples",
+    "finstack-quant-py/tests",
     "scripts",
     "outputs",
     "concatenate_script.py",
@@ -272,18 +274,18 @@ allowed-unresolved-imports = [
     "asteval.**",
     "pydantic.**",
     "matplotlib.**",
-    "finstack.finstack",
-    "finstack.finstack.**",
+    "finstack_quant.finstack_quant",
+    "finstack_quant.finstack_quant.**",
 ]
 
 [tool.ty.rules]
 # Pyright also uses `type: ignore` comments; suppress noise from shared suppressions.
 unused-type-ignore-comment = "ignore"
 
-# __init__.py files bridge the native Rust extension (finstack.finstack)
+# __init__.py files bridge the native Rust extension (finstack_quant.finstack_quant)
 # whose submodule attributes ty cannot introspect statically.
 [[tool.ty.overrides]]
-include = ["finstack-py/finstack/__init__.py", "finstack-py/finstack/*/__init__.py"]
+include = ["finstack-quant-py/finstack_quant/__init__.py", "finstack-quant-py/finstack_quant/*/__init__.py"]
 [tool.ty.overrides.rules]
 unresolved-attribute = "ignore"
 
@@ -297,8 +299,8 @@ error-on-warning = true
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
-include = ["finstack-py/finstack"]
-extraPaths = ["finstack-py"]
+include = ["finstack-quant-py/finstack_quant"]
+extraPaths = ["finstack-quant-py"]
 reportMissingModuleSource = "none"
 
 #######################

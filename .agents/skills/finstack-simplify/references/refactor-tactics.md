@@ -1,6 +1,6 @@
 # Refactor tactics: the concrete moves
 
-Each tactic has: **when to use**, **when NOT to use**, and a **before/after** in finstack idiom.
+Each tactic has: **when to use**, **when NOT to use**, and a **before/after** in finstack-quant idiom.
 
 Apply tactics one at a time per slice. Don't chain multiple tactics unless the chain is the slice — e.g., "Inline the single-impl trait AND delete the resulting wrapper" is a reasonable coupled slice.
 
@@ -227,7 +227,7 @@ pub fn sharpe(returns: &[f64], rf: f64, annualization: f64) -> Option<f64> {
 ```rust
 #[pyfunction]
 fn sharpe(returns: Vec<f64>, rf: f64, annualization: f64) -> PyResult<f64> {
-    Ok(finstack_analytics::sharpe(&returns, rf, annualization).unwrap_or(0.0))
+    Ok(finstack_quant_analytics::sharpe(&returns, rf, annualization).unwrap_or(0.0))
 }
 ```
 
@@ -332,7 +332,7 @@ Use `Arc<DiscountCurve>` directly at call-sites, or add `#[derive(Clone)]` to `D
 3. Migrate call-sites.
 4. Delete the losers.
 
-**Watch out for:** `RoundingConfig` vs `RoundingContext` in finstack — they *look* like duplicates, but one is input and the other is output metadata. They are deliberately separate. See `financial-invariants.md`.
+**Watch out for:** `RoundingConfig` vs `RoundingContext` in finstack-quant — they *look* like duplicates, but one is input and the other is output metadata. They are deliberately separate. See `financial-invariants.md`.
 
 ---
 
@@ -390,7 +390,7 @@ Delete the bespoke helper. Use the standard.
 3. Delete the secondary paths.
 4. Update tests that called secondary paths to call the canonical one.
 
-**Finstack-specific:** `statements/src/registry/mod.rs` + `statements/src/registry/dynamic.rs` — typically one of these should be the authority and the other should either be deleted or become a pure consumer.
+**Finstack Quant-specific:** `statements/src/registry/mod.rs` + `statements/src/registry/dynamic.rs` — typically one of these should be the authority and the other should either be deleted or become a pure consumer.
 
 ---
 

@@ -21,7 +21,7 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_ALLOWLIST = Path("scripts/hardcoded_assumptions_allowlist.json")
-DEFAULT_ROOTS = ("finstack", "finstack-py/src", "finstack-wasm/src", "finstack-wasm/exports")
+DEFAULT_ROOTS = ("finstack-quant", "finstack-quant-py/src", "finstack-quant-wasm/src", "finstack-quant-wasm/exports")
 SOURCE_EXTENSIONS = {".json", ".py", ".pyi", ".rs", ".toml", ".ts", ".tsx", ".js"}
 EXCLUDED_DIRS = {
     ".git",
@@ -51,13 +51,13 @@ REGISTRY_CODE_PATH_PARTS = (
     "src/credit/registry.rs",
     "src/rating_scales.rs",
     "src/contract_specs.rs",
-    "finstack/analytics/src/registry.rs",
-    "finstack/valuations/src/calibration/defaults.rs",
-    "finstack/valuations/src/market/conventions/loaders/",
+    "finstack-quant/analytics/src/registry.rs",
+    "finstack-quant/valuations/src/calibration/defaults.rs",
+    "finstack-quant/valuations/src/market/conventions/loaders/",
     "src/analysis/ecl/policy.rs",
-    "finstack/monte_carlo/src/registry.rs",
-    "finstack/margin/src/registry/",
-    "finstack/margin/src/regulatory/frtb/params/registry.rs",
+    "finstack-quant/monte_carlo/src/registry.rs",
+    "finstack-quant/margin/src/registry/",
+    "finstack-quant/margin/src/regulatory/frtb/params/registry.rs",
     "structured_credit/assumptions.rs",
 )
 
@@ -495,7 +495,7 @@ def render_markdown(findings: list[Finding], include_allowed: bool) -> str:
 def render_json(findings: list[Finding]) -> str:
     """Render a JSON report."""
     payload = {
-        "schema_version": "finstack.hardcoded_assumptions_audit/1",
+        "schema_version": "finstack_quant.hardcoded_assumptions_audit/1",
         "counts": status_counts(findings),
         "findings": [
             {

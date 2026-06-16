@@ -1,0 +1,50 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "credit_default_swap",
+    "spec": {
+      "id": "CDS-CORP-5Y",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "convention": "IsdaNa",
+      "premium": {
+        "start": "2024-03-20",
+        "end": "2029-03-20",
+        "frequency": {"count": 3, "unit": "months"},
+        "stub": "ShortFront",
+        "bdc": "following",
+        "calendar_id": null,
+        "day_count": "Act360",
+        "spread_bp": 100.0,
+        "discount_curve_id": "USD-OIS"
+      },
+      "protection": {
+        "credit_curve_id": "CORP-HAZARD",
+        "recovery_rate": 0.4,
+        "settlement_delay": 3
+      },
+      "pricing_overrides": {
+        "quoted_clean_price": null,
+        "rho_bump_decimal": null,
+        "vega_bump_decimal": null,
+        "implied_volatility": null,
+        "cds_quote_bp": null,
+        "upfront_payment": null,
+        "ytm_bump_decimal": null,
+        "theta_period": null,
+        "mc_seed_scenario": null,
+        "adaptive_bumps": false,
+        "spot_bump_pct": null,
+        "vol_bump_pct": null,
+        "rate_bump_bp": null
+      },
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

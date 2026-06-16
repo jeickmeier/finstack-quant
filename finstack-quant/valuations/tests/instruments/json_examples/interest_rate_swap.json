@@ -1,0 +1,45 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "interest_rate_swap",
+    "spec": {
+      "id": "IRS-5Y-USD",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "fixed": {
+        "discount_curve_id": "USD-OIS",
+        "rate": 0.03,
+        "frequency": {"count": 6, "unit": "months"},
+        "day_count": "Thirty360",
+        "bdc": "modified_following",
+        "calendar_id": null,
+        "stub": "None",
+        "start": "2024-01-01",
+        "end": "2029-01-01",
+        "par_method": null,
+        "compounding_simple": true
+      },
+      "float": {
+        "discount_curve_id": "USD-OIS",
+        "forward_curve_id": "USD-SOFR-3M",
+        "spread_bp": 0.0,
+        "frequency": {"count": 3, "unit": "months"},
+        "day_count": "Act360",
+        "bdc": "modified_following",
+        "calendar_id": null,
+        "stub": "None",
+        "reset_lag_days": 2,
+        "start": "2024-01-01",
+        "end": "2029-01-01",
+        "compounding": "Simple"
+      },
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

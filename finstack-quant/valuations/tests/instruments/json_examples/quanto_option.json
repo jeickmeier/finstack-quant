@@ -1,0 +1,50 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "quanto_option",
+    "spec": {
+      "id": "QUANTO-NKY-USD-CALL",
+      "underlying_ticker": "NKY",
+      "equity_strike": {
+        "amount": "35000",
+        "currency": "JPY"
+      },
+      "option_type": "call",
+      "expiry": "2024-12-20",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "quote_currency": "USD",
+      "base_currency": "JPY",
+      "correlation": -0.2,
+      "day_count": "Act365F",
+      "domestic_discount_curve_id": "USD-OIS",
+      "foreign_discount_curve_id": "JPY-OIS",
+      "spot_id": "NKY-SPOT",
+      "vol_surface_id": "NKY-VOL",
+      "div_yield_id": "NKY-DIV",
+      "fx_rate_id": "JPYUSD-SPOT",
+      "fx_vol_id": "JPYUSD-VOL",
+      "pricing_overrides": {
+        "quoted_clean_price": null,
+        "rho_bump_decimal": null,
+        "vega_bump_decimal": null,
+        "implied_volatility": null,
+        "cds_quote_bp": null,
+        "upfront_payment": null,
+        "ytm_bump_decimal": null,
+        "theta_period": null,
+        "mc_seed_scenario": null,
+        "adaptive_bumps": false,
+        "spot_bump_pct": null,
+        "vol_bump_pct": null,
+        "rate_bump_bp": null
+      },
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

@@ -1,0 +1,44 @@
+[package]
+name = "finstack-quant-portfolio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Portfolio aggregation for Finstack Quant: positions, books, and deterministic base-currency rollups with explicit FX policy"
+
+[dependencies]
+finstack-quant-core = { path = "../core" }
+finstack-quant-attribution = { path = "../attribution" }
+finstack-quant-cashflows = { path = "../cashflows" }
+finstack-quant-margin = { path = "../margin" }
+finstack-quant-valuations = { path = "../valuations" }
+finstack-quant-factor-model = { path = "../factor-model" }
+finstack-quant-scenarios = { path = "../scenarios" }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+indexmap = { workspace = true, features = ["serde"] }
+tracing = "0.1"
+time = { workspace = true, features = ["macros", "serde", "parsing", "formatting"] }
+rayon = "1.11"
+good_lp = { version = "1.15", default-features = false, features = ["microlp"] }
+
+[dev-dependencies]
+criterion = { workspace = true }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+finstack-quant-test-utils = { path = "../test-utils" }
+smallvec = { version = "1.15", default-features = false }
+
+[[bench]]
+name = "portfolio_valuation"
+harness = false
+
+[[bench]]
+name = "parallel_thresholds"
+harness = false
+
+[lints]
+workspace = true

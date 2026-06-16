@@ -4,9 +4,9 @@ description: When python code standards are needed
 globs:
 ---
 
-# Finstack Python Bindings — Code Standards
+# Finstack Quant Python Bindings — Code Standards
 
-Standards for the `finstack-py` Python bindings (PyO3-based).
+Standards for the `finstack-quant-py` Python bindings (PyO3-based).
 
 ## Goals
 
@@ -21,7 +21,7 @@ Rust is the single source of truth for all API topology and naming:
 
 - The binding module tree under `src/bindings/` mirrors the Rust umbrella crate structure exactly.
 - Type and function names in Python match their Rust names exactly (e.g. Rust `sharpe` stays `sharpe`, not `sharpe_ratio`; Rust `Date` stays `Date`, not a host-specific alias).
-- No convenience re‑exports at `finstack.*` unless the Rust umbrella root exports them.
+- No convenience re‑exports at `finstack_quant.*` unless the Rust umbrella root exports them.
 - No legacy aliases or compatibility paths.
 
 See `docs/superpowers/specs/2026-04-10-rust-canonical-api-alignment-design.md` for the full spec.
@@ -30,18 +30,18 @@ See `docs/superpowers/specs/2026-04-10-rust-canonical-api-alignment-design.md` f
 
 ### Source Tree
 
-All binding Rust code lives under `finstack-py/src/bindings/`:
+All binding Rust code lives under `finstack-quant-py/src/bindings/`:
 
 ```
-finstack-py/src/
+finstack-quant-py/src/
   lib.rs            # thin entrypoint: mod bindings; delegates to bindings::register_root
   bindings/
     mod.rs          # register_root() — registers all crate domains
-    core/           # finstack::core bindings
-    analytics/      # finstack::analytics bindings
-    margin/         # finstack::margin bindings
-    valuations/     # finstack::valuations bindings
-    statements/     # finstack::statements bindings
+    core/           # finstack_quant::core bindings
+    analytics/      # finstack_quant::analytics bindings
+    margin/         # finstack_quant::margin bindings
+    valuations/     # finstack_quant::valuations bindings
+    statements/     # finstack_quant::statements bindings
     statements_analytics/
     portfolio/
     scenarios/
@@ -78,7 +78,7 @@ Rules:
 
 ### Python Package Root
 
-`finstack-py/finstack/__init__.py` exposes only the 10 umbrella domains:
+`finstack-quant-py/finstack_quant/__init__.py` exposes only the 10 umbrella domains:
 
 ```python
 __all__ = (
@@ -87,15 +87,15 @@ __all__ = (
 )
 ```
 
-No leaf types at `finstack.*`.
+No leaf types at `finstack_quant.*`.
 
 ## Type Wrapping Pattern
 
 ```rust
-#[pyclass(module = "finstack.core.currency", name = "Currency", frozen)]
+#[pyclass(module = "finstack_quant.core.currency", name = "Currency", frozen)]
 #[derive(Clone)]
 pub struct PyCurrency {
-    pub(crate) inner: finstack_core::currency::Currency,
+    pub(crate) inner: finstack_quant_core::currency::Currency,
 }
 
 #[pymethods]
@@ -143,9 +143,9 @@ Convert core errors via `errors.rs`:
 
 ## Tests and Stubs
 
-- Structural parity tests under `finstack-py/tests/parity/` validate namespace topology against `finstack-py/parity_contract.toml`; behavioral parity cases live alongside runtime tests such as `finstack-py/tests/test_core_parity.py`.
+- Structural parity tests under `finstack-quant-py/tests/parity/` validate namespace topology against `finstack-quant-py/parity_contract.toml`; behavioral parity cases live alongside runtime tests such as `finstack-quant-py/tests/test_core_parity.py`.
 - Build locally: `uv run maturin develop --release`.
-- `.pyi` stubs in `finstack-py/finstack/` are derived from the contract and binding code.
+- `.pyi` stubs in `finstack-quant-py/finstack_quant/` are derived from the contract and binding code.
 
 ## Review Checklist
 

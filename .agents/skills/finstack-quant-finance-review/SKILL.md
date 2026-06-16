@@ -15,7 +15,7 @@ Review code like a senior quantitative developer responsible for getting prices,
 ## Audit Discipline
 
 - Inspect the available code before giving findings. If repository files are present, do not answer with only a generic audit framework.
-- For `rfin`, start broad with `cargo metadata --no-deps --format-version 1`, then trace the affected crates, bindings, parity contract, tests, and examples.
+- For `finstack-quant`, start broad with `cargo metadata --no-deps --format-version 1`, then trace the affected crates, bindings, parity contract, tests, and examples.
 - Ground every finding in a concrete file and line when code is available. If code is unavailable, state that limitation and provide only a search plan/checklist.
 - Separate current-production benchmark standards from legacy workflows. Treat LIBOR as legacy-only unless the code explicitly models fallback or historical contracts.
 - Prefer targeted verification tied to the defect over slow whole-workspace runs unless the change crosses crate or binding boundaries.

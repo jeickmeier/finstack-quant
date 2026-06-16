@@ -1,0 +1,35 @@
+{
+  "schema": "finstack_quant.instruments.fx.conventions.registry.v1",
+  "namespace": "instruments.fx.market_conventions",
+  "version": 1,
+  "entries": [
+    {
+      "ids": [
+        "EUR/USD",
+        "EURUSD"
+      ],
+      "record": {
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "spot_lag_days": 2,
+        "business_day_convention": "modified_following",
+        "base_calendar_id": "target2",
+        "quote_calendar_id": "usny"
+      }
+    },
+    {
+      "ids": [
+        "USD/CAD",
+        "USDCAD"
+      ],
+      "record": {
+        "base_currency": "USD",
+        "quote_currency": "CAD",
+        "spot_lag_days": 1,
+        "business_day_convention": "modified_following",
+        "base_calendar_id": "usny",
+        "quote_calendar_id": "cato"
+      }
+    }
+  ]
+}

@@ -68,7 +68,7 @@ When in doubt, keep the old behavior and flag the invariant in the audit. **Neve
 
 **What to do:**
 - If your refactor touches a struct or enum annotated with `#[derive(Serialize, Deserialize)]` and that type is part of a public API boundary (input or output of a scenario DSL, a statement model, a pricing request), **stop** and flag it. Serde changes go in their own slice with explicit migration notes.
-- If in doubt, grep for the type name in `**/*.json`, `**/*.toml`, and `finstack-py/tests/` — if it appears in test fixtures, it's a public contract.
+- If in doubt, grep for the type name in `**/*.json`, `**/*.toml`, and `finstack-quant-py/tests/` — if it appears in test fixtures, it's a public contract.
 
 ---
 
@@ -108,7 +108,7 @@ When in doubt, keep the old behavior and flag the invariant in the audit. **Neve
 - Collapsing two calendar implementations where one had a subtle policy difference.
 
 **What to do:**
-- Any refactor in `finstack/core/src/time/` or anywhere touching `DayCount`, `BusinessDayConvention`, `Calendar`, `Holiday` must be flagged "day-count-sensitive." Read the existing tests carefully — they exist for a reason.
+- Any refactor in `finstack-quant/core/src/time/` or anywhere touching `DayCount`, `BusinessDayConvention`, `Calendar`, `Holiday` must be flagged "day-count-sensitive." Read the existing tests carefully — they exist for a reason.
 
 ---
 
@@ -122,13 +122,13 @@ When in doubt, keep the old behavior and flag the invariant in the audit. **Neve
 - Adding a Python-only "convenience" wrapper (logic drift).
 
 **What to do:**
-- Every slice that touches a public Rust symbol re-runs `uv run pytest finstack-py/tests/parity`. If it fails, the slice is not done.
+- Every slice that touches a public Rust symbol re-runs `uv run pytest finstack-quant-py/tests/parity`. If it fails, the slice is not done.
 
 ---
 
 ## 9. Model evaluation precedence (Value > Forecast > Formula)
 
-**Invariant:** In `finstack/statements`, period-level evaluation follows a deterministic precedence: explicit Values beat Forecasts beat Formulas. This is not an implementation detail; it's a contract documented in the project description.
+**Invariant:** In `finstack-quant/statements`, period-level evaluation follows a deterministic precedence: explicit Values beat Forecasts beat Formulas. This is not an implementation detail; it's a contract documented in the project description.
 
 **How this is broken by refactoring:**
 - Reordering the phases of an evaluator "to be more consistent."

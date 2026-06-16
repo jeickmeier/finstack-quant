@@ -1,0 +1,665 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "cdx_ig_46_payer_atm_jun26",
+    "domain": "credit.cds_option",
+    "description": "Bloomberg CDSO CDX.NA.IG.46 100MM USD payer option struck at the ATM forward spread.",
+    "valuation_date": "2026-05-07",
+    "source": "bloomberg-screen",
+    "source_detail": "Bloomberg CDSO/CDSW/CDSD CDX.NA.IG.46 V1, 100MM USD notional, S531 USD ISDA Swap Curve - Mid, CBBT Mid CDX curve, valuation date 2026-05-07, expiry 2026-06-17, ATM payer struck at 55.2848bp, Spread Vol 36.03% [dv01 re-blessed 2026-05-17: audit fix W-18 reconciled the CDS-option IR DV01 to finstack-quant's internal central-difference convention (consistent with the CDS DV01) for portfolio aggregation; dv01 is now an internal signed slope = -(Bloomberg CDSO screen DV01)/2, no longer a like-for-like Bloomberg-screen value.]",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-07",
+    "last_reviewed_by": "claude",
+    "last_reviewed_on": "2026-05-17",
+    "review_interval_months": 6,
+    "regen_command": "manual Bloomberg CDSO/CDSW/CDSD screen transcription; see provenance.screenshots",
+    "screenshots": [
+      {
+        "path": "screenshots/cdx_ig_46_payer_atm_jun26__main.png",
+        "screen": "CDSO",
+        "captured_on": "2026-05-07",
+        "description": "Bloomberg CDSO Credit Default Swaption screen for CDX.NA.IG.46 V1 100MM USD ATM payer with strike/ATM forward 55.2848bp, spread vol 36.03%, market value 118781.76, IR DV01 228.21, Spread DV01 25352.02, Vega(1%) 3411.78, Theta -1499.93"
+      },
+      {
+        "path": "screenshots/cdx_ig_46_payer_atm_jun26__underlying_cds.png",
+        "screen": "CDSW",
+        "captured_on": "2026-05-07",
+        "description": "Bloomberg CDSW underlying CDX.NA.IG.46 terms: 100MM USD notional, 100bp coupon, 53.6264bp traded spread, maturity 2031-06-20, cash amount -2273847, Spread DV01 46963.21, IR DV01 537.99"
+      },
+      {
+        "path": "screenshots/cdx_ig_46_payer_atm_jun26__swap_curve.png",
+        "screen": "CDSD",
+        "captured_on": "2026-05-07",
+        "description": "Bloomberg CDSD forward CDS matrix for CDX.NA.IG.46 using S531 USD ISDA Swap Curve - Mid and CBBT Mid CDX curve, with 5Y spot spread 53.6264bp"
+      },
+      {
+        "path": "screenshots/cdx_ig_46_payer_atm_jun26__benchmark_curve_rates.png",
+        "screen": "SWCR",
+        "captured_on": "2026-05-07",
+        "description": "Bloomberg benchmark curve rates popup for S531 USD Custom Swap Curve - Mid dated 2026-05-07"
+      }
+    ]
+  },
+  "kind": "pricing",
+  "model": "bloomberg_cdso",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "cdx_ig_46_pricing_market",
+        "description": "Phase 2 migration: bootstraps the USD-S531 swap discount curve and the CDX.NA.IG.46 hazard curve from raw quotes. The SABR vol surface continues to ship as a snapshot in initial_market.surfaces (calibrating it from raw option quotes is deferred to a later sweep).",
+        "quote_sets": {
+          "s531_rates": [
+            "USD-S531-DEP-1M",
+            "USD-S531-DEP-2M",
+            "USD-S531-DEP-3M",
+            "USD-S531-DEP-6M",
+            "USD-S531-SWAP-1Y",
+            "USD-S531-SWAP-2Y",
+            "USD-S531-SWAP-3Y",
+            "USD-S531-SWAP-4Y",
+            "USD-S531-SWAP-5Y",
+            "USD-S531-SWAP-6Y",
+            "USD-S531-SWAP-7Y",
+            "USD-S531-SWAP-8Y",
+            "USD-S531-SWAP-9Y",
+            "USD-S531-SWAP-10Y",
+            "USD-S531-SWAP-12Y",
+            "USD-S531-SWAP-15Y",
+            "USD-S531-SWAP-20Y",
+            "USD-S531-SWAP-25Y",
+            "USD-S531-SWAP-30Y"
+          ],
+          "cdx_ig_46_cds": [
+            "CDX-IG-46-CBBT-6M",
+            "CDX-IG-46-CBBT-1Y",
+            "CDX-IG-46-CBBT-2Y",
+            "CDX-IG-46-CBBT-3Y",
+            "CDX-IG-46-CBBT-4Y",
+            "CDX-IG-46-CBBT-5Y",
+            "CDX-IG-46-CBBT-7Y",
+            "CDX-IG-46-CBBT-10Y"
+          ]
+        },
+        "steps": [
+          {
+            "id": "USD-S531-SWAP-20260507",
+            "quote_set": "s531_rates",
+            "kind": "discount",
+            "curve_id": "USD-S531-SWAP-20260507",
+            "currency": "USD",
+            "base_date": "2026-05-07",
+            "method": "Bootstrap",
+            "interpolation": "linear",
+            "extrapolation": "flat_forward",
+            "pricing_discount_id": null,
+            "pricing_forward_id": null,
+            "conventions": {
+              "curve_day_count": null
+            }
+          },
+          {
+            "id": "CDX-NA-IG-46-CBBT",
+            "quote_set": "cdx_ig_46_cds",
+            "kind": "hazard",
+            "curve_id": "CDX-NA-IG-46-CBBT",
+            "entity": "CDX.NA.IG.46",
+            "seniority": "senior",
+            "currency": "USD",
+            "base_date": "2026-05-07",
+            "discount_curve_id": "USD-S531-SWAP-20260507",
+            "recovery_rate": 0.4,
+            "notional": 1.0,
+            "method": "Bootstrap",
+            "interpolation": "log_linear",
+            "par_interp": "Linear",
+            "doc_clause": "isda_na"
+          }
+        ],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-DEP-1M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036363
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-DEP-2M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036438
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-DEP-3M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036488
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-S531-DEP-6M",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 6,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036618
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-1Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03724
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-2Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "years"
+            }
+          },
+          "rate": 0.037105
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-3Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03683
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-4Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 4,
+              "unit": "years"
+            }
+          },
+          "rate": 0.036885
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-5Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 5,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03717
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-6Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 6,
+              "unit": "years"
+            }
+          },
+          "rate": 0.037595
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-7Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 7,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03805
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-8Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 8,
+              "unit": "years"
+            }
+          },
+          "rate": 0.038495
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-9Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 9,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03894
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-10Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 10,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03938
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-12Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 12,
+              "unit": "years"
+            }
+          },
+          "rate": 0.04024
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-15Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 15,
+              "unit": "years"
+            }
+          },
+          "rate": 0.04131
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-20Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 20,
+              "unit": "years"
+            }
+          },
+          "rate": 0.0422
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-25Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 25,
+              "unit": "years"
+            }
+          },
+          "rate": 0.042265
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-S531-SWAP-30Y",
+          "index": "USD-SOFR-OIS",
+          "pillar": {
+            "tenor": {
+              "count": 30,
+              "unit": "years"
+            }
+          },
+          "rate": 0.04196
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-6M",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 6,
+              "unit": "months"
+            }
+          },
+          "spread_bp": 16.14,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-1Y",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 16.14,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-2Y",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 24.14,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-3Y",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 32.36,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-4Y",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 4,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 42.9932,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-5Y",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 5,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 53.6264,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-7Y",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 7,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 72.64,
+          "recovery_rate": 0.4
+        },
+        {
+          "kind": "cds_quote",
+          "type": "cds_par_spread",
+          "id": "CDX-IG-46-CBBT-10Y",
+          "entity": "CDX.NA.IG.46",
+          "convention": {
+            "currency": "USD",
+            "doc_clause": "isda_na"
+          },
+          "pillar": {
+            "tenor": {
+              "count": 10,
+              "unit": "years"
+            }
+          },
+          "spread_bp": 92.35,
+          "recovery_rate": 0.4
+        }
+      ],
+      "prior_market": [
+        {
+          "kind": "vol_surface",
+          "id": "CDX-NA-IG-46-CDSO-VOL",
+          "expiries": [
+            0.08333333333333333,
+            0.25,
+            0.5,
+            1.0
+          ],
+          "strikes": [
+            0.004,
+            0.00552848,
+            0.0075
+          ],
+          "secondary_axis": "strike",
+          "interpolation_mode": "vol",
+          "vols_row_major": [
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603,
+            0.3603
+          ]
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "type": "cds_option",
+    "spec": {
+      "id": "CDX-NA-IG-46-CDSO-PAYER-ATM-20260507",
+      "strike": "0.00552848",
+      "option_type": "call",
+      "expiry": "2026-06-17",
+      "cds_maturity": "2031-06-20",
+      "notional": {
+        "amount": "100000000",
+        "currency": "USD"
+      },
+      "recovery_rate": 0.4,
+      "discount_curve_id": "USD-S531-SWAP-20260507",
+      "credit_curve_id": "CDX-NA-IG-46-CBBT",
+      "vol_surface_id": "CDX-NA-IG-46-CDSO-VOL",
+      "underlying_convention": "isda_na",
+      "pricing_overrides": {
+        "implied_volatility": 0.3603
+      },
+      "cash_settlement_date": "2026-05-12",
+      "exercise_settlement_date": "2026-06-23",
+      "underlying_effective_date": "2026-03-20",
+      "underlying_is_index": true,
+      "index_factor": 1.0,
+      "realized_index_loss": null,
+      "underlying_cds_coupon": "0.01",
+      "exercise_style": "european",
+      "settlement": "cash",
+      "attributes": {
+        "tags": [
+          "golden",
+          "bloomberg",
+          "cdso",
+          "cdx",
+          "index-cds-option",
+          "payer",
+          "atm"
+        ],
+        "meta": {
+          "bloomberg_screen": "CDSO",
+          "index": "MARKIT CDX.NA.IG.46 06/31",
+          "bbg_index_id": "SP650F62",
+          "red_pair_code": "2165BYEJ0",
+          "position": "Long Payer",
+          "trade_date": "2026-05-07",
+          "spread_vol_pct": "36.03",
+          "atm_forward_bp": "55.2848",
+          "strike_spread_bp": "55.2848",
+          "swap_curve": "S531 USD ISDA Swap Curve - Mid",
+          "cds_curve": "CBBT Mid"
+        }
+      }
+    }
+  },
+  "expected": {
+    "npv": 118781.76,
+    "par_spread": 55.2848,
+    "delta": 0.507,
+    "gamma": 0.547,
+    "vega": 3411.78,
+    "dv01": -112.536042572938,
+    "cs01": 25352.02,
+    "spread_dv01": 46963.21,
+    "theta": -1499.93
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 6.0,
+      "rel": 1e-06,
+      "tolerance_reason": "Expected output is the raw Bloomberg Market Value. Phase 6 index front-end-protection timing fix reconciled NPV to -$0.09 versus Bloomberg; the 2026-06 moderate-fix pass removed the ARRC 2-day lookback from cleared-OIS presets (plain compounded in arrears), shifting the bootstrapped USD swap curve and leaving a documented -$5.32 residual. A $6 band admits this convention residual without hiding model drift."
+    },
+    "par_spread": {
+      "abs": 0.07,
+      "rel": 1e-06,
+      "tolerance_reason": "Bloomberg displays ATM Fwd to 4 decimals in bp. Phase 2 bootstrap migration residual is ~0.062 bp (bootstrapped curves). 0.07 bp absolute tolerance accommodates this last-mile residual while expected_outputs remains the Bloomberg screen value."
+    },
+    "delta": {
+      "abs": 0.001,
+      "rel": 1e-06,
+      "tolerance_reason": "Expected output is the raw Bloomberg CDSO Delta N(d1) stored as a unitless ratio (50.70% -> 0.5070). A 0.001 absolute band is tighter than the requested 0.01 max and allows only source-screen rounding noise."
+    },
+    "gamma": {
+      "abs": 0.005,
+      "tolerance_reason": "Expected output is the raw Bloomberg CDSO Gamma +/-5bp screen value stored as a unitless ratio (54.70% -> 0.5470). A 0.005 absolute band is tighter than the requested 0.01 max and allows the remaining screen-rounding / convention residual without admitting material drift."
+    },
+    "vega": {
+      "abs": 25.0,
+      "rel": 0.01,
+      "tolerance_reason": "Expected output is the raw Bloomberg Vega(1%). After Phase 8 (canonical-NPV simplification — see convention_decisions), finstack reports the plain one-sided σ+0.01 forward difference of the canonical Bloomberg quadrature NPV. The previous FEP-beta vega re-parameterization closed the residual to ~$1 but introduced a parallel calibration pathway and silent solver fallbacks; removing it leaves a documented ~$21 (0.62%) convention residual on this fixture without admitting material model drift."
+    },
+    "dv01": {
+      "abs": 0.5,
+      "rel": 1e-06,
+      "tolerance_reason": "dv01 is finstack-quant's internal central-difference IR sensitivity (dV/dr per +1bp) computed via sensitivity_central_diff, unified with the CDS IR DV01 convention so the two aggregate consistently in a portfolio (audit fix W-18). It is the negated half of the Bloomberg CDSO bond-convention screen DV01 (formerly +228.21) and is intentionally no longer a like-for-like Bloomberg-screen value; the expected output is finstack-quant's own deterministic computation, so the tolerance only needs to absorb bootstrap re-calibration jitter."
+    },
+    "cs01": {
+      "abs": 650.0,
+      "tolerance_reason": "Expected output is the raw Bloomberg Spread DV01. Phase 7 verifies FEP is recomputed on each bumped hazard curve, but finstack remains ~$592.21 under Bloomberg; a $650 known-gap band admits the documented convention residual without hiding larger regressions."
+    },
+    "spread_dv01": {
+      "abs": 500.0,
+      "tolerance_reason": "Expected output is the raw Bloomberg underlying CDS Spread DV01 from the linked CDS<GO> screenshot. finstack computes the CDSW-style +1bp quoted-spread rebootstrap sensitivity on the synthetic 100MM CDX underlying. The executable fixture uses market-envelope bootstrapping, leaving a ~$444 residual versus the source screenshot; a $500 band is ~1% of DV01 and keeps this underlying-CDS check tight to Bloomberg while admitting the documented bootstrap-source residual."
+    },
+    "theta": {
+      "abs": 55.0,
+      "tolerance_reason": "Expected output is the raw Bloomberg Theta. Phase 7 diagnostics tested FEP-horizon shortening and as-of-shift variants; finstack keeps the pure DOCS 2055833 exercise-time shortening convention, leaving a documented ~$48.35 residual. A $55 band admits that residual without hiding larger regressions."
+    }
+  }
+}

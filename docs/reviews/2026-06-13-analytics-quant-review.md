@@ -1,12 +1,12 @@
 # Analytics Crate — Quant Finance Review (2026-06-13)
 
-**Scope:** `finstack/analytics/` (returns, risk metrics, tail risk, drawdown,
+**Scope:** `finstack-quant/analytics/` (returns, risk metrics, tail risk, drawdown,
 benchmark/greeks, rolling kernels, nearest-correlation, aggregation, lookback,
-the `Performance` orchestrator) and the related Python (`finstack-py/src/bindings/analytics/`)
-and WASM (`finstack-wasm/src/api/analytics/`) bindings.
+the `Performance` orchestrator) and the related Python (`finstack-quant-py/src/bindings/analytics/`)
+and WASM (`finstack-quant-wasm/src/api/analytics/`) bindings.
 
-**Grounding:** All 178 `finstack-analytics` library unit tests pass
-(`cargo test -p finstack-analytics --lib`). The capture-ratio and alpha
+**Grounding:** All 178 `finstack-quant-analytics` library unit tests pass
+(`cargo test -p finstack-quant-analytics --lib`). The capture-ratio and alpha
 convention gaps below were reproduced numerically. The `tests/` integration
 suite was not run and the Python/WASM wheels were not rebuilt.
 
@@ -25,7 +25,7 @@ complete. Residual risk is concentrated in **convention alignment** and
 
 #### 1. Capture ratios use a per-period geometric-mean ratio, not the cumulative/annualized return ratio used by Morningstar/Bacon/empyrical
 
-- **Location:** `finstack/analytics/src/benchmark.rs:886` (`geometric_capture`),
+- **Location:** `finstack-quant/analytics/src/benchmark.rs:886` (`geometric_capture`),
   exposed via `up_capture` (`:686`), `down_capture` (`:719`), `capture_ratio` (`:748`).
 - **Issue:** `geometric_capture` computes `(Π(1+r_p))^(1/count) − 1` over the
   up/down subset and divides by the benchmark's per-period geometric mean. The
@@ -49,7 +49,7 @@ complete. Residual risk is concentrated in **convention alignment** and
 
 #### 2. `Performance` construction rejects the entire panel on one delisted/defaulted column or any return ≤ −1.0
 
-- **Location:** `finstack/analytics/src/performance/mod.rs:117`
+- **Location:** `finstack-quant/analytics/src/performance/mod.rs:117`
   (`clean_return_column`, lines 136–161).
 - **Issue:** After `clean_returns` strips *trailing* NaNs, any column whose length
   no longer equals the grid length is a hard error (delisted / IPO-mid-sample
@@ -66,9 +66,9 @@ complete. Residual risk is concentrated in **convention alignment** and
 
 #### 3. Python `GreeksResult.alpha` is documented as "Jensen's alpha", but the value is the raw-return OLS intercept
 
-- **Location:** `finstack-py/src/bindings/analytics/types.rs:149` labels it
+- **Location:** `finstack-quant-py/src/bindings/analytics/types.rs:149` labels it
   `Jensen's alpha (annualized)`. The Rust source
-  (`finstack/analytics/src/benchmark.rs:492`) computes
+  (`finstack-quant/analytics/src/benchmark.rs:492`) computes
   `(mean_x − β·mean_y)·ann_factor` — the intercept of `r_p = α + β·r_m` on **raw**
   returns, with no risk-free term.
 - **Issue:** True Jensen's alpha regresses excess returns; it differs from the
@@ -87,13 +87,13 @@ the Rust source, so it is a convention note rather than a bug; ensure callers
 know `alpha` is not CAPM alpha.
 
 #### 5. Sortino `mar` (per-period) vs Sharpe `risk_free_rate` (annualized) unit asymmetry
-Thoroughly documented at `finstack/analytics/src/performance/scalar.rs:119`, but
+Thoroughly documented at `finstack-quant/analytics/src/performance/scalar.rs:119`, but
 `summary_to_dataframe` and the flat facade make it easy to pass an annualized
 target to `sortino` / `downside_deviation` by mistake. Consider a brief note in
 the Python/WASM method docs (currently silent on the per-period requirement).
 
 #### 6. `beta` CI uses the asymptotic 1.96 for `n−2 ≥ 240`
-`finstack/analytics/src/benchmark.rs:287` — ~0.5% narrower than exact t(240).
+`finstack-quant/analytics/src/benchmark.rs:287` — ~0.5% narrower than exact t(240).
 Documented and immaterial at that sample size.
 
 ---

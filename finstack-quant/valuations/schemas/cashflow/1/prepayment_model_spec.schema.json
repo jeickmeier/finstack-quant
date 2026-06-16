@@ -1,0 +1,88 @@
+{
+  "$defs": {
+    "PrepaymentCurve": {
+      "description": "Prepayment curve shape.",
+      "oneOf": [
+        {
+          "description": "Constant CPR (no seasoning effect)",
+          "properties": {
+            "curve": {
+              "const": "constant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curve"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "PSA standard curve: ramps to 6% CPR over 30 months",
+          "properties": {
+            "curve": {
+              "const": "psa",
+              "type": "string"
+            },
+            "speed_multiplier": {
+              "description": "Speed multiplier (1.0 = 100% PSA)",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "speed_multiplier"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR.",
+          "properties": {
+            "curve": {
+              "const": "cmbs_lockout",
+              "type": "string"
+            },
+            "lockout_months": {
+              "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "curve",
+            "lockout_months"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Prepayment model specifications for credit instruments. Rust types: PrepaymentCurve, PrepaymentModelSpec from finstack_quant_valuations::cashflow::builder::specs::prepayment",
+  "properties": {
+    "cpr": {
+      "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`] is active: the\nannual CPR is then derived entirely from the PSA seasoning ramp and\nits `speed_multiplier`. It IS used by [`PrepaymentCurve::CmbsLockout`]\nas the post-lockout CPR.",
+      "format": "double",
+      "type": "number"
+    },
+    "curve": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PrepaymentCurve"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional curve shape (default: constant)"
+    }
+  },
+  "required": [
+    "cpr"
+  ],
+  "title": "Prepayment Model Specification",
+  "type": "object"
+}

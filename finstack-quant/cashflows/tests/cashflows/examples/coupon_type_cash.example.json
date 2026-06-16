@@ -1,0 +1,4 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "coupon_type": "Cash"
+}

@@ -1,0 +1,598 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "usd_cap_5y_atm_black",
+    "domain": "rates.cap_floor",
+    "description": "Bloomberg SWPM USD 5Y ATM SOFR cap captured from screens on 2026-05-02.",
+    "valuation_date": "2026-05-02",
+    "source": "bloomberg-screen",
+    "source_detail": "Bloomberg SWPM USD SOFR cap, curve 490 USD SOFR discount/projection, USD RFR BVOL Cube, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained; the screen uses normal volatility/HW1F market setup, represented here through finstack-quant's normal cap/floor pricing path. Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved in initial_market with empty plan.steps. Bloomberg-parity contract (NPV abs 1.0) preserved.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-02",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-09",
+    "review_interval_months": 6,
+    "regen_command": "manual Bloomberg SWPM screen transcription; see provenance.screenshots",
+    "screenshots": [
+      {
+        "path": "screenshots/usd_cap_5y_atm_black__main.png",
+        "screen": "SWPM",
+        "captured_on": "2026-05-02",
+        "description": "Main SWPM cap terms and valuation results"
+      },
+      {
+        "path": "screenshots/usd_cap_5y_atm_black__cashflows.png",
+        "screen": "SWPM",
+        "captured_on": "2026-05-02",
+        "description": "Bloomberg cashflow table with caplet payments, discount factors, intrinsic PV, time PV, and total PV"
+      },
+      {
+        "path": "screenshots/usd_cap_5y_atm_black__curve.png",
+        "screen": "SWPM",
+        "captured_on": "2026-05-02",
+        "description": "Curve 490 USD SOFR screen with visible market rates, zero rates, and discount factors"
+      },
+      {
+        "path": "screenshots/usd_cap_5y_atm_black__vol_cube.png",
+        "screen": "VCUB",
+        "captured_on": "2026-05-02",
+        "description": "USD RFR BVOL Cube normal-vol table; fixture uses the visible 5Y tenor column as the caplet normal-vol term structure"
+      },
+      {
+        "path": "screenshots/usd_cap_5y_atm_black__contract_detail_1.png",
+        "screen": "SWPM",
+        "captured_on": "2026-05-02",
+        "description": "Cap contract-detail screen with index, schedule generation, lookback, cutoff, fixing calendar, and first accrual schedule rows"
+      },
+      {
+        "path": "screenshots/usd_cap_5y_atm_black__contract_detail_2.png",
+        "screen": "SWPM",
+        "captured_on": "2026-05-02",
+        "description": "Continuation of the cap contract-detail accrual schedule through maturity"
+      }
+    ]
+  },
+  "kind": "pricing",
+  "model": "hull_white_1f",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "usd_cap_5y_tier_a_wrap",
+        "description": "Tier-A wrap: the cap is a Bloomberg-parity test with very tight 1-dollar tolerance on 10MM notional NPV. Calibrating USD-SOFR-DISC or USD-SOFR forward from quotes introduces curve drift that shifts the cap's caplet PVs by tens of dollars or more \u2014 outside the parity tolerance. The envelope wrap preserves the snapshot verbatim in initial_market while routing through engine::execute_with_diagnostics.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [],
+      "prior_market": [
+        {
+          "kind": "forward_curve",
+          "id": "USD-SOFR",
+          "base": "2026-05-02",
+          "reset_lag": 0,
+          "day_count": "Act360",
+          "tenor": 0.25,
+          "knot_points": [
+            [
+              0.0,
+              0.03634
+            ],
+            [
+              0.019178082191780823,
+              0.03634
+            ],
+            [
+              0.038356164383561646,
+              0.036351
+            ],
+            [
+              0.057534246575342465,
+              0.036335
+            ],
+            [
+              0.08333333333333333,
+              0.036432
+            ],
+            [
+              0.16666666666666666,
+              0.0365047
+            ],
+            [
+              0.25,
+              0.036544
+            ],
+            [
+              0.3333333333333333,
+              0.036589
+            ],
+            [
+              0.4166666666666667,
+              0.036629
+            ],
+            [
+              0.5,
+              0.0366705
+            ],
+            [
+              0.5833333333333334,
+              0.0367315
+            ],
+            [
+              0.6666666666666666,
+              0.036836
+            ],
+            [
+              0.75,
+              0.0369315
+            ],
+            [
+              0.8333333333333334,
+              0.037023
+            ],
+            [
+              0.9166666666666666,
+              0.0371385
+            ],
+            [
+              1.0,
+              0.0372495
+            ],
+            [
+              1.5,
+              0.0372925
+            ],
+            [
+              2.0,
+              0.0371735
+            ],
+            [
+              3.0,
+              0.0368633
+            ],
+            [
+              4.0,
+              0.036904
+            ],
+            [
+              5.0,
+              0.0371715
+            ],
+            [
+              6.0,
+              0.037587
+            ],
+            [
+              7.0,
+              0.038033
+            ],
+            [
+              8.0,
+              0.03848
+            ],
+            [
+              9.0,
+              0.038924
+            ],
+            [
+              10.0,
+              0.03936
+            ],
+            [
+              12.0,
+              0.0402133
+            ]
+          ],
+          "interp_style": "linear",
+          "extrapolation": "flat_forward",
+          "rate_calibration": {
+            "index_id": "USD-SOFR",
+            "currency": "USD",
+            "discount_curve_id": "USD-SOFR-DISC",
+            "quotes": [
+              {
+                "deposit": {
+                  "tenor": "1W",
+                  "rate": 0.03634
+                }
+              },
+              {
+                "deposit": {
+                  "tenor": "2W",
+                  "rate": 0.036351
+                }
+              },
+              {
+                "deposit": {
+                  "tenor": "3W",
+                  "rate": 0.036335
+                }
+              },
+              {
+                "deposit": {
+                  "tenor": "1M",
+                  "rate": 0.036432
+                }
+              },
+              {
+                "deposit": {
+                  "tenor": "2M",
+                  "rate": 0.0365047
+                }
+              },
+              {
+                "deposit": {
+                  "tenor": "3M",
+                  "rate": 0.036544
+                }
+              },
+              {
+                "deposit": {
+                  "tenor": "6M",
+                  "rate": 0.0366705
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "1Y",
+                  "rate": 0.0372495,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "2Y",
+                  "rate": 0.0371735,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "5Y",
+                  "rate": 0.0371715,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "10Y",
+                  "rate": 0.03936,
+                  "spread_decimal": null
+                }
+              },
+              {
+                "swap": {
+                  "tenor": "12Y",
+                  "rate": 0.0402133,
+                  "spread_decimal": null
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-SOFR-DISC",
+          "base": "2026-05-02",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.019178082191780823,
+              0.998992
+            ],
+            [
+              0.038356164383561646,
+              0.998286
+            ],
+            [
+              0.057534246575342465,
+              0.997583
+            ],
+            [
+              0.08333333333333333,
+              0.996571
+            ],
+            [
+              0.16666666666666666,
+              0.993452
+            ],
+            [
+              0.25,
+              0.990448
+            ],
+            [
+              0.3333333333333333,
+              0.987057
+            ],
+            [
+              0.4166666666666667,
+              0.984373
+            ],
+            [
+              0.5,
+              0.981305
+            ],
+            [
+              0.5833333333333334,
+              0.97814
+            ],
+            [
+              0.6666666666666666,
+              0.975249
+            ],
+            [
+              0.75,
+              0.972171
+            ],
+            [
+              0.8333333333333334,
+              0.969391
+            ],
+            [
+              0.9166666666666666,
+              0.966303
+            ],
+            [
+              1.0,
+              0.963316
+            ],
+            [
+              1.5,
+              0.945253
+            ],
+            [
+              2.0,
+              0.928307
+            ],
+            [
+              3.0,
+              0.895259
+            ],
+            [
+              4.0,
+              0.862943
+            ],
+            [
+              5.0,
+              0.830729
+            ],
+            [
+              6.0,
+              0.798334
+            ],
+            [
+              7.0,
+              0.766391
+            ],
+            [
+              8.0,
+              0.734974
+            ],
+            [
+              9.0,
+              0.703985
+            ],
+            [
+              10.0,
+              0.673855
+            ],
+            [
+              12.0,
+              0.615431
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": {
+            "index_id": "USD-SOFR",
+            "currency": "USD",
+            "quotes": [
+              {
+                "quote_type": "deposit",
+                "tenor": "1W",
+                "rate": 0.03634
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "2W",
+                "rate": 0.036351
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "3W",
+                "rate": 0.036335
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "1M",
+                "rate": 0.036432
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "2M",
+                "rate": 0.0365047
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "3M",
+                "rate": 0.036544
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "6M",
+                "rate": 0.0366705
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "1Y",
+                "rate": 0.0372495
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "2Y",
+                "rate": 0.0371735
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "5Y",
+                "rate": 0.0371715
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "10Y",
+                "rate": 0.03936
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "12Y",
+                "rate": 0.0402133
+              }
+            ]
+          }
+        },
+        {
+          "kind": "vol_surface",
+          "id": "USD-RFR-BVOL-CUBE-5Y",
+          "expiries": [
+            0.266666666667,
+            0.522222222222,
+            0.783333333333,
+            1.025,
+            1.280555555556,
+            1.541666666667,
+            1.794444444444,
+            2.047222222222,
+            2.3,
+            2.552777777778,
+            2.808333333333,
+            3.058333333333,
+            3.311111111111,
+            3.566666666667,
+            3.822222222222,
+            4.069444444444,
+            4.325,
+            4.580555555556,
+            4.836111111111,
+            5.083333333333
+          ],
+          "strikes": [
+            0.0366561
+          ],
+          "secondary_axis": "strike",
+          "interpolation_mode": "vol",
+          "vols_row_major": [
+            0.00483385,
+            0.0062337,
+            0.00698487,
+            0.00737708,
+            0.00967406,
+            0.0093958,
+            0.00875504,
+            0.00850833,
+            0.00827289,
+            0.00847498,
+            0.00869723,
+            0.00892629,
+            0.00898619,
+            0.00917668,
+            0.00937279,
+            0.00956292,
+            0.00943487,
+            0.00961022,
+            0.00979113,
+            0.0099745
+          ]
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "type": "cap_floor",
+    "spec": {
+      "id": "USD-SOFR-CAP-5Y-ATM-SWPM-20260502",
+      "rate_option_type": "cap",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "strike": "0.0366561",
+      "start_date": "2026-05-05",
+      "maturity": "2031-05-06",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "day_count": "Act360",
+      "calendar_id": "usny",
+      "discount_curve_id": "USD-SOFR-DISC",
+      "forward_curve_id": "USD-SOFR",
+      "vol_surface_id": "USD-RFR-BVOL-CUBE-5Y",
+      "vol_type": "normal",
+      "pricing_overrides": {
+        "tree_steps": 300,
+        "hw1f_sigma": 0.0094182,
+        "hw1f_mean_reversion": 0.0342
+      },
+      "attributes": {
+        "tags": [
+          "golden",
+          "bloomberg",
+          "swpm"
+        ],
+        "meta": {
+          "bloomberg_screen": "SWPM",
+          "curve_number": "490",
+          "curve_name": "USD SOFR",
+          "vol_cube": "USD RFR BVOL Cube",
+          "screen_model": "HW1F",
+          "screen_volatility_type": "Normal",
+          "screen_convexity_adjustment": "Normal",
+          "hw1f_calibration_method": "fixed_kappa_sigma_from_visible_caplet_normal_vol_strip",
+          "hw1f_fixed_kappa": "0.0342",
+          "hw1f_source_quote": "VCUB USD RFR BVOL Cube visible 5Y tenor caplet normal-vol strip transcribed in inputs.market.surfaces[USD-RFR-BVOL-CUBE-5Y].vols_row_major",
+          "hw1f_source_quote_normal_vol": "caplet strip, 20 quarterly expiries",
+          "hw1f_short_rate_sigma": "0.0094182",
+          "hw1f_param_routing": "kappa and sigma are supplied to the cap/floor HW1F tree via the dedicated spec.pricing_overrides.hw1f_mean_reversion and hw1f_sigma fields (the short-rate channel the pricer consumes), not market_quotes.implied_volatility.",
+          "hw1f_calibration_note": "Bloomberg screenshot shows HW1F and normal-vol VCUB inputs but does not show mean reversion. Kappa is an explicit fixed calibration assumption; sigma is the HW1F short-rate absolute volatility derived from the visible caplet normal-vol strip rather than tuned to expected_outputs.",
+          "legacy_fixture_name": "usd_cap_5y_atm_black"
+        }
+      }
+    }
+  },
+  "expected": {
+    "npv": 258327.94,
+    "vega": 265946.0,
+    "dv01": 2158.57
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 1.0,
+      "rel": 1e-05,
+      "tolerance_reason": "Bloomberg SWPM screen NPV is displayed to cents; the executable fixture should reproduce the screen within one dollar on 10MM notional. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "vega": {
+      "abs": 10.0,
+      "rel": 0.0001,
+      "tolerance_reason": "Bloomberg displays Vega(1bp)=2,659.46; expected_outputs stores the comparable per-1pct normal-vol value of 265,946.0. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "dv01": {
+      "abs": 25.0,
+      "rel": 0.0005,
+      "tolerance_reason": "Bloomberg SWPM screen DV01 is displayed to cents and may be shown as a screen-side absolute or payer/receiver signed value. For a long cap, first-principles rate-up PV change is positive, so expected_outputs stores the positive magnitude. Temporarily widened to $25 while the remaining quote-basis DV01 convention gap is investigated; revisit and reduce once the rebootstrap path fully reconciles to Bloomberg. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    }
+  }
+}

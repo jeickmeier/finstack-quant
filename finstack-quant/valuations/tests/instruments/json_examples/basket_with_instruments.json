@@ -1,0 +1,88 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "basket",
+    "spec": {
+      "id": "BASKET-MIXED",
+      "constituents": [
+        {
+          "id": "BOND-CORP",
+          "reference": {
+            "instrument": {
+              "type": "bond",
+              "spec": {
+                "id": "CORP-BOND-001",
+                "notional": {
+                  "amount": "1000",
+                  "currency": "USD"
+                },
+                "issue": "2024-01-01",
+                "maturity": "2034-01-01",
+                "cashflow_spec": {
+                  "Fixed": {
+                    "coupon_type": "Cash",
+                    "rate": 0.05,
+                    "freq": {"count": 6, "unit": "months"},
+                    "dc": "Thirty360",
+                    "bdc": "following",
+                    "calendar_id": null,
+                    "stub": "None"
+                  }
+                },
+                "discount_curve_id": "USD-OIS",
+                "credit_curve_id": null,
+                "pricing_overrides": {
+                  "quoted_clean_price": null,
+                  "rho_bump_decimal": null,
+                  "vega_bump_decimal": null,
+                  "implied_volatility": null,
+                  "cds_quote_bp": null,
+                  "upfront_payment": null,
+                  "ytm_bump_decimal": null,
+                  "theta_period": null,
+                  "mc_seed_scenario": null,
+                  "adaptive_bumps": false,
+                  "spot_bump_pct": null,
+                  "vol_bump_pct": null,
+                  "rate_bump_bp": null
+                },
+                "call_put": null,
+                "accrual_method": "Linear",
+                "attributes": {
+                  "tags": [],
+                  "meta": {}
+                },
+                "settlement_days": null,
+                "ex_coupon_days": null
+              }
+            }
+          },
+          "weight": 0.0,
+          "units": 100.0,
+          "ticker": "CORP"
+        },
+        {
+          "id": "EQ-AAPL",
+          "reference": {
+            "price_id": "AAPL-SPOT",
+            "asset_type": "equity"
+          },
+          "weight": 0.4,
+          "units": null,
+          "ticker": "AAPL"
+        }
+      ],
+      "expense_ratio": 0.001,
+      "currency": "USD",
+      "discount_curve_id": "USD-OIS",
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      },
+      "pricing_config": {
+        "days_in_year": 365.25,
+        "fx_policy": "cashflow_date"
+      }
+    }
+  }
+}

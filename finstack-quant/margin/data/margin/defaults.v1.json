@@ -1,0 +1,44 @@
+{
+  "schema": "finstack_quant.margin.defaults.v1",
+  "version": 1,
+  "defaults": {
+    "vm": {
+      "threshold": 0.0,
+      "mta": 500000.0,
+      "rounding": 10000.0,
+      "independent_amount": 0.0,
+      "frequency": "daily",
+      "settlement_lag": 1
+    },
+    "im": {
+      "simm": { "mpor_days": 10, "threshold": 50000000.0, "mta": 0.0, "segregated": true },
+      "schedule": { "mpor_days": 10, "threshold": 50000000.0, "mta": 0.0, "segregated": true },
+      "cleared": { "mpor_days": 5, "threshold": 0.0, "mta": 0.0, "segregated": false },
+      "repo_haircut": { "mpor_days": 2, "threshold": 0.0, "mta": 0.0, "segregated": false }
+    },
+    "timing": {
+      "standard": {
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2,
+        "dispute_resolution_days": 2,
+        "delivery_grace_days": 1
+      },
+      "regulatory_vm": {
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2,
+        "dispute_resolution_days": 1,
+        "delivery_grace_days": 0
+      },
+      "ccp": {
+        "notification_deadline_hours": 10,
+        "response_deadline_hours": 1,
+        "dispute_resolution_days": 1,
+        "delivery_grace_days": 0
+      }
+    },
+    "cleared_settlement": {
+      "rounding": 1.0,
+      "settlement_lag": 0
+    }
+  }
+}

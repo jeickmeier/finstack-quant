@@ -1,0 +1,29 @@
+{
+    "schema": "finstack_quant.instruments.option.conventions.registry.v1",
+    "namespace": "instruments.option.market_conventions",
+    "version": 1,
+    "entries": [
+        {
+            "ids": [
+                "USD",
+                "US-EQ"
+            ],
+            "record": {
+                "calendar_id": "nyse",
+                "settlement_days": 2,
+                "business_day_convention": "modified_following"
+            }
+        },
+        {
+            "ids": [
+                "EUR",
+                "EU-EQ"
+            ],
+            "record": {
+                "calendar_id": "target2",
+                "settlement_days": 2,
+                "business_day_convention": "modified_following"
+            }
+        }
+    ]
+}

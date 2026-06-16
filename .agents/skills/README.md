@@ -1,6 +1,6 @@
 # Finstack Skill Catalog
 
-This directory contains the active project skills for maintaining the finstack Rust/Python/WASM quant library.
+This directory contains the active project skills for maintaining the finstack-quant Rust/Python/WASM quant library.
 
 ## Agent Compatibility
 
@@ -19,8 +19,8 @@ These skills use the shared Agent Skills layout: one folder per skill, each with
 | `finstack-rust-architecture-review` | Crate/module boundaries, ownership, errors, async/concurrency, public API shape | Writing architecture docs |
 | `finstack-rust-library-architecture-docs` | Source-backed Rust architecture documentation | Critiquing architecture quality |
 | `finstack-binding-parity-reviewer` | Rust/PyO3/WASM/stub/export/parity-contract drift | The main issue is quant correctness |
-| `finstack-simplify` | Finstack-specific slop, dedupe, wrapper bloat, public API consolidation | Small mechanical refactor with known scope |
-| `finstack-refactor` | Behavior-preserving structural edits after scope is clear | Broad finstack simplification audit |
+| `finstack-simplify` | Finstack Quant-specific slop, dedupe, wrapper bloat, public API consolidation | Small mechanical refactor with known scope |
+| `finstack-refactor` | Behavior-preserving structural edits after scope is clear | Broad finstack-quant simplification audit |
 | `finstack-performance-reviewer` | Hot paths, allocations, concurrency, benchmark regression | Formula/convention correctness |
 | `finstack-documentation-maintainer` | API docs, stale docs, README/spec/changelog cleanup, examples | Release-wide readiness |
 | `finstack-production-release-prep` | Release orchestration, semver, docs, audit, final gates | One failing check or narrow cleanup |

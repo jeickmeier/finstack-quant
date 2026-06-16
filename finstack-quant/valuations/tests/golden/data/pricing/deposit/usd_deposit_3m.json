@@ -1,0 +1,122 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "usd_deposit_3m",
+    "domain": "rates.deposit",
+    "description": "QuantLib-parity USD 3M money-market deposit on a committed discount curve.",
+    "valuation_date": "2026-04-30",
+    "source": "quantlib",
+    "source_detail": "QuantLib-Python 1.42.1 parity check using IborIndex forecast fixing for deposit par rate, CashFlows.npv for start and maturity flows, and central finite-difference DV01 on a deterministic USD discount curve. Phase-2 envelope migration (2026-05-09): wrapped in market_envelope with the curve carried in initial_market.curves and an empty plan.steps. The QuantLib oracle's synthetic time pillars are not bootstrap-reproducible; true-calibration migration would require >1e-12 par_rate tolerance. The envelope wrap still routes through engine::execute_with_diagnostics, so the fixture exercises the calibration entry point's plumbing. Regenerated 2026-06-11 (docs/reviews/2026-06-09-core-quant-review.md): core npv now excludes flows on or before the valuation date (market-standard holder-view position value), so the T+0 initial -10MM notional exchange on the 2026-04-30 valuation date is no longer part of npv. New expected npv = prior QuantLib trade NPV (2877.927119438455) + 10,000,000 excluded initial flow at DF=1; equivalently QuantLib CashFlows.npv with includeSettlementDateFlows=False. deposit_par_rate and dv01 are unchanged (the t=0 flow has DF=1 and no rate sensitivity).",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-04-30",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-06-11",
+    "review_interval_months": 6,
+    "regen_command": "manual QuantLib-Python oracle; see inputs.source_reference for reproduction formulas and intermediate values",
+    "screenshots": []
+  },
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "usd_deposit_3m",
+        "description": "Tier-A wrap: deposit is priced against a pre-built USD-OIS curve carried in initial_market. The curve cannot be bootstrapped from a real-date deposit quote at par_rate tolerance 1e-12 because the snapshot uses synthetic time pillars (0.25, 0.5, ..., 5.0) that don't align with the calibration engine's date arithmetic. Routing through engine::execute_with_diagnostics still validates the envelope schema and the calibration entry point with no calibration-side math change.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [],
+      "prior_market": [
+        {
+          "kind": "discount_curve",
+          "id": "USD-OIS",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.99
+            ],
+            [
+              0.5,
+              0.9802
+            ],
+            [
+              1.0,
+              0.9608
+            ],
+            [
+              2.0,
+              0.9231
+            ],
+            [
+              5.0,
+              0.8187
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "deposit",
+      "spec": {
+        "id": "USD-DEP-3M-GOLDEN",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "start_date": "2026-04-30",
+        "maturity": "2026-07-30",
+        "day_count": "Act360",
+        "quote_rate": "0.041",
+        "discount_curve_id": "USD-OIS",
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        },
+        "spot_lag_days": 0,
+        "calendar_id": null
+      }
+    }
+  },
+  "expected": {
+    "npv": 10002877.927119438,
+    "deposit_par_rate": 0.03985001083863061,
+    "dv01": -249.38681957910967
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 1e-06
+    },
+    "deposit_par_rate": {
+      "abs": 1e-12
+    },
+    "dv01": {
+      "abs": 1e-06
+    }
+  }
+}

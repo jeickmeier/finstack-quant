@@ -1,0 +1,32 @@
+[package]
+name = "finstack-quant-scenarios"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Deterministic scenario DSL for Finstack Quant with preview, composition, and phase-ordered apply across market/statements/valuations"
+
+[dependencies]
+finstack-quant-attribution = { path = "../attribution" }
+finstack-quant-core = { path = "../core" }
+finstack-quant-statements = { path = "../statements" }
+finstack-quant-valuations = { path = "../valuations" }
+indexmap = { workspace = true, features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true, features = ["macros"] }
+tracing = { version = "0.1", default-features = false }
+
+[dev-dependencies]
+criterion = { workspace = true }
+finstack-quant-test-utils = { path = "../test-utils" }
+
+[[bench]]
+name = "scenarios"
+harness = false
+
+[lints]
+workspace = true

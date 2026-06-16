@@ -12,8 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-BOND_SCHEMA = ROOT / "finstack/valuations/schemas/instruments/1/fixed_income/bond.schema.json"
-IR_FUTURE_SCHEMA = ROOT / "finstack/valuations/schemas/instruments/1/rates/interest_rate_future.schema.json"
+BOND_SCHEMA = ROOT / "finstack-quant/valuations/schemas/instruments/1/fixed_income/bond.schema.json"
+IR_FUTURE_SCHEMA = ROOT / "finstack-quant/valuations/schemas/instruments/1/rates/interest_rate_future.schema.json"
 
 BOND_DESCRIPTION = (
     "Fixed income bond instrument with fixed, floating, or amortizing cashflows. "

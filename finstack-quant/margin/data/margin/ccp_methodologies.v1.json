@@ -1,0 +1,44 @@
+{
+  "schema": "finstack_quant.margin.ccp.v1",
+  "version": 1,
+  "entries": [
+    {
+      "ids": ["lch_swapclear", "lch"],
+      "record": { "mpor_days": 5, "conservative_rate": 0.02 }
+    },
+    {
+      "ids": ["lch_cdsclear", "lch_cds"],
+      "record": { "mpor_days": 5, "conservative_rate": 0.08 }
+    },
+    {
+      "ids": ["cme"],
+      "record": { "mpor_days": 5, "conservative_rate": 0.03 }
+    },
+    {
+      "ids": ["ice_clear_credit", "ice", "ice_credit"],
+      "record": { "mpor_days": 5, "conservative_rate": 0.10 }
+    },
+    {
+      "ids": ["ice_clear_us", "ice_us"],
+      "record": { "mpor_days": 5, "conservative_rate": 0.05 }
+    },
+    {
+      "ids": ["jscc"],
+      "record": { "mpor_days": 5, "conservative_rate": 0.03 }
+    },
+    {
+      "ids": ["eurex"],
+      "record": { "mpor_days": 5, "conservative_rate": 0.03 }
+    },
+    {
+      "ids": ["generic_var", "default"],
+      "record": {
+        "mpor_days": 5,
+        "conservative_rate": 0.05,
+        "generic_var_confidence": 0.99,
+        "generic_var_lookback_days": 250,
+        "is_default": true
+      }
+    }
+  ]
+}

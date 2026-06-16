@@ -1,6 +1,6 @@
 # Serde Stability Policy
 
-This document is the contract for wire-format stability of the `finstack`
+This document is the contract for wire-format stability of the `finstack-quant`
 workspace. It tells a downstream consumer (data warehouse, risk database,
 Python / WASM pipeline) what is safe to persist and under what conditions
 those persisted bytes must be upgraded.
@@ -63,11 +63,11 @@ corresponding `const` lives in the same module and is the source of truth.
 
 | Type | Module | Const | Current version |
 |---|---|---|---|
-| `ValuationResult` | `finstack_valuations::results` | `VALUATION_RESULT_SCHEMA_VERSION` | 1 |
-| `StatementResult` | `finstack_statements::evaluator::results` | `STATEMENT_RESULT_SCHEMA_VERSION` | 1 |
-| `PortfolioResult` | `finstack_portfolio::results` | `PORTFOLIO_RESULT_SCHEMA_VERSION` | 1 |
-| `PortfolioOptimizationResult` | `finstack_portfolio::optimization::result` | `PORTFOLIO_OPTIMIZATION_RESULT_SCHEMA_VERSION` | 1 |
-| `CreditFactorModel` | `finstack_valuations::factor_model::credit` | `"finstack.credit_factor_model/1"` (string tag, not a `u32` const) | 1 |
+| `ValuationResult` | `finstack_quant_valuations::results` | `VALUATION_RESULT_SCHEMA_VERSION` | 1 |
+| `StatementResult` | `finstack_quant_statements::evaluator::results` | `STATEMENT_RESULT_SCHEMA_VERSION` | 1 |
+| `PortfolioResult` | `finstack_quant_portfolio::results` | `PORTFOLIO_RESULT_SCHEMA_VERSION` | 1 |
+| `PortfolioOptimizationResult` | `finstack_quant_portfolio::optimization::result` | `PORTFOLIO_OPTIMIZATION_RESULT_SCHEMA_VERSION` | 1 |
+| `CreditFactorModel` | `finstack_quant_valuations::factor_model::credit` | `"finstack_quant.credit_factor_model/1"` (string tag, not a `u32` const) | 1 |
 
 ### When to bump `schema_version`
 
@@ -103,13 +103,13 @@ Do NOT bump for:
 ### How consumers should read versioned payloads
 
 ```rust
-use finstack_valuations::results::{
+use finstack_quant_valuations::results::{
     ValuationResult, VALUATION_RESULT_SCHEMA_VERSION,
 };
 
 let payload: ValuationResult = serde_json::from_str(&bytes)?;
 if payload.schema_version > VALUATION_RESULT_SCHEMA_VERSION {
-    // Refuse: binary is older than data. Upgrade finstack, don't plow through.
+    // Refuse: binary is older than data. Upgrade finstack-quant, don't plow through.
     return Err(/* forward-incompatible error */);
 }
 // payload.schema_version < CURRENT is handled by `#[serde(default)]` and any
@@ -125,11 +125,11 @@ consumer or be prepared to handle deserialization errors on upgrade.
 
 Notable in this category:
 
-- `finstack_valuations::results::ValuationDetails`
+- `finstack_quant_valuations::results::ValuationDetails`
   (enum of structured pricing details; variants may be added)
-- `finstack_portfolio::valuation::PortfolioValuation`
+- `finstack_quant_portfolio::valuation::PortfolioValuation`
   (sub-envelope of `PortfolioResult`)
-- `finstack_portfolio::factor_model::whatif::{WhatIfResult, StressResult}`
+- `finstack_quant_portfolio::factor_model::whatif::{WhatIfResult, StressResult}`
   (no versioning yet — track upstream)
 - All `*Spec`, `*Config`, `*Envelope` types used as inputs to pricing,
   calibration, scenarios, and statements. These are user-authored payloads;
@@ -141,18 +141,18 @@ The following types were introduced with the credit factor hierarchy feature.
 They follow the additive-only rule; new `Option<T>` fields may be added between
 minor versions without a schema-version bump.
 
-- `CreditFactorAttribution` (`finstack_attribution::credit_factor`) —
+- `CreditFactorAttribution` (`finstack_quant_attribution::credit_factor`) —
   additive, opt-in field on `PnlAttribution`; deserializing an older payload
   (missing field) produces `None`.
-- `CreditCarryDecomposition` (`finstack_attribution::credit_factor`) —
+- `CreditCarryDecomposition` (`finstack_quant_attribution::credit_factor`) —
   additive, opt-in field on `PnlAttribution`; same rule as above.
-- `SourceLine` (`finstack_attribution::credit_factor`) — custom
+- `SourceLine` (`finstack_quant_attribution::credit_factor`) — custom
   `Deserialize`: accepts both legacy `Money` shape and new tagged shape for
   backward compatibility.
-- `PositionResidualContribution` (`finstack_valuations::factor_model::credit`) —
+- `PositionResidualContribution` (`finstack_quant_valuations::factor_model::credit`) —
   additive, opt-in field on `RiskDecomposition`.
 - `CreditCalibrationInputs`, `CreditCalibrationConfig`
-  (`finstack_valuations::factor_model::credit_calibration`) — versioned serde
+  (`finstack_quant_valuations::factor_model::credit_calibration`) — versioned serde
   (round-trippable) but carry no `schema_version` constant yet; safe to
   persist when the workspace version is pinned.
 

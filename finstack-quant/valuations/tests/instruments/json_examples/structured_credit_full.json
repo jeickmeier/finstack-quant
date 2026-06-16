@@ -1,0 +1,432 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "structured_credit",
+    "spec": {
+      "id": "FULL-CLO",
+      "deal_type": "CLO",
+      "pool": {
+        "id": "POOL-FULL",
+        "deal_type": "CLO",
+        "base_currency": "USD",
+        "assets": [
+          {
+            "id": "LOAN1",
+            "asset_type": {
+              "type": "FirstLienLoan",
+              "industry": null
+            },
+            "balance": {
+              "amount": "12000000",
+              "currency": "USD"
+            },
+            "rate": 0.035,
+            "spread_bps": 350.0,
+            "index_id": "SOFR-3M",
+            "maturity": "2030-01-01",
+            "credit_quality": "BB",
+            "industry": "Technology",
+            "obligor_id": "OBLIGOR-1",
+            "is_defaulted": false,
+            "recovery_amount": null,
+            "purchase_price": null,
+            "acquisition_date": null,
+            "day_count": "Act360",
+            "smm_override": 0.0123,
+            "mdr_override": 0.0042
+          },
+          {
+            "id": "BOND1",
+            "asset_type": {
+              "type": "HighYieldBond",
+              "industry": null
+            },
+            "balance": {
+              "amount": "8000000",
+              "currency": "USD"
+            },
+            "rate": 0.055,
+            "spread_bps": null,
+            "index_id": null,
+            "maturity": "2029-07-01",
+            "credit_quality": "A",
+            "industry": "Healthcare",
+            "obligor_id": "OBLIGOR-2",
+            "is_defaulted": true,
+            "recovery_amount": {
+              "amount": "1000000",
+              "currency": "USD"
+            },
+            "purchase_price": {
+              "amount": "7800000",
+              "currency": "USD"
+            },
+            "acquisition_date": null,
+            "day_count": "Act365F",
+            "smm_override": null,
+            "mdr_override": null
+          }
+        ],
+        "cumulative_defaults": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_recoveries": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_prepayments": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "reinvestment_period": {
+          "end_date": "2026-01-01",
+          "is_active": true,
+          "criteria": {
+            "max_price": 102.5,
+            "min_yield": 0.04,
+            "maintain_credit_quality": true,
+            "maintain_wal": false,
+            "apply_eligibility_criteria": true
+          }
+        },
+        "collection_account": {
+          "amount": "250000",
+          "currency": "USD"
+        },
+        "reserve_account": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "excess_spread_account": {
+          "amount": "75000",
+          "currency": "USD"
+        },
+        "rep_lines": [
+          {
+            "id": "REP1",
+            "balance": {
+              "amount": "20000000",
+              "currency": "USD"
+            },
+            "rate": 0.055,
+            "spread_bps": 180.0,
+            "index_id": "SOFR-1M",
+            "maturity": "2031-01-01",
+            "seasoning_months": 12,
+            "day_count": "Act360",
+            "cpr": 0.08,
+            "cdr": 0.03,
+            "recovery_rate": 0.5
+          }
+        ]
+      },
+      "tranches": {
+        "tranches": [
+          {
+            "id": "EQUITY",
+            "attachment_point": 0.0,
+            "detachment_point": 10.0,
+            "behavior_type": "Standard",
+            "seniority": "Equity",
+            "rating": "BB",
+            "original_balance": {
+              "amount": "5000000",
+              "currency": "USD"
+            },
+            "current_balance": {
+              "amount": "5000000",
+              "currency": "USD"
+            },
+            "target_balance": null,
+            "coupon": {
+              "Fixed": {
+                "rate": 0.12
+              }
+            },
+            "oc_trigger": {
+              "trigger_level": 1.15,
+              "cure_level": null,
+              "breach_date": null,
+              "consequence": "DivertCashFlow"
+            },
+            "ic_trigger": {
+              "trigger_level": 1.05,
+              "cure_level": null,
+              "breach_date": null,
+              "consequence": "DivertCashFlow"
+            },
+            "credit_enhancement": {
+              "subordination": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "overcollateralization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread": 0.0,
+              "cash_trap_active": false
+            },
+            "frequency": {"count": 3, "unit": "months"},
+            "day_count": "Act360",
+            "deferred_interest": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "is_revolving": true,
+            "can_reinvest": true,
+            "maturity": "2034-01-01",
+            "expected_maturity": "2030-01-01",
+            "payment_priority": 2,
+            "attributes": {
+              "tags": [
+                "equity"
+              ],
+              "meta": {
+                "desk": "alts"
+              }
+            }
+          },
+          {
+            "id": "SENIOR",
+            "attachment_point": 10.0,
+            "detachment_point": 100.0,
+            "behavior_type": "Standard",
+            "seniority": "Senior",
+            "rating": "AAA",
+            "original_balance": {
+              "amount": "45000000",
+              "currency": "USD"
+            },
+            "current_balance": {
+              "amount": "45000000",
+              "currency": "USD"
+            },
+            "target_balance": {
+              "amount": "30000000",
+              "currency": "USD"
+            },
+            "coupon": {
+              "Floating": {
+                "index_id": "SOFR-3M",
+                "spread_bp": 150.0,
+                "gearing": 1.0,
+                "gearing_includes_spread": true,
+                "floor_bp": 0.0,
+                "all_in_floor_bp": 25.0,
+                "cap_bp": 1200.0,
+                "index_cap_bp": null,
+                "reset_freq": {"count": 3, "unit": "months"},
+                "reset_lag_days": 2,
+                "dc": "Act360",
+                "bdc": "modified_following",
+                "calendar_id": "NYC",
+                "fixing_calendar_id": "NYC",
+                "end_of_month": false,
+                "payment_lag_days": 0
+              }
+            },
+            "oc_trigger": null,
+            "ic_trigger": null,
+            "credit_enhancement": {
+              "subordination": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "overcollateralization": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "reserve_account": {
+                "amount": "0",
+                "currency": "USD"
+              },
+              "excess_spread": 0.0,
+              "cash_trap_active": false
+            },
+            "frequency": {"count": 3, "unit": "months"},
+            "day_count": "Act360",
+            "deferred_interest": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "is_revolving": false,
+            "can_reinvest": false,
+            "maturity": "2034-01-01",
+            "expected_maturity": null,
+            "payment_priority": 1,
+            "attributes": {
+              "tags": [
+                "senior"
+              ],
+              "meta": {}
+            }
+          }
+        ],
+        "total_size": {
+          "amount": "50000000",
+          "currency": "USD"
+        }
+      },
+      "closing_date": "2024-01-01",
+      "first_payment_date": "2024-04-01",
+      "reinvestment_end_date": "2026-01-01",
+      "maturity": "2034-01-01",
+      "frequency": {"count": 1, "unit": "months"},
+      "discount_curve_id": "USD-SOFR-DISC",
+      "attributes": {
+        "tags": [
+          "full"
+        ],
+        "meta": {
+          "book": "structured_credit"
+        }
+      },
+      "prepayment_spec": {
+        "cpr": 0.06,
+        "curve": {
+          "curve": "psa",
+          "speed_multiplier": 175.0
+        }
+      },
+      "default_spec": {
+        "cdr": 0.03,
+        "curve": {
+          "curve": "sda",
+          "speed_multiplier": 125.0
+        }
+      },
+      "recovery_spec": {
+        "rate": 0.55,
+        "recovery_lag": 10
+      },
+      "market_conditions": {
+        "refi_rate": 0.035,
+        "original_rate": 0.05,
+        "hpa": 0.02,
+        "unemployment": 0.05,
+        "seasonal_factor": 0.98,
+        "custom_factors": {
+          "stress": 1.2
+        }
+      },
+      "credit_factors": {
+        "credit_score": 720,
+        "dti": 0.32,
+        "ltv": 0.85,
+        "delinquency_days": 15,
+        "unemployment_rate": 0.04,
+        "custom_factors": {
+          "fico_band": 700.0
+        }
+      },
+      "deal_metadata": {
+        "manager_id": "Manager-X",
+        "servicer_id": "Servicer-Y",
+        "master_servicer_id": "Master-Z",
+        "special_servicer_id": "Special-W",
+        "trustee_id": "Trustee-T"
+      },
+      "behavior_overrides": {
+        "cpr_annual": 0.18,
+        "abs_speed": 0.012,
+        "psa_speed_multiplier": 1.3,
+        "cdr_annual": 0.025,
+        "sda_speed_multiplier": 1.1,
+        "recovery_rate": 0.42,
+        "recovery_lag_months": 9,
+        "reinvestment_price": 101.0
+      },
+      "default_assumptions": {
+        "base_cdr_annual": 0.03,
+        "base_recovery_rate": 0.45,
+        "base_cpr_annual": 0.09,
+        "psa_speed": 110.0,
+        "sda_speed": 1.2,
+        "abs_speed_monthly": 0.011,
+        "cpr_by_asset_type": {
+          "abs_auto": 0.2
+        },
+        "cdr_by_asset_type": {
+          "abs_auto": 0.03
+        },
+        "recovery_by_asset_type": {
+          "abs_auto": 0.5
+        }
+      },
+      "stochastic_prepay_spec": {
+        "model": "FactorCorrelated",
+        "base_spec": {
+          "cpr": 0.06,
+          "curve": {
+            "curve": "psa",
+            "speed_multiplier": 1.1
+          }
+        },
+        "factor_loading": 0.25,
+        "cpr_volatility": 0.12
+      },
+      "stochastic_default_spec": {
+        "model": "Copula",
+        "base_cdr": 0.025,
+        "copula_spec": {
+          "type": "Gaussian"
+        },
+        "correlation": 0.35
+      },
+      "correlation_structure": {
+        "structure": "Sectored",
+        "intra_sector": 0.28,
+        "inter_sector": 0.12,
+        "prepay_default": -0.18
+      },
+      "hedge_swaps": [
+        {
+          "id": "HEDGE-SWAP",
+          "notional": {
+            "amount": "10000000",
+            "currency": "USD"
+          },
+          "side": "pay",
+          "fixed": {
+            "discount_curve_id": "USD-OIS",
+            "rate": 0.015,
+            "frequency": {"count": 6, "unit": "months"},
+            "day_count": "Thirty360",
+            "bdc": "modified_following",
+            "calendar_id": "USD",
+            "stub": "None",
+            "start": "2024-01-01",
+            "end": "2028-01-01",
+            "par_method": null,
+            "compounding_simple": true
+          },
+          "float": {
+            "discount_curve_id": "USD-OIS",
+            "forward_curve_id": "USD-SOFR-3M",
+            "spread_bp": 0.0,
+            "frequency": {"count": 3, "unit": "months"},
+            "day_count": "Act360",
+            "bdc": "modified_following",
+            "calendar_id": "USD",
+            "stub": "None",
+            "reset_lag_days": 2,
+            "fixing_calendar_id": null,
+            "start": "2024-01-01",
+            "end": "2028-01-01",
+            "compounding": "Simple"
+          },
+          "attributes": {
+            "tags": [],
+            "meta": {}
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "dow_call_degenerate_bs",
+    "domain": "exotics.barrier_option",
+    "description": "Down-and-out call with barrier far below spot degenerates to vanilla Black-Scholes call (Reiner-Rubinstein 1991).",
+    "valuation_date": "2026-04-30",
+    "source": "formula",
+    "source_detail": "Reiner & Rubinstein (1991), 'Breaking Down the Barriers', Risk Magazine 4(8), 28-35. Down-and-out call formula with H=1 (barrier far below S=100) reduces to the vanilla Black-Scholes call: C_do(H->0) = C_BS. Reference computed via standard BS formula: d1=(ln(S/K)+(r+sigma^2/2)*T)/(sigma*sqrt(T))=0.35, d2=0.15, N(d1)=0.63683, N(d2)=0.55962, C=S*N(d1)-K*exp(-r*T)*N(d2)=10.450583572185565 per unit notional. Parameters: S=K=100, H=1, T=1y Act365F (2026-04-30 to 2027-04-30), r=5%, q=0%, sigma=20%.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-16",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-16",
+    "review_interval_months": 6,
+    "regen_command": "",
+    "screenshots": []
+  },
+  "kind": "pricing",
+  "model": "barrier_bs_continuous",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "barrier_dow_degenerate_bs",
+        "description": "Synthetic flat market for degenerate down-and-out call golden test. S=K=100, r=5% (OIS), q=0%, sigma=20% flat.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [
+        {
+          "kind": "price",
+          "id": "SPX-DIVYIELD",
+          "scalar": {
+            "unitless": 0.0
+          }
+        },
+        {
+          "kind": "price",
+          "id": "SPX-SPOT",
+          "scalar": {
+            "price": {
+              "amount": "100",
+              "currency": "USD"
+            }
+          }
+        }
+      ],
+      "prior_market": [
+        {
+          "kind": "discount_curve",
+          "id": "USD-OIS",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              1.0,
+              0.951229424500714
+            ],
+            [
+              5.0,
+              0.778800783071405
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        },
+        {
+          "kind": "vol_surface",
+          "id": "SPX-VOL",
+          "expiries": [
+            0.25,
+            0.5,
+            1.0,
+            2.0
+          ],
+          "strikes": [
+            50.0,
+            75.0,
+            100.0,
+            125.0,
+            150.0
+          ],
+          "secondary_axis": "strike",
+          "interpolation_mode": "vol",
+          "vols_row_major": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ]
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "type": "barrier_option",
+    "spec": {
+      "id": "BAR-SPX-DOW-DEGEN-GOLDEN",
+      "underlying_ticker": "SPX",
+      "strike": 100.0,
+      "barrier": {
+        "amount": "1",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "barrier_type": "down_and_out",
+      "expiry": "2027-04-30",
+      "notional": {
+        "amount": "1",
+        "currency": "USD"
+      },
+      "day_count": "Act365F",
+      "use_gobet_miri": false,
+      "discount_curve_id": "USD-OIS",
+      "spot_id": "SPX-SPOT",
+      "vol_surface_id": "SPX-VOL",
+      "div_yield_id": "SPX-DIVYIELD",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
+    "npv": 10.450583572185565
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 1e-09,
+      "rel": 1e-09,
+      "tolerance_reason": "Formula self-test: degenerate down-and-out call (H=1 << S=100) equals vanilla Black-Scholes call to machine precision under the analytical Reiner-Rubinstein pricer. Tolerance set to 1e-9 to detect any drift from formula changes."
+    }
+  }
+}

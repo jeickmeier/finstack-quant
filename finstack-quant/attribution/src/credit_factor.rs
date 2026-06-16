@@ -1,0 +1,713 @@
+//! Linear hierarchy-level decomposition of credit P&L.
+//!
+//! Given a calibrated [`CreditFactorModel`], a per-position list of CS01s and
+//! issuer ids, and the per-period factor moves produced by
+//! [`finstack_quant_factor_model::decompose_period`], [`compute_credit_factor_attribution`]
+//! returns a [`CreditFactorAttribution`] that obeys
+//!
+//! ```text
+//! generic_pnl + Σ_levels(level.total) + adder_pnl_total ≡ Σ_i (CS01_i × ΔS_i)
+//! ```
+//!
+//! at absolute tolerance `1e-8`.
+//!
+//! # Math
+//!
+//! For each position `i` with issuer `g_i` and credit-curve sensitivity
+//! `CS01_i = ∂PV_i/∂s` (workspace-canonical signed sensitivity: **negative**
+//! for long credit risk, since price falls as spreads widen — see
+//! `finstack_quant_valuations::metrics::sensitivities::cs01`):
+//!
+//! ```text
+//! ΔS_i = β_i^PC · ΔF_PC + Σ_k β_i^level_k · ΔF_level_k(g_i^k) + Δadder_i
+//! ```
+//!
+//! Multiplying through by `CS01_i` and summing over positions (no extra
+//! negation — the same convention as the bump-and-reprice cascade path in
+//! `credit_decomposition.rs`, so a long-credit book shows a **loss** when
+//! spreads widen):
+//!
+//! ```text
+//! generic_pnl  = Σ_i CS01_i · β_i^PC · ΔF_PC
+//! level_k.bucket(g) = Σ_{i in g} CS01_i · β_i^level_k · ΔF_level_k(g)
+//! adder_pnl_total   = Σ_i CS01_i · Δadder_i
+//! ```
+//!
+//! # Determinism
+//!
+//! All keyed maps are [`BTreeMap`]; the function performs no I/O.
+
+use std::collections::BTreeMap;
+
+use finstack_quant_core::money::Money;
+use finstack_quant_core::types::IssuerId;
+use finstack_quant_core::Error;
+use finstack_quant_factor_model::credit::hierarchy::{CreditFactorModel, IssuerBetaRow};
+use serde::{Deserialize, Serialize};
+
+use super::credit_cascade::{
+    bucket_amounts_to_money, hierarchy_level_name, optional_adder_amounts_by_issuer,
+};
+use super::types::{CreditFactorAttribution, LevelPnl};
+use finstack_quant_factor_model::PeriodDecomposition;
+
+/// Options controlling the level of detail emitted by
+/// [`compute_credit_factor_attribution`].
+///
+/// Defaults: per-issuer adder breakdown OFF (large-portfolio payload control);
+/// per-bucket breakdown ON.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields, default)]
+pub struct CreditFactorDetailOptions {
+    /// When true, populate `CreditFactorAttribution.adder_pnl_by_issuer`.
+    /// Defaults to `false` to keep payload small for big portfolios.
+    pub include_per_issuer_adder: bool,
+    /// When true, populate `LevelPnl.by_bucket` for every level. When false,
+    /// only `LevelPnl.total` is populated. Defaults to `true`.
+    pub include_per_bucket_breakdown: bool,
+}
+
+impl Default for CreditFactorDetailOptions {
+    fn default() -> Self {
+        Self {
+            include_per_issuer_adder: false,
+            include_per_bucket_breakdown: true,
+        }
+    }
+}
+
+/// Per-position input to [`compute_credit_factor_attribution`].
+///
+/// `cs01` is signed money (typical convention: long credit risk → negative
+/// CS01, since price falls as spread widens). `delta_spread` is the observed
+/// raw `ΔS_i` for the issuer's curve — kept on the struct as a sanity-check
+/// hook, not used by the linear decomposition itself (the period
+/// decomposition already encodes it via `β·ΔF + Δadder`).
+#[derive(Debug, Clone)]
+pub struct CreditAttributionInput {
+    /// Caller-supplied position identifier (free-form string; not validated).
+    pub position_id: String,
+    /// Issuer this position is exposed to.
+    pub issuer_id: IssuerId,
+    /// Credit-curve sensitivity in money units.
+    pub cs01: Money,
+    /// Observed `ΔS_i` for this issuer (informational only).
+    pub delta_spread: f64,
+}
+
+/// Stable, deterministic identifier for a [`CreditFactorModel`].
+///
+/// Defined as `"{as_of}/{fnv1a64(serde_json::to_string(model))}"` (16-char
+/// lowercase hex). The model is serialized via `serde_json` (which uses
+/// `BTreeMap`-stable order) so two byte-identical models produce the same id.
+///
+/// FNV-1a is used to avoid a new external crypto dependency; the id is for
+/// traceability, not security.
+#[allow(clippy::expect_used)] // CreditFactorModel has no non-serializable fields
+pub fn credit_factor_model_id(model: &CreditFactorModel) -> String {
+    const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+    let json = serde_json::to_string(model).expect("CreditFactorModel is always serializable");
+    let mut hash: u64 = FNV_OFFSET;
+    for b in json.as_bytes() {
+        hash ^= u64::from(*b);
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    format!("{}/{:016x}", model.as_of, hash)
+}
+
+/// Compute hierarchy-level credit P&L from per-position CS01s and an already-
+/// decomposed period.
+///
+/// # Errors
+///
+/// Returns [`Error::Validation`] when:
+///
+/// - `positions` is empty (there is no meaningful currency or result to
+///   fabricate);
+/// - the positions' `cs01` values are not all denominated in the same
+///   currency (no implicit cross-currency math — convert explicitly first);
+/// - the period decomposition shape (level count / dimension order) does not
+///   match the model's hierarchy;
+/// - a position with non-zero CS01 references an issuer that has no
+///   [`IssuerBetaRow`] in the model (silently dropping risk is forbidden);
+/// - a position with non-zero CS01 references an issuer that is absent from
+///   `period.d_adder` — the adder term would be silently omitted and the
+///   module-level reconciliation identity would break.
+pub fn compute_credit_factor_attribution(
+    model: &CreditFactorModel,
+    options: &CreditFactorDetailOptions,
+    positions: &[CreditAttributionInput],
+    period: &PeriodDecomposition,
+) -> Result<CreditFactorAttribution, Error> {
+    // ------------------------------------------------------------------
+    // Shape check: period decomposition must agree with model hierarchy.
+    // ------------------------------------------------------------------
+    let num_levels = model.hierarchy.levels.len();
+    if period.by_level.len() != num_levels {
+        return Err(Error::Validation(format!(
+            "credit_factor_attribution: period has {} levels but model hierarchy has {}",
+            period.by_level.len(),
+            num_levels
+        )));
+    }
+    for (k, (period_lvl, model_dim)) in period
+        .by_level
+        .iter()
+        .zip(model.hierarchy.levels.iter())
+        .enumerate()
+    {
+        if period_lvl.level_index != k || &period_lvl.dimension != model_dim {
+            return Err(Error::Validation(format!(
+                "credit_factor_attribution: level {} dimension mismatch (period={:?}, model={:?})",
+                k, period_lvl.dimension, model_dim
+            )));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Output currency: all positions must share one currency. No implicit
+    // cross-currency math (workspace invariant); reject empty input instead
+    // of fabricating an arbitrary-currency zero result.
+    // ------------------------------------------------------------------
+    let Some(first) = positions.first() else {
+        return Err(Error::Validation(
+            "credit_factor_attribution: positions is empty".to_string(),
+        ));
+    };
+    let ccy = first.cs01.currency();
+    for input in positions {
+        if input.cs01.currency() != ccy {
+            return Err(Error::Validation(format!(
+                "credit_factor_attribution: mixed CS01 currencies (position {:?} is {}, expected {}); convert explicitly before attribution",
+                input.position_id,
+                input.cs01.currency(),
+                ccy
+            )));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Index issuer beta rows by id for O(log n) lookup.
+    // ------------------------------------------------------------------
+    let mut beta_idx: BTreeMap<&IssuerId, &IssuerBetaRow> = BTreeMap::new();
+    for row in &model.issuer_betas {
+        beta_idx.insert(&row.issuer_id, row);
+    }
+
+    // ------------------------------------------------------------------
+    // Pre-validate: every position with non-zero CS01 must have a beta row
+    // in the model and an entry in `period.d_adder`. Silently dropping (or
+    // partially attributing) risk is forbidden — error loudly instead.
+    // ------------------------------------------------------------------
+    let mut unknown_issuers: Vec<&str> = Vec::new();
+    let mut missing_adder: Vec<&str> = Vec::new();
+    for input in positions {
+        #[allow(clippy::float_cmp)] // bit-exact zero sentinel; see loop below
+        let is_zero = input.cs01.amount() == 0.0;
+        if is_zero {
+            continue;
+        }
+        if !beta_idx.contains_key(&input.issuer_id) {
+            unknown_issuers.push(input.issuer_id.as_str());
+        } else if !period.d_adder.contains_key(&input.issuer_id) {
+            missing_adder.push(input.issuer_id.as_str());
+        }
+    }
+    if !unknown_issuers.is_empty() {
+        unknown_issuers.sort_unstable();
+        unknown_issuers.dedup();
+        return Err(Error::Validation(format!(
+            "credit_factor_attribution: issuer(s) not found in CreditFactorModel.issuer_betas: {}",
+            unknown_issuers.join(", ")
+        )));
+    }
+    if !missing_adder.is_empty() {
+        missing_adder.sort_unstable();
+        missing_adder.dedup();
+        return Err(Error::Validation(format!(
+            "credit_factor_attribution: issuer(s) with non-zero CS01 absent from period.d_adder (one-sided spread data?): {}; attribution would be silently partial",
+            missing_adder.join(", ")
+        )));
+    }
+
+    // Pre-fill level totals and per-bucket maps (zeroed).
+    let mut level_totals: Vec<f64> = vec![0.0; num_levels];
+    let mut level_by_bucket: Vec<BTreeMap<String, f64>> =
+        (0..num_levels).map(|_| BTreeMap::new()).collect();
+
+    let mut generic_pnl_amt = 0.0_f64;
+    let mut adder_total_amt = 0.0_f64;
+    let mut adder_by_issuer_amt: BTreeMap<IssuerId, f64> = BTreeMap::new();
+
+    let d_generic = period.d_generic;
+
+    for input in positions {
+        let cs01 = input.cs01.amount();
+        // Bit-exact zero check: positions with zero CS01 contribute nothing to
+        // any factor's P&L, so we short-circuit. The comparison is intentional
+        // — `input.cs01` is constructed by callers as `Money::new(0.0, ccy)`
+        // when the position has no CS01 exposure, so bit-equality is the right
+        // test (NOT epsilon-based).
+        #[allow(clippy::float_cmp)]
+        let is_zero = cs01 == 0.0;
+        if is_zero {
+            continue;
+        }
+        // Pre-validated above: every non-zero-CS01 issuer has a beta row.
+        let Some(row) = beta_idx.get(&input.issuer_id) else {
+            return Err(Error::Validation(format!(
+                "credit_factor_attribution: issuer {:?} not found in CreditFactorModel.issuer_betas",
+                input.issuer_id.as_str()
+            )));
+        };
+        if row.betas.levels.len() != num_levels {
+            return Err(Error::Validation(format!(
+                "credit_factor_attribution: issuer {:?} betas.levels.len() = {}, expected {}",
+                input.issuer_id.as_str(),
+                row.betas.levels.len(),
+                num_levels
+            )));
+        }
+
+        // Generic PC contribution. CS01 is the signed sensitivity ∂PV/∂s
+        // (workspace-canonical: negative for long credit), so P&L for a
+        // spread move is `+CS01 × Δs` — no extra negation, matching the
+        // bump-and-reprice path in `credit_decomposition.rs`.
+        generic_pnl_amt += cs01 * row.betas.pc * d_generic;
+
+        // Per-level: locate this issuer's bucket at level k; if the period
+        // doesn't contain that bucket (e.g. one-sided in decompose_period) the
+        // contribution falls into the adder via the period's d_adder.
+        for k in 0..num_levels {
+            let Some(bucket) = model.hierarchy.bucket_path(&row.tags, k) else {
+                continue;
+            };
+            let d_level = match period.by_level[k].deltas.get(&bucket) {
+                Some(v) => *v,
+                None => continue,
+            };
+            let beta_k = row.betas.levels[k];
+            let contribution = cs01 * beta_k * d_level;
+            level_totals[k] += contribution;
+            if options.include_per_bucket_breakdown {
+                *level_by_bucket[k].entry(bucket).or_insert(0.0) += contribution;
+            }
+        }
+
+        // Adder contribution. Pre-validated above: every non-zero-CS01
+        // issuer has an entry in period.d_adder, so nothing is silently
+        // dropped here (zero-CS01 positions were short-circuited earlier).
+        if let Some(d_adder) = period.d_adder.get(&input.issuer_id) {
+            let contribution = cs01 * d_adder;
+            adder_total_amt += contribution;
+            if options.include_per_issuer_adder {
+                *adder_by_issuer_amt
+                    .entry(input.issuer_id.clone())
+                    .or_insert(0.0) += contribution;
+            }
+        }
+    }
+
+    // Materialize levels.
+    let mut levels = Vec::with_capacity(num_levels);
+    for (k, total) in level_totals.iter().enumerate() {
+        let dim = &model.hierarchy.levels[k];
+        let level_name = hierarchy_level_name(dim);
+        let by_bucket = bucket_amounts_to_money(
+            &level_by_bucket[k],
+            ccy,
+            options.include_per_bucket_breakdown,
+        );
+        levels.push(LevelPnl {
+            level_name,
+            total: Money::new(*total, ccy),
+            by_bucket,
+        });
+    }
+
+    let adder_pnl_by_issuer = optional_adder_amounts_by_issuer(
+        adder_by_issuer_amt,
+        ccy,
+        options.include_per_issuer_adder,
+    );
+
+    Ok(CreditFactorAttribution {
+        model_id: credit_factor_model_id(model),
+        generic_pnl: Money::new(generic_pnl_amt, ccy),
+        levels,
+        adder_pnl_total: Money::new(adder_total_amt, ccy),
+        // This portfolio-level decomposition works purely from a
+        // `PeriodDecomposition` of scalar spread levels; it carries no
+        // hazard-curve term structure, so the non-parallel curve-shape
+        // component is identically zero here.
+        curve_shape_pnl: Money::new(0.0, ccy),
+        adder_pnl_by_issuer,
+        adder_magnitude: None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::create_date;
+    use finstack_quant_factor_model::credit::hierarchy::{
+        AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
+        FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
+        IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
+    };
+    use finstack_quant_factor_model::{decompose_levels, decompose_period};
+    use finstack_quant_factor_model::{
+        FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
+    };
+    use std::collections::BTreeMap;
+    use time::Month;
+
+    fn make_tags(rating: &str, region: &str) -> IssuerTags {
+        let mut m = BTreeMap::new();
+        m.insert("rating".into(), rating.into());
+        m.insert("region".into(), region.into());
+        IssuerTags(m)
+    }
+
+    fn empty_factor_model_config() -> FactorModelConfig {
+        FactorModelConfig {
+            factors: vec![],
+            covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
+            matching: MatchingConfig::MappingTable(vec![]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: Default::default(),
+            bump_size: None,
+            unmatched_policy: None,
+        }
+    }
+
+    fn issuer_row(id: &str, rating: &str, region: &str, pc: f64, lv: Vec<f64>) -> IssuerBetaRow {
+        IssuerBetaRow {
+            issuer_id: IssuerId::new(id),
+            tags: make_tags(rating, region),
+            mode: IssuerBetaMode::IssuerBeta,
+            betas: IssuerBetas { pc, levels: lv },
+            adder_at_anchor: 0.0,
+            adder_vol_annualized: 0.01,
+            adder_vol_source: AdderVolSource::Default,
+            fit_quality: None,
+        }
+    }
+
+    fn model_two_levels() -> CreditFactorModel {
+        CreditFactorModel {
+            schema_version: CreditFactorModel::SCHEMA_VERSION.into(),
+            as_of: create_date(2024, Month::March, 29).unwrap(),
+            calibration_window: DateRange {
+                start: create_date(2022, Month::March, 29).unwrap(),
+                end: create_date(2024, Month::March, 29).unwrap(),
+            },
+            policy: IssuerBetaPolicy::GloballyOff,
+            generic_factor: GenericFactorSpec {
+                name: "CDX IG 5Y".into(),
+                series_id: "cdx.ig.5y".into(),
+            },
+            hierarchy: CreditHierarchySpec {
+                levels: vec![HierarchyDimension::Rating, HierarchyDimension::Region],
+            },
+            config: empty_factor_model_config(),
+            issuer_betas: vec![
+                issuer_row("ISSUER-A", "IG", "EU", 1.1, vec![0.9, 1.05]),
+                issuer_row("ISSUER-B", "IG", "EU", 1.2, vec![0.95, 1.0]),
+                issuer_row("ISSUER-C", "HY", "NA", 0.8, vec![1.05, 0.92]),
+            ],
+            anchor_state: LevelsAtAnchor {
+                pc: 0.0,
+                by_level: vec![],
+            },
+            static_correlation: FactorCorrelationMatrix::identity(vec![]),
+            vol_state: VolState {
+                factors: BTreeMap::new(),
+                idiosyncratic: BTreeMap::new(),
+            },
+            factor_histories: None,
+            diagnostics: CalibrationDiagnostics {
+                mode_counts: BTreeMap::new(),
+                bucket_sizes_per_level: vec![],
+                fold_ups: vec![],
+                r_squared_histogram: None,
+                tag_taxonomy: BTreeMap::new(),
+            },
+        }
+    }
+
+    fn make_period_from_spreads(
+        model: &CreditFactorModel,
+        s_t0: BTreeMap<IssuerId, f64>,
+        g_t0: f64,
+        s_t1: BTreeMap<IssuerId, f64>,
+        g_t1: f64,
+    ) -> PeriodDecomposition {
+        let from = decompose_levels(
+            model,
+            &s_t0,
+            g_t0,
+            create_date(2025, Month::January, 1).unwrap(),
+            None,
+        )
+        .unwrap();
+        let to = decompose_levels(
+            model,
+            &s_t1,
+            g_t1,
+            create_date(2025, Month::January, 31).unwrap(),
+            None,
+        )
+        .unwrap();
+        decompose_period(&from, &to).unwrap()
+    }
+
+    #[test]
+    fn reconciles_to_sum_of_cs01_times_delta_spread() {
+        let model = model_two_levels();
+
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        s_t0.insert(IssuerId::new("ISSUER-B"), 110.0);
+        s_t0.insert(IssuerId::new("ISSUER-C"), 350.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        s_t1.insert(IssuerId::new("ISSUER-B"), 118.0);
+        s_t1.insert(IssuerId::new("ISSUER-C"), 360.0);
+        let period = make_period_from_spreads(&model, s_t0.clone(), 80.0, s_t1.clone(), 85.0);
+
+        let positions = vec![
+            CreditAttributionInput {
+                position_id: "P1".into(),
+                issuer_id: IssuerId::new("ISSUER-A"),
+                cs01: Money::new(-1500.0, Currency::USD),
+                delta_spread: 5.0,
+            },
+            CreditAttributionInput {
+                position_id: "P2".into(),
+                issuer_id: IssuerId::new("ISSUER-B"),
+                cs01: Money::new(-2000.0, Currency::USD),
+                delta_spread: 8.0,
+            },
+            CreditAttributionInput {
+                position_id: "P3".into(),
+                issuer_id: IssuerId::new("ISSUER-C"),
+                cs01: Money::new(-500.0, Currency::USD),
+                delta_spread: 10.0,
+            },
+        ];
+
+        let opts = CreditFactorDetailOptions::default();
+        let detail = compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap();
+
+        // Expected sum: Σ CS01_i × ΔS_i with the canonical signed CS01
+        // (negative for long credit). ΔS_i comes from the period itself
+        // (s_t1 - s_t0) — we drive both sides with the same numbers.
+        let expected: f64 = positions
+            .iter()
+            .map(|p| {
+                let ds = s_t1[&p.issuer_id] - s_t0[&p.issuer_id];
+                p.cs01.amount() * ds
+            })
+            .sum();
+        let attributed = detail.generic_pnl.amount()
+            + detail.levels.iter().map(|l| l.total.amount()).sum::<f64>()
+            + detail.adder_pnl_total.amount();
+        assert!(
+            (attributed - expected).abs() < 1e-8,
+            "reconciliation failed: attributed={}, expected={}",
+            attributed,
+            expected
+        );
+        // Economic direction: every position is long credit (negative CS01)
+        // and every spread widened, so the attributed total must be a loss.
+        assert!(
+            attributed < 0.0,
+            "long-credit book with widening spreads must show a loss, got {attributed}"
+        );
+    }
+
+    #[test]
+    fn empty_positions_errors() {
+        let model = model_two_levels();
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        let period = make_period_from_spreads(&model, s_t0, 80.0, s_t1, 85.0);
+
+        let opts = CreditFactorDetailOptions::default();
+        let err = compute_credit_factor_attribution(&model, &opts, &[], &period).unwrap_err();
+        assert!(err.to_string().contains("positions is empty"), "{err}");
+    }
+
+    #[test]
+    fn mixed_currency_cs01_errors() {
+        let model = model_two_levels();
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        s_t0.insert(IssuerId::new("ISSUER-B"), 110.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        s_t1.insert(IssuerId::new("ISSUER-B"), 118.0);
+        let period = make_period_from_spreads(&model, s_t0, 80.0, s_t1, 85.0);
+
+        let positions = vec![
+            CreditAttributionInput {
+                position_id: "P1".into(),
+                issuer_id: IssuerId::new("ISSUER-A"),
+                cs01: Money::new(-1500.0, Currency::USD),
+                delta_spread: 5.0,
+            },
+            CreditAttributionInput {
+                position_id: "P2".into(),
+                issuer_id: IssuerId::new("ISSUER-B"),
+                cs01: Money::new(-2000.0, Currency::EUR),
+                delta_spread: 8.0,
+            },
+        ];
+
+        let opts = CreditFactorDetailOptions::default();
+        let err =
+            compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("mixed CS01 currencies"), "{msg}");
+        assert!(msg.contains("P2"), "{msg}");
+    }
+
+    #[test]
+    fn unknown_issuer_errors() {
+        let model = model_two_levels();
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        let period = make_period_from_spreads(&model, s_t0, 80.0, s_t1, 85.0);
+
+        let positions = vec![CreditAttributionInput {
+            position_id: "P1".into(),
+            issuer_id: IssuerId::new("ISSUER-UNKNOWN"),
+            cs01: Money::new(-1000.0, Currency::USD),
+            delta_spread: 5.0,
+        }];
+
+        let opts = CreditFactorDetailOptions::default();
+        let err =
+            compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("not found in CreditFactorModel.issuer_betas"),
+            "{msg}"
+        );
+        assert!(msg.contains("ISSUER-UNKNOWN"), "{msg}");
+    }
+
+    #[test]
+    fn issuer_missing_from_d_adder_errors() {
+        let model = model_two_levels();
+        // ISSUER-B is present at t0 only, so decompose_period drops it from
+        // d_adder (restricted to issuers present in both snapshots).
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        s_t0.insert(IssuerId::new("ISSUER-B"), 110.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        let period = make_period_from_spreads(&model, s_t0, 80.0, s_t1, 85.0);
+        assert!(!period.d_adder.contains_key(&IssuerId::new("ISSUER-B")));
+
+        let positions = vec![CreditAttributionInput {
+            position_id: "P1".into(),
+            issuer_id: IssuerId::new("ISSUER-B"),
+            cs01: Money::new(-2000.0, Currency::USD),
+            delta_spread: 8.0,
+        }];
+
+        let opts = CreditFactorDetailOptions::default();
+        let err =
+            compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("absent from period.d_adder"), "{msg}");
+        assert!(msg.contains("ISSUER-B"), "{msg}");
+    }
+
+    #[test]
+    fn zero_cs01_position_with_unknown_issuer_is_allowed() {
+        let model = model_two_levels();
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        let period = make_period_from_spreads(&model, s_t0, 80.0, s_t1, 85.0);
+
+        let positions = vec![
+            CreditAttributionInput {
+                position_id: "P1".into(),
+                issuer_id: IssuerId::new("ISSUER-A"),
+                cs01: Money::new(-1000.0, Currency::USD),
+                delta_spread: 5.0,
+            },
+            CreditAttributionInput {
+                position_id: "P2".into(),
+                issuer_id: IssuerId::new("ISSUER-UNKNOWN"),
+                cs01: Money::new(0.0, Currency::USD),
+                delta_spread: 0.0,
+            },
+        ];
+
+        let opts = CreditFactorDetailOptions::default();
+        assert!(compute_credit_factor_attribution(&model, &opts, &positions, &period).is_ok());
+    }
+
+    #[test]
+    fn per_issuer_adder_is_omitted_by_default() {
+        let model = model_two_levels();
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        s_t0.insert(IssuerId::new("ISSUER-B"), 110.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        s_t1.insert(IssuerId::new("ISSUER-B"), 118.0);
+        let period = make_period_from_spreads(&model, s_t0, 80.0, s_t1, 85.0);
+
+        let positions = vec![CreditAttributionInput {
+            position_id: "P1".into(),
+            issuer_id: IssuerId::new("ISSUER-A"),
+            cs01: Money::new(-1000.0, Currency::USD),
+            delta_spread: 5.0,
+        }];
+
+        let opts = CreditFactorDetailOptions::default();
+        let detail = compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap();
+        assert!(detail.adder_pnl_by_issuer.is_none());
+    }
+
+    #[test]
+    fn per_bucket_breakdown_can_be_disabled() {
+        let model = model_two_levels();
+        let mut s_t0 = BTreeMap::new();
+        s_t0.insert(IssuerId::new("ISSUER-A"), 100.0);
+        s_t0.insert(IssuerId::new("ISSUER-B"), 110.0);
+        let mut s_t1 = BTreeMap::new();
+        s_t1.insert(IssuerId::new("ISSUER-A"), 105.0);
+        s_t1.insert(IssuerId::new("ISSUER-B"), 118.0);
+        let period = make_period_from_spreads(&model, s_t0, 80.0, s_t1, 85.0);
+
+        let positions = vec![CreditAttributionInput {
+            position_id: "P1".into(),
+            issuer_id: IssuerId::new("ISSUER-A"),
+            cs01: Money::new(-1000.0, Currency::USD),
+            delta_spread: 5.0,
+        }];
+
+        let opts = CreditFactorDetailOptions {
+            include_per_issuer_adder: false,
+            include_per_bucket_breakdown: false,
+        };
+        let detail = compute_credit_factor_attribution(&model, &opts, &positions, &period).unwrap();
+        for level in &detail.levels {
+            assert!(level.by_bucket.is_empty());
+        }
+    }
+}

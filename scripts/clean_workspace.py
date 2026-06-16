@@ -11,8 +11,8 @@ import shutil
 
 ROOT_DIRS = (
     ".venv",
-    "finstack-wasm/pkg",
-    "finstack-wasm/pkg-node",
+    "finstack-quant-wasm/pkg",
+    "finstack-quant-wasm/pkg-node",
     "book/book",
 )
 

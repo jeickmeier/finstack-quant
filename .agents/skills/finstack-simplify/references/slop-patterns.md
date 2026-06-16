@@ -1,6 +1,6 @@
 # Slop patterns: the catalogue
 
-Every category below is something this skill hunts for during Phase 1 (Audit). Each entry has: **what it looks like**, **how to detect it**, a **finstack-specific example shape**, and **how to fix**. "Fix" always defaults to *delete*.
+Every category below is something this skill hunts for during Phase 1 (Audit). Each entry has: **what it looks like**, **how to detect it**, a **finstack-quant-specific example shape**, and **how to fix**. "Fix" always defaults to *delete*.
 
 If you find a pattern that isn't in this catalogue, add it here in your audit report under "New pattern observed" with the same shape.
 
@@ -15,12 +15,12 @@ If you find a pattern that isn't in this catalogue, add it here in your audit re
 - Look for multiple `impl Foo { pub fn ... }` blocks with similar signatures and overlapping bodies.
 - Any time you see a `match version { .. }` or `if legacy { .. }` inside a public function, suspect a parallel universe.
 
-**Finstack-specific shape:**
+**Finstack Quant-specific shape:**
 - Curve builders: `DiscountCurveBuilder::new` + `DiscountCurveBuilder::from_market_data` + `build_discount_curve()` free function — three entry points doing substantively the same job.
 - Surface construction: `VolSurface::new` + `VolSurface::from_grid` + `vol_surface_from_points()`.
 - Multiple `forecast_eval_*` functions that differ only in which subset of inputs they accept.
 
-**Fix:** Pick the canonical entry point (usually the one with the richest signature + `Result` return). Collapse everything else into it. Convert the others to private helpers or delete outright. Update call-sites in the binding layer (`finstack-py/src/bindings/`, `finstack-wasm/src/api/`) in the **same slice** — don't leave orphans.
+**Fix:** Pick the canonical entry point (usually the one with the richest signature + `Result` return). Collapse everything else into it. Convert the others to private helpers or delete outright. Update call-sites in the binding layer (`finstack-quant-py/src/bindings/`, `finstack-quant-wasm/src/api/`) in the **same slice** — don't leave orphans.
 
 **Bias:** prefer the one that already takes `&MarketData` or another strongly-typed context object. Infallible shortcuts that hide a `.unwrap()` are traps; delete them.
 
@@ -41,7 +41,7 @@ pub fn compute_sharpe(returns: &[f64], rf: f64) -> f64 {
 - Functions whose body is `return other_fn(args)` with no transformation.
 - Wrappers that "just provide a default" when the default is already `Default::default()` on the param type.
 
-**Finstack-specific shape:**
+**Finstack Quant-specific shape:**
 - `analytics::portfolio_sharpe(r)` that just forwards to `analytics::sharpe(r, 1.0)`.
 - `valuations::price_bond(b)` that forwards to `valuations::price_bond_with_curve(b, default_curve())`.
 
@@ -59,7 +59,7 @@ pub fn compute_sharpe(returns: &[f64], rf: f64) -> f64 {
 - Pairs of functions `x` and `try_x` in the same module.
 - `fn x(...) -> T { Self::try_x(...).expect(...) }`.
 
-**Finstack-specific shape:** Constructors on primitives. `Currency::new` panicking and `Currency::try_new` returning `Result`, with `new` implemented via `try_new().unwrap()`. Both are public.
+**Finstack Quant-specific shape:** Constructors on primitives. `Currency::new` panicking and `Currency::try_new` returning `Result`, with `new` implemented via `try_new().unwrap()`. Both are public.
 
 **Fix:** **Collapse to one.** The binding crate has `#![deny(clippy::unwrap_used)]` and `#![deny(clippy::panic)]` — the panicking sibling is already unusable from bindings. Delete it. Keep only the `Result`-returning one. If the user really wants an infallible version, give it a distinct name that reflects a genuinely infallible input type (e.g., a validated newtype), not a `try_`/`_` pair.
 
@@ -76,7 +76,7 @@ pub fn compute_sharpe(returns: &[f64], rf: f64) -> f64 {
 - Two functions with the same numerical output on test vectors but different code paths.
 - Structural review: list all `max_drawdown`, `sharpe`, `sortino`, `var_*`, `cs01_*` in the workspace. If there's more than one of any of them, suspect duplication.
 
-**Finstack-specific shape:**
+**Finstack Quant-specific shape:**
 - `analytics::drawdown::max_drawdown()` and `portfolio::drawdown::max_drawdown()` with subtly different handling of NaN / empty input.
 - Two z-spread solvers in `valuations/pricing/bond.rs` and `valuations/pricing/loan.rs`.
 - CS01 computed differently for corporates vs. private-credit.
@@ -100,7 +100,7 @@ impl CurveBuilder for DiscountCurveBuilder { ... }
 - `grep -r "impl.*for" | awk` to count impls per trait. Any trait with exactly one impl is suspect.
 - Traits defined in a module that also contains the only impl.
 
-**Finstack-specific shape:** "Pluggable" abstractions added speculatively during vibe-coding. `trait ScenarioAdapter` with only `MarketAdapter` implementing it. `trait Evaluator` with only `StatementEvaluator` implementing it.
+**Finstack Quant-specific shape:** "Pluggable" abstractions added speculatively during vibe-coding. `trait ScenarioAdapter` with only `MarketAdapter` implementing it. `trait Evaluator` with only `StatementEvaluator` implementing it.
 
 **Fix:** Collapse the trait away. Use the concrete type directly. If the user *plans* to add a second impl, defer the trait until the second impl exists — speculative traits are a tax on every reader until that day comes.
 
@@ -120,7 +120,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Grep for callers of a generic function. If every call site uses the same concrete type, it's single-instantiation.
 - PhantomData fields in structs, especially if the type parameter is never used in a meaningful way.
 
-**Finstack-specific shape:** `fn price<P: Pricer>(p: P)` where only `BondPricer` ever gets passed. `struct Cache<K, V>` where `K = String, V = Decimal` everywhere.
+**Finstack Quant-specific shape:** `fn price<P: Pricer>(p: P)` where only `BondPricer` ever gets passed. `struct Cache<K, V>` where `K = String, V = Decimal` everywhere.
 
 **Fix:** Delete the type parameter. Use the concrete type. Keep the generic only when you have two concrete instantiations *today* or when the caller (downstream Rust user, Python, or WASM) genuinely needs to pick. Note: PyO3 and wasm-bindgen can't expose generics anyway — any generic in code that feeds a binding is a strong delete signal.
 
@@ -135,7 +135,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Look for two modules with similar names (`checks/` and `checks_v2/`, or `runner.rs` and `suite.rs`).
 - `git log -- path/` showing a rename-in-progress.
 
-**Finstack-specific shape:**
+**Finstack Quant-specific shape:**
 - `statements/src/checks/runner.rs` (deleted in status but referenced?) alongside `checks/suite.rs`.
 - `registry/dynamic.rs` alongside `registry/mod.rs` with overlapping responsibilities.
 - Anywhere `forecast_eval.rs` imports from both a new and old forecast module.
@@ -155,7 +155,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Look for `pub fn register_root(...)` in more than one place per crate.
 - Builders that have more than one `pub fn build(...)` variant.
 
-**Finstack-specific shape:**
+**Finstack Quant-specific shape:**
 - `statements/src/registry/mod.rs` + `statements/src/registry/dynamic.rs` + an ad-hoc `HashMap<String, ...>` elsewhere.
 - `ModelBuilder::build()` that coexists with `ModelBuilder::finalize()` and `ModelBuilder::into_model()`.
 - Check registration via `suite.add_check(...)` AND `checks::register_builtin(...)` AND `#[check]` proc-macros.
@@ -175,7 +175,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Variants with identical field shapes and similar names (e.g., `InvalidCurve`, `BadCurve`, `MalformedCurve`).
 - Variants that are only used once and could be replaced with a `source()` chain.
 
-**Finstack-specific shape:** Per-crate `Error` enums in `analytics`, `valuations`, `statements` that each have their own `ParseError`, `ValidationError`, `InvalidInput`, etc., with no shared structure. Bindings then map them all to the same Python/JS error anyway via `core_to_py()` / `JsValue::from_str`.
+**Finstack Quant-specific shape:** Per-crate `Error` enums in `analytics`, `valuations`, `statements` that each have their own `ParseError`, `ValidationError`, `InvalidInput`, etc., with no shared structure. Bindings then map them all to the same Python/JS error anyway via `core_to_py()` / `JsValue::from_str`.
 
 **Fix:**
 - Delete unused variants.
@@ -194,7 +194,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Look for `pub use foo::*` patterns (glob re-exports).
 - Any re-export of a `*Builder` intermediate state (e.g., re-exporting `DiscountCurveBuilderStage1`) is a smell.
 
-**Finstack-specific shape:** `statements/src/prelude.rs` exporting internal evaluator types used by no one outside the crate. `core` re-exporting Polars' entire API.
+**Finstack Quant-specific shape:** `statements/src/prelude.rs` exporting internal evaluator types used by no one outside the crate. `core` re-exporting Polars' entire API.
 
 **Fix:** Reduce the prelude to the types downstream users actually construct or match on. Remove internal-only re-exports. Cross-check by grepping every item in the prelude — if it's never imported outside the crate, demote it.
 
@@ -209,7 +209,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - `cargo-udeps` or `cargo-machete` for unused dependencies.
 - Grep for function names and see if there are any non-definition hits.
 
-**Finstack-specific shape:** Test utility functions left in `src/` instead of `tests/` or `mod tests`. Old scenario-engine types never wired into the builder.
+**Finstack Quant-specific shape:** Test utility functions left in `src/` instead of `tests/` or `mod tests`. Old scenario-engine types never wired into the builder.
 
 **Fix:** Delete. If it's "might be useful someday", it goes; `git` remembers.
 
@@ -223,7 +223,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Any `pub struct Foo { pub x: ..., pub y: ..., pub z: ... }` that also has a builder. The fields probably shouldn't both be `pub` AND have a builder; pick one.
 - Grep for each `pub fn` to see if any caller outside the defining crate uses it.
 
-**Finstack-specific shape:** Wrapper types in bindings (`pub(crate) inner: RustType`) that then expose `pub fn inner()` accessors. Internal error types re-exported at the crate root.
+**Finstack Quant-specific shape:** Wrapper types in bindings (`pub(crate) inner: RustType`) that then expose `pub fn inner()` accessors. Internal error types re-exported at the crate root.
 
 **Fix:** Tighten visibility to the minimum necessary. Public surface area is a contract; smaller contract = less to break.
 
@@ -237,7 +237,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Grep for `Config`, `Options`, `Settings`, `Params` suffixes on structs in the same module.
 - Multiple `Default` impls that produce subtly different defaults.
 
-**Finstack-specific shape:** `ScenarioConfig` vs `ScenarioOptions` in `scenarios/`. `RoundingConfig` vs `RoundingContext`.
+**Finstack Quant-specific shape:** `ScenarioConfig` vs `ScenarioOptions` in `scenarios/`. `RoundingConfig` vs `RoundingContext`.
 
 **Fix:** One config type per capability. Pick the most complete and delete the others. If sub-configs are needed for different phases, they should be composable (struct-of-substructs) not parallel.
 
@@ -254,7 +254,7 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 - Any abstraction added for "future flexibility" that has no current second user.
 - Documentation that says "extensible" without showing what currently extends it.
 
-**Finstack-specific shape:** `ScenarioEngineFactory` that returns `ScenarioEngine` and nothing else. `StatementEvaluatorStrategy` with one strategy implemented.
+**Finstack Quant-specific shape:** `ScenarioEngineFactory` that returns `ScenarioEngine` and nothing else. `StatementEvaluatorStrategy` with one strategy implemented.
 
 **Fix:** Inline the factory. Remove the abstract base. Kill the event bus. Re-introduce the abstraction the day a second user appears; until then, every reader is paying the cost.
 
@@ -265,11 +265,11 @@ pub fn evaluate<T: Numeric>(input: &[T]) -> T { ... }
 **Looks like:** A Python or WASM binding that does more than type conversion — e.g., validates input, computes something, or calls multiple Rust functions in sequence before returning.
 
 **Detect:**
-- In `finstack-py/src/bindings/*.rs`, look for functions longer than ~20 lines, or with any arithmetic, or with any non-trivial control flow.
-- In `finstack-wasm/src/api/*.rs`, same test.
+- In `finstack-quant-py/src/bindings/*.rs`, look for functions longer than ~20 lines, or with any arithmetic, or with any non-trivial control flow.
+- In `finstack-quant-wasm/src/api/*.rs`, same test.
 - Any binding that calls more than one Rust function is suspect.
 
-**Finstack-specific shape:** A Python binding that takes `curve: &PyAny`, extracts fields, constructs a Rust `Curve`, *then* computes the discount factor inline — instead of calling a single Rust function.
+**Finstack Quant-specific shape:** A Python binding that takes `curve: &PyAny`, extracts fields, constructs a Rust `Curve`, *then* computes the discount factor inline — instead of calling a single Rust function.
 
 **Fix:** Move the logic into a Rust function. Reduce the binding to: extract params → call the Rust fn → wrap the result → map errors. See `references/binding-drift.md` for the full procedure.
 

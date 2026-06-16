@@ -1,0 +1,54 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "asian_option",
+    "spec": {
+      "id": "ASIAN-SPX-ARITH-6M",
+      "underlying_ticker": "SPX",
+      "strike": {
+        "amount": "4500",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "averaging_method": "Arithmetic",
+      "expiry": "2024-06-30",
+      "fixing_dates": [
+        "2024-01-31",
+        "2024-02-29",
+        "2024-03-31",
+        "2024-04-30",
+        "2024-05-31",
+        "2024-06-30"
+      ],
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "day_count": "Act365F",
+      "discount_curve_id": "USD-OIS",
+      "spot_id": "SPX-SPOT",
+      "vol_surface_id": "SPX-VOL",
+      "div_yield_id": "SPX-DIV",
+      "pricing_overrides": {
+        "quoted_clean_price": null,
+        "rho_bump_decimal": null,
+        "vega_bump_decimal": null,
+        "implied_volatility": null,
+        "cds_quote_bp": null,
+        "upfront_payment": null,
+        "ytm_bump_decimal": null,
+        "theta_period": null,
+        "mc_seed_scenario": null,
+        "adaptive_bumps": false,
+        "spot_bump_pct": null,
+        "vol_bump_pct": null,
+        "rate_bump_bp": null
+      },
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      },
+      "past_fixings": []
+    }
+  }
+}

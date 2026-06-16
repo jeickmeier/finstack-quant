@@ -1,4 +1,4 @@
-# Quant Finance Review — `finstack/covenants` Crate and Bindings
+# Quant Finance Review — `finstack-quant/covenants` Crate and Bindings
 
 > **Remediation status (2026-06-12): NOT STARTED.** Review complete; all
 > Blocker/Major findings below were empirically confirmed with throwaway
@@ -7,10 +7,10 @@
 > review time: 52 tests across 4 suites.
 
 **Date:** 2026-06-12
-**Scope:** `finstack/covenants` (engine, forward forecasting, schedule, metric,
-report, templates, json), `finstack-py/src/bindings/covenants`,
-`finstack-wasm/src/api/covenants`, JS facade (`exports/covenants.js`),
-Python stub (`finstack/covenants/__init__.pyi`), parity contract entries,
+**Scope:** `finstack-quant/covenants` (engine, forward forecasting, schedule, metric,
+report, templates, json), `finstack-quant-py/src/bindings/covenants`,
+`finstack-quant-wasm/src/api/covenants`, JS facade (`exports/covenants.js`),
+Python stub (`finstack-quant/covenants/__init__.pyi`), parity contract entries,
 and all crate/binding tests (~2,800 source lines reviewed in full).
 
 ---
@@ -190,10 +190,10 @@ windows with first-match-wins.
   amounts with no currency tag — given the workspace's currency-safety
   invariant, at minimum document the deal-currency assumption.
 - **Mi7.** Python `__all__` in registration isn't sorted
-  (`finstack-py/src/bindings/covenants/mod.rs:135-147`); binding standards
+  (`finstack-quant-py/src/bindings/covenants/mod.rs:135-147`); binding standards
   require sorted, and the `.pyi` stub *is* sorted.
 - **Mi8.** No WASM facade tests exercise the covenants namespace (nothing in
-  `finstack-wasm/tests/` touches it; WASM standards checklist requires
+  `finstack-quant-wasm/tests/` touches it; WASM standards checklist requires
   facade tests). Python parity has 2 covenant tests; thin but present.
 - **Mi9.** `ThresholdSchedule` accepts duplicate dates; last entry wins
   silently on lookup — document or reject.

@@ -1,6 +1,6 @@
-# Finstack
+# Finstack Quant
 
-Finstack is a Rust-first quantitative finance workspace with Python and
+Finstack Quant is a Rust-first quantitative finance workspace with Python and
 WebAssembly bindings. The repository is organized around reusable financial
 primitives, pricing and risk engines, statement modeling, deterministic
 scenario tooling, portfolio analytics, and thin binding layers that keep the
@@ -9,9 +9,9 @@ business logic in Rust.
 ## Workspace Layout
 
 ```text
-rfin/
-├── finstack/
-│   ├── Cargo.toml                 # `finstack` umbrella crate
+finstack-quant/
+├── finstack-quant/
+│   ├── Cargo.toml                 # `finstack-quant` umbrella crate
 │   ├── src/                       # Feature-gated re-exports
 │   ├── core/                      # Dates, money, market data, math, expressions
 │   ├── cashflows/                 # Schedule construction and cashflow aggregation
@@ -23,8 +23,8 @@ rfin/
 │   ├── valuations/                # Instruments, pricing, metrics, calibration
 │   ├── portfolio/                 # Portfolio valuation, grouping, optimization
 │   └── scenarios/                 # Scenario composition and application
-├── finstack-py/                   # PyO3 bindings packaged as `finstack`
-├── finstack-wasm/                 # wasm-bindgen bindings packaged as `finstack-wasm`
+├── finstack-quant-py/                   # PyO3 bindings packaged as `finstack-quant-py`
+├── finstack-quant-wasm/                 # wasm-bindgen bindings packaged as `finstack-quant-wasm`
 ├── docs/                          # Shared references and project documentation
 ├── pyproject.toml                 # Python packaging and tooling
 ├── Cargo.toml                     # Workspace manifest
@@ -33,61 +33,62 @@ rfin/
 
 ## Library Map
 
-- `finstack-core`: currencies, money, rates, dates, calendars, market data,
+- `finstack-quant-core`: currencies, money, rates, dates, calendars, market data,
   cashflow primitives, math utilities, and the expression engine.
-- `finstack-cashflows`: schedule construction, accrual logic, and
+- `finstack-quant-cashflows`: schedule construction, accrual logic, and
   currency-preserving cashflow aggregation for bonds, loans, swaps, and
   structured products.
-- `finstack-analytics`: return-series performance analytics, drawdown analysis,
+- `finstack-quant-analytics`: return-series performance analytics, drawdown analysis,
   tail risk, benchmark-relative metrics, and rolling statistics.
-- `finstack-monte-carlo`: generic Monte Carlo engine, stochastic processes,
+- `finstack-quant-monte-carlo`: generic Monte Carlo engine, stochastic processes,
   discretizations, payoffs, variance reduction, and result types.
-- `finstack-margin`: CSA and repo margin specs, VM/IM engines, SIMM helpers,
+- `finstack-quant-margin`: CSA and repo margin specs, VM/IM engines, SIMM helpers,
   collateral eligibility, and XVA primitives.
-- `finstack-statements`: period-based financial statement modeling,
+- `finstack-quant-statements`: period-based financial statement modeling,
   forecasting, formula evaluation, and extension hooks.
-- `finstack-statements-analytics`: higher-level analysis on top of
-  `finstack-statements`, including scenarios, variance tooling, templates,
+- `finstack-quant-statements-analytics`: higher-level analysis on top of
+  `finstack-quant-statements`, including scenarios, variance tooling, templates,
   reporting, and covenant-oriented workflows.
-- `finstack-valuations`: instrument coverage across rates, credit, equity, FX,
+- `finstack-quant-valuations`: instrument coverage across rates, credit, equity, FX,
   structured products, and private markets, plus pricing, metrics,
   attribution, covenants, and calibration.
-- `finstack-portfolio`: entity and position containers, aggregation, grouping,
+- `finstack-quant-portfolio`: entity and position containers, aggregation, grouping,
   selective repricing, factor decomposition, optimization, and scenario-aware
   workflows.
-- `finstack-scenarios`: deterministic scenario composition, market-data and
+- `finstack-quant-scenarios`: deterministic scenario composition, market-data and
   statement shocks, instrument shocks, and time roll-forward workflows.
 
 ## Umbrella Crate
 
-The top-level Rust crate is `finstack`, which re-exports every sub-crate so
+The top-level Rust crate is `finstack-quant`, imported in Rust as `finstack_quant`,
+which re-exports every sub-crate so
 downstream consumers reach the full API through a single dependency.
 
 ```toml
 [dependencies]
-finstack = { path = "finstack" }
+finstack-quant = { path = "finstack-quant" }
 ```
 
-`finstack-cashflows` is a standalone workspace crate and a direct dependency of
-`finstack-valuations`.
+`finstack-quant-cashflows` is a standalone workspace crate and a direct dependency of
+`finstack-quant-valuations`.
 
 ## Python Bindings
 
-`finstack-py` builds the Python package `finstack`. Top-level subpackages (lazy-loaded):
+`finstack-quant-py` builds the Python package `finstack_quant`. Top-level subpackages (lazy-loaded):
 
 - `analytics`, `cashflows`, `core`, `margin`, `monte_carlo`, `portfolio`,
   `scenarios`, `statements`, `statements_analytics`, `valuations`
 
-Nested modules under `finstack.valuations` (for example `correlation`, `instruments`)
-mirror the Rust crate layout. See [`finstack-py/README.md`](finstack-py/README.md).
+Nested modules under `finstack_quant.valuations` (for example `correlation`, `instruments`)
+mirror the Rust crate layout. See [`finstack-quant-py/README.md`](finstack-quant-py/README.md).
 
-Notebooks live under `finstack-py/examples/notebooks/`. Run them with
+Notebooks live under `finstack-quant-py/examples/notebooks/`. Run them with
 `mise run python-examples` or
-`uv run python finstack-py/examples/notebooks/run_all_notebooks.py`.
+`uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py`.
 
 ## WASM Bindings
 
-`finstack-wasm` builds the `finstack-wasm` package for browser and Node.js
+`finstack-quant-wasm` builds the `finstack-quant-wasm` package for browser and Node.js
 consumers. It exposes namespaced modules that mirror the Rust workspace:
 
 - `core`
@@ -100,9 +101,9 @@ consumers. It exposes namespaced modules that mirror the Rust workspace:
 - `statements_analytics`
 - `valuations`
 
-The package facade lives in `finstack-wasm/index.js`, TypeScript declarations
-live in `finstack-wasm/index.d.ts`, and the namespace shims live in
-`finstack-wasm/exports/`.
+The package facade lives in `finstack-quant-wasm/index.js`, TypeScript declarations
+live in `finstack-quant-wasm/index.d.ts`, and the namespace shims live in
+`finstack-quant-wasm/exports/`.
 
 ## Development Setup
 
@@ -128,8 +129,8 @@ mise install
 ### Quick Start
 
 ```bash
-git clone https://github.com/jeickmeier/finstack.git
-cd finstack
+git clone https://github.com/jeickmeier/finstack-quant.git
+cd finstack-quant
 mise install
 
 mise run rust-build
@@ -165,8 +166,8 @@ Run `mise tasks` to list every available task.
 ## Documentation
 
 - `docs/` for shared references, standards, and design notes.
-- [`finstack-py/README.md`](finstack-py/README.md) and
-  [`finstack-py/examples/notebooks/README.md`](finstack-py/examples/notebooks/README.md)
+- [`finstack-quant-py/README.md`](finstack-quant-py/README.md) and
+  [`finstack-quant-py/examples/notebooks/README.md`](finstack-quant-py/examples/notebooks/README.md)
   for Python bindings and the notebook curriculum.
 
 ## License

@@ -1,7 +1,7 @@
-# Quant Finance Review — `finstack/valuations` + Python/WASM Bindings
+# Quant Finance Review — `finstack-quant/valuations` + Python/WASM Bindings
 
 - **Date:** 2026-06-09
-- **Scope:** `finstack/valuations` (all instrument families, models, calibration, metrics, market conventions, pricer registry/JSON) plus `finstack-py/src/bindings/valuations/` and `finstack-wasm/src/api/valuations/` with stubs, facades, and `parity_contract.toml`.
+- **Scope:** `finstack-quant/valuations` (all instrument families, models, calibration, metrics, market conventions, pricer registry/JSON) plus `finstack-quant-py/src/bindings/valuations/` and `finstack-quant-wasm/src/api/valuations/` with stubs, facades, and `parity_contract.toml`.
 - **Method:** Seven parallel read-only review agents (rates, credit, fixed income cash, securitized, FX/equity/commodity/exotics, models/calibration/metrics infra, bindings parity), each tracing implementation → helpers → tests before reporting. The five blockers were independently re-verified at the source by the orchestrator (marked ✅). No code was modified and no tests were executed; numerical claims were verified by derivation/recomputation.
 - **Severity guide:** Blocker = incorrect price/P&L/risk or broken market standard; Major = numerical instability, bad edge case, or missing market-standard feature; Moderate = perf/API/latent hazard; Minor = docs/polish.
 - **Known intentional convention (not flagged):** DV01/CS01 are dPV/dy native sign — negative for long bonds/receivers is intentional.
@@ -24,36 +24,36 @@ Recurring failure patterns:
 
 ### **[FIXED 2026-06-09]** B1 ✅ — MtM-resetting XCCY swap inverts the CIP forward-FX ratio
 
-- **Location:** `finstack/valuations/src/instruments/rates/xccy_swap/pricing_mtm.rs:486` (`compute_resetting_notional_and_df_r`), consumed by `pv_mtm_reset` and `mtm_resetting_leg_schedule`.
-- **Issue:** Code computes `x_t = spot × (P_C / P_R)`. With spot quoted constant-per-resetting (verified against `FxProvider` semantics, `finstack/core/src/money/fx/provider.rs:80-89`), CIP requires `F = S × P_R / P_C`. Example: EUR@1%/USD@2%, S=1.10 → correct F(1y)=1.111 (low-yield ccy at forward premium); code gives 1.089. The module doc and the unit test (`compute_resetting_notional_matches_formula`) encode the inverted formula.
+- **Location:** `finstack-quant/valuations/src/instruments/rates/xccy_swap/pricing_mtm.rs:486` (`compute_resetting_notional_and_df_r`), consumed by `pv_mtm_reset` and `mtm_resetting_leg_schedule`.
+- **Issue:** Code computes `x_t = spot × (P_C / P_R)`. With spot quoted constant-per-resetting (verified against `FxProvider` semantics, `finstack-quant/core/src/money/fx/provider.rs:80-89`), CIP requires `F = S × P_R / P_C`. Example: EUR@1%/USD@2%, S=1.10 → correct F(1y)=1.111 (low-yield ccy at forward premium); code gives 1.089. The module doc and the unit test (`compute_resetting_notional_matches_formula`) encode the inverted formula.
 - **Impact:** Every reset notional, rebalancing cashflow, coupon on the resetting leg, and final exchange is wrong; error grows ~2× the rate differential per year (~35% notional error at the last reset for 5%/2% rates over 5y).
 - **Fix:** `x_t = spot × (p_r / p_c)`; update module doc, design-spec formula, and test expectation.
 
 ### **[FIXED 2026-06-09]** B2 ✅ — Callable-bond tree silently drops part of any cashflow inside the first time step
 
-- **Location:** `finstack/valuations/src/instruments/fixed_income/bond/pricing/engine/tree/bond_valuator.rs:310-334`.
+- **Location:** `finstack-quant/valuations/src/instruments/fixed_income/bond/pricing/engine/tree/bond_valuator.rs:310-334`.
 - **Issue:** Distributed cashflow mapping gates the lower-step share on `step_idx > 0`; a coupon with `t < dt` (raw index in (0,1)) loses its `(1−weight)` share. Backward induction includes step 0, and the term-loan tree engine books `lo == 0` correctly — the guard is anomalous. The PV-preservation test uses annual coupons and can't catch it.
 - **Impact:** Any callable/putable bond valued within one tree step of a coupon (default 100 steps on 10y → ~36-day window, ~20% of dates) leaks up to a full coupon of PV; contaminates OAS, effective duration/convexity, quote conversions.
 - **Fix:** Change the guard to `if step_idx < num_steps`, booking the share at step 0 with the existing `value_at_step_time` DF correction.
 
 ### **[FIXED 2026-06-09]** B3 ✅ — Dollar-roll implied financing rate: drop sign inverted; paydown treated as full-par cost
 
-- **Location:** `finstack/valuations/src/instruments/fixed_income/dollar_roll/carry.rs:106-115` (and `break_even_drop`, lines 143-152).
+- **Location:** `finstack-quant/valuations/src/instruments/fixed_income/dollar_roll/carry.rs:106-115` (and `break_even_drop`, lines 143-152).
 - **Issue:** `net_benefit = drop + coupon − paydown`. The breakeven derivation (independently re-derived) is `r = [coupon + s·(100 − P_back) − drop] / P_front × 360/d`. A larger drop should *lower* the implied financing rate (roll special/cheap); code raises it, so `roll_specialness` (line 134) moves the wrong direction, contradicting its own doc. Paydown enters at full par with the wrong contribution instead of `s·(100 − P_back)`.
 - **Impact:** Implied rate, specialness (bp), and break-even drop wrong in level and direction — directly misleading roll/RV decisions. Tests only assert wide bounds, satisfied by the flipped convention too.
 - **Fix:** numerator = `coupon_income + principal_paydown × (100 − back_price)/100 − drop`; mirror in `break_even_drop`.
 
 ### **[FIXED 2026-06-09]** B4 ✅ — "SDA" default curve is ~10× the PSA/BMA standard at peak, ~100× at terminal
 
-- **Location:** `finstack/cashflows/src/builder/specs/default.rs:66-80` (consumed by structured_credit via `DefaultModelSpec`).
+- **Location:** `finstack-quant/cashflows/src/builder/specs/default.rs:66-80` (consumed by structured_credit via `DefaultModelSpec`).
 - **Issue:** Implemented: ramp to **6% CDR at month 30**, decline to **3% terminal by month 60**. Actual 100 SDA: 0.02%/month ramp to **0.60% CDR** at month 30, **flat months 30–60**, decline months 61–120 to **0.03%**, flat after. Wrong level and wrong shape (no plateau, wrong decline window).
 - **Impact:** Anyone selecting `DefaultCurve::Sda { speed_multiplier: 1.0 }` expecting 100 SDA gets default rates an order of magnitude too high — massively wrong tranche prices/losses.
 - **Fix:** Implement actual SDA knots (0.006 peak, plateau 30–60, decline to 0.0003 by month 120) or rename the variant.
 
 ### **[FIXED 2026-06-09]** B5 ✅ — Python `CDSOption.price()` hardcodes the decommissioned `"black76"` model — always fails
 
-- **Location:** `finstack-py/src/bindings/valuations/credit_derivatives.rs:89-96`; `price()` at lines 54-57 passes the macro's `$model` with no override.
-- **Issue:** The registry registers only `BloombergCdso` for CDSOption (`finstack/valuations/src/pricer/credit.rs:43-51`; registry test asserts `get_pricer(CDSOption, Black76).is_none()`). Every Python `CDSOption.price(market, as_of)` raises. No behavioral test covers it (only topology tests touch the module).
+- **Location:** `finstack-quant-py/src/bindings/valuations/credit_derivatives.rs:89-96`; `price()` at lines 54-57 passes the macro's `$model` with no override.
+- **Issue:** The registry registers only `BloombergCdso` for CDSOption (`finstack-quant/valuations/src/pricer/credit.rs:43-51`; registry test asserts `get_pricer(CDSOption, Black76).is_none()`). Every Python `CDSOption.price(market, as_of)` raises. No behavioral test covers it (only topology tests touch the module).
 - **Fix:** Pass `"default"` (resolving via `Instrument::default_model()`) for all four CDS-family wrappers (see also Mo-binding-5); add a `CDSOption.example().price(...)` smoke test.
 
 ---
@@ -78,7 +78,7 @@ Recurring failure patterns:
 8. **[FIXED 2026-06-09]** **Call/put windows exercise only at the two endpoint dates on the tree** — `bond/pricing/engine/tree/bond_valuator.rs:77-96` (`_cashflow_dates` is dead). YTW (`quote_conversions.rs:783-803`) enumerates every coupon date in the window; tree/OAS and YTW use different exercise sets. Issuer option materially undervalued (PV biased up, OAS down). A unit test enshrines the behavior; the `CallPut` docs call it a window. Fix: exercise at every step (or coupon date) within a window.
 9. **[FIXED 2026-06-09]** **Term-loan IRR/DM metrics price at `clean% × notional_limit`** — `term_loan/metrics/irr_helpers.rs:85-95` (feeds YTM/YTC/YTW), `discount_margin.rs:104-110`, `cs01.rs:52-55`. No accrued interest; original commitment instead of funded/amortized outstanding (LSTA prices against current funded outstanding). Loan amortized to 70% quoted at 99 → purchase leg overstated ~43%. Fix: `px/100 × outstanding_at_settlement + accrued_at_settlement`.
 10. **[FIXED 2026-06-09]** **TIPS index ratio interpolated in the lagged month, not the settlement month** — `inflation_linked_bond/types.rs:649-661` + `core/src/market_data/scalars/inflation_index.rs:349-359`. Official: `RefCPI(d) = CPI(m−3) + (day−1)/D(settlement month) × [CPI(m−2) − CPI(m−3)]`; code weights by days in the lagged month and inherits `add_months(-3)` day-clamping kinks. Won't reconcile with Treasury-published index ratios; wrong settlement invoices.
-11. **[FIXED 2026-06-09]** **Ex-coupon window: accrued floored at zero; buyer keeps the ex-period coupon** — `finstack/cashflows/src/accrual.rs:498-513` (returns `None` → accrued 0) + `bond/types/pricing.rs:20-38` (no ex-coupon flow filter). Market standard (gilts) is negative accrued and no coupon to buyer. Clean↔dirty and YTM wrong in the ex window.
+11. **[FIXED 2026-06-09]** **Ex-coupon window: accrued floored at zero; buyer keeps the ex-period coupon** — `finstack-quant/cashflows/src/accrual.rs:498-513` (returns `None` → accrued 0) + `bond/types/pricing.rs:20-38` (no ex-coupon flow filter). Market standard (gilts) is negative accrued and no coupon to buyer. Clean↔dirty and YTM wrong in the ex window.
 
 ### Securitized
 
@@ -107,7 +107,7 @@ Recurring failure patterns:
 ### Bindings
 
 27. **[FIXED 2026-06-09]** **WASM map-returning functions emit ES2015 `Map`s; `index.d.ts` declares plain objects** — `api/valuations/exotic_rates.rs:51` (`tarnCouponProfile`), `fx.rs:247-251` (`FxOption.greeks()`), `sabr.rs:179-184` (`arbitrageDiagnostics`), `pricing.rs:194-197` (`listStandardMetricsGrouped`). serde-wasm-bindgen 0.6 default; nothing enables `json_compatible()`. TS users get silent `undefined` property reads; Python returns dicts (shape parity broken). No `.test.mjs` facade tests exist. Fix: `Serializer::json_compatible()` or `js_sys::Reflect` (as `analytic.rs` `bsGreeks` already does); add facade tests.
-28. **[FIXED 2026-06-09]** **`SabrCalibrator.calibrate` defaults `beta=1.0` only in Python** — `finstack-py/src/bindings/valuations/sabr.rs:35,390`; Rust and WASM require it. Omitting beta silently fixes the equity convention for a rates user. Fix: make required (match Rust/WASM).
+28. **[FIXED 2026-06-09]** **`SabrCalibrator.calibrate` defaults `beta=1.0` only in Python** — `finstack-quant-py/src/bindings/valuations/sabr.rs:35,390`; Rust and WASM require it. Omitting beta silently fixes the equity convention for a rates user. Fix: make required (match Rust/WASM).
 29. **[FIXED 2026-06-09]** **WASM SABR surface drift** — missing `params` getter on `SabrModel` and `withTolerance` on `SabrCalibrator` (Python has both); `calibrate_auto_shift` / `calibrate_auto_shift_with_derivatives` unreachable from both hosts (relevant for negative-rate smiles).
 
 ---
@@ -159,10 +159,10 @@ Recurring failure patterns:
 - **[FIXED 2026-06-09]** CTD selection labels gross basis "net basis"; no implied-repo-ranked CTD (`bond_future/types.rs:747-869`). Conversion factor itself verified against all five CME IR232 examples.
 - **[FIXED 2026-06-09]** Same-day cashflow inclusion inconsistent across bond engines (discount/hazard include `as_of` flows; tree and YTM exclude). Unified on strict post-as_of exclusion (settlement convention). Golden: `bhccn_10_2032_callable_bloomberg` OAS tolerance widened to 3bp (documented convention residual vs the Bloomberg screen, combined with the OAS-solver and hazard-opt-in fixes).
 - **[FIXED 2026-06-09]** FxSpot `spot_rate` bypasses validation via builder/serde; settlement cashflow undiscounted (`fx/fx_spot/types.rs:369-382, 464-474`).
-- **[FIXED 2026-06-09]** Python direct instrument wrappers never release the GIL (`finstack-py/src/bindings/valuations/direct_wrapper.rs:54-122`; `pricing.rs`/`calibration.rs`/`fourier.rs` all detach correctly).
+- **[FIXED 2026-06-09]** Python direct instrument wrappers never release the GIL (`finstack-quant-py/src/bindings/valuations/direct_wrapper.rs:54-122`; `pricing.rs`/`calibration.rs`/`fourier.rs` all detach correctly).
 - **[FIXED 2026-06-09]** Python `fx`/`exotics` `price_with_metrics` hardcodes `market_history = None` (hvar/ES unreachable; WASM exposes it) — `direct_wrapper.rs:74-94`.
-- **[FIXED 2026-06-09]** `barrier_call` returns silent NaN on invalid inputs in both bindings (`finstack-py/.../analytic.rs:253-265`, `finstack-wasm/.../analytic.rs:196-207`); siblings use `checked_closed_form_value`.
-- **[FIXED 2026-06-09]** `merton_jump_cos_price` runtime keyword is `lambda` (Python reserved word); stub declares `lambda_` (`finstack-py/.../fourier.rs:180,191` vs `.pyi:1145`).
+- **[FIXED 2026-06-09]** `barrier_call` returns silent NaN on invalid inputs in both bindings (`finstack-quant-py/.../analytic.rs:253-265`, `finstack-quant-wasm/.../analytic.rs:196-207`); siblings use `checked_closed_form_value`.
+- **[FIXED 2026-06-09]** `merton_jump_cos_price` runtime keyword is `lambda` (Python reserved word); stub declares `lambda_` (`finstack-quant-py/.../fourier.rs:180,191` vs `.pyi:1145`).
 - **[FIXED 2026-06-09]** CDS-family Python wrappers hardcode model strings with no override (`"hazard_rate"` currently matches defaults; the pattern is what broke B5). Use `"default"`.
 
 ---
@@ -183,7 +183,7 @@ Recurring failure patterns:
 - **[FIXED 2026-06-09]** Expired-option conventions inconsistent across the FX family (quanto returns 0 at t≤0; FxOption/digitals/barriers return intrinsic at expiry). Quanto now returns quanto-adjusted intrinsic at t≤0.
 - **[FIXED 2026-06-09]** Richard-Roll seasonality keyed to `seasoning % 12` not calendar month (latent; amplitude defaults to 0); `expected_smm` omits refi multiplier and Jensen term. Seasonality now keys to calendar month via optional origination month; `expected_smm` includes refi multiplier and Jensen term.
 - **[FIXED 2026-06-09]** `CloWalCalculator` returns pool WAM labeled WAL (exported helper, not the registered metric). Now delegates to the principal-weighted WAL calculator.
-- **[FIXED 2026-06-09]** Native `__all__` in `finstack-py/.../valuations/mod.rs:161-198` omits five registered names; masked by the Python shim.
+- **[FIXED 2026-06-09]** Native `__all__` in `finstack-quant-py/.../valuations/mod.rs:161-198` omits five registered names; masked by the Python shim.
 - **[FIXED 2026-06-09]** COS `n_terms` stub drift (`.pyi` says `int = 128`; runtime `Option[int] = None`).
 - **[FIXED 2026-06-09]** `CreditState` parameter order diverges Python vs WASM (positional-porting hazard). WASM aligned to Rust/Python canonical order (breaking).
 - **[FIXED 2026-06-09]** Stale d.ts header (`index.d.ts:561` labels factor-model exports `valuations.creditFactorHierarchy`).

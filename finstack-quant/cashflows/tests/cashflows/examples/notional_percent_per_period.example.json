@@ -1,0 +1,14 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "notional": {
+    "initial": {
+      "amount": "10000000",
+      "currency": "USD"
+    },
+    "amort": {
+      "PercentOfOriginalPerPeriod": {
+        "pct": 0.05
+      }
+    }
+  }
+}

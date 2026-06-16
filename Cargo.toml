@@ -4,54 +4,54 @@ edition = "2021"
 rust-version = "1.90"
 authors = ["Jon Eickmeier (me@jeickmeier.com)"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/jeickmeier/finstack"
+repository = "https://github.com/jeickmeier/finstack-quant"
 
 [workspace]
 members = [
-    "finstack/core",
-    "finstack/attribution",
-    "finstack/cashflows",
-    "finstack/covenants",
-    "finstack/monte_carlo",
-    "finstack/margin",
-    "finstack/analytics",
-    "finstack/statements",
-    "finstack/statements-analytics",
-    "finstack/valuations",
-    "finstack/valuations/macros",
-    "finstack/factor-model",
-    "finstack/portfolio",
-    "finstack/scenarios",
-    "finstack/test-utils",
-    "finstack-py",
-    "finstack-wasm",
-    "finstack"
+    "finstack-quant/core",
+    "finstack-quant/attribution",
+    "finstack-quant/cashflows",
+    "finstack-quant/covenants",
+    "finstack-quant/monte_carlo",
+    "finstack-quant/margin",
+    "finstack-quant/analytics",
+    "finstack-quant/statements",
+    "finstack-quant/statements-analytics",
+    "finstack-quant/valuations",
+    "finstack-quant/valuations/macros",
+    "finstack-quant/factor-model",
+    "finstack-quant/portfolio",
+    "finstack-quant/scenarios",
+    "finstack-quant/test-utils",
+    "finstack-quant-py",
+    "finstack-quant-wasm",
+    "finstack-quant"
 ]
 resolver = "2"
 
 # Exclude Python and WASM bindings from default builds and coverage
 default-members = [
-    "finstack/core",
-    "finstack/attribution",
-    "finstack/cashflows",
-    "finstack/covenants",
-    "finstack/monte_carlo",
-    "finstack/analytics",
-    "finstack/margin",
-    "finstack/statements",
-    "finstack/statements-analytics",
-    "finstack/valuations",
-    "finstack/factor-model",
-    "finstack/portfolio",
-    "finstack/scenarios",
-    "finstack"
+    "finstack-quant/core",
+    "finstack-quant/attribution",
+    "finstack-quant/cashflows",
+    "finstack-quant/covenants",
+    "finstack-quant/monte_carlo",
+    "finstack-quant/analytics",
+    "finstack-quant/margin",
+    "finstack-quant/statements",
+    "finstack-quant/statements-analytics",
+    "finstack-quant/valuations",
+    "finstack-quant/factor-model",
+    "finstack-quant/portfolio",
+    "finstack-quant/scenarios",
+    "finstack-quant"
 ]
 
 [workspace.metadata.coverage]
 # Coverage configuration: only run on core Rust library, not bindings
-exclude = ["finstack-py", "finstack-wasm"]
+exclude = ["finstack-quant-py", "finstack-quant-wasm"]
 # Additional patterns to exclude from coverage reports
-ignore-filename-regex = ["tests?/", "target/", "\\.cargo/", ".*finstack-py/.*", ".*finstack-wasm/.*"]
+ignore-filename-regex = ["tests?/", "target/", "\\.cargo/", ".*finstack-quant-py/.*", ".*finstack-quant-wasm/.*"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -123,7 +123,7 @@ profile = "finstack-strict"
 # `clippy::manual_let_else`, `clippy::match_same_arms`, `clippy::redundant_clone`,
 # `clippy::clone_on_ref_ptr`, and `clippy::match_wildcard_for_single_variants`
 # are at "warn" (target: deny) until the remaining legacy sites — mostly in
-# finstack-valuations — are cleaned up.
+# finstack-quant-valuations — are cleaned up.
 [workspace.lints.rust]
 unsafe_code = "deny"            # project policy: no unsafe anywhere (libs use forbid)
 missing_docs = "deny"           # all public API must be documented (rustc lint, not clippy)
@@ -151,7 +151,7 @@ missing_docs = "deny"           # all public API must be documented (rustc lint,
 "too_many_arguments" = "deny"
 "type_complexity" = "deny"
 "large_enum_variant" = "deny"
-"module_name_repetitions" = "allow"   # allow finstack_valuations::valuations
+"module_name_repetitions" = "allow"   # allow finstack_quant_valuations::valuations
 "too_many_lines" = "allow"
 
 # ---- PERFORMANCE ----

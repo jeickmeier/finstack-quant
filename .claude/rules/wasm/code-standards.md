@@ -4,7 +4,7 @@ description: Rust-Wasm Bindings
 globs:
 ---
 
-# WASM Bindings Code Standards for finstack-wasm
+# WASM Bindings Code Standards for finstack-quant-wasm
 
 ## Core Principles
 
@@ -20,7 +20,7 @@ globs:
 ### Organization
 
 ```
-finstack-wasm/
+finstack-quant-wasm/
 ├── src/
 │   ├── lib.rs            # mod api; pub use api::*;
 │   ├── api/              # NEW: crate-namespaced binding tree
@@ -51,10 +51,10 @@ finstack-wasm/
 
 ### Key Architecture Rules
 
-- `finstack-wasm/src/lib.rs` exports only the `api` tree. Old flat re-exports are removed.
-- `finstack-wasm/src/api/mod.rs` declares `pub mod` for each crate domain. No `pub use *` glob re-exports (they are unnecessary for wasm-bindgen and `pub use core::*` shadows `std::core`).
+- `finstack-quant-wasm/src/lib.rs` exports only the `api` tree. Old flat re-exports are removed.
+- `finstack-quant-wasm/src/api/mod.rs` declares `pub mod` for each crate domain. No `pub use *` glob re-exports (they are unnecessary for wasm-bindgen and `pub use core::*` shadows `std::core`).
 - The `core` Rust module is named `core_ns` on disk to avoid shadowing Rust's `core` prelude.
-- `pkg/finstack_wasm.js` is an internal generated artifact, NOT the public API.
+- `pkg/finstack_quant_wasm.js` is an internal generated artifact, NOT the public API.
 - The published entrypoint is `index.js`, a hand-written facade that groups raw bindgen exports into crate namespaces.
 
 ### Naming Conventions
@@ -74,7 +74,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen(js_name = TypeName)]
 #[derive(Clone, Debug)]
 pub struct JsTypeName {
-    pub(crate) inner: finstack_core::TypeName,
+    pub(crate) inner: finstack_quant_core::TypeName,
 }
 
 #[wasm_bindgen(js_class = TypeName)]
@@ -87,7 +87,7 @@ impl JsTypeName {
         Ok(JsTypeName { inner })
     }
 
-    pub(crate) fn inner(&self) -> &finstack_core::TypeName {
+    pub(crate) fn inner(&self) -> &finstack_quant_core::TypeName {
         &self.inner
     }
 }
@@ -115,7 +115,7 @@ impl JsTypeName {
 ## Error Handling
 
 ```rust
-fn convert_error(err: finstack_core::Error) -> JsValue {
+fn convert_error(err: finstack_quant_core::Error) -> JsValue {
     JsValue::from_str(&format!("{}", err))
 }
 
@@ -136,7 +136,7 @@ impl JsMoney {
 Each `exports/<crate>.js` groups raw bindgen exports into a namespace:
 
 ```javascript
-import * as raw from "../pkg/finstack_wasm.js";
+import * as raw from "../pkg/finstack_quant_wasm.js";
 
 export const core = {
   Currency: raw.Currency,
@@ -151,7 +151,7 @@ export const core = {
 And `index.js` re-exports all namespaces:
 
 ```javascript
-import init from "./pkg/finstack_wasm.js";
+import init from "./pkg/finstack_quant_wasm.js";
 
 export { core } from "./exports/core.js";
 export { analytics } from "./exports/analytics.js";
@@ -184,7 +184,7 @@ pub fn init() {
 
 ## Testing
 
-- Facade tests: `finstack-wasm/tests/*.test.mjs` (Node test runner)
+- Facade tests: `finstack-quant-wasm/tests/*.test.mjs` (Node test runner)
 - Rust-side tests: `wasm_bindgen_test` in `tests/web.rs`
 
 ```javascript
@@ -206,4 +206,4 @@ test("core namespace exposes Currency", () => {
 - [ ] Type names match Rust; any exception is explicitly documented.
 - [ ] Errors converted to `JsValue`; no `.unwrap()` on user inputs.
 - [ ] Facade JS file updated with new exports.
-- [ ] Tests pass: `node --test tests/*.mjs` and `cargo test -p finstack-wasm`.
+- [ ] Tests pass: `node --test tests/*.mjs` and `cargo test -p finstack-quant-wasm`.

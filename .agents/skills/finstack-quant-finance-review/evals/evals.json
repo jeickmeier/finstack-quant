@@ -4,7 +4,7 @@
     {
       "id": 1,
       "name": "implied-vol-numerical-regression",
-      "prompt": "Review finstack/core/src/math/volatility/implied.rs for numerical stability and regression test gaps around short expiry and low vega.",
+      "prompt": "Review finstack-quant/core/src/math/volatility/implied.rs for numerical stability and regression test gaps around short expiry and low vega.",
       "expected_output": "Findings-first quant review with numerical regression notes, edge-case tests, tolerance recommendations, and targeted verification.",
       "files": []
     },

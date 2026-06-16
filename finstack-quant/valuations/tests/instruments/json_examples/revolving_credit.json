@@ -1,0 +1,79 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "revolving_credit",
+    "spec": {
+      "id": "RCF-USD-3Y",
+      "commitment_amount": {
+        "amount": "50000000",
+        "currency": "USD"
+      },
+      "drawn_amount": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "commitment_date": "2024-01-01",
+      "maturity": "2027-01-01",
+      "base_rate_spec": {
+        "Floating": {
+          "index_id": "USD-SOFR-3M",
+          "spread_bp": 250.0,
+          "gearing": 1.0,
+          "floor_bp": 0.0,
+          "cap_bp": null,
+          "reset_freq": {"count": 3, "unit": "months"},
+          "reset_lag_days": 2,
+          "dc": "Act360",
+          "bdc": "modified_following",
+          "calendar_id": "weekends_only",
+          "end_of_month": false,
+          "payment_lag_days": 0
+        }
+      },
+      "day_count": "Act360",
+      "frequency": {"count": 3, "unit": "months"},
+      "fees": {
+        "upfront_fee": null,
+        "commitment_fee_tiers": [
+          {
+            "threshold": 0.0,
+            "bps": 25.0
+          }
+        ],
+        "usage_fee_tiers": [
+          {
+            "threshold": 0.0,
+            "bps": 10.0
+          }
+        ],
+        "facility_fee_bp": 5.0
+      },
+      "draw_repay_spec": {
+        "Deterministic": [
+          {
+            "date": "2024-03-01",
+            "amount": {
+              "amount": "5000000",
+              "currency": "USD"
+            },
+            "is_draw": true
+          },
+          {
+            "date": "2025-06-01",
+            "amount": {
+              "amount": "3000000",
+              "currency": "USD"
+            },
+            "is_draw": false
+          }
+        ]
+      },
+      "discount_curve_id": "USD-OIS",
+      "recovery_rate": 0.0,
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

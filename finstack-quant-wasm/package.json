@@ -1,0 +1,92 @@
+{
+  "name": "finstack-quant-wasm",
+  "version": "0.5.0",
+  "type": "module",
+  "description": "WebAssembly bindings for Finstack Quant - high-performance financial computation library for bonds, derivatives, and portfolio analytics",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "exports/**",
+    "pkg/**",
+    "pkg-node/**",
+    "snippets/**",
+    "types/**"
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./types": {
+      "types": "./types/generated/index.ts"
+    },
+    "./package.json": "./package.json",
+    "./pkg/finstack_quant_wasm_bg.wasm": "./pkg/finstack_quant_wasm_bg.wasm"
+  },
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg",
+    "build:node": "wasm-pack build --target nodejs --out-dir pkg-node",
+    "build:optimized": "wasm-pack build --target web --out-dir pkg && npm run optimize",
+    "prepare": "command -v wasm-pack >/dev/null 2>&1 && npm run build || true",
+    "docs:check": "node scripts/check-dts-docs.mjs",
+    "optimize": "command -v wasm-opt >/dev/null 2>&1 && wasm-opt -Oz -o pkg/finstack_quant_wasm_bg.wasm pkg/finstack_quant_wasm_bg.wasm || echo 'wasm-opt not found, skipping optimization'",
+    "test": "wasm-pack test --node",
+    "test:browser": "wasm-pack test --chrome --headless",
+    "test:facade": "node --test \"tests/facade/**/*.test.mjs\"",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md,mjs,mks}\"",
+    "format:fix": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md,mjs,mks}\"",
+    "format:check": "npm run format",
+    "examples:install": "cd examples && npm install",
+    "examples:dev": "cd examples && npm run dev",
+    "examples:build": "cd examples && npm run build",
+    "bench": "node benchmarks/bench.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeickmeier/finstack-quant"
+  },
+  "homepage": "https://github.com/jeickmeier/finstack-quant#readme",
+  "bugs": {
+    "url": "https://github.com/jeickmeier/finstack-quant/issues"
+  },
+  "keywords": [
+    "wasm",
+    "webassembly",
+    "finance",
+    "rust",
+    "derivatives",
+    "bonds",
+    "pricing",
+    "fixed-income",
+    "rates",
+    "credit",
+    "fx",
+    "equity",
+    "options",
+    "swaps",
+    "portfolio",
+    "risk",
+    "calibration",
+    "monte-carlo",
+    "structured-products"
+  ],
+  "author": "Finstack Quant Contributors",
+  "license": "MIT OR Apache-2.0",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.48.1",
+    "@typescript-eslint/parser": "^8.48.1",
+    "@wasm-tool/wasm-pack-plugin": "^1.7.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^16.5.0",
+    "prettier": "^3.8.2",
+    "react": "^19.2.1",
+    "typescript": "^5.9.3"
+  }
+}

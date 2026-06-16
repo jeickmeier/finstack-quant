@@ -1,0 +1,76 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "beta1_smile",
+    "domain": "volatility.sabr",
+    "description": "Lognormal SABR (beta=1) smile across five strikes ITM/ATM/OTM. Locks the Task-1 Hagan (1-beta) exponent fix for the equity/lognormal case.",
+    "valuation_date": "2026-05-16",
+    "source": "formula",
+    "source_detail": "Hagan et al. (2002) 'Managing Smile Risk', Wilmott Magazine, eq. 2.17a/2.18. For beta=1: z = (nu/alpha)*ln(F/K); chi(z) = ln((sqrt(1-2*rho*z+z^2)+z-rho)/(1-rho)); factor1 = alpha (since F_mid^(1-beta)=1); factor2 = z/chi(z); time_correction = 0.25*rho*beta*nu*alpha + (2-3*rho^2)*nu^2/24; vol = factor1*factor2*(1+T*time_correction). With Obloj (2008) arXiv:0708.0998v2 corrected z for the z/chi(z) ratio (z already exact for beta=1). Derived independently in Python from first principles; NOT copied from SABRModel output. Parameters: alpha=0.20, beta=1.0, nu=0.30, rho=-0.20, F=100, T=1.0. Manual derivation for K=80: z=0.334715326971315, chi(z)=0.319013215991865, factor1=0.200000, factor2=1.049220879237335, rho_term=-0.003, nu_term=0.00705, time_correction=0.00405, factor3=1.00405, vol=0.210694044759649.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-16",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-16",
+    "review_interval_months": 6,
+    "regen_command": "",
+    "screenshots": []
+  },
+  "kind": "sabr_smile",
+  "alpha": 0.2,
+  "beta": 1.0,
+  "nu": 0.3,
+  "rho": -0.2,
+  "forward": 100.0,
+  "time_to_expiry": 1.0,
+  "strikes": [
+    {
+      "key": "vol_k80",
+      "strike": 80.0
+    },
+    {
+      "key": "vol_k90",
+      "strike": 90.0
+    },
+    {
+      "key": "vol_k100",
+      "strike": 100.0
+    },
+    {
+      "key": "vol_k110",
+      "strike": 110.0
+    },
+    {
+      "key": "vol_k120",
+      "strike": 120.0
+    }
+  ],
+  "expected": {
+    "vol_k80": 0.210694044759649,
+    "vol_k90": 0.204734188767634,
+    "vol_k100": 0.20081,
+    "vol_k110": 0.198602227748427,
+    "vol_k120": 0.197788603969262
+  },
+  "tolerances": {
+    "vol_k80": {
+      "abs": 1e-09,
+      "tolerance_reason": "Hagan 2002 closed-form; numerical precision only"
+    },
+    "vol_k90": {
+      "abs": 1e-09,
+      "tolerance_reason": "Hagan 2002 closed-form; numerical precision only"
+    },
+    "vol_k100": {
+      "abs": 1e-09,
+      "tolerance_reason": "ATM case uses eq. 2.18 directly; exact"
+    },
+    "vol_k110": {
+      "abs": 1e-09,
+      "tolerance_reason": "Hagan 2002 closed-form; numerical precision only"
+    },
+    "vol_k120": {
+      "abs": 1e-09,
+      "tolerance_reason": "Hagan 2002 closed-form; numerical precision only"
+    }
+  }
+}

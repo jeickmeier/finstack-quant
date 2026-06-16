@@ -1,0 +1,333 @@
+{
+  "schema": "finstack_quant.calibration.conventions.registry.v1",
+  "namespace": "calibration.rate_index",
+  "version": 2,
+  "entries": [
+    {
+      "ids": [
+        "USD-SOFR-1M",
+        "SOFR-1M"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "term",
+        "tenor": "1M",
+        "day_count": "Act360",
+        "default_payment_frequency": "1M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 2,
+        "ois_compounding": null,
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Thirty360",
+        "default_fixed_leg_frequency": "6M"
+      }
+    },
+    {
+      "ids": [
+        "USD-SOFR-3M",
+        "SOFR-3M"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "term",
+        "tenor": "3M",
+        "day_count": "Act360",
+        "default_payment_frequency": "3M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 2,
+        "ois_compounding": null,
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Thirty360",
+        "default_fixed_leg_frequency": "6M"
+      }
+    },
+    {
+      "ids": [
+        "USD-SOFR-6M",
+        "SOFR-6M",
+        "USD-Standard-Swap"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "term",
+        "tenor": "6M",
+        "day_count": "Act360",
+        "default_payment_frequency": "6M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 2,
+        "ois_compounding": null,
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Thirty360",
+        "default_fixed_leg_frequency": "6M"
+      }
+    },
+    {
+      "ids": [
+        "USD-LIBOR-3M",
+        "LIBOR-3M"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "term",
+        "tenor": "3M",
+        "day_count": "Act360",
+        "default_payment_frequency": "3M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 2,
+        "ois_compounding": null,
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Thirty360",
+        "default_fixed_leg_frequency": "6M"
+      }
+    },
+    {
+      "ids": [
+        "USD-SOFR-OIS",
+        "SOFR-OIS"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act360",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 2,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "sofr",
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "USD-SOFR",
+        "SOFR"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act360",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 2,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "sofr",
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "USD-OIS"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act360",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 2,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "sofr",
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "USD-FEDFUNDS-OIS",
+        "USD-FEDFUNDS",
+        "USD-FF-OIS",
+        "USD-EFFR-OIS",
+        "USD-EFFR"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act360",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 2,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "fedfunds",
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "GBP-SONIA-OIS",
+        "GBP-SONIA",
+        "SONIA-OIS"
+      ],
+      "record": {
+        "currency": "GBP",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act365F",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "sonia",
+        "market_calendar_id": "gblo",
+        "market_settlement_days": 0,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act365F",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "EUR-ESTR-OIS",
+        "EUR-ESTR",
+        "ESTR-OIS",
+        "EUR-EST-OIS",
+        "EUR-EST",
+        "EST-OIS"
+      ],
+      "record": {
+        "currency": "EUR",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act360",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 2,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "estr",
+        "market_calendar_id": "target2",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "JPY-TONA-OIS",
+        "JPY-TONA",
+        "TONA-OIS",
+        "JPY-TONAR-OIS",
+        "JPY-TONAR",
+        "TONAR-OIS"
+      ],
+      "record": {
+        "currency": "JPY",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act365F",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 2,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "tona",
+        "market_calendar_id": "jpto",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act365F",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "CHF-SARON-OIS",
+        "CHF-SARON",
+        "SARON-OIS"
+      ],
+      "record": {
+        "currency": "CHF",
+        "kind": "overnight_rfr",
+        "tenor": null,
+        "day_count": "Act360",
+        "default_payment_frequency": "1Y",
+        "default_payment_lag_days": 2,
+        "default_reset_lag_days": 0,
+        "ois_compounding": "saron",
+        "market_calendar_id": "chzh",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "EUR-EURIBOR-3M"
+      ],
+      "record": {
+        "currency": "EUR",
+        "kind": "term",
+        "tenor": "3M",
+        "day_count": "Act360",
+        "default_payment_frequency": "3M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 2,
+        "ois_compounding": null,
+        "market_calendar_id": "target2",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Thirty360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "EUR-EURIBOR-6M"
+      ],
+      "record": {
+        "currency": "EUR",
+        "kind": "term",
+        "tenor": "6M",
+        "day_count": "Act360",
+        "default_payment_frequency": "6M",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 2,
+        "ois_compounding": null,
+        "market_calendar_id": "target2",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Thirty360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    },
+    {
+      "ids": [
+        "USD-Deposit",
+        "USD-DEPOSIT"
+      ],
+      "record": {
+        "currency": "USD",
+        "kind": "term",
+        "tenor": "1D",
+        "day_count": "Act360",
+        "default_payment_frequency": "1D",
+        "default_payment_lag_days": 0,
+        "default_reset_lag_days": 0,
+        "ois_compounding": null,
+        "market_calendar_id": "usny",
+        "market_settlement_days": 2,
+        "market_business_day_convention": "modified_following",
+        "default_fixed_leg_day_count": "Act360",
+        "default_fixed_leg_frequency": "1Y"
+      }
+    }
+  ]
+}

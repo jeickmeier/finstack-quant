@@ -1,0 +1,578 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "usd_sofr_5y_receive_fixed_swpm",
+    "domain": "rates.irs",
+    "description": "Bloomberg SWPM USD SOFR 5Y receive-fixed swap captured from screens on 2026-04-30.",
+    "valuation_date": "2026-05-04",
+    "source": "bloomberg-screen",
+    "source_detail": "Bloomberg SWPM, curve 490 USD SOFR, curve date 2026-04-30, valuation date 2026-05-04 Phase-2 envelope migration (2026-05-09): replaced materialized market.curves with a calibration plan driven by SWPM Curve 490 Market Rates (26 quotes, deposits + OIS swaps) transcribed from the curve screenshot.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-04-30",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-09",
+    "review_interval_months": 6,
+    "regen_command": "manual Bloomberg SWPM screen transcription; see provenance.screenshots",
+    "screenshots": [
+      {
+        "path": "screenshots/usd_sofr_5y_receive_fixed_swpm__main.png",
+        "screen": "SWPM",
+        "captured_on": "2026-04-30",
+        "description": "Main SWPM terms and valuation results for the receive-fixed USD SOFR swap"
+      },
+      {
+        "path": "screenshots/usd_sofr_5y_receive_fixed_swpm__fixed_leg.png",
+        "screen": "SWPM",
+        "captured_on": "2026-04-30",
+        "description": "Fixed leg details and annual payment schedule"
+      },
+      {
+        "path": "screenshots/usd_sofr_5y_receive_fixed_swpm__float_leg.png",
+        "screen": "SWPM",
+        "captured_on": "2026-04-30",
+        "description": "Floating SOFR leg details and annual reset/payment schedule"
+      },
+      {
+        "path": "screenshots/usd_sofr_5y_receive_fixed_swpm__cashflows.png",
+        "screen": "SWPM",
+        "captured_on": "2026-04-30",
+        "description": "Bloomberg economic cashflow table with discount factors and PV rows"
+      },
+      {
+        "path": "screenshots/usd_sofr_5y_receive_fixed_swpm__curve.png",
+        "screen": "SWPM",
+        "captured_on": "2026-04-30",
+        "description": "Curve 490 USD SOFR screen with visible market rates, zero rates, and discount factors"
+      }
+    ]
+  },
+  "kind": "pricing",
+  "model": "discounting",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "usd_sofr_5y_swpm_calibrated",
+        "description": "USD-SOFR discount curve calibrated from Bloomberg SWPM Curve 490 Market Rates (transcribed 2026-04-30). 26 quotes total: 3 short-end deposits (1W-3W) and 23 OIS swaps (1M-12Y). The step's `conventions.ois_compounding` override sets the bootstrap-internal float-leg compounding to `CompoundedWithRateCutoff{cutoff_days: 1}` to match Bloomberg SWPM's convention (which differs from ARRC's `CompoundedInArrears{lookback_days: 2}` default). Without this override, calibrated DFs at the 5Y zone drift by ~3-4e-4 from Bloomberg's screen values.",
+        "quote_sets": {
+          "swpm_490_rates": [
+            "USD-SOFR-DEPOSIT-1W",
+            "USD-SOFR-DEPOSIT-2W",
+            "USD-SOFR-DEPOSIT-3W",
+            "USD-SOFR-SWAP-1M",
+            "USD-SOFR-SWAP-2M",
+            "USD-SOFR-SWAP-3M",
+            "USD-SOFR-SWAP-4M",
+            "USD-SOFR-SWAP-5M",
+            "USD-SOFR-SWAP-6M",
+            "USD-SOFR-SWAP-7M",
+            "USD-SOFR-SWAP-8M",
+            "USD-SOFR-SWAP-9M",
+            "USD-SOFR-SWAP-10M",
+            "USD-SOFR-SWAP-11M",
+            "USD-SOFR-SWAP-12M",
+            "USD-SOFR-SWAP-18M",
+            "USD-SOFR-SWAP-2Y",
+            "USD-SOFR-SWAP-3Y",
+            "USD-SOFR-SWAP-4Y",
+            "USD-SOFR-SWAP-5Y",
+            "USD-SOFR-SWAP-6Y",
+            "USD-SOFR-SWAP-7Y",
+            "USD-SOFR-SWAP-8Y",
+            "USD-SOFR-SWAP-9Y",
+            "USD-SOFR-SWAP-10Y",
+            "USD-SOFR-SWAP-12Y"
+          ]
+        },
+        "steps": [
+          {
+            "id": "USD-SOFR",
+            "quote_set": "swpm_490_rates",
+            "kind": "discount",
+            "curve_id": "USD-SOFR",
+            "currency": "USD",
+            "base_date": "2026-04-30",
+            "method": "Bootstrap",
+            "interpolation": "log_linear",
+            "extrapolation": "flat_forward",
+            "pricing_discount_id": null,
+            "pricing_forward_id": null,
+            "conventions": {
+              "curve_day_count": "Act365F",
+              "ois_compounding": {
+                "CompoundedWithRateCutoff": {
+                  "cutoff_days": 1
+                }
+              }
+            }
+          }
+        ],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-SOFR-DEPOSIT-1W",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "weeks"
+            }
+          },
+          "rate": 0.036355
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-SOFR-DEPOSIT-2W",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "weeks"
+            }
+          },
+          "rate": 0.036425
+        },
+        {
+          "kind": "rate_quote",
+          "type": "deposit",
+          "id": "USD-SOFR-DEPOSIT-3W",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "weeks"
+            }
+          },
+          "rate": 0.036379999999999996
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-1M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 1,
+              "unit": "months"
+            }
+          },
+          "rate": 0.03644
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-2M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "months"
+            }
+          },
+          "rate": 0.0365342
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-3M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "months"
+            }
+          },
+          "rate": 0.0365665
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-4M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 4,
+              "unit": "months"
+            }
+          },
+          "rate": 0.0365978
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-5M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 5,
+              "unit": "months"
+            }
+          },
+          "rate": 0.0366465
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-6M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 6,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036695000000000005
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-7M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 7,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036749000000000004
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-8M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 8,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036840000000000005
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-9M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 9,
+              "unit": "months"
+            }
+          },
+          "rate": 0.036924
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-10M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 10,
+              "unit": "months"
+            }
+          },
+          "rate": 0.037010999999999995
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-11M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 11,
+              "unit": "months"
+            }
+          },
+          "rate": 0.037124000000000004
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-12M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 12,
+              "unit": "months"
+            }
+          },
+          "rate": 0.03722
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-18M",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 18,
+              "unit": "months"
+            }
+          },
+          "rate": 0.0372225
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-2Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 2,
+              "unit": "years"
+            }
+          },
+          "rate": 0.037075
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-3Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 3,
+              "unit": "years"
+            }
+          },
+          "rate": 0.036739
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-4Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 4,
+              "unit": "years"
+            }
+          },
+          "rate": 0.036764899999999996
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-5Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 5,
+              "unit": "years"
+            }
+          },
+          "rate": 0.0370075
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-6Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 6,
+              "unit": "years"
+            }
+          },
+          "rate": 0.0374452
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-7Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 7,
+              "unit": "years"
+            }
+          },
+          "rate": 0.03789
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-8Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 8,
+              "unit": "years"
+            }
+          },
+          "rate": 0.0383675
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-9Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 9,
+              "unit": "years"
+            }
+          },
+          "rate": 0.0388245
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-10Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 10,
+              "unit": "years"
+            }
+          },
+          "rate": 0.0392685
+        },
+        {
+          "kind": "rate_quote",
+          "type": "swap",
+          "id": "USD-SOFR-SWAP-12Y",
+          "index": "USD-SOFR",
+          "pillar": {
+            "tenor": {
+              "count": 12,
+              "unit": "years"
+            }
+          },
+          "rate": 0.0401351
+        }
+      ],
+      "prior_market": []
+    }
+  },
+  "instrument": {
+    "schema": "finstack_quant.instrument/1",
+    "instrument": {
+      "type": "interest_rate_swap",
+      "spec": {
+        "id": "USD-SOFR-5Y-RCV-FIXED-SWPM-20260430",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "side": "receive",
+        "fixed": {
+          "discount_curve_id": "USD-SOFR",
+          "rate": "0.035",
+          "frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "day_count": "Act360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "start": "2026-05-04",
+          "end": "2031-05-04",
+          "par_method": null,
+          "payment_lag_days": 2,
+          "compounding_simple": true
+        },
+        "float": {
+          "discount_curve_id": "USD-SOFR",
+          "forward_curve_id": "USD-SOFR",
+          "spread_bp": "0",
+          "frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "day_count": "Act360",
+          "calendar_id": "usny",
+          "stub": "None",
+          "reset_lag_days": 0,
+          "payment_lag_days": 2,
+          "fixing_calendar_id": "usny",
+          "start": "2026-05-04",
+          "end": "2031-05-04",
+          "compounding": {
+            "CompoundedWithRateCutoff": {
+              "cutoff_days": 1
+            }
+          }
+        },
+        "attributes": {
+          "tags": [
+            "golden",
+            "bloomberg",
+            "swpm"
+          ],
+          "meta": {
+            "bloomberg_screen": "SWPM",
+            "curve_number": "490",
+            "curve_name": "USD SOFR",
+            "schedule_adjust": "acc_and_pay_dates"
+          }
+        }
+      }
+    }
+  },
+  "expected": {
+    "npv": -91334.81,
+    "par_rate": 0.0370075,
+    "dv01": -4523.48,
+    "fixed_leg_payment_count": 5.0,
+    "floating_leg_payment_count": 5.0,
+    "fixed_first_payment_date": 20944.0,
+    "fixed_last_payment_date": 22406.0,
+    "floating_first_payment_date": 20944.0,
+    "floating_last_payment_date": 22406.0,
+    "fixed_first_accrual_factor": 1.013888888889,
+    "floating_first_accrual_factor": 1.013888888889
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 70.0,
+      "tolerance_reason": "Bloomberg SWPM screen value remains the assertion target. The calibration's `conventions.ois_compounding = CompoundedWithRateCutoff{cutoff_days: 1}` override aligns the bootstrap-internal float-leg compounding with Bloomberg's SWPM convention, eliminating ~40 NPV of drift vs the registry's ARRC `CompoundedInArrears{lookback_days: 2}` default. Residual ~62 NPV comes from finer-grained schedule/day-count differences (sub-period day counts, stub handling, etc.) that aren't reproducible without internal access to Bloomberg's pricing kernel."
+    },
+    "par_rate": {
+      "abs": 1.5e-06,
+      "tolerance_reason": "Bloomberg par coupon to six decimals (percent). With the OIS compounding override matching Bloomberg's SWPM convention, par_rate drift is ~0.014 bp (was ~0.025 bp without override). Residual is from the same higher-order schedule conventions as NPV."
+    },
+    "dv01": {
+      "abs": 0.65,
+      "tolerance_reason": "Executable DV01 from Finstack Quant's signed receive-fixed convention against the calibrated curve. The OIS compounding override slightly shifts the bootstrap-implied curve, producing a small (~0.6) DV01 delta vs Bloomberg's screen value. Bloomberg's screen-positive 4523.48 is retained in inputs.source_reference.screen_outputs for provenance."
+    },
+    "fixed_leg_payment_count": {
+      "abs": 1e-12
+    },
+    "floating_leg_payment_count": {
+      "abs": 1e-12
+    },
+    "fixed_first_payment_date": {
+      "abs": 1e-12
+    },
+    "fixed_last_payment_date": {
+      "abs": 1e-12
+    },
+    "floating_first_payment_date": {
+      "abs": 1e-12
+    },
+    "floating_last_payment_date": {
+      "abs": 1e-12
+    },
+    "fixed_first_accrual_factor": {
+      "abs": 1e-12
+    },
+    "floating_first_accrual_factor": {
+      "abs": 1e-12
+    }
+  }
+}

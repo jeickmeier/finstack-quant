@@ -1,0 +1,235 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "ust_ty_10y_front_month",
+    "domain": "fixed_income.bond_future",
+    "description": "Synthetic UST 10Y front-month bond future with embedded CTD bond.",
+    "valuation_date": "2026-04-30",
+    "source": "formula",
+    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-01",
+    "last_reviewed_by": "claude",
+    "last_reviewed_on": "2026-05-18",
+    "review_interval_months": 6,
+    "regen_command": "manual formula fixture; values captured from canonical pricing runner",
+    "screenshots": []
+  },
+  "kind": "pricing",
+  "model": "bond_future_clean_price_proxy",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "ust_ty_10y_front_month_tier_a_wrap",
+        "description": "Tier-A wrap (Phase-2 envelope migration, 2026-05-09): the original market snapshot is preserved in initial_market with empty plan.steps. Routes through engine::execute_with_diagnostics without changing pricing math.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [],
+      "prior_market": [
+        {
+          "kind": "discount_curve",
+          "id": "USD-OIS",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.99
+            ],
+            [
+              0.5,
+              0.9802
+            ],
+            [
+              1.0,
+              0.9608
+            ],
+            [
+              2.0,
+              0.9231
+            ],
+            [
+              5.0,
+              0.8187
+            ],
+            [
+              10.0,
+              0.6703
+            ],
+            [
+              30.0,
+              0.301
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-TREASURY",
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.9895
+            ],
+            [
+              0.5,
+              0.9792
+            ],
+            [
+              1.0,
+              0.9589
+            ],
+            [
+              2.0,
+              0.9185
+            ],
+            [
+              5.0,
+              0.804
+            ],
+            [
+              10.0,
+              0.6466
+            ],
+            [
+              30.0,
+              0.2967
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "type": "bond_future",
+    "spec": {
+      "id": "UST-TY-10Y-FRONT-MONTH-GOLDEN",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "expiry": "2026-06-19",
+      "delivery_start": "2026-06-22",
+      "delivery_end": "2026-06-30",
+      "quoted_price": 119.5,
+      "position": "long",
+      "contract_specs": {
+        "contract_size": 100000.0,
+        "tick_size": 0.015625,
+        "tick_value": 15.625,
+        "standard_coupon": 0.06,
+        "standard_maturity_years": 10.0,
+        "settlement_days": 2,
+        "calendar_id": "nyse",
+        "repo_day_count_basis": "act360"
+      },
+      "deliverable_basket": [
+        {
+          "bond_id": "US91282CJL54",
+          "conversion_factor": 0.8234
+        }
+      ],
+      "ctd_bond_id": "US91282CJL54",
+      "ctd_bond": {
+        "id": "US91282CJL54",
+        "notional": {
+          "amount": "100000",
+          "currency": "USD"
+        },
+        "issue_date": "2024-05-15",
+        "maturity": "2034-05-15",
+        "cashflow_spec": {
+          "Fixed": {
+            "rate": "0.0425",
+            "freq": {
+              "count": 6,
+              "unit": "months"
+            },
+            "dc": "Thirty360",
+            "calendar_id": "nyse",
+            "stub": "None"
+          }
+        },
+        "discount_curve_id": "USD-TREASURY",
+        "credit_curve_id": null,
+        "pricing_overrides": {
+          "quoted_clean_price": 98.5
+        },
+        "call_put": null,
+        "accrual_method": "Linear",
+        "attributes": {
+          "tags": [
+            "golden"
+          ],
+          "meta": {}
+        },
+        "settlement_days": 1,
+        "ex_coupon_days": 0
+      },
+      "discount_curve_id": "USD-TREASURY",
+      "attributes": {
+        "tags": [
+          "golden"
+        ],
+        "meta": {}
+      }
+    }
+  },
+  "expected": {
+    "npv": -1048.052660635932,
+    "futures_price": 119.6048052660636,
+    "conversion_factor": 0.8234,
+    "dv01": -17.55082913611261
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "futures_price": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    },
+    "conversion_factor": {
+      "abs": 1e-12
+    },
+    "dv01": {
+      "abs": 1e-09,
+      "rel": 5e-09,
+      "tolerance_reason": "Formula self-test: tolerance pinned to ~10x the worst observed deterministic FP residual (1.16e-10 abs / 2.8e-11 rel) for canonical pricing on synthetic inputs. Tightening from 1e-6 to 1e-9 catches drift introduced by refactors, FP-contract changes, or algorithm swaps that would otherwise be invisible at the looser band."
+    }
+  }
+}

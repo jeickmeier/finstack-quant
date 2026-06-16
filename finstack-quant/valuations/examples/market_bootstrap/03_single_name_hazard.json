@@ -1,0 +1,231 @@
+{
+  "$schema": "../../schemas/calibration/3/calibration.schema.json",
+  "schema": "finstack_quant.calibration",
+  "plan": {
+    "id": "issuer_a_hazard",
+    "description": "Single-name hazard curve for Issuer-A bootstrapped from CDS par spreads, chained on a USD-OIS discount curve bootstrapped from deposit and IRS quotes in the same plan. Step 1 produces the USD-OIS discount curve; step 2 calibrates the hazard curve against it. The envelope is fully self-bootstrapping from quotes \u2014 no hand-entered curves in initial_market. Recovery rate 0.4 follows the ISDA CDS standard model convention for senior unsecured single-name CDS.",
+    "quote_sets": {
+      "usd_rate_quotes": [
+        "USD-SOFR-DEP-1M",
+        "USD-SOFR-DEP-3M",
+        "USD-OIS-SWAP-1Y",
+        "USD-OIS-SWAP-2Y",
+        "USD-OIS-SWAP-5Y",
+        "USD-OIS-SWAP-10Y"
+      ],
+      "issuer_a_cds_quotes": [
+        "ISSUER-A-CDS-1Y",
+        "ISSUER-A-CDS-3Y",
+        "ISSUER-A-CDS-5Y",
+        "ISSUER-A-CDS-7Y",
+        "ISSUER-A-CDS-10Y"
+      ]
+    },
+    "steps": [
+      {
+        "id": "USD-OIS",
+        "quote_set": "usd_rate_quotes",
+        "kind": "discount",
+        "curve_id": "USD-OIS",
+        "currency": "USD",
+        "base_date": "2026-05-08",
+        "method": "Bootstrap",
+        "interpolation": "linear",
+        "extrapolation": "flat_forward",
+        "pricing_discount_id": null,
+        "pricing_forward_id": null,
+        "conventions": {
+          "curve_day_count": null
+        }
+      },
+      {
+        "id": "ISSUER-A-CDS",
+        "quote_set": "issuer_a_cds_quotes",
+        "kind": "hazard",
+        "curve_id": "ISSUER-A-CDS",
+        "entity": "Issuer-A",
+        "seniority": "senior",
+        "currency": "USD",
+        "base_date": "2026-05-08",
+        "discount_curve_id": "USD-OIS",
+        "recovery_rate": 0.4,
+        "notional": 1.0,
+        "method": "Bootstrap",
+        "interpolation": "linear",
+        "par_interp": "Linear"
+      }
+    ],
+    "settings": {}
+  },
+  "market_data": [
+    {
+      "kind": "rate_quote",
+      "type": "deposit",
+      "id": "USD-SOFR-DEP-1M",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 1,
+          "unit": "months"
+        }
+      },
+      "rate": 0.0525
+    },
+    {
+      "kind": "rate_quote",
+      "type": "deposit",
+      "id": "USD-SOFR-DEP-3M",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 3,
+          "unit": "months"
+        }
+      },
+      "rate": 0.052
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-1Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 1,
+          "unit": "years"
+        }
+      },
+      "rate": 0.051
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-2Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 2,
+          "unit": "years"
+        }
+      },
+      "rate": 0.049
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-5Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "rate": 0.045
+    },
+    {
+      "kind": "rate_quote",
+      "type": "swap",
+      "id": "USD-OIS-SWAP-10Y",
+      "index": "USD-SOFR-OIS",
+      "pillar": {
+        "tenor": {
+          "count": 10,
+          "unit": "years"
+        }
+      },
+      "rate": 0.041
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "ISSUER-A-CDS-1Y",
+      "entity": "Issuer-A",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 1,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 80.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "ISSUER-A-CDS-3Y",
+      "entity": "Issuer-A",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 3,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 110.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "ISSUER-A-CDS-5Y",
+      "entity": "Issuer-A",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 5,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 130.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "ISSUER-A-CDS-7Y",
+      "entity": "Issuer-A",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 7,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 145.0,
+      "recovery_rate": 0.4
+    },
+    {
+      "kind": "cds_quote",
+      "type": "cds_par_spread",
+      "id": "ISSUER-A-CDS-10Y",
+      "entity": "Issuer-A",
+      "convention": {
+        "currency": "USD",
+        "doc_clause": "isda_na"
+      },
+      "pillar": {
+        "tenor": {
+          "count": 10,
+          "unit": "years"
+        }
+      },
+      "spread_bp": 155.0,
+      "recovery_rate": 0.4
+    }
+  ],
+  "prior_market": []
+}

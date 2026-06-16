@@ -1,11 +1,11 @@
 ---
 trigger: model_decision
-description: Rust testing framework for the rust finstack library.
+description: Rust testing framework for the rust finstack-quant library.
 globs:
 ---
 ### Rust Testing Standards (Finstack)
 
-These standards apply to all Rust crates in the Finstack workspace (`finstack/core`, `statements`, `valuations`, `scenarios`, `portfolio`, `io`) and should be read alongside our code standards. They reinforce our core invariants: determinism, currency‑safety, stable serde schemas, and parity across bindings.
+These standards apply to all Rust crates in the Finstack Quant workspace (`finstack-quant/core`, `statements`, `valuations`, `scenarios`, `portfolio`, `io`) and should be read alongside our code standards. They reinforce our core invariants: determinism, currency‑safety, stable serde schemas, and parity across bindings.
 
 ### Guiding principles
 

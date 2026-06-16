@@ -285,7 +285,7 @@ Use these anchor keys from `docs/REFERENCES.md`:
 **Good:**
 ```rust
 /// ```rust
-/// use finstack_valuations::pricer::PricerRegistry;
+/// use finstack_quant_valuations::pricer::PricerRegistry;
 ///
 /// let registry = PricerRegistry::builder()
 ///     .with_rates()

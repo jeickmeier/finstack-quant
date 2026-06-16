@@ -1,0 +1,504 @@
+{
+  "schema_version": "finstack_quant.golden/2",
+  "metadata": {
+    "name": "cds_5y_par_spread",
+    "domain": "credit.cds",
+    "description": "Bloomberg CDSW 5Y IBM single-name CDS with standard coupon and quoted spread.",
+    "valuation_date": "2026-05-02",
+    "source": "bloomberg-screen",
+    "source_detail": "Bloomberg CDSW IBM USD senior CDS, 2014 SNAC XR14, S531 USD Custom Swap Curve - Mid, IBM USD Senior Curve, valuation date 2026-05-02 Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved.",
+    "captured_by": "jeickmeier",
+    "captured_on": "2026-05-02",
+    "last_reviewed_by": "jeickmeier",
+    "last_reviewed_on": "2026-05-09",
+    "review_interval_months": 6,
+    "regen_command": "manual Bloomberg CDSW/CDSD screen transcription; see provenance.screenshots",
+    "screenshots": [
+      {
+        "path": "screenshots/cds_5y_par_spread__main.png",
+        "screen": "CDSW",
+        "captured_on": "2026-05-02",
+        "description": "Main Bloomberg CDS valuation screen with IBM terms, quoted spread, standard coupon, upfront, spread DV01, IR DV01, and default exposure"
+      },
+      {
+        "path": "screenshots/cds_5y_par_spread__swap_curve.png",
+        "screen": "CDSW",
+        "captured_on": "2026-05-02",
+        "description": "S531 USD Custom Swap Curve - Mid benchmark curve rates used by the CDS valuation screen"
+      },
+      {
+        "path": "screenshots/cds_5y_par_spread__credit_curve.png",
+        "screen": "CDSD",
+        "captured_on": "2026-05-02",
+        "description": "IBM USD Senior Curve single-name CDS spread term structure"
+      }
+    ]
+  },
+  "kind": "pricing",
+  "model": "hazard_rate",
+  "market": {
+    "kind": "envelope",
+    "envelope": {
+      "schema": "finstack_quant.calibration",
+      "plan": {
+        "id": "cds_5y_par_spread_tier_a_wrap",
+        "description": "Tier-A wrap (Phase-2 envelope migration, 2026-05-09): the original market snapshot is preserved in initial_market with empty plan.steps. Routes through engine::execute_with_diagnostics without changing pricing math.",
+        "quote_sets": {},
+        "steps": [],
+        "settings": {
+          "fx": {
+            "pivot_currency": "USD",
+            "enable_triangulation": true,
+            "cache_capacity": 256
+          }
+        }
+      },
+      "market_data": [],
+      "prior_market": [
+        {
+          "kind": "hazard_curve",
+          "id": "IBM-USD-SENIOR",
+          "base": "2026-05-02",
+          "knot_points": [
+            [
+              0.13972602739726028,
+              0.00997646002277055
+            ],
+            [
+              0.38904109589041097,
+              0.010174852397118335
+            ],
+            [
+              0.6383561643835617,
+              0.01017246986940027
+            ],
+            [
+              0.8876712328767123,
+              0.010174050726913558
+            ],
+            [
+              1.1369863013698631,
+              0.010175577951597636
+            ],
+            [
+              1.3863013698630138,
+              0.010177051103745225
+            ],
+            [
+              1.6356164383561644,
+              0.010174391557496821
+            ],
+            [
+              1.884931506849315,
+              0.010171645976754755
+            ],
+            [
+              2.136986301369863,
+              0.010175861524607865
+            ],
+            [
+              2.389041095890411,
+              0.010173574090087208
+            ],
+            [
+              2.638356164383562,
+              0.010175851741102629
+            ],
+            [
+              2.884931506849315,
+              0.010177267513353206
+            ],
+            [
+              3.136986301369863,
+              0.010173574731178204
+            ],
+            [
+              3.389041095890411,
+              0.010175091002821083
+            ],
+            [
+              3.638356164383562,
+              0.01017184051056745
+            ],
+            [
+              3.884931506849315,
+              0.010176000795259658
+            ],
+            [
+              4.136986301369863,
+              0.01017429786109359
+            ],
+            [
+              4.389041095890411,
+              0.010175565889646949
+            ],
+            [
+              4.638356164383562,
+              0.010175080613668765
+            ],
+            [
+              4.884931506849315,
+              0.010173650631709216
+            ],
+            [
+              5.136986301369863,
+              0.010286841673740938
+            ]
+          ],
+          "recovery_rate": 0.4,
+          "issuer": null,
+          "seniority": null,
+          "currency": null,
+          "day_count": "Act365F",
+          "par_points": [
+            [
+              0.5,
+              10.5
+            ],
+            [
+              1.0,
+              14.5
+            ],
+            [
+              2.0,
+              22.0
+            ],
+            [
+              3.0,
+              32.0
+            ],
+            [
+              4.0,
+              43.5
+            ],
+            [
+              5.0,
+              57.0
+            ],
+            [
+              7.0,
+              68.5
+            ],
+            [
+              10.0,
+              80.4
+            ]
+          ],
+          "par_interp": "Linear"
+        },
+        {
+          "kind": "discount_curve",
+          "id": "USD-S531-SWAP",
+          "base": "2026-05-02",
+          "day_count": "Act365F",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.13972602739726028,
+              0.9948564304744848
+            ],
+            [
+              0.38904109589041097,
+              0.98574857
+            ],
+            [
+              0.6383561643835617,
+              0.97668173
+            ],
+            [
+              0.8876712328767123,
+              0.96764815
+            ],
+            [
+              1.1369863013698631,
+              0.95875431
+            ],
+            [
+              1.3863013698630138,
+              0.94999432
+            ],
+            [
+              1.6356164383561644,
+              0.94131437
+            ],
+            [
+              1.884931506849315,
+              0.93271373
+            ],
+            [
+              2.136986301369863,
+              0.92419467
+            ],
+            [
+              2.389041095890411,
+              0.91584876
+            ],
+            [
+              2.638356164383562,
+              0.9076677
+            ],
+            [
+              2.884931506849315,
+              0.89964844
+            ],
+            [
+              3.136986301369863,
+              0.8914406
+            ],
+            [
+              3.389041095890411,
+              0.88321729
+            ],
+            [
+              3.638356164383562,
+              0.87515799
+            ],
+            [
+              3.884931506849315,
+              0.86725959
+            ],
+            [
+              4.136986301369863,
+              0.85911547
+            ],
+            [
+              4.389041095890411,
+              0.85089899
+            ],
+            [
+              4.638356164383562,
+              0.84284912
+            ],
+            [
+              4.884931506849315,
+              0.83496263
+            ],
+            [
+              5.136986301369863,
+              0.82680571
+            ]
+          ],
+          "interp_style": "log_linear",
+          "extrapolation": "flat_forward",
+          "min_forward_rate": null,
+          "allow_non_monotonic": false,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": {
+            "index_id": "USD-SOFR-OIS",
+            "currency": "USD",
+            "quotes": [
+              {
+                "quote_type": "deposit",
+                "tenor": "1M",
+                "rate": 0.03644
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "2M",
+                "rate": 0.036528
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "3M",
+                "rate": 0.036583
+              },
+              {
+                "quote_type": "deposit",
+                "tenor": "6M",
+                "rate": 0.03672
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "1Y",
+                "rate": 0.037255
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "2Y",
+                "rate": 0.037125
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "3Y",
+                "rate": 0.03681
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "4Y",
+                "rate": 0.036840000000000005
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "5Y",
+                "rate": 0.037115
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "6Y",
+                "rate": 0.037555
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "7Y",
+                "rate": 0.038045
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "8Y",
+                "rate": 0.038505
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "9Y",
+                "rate": 0.03894
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "10Y",
+                "rate": 0.039369999999999995
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "12Y",
+                "rate": 0.040235
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "15Y",
+                "rate": 0.04133
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "20Y",
+                "rate": 0.04221
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "25Y",
+                "rate": 0.042265
+              },
+              {
+                "quote_type": "swap",
+                "tenor": "30Y",
+                "rate": 0.041935
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "instrument": {
+    "type": "credit_default_swap",
+    "spec": {
+      "id": "IBM-USD-SENIOR-CDS-5Y-CDSW-20260502",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "side": "pay",
+      "convention": "isda_na",
+      "premium": {
+        "start": "2026-03-20",
+        "end": "2031-06-20",
+        "frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "calendar_id": "nyse",
+        "day_count": "Act360",
+        "spread_bp": "100.0",
+        "discount_curve_id": "USD-S531-SWAP"
+      },
+      "protection": {
+        "credit_curve_id": "IBM-USD-SENIOR",
+        "recovery_rate": 0.4,
+        "settlement_delay": 2
+      },
+      "pricing_overrides": {
+        "cds_quote_bp": 60.5
+      },
+      "valuation_convention": "bloomberg_cdsw_clean",
+      "doc_clause": "xr14",
+      "protection_effective_date": "2026-05-02",
+      "attributes": {
+        "tags": [
+          "golden",
+          "bloomberg",
+          "cdsw",
+          "single-name-cds"
+        ],
+        "meta": {
+          "bloomberg_screen": "CDSW",
+          "reference_entity": "International Business Machines Corp",
+          "ticker": "IBM",
+          "reference_obligation": "US459200KA85",
+          "debt_type": "Senior",
+          "contract": "2014 SNAC",
+          "restructuring": "XR14",
+          "trade_date": "2026-05-02",
+          "cash_settle_date": "2026-05-07",
+          "cash_calculated_date": "2026-05-06",
+          "curve_date": "2026-05-02",
+          "swap_curve": "S531 USD Custom Swap Curve - Mid",
+          "cds_curve": "IBM USD Senior Curve"
+        }
+      }
+    }
+  },
+  "expected": {
+    "npv": -181992.0,
+    "par_spread": 60.5,
+    "risky_pv01": 4680.88,
+    "dv01": 45.91,
+    "cs01": 4680.88,
+    "recovery_01": 76.03,
+    "jump_to_default": 5988055.555555556,
+    "default_exposure": 6181992.0
+  },
+  "tolerances": {
+    "npv": {
+      "abs": 5.0,
+      "rel": 1e-08,
+      "tolerance_reason": "Bloomberg displays Principal rounded to whole USD; widened slightly to allow the remaining model-vs-screen convention residual, transcribed curve input noise, and deterministic protection-leg integration rounding while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "par_spread": {
+      "abs": 0.02,
+      "rel": 1e-08,
+      "tolerance_reason": "Bloomberg displays spread to four decimal places in bp, but executable par_spread recomputes from a transcribed survival/discount curve proxy rather than Bloomberg's internal curve object. Allow the documented sub-0.02bp curve-construction residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "risky_pv01": {
+      "abs": 0.5,
+      "rel": 1e-08,
+      "tolerance_reason": "Bloomberg displays Spread DV01 to cents; widened to allow the remaining CDS curve/bootstrap convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "dv01": {
+      "abs": 1.5,
+      "rel": 1e-08,
+      "tolerance_reason": "Bloomberg displays IR DV01 to cents; widened to allow the remaining Rust/Python rate-shock convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "cs01": {
+      "abs": 0.5,
+      "rel": 1e-08,
+      "tolerance_reason": "Bloomberg displays Spread DV01 to cents; widened to allow the remaining CDS curve/bootstrap convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "recovery_01": {
+      "abs": 0.3,
+      "rel": 1e-08,
+      "tolerance_reason": "Bloomberg displays Rec Risk (1%) to cents; widened to allow the remaining recovery-risk convention residual while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "jump_to_default": {
+      "abs": 1e-06,
+      "rel": 1e-12,
+      "tolerance_reason": "The screenshot does not display accrued-premium-adjusted JTD; this asserts finstack JTD exactly while default_exposure below checks Bloomberg Def Exposure. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    },
+    "default_exposure": {
+      "abs": 5.0,
+      "rel": 1e-08,
+      "tolerance_reason": "Bloomberg displays Def Exposure rounded to whole USD; widened slightly to allow the remaining model-vs-screen convention residual, transcribed curve input noise, and deterministic protection-leg integration rounding while preserving Bloomberg expected_outputs. abs-or-rel: absolute/display tolerance is the intended comparison gate; relative tolerance is retained only as a legacy diagnostic."
+    }
+  }
+}

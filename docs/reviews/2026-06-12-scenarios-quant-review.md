@@ -1,9 +1,9 @@
 # Scenarios Crate & Bindings — Quant Finance Review
 
 **Date:** 2026-06-12
-**Scope:** `finstack/scenarios` (spec, engine, all adapters, horizon, templates incl. embedded JSON data), `finstack-py/src/bindings/scenarios/` (mod, engine, horizon, operation_spec), `finstack-wasm/src/api/scenarios/`, parity contract section.
-**Method:** Full read of spec.rs, engine.rs, utils.rs, horizon.rs, warning.rs, traits.rs, all adapters (curves, vol, fx, time_roll, statements, instruments, basecorr, equity), templates/registry.rs + the five embedded template JSONs, and both binding surfaces. Cross-crate verification of shock consumers in `finstack-valuations` (pricing_overrides, calibration/bumps) via grep + targeted reads. Every finding cites file:line. No code changes; tests were not executed.
-**Status:** Remediation **COMPLETE** (2026-06-12, same day). All findings fixed except the deliberate carve-outs noted below. Verified: `cargo nextest run -p finstack-scenarios` (258/258), targeted `finstack-valuations` bond/overrides tests, `mise run rust-lint`, `mise run wasm-lint`.
+**Scope:** `finstack-quant/scenarios` (spec, engine, all adapters, horizon, templates incl. embedded JSON data), `finstack-quant-py/src/bindings/scenarios/` (mod, engine, horizon, operation_spec), `finstack-quant-wasm/src/api/scenarios/`, parity contract section.
+**Method:** Full read of spec.rs, engine.rs, utils.rs, horizon.rs, warning.rs, traits.rs, all adapters (curves, vol, fx, time_roll, statements, instruments, basecorr, equity), templates/registry.rs + the five embedded template JSONs, and both binding surfaces. Cross-crate verification of shock consumers in `finstack-quant-valuations` (pricing_overrides, calibration/bumps) via grep + targeted reads. Every finding cites file:line. No code changes; tests were not executed.
+**Status:** Remediation **COMPLETE** (2026-06-12, same day). All findings fixed except the deliberate carve-outs noted below. Verified: `cargo nextest run -p finstack-quant-scenarios` (258/258), targeted `finstack-quant-valuations` bond/overrides tests, `mise run rust-lint`, `mise run wasm-lint`.
 
 ## Remediation Summary
 
@@ -16,7 +16,7 @@
 - **MO-4 — partially fixed.** Python report dict now includes `rounding_context` and `time_roll_json`; py/wasm docstrings state which operations are inert without a portfolio/calendar. *Carve-out:* bindings still do not accept instruments/calendar inputs (deliberate scope decision; revisit if Python-side instrument shocks are needed).
 - **MO-5 — fixed.** `compute_horizon_return` releases the GIL (`py.detach`, owned market copy); NaN sentinel and currency caveats documented.
 - **MI-1 — fixed** (spot positivity is now a hard error, same policy as knots). **MI-2 — fixed** (credit-triangle magnitude bias stated in the fallback warning). **MI-3 — fixed** (placeholder-id note appended to all five template descriptions). **MI-4/MI-5 — fixed** (naming-assumption and lookup-order docs).
-- *Drive-by:* fixed pre-existing `finstack-py` compile breakage (`allow_threads` → `detach` in `factor_model/credit.rs`, committed in f382e85d7) and a pre-existing unused import in `attribution/pnl_attribution.rs`.
+- *Drive-by:* fixed pre-existing `finstack-quant-py` compile breakage (`allow_threads` → `detach` in `factor_model/credit.rs`, committed in f382e85d7) and a pre-existing unused import in `attribution/pnl_attribution.rs`.
 
 ---
 
@@ -32,21 +32,21 @@ None. Nothing corrupts an on-pillar, market-only scenario (the dominant use case
 
 #### M-1. Instrument spread shocks never affect valuation — including in a shipped template
 
-**Location:** `finstack/scenarios/src/adapters/instruments.rs:153-163` (`ShockKind::Spread` arm of `apply_shock`); consumer absence verified in `finstack/valuations/src/instruments/pricing_overrides.rs:733-759`.
-**Issue:** Spread shocks have no first-class pricing path. Every `InstrumentSpreadBpByType` / `InstrumentSpreadBpByAttr` unconditionally writes `scenario_spread_shock_bp` into instrument `Attributes.meta` as a string and emits `Warning::InstrumentShockFallback`. A workspace-wide grep finds **no consumer** of that metadata key: `ScenarioPricingOverrides` carries only `scenario_price_shock_pct`, and no pricer in `finstack-valuations` reads `scenario_spread_shock_bp`. The shock is a PV no-op, yet `operations_applied` still increments, and the tests (`tests/shocks/instrument_shocks_test.rs:174-182`) only assert the metadata write — nothing asserts pricing impact.
+**Location:** `finstack-quant/scenarios/src/adapters/instruments.rs:153-163` (`ShockKind::Spread` arm of `apply_shock`); consumer absence verified in `finstack-quant/valuations/src/instruments/pricing_overrides.rs:733-759`.
+**Issue:** Spread shocks have no first-class pricing path. Every `InstrumentSpreadBpByType` / `InstrumentSpreadBpByAttr` unconditionally writes `scenario_spread_shock_bp` into instrument `Attributes.meta` as a string and emits `Warning::InstrumentShockFallback`. A workspace-wide grep finds **no consumer** of that metadata key: `ScenarioPricingOverrides` carries only `scenario_price_shock_pct`, and no pricer in `finstack-quant-valuations` reads `scenario_spread_shock_bp`. The shock is a PV no-op, yet `operations_applied` still increments, and the tests (`tests/shocks/instrument_shocks_test.rs:174-182`) only assert the metadata write — nothing asserts pricing impact.
 **Impact:** Spread-widening stress silently understates P&L for anyone not auditing warnings. The shipped **`svb_2023` builtin template's entire credit component** (`data/templates/svb_2023.json`, `instrument_spread_bp_by_attr` on `sector=regional_banks` +150bp) changes no valuation — a historical stress template whose credit leg does nothing. The warning text is honest ("will not affect valuation unless the downstream consumer reads that metadata"), but a stress operation in the stable serde wire contract that cannot move a price is a missing market-standard feature.
 **Fix:** Add `scenario_spread_shock_bp` to `ScenarioPricingOverrides` and apply it in credit-sensitive pricers (z-spread or hazard bump), or reject these operations with a typed error until supported. Re-spec `svb_2023`'s credit leg as a `curve_parallel_bp` on a regional-banks `par_cds` curve. Add a test asserting PV impact (not just metadata).
 
 #### M-2. Off-pillar node bumps deliver only `(w0² + w1²)` of the requested bp at the target tenor
 
-**Location:** `finstack/scenarios/src/utils.rs:275-331` (`calculate_interpolation_weights`) consumed by `finstack/scenarios/src/adapters/curves.rs:104-131` (`resolve_bump_targets`, `TenorMatchMode::Interpolate`); discount path confirmed through `finstack/valuations/src/calibration/bumps/rates.rs:380-397` (`BumpRequest::Tenors` bumps the closest synthetic par quote per target).
+**Location:** `finstack-quant/scenarios/src/utils.rs:275-331` (`calculate_interpolation_weights`) consumed by `finstack-quant/scenarios/src/adapters/curves.rs:104-131` (`resolve_bump_targets`, `TenorMatchMode::Interpolate`); discount path confirmed through `finstack-quant/valuations/src/calibration/bumps/rates.rs:380-397` (`BumpRequest::Tenors` bumps the closest synthetic par quote per target).
 **Issue:** A bump at off-pillar tenor *t* is split between adjacent pillars with linear weights `w0 + w1 = 1`. Under linear interpolation, the realized curve move at *t* is then `bp · (w0² + w1²)`: a +50bp request at 3Y on a {2Y, 4Y} curve moves the 3Y rate by only **+25bp**. The spec doc calls this "key-rate bump at interpolated time" (`spec.rs:793-794`), which a desk reads as "the curve at that tenor moves by the full bp". The behavior is codified nowhere: `tests/shocks/tenor_shocks_test.rs` only asserts "DF changed", not the magnitude. On-pillar requests are unaffected (the weight degenerates to 1.0 at a knot), which is why the shipped templates (2Y/5Y/10Y/30Y nodes on standard curves) are unlikely to hit it.
 **Impact:** User-requested off-pillar key-rate stresses silently deliver as little as half the requested shock — materially wrong scenario risk with no warning. Affects all curve kinds routed through `resolve_bump_targets` (discount, forward, ParCDS, inflation, commodity, vol-index node bumps).
 **Fix (pick one):** (a) insert a new knot at the requested tenor carrying the full bump — cleanest key-rate semantics; (b) rescale weights by `1/(w0² + w1²)` so the interpolated point realizes the full bump; (c) explicitly document the allocation semantics and emit a warning whenever the requested tenor is off-pillar. Add a magnitude-pinning test either way.
 
 #### M-3. The engine discards the `RollForwardReport`, including valuation failures
 
-**Location:** `finstack/scenarios/src/engine.rs:812` (Phase 0 drops the return of `apply_time_roll_forward`); report contents built in `finstack/scenarios/src/adapters/time_roll.rs:221-285`.
+**Location:** `finstack-quant/scenarios/src/engine.rs:812` (Phase 0 drops the return of `apply_time_roll_forward`); report contents built in `finstack-quant/scenarios/src/adapters/time_roll.rs:221-285`.
 **Issue:** `apply_time_roll_forward` computes per-instrument carry (two full valuations per instrument: t0 and t1) and a `failed_instruments` list (instruments whose t0/t1 valuation errored during the roll). When invoked through `ScenarioEngine::apply`, the entire report is discarded.
 **Impact:** (a) Valuation failures during an engine-driven roll vanish — no `Warning` reaches `ApplicationReport`, violating the fail-loudly expectation for a stress system; (b) the carry computation is pure wasted compute (2 PVs × N instruments) on the engine path. The carry decomposition is only available via the standalone `apply_time_roll_forward` public function.
 **Fix:** Map `failed_instruments` into `Warning` variants appended to `ApplicationReport`. Either surface carry in the report or skip the carry computation entirely when invoked from `apply` (instruments-supplied contexts only).
@@ -57,31 +57,31 @@ None. Nothing corrupts an on-pillar, market-only scenario (the dominant use case
 
 #### MO-1. `rounding_context` stamps the default, not the active policy
 
-**Location:** `finstack/scenarios/src/engine.rs:29-34` (`rounding_stamp`).
+**Location:** `finstack-quant/scenarios/src/engine.rs:29-34` (`rounding_stamp`).
 **Issue:** Formats `RoundingMode::default()` unconditionally. A caller running under a non-default `FinstackConfig` rounding mode gets the wrong policy stamped — contradicting the workspace invariant that the *active* `RoundingContext` is stamped into result envelopes.
 **Fix:** Thread the active config through `ExecutionContext`, or stamp nothing rather than a potentially false value.
 
 #### MO-2. Mid-apply errors leave the market partially mutated, undocumented
 
-**Location:** `finstack/scenarios/src/engine.rs:775-1024` (`apply`); unknown-id bump rejection confirmed in `finstack/core/src/market_data/context/ops_bump.rs:123`.
+**Location:** `finstack-quant/scenarios/src/engine.rs:775-1024` (`apply`); unknown-id bump rejection confirmed in `finstack-quant/core/src/market_data/context/ops_bump.rs:123`.
 **Issue:** `apply` mutates `ctx.market` in place across operations (curve replacements via `UpdateCurve`, batched bumps flushed between ops). A later op failing — `MarketDataNotFound`, or `MarketContext::bump` rejecting an unknown id — returns `Err` with earlier shocks already applied. No rollback, and the docs do not mention non-atomicity. Python/WASM callers are insulated (they operate on deserialized copies and serialize only on success); Rust callers passing a live `&mut MarketContext` get a half-applied scenario.
 **Fix:** Document non-atomicity prominently in `apply`'s docs, or stage on a clone and swap on success.
 
 #### MO-3. Hierarchy expansion does not filter resolved ids by kind
 
-**Location:** `finstack/scenarios/src/engine.rs:374-470` (`expand_hierarchy_operations`).
+**Location:** `finstack-quant/scenarios/src/engine.rs:374-470` (`expand_hierarchy_operations`).
 **Issue:** Expansion maps every `curve_id` in the matched hierarchy subtree into the operation's kind (`HierarchyCurveParallelBp{Discount}` → one `CurveParallelBp` per id). The same hierarchy `curve_ids` collection serves discount curves, vol surfaces, *and* equity price ids (the equity variant resolves from it too), so a node grouping mixed content turns a taxonomy mismatch into a hard `MarketDataNotFound` abort mid-apply (compounding MO-2). Inconsistent failure modes: direct equity ops warn-and-skip on missing ids (`adapters/equity.rs:33`), while hierarchy-expanded curve ops hard-error — wrong way around for machine-derived ids that the user never typed.
 **Fix:** Filter resolved ids by target collection (kind) at expansion time, or warn-and-skip on missing ids for hierarchy-expanded operations instead of aborting.
 
 #### MO-4. Bindings cannot supply instruments, calendar, or rate bindings; rounding stamp dropped in Python
 
-**Location:** `finstack-py/src/bindings/scenarios/engine.rs:35-42`, `finstack-wasm/src/api/scenarios/mod.rs:32-39`; report dict built at `finstack-py/src/bindings/scenarios/engine.rs:18-26`.
+**Location:** `finstack-quant-py/src/bindings/scenarios/engine.rs:35-42`, `finstack-quant-wasm/src/api/scenarios/mod.rs:32-39`; report dict built at `finstack-quant-py/src/bindings/scenarios/engine.rs:18-26`.
 **Issue:** Both bindings hardcode `instruments: None, rate_bindings: None, calendar: None`. From Python/WASM: all instrument price/spread and correlation shock operations warn-and-noop (`InstrumentShockNoPortfolio` / `CorrelationShockNoPortfolio`); `TimeRollForward` in `BusinessDays` mode never sees a holiday calendar (ModifiedFollowing degrades to weekend-only adjustment); `RateBinding` persistence is unavailable. Additionally `set_report_items` omits `rounding_context`, so the policy stamp never reaches Python.
 **Fix:** Accept optional calendar id and instruments JSON in the binding entry points; surface `rounding_context` in the report dict; at minimum, document in the binding docstrings which operations are inert without a portfolio.
 
 #### MO-5. `compute_horizon_return` holds the GIL and strips currency
 
-**Location:** `finstack-py/src/bindings/scenarios/horizon.rs:36-95` (no `py.detach`, unlike `apply_scenario`); getters at `horizon.rs:125-132`.
+**Location:** `finstack-quant-py/src/bindings/scenarios/horizon.rs:36-95` (no `py.detach`, unlike `apply_scenario`); getters at `horizon.rs:125-132`.
 **Issue:** Horizon analysis (multiple revaluations + rayon-parallel attribution) runs with the GIL held, blocking other Python threads for the duration. Separately, the `initial_value` / `terminal_value` getters return bare `f64` amounts with no currency, and `total_return_pct` can return `NaN` on currency mismatch with no Python-side documentation of that sentinel.
 **Fix:** Wrap the compute in `py.detach`; return `(amount, currency)` or document that `to_json()` is the currency-faithful accessor; document the NaN sentinel.
 
@@ -91,11 +91,11 @@ None. Nothing corrupts an on-pillar, market-only scenario (the dominant use case
 
 #### MI-1. Vol-index parallel shock silently clamps spot to zero
 
-`finstack/scenarios/src/adapters/curves.rs:655` — knot levels are validated strictly positive post-shock (hard error via `check_vol_index_post_shock_positivity`), but `spot_level` is silently floored at `0.0`. A zero vol-index spot is as degenerate as a zero knot; make the spot check consistent with the knot check.
+`finstack-quant/scenarios/src/adapters/curves.rs:655` — knot levels are validated strictly positive post-shock (hard error via `check_vol_index_post_shock_positivity`), but `spot_level` is silently floored at `0.0`. A zero vol-index spot is as degenerate as a zero knot; make the spot check consistent with the knot check.
 
 #### MI-2. Hazard fallback shift ignores the credit triangle
 
-`finstack/scenarios/src/adapters/curves.rs:328-357` — when par-CDS recalibration fails, the fallback (`bump_hazard_shift`) shifts hazard rates by the raw spread bp. The standard approximation is `Δλ ≈ Δs/(1−R)`, so the fallback under-shocks default intensities by ~(1−R) (≈40% for senior unsecured). The `HazardRecalibrationFallback` warning is honest about additive-shift semantics but not the magnitude bias. Scale the fallback by `1/(1−R)` or state the bias in the warning.
+`finstack-quant/scenarios/src/adapters/curves.rs:328-357` — when par-CDS recalibration fails, the fallback (`bump_hazard_shift`) shifts hazard rates by the raw spread bp. The standard approximation is `Δλ ≈ Δs/(1−R)`, so the fallback under-shocks default intensities by ~(1−R) (≈40% for senior unsecured). The `HazardRecalibrationFallback` warning is honest about additive-shift semantics but not the magnitude bias. Scale the fallback by `1/(1−R)` or state the bias in the warning.
 
 #### MI-3. Template labeling anachronisms
 
@@ -103,11 +103,11 @@ None. Nothing corrupts an on-pillar, market-only scenario (the dominant use case
 
 #### MI-4. Discount-curve heuristic depends on a 3-char uppercase prefix
 
-`finstack/scenarios/src/adapters/curves.rs:219-249` — ids like `sofr-usd` or `OIS-USD` silently bypass the currency-prefix heuristic into single-curve fallback or error. Warned via `DiscountCurveHeuristic`, but brittle; document the naming assumption.
+`finstack-quant/scenarios/src/adapters/curves.rs:219-249` — ids like `sofr-usd` or `OIS-USD` silently bypass the currency-prefix heuristic into single-curve fallback or error. Warned via `DiscountCurveHeuristic`, but brittle; document the naming assumption.
 
 #### MI-5. `update_rate_from_binding` lookup shadowing
 
-`finstack/scenarios/src/adapters/statements.rs:122-145` — if a curve id exists as both a discount and a forward curve, the discount silently wins. Document or disambiguate.
+`finstack-quant/scenarios/src/adapters/statements.rs:122-145` — if a curve id exists as both a discount and a forward curve, the discount silently wins. Document or disambiguate.
 
 ---
 

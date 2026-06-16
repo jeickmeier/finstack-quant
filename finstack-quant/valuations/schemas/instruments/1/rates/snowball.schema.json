@@ -1,0 +1,7 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/snowball.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Snowball",
+  "description": "Snowball instrument schema",
+  "type": "object"
+}

@@ -1,0 +1,36 @@
+[package]
+name = "finstack-quant-monte-carlo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Monte Carlo simulation engine for quantitative finance"
+
+[dependencies]
+finstack-quant-core = { path = "../core" }
+smallvec = { version = "1.15", default-features = false, features = ["serde"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+rayon = "1.11"
+nalgebra = { version = "0.34" }
+
+[features]
+default = []
+# Enables experimental variance-reduction utilities that are not yet wired into
+# the engine or pricers (importance sampling, moment matching). Build them only
+# when developing or evaluating the underlying estimators; production paths use
+# control variates and antithetic pairing, both of which are always available.
+vr-experimental = []
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "mc_hot_paths"
+harness = false
+
+[lints]
+workspace = true

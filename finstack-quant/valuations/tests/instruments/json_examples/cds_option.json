@@ -1,0 +1,45 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "cds_option",
+    "spec": {
+      "id": "CDSOPT-CALL-CORP-5Y",
+      "strike": "0.01",
+      "option_type": "call",
+      "exercise_style": "european",
+      "expiry": "2025-06-20",
+      "cds_maturity": "2030-06-20",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "settlement": "cash",
+      "recovery_rate": 0.4,
+      "discount_curve_id": "USD-OIS",
+      "credit_curve_id": "CORP-HAZARD",
+      "vol_surface_id": "CDSOPT-VOL",
+      "pricing_overrides": {
+        "quoted_clean_price": null,
+        "rho_bump_decimal": null,
+        "vega_bump_decimal": null,
+        "implied_volatility": null,
+        "cds_quote_bp": null,
+        "upfront_payment": null,
+        "ytm_bump_decimal": null,
+        "theta_period": null,
+        "mc_seed_scenario": null,
+        "adaptive_bumps": false,
+        "spot_bump_pct": null,
+        "vol_bump_pct": null,
+        "rate_bump_bp": null
+      },
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      },
+      "underlying_is_index": false,
+      "index_factor": null,
+      "realized_index_loss": null
+    }
+  }
+}

@@ -1,0 +1,28 @@
+[package]
+name = "finstack-quant-factor-model"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Factor model framework for Finstack Quant with hierarchical credit factor decomposition and offline calibration"
+
+[dependencies]
+finstack-quant-core = { path = "../core" }
+finstack-quant-analytics = { path = "../analytics" }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = "1.11.0"
+serde_json = { workspace = true }
+time = { workspace = true, features = ["macros"] }
+
+[[bench]]
+name = "factor_model"
+harness = false
+
+[lints]
+workspace = true

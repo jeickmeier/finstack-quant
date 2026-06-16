@@ -1,0 +1,20 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "equity",
+    "spec": {
+      "id": "EQUITY-AAPL",
+      "ticker": "AAPL",
+      "currency": "USD",
+      "shares": 100.0,
+      "price_quote": null,
+      "price_id": "AAPL-SPOT",
+      "div_yield_id": "AAPL-DIV",
+      "discount_curve_id": "USD",
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

@@ -3,15 +3,15 @@ trigger: always_on
 description:
 globs:
 ---
-# Finstack (Rust) — Deterministic Financial Computation Library
+# Finstack Quant (Rust) — Deterministic Financial Computation Library
 
 ## Overview
 
-Finstack is a deterministic, cross‑platform financial computation engine with a Rust core and first‑class Python and WebAssembly bindings. It emphasizes accounting‑grade correctness (Decimal numerics), currency‑safety, stable wire formats, and predictable performance for statements, valuations, scenarios, and portfolio analysis.
+Finstack Quant is a deterministic, cross‑platform financial computation engine with a Rust core and first‑class Python and WebAssembly bindings. It emphasizes accounting‑grade correctness (Decimal numerics), currency‑safety, stable wire formats, and predictable performance for statements, valuations, scenarios, and portfolio analysis.
 
 ## Project Purpose
 
-Finstack aims to provide:
+Finstack Quant aims to provide:
 
 - **Determinism**: Decimal by default; serial and parallel runs produce identical results.
 - **Currency‑safety**: No implicit cross‑currency math; explicit FX policies stamped in results.
@@ -22,9 +22,9 @@ Finstack aims to provide:
 ## Architecture
 
 ```
-Workspace (meta‑crate: finstack)
+Workspace (meta-crate: finstack-quant)
 ┌──────────────────────┐
-│    finstack (meta)   │  -> re‑exports subcrates via features
+│ finstack-quant (meta) │  -> re‑exports subcrates via features
 └──────────┬───────────┘
            │
  ┌─────────┴──────────────────────────────────────────────────────────────────────────────────┐
@@ -43,8 +43,8 @@ Workspace (meta‑crate: finstack)
  │                                                                                             │
  │ Supporting crates                                                                           │
  │  io                   ← CSV/Parquet/Arrow interop (optional; schema‑stable)                 │
- │  finstack‑py          ← Python bindings (PyO3); src/bindings/ mirrors crate tree            │
- │  finstack‑wasm        ← WASM bindings (wasm‑bindgen); src/api/ + JS facade                  │
+ │  finstack-quant-py          ← Python bindings (PyO3); src/bindings/ mirrors crate tree            │
+ │  finstack-quant-wasm        ← WASM bindings (wasm‑bindgen); src/api/ + JS facade                  │
  └─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,16 +72,16 @@ Workspace (meta‑crate: finstack)
 
 ## Language Bindings
 
-### Python (finstack‑py)
+### Python (finstack-quant-py)
 
 - Wheels for major OSes; heavy compute releases the GIL; DataFrame‑friendly outputs.
-- Binding Rust code under `finstack-py/src/bindings/` mirrors the 10 crate domains exactly.
+- Binding Rust code under `finstack-quant-py/src/bindings/` mirrors the 10 crate domains exactly.
 - Names match Rust (e.g. `Date`, `sharpe`); no legacy aliases.
 
-### WebAssembly (finstack‑wasm)
+### WebAssembly (finstack-quant-wasm)
 
 - Browser/Node support; JSON IO parity with serde; feature flags for tree‑shaking and small bundles.
-- Binding Rust code under `finstack-wasm/src/api/` with a hand-written JS facade at `index.js`.
+- Binding Rust code under `finstack-quant-wasm/src/api/` with a hand-written JS facade at `index.js`.
 - Public API is accessed via crate-domain namespaces (e.g. `core.Currency`, `analytics.sharpe`).
 
 ## Key Features

@@ -1,0 +1,26 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "variance_swap",
+    "spec": {
+      "id": "VARSPX-1Y",
+      "underlying_ticker": "SPX",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "strike_variance": 0.04,
+      "start_date": "2024-01-01",
+      "maturity": "2025-01-01",
+      "observation_freq": {"count": 1, "unit": "days"},
+      "realized_var_method": "Parkinson",
+      "side": "receive",
+      "discount_curve_id": "USD-OIS",
+      "day_count": "Act365F",
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

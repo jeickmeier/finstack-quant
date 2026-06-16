@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Migrate golden fixtures from `finstack.golden/1` to `finstack.golden/2`.
+"""Migrate golden fixtures from `finstack_quant.golden/1` to `finstack_quant.golden/2`.
 
 The v2 schema replaces the free-form `inputs` blob with strict, named sections:
 
@@ -31,9 +31,9 @@ import json
 from pathlib import Path
 import sys
 
-DATA_ROOT = Path(__file__).resolve().parents[2] / ("finstack/valuations/tests/golden/data")
-V1 = "finstack.golden/1"
-V2 = "finstack.golden/2"
+DATA_ROOT = Path(__file__).resolve().parents[2] / ("finstack-quant/valuations/tests/golden/data")
+V1 = "finstack_quant.golden/1"
+V2 = "finstack_quant.golden/2"
 SABR_DOMAIN = "volatility.sabr"
 
 SABR_BODY_KEYS = ("alpha", "beta", "nu", "rho", "forward", "time_to_expiry", "strikes")

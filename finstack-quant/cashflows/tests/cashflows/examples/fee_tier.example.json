@@ -1,0 +1,7 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "fee_tier": {
+    "threshold": "0.5",
+    "bps": "25.0"
+  }
+}

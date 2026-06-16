@@ -1,6 +1,6 @@
 ---
 description: Preserve source-backed golden expected values and tight tolerances
-globs: "finstack/valuations/tests/golden/data/**/*.json,finstack-py/tests/golden/**/*.py,finstack/valuations/tests/golden/**/*.rs"
+globs: "finstack-quant/valuations/tests/golden/data/**/*.json,finstack-quant-py/tests/golden/**/*.py,finstack-quant/valuations/tests/golden/**/*.rs"
 alwaysApply: false
 ---
 

@@ -1,0 +1,33 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "cds_tranche",
+    "spec": {
+      "id": "CDXIG-42-0X3",
+      "index_name": "CDX.NA.IG",
+      "series": 42,
+      "attach_pct": 0.0,
+      "detach_pct": 0.03,
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "maturity": "2029-12-20",
+      "running_coupon_bp": 100.0,
+      "frequency": {"count": 3, "unit": "months"},
+      "day_count": "Act360",
+      "bdc": "following",
+      "calendar_id": null,
+      "discount_curve_id": "USD-OIS",
+      "credit_index_id": "CDX.NA.IG.HAZARD",
+      "side": "BuyProtection",
+      "effective_date": null,
+      "accumulated_loss": 0.0,
+      "standard_imm_dates": false,
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

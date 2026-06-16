@@ -1,0 +1,23 @@
+{
+  "schema": "finstack_quant.instruments.xccy.conventions.registry.v1",
+  "namespace": "instruments.xccy.market_conventions",
+  "version": 1,
+  "entries": [
+    {
+      "ids": ["EUR/USD-XCCY", "EURUSD-XCCY"],
+      "record": {
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "base_index_id": "EUR-ESTR-OIS",
+        "quote_index_id": "USD-SOFR-OIS",
+        "spot_lag_days": 2,
+        "payment_frequency": "3M",
+        "day_count": "Act360",
+        "business_day_convention": "modified_following",
+        "base_calendar_id": "target2",
+        "quote_calendar_id": "usny",
+        "notional_exchange": {"mtm_resetting": {"resetting_side": "leg1"}}
+      }
+    }
+  ]
+}

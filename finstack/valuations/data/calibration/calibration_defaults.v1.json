@@ -1,8 +1,0 @@
-{
-  "schema": "finstack.valuations.calibration_defaults.v1",
-  "version": 1,
-  "validation": {
-    "recovery_rate_abs_tolerance": 1e-12,
-    "minimum_lgd_for_hazard_guess": 1e-6
-  }
-}

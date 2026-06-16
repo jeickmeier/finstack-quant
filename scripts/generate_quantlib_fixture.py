@@ -3,9 +3,9 @@
 Runs QuantLib's analytical/pricing engines on three canonical instruments and
 emits JSON fixtures consumed by:
 
-- ``finstack/valuations/tests/sanity_invariants/test_bond_quantlib_external_parity.rs``
+- ``finstack-quant/valuations/tests/sanity_invariants/test_bond_quantlib_external_parity.rs``
   — base valuation parity (NPV, DV01)
-- ``finstack/attribution/tests/attribution/quantlib_parity.rs``
+- ``finstack-quant/attribution/tests/attribution/quantlib_parity.rs``
   — attribution decomposition parity (carry, rates, residual via
     ``attribute_pnl_metrics_based``)
 
@@ -14,7 +14,7 @@ Run with::
     uv run python scripts/generate_quantlib_fixture.py
 
 Outputs three JSON files under
-``finstack/valuations/tests/data/quantlib_parity/``:
+``finstack-quant/valuations/tests/data/quantlib_parity/``:
 
 - ``bond_5pct_10y_usd.json``        vanilla USD fixed-rate bond
 - ``irs_5y_usd.json``               vanilla USD interest-rate swap (5y, semi/quarterly)
@@ -42,7 +42,9 @@ from typing import Any
 
 import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813  (QuantLib's canonical Python alias)
 
-FIXTURE_DIR = Path(__file__).resolve().parents[1] / "finstack" / "valuations" / "tests" / "data" / "quantlib_parity"
+FIXTURE_DIR = (
+    Path(__file__).resolve().parents[1] / "finstack-quant" / "valuations" / "tests" / "data" / "quantlib_parity"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +86,7 @@ def _write_fixture(name: str, data: dict[str, Any]) -> None:
 def build_bond_fixture() -> dict[str, Any]:
     """5% semi-annual USD bond, 10y to maturity.
 
-    Convention set is chosen to match finstack's `Bond::fixed` defaults so the
+    Convention set is chosen to match finstack-quant's `Bond::fixed` defaults so the
     parity test does not require any special builder calls on the Rust side:
 
       day count          = 30/360 (Bond Basis)

@@ -1,4 +1,4 @@
-# Pre-commit hooks for finstack workspace
+# Pre-commit hooks for finstack-quant workspace
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 
@@ -16,15 +16,15 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^(finstack-wasm/pkg|finstack-py/finstack/.*\.pyi|.*/coverage/)
+        exclude: ^(finstack-quant-wasm/pkg|finstack-quant-py/finstack_quant/.*\.pyi|.*/coverage/)
       - id: end-of-file-fixer
-        exclude: ^(finstack-wasm/pkg|finstack-py/finstack/.*\.pyi|.*/coverage/)
+        exclude: ^(finstack-quant-wasm/pkg|finstack-quant-py/finstack_quant/.*\.pyi|.*/coverage/)
       - id: check-yaml
         args: [--allow-multiple-documents]
       - id: check-toml
       - id: check-json
         # Exclude: tsconfig (JSONC with comments), generated audit files, pkg dirs
-        exclude: ^(finstack-wasm/pkg|node_modules|package-lock\.json|.*tsconfig.*\.json|scripts/audits/.*\.json)
+        exclude: ^(finstack-quant-wasm/pkg|node_modules|package-lock\.json|.*tsconfig.*\.json|scripts/audits/.*\.json)
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=500]
@@ -54,9 +54,9 @@ repos:
 
       - id: wasm-format
         name: WASM format (prettier)
-        entry: bash -c 'cd finstack-wasm && npm run format:fix'
+        entry: bash -c 'cd finstack-quant-wasm && npm run format:fix'
         language: system
-        files: ^finstack-wasm/.*\.(ts|tsx|js|jsx)$
+        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx)$
         pass_filenames: false
 
   - repo: https://github.com/igorshubovych/markdownlint-cli
@@ -69,7 +69,7 @@ repos:
         # MD036: emphasis as heading, MD029: ordered list prefix
         # MD032: blanks around lists, MD051: link fragments
         args: [--disable, MD013, MD033, MD041, MD024, MD040, MD036, MD029, MD032, MD051, --]
-        exclude: ^(CHANGELOG\.md|PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
+        exclude: ^(CHANGELOG\.md|PARITY_AUDIT\.md|book/src/SUMMARY\.md|finstack-quant-wasm/pkg|node_modules|vendor|\.cursor|\.agent|\.zenflow|\.zencoder)
 
   # ============================================
   # Linting (all languages)
@@ -92,9 +92,9 @@ repos:
 
       - id: wasm-lint
         name: WASM lint (eslint)
-        entry: bash -c 'cd finstack-wasm && npm run lint'
+        entry: bash -c 'cd finstack-quant-wasm && npm run lint'
         language: system
-        files: ^finstack-wasm/.*\.(ts|tsx|js|jsx)$
+        files: ^finstack-quant-wasm/.*\.(ts|tsx|js|jsx)$
         pass_filenames: false
 
   # ============================================
@@ -104,7 +104,7 @@ repos:
     hooks:
       - id: ty
         name: Python typecheck (ty)
-        entry: uv run --no-sync ty check finstack-py/finstack
+        entry: uv run --no-sync ty check finstack-quant-py/finstack_quant
         language: system
         types: [python]
         pass_filenames: false
@@ -132,16 +132,16 @@ repos:
     hooks:
       - id: bandit
         name: Python security checks (bandit)
-        args: ["-r", "finstack-py/finstack", "-x", "finstack-py/tests"]
+        args: ["-r", "finstack-quant-py/finstack_quant", "-x", "finstack-quant-py/tests"]
         pass_filenames: false
 
   - repo: local
     hooks:
       - id: wasm-audit
         name: WASM security (npm audit)
-        entry: bash -c 'cd finstack-wasm && npm audit --audit-level=high --omit=dev'
+        entry: bash -c 'cd finstack-quant-wasm && npm audit --audit-level=high --omit=dev'
         language: system
-        files: ^finstack-wasm/(package\.json|package-lock\.json)$
+        files: ^finstack-quant-wasm/(package\.json|package-lock\.json)$
         pass_filenames: false
 
       - id: cargo-deny

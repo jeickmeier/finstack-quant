@@ -1,9 +1,9 @@
 ---
 trigger: model_decision
-description: Information about the coding standards of the rust finstack library
+description: Information about the coding standards of the rust finstack-quant library
 globs:
 ---
-# Rust Code Standards for rfin Project
+# Rust Code Standards for the finstack-quant Project
 
 ## Core Principles
 
@@ -32,7 +32,7 @@ globs:
 ///
 /// # Examples
 /// ```
-/// use rfin_core::Currency;
+/// use finstack_quant_core::Currency;
 /// let usd = Currency::USD;
 /// ```
 pub struct MyType;
@@ -42,9 +42,9 @@ pub struct MyType;
 
 ### Mathematical Utilities Organization
 
-**Default Principle**: Mathematical functions belong in `finstack_core::math::` unless they are exclusively useful for a specific domain (e.g., Monte Carlo path simulation, not general numerical computation).
+**Default Principle**: Mathematical functions belong in `finstack_quant_core::math::` unless they are exclusively useful for a specific domain (e.g., Monte Carlo path simulation, not general numerical computation).
 
-**Core Math Modules** (`finstack_core::math::`):
+**Core Math Modules** (`finstack_quant_core::math::`):
 
 - `stats` - Statistical functions (mean, variance, correlation, streaming statistics via `OnlineStats`)
 - `special_functions` - Normal distribution functions (norm_cdf, norm_pdf, erf, inverse CDF)
@@ -280,7 +280,7 @@ pub trait Discount: TermStructure {
 //!
 //! # Examples
 //! ```
-//! use rfin_core::dates::{Date, DayCount};
+//! use finstack_quant_core::dates::{Date, DayCount};
 //! let yf = DayCount::Act360.year_fraction(start, end)?;
 //! ```
 //!

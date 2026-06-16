@@ -2,13 +2,13 @@
 
 ## Project Structure
 
-- Multi-crate Rust workspace: `finstack/core`, `finstack/analytics`, `finstack/valuations`, `finstack/statements`, `finstack/statements-analytics`, `finstack/scenarios`, `finstack/portfolio`, `finstack/margin`, `finstack/monte_carlo`
-- Python bindings in `finstack-py/` (PyO3); WASM bindings in `finstack-wasm/` (wasm-bindgen)
-- Python binding Rust code lives under `finstack-py/src/bindings/` (one subdirectory per crate domain)
-- WASM binding Rust code lives under `finstack-wasm/src/api/` with a hand-written JS facade at `finstack-wasm/index.js`
-- `.pyi` stubs in `finstack-py/finstack/` are derived from contract and binding code; structural parity tests live under `finstack-py/tests/parity`, with behavioral parity tests alongside runtime tests such as `finstack-py/tests/test_core_parity.py`
-- Parity contract: `finstack-py/parity_contract.toml`
-- Example notebooks in `finstack-py/examples/notebooks/`; runner script: `run_all_notebooks.py`
+- Multi-crate Rust workspace: `finstack-quant/core`, `finstack-quant/analytics`, `finstack-quant/valuations`, `finstack-quant/statements`, `finstack-quant/statements-analytics`, `finstack-quant/scenarios`, `finstack-quant/portfolio`, `finstack-quant/margin`, `finstack-quant/monte_carlo`
+- Python bindings in `finstack-quant-py/` (PyO3); WASM bindings in `finstack-quant-wasm/` (wasm-bindgen)
+- Python binding Rust code lives under `finstack-quant-py/src/bindings/` (one subdirectory per crate domain)
+- WASM binding Rust code lives under `finstack-quant-wasm/src/api/` with a hand-written JS facade at `finstack-quant-wasm/index.js`
+- `.pyi` stubs in `finstack-quant-py/finstack_quant/` are derived from contract and binding code; structural parity tests live under `finstack-quant-py/tests/parity`, with behavioral parity tests alongside runtime tests such as `finstack-quant-py/tests/test_core_parity.py`
+- Parity contract: `finstack-quant-py/parity_contract.toml`
+- Example notebooks in `finstack-quant-py/examples/notebooks/`; runner script: `run_all_notebooks.py`
 
 ## Build and Tooling
 
@@ -31,13 +31,13 @@
 
 - Rust is the canonical API design. Type and function names in Python/WASM must match Rust exactly (exceptions only for documented host-language collisions)
 - All logic stays in Rust crates; bindings do only type conversion, wrapper construction, error mapping
-- Python binding tree: `finstack-py/src/bindings/{core,analytics,margin,...}/`; `lib.rs` delegates to `bindings::register_root`
-- WASM binding tree: `finstack-wasm/src/api/{core_ns,analytics,margin,...}/`; public API via `index.js` facade, not raw pkg/
+- Python binding tree: `finstack-quant-py/src/bindings/{core,analytics,margin,...}/`; `lib.rs` delegates to `bindings::register_root`
+- WASM binding tree: `finstack-quant-wasm/src/api/{core_ns,analytics,margin,...}/`; public API via `index.js` facade, not raw pkg/
 - Wrapper pattern: `pub(crate) inner: RustType` with `from_inner()` constructor
 - Error handling: centralized `core_to_py()` in `errors.rs` (Python), `JsValue::from_str` (WASM); never use `.unwrap()` or `.expect()` in non-test binding code
 - Module registration: every submodule sets `__all__` via `PyList` in `register()`; no dynamic export discovery
 - Builder pattern: fluent chaining (e.g., `Type.builder(id).field(val).build()`)
-- **WASM exposes a strict subset of `finstack-core`** (currently `currency`, `dates`, `market_data`, `math`, `money`, `types`). Python tracks the full crate surface; WASM is opt-in per module. The agreed subset is documented in `[wasm_core_subset]` in `finstack-py/parity_contract.toml` — update it whenever the WASM core surface changes.
+- **WASM exposes a strict subset of `finstack-quant-core`** (currently `currency`, `dates`, `market_data`, `math`, `money`, `types`). Python tracks the full crate surface; WASM is opt-in per module. The agreed subset is documented in `[wasm_core_subset]` in `finstack-quant-py/parity_contract.toml` — update it whenever the WASM core surface changes.
 
 ## API Conventions
 
@@ -57,7 +57,7 @@
   - `rolling_var_forecasts_with_fn(..., fn)` — specialized closure variant (Rust-internal)
 - **Descriptive suffixes for specialized variants:** use `_from_<input>` (alternate input shape), `_with_<thing>` (alternate dispatch mechanism), `_unchecked` (invariant-skipping). Suffixes are only for the non-canonical variants; the short base name belongs to the one exposed through bindings.
 - **Accessors still use `get_*`** (see above) — naming-strategy shortening does not override the `get_*` convention.
-- **When renaming, propagate everywhere in one slice:** Rust source + Rust tests + re-exports → PyO3 `#[pyfunction]` + `__all__` + `.pyi` + `__init__.py` → WASM `#[wasm_bindgen(js_name=...)]` + `index.d.ts` + `exports/*.js` → `finstack-py/parity_contract.toml` + benchmarks + notebooks. Verify with `mise run all-fmt && mise run all-lint && mise run all-test && mise run python-build`.
+- **When renaming, propagate everywhere in one slice:** Rust source + Rust tests + re-exports → PyO3 `#[pyfunction]` + `__all__` + `.pyi` + `__init__.py` → WASM `#[wasm_bindgen(js_name=...)]` + `index.d.ts` + `exports/*.js` → `finstack-quant-py/parity_contract.toml` + benchmarks + notebooks. Verify with `mise run all-fmt && mise run all-lint && mise run all-test && mise run python-build`.
 
 ## Workflow Preferences
 

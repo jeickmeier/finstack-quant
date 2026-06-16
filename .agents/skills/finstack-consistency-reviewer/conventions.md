@@ -1,6 +1,6 @@
 # Established Codebase Conventions
 
-Reference of patterns observed across the rfin codebase. When reviewing for consistency, deviations from these patterns are candidates for findings.
+Reference of patterns observed across the finstack-quant codebase. When reviewing for consistency, deviations from these patterns are candidates for findings.
 
 ## Rust Conventions
 
@@ -11,7 +11,7 @@ Reference of patterns observed across the rfin codebase. When reviewing for cons
 | `thiserror::Error` derive | `#[derive(Error, Debug)]` | All crates |
 | `#[non_exhaustive]` on error enums | `#[non_exhaustive] pub enum Error` | All crates |
 | `pub type Result<T>` alias | `pub type Result<T> = std::result::Result<T, Error>` | All crates |
-| `#[from]` for wrapped errors | `Core(#[from] finstack_core::Error)` | All crates |
+| `#[from]` for wrapped errors | `Core(#[from] finstack_quant_core::Error)` | All crates |
 | Helper constructors on errors | `Error::missing_curve_with_suggestions(...)` | core (partial) |
 
 **Deviation to watch:** Not all error variants have helper constructors. Only core crate uses them extensively.
@@ -77,7 +77,7 @@ Reference of patterns observed across the rfin codebase. When reviewing for cons
 | Wrapper naming | `Py{Type}` | `PyCurrency`, `PyMoney`, `PyDiscountCurve` |
 | Module registration | `pub(crate) fn register()` | Every submodule has one |
 | Argument parsing | Centralized `*Arg` types | `CurrencyArg` in `common/args.rs` |
-| Error mapping | `map_error()` function | `finstack-py/src/errors.rs` |
+| Error mapping | `map_error()` function | `finstack-quant-py/src/errors.rs` |
 | Inner field | `pub(crate) inner: RustType` | Consistent across all wrappers |
 
 ## WASM Binding Conventions

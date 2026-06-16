@@ -1,0 +1,10 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "notional": {
+    "initial": {
+      "amount": "1000000",
+      "currency": "USD"
+    },
+    "amort": "None"
+  }
+}

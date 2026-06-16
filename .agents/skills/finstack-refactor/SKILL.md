@@ -15,7 +15,7 @@ Do not load every reference by default. Open only the file that matches the curr
 
 - `references/repo-refactor-boundaries.md`: open when deciding whether code belongs in Rust core crates, bindings, stubs, exports, or parity surfaces.
 - `references/rust-refactor-heuristics.md`: open when refactoring Rust internals or choosing between helpers, structs, enums, params structs, modules, or traits.
-- `references/binding-layer-patterns.md`: open when touching `finstack-py` binding code, Python-facing API shape, registration, or error mapping.
+- `references/binding-layer-patterns.md`: open when touching `finstack-quant-py` binding code, Python-facing API shape, registration, or error mapping.
 - `references/refactor-sync-checklist.md`: open before finishing a refactor that changes public APIs, exports, module layout, names, or cross-language surfaces.
 - `references/repo-examples.md`: open when you want a repo-shaped example before choosing the operation.
 

@@ -1,0 +1,30 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "amortization_spec": {
+    "StepRemaining": {
+      "schedule": [
+        [
+          "2025-06-15",
+          {
+            "amount": "750000",
+            "currency": "USD"
+          }
+        ],
+        [
+          "2025-12-15",
+          {
+            "amount": "500000",
+            "currency": "USD"
+          }
+        ],
+        [
+          "2026-06-15",
+          {
+            "amount": "250000",
+            "currency": "USD"
+          }
+        ]
+      ]
+    }
+  }
+}

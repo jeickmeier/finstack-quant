@@ -1,7 +1,7 @@
 # Valuations Crate — Test-Suite Audit (Duplicates / Dead Tests / Coverage Holes)
 
 **Date:** 2026-06-13
-**Scope:** `finstack/valuations` test suite — ~7,000 test functions (4,175 in `tests/`, 2,854 unit tests in `src/`) across 580 files / ~171K lines, plus `src/` unit tests, wired into 14 test binaries (43 instrument families + 9 non-instrument test groups).
+**Scope:** `finstack-quant/valuations` test suite — ~7,000 test functions (4,175 in `tests/`, 2,854 unit tests in `src/`) across 580 files / ~171K lines, plus `src/` unit tests, wired into 14 test binaries (43 instrument families + 9 non-instrument test groups).
 **Goal:** find (1) duplicate tests, (2) dead / unnecessary tests safe to remove, and (3) major coverage holes worth filling.
 
 ## Methodology

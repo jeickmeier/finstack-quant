@@ -1,0 +1,80 @@
+{
+  "$schema": "../../schemas/calibration/3/calibration.schema.json",
+  "schema": "finstack_quant.calibration",
+  "plan": {
+    "id": "equity_spots_dividends_snapshot",
+    "description": "Snapshot-only example: equity spot prices in initial_market.prices and a quarterly dividend schedule for AAPL in initial_market.dividends, with no calibration steps. Demonstrates Track B for equities \u2014 non-bootstrapped equity marks (spot prices and dividend schedules) loaded directly as MarketScalar and DividendSchedule values. This is a standalone variant of the initial_market block from 08_equity_vol_surface.json, presented without the vol_surface calibration step to isolate the Track B equity snapshot pattern. Spot prices use the MarketScalar::Price(Money) shape. The AAPL dividend schedule uses four quarterly cash dividends of $0.25 each, matching standard US large-cap quarterly payout conventions.",
+    "quote_sets": {},
+    "steps": [],
+    "settings": {}
+  },
+  "market_data": [
+    {
+      "kind": "price",
+      "id": "AAPL",
+      "scalar": {
+        "price": {
+          "amount": "175.00",
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "kind": "price",
+      "id": "MSFT",
+      "scalar": {
+        "price": {
+          "amount": "410.00",
+          "currency": "USD"
+        }
+      }
+    },
+    {
+      "kind": "dividend_schedule",
+      "schedule": {
+        "id": "AAPL-DIVS",
+        "underlying": "AAPL",
+        "currency": "USD",
+        "events": [
+          {
+            "date": "2026-08-15",
+            "kind": {
+              "cash": {
+                "amount": "0.25",
+                "currency": "USD"
+              }
+            }
+          },
+          {
+            "date": "2026-11-15",
+            "kind": {
+              "cash": {
+                "amount": "0.25",
+                "currency": "USD"
+              }
+            }
+          },
+          {
+            "date": "2027-02-15",
+            "kind": {
+              "cash": {
+                "amount": "0.25",
+                "currency": "USD"
+              }
+            }
+          },
+          {
+            "date": "2027-05-15",
+            "kind": {
+              "cash": {
+                "amount": "0.25",
+                "currency": "USD"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "prior_market": []
+}

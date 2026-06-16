@@ -1,0 +1,101 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket_with_instruments.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Supplementary schema showing a basket instrument with full embedded instrument constituents. Uses the 'basket' discriminator — not a separate instrument type. See basket.schema.json for the reference-only variant.",
+  "examples": [
+    {
+      "instrument": {
+        "spec": {
+          "attributes": {
+            "meta": {},
+            "tags": []
+          },
+          "constituents": [
+            {
+              "id": "BOND-CORP",
+              "reference": {
+                "instrument": {
+                  "spec": {
+                    "attributes": {
+                      "meta": {},
+                      "tags": []
+                    },
+                    "call_put": null,
+                    "cashflow_spec": {
+                      "Fixed": {
+                        "bdc": "following",
+                        "calendar_id": null,
+                        "coupon_type": "Cash",
+                        "dc": "Thirty360",
+                        "freq": {
+                          "count": 6,
+                          "unit": "months"
+                        },
+                        "rate": 0.05,
+                        "stub": "None"
+                      }
+                    },
+                    "credit_curve_id": null,
+                    "discount_curve_id": "USD-OIS",
+                    "ex_coupon_days": null,
+                    "id": "CORP-BOND-001",
+                    "issue_date": "2024-01-01",
+                    "maturity": "2034-01-01",
+                    "notional": {
+                      "amount": "1000",
+                      "currency": "USD"
+                    },
+                    "pricing_overrides": {},
+                    "settlement_days": null
+                  },
+                  "type": "bond"
+                }
+              },
+              "ticker": "CORP",
+              "units": 100.0,
+              "weight": 0.0
+            },
+            {
+              "id": "EQ-AAPL",
+              "reference": {
+                "asset_type": "equity",
+                "price_id": "AAPL-SPOT"
+              },
+              "ticker": "AAPL",
+              "units": null,
+              "weight": 0.4
+            }
+          ],
+          "currency": "USD",
+          "discount_curve_id": "USD-OIS",
+          "expense_ratio": 0.001,
+          "id": "BASKET-MIXED",
+          "pricing_config": {
+            "days_in_year": 365.25,
+            "fx_policy": "cashflow_date"
+          }
+        },
+        "type": "basket"
+      },
+      "schema": "finstack_quant.instrument/1"
+    }
+  ],
+  "properties": {
+    "instrument": {
+      "description": "The Basket with Instrument Constituents instrument definition",
+      "type": "object"
+    },
+    "schema": {
+      "const": "finstack_quant.instrument/1",
+      "description": "Schema version identifier",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "instrument"
+  ],
+  "title": "Basket with Instrument Constituents",
+  "type": "object"
+}

@@ -1,0 +1,35 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "inflation_linked_bond",
+    "spec": {
+      "id": "TIPS-10Y",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "real_coupon": 0.025,
+      "frequency": {"count": 6, "unit": "months"},
+      "day_count": "Act365F",
+      "issue_date": "2024-01-15",
+      "maturity": "2034-01-15",
+      "base_index": 100.0,
+      "base_date": "2024-01-15",
+      "indexation_method": "TIPS",
+      "lag": {
+        "months": 3
+      },
+      "deflation_protection": "MaturityOnly",
+      "bdc": "following",
+      "stub": "None",
+      "calendar_id": null,
+      "discount_curve_id": "USD-TIPS",
+      "inflation_index_id": "US-CPI",
+      "quoted_clean": null,
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

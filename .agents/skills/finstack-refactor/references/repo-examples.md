@@ -6,7 +6,7 @@ Use these examples as shape guides. They are intentionally short and operational
 
 ### Before
 
-A `#[pyfunction]` in `finstack-py` parses Python inputs and also decides a pricing or validation rule before calling core.
+A `#[pyfunction]` in `finstack-quant-py` parses Python inputs and also decides a pricing or validation rule before calling core.
 
 ```rust
 #[pyfunction]
@@ -16,7 +16,7 @@ fn price_like_python_api(...) -> PyResult<f64> {
     } else {
         fallback_bump(...)
     };
-    finstack_valuations::price_with_bump(..., bump).map_err(core_to_py)
+    finstack_quant_valuations::price_with_bump(..., bump).map_err(core_to_py)
 }
 ```
 
@@ -28,7 +28,7 @@ Move the rule into core, keep the binding focused on conversion and error mappin
 #[pyfunction]
 fn price_like_python_api(...) -> PyResult<f64> {
     let params = PriceParams { ... };
-    finstack_valuations::price_like_api(params).map_err(core_to_py)
+    finstack_quant_valuations::price_like_api(params).map_err(core_to_py)
 }
 ```
 
@@ -94,9 +94,9 @@ Split internals by responsibility, but keep the same external package shape:
 
 - keep `register()` behavior stable
 - keep `__all__` stable unless the user asked for a public-surface cleanup
-- keep package-level imports working through `finstack-py/src/lib.rs` and Python `__init__.py`
+- keep package-level imports working through `finstack-quant-py/src/lib.rs` and Python `__init__.py`
 
-This is the model used throughout the binding tree registered from `finstack-py/src/lib.rs`.
+This is the model used throughout the binding tree registered from `finstack-quant-py/src/lib.rs`.
 
 ## Example 4: rename toward repo conventions and update mirrored surfaces
 

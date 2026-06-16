@@ -11,9 +11,9 @@ A phased simplification workflow for the **finstack** workspace (Rust core + Pyt
 
 ## When to use this skill
 
-Trigger when the user is asking to simplify, audit, refactor, or dedupe _any_ part of finstack. Even weak signals count: "this feels over-engineered", "why are there two ways to build a curve", "the checks module is a mess", "find dead code in margin". If the user is clearly working on something finstack-adjacent (Rust workspace, PyO3 bindings, wasm-bindgen bindings, parity, builders, registries), default to using this skill over a generic simplify skill.
+Trigger when the user is asking to simplify, audit, refactor, or dedupe _any_ part of finstack_quant. Even weak signals count: "this feels over-engineered", "why are there two ways to build a curve", "the checks module is a mess", "find dead code in margin". If the user is clearly working on something finstack-adjacent (Rust workspace, PyO3 bindings, wasm-bindgen bindings, parity, builders, registries), default to using this skill over a generic simplify skill.
 
-**Do NOT use** for: generic non-finstack code, pure bug hunting with no simplicity angle (use `finstack-quality-gate-triage`), performance tuning without a simplicity angle (use `finstack-performance-reviewer`), or new feature work.
+**Do NOT use** for: generic non-finstack-quant code, pure bug hunting with no simplicity angle (use `finstack-quality-gate-triage`), performance tuning without a simplicity angle (use `finstack-performance-reviewer`), or new feature work.
 
 ## The core loop
 
@@ -72,7 +72,7 @@ Run the **full finstack verify stack** for the affected layers. These commands a
 - WASM touched: `mise run wasm-lint && mise run wasm-test` (and `mise run wasm-build` if you changed WASM bindings)
 - WASM UI touched: `mise run lint-ui && mise run test-ui`
 - Python touched: `mise run python-lint && mise run python-test` (and `mise run python-build` if you changed Rust code that PyO3 binds — debug builds are too slow for portfolio valuation; AGENTS.md mandates release profile)
-- Parity impact: re-run `finstack-py/tests/parity` and check `parity_contract.toml` is still green.
+- Parity impact: re-run `finstack-quant-py/tests/parity` and check `parity_contract.toml` is still green.
 
 Prefer the repo `mise run` tasks from `AGENTS.md` for verification. Use focused checks while iterating and broader `mise run all-*` gates only when the slice is broad enough to justify them.
 
@@ -95,8 +95,8 @@ After Verify passes, offer the user three options: (a) continue to the next slic
 
 ## Reference files (read these when the audit hits their topic)
 
-- `references/slop-patterns.md` — catalogue of every non-simplicity issue this skill hunts for, with finstack-specific examples (registry sprawl, builder duplication, `_builder.rs` vs `builder/mod.rs` ambiguity, prelude bloat, etc.). **Read before every audit.**
-- `references/binding-drift.md` — how to detect and fix drift between `finstack/` (Rust) and `finstack-py/src/bindings/` + `finstack-wasm/src/api/`. Parity-contract considerations and documented host-language name collisions. **Read whenever bindings are in scope.**
+- `references/slop-patterns.md` — catalogue of every non-simplicity issue this skill hunts for, with finstack-quant-specific examples (registry sprawl, builder duplication, `_builder.rs` vs `builder/mod.rs` ambiguity, prelude bloat, etc.). **Read before every audit.**
+- `references/binding-drift.md` — how to detect and fix drift between `finstack-quant/` (Rust) and `finstack-quant-py/src/bindings/` + `finstack-quant-wasm/src/api/`. Parity-contract considerations and documented host-language name collisions. **Read whenever bindings are in scope.**
 - `references/financial-invariants.md` — what you're NOT allowed to change while simplifying: Decimal equality, FX policy stamping, serde field names (unknown-field-deny), rounding context metadata, parallel≡serial, ISDA day-counts. **Read before any refactor that touches numerics, FX, or serde.**
 - `references/workflow.md` — the phased loop in detail: risk tiers, commit boundaries, the make targets, when to rebuild bindings, how to handle a failing verify step. **Read at the start of every session.**
 - `references/refactor-tactics.md` — the concrete moves you apply in Phase 3: inline / collapse / delete / generic-to-concrete / trait-to-fn / single-canonical-constructor / etc. Each tactic has a before/after. **Read before every refactor slice.**

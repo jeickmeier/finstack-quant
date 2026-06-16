@@ -9,7 +9,7 @@ This is the procedural spine of the skill. Read it at the start of every session
 **Inputs:** a scope (usually a crate or subsystem, e.g., `statements/checks/`, `margin/`, `core/market_data/surfaces/`).
 
 **Actions:**
-1. Read every file in the scope. Also read the binding counterparts under `finstack-py/src/bindings/` and `finstack-wasm/src/api/` for the same crate domain.
+1. Read every file in the scope. Also read the binding counterparts under `finstack-quant-py/src/bindings/` and `finstack-quant-wasm/src/api/` for the same crate domain.
 2. Apply every category from `slop-patterns.md`. For each finding, collect: file, line, pattern category, brief explanation, proposed fix, impact (H/M/L), risk (H/M/L).
 3. Apply `binding-drift.md` checks if the scope has bindings.
 4. Cross-check against `financial-invariants.md` — every finding that touches numerics, FX, serde, parity, or parallelism must be flagged as invariant-sensitive.
@@ -109,7 +109,7 @@ mise run test-ui
 ### If the slice is Tier 3 or Tier 4 (any public surface change or invariant-sensitive)
 
 ```bash
-uv run pytest finstack-py/tests/parity -x
+uv run pytest finstack-quant-py/tests/parity -x
 ```
 
 Plus: diff golden test outputs serial vs parallel for any invariant-sensitive slice.
@@ -175,7 +175,7 @@ Per `.cursor/rules/project-rules.md`: **if you change the Rust library, you will
 - Rebuild Python: `mise run python-build` (release).
 - Rebuild WASM: `mise run wasm-build`.
 
-If your slice touched `finstack/*` but not the binding crates, you still need to rebuild **if you want the binding tests to pick up the change.** Always rebuild before running `mise run python-test` or `mise run wasm-test`.
+If your slice touched `finstack-quant/*` but not the binding crates, you still need to rebuild **if you want the binding tests to pick up the change.** Always rebuild before running `mise run python-test` or `mise run wasm-test`.
 
 ---
 

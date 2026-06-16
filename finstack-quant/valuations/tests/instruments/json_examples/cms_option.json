@@ -1,0 +1,51 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "cms_option",
+    "spec": {
+      "id": "CMSOPT-10Y-USD",
+      "strike": 0.025,
+      "cms_tenor": 10.0,
+      "fixing_dates": [
+        "2025-03-20",
+        "2025-06-20",
+        "2025-09-22",
+        "2025-12-22"
+      ],
+      "accrual_fractions": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "option_type": "call",
+      "notional": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "day_count": "Act365F",
+      "discount_curve_id": "USD-OIS",
+      "forward_curve_id": "USD-LIBOR-3M",
+      "vol_surface_id": "USD-CMS10Y-VOL",
+      "pricing_overrides": {
+        "quoted_clean_price": null,
+        "rho_bump_decimal": null,
+        "vega_bump_decimal": null,
+        "implied_volatility": null,
+        "cds_quote_bp": null,
+        "upfront_payment": null,
+        "ytm_bump_decimal": null,
+        "theta_period": null,
+        "mc_seed_scenario": null,
+        "adaptive_bumps": false,
+        "spot_bump_pct": null,
+        "vol_bump_pct": null,
+        "rate_bump_bp": null
+      },
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

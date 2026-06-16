@@ -1,0 +1,68 @@
+{
+  "$defs": {
+    "DefaultCurve": {
+      "description": "Default curve shape.",
+      "oneOf": [
+        {
+          "description": "Constant CDR (no seasoning effect)",
+          "properties": {
+            "curve": {
+              "const": "constant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "curve"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "SDA standard curve: ramps to peak then declines",
+          "properties": {
+            "curve": {
+              "const": "sda",
+              "type": "string"
+            },
+            "speed_multiplier": {
+              "description": "Speed multiplier (1.0 = 100% SDA)",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "curve",
+            "speed_multiplier"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Default model specifications for credit instruments. Rust types: DefaultCurve, DefaultModelSpec, DefaultEvent from finstack_quant_valuations::cashflow::builder::specs::default",
+  "properties": {
+    "cdr": {
+      "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when [`DefaultCurve::Sda`] is active: the\nannual CDR is then derived entirely from the SDA seasoning curve and\nits `speed_multiplier`.",
+      "format": "double",
+      "type": "number"
+    },
+    "curve": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DefaultCurve"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional curve shape (default: constant)"
+    }
+  },
+  "required": [
+    "cdr"
+  ],
+  "title": "Default Model Specification",
+  "type": "object"
+}

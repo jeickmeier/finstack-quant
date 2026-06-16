@@ -1,0 +1,22 @@
+{
+  "schema": "finstack_quant.instrument/1",
+  "instrument": {
+    "type": "deposit",
+    "spec": {
+      "id": "DEP-USD-6M",
+      "notional": {
+        "amount": "100000",
+        "currency": "USD"
+      },
+      "start_date": "2024-01-01",
+      "maturity": "2024-07-01",
+      "day_count": "Act360",
+      "quote_rate": 0.045,
+      "discount_curve_id": "USD-OIS",
+      "attributes": {
+        "tags": [],
+        "meta": {}
+      }
+    }
+  }
+}

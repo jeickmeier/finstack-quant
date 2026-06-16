@@ -1,7 +1,7 @@
-# Finstack Documentation References
+# Finstack Quant Documentation References
 
 This file provides stable anchors for canonical references used across the
-`finstack` crates. Public Rust, Python, and WASM documentation should link here
+`finstack-quant` crates. Public Rust, Python, and WASM documentation should link here
 when an API implements a market convention, pricing model, numerical method, or
 risk calculation with a standard reference.
 

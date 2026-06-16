@@ -1,0 +1,10 @@
+{
+  "schema": "finstack_quant.cashflow/1",
+  "prepayment_model_spec": {
+    "cpr": 0.06,
+    "curve": {
+      "curve": "psa",
+      "speed_multiplier": 1.0
+    }
+  }
+}
