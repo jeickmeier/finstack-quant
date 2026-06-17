@@ -131,6 +131,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "parametric_var_decomposition_typed",
         "historical_var_decomposition_typed",
         "evaluate_risk_budget_typed",
+        "factor_stress",
+        "position_what_if",
+        "build_stress_attribution",
+        "build_credit_vol_report",
         "validate_allocation_json",
         "position_component_var",
         // optimization spec/result classes (Slice 9)

@@ -2,6 +2,10 @@
 
 use super::types::{PyCsaSpec, PyImMethodology};
 use crate::errors::{core_to_py, display_to_py};
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
+use finstack_quant_core::HashMap;
 use finstack_quant_margin as fm;
 use pyo3::prelude::*;
 
@@ -138,6 +142,44 @@ pub struct PyImResult {
     pub(super) inner: fm::ImResult,
 }
 
+impl PyImResult {
+    pub(super) fn from_inner(inner: fm::ImResult) -> Self {
+        Self { inner }
+    }
+}
+
+pub(super) fn imresult_from_parts(
+    amount: Money,
+    methodology: fm::ImMethodology,
+    as_of: Date,
+    mpor_days: u32,
+    breakdown: HashMap<String, Money>,
+) -> PyImResult {
+    PyImResult::from_inner(fm::ImResult::with_breakdown(
+        amount,
+        methodology,
+        as_of,
+        mpor_days,
+        breakdown,
+    ))
+}
+
+pub(super) fn imresult_from_amount(
+    amount: Money,
+    methodology: fm::ImMethodology,
+    as_of: Date,
+    mpor_days: u32,
+    breakdown_key: impl Into<String>,
+) -> PyImResult {
+    let mut breakdown = HashMap::default();
+    breakdown.insert(breakdown_key.into(), amount);
+    imresult_from_parts(amount, methodology, as_of, mpor_days, breakdown)
+}
+
+pub(super) fn money_from_amount(amount: f64, currency: Currency) -> PyResult<Money> {
+    Money::try_new(amount, currency).map_err(core_to_py)
+}
+
 #[pymethods]
 impl PyImResult {
     /// Calculated initial margin amount.
@@ -164,6 +206,12 @@ impl PyImResult {
     #[getter]
     fn mpor_days(&self) -> u32 {
         self.inner.mpor_days
+    }
+
+    /// Calculation date as an ISO 8601 string.
+    #[getter]
+    fn as_of(&self) -> String {
+        self.inner.as_of.to_string()
     }
 
     /// Risk-class breakdown keys (if available).

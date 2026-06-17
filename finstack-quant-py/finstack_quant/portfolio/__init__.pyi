@@ -24,10 +24,13 @@ __all__ = [
     "apply_scenario_and_revalue",
     "allocate_weights",
     "brinson_fachler",
+    "build_credit_vol_report",
     "build_portfolio_from_spec",
+    "build_stress_attribution",
     "carino_link",
     "days_to_liquidate",
     "evaluate_risk_budget",
+    "factor_stress",
     "historical_var_decomposition",
     "kyle_lambda",
     "liquidity_tier",
@@ -40,6 +43,7 @@ __all__ = [
     "portfolio_result_get_metric",
     "portfolio_result_total_value",
     "replay_portfolio",
+    "position_what_if",
     "roll_effective_spread",
     "twrr_linked",
     "twrr_modified_dietz",
@@ -1498,6 +1502,42 @@ def evaluate_risk_budget_typed(
     utilization_threshold: float = 1.20,
 ) -> RiskBudgetResult:
     """Typed sibling of :func:`evaluate_risk_budget`."""
+    ...
+
+def factor_stress(
+    portfolio: Portfolio | str,
+    market: MarketContext | str,
+    factor_model_config_json: str,
+    as_of: str,
+    stresses: list[tuple[str, float]],
+) -> StressResult:
+    """Run a factor-stress scenario and revalue the portfolio under the stressed market."""
+    ...
+
+def position_what_if(
+    portfolio: Portfolio | str,
+    market: MarketContext | str,
+    factor_model_config_json: str,
+    as_of: str,
+    changes: list[dict[str, Any]],
+) -> WhatIfResult:
+    """Run position remove/resize what-if analysis from a factor-model config."""
+    ...
+
+def build_stress_attribution(
+    position_ids: list[str],
+    position_pnls: list[list[float]],
+    confidence: float = 0.95,
+) -> StressAttribution:
+    """Build tail-scenario stress attribution from per-position scenario P&Ls."""
+    ...
+
+def build_credit_vol_report(
+    decomposition: RiskDecomposition,
+    model: Any,
+    by_position: bool = False,
+) -> CreditVolReport:
+    """Build a credit volatility report from a risk decomposition and credit model."""
     ...
 
 def position_component_var(

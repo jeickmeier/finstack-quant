@@ -262,9 +262,13 @@ class TestMarginNamespace:
         """Margin should export IM/VM types and CSA spec."""
         from finstack_quant.margin import (  # noqa: F401
             CsaSpec,
+            HaircutImCalculator,
             ImMethodology,
             ImResult,
             NettingSetId,
+            ScheduleImCalculator,
+            SimmCalculator,
+            SimmSensitivities,
             VmCalculator,
             VmResult,
         )
@@ -288,13 +292,17 @@ class TestPortfolioNamespace:
             SensitivityMatrix,
             aggregate_full_cashflows,
             aggregate_metrics,
+            build_credit_vol_report,
             build_portfolio_from_spec,
+            build_stress_attribution,
             compute_factor_sensitivities,
             compute_pnl_profiles,
             decompose_factor_risk,
+            factor_stress,
             parse_portfolio_spec,
             portfolio_result_get_metric,
             portfolio_result_total_value,
+            position_what_if,
         )
 
     def test_m18_position_filter_exports_python_keyword_safe_not(self) -> None:

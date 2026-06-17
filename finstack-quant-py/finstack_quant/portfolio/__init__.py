@@ -46,7 +46,12 @@ exporting to downstream services.
 
 from __future__ import annotations
 
+import contextlib
+
 from finstack_quant.finstack_quant import portfolio as _portfolio
+
+with contextlib.suppress(NameError):
+    del annotations
 
 PortfolioError = _portfolio.PortfolioError
 FinstackValuationError = _portfolio.FinstackValuationError
@@ -120,6 +125,10 @@ DecompositionConfig = _portfolio.DecompositionConfig
 parametric_var_decomposition_typed = _portfolio.parametric_var_decomposition_typed
 historical_var_decomposition_typed = _portfolio.historical_var_decomposition_typed
 evaluate_risk_budget_typed = _portfolio.evaluate_risk_budget_typed
+factor_stress = _portfolio.factor_stress
+position_what_if = _portfolio.position_what_if
+build_stress_attribution = _portfolio.build_stress_attribution
+build_credit_vol_report = _portfolio.build_credit_vol_report
 position_component_var = _portfolio.position_component_var
 
 # Portfolio optimization specifications and results
@@ -199,7 +208,9 @@ __all__: list[str] = [
     "amihud_illiquidity",
     "apply_scenario_and_revalue",
     "brinson_fachler",
+    "build_credit_vol_report",
     "build_portfolio_from_spec",
+    "build_stress_attribution",
     "carino_link",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
@@ -207,6 +218,7 @@ __all__: list[str] = [
     "decompose_factor_risk",
     "evaluate_risk_budget",
     "evaluate_risk_budget_typed",
+    "factor_stress",
     "historical_var_decomposition",
     "historical_var_decomposition_typed",
     "kyle_lambda",
@@ -222,6 +234,7 @@ __all__: list[str] = [
     "portfolio_result_get_metric",
     "portfolio_result_total_value",
     "position_component_var",
+    "position_what_if",
     "replay_portfolio",
     "roll_effective_spread",
     "twrr_linked",

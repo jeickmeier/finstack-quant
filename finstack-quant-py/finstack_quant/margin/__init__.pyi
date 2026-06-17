@@ -24,6 +24,10 @@ __all__ = [
     "VmResult",
     "VmCalculator",
     "ImResult",
+    "SimmSensitivities",
+    "SimmCalculator",
+    "ScheduleImCalculator",
+    "HaircutImCalculator",
     "FundingConfig",
     "XvaConfig",
     "ExposureDiagnostics",
@@ -1444,6 +1448,11 @@ class ImResult:
         """
         ...
 
+    @property
+    def as_of(self) -> str:
+        """Calculation date as an ISO 8601 string."""
+        ...
+
     def breakdown_keys(self) -> list[str]:
         """Risk-class breakdown keys (if available).
 
@@ -1478,6 +1487,103 @@ class ImResult:
         ...
 
     def __repr__(self) -> str: ...
+
+class SimmSensitivities:
+    """ISDA SIMM sensitivity portfolio.
+
+    Values are signed currency sensitivities loaded by SIMM risk class. Use
+    ``from_json``/``to_json`` for full-fidelity interop or the ``add_*`` helpers
+    for interactive notebooks.
+    """
+
+    def __init__(self, base_currency: str = "USD") -> None: ...
+    @staticmethod
+    def from_json(json: str) -> SimmSensitivities: ...
+    def to_json(self) -> str: ...
+    def add_ir_delta(self, currency: str, tenor: str, amount: float) -> None: ...
+    def add_ir_vega(self, currency: str, tenor: str, amount: float) -> None: ...
+    def add_credit_delta(self, name: str, qualifying: bool, tenor: str, amount: float) -> None: ...
+    def add_credit_delta_bucketed(self, sector: str, name: str, tenor: str, amount: float) -> None: ...
+    def add_equity_delta(self, underlier: str, amount: float) -> None: ...
+    def add_equity_vega(self, underlier: str, amount: float) -> None: ...
+    def add_fx_delta(self, currency: str, amount: float) -> None: ...
+    def add_fx_vega(self, ccy1: str, ccy2: str, amount: float) -> None: ...
+    def add_commodity_delta(self, bucket: str, amount: float) -> None: ...
+    def add_curvature(self, risk_class: str, amount: float) -> None: ...
+    def is_empty(self) -> bool: ...
+    @property
+    def base_currency(self) -> str: ...
+
+class SimmCalculator:
+    """ISDA SIMM initial-margin calculator."""
+
+    def __init__(self, version: str = "v2_6", mpor_days: int | None = None) -> None: ...
+    @property
+    def version(self) -> str: ...
+    @property
+    def mpor_days(self) -> int: ...
+    def calculate_from_sensitivities(
+        self,
+        sensitivities: SimmSensitivities,
+        currency: str,
+        year: int,
+        month: int,
+        day: int,
+    ) -> ImResult: ...
+
+class ScheduleImCalculator:
+    """BCBS-IOSCO regulatory schedule initial-margin calculator."""
+
+    @staticmethod
+    def bcbs_standard() -> ScheduleImCalculator: ...
+    @staticmethod
+    def from_registry_id(schedule_id: str) -> ScheduleImCalculator: ...
+    def with_asset_class(self, asset_class: str) -> ScheduleImCalculator: ...
+    def with_maturity(self, years: float) -> ScheduleImCalculator: ...
+    def rate(self, asset_class: str, maturity_years: float) -> float: ...
+    def calculate_for_notional(
+        self,
+        notional: float,
+        currency: str,
+        asset_class: str,
+        maturity_years: float,
+        year: int,
+        month: int,
+        day: int,
+    ) -> ImResult: ...
+    def calculate_netting_set_with_ngr(
+        self,
+        positions: list[tuple[float, float]],
+        currency: str,
+        asset_class: str,
+        maturity_years: float,
+        year: int,
+        month: int,
+        day: int,
+    ) -> ImResult | None: ...
+
+class HaircutImCalculator:
+    """Haircut-based initial-margin calculator."""
+
+    @staticmethod
+    def bcbs_standard() -> HaircutImCalculator: ...
+    @staticmethod
+    def us_treasuries() -> HaircutImCalculator: ...
+    @staticmethod
+    def from_schedule(schedule: EligibleCollateralSchedule) -> HaircutImCalculator: ...
+    def with_default_asset_class(self, asset_class: CollateralAssetClass) -> HaircutImCalculator: ...
+    def with_posted_collateral_currency(self, currency: str) -> HaircutImCalculator: ...
+    def haircut_for(self, asset_class: CollateralAssetClass) -> float: ...
+    def calculate_for_collateral(
+        self,
+        collateral_value: float,
+        currency: str,
+        asset_class: CollateralAssetClass,
+        currency_mismatch: bool,
+        year: int,
+        month: int,
+        day: int,
+    ) -> ImResult: ...
 
 class FundingConfig:
     """Funding cost/benefit configuration for FVA calculation.

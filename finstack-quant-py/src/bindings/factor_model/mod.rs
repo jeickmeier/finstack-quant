@@ -6,7 +6,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
-mod credit;
+pub(crate) mod credit;
 
 /// Register the `factor_model` Python domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

@@ -20,6 +20,7 @@ use indexmap::IndexMap;
 use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule, PyType};
+use serde::Deserialize;
 
 use finstack_quant_portfolio::factor_model::{
     self as fm, CreditVolReport, DecompositionConfig, DecompositionMethod, FactorAssignmentReport,
@@ -33,7 +34,10 @@ use finstack_quant_portfolio::factor_model::{
 };
 use finstack_quant_portfolio::types::PositionId;
 
-use crate::errors::core_to_py;
+use crate::bindings::date_utils::parse_iso_date_py;
+use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
+use crate::bindings::factor_model::credit::PyCreditFactorModel;
+use crate::errors::{core_to_py, display_to_py, portfolio_to_py, serde_json_to_py};
 
 use super::json_bridge::{deserialize_json, serialize_json};
 
@@ -52,6 +56,95 @@ fn to_position_ids(ids: Vec<String>) -> Vec<PositionId> {
 fn flatten_square_matrix(matrix: Vec<Vec<f64>>, n: usize, label: &str) -> PyResult<Vec<f64>> {
     fm::flatten_square_matrix(matrix, n, label)
         .map_err(|e| crate::errors::value_error(e.to_string()))
+}
+
+/// Serialize a Python object to JSON via `json.dumps`, then deserialize into `T`.
+fn py_to_serde<'py, T: serde::de::DeserializeOwned>(
+    py: Python<'py>,
+    obj: &Bound<'py, PyAny>,
+    label: &str,
+) -> PyResult<T> {
+    let json_mod = py.import("json")?;
+    let json_str: String = json_mod.call_method1("dumps", (obj,))?.extract()?;
+    serde_json::from_str(&json_str).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
+}
+
+#[derive(Deserialize)]
+struct PositionChangeSpec {
+    kind: String,
+    position_id: String,
+    #[serde(default)]
+    new_quantity: Option<f64>,
+}
+
+fn parse_position_changes(
+    py: Python<'_>,
+    changes: &Bound<'_, PyAny>,
+) -> PyResult<Vec<fm::PositionChange>> {
+    let specs: Vec<PositionChangeSpec> = py_to_serde(py, changes, "position changes")?;
+    specs
+        .into_iter()
+        .map(
+            |spec| match spec.kind.trim().to_ascii_lowercase().as_str() {
+                "remove" => Ok(fm::PositionChange::Remove {
+                    position_id: PositionId::new(spec.position_id),
+                }),
+                "resize" => {
+                    let new_quantity = spec.new_quantity.ok_or_else(|| {
+                        crate::errors::value_error(format!(
+                            "resize change for position '{}' requires new_quantity",
+                            spec.position_id
+                        ))
+                    })?;
+                    Ok(fm::PositionChange::Resize {
+                        position_id: PositionId::new(spec.position_id),
+                        new_quantity,
+                    })
+                }
+                "add" => Err(crate::errors::value_error(
+                    "position_what_if does not support add changes yet; use remove or resize",
+                )),
+                other => Err(crate::errors::value_error(format!(
+                    "unknown position change kind '{other}' (expected 'remove' or 'resize')"
+                ))),
+            },
+        )
+        .collect()
+}
+
+fn transpose_position_pnls(
+    position_ids: Vec<String>,
+    position_pnls: Vec<Vec<f64>>,
+) -> PyResult<(Vec<PositionId>, Vec<f64>, usize)> {
+    let n = position_ids.len();
+    if position_pnls.len() != n {
+        return Err(crate::errors::value_error(format!(
+            "position_pnls must have {n} rows (one per position), got {}",
+            position_pnls.len()
+        )));
+    }
+    if n == 0 {
+        return Ok((to_position_ids(position_ids), Vec::new(), 0));
+    }
+
+    let n_scenarios = position_pnls[0].len();
+    for (i, row) in position_pnls.iter().enumerate() {
+        if row.len() != n_scenarios {
+            return Err(crate::errors::value_error(format!(
+                "position_pnls row {i} has {} scenarios, expected {n_scenarios}",
+                row.len()
+            )));
+        }
+    }
+
+    let mut flat = Vec::with_capacity(n_scenarios * n);
+    for scenario in 0..n_scenarios {
+        for row in &position_pnls {
+            flat.push(row[scenario]);
+        }
+    }
+
+    Ok((to_position_ids(position_ids), flat, n_scenarios))
 }
 
 /// Convert a Rust `DecompositionMethod` to a stable Python string.
@@ -1437,6 +1530,12 @@ pub struct PyCreditVolReport {
     pub(crate) inner: CreditVolReport,
 }
 
+impl PyCreditVolReport {
+    pub(crate) fn from_inner(inner: CreditVolReport) -> Self {
+        Self { inner }
+    }
+}
+
 #[pymethods]
 impl PyCreditVolReport {
     #[getter]
@@ -1831,6 +1930,109 @@ fn evaluate_risk_budget_typed(
     Ok(PyRiskBudgetResult::from_inner(result))
 }
 
+/// Run a factor-stress scenario and revalue the portfolio under the stressed market.
+#[pyfunction]
+#[pyo3(signature = (portfolio, market, factor_model_config_json, as_of, stresses))]
+fn factor_stress(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    factor_model_config_json: &str,
+    as_of: &str,
+    stresses: Vec<(String, f64)>,
+) -> PyResult<PyStressResult> {
+    let portfolio = extract_portfolio_ref(portfolio)?;
+    let market = extract_market_ref(market)?;
+    let as_of = parse_iso_date_py(as_of)?;
+    let config: finstack_quant_factor_model::FactorModelConfig =
+        serde_json::from_str(factor_model_config_json).map_err(display_to_py)?;
+    let stresses: Vec<_> = stresses
+        .into_iter()
+        .map(|(factor_id, shift)| (finstack_quant_factor_model::FactorId::new(factor_id), shift))
+        .collect();
+
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let result = py
+        .detach(move || {
+            let model = fm::FactorModelBuilder::new().config(config).build()?;
+            let base = model.analyze(portfolio_ref, market_ref, as_of)?;
+            let sensitivities = model.compute_sensitivities(portfolio_ref, market_ref, as_of)?;
+            model
+                .what_if(&base, &sensitivities, portfolio_ref, market_ref, as_of)
+                .factor_stress(&stresses)
+        })
+        .map_err(portfolio_to_py)?;
+
+    Ok(PyStressResult::from_inner(result))
+}
+
+/// Run position remove/resize what-if analysis from a factor-model config.
+#[pyfunction]
+#[pyo3(signature = (portfolio, market, factor_model_config_json, as_of, changes))]
+fn position_what_if(
+    py: Python<'_>,
+    portfolio: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    factor_model_config_json: &str,
+    as_of: &str,
+    changes: &Bound<'_, PyAny>,
+) -> PyResult<PyWhatIfResult> {
+    let portfolio = extract_portfolio_ref(portfolio)?;
+    let market = extract_market_ref(market)?;
+    let as_of = parse_iso_date_py(as_of)?;
+    let config: finstack_quant_factor_model::FactorModelConfig =
+        serde_json::from_str(factor_model_config_json).map_err(display_to_py)?;
+    let changes = parse_position_changes(py, changes)?;
+
+    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
+    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
+    let result = py
+        .detach(move || {
+            let model = fm::FactorModelBuilder::new().config(config).build()?;
+            let base = model.analyze(portfolio_ref, market_ref, as_of)?;
+            let sensitivities = model.compute_sensitivities(portfolio_ref, market_ref, as_of)?;
+            model
+                .what_if(&base, &sensitivities, portfolio_ref, market_ref, as_of)
+                .position_what_if(&changes)
+        })
+        .map_err(portfolio_to_py)?;
+
+    Ok(PyWhatIfResult::from_inner(result))
+}
+
+/// Build tail-scenario stress attribution from per-position scenario P&Ls.
+#[pyfunction]
+#[pyo3(signature = (position_ids, position_pnls, confidence = 0.95))]
+fn build_stress_attribution(
+    py: Python<'_>,
+    position_ids: Vec<String>,
+    position_pnls: Vec<Vec<f64>>,
+    confidence: f64,
+) -> PyResult<PyStressAttribution> {
+    let (ids, flat, n_scenarios) = transpose_position_pnls(position_ids, position_pnls)?;
+    let result = py
+        .detach(move || fm::build_stress_attribution(&ids, &flat, n_scenarios, confidence))
+        .map_err(core_to_py)?;
+    Ok(PyStressAttribution::from_inner(result))
+}
+
+/// Build a credit volatility report from a risk decomposition and credit model.
+#[pyfunction]
+#[pyo3(signature = (decomposition, model, by_position = false))]
+fn build_credit_vol_report(
+    py: Python<'_>,
+    decomposition: &PyRiskDecomposition,
+    model: &PyCreditFactorModel,
+    by_position: bool,
+) -> PyResult<PyCreditVolReport> {
+    let decomposition = decomposition.inner.clone();
+    let model = model.inner.clone();
+    let report =
+        py.detach(move || fm::build_credit_vol_report(&decomposition, &model, by_position));
+    Ok(PyCreditVolReport::from_inner(report))
+}
+
 /// Look up a position by id inside a :class:`PositionRiskDecomposition` and
 /// return its component VaR. Raises ``KeyError`` if absent.
 #[pyfunction]
@@ -1884,6 +2086,10 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parametric_var_decomposition_typed, m)?)?;
     m.add_function(wrap_pyfunction!(historical_var_decomposition_typed, m)?)?;
     m.add_function(wrap_pyfunction!(evaluate_risk_budget_typed, m)?)?;
+    m.add_function(wrap_pyfunction!(factor_stress, m)?)?;
+    m.add_function(wrap_pyfunction!(position_what_if, m)?)?;
+    m.add_function(wrap_pyfunction!(build_stress_attribution, m)?)?;
+    m.add_function(wrap_pyfunction!(build_credit_vol_report, m)?)?;
     m.add_function(wrap_pyfunction!(position_component_var, m)?)?;
 
     Ok(())

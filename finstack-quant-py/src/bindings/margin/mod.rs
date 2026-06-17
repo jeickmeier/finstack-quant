@@ -4,6 +4,7 @@
 //! collateral types, XVA configuration/results, and margin metrics.
 
 mod calculators;
+mod im;
 mod metrics;
 mod regulatory;
 mod types;
@@ -22,6 +23,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
 
     types::register(py, &m)?;
     calculators::register(py, &m)?;
+    im::register(py, &m)?;
     xva::register(py, &m)?;
     metrics::register(py, &m)?;
     regulatory::register(py, &m)?;
@@ -43,6 +45,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "VmResult",
             "VmCalculator",
             "ImResult",
+            "SimmSensitivities",
+            "SimmCalculator",
+            "ScheduleImCalculator",
+            "HaircutImCalculator",
             // XVA
             "FundingConfig",
             "XvaConfig",

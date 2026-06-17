@@ -17,6 +17,10 @@ CONSTANTS = _margin.CONSTANTS
 VmResult = _margin.VmResult
 VmCalculator = _margin.VmCalculator
 ImResult = _margin.ImResult
+SimmSensitivities = _margin.SimmSensitivities
+SimmCalculator = _margin.SimmCalculator
+ScheduleImCalculator = _margin.ScheduleImCalculator
+HaircutImCalculator = _margin.HaircutImCalculator
 FundingConfig = _margin.FundingConfig
 XvaConfig = _margin.XvaConfig
 ExposureDiagnostics = _margin.ExposureDiagnostics
@@ -50,6 +54,7 @@ __all__: list[str] = [
     "FrtbSensitivities",
     "FundingConfig",
     "Haircut01",
+    "HaircutImCalculator",
     "ImMethodology",
     "ImResult",
     "MarginCallType",
@@ -60,6 +65,9 @@ __all__: list[str] = [
     "SaCcrEngine",
     "SaCcrNettingSetConfig",
     "SaCcrTrade",
+    "ScheduleImCalculator",
+    "SimmCalculator",
+    "SimmSensitivities",
     "VmCalculator",
     "VmResult",
     "XvaConfig",

@@ -56,9 +56,10 @@ pub use credit_vol_forecast::{
 pub use model::{FactorModel, FactorModelBuilder};
 pub use parametric::ParametricDecomposer;
 pub use position_risk::{
-    DecompositionConfig, DecompositionMethod, HistoricalPositionDecomposer,
-    ParametricPositionDecomposer, PositionEsContribution, PositionRiskDecomposition,
-    PositionVarContribution, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
+    build_stress_attribution, DecompositionConfig, DecompositionMethod,
+    HistoricalPositionDecomposer, ParametricPositionDecomposer, PositionEsContribution,
+    PositionRiskDecomposition, PositionVarContribution, StressAttribution, StressPositionEntry,
+    TailScenarioBreakdown,
 };
 pub use risk_budget::{PositionBudgetEntry, RiskBudget, RiskBudgetResult};
 pub use simulation::SimulationDecomposer;
