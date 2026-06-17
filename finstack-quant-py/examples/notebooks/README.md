@@ -46,7 +46,7 @@ listed below) and **deep-dive sub-directories** (jump to as needed).
 | Math Toolkit | Linear algebra, statistics, special functions, compensated summation |
 | Registry Defaults and Overrides | FinstackConfig extensions, registry override payloads, JSON round-tripping |
 
-Deep dives: `market_data/` (9 notebooks, including dynamic term structure), `dates/` (3 notebooks)
+Deep dives: `market_data/` (10 notebooks, including SABR volatility smiles and dynamic term structure), `dates/` (3 notebooks)
 
 ### Level 2 -- Instrument Pricing (`02_pricing/`)
 
@@ -64,7 +64,11 @@ Deep dives: `instruments/` (15 notebooks, including credit events, Fourier prici
 |----------|--------|
 | Performance Analytics | Performance class, CAGR, Sharpe, drawdowns, rolling metrics |
 | Risk and Factor Analytics | VaR, factor regression, capture ratios, ruin estimation |
-| GARCH Volatility | GARCH, EGARCH, GJR-GARCH fitting, variance forecasts, residual diagnostics |
+| Factor Sensitivity | Factor sensitivities and risk decomposition for portfolio positions |
+| Feature Transforms | Cross-sectional ranking, time-series transforms, grouped normalization |
+| Breakeven Analysis | Spread / carry breakevens from cs01, dv01, and carry metrics |
+| Return-Contribution Attribution | Single-period return contribution, group/factor decomposition, Brinson-Fachler, weighting modes |
+| Portfolio Returns and Attribution | Time- and money-weighted returns (TWRR/MWRR), multi-period Brinson-Fachler, Carino linking |
 
 ### Level 4 -- Financial Statement Modeling (`04_statement_modeling/`)
 
@@ -73,7 +77,7 @@ Deep dives: `instruments/` (15 notebooks, including credit events, Fourier prici
 | Statement Modeling | ModelBuilder, Evaluator, DSL formulas, Polars export |
 | Statement Analytics | Sensitivity, tornado, variance, goal-seek, dependency tracing |
 
-Deep dives: `models/` (10 notebooks, including IFRS 9 / CECL ECL, credit scoring / PD, and comparable-company analysis)
+Deep dives: `models/` (11 notebooks, including real-estate and roll-forward templates, IFRS 9 / CECL ECL, credit scoring / PD, and comparable-company analysis)
 
 ### Level 5 -- Portfolio and Scenarios (`05_portfolio_and_scenarios/`)
 
@@ -84,6 +88,7 @@ Deep dives: `models/` (10 notebooks, including IFRS 9 / CECL ECL, credit scoring
 | Horizon Total Return | Carry + scenario P&L composition, factor-decomposed total return |
 | Historical Replay | Replay portfolio through dated market snapshots, P&L, attribution |
 | Liquidity Risk | Roll spread, Amihud illiquidity, days-to-liquidate, Bangia LVaR, Almgren-Chriss impact |
+| Portfolio Risk Decomposition | Euler VaR/ES decomposition (parametric & historical), risk budgeting, capital allocation |
 
 Deep dives: `scenarios/` (4 notebooks)
 
@@ -94,6 +99,7 @@ Deep dives: `scenarios/` (4 notebooks)
 | Monte Carlo Simulation | TimeGrid, McEngine, EuropeanPricer, Black-Scholes benchmarks |
 | Correlation and Credit Models | Copulas, recovery models, factor models, correlated Bernoulli |
 | Margin, Collateral, and XVA | CSA, VM/IM, XVA, collateral analytics |
+| Regulatory Capital | FRTB SBA market-risk capital, SA-CCR counterparty EAD, initial-margin methodology |
 
 Deep dives: `monte_carlo/` (4 notebooks), `correlation/` (3 notebooks)
 
