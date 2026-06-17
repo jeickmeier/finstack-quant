@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Portfolio aggregation for Finstack Quant: positions, books, and deterministic base-currency rollups with explicit FX policy"
+autobenches = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.6.0" }
@@ -34,6 +35,18 @@ smallvec = { version = "1.15", default-features = false }
 
 [[bench]]
 name = "portfolio_valuation"
+harness = false
+
+[[bench]]
+name = "portfolio_cashflows"
+harness = false
+
+[[bench]]
+name = "portfolio_metrics"
+harness = false
+
+[[bench]]
+name = "portfolio_attribution"
 harness = false
 
 [[bench]]

@@ -1,7 +1,9 @@
-# Portfolio benchmarks
+# Portfolio Benchmarks
 
-Criterion benchmarks for portfolio valuation, metrics, cashflows, attribution, and
-parallel thresholds.
+Criterion benchmarks for the maintained portfolio hot paths: full valuation,
+cashflows, metrics, attribution, and parallel threshold behavior. The suite is manifest-driven
+(`autobenches = false`) so new files do not expand benchmark runtime unless they
+are deliberately added to `Cargo.toml`.
 
 ## Run
 
@@ -18,8 +20,8 @@ cargo bench -p finstack-quant-portfolio -- --baseline my_baseline
 | Bench | Focus |
 |-------|--------|
 | `portfolio_valuation` | Full valuation, entity/multicurrency aggregation, filtering, scaling, `revalue_affected` |
-| `portfolio_metrics` | `aggregate_metrics` alone and with valuation |
 | `portfolio_cashflows` | Cashflow ladder aggregation |
+| `portfolio_metrics` | `aggregate_metrics` alone and with valuation |
 | `portfolio_attribution` | P&L attribution paths |
 | `parallel_thresholds` | Rayon parallel thresholds |
 

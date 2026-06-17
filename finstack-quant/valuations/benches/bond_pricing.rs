@@ -332,7 +332,8 @@ fn bench_tree_step_scaling(c: &mut Criterion) {
         .quoted_clean_price
         .unwrap_or(99.0);
 
-    for steps in [50, 100, 200, 500] {
+    {
+        let steps = 100;
         let config = TreePricerConfig {
             tree_steps: steps,
             volatility: 0.01,

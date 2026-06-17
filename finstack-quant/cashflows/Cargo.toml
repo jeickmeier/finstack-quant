@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Cashflow schedule construction, projection, and aggregation for structured finance"
+autobenches = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.6.0" }

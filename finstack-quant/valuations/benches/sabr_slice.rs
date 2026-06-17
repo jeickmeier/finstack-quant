@@ -1,7 +1,7 @@
 //! Criterion benchmark for SABR slice calibration.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_valuations::calibration::api::schema::{StepParams, VolSurfaceParams};
@@ -24,20 +24,24 @@ use time::Month;
 
 fn bench_sabr_slice(c: &mut Criterion) {
     let base_date = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let expiry = Date::from_calendar_date(2026, Month::January, 1).unwrap();
+    let target_expiry = DayCount::Act365F
+        .year_fraction(base_date, expiry, DayCountContext::default())
+        .unwrap();
     let quotes = [
         VolQuote::OptionVol {
             id: QuoteId::new("SPY-VOL-30D-95"),
             underlying: "SPY".to_string().into(),
-            expiry: base_date + time::Duration::days(30),
-            strike: 95.0,
-            vol: 0.22,
+            expiry,
+            strike: 90.0,
+            vol: 0.20,
             option_type: OptionType::Call,
             convention: OptionConventionId::new("USD-Option"),
         },
         VolQuote::OptionVol {
             id: QuoteId::new("SPY-VOL-30D-100"),
             underlying: "SPY".to_string().into(),
-            expiry: base_date + time::Duration::days(30),
+            expiry,
             strike: 100.0,
             vol: 0.20,
             option_type: OptionType::Call,
@@ -46,25 +50,28 @@ fn bench_sabr_slice(c: &mut Criterion) {
         VolQuote::OptionVol {
             id: QuoteId::new("SPY-VOL-30D-105"),
             underlying: "SPY".to_string().into(),
-            expiry: base_date + time::Duration::days(30),
-            strike: 105.0,
-            vol: 0.21,
+            expiry,
+            strike: 110.0,
+            vol: 0.20,
             option_type: OptionType::Call,
             convention: OptionConventionId::new("USD-Option"),
         },
     ];
-    let settings = CalibrationConfig::default();
+    let settings = CalibrationConfig {
+        fail_on_bad_fit: false,
+        ..Default::default()
+    };
     let params = VolSurfaceParams {
         surface_id: "SPY-VOL".to_string(),
         base_date,
         underlying_ticker: "SPY".to_string(),
         model: "SABR".to_string(),
         discount_curve_id: Some("USD-OIS".into()),
-        beta: 1.0,
-        target_expiries: vec![1.0 / 12.0],
-        target_strikes: vec![95.0, 100.0, 105.0],
-        spot_override: None,
-        dividend_yield_override: None,
+        beta: 0.5,
+        target_expiries: vec![target_expiry],
+        target_strikes: vec![90.0, 100.0, 110.0],
+        spot_override: Some(100.0),
+        dividend_yield_override: Some(0.0),
         expiry_extrapolation: Default::default(),
     };
     let step = StepParams::VolSurface(params);

@@ -33,7 +33,8 @@ fn bench_european_pricer(c: &mut Criterion) {
     let payoff = EuropeanCall::new(100.0, 1.0, 252);
     let df = (-0.05_f64).exp();
 
-    for &num_paths in &[1_000, 10_000, 50_000] {
+    {
+        let &num_paths = &10_000;
         group.bench_with_input(BenchmarkId::new("paths", num_paths), &num_paths, |b, &n| {
             let pricer = EuropeanPricer::new(n).with_seed(42).with_parallel(false);
             b.iter(|| {
@@ -60,7 +61,8 @@ fn bench_lsmc_pricer(c: &mut Criterion) {
     let num_steps = 12;
     let exercise_dates: Vec<usize> = (1..=num_steps).collect();
 
-    for &num_paths in &[1_000, 5_000, 10_000] {
+    {
+        let &num_paths = &5_000;
         group.bench_with_input(BenchmarkId::new("paths", num_paths), &num_paths, |b, &n| {
             let config = LsmcConfig::new(n, exercise_dates.clone(), num_steps)
                 .expect("valid LSMC config")
@@ -93,7 +95,7 @@ fn bench_lsq_regression(c: &mut Criterion) {
     let mut group = c.benchmark_group("lsq_regression");
     let k = 3; // cubic basis: {1, x, x^2}
 
-    for &n in &[100, 500, 2_000] {
+    for &n in &[500] {
         // Build a deterministic design matrix and response vector
         let mut design = vec![0.0; n * k];
         let mut y = vec![0.0; n];

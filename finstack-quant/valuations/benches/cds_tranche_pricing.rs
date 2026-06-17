@@ -99,10 +99,10 @@ fn create_market() -> MarketContext {
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
         .knots(vec![
             (3.0, 0.25),  // 0-3% equity
-            (7.0, 0.45),  // 0-7% junior mezzanine
-            (10.0, 0.60), // 0-10% senior mezzanine
-            (15.0, 0.75), // 0-15% senior
-            (30.0, 0.85), // 0-30% super senior
+            (7.0, 0.25),  // 0-7% junior mezzanine
+            (10.0, 0.25), // 0-10% senior mezzanine
+            (15.0, 0.25), // 0-15% senior
+            (30.0, 0.25), // 0-30% super senior
         ])
         .build()
         .unwrap();
@@ -111,13 +111,14 @@ fn create_market() -> MarketContext {
     let index_data = CreditIndexData::builder()
         .num_constituents(125)
         .recovery_rate(0.40)
-        .index_credit_curve(Arc::new(index_curve))
+        .index_credit_curve(Arc::new(index_curve.clone()))
         .base_correlation_curve(Arc::new(base_corr_curve))
         .build()
         .unwrap();
 
     MarketContext::new()
         .insert(discount_curve)
+        .insert(index_curve)
         .insert_credit_index("CDX.NA.IG.42", index_data)
 }
 
@@ -161,10 +162,10 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
     let base_corr_curve = BaseCorrelationCurve::builder("CDX.NA.IG.42_5Y")
         .knots(vec![
             (3.0, 0.25),
-            (7.0, 0.45),
-            (10.0, 0.60),
-            (15.0, 0.75),
-            (30.0, 0.85),
+            (7.0, 0.25),
+            (10.0, 0.25),
+            (15.0, 0.25),
+            (30.0, 0.25),
         ])
         .build()
         .unwrap();
@@ -192,7 +193,7 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
     let index_data = CreditIndexData::builder()
         .num_constituents(num_issuers as u16)
         .recovery_rate(0.40)
-        .index_credit_curve(Arc::new(index_curve))
+        .index_credit_curve(Arc::new(index_curve.clone()))
         .base_correlation_curve(Arc::new(base_corr_curve))
         .issuer_curves(issuer_curves)
         .build()
@@ -200,6 +201,7 @@ fn create_market_with_issuers(num_issuers: usize) -> MarketContext {
 
     MarketContext::new()
         .insert(discount_curve)
+        .insert(index_curve)
         .insert_credit_index("CDX.NA.IG.42", index_data)
 }
 
@@ -330,8 +332,7 @@ fn bench_cds_tranche_heterogeneous(c: &mut Criterion) {
     let mut group = c.benchmark_group("cds_tranche_heterogeneous");
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    // Benchmark different pool sizes for heterogeneous portfolios
-    let pool_sizes = vec![10, 25, 50, 125];
+    let pool_sizes = vec![50];
 
     for &pool_size in &pool_sizes {
         let market = create_market_with_issuers(pool_size);

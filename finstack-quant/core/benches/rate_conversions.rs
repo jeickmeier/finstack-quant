@@ -6,6 +6,7 @@
 //! - Round-trip conversions
 //! - Batch conversion scenarios
 
+#[path = "support/bench_utils.rs"]
 mod bench_utils;
 
 use bench_utils::bench_iter;
@@ -158,7 +159,8 @@ fn bench_round_trip_conversions(c: &mut Criterion) {
 fn bench_batch_conversions(c: &mut Criterion) {
     let mut group = c.benchmark_group("batch_conversions");
 
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(
             BenchmarkId::new("periodic_to_continuous", size),
             &size,

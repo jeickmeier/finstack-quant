@@ -6,6 +6,7 @@
 //! - ISMA vs ISDA ActAct variants
 //! - 30/360 family conventions
 
+#[path = "support/bench_utils.rs"]
 mod bench_utils;
 
 use bench_utils::bench_iter;
@@ -107,7 +108,8 @@ fn bench_daycount_batch_calculations(c: &mut Criterion) {
     let convention = DayCount::Act360;
     let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(
             BenchmarkId::new("year_fractions", size),
             &size,

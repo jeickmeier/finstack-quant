@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Instrument pricing, cashflows, and risk for Finstack Quant: fixed income, derivatives, structured credit, Monte Carlo, and PDE/tree methods"
+autobenches = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.6.0" }
@@ -57,6 +58,10 @@ name = "bond_pricing"
 harness = false
 
 [[bench]]
+name = "bond_future_bench"
+harness = false
+
+[[bench]]
 name = "swap_pricing"
 harness = false
 
@@ -65,11 +70,11 @@ name = "option_pricing"
 harness = false
 
 [[bench]]
-name = "cds_pricing"
+name = "cms_pricing"
 harness = false
 
 [[bench]]
-name = "cashflow_generation"
+name = "cds_pricing"
 harness = false
 
 [[bench]]
@@ -81,10 +86,6 @@ name = "cds_tranche_pricing"
 harness = false
 
 [[bench]]
-name = "swaption_pricing"
-harness = false
-
-[[bench]]
 name = "cds_index_pricing"
 harness = false
 
@@ -93,7 +94,11 @@ name = "structured_credit_pricing"
 harness = false
 
 [[bench]]
-name = "convertible_pricing"
+name = "swaption_pricing"
+harness = false
+
+[[bench]]
+name = "cashflow_generation"
 harness = false
 
 [[bench]]
@@ -101,59 +106,7 @@ name = "calibration"
 harness = false
 
 [[bench]]
-name = "mc_pricing"
-harness = false
-
-[[bench]]
-name = "merton_mc_pricing"
-harness = false
-
-[[bench]]
-name = "fi_misc_pricing"
-harness = false
-
-[[bench]]
-name = "mc_exotics_pricing"
-harness = false
-
-[[bench]]
-name = "bucketed_risk"
-harness = false
-
-[[bench]]
-name = "structured_credit_pool"
-harness = false
-
-[[bench]]
-name = "df_bootstrap"
-harness = false
-
-[[bench]]
-name = "fwd_curve"
-harness = false
-
-[[bench]]
-name = "sabr_slice"
-harness = false
-
-[[bench]]
-name = "bond_future_bench"
-harness = false
-
-[[bench]]
-name = "metrics"
-harness = false
-
-[[bench]]
-name = "equity_pricing"
-harness = false
-
-[[bench]]
-name = "fx_dates"
-harness = false
-
-[[bench]]
-name = "inflation_pricing"
+name = "global_calibration"
 harness = false
 
 [[bench]]
@@ -165,11 +118,71 @@ name = "linear_rates"
 harness = false
 
 [[bench]]
-name = "fx_pricing"
+name = "df_bootstrap"
+harness = false
+
+[[bench]]
+name = "fwd_curve"
+harness = false
+
+[[bench]]
+name = "mc_pricing"
+harness = false
+
+[[bench]]
+name = "mc_exotics_pricing"
+harness = false
+
+[[bench]]
+name = "merton_mc_pricing"
+harness = false
+
+[[bench]]
+name = "fi_misc_pricing"
+harness = false
+
+[[bench]]
+name = "pe_fund_pricing"
+harness = false
+
+[[bench]]
+name = "equity_pricing"
+harness = false
+
+[[bench]]
+name = "convertible_pricing"
+harness = false
+
+[[bench]]
+name = "inflation_pricing"
 harness = false
 
 [[bench]]
 name = "commodity_pricing"
+harness = false
+
+[[bench]]
+name = "bucketed_risk"
+harness = false
+
+[[bench]]
+name = "metrics"
+harness = false
+
+[[bench]]
+name = "sabr_slice"
+harness = false
+
+[[bench]]
+name = "fx_pricing"
+harness = false
+
+[[bench]]
+name = "fx_exotics_pricing"
+harness = false
+
+[[bench]]
+name = "xccy_pricing"
 harness = false
 
 [[bin]]

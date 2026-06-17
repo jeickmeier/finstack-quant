@@ -152,13 +152,12 @@ fn bench_asian_option_mc(c: &mut Criterion) {
     let as_of = as_of();
     let market = create_mc_market(as_of, 100.0, 0.25, 0.05);
 
-    for paths in [1_000_u64, 2_500, 5_000] {
-        group.throughput(Throughput::Elements(paths));
-        let option = asian_option(paths as usize);
-        group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
-            b.iter(|| black_box(option.npv_mc(black_box(&market), black_box(as_of)).unwrap()));
-        });
-    }
+    let paths = 2_500_u64;
+    group.throughput(Throughput::Elements(paths));
+    let option = asian_option(paths as usize);
+    group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
+        b.iter(|| black_box(option.npv_mc(black_box(&market), black_box(as_of)).unwrap()));
+    });
     group.finish();
 }
 
@@ -167,13 +166,12 @@ fn bench_lookback_option_mc(c: &mut Criterion) {
     let as_of = as_of();
     let market = create_mc_market(as_of, 100.0, 0.25, 0.05);
 
-    for paths in [1_000_u64, 2_500, 5_000] {
-        group.throughput(Throughput::Elements(paths));
-        let option = lookback_option(paths as usize);
-        group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
-            b.iter(|| option.value(black_box(&market), black_box(as_of)));
-        });
-    }
+    let paths = 2_500_u64;
+    group.throughput(Throughput::Elements(paths));
+    let option = lookback_option(paths as usize);
+    group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
+        b.iter(|| option.value(black_box(&market), black_box(as_of)));
+    });
     group.finish();
 }
 
@@ -182,13 +180,12 @@ fn bench_autocallable_mc(c: &mut Criterion) {
     let as_of = as_of();
     let market = create_mc_market(as_of, 100.0, 0.25, 0.05);
 
-    for paths in [1_000_u64, 2_500, 5_000] {
-        group.throughput(Throughput::Elements(paths));
-        let note = autocallable_note(paths as usize);
-        group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
-            b.iter(|| note.value(black_box(&market), black_box(as_of)));
-        });
-    }
+    let paths = 2_500_u64;
+    group.throughput(Throughput::Elements(paths));
+    let note = autocallable_note(paths as usize);
+    group.bench_with_input(BenchmarkId::from_parameter(paths), &paths, |b, &_paths| {
+        b.iter(|| note.value(black_box(&market), black_box(as_of)));
+    });
     group.finish();
 }
 
@@ -223,32 +220,28 @@ fn make_cliquet(as_of: Date, n_resets: usize) -> CliquetOption {
         .unwrap()
 }
 
-/// Scale cliquet option MC cost vs number of reset periods (4, 8, 12, 24).
-///
-/// More reset dates = more simulation time steps per path, directly scaling
-/// the inner path generation loop in the GBM MC engine.
+/// Representative cliquet option MC cost with 12 reset periods.
 fn bench_cliquet_option_mc(c: &mut Criterion) {
     let mut group = c.benchmark_group("cliquet_option_mc");
     let as_of = as_of();
     let market = create_mc_market(as_of, 100.0, 0.25, 0.05);
 
-    for n_resets in [4_usize, 8, 12, 24] {
-        let option = make_cliquet(as_of, n_resets);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{n_resets}resets")),
-            &n_resets,
-            |b, _| {
-                b.iter(|| {
-                    black_box(finstack_quant_valuations::instruments::Instrument::value(
-                        &option,
-                        black_box(&market),
-                        black_box(as_of),
-                    ))
-                    .unwrap()
-                })
-            },
-        );
-    }
+    let n_resets = 12;
+    let option = make_cliquet(as_of, n_resets);
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{n_resets}resets")),
+        &n_resets,
+        |b, _| {
+            b.iter(|| {
+                black_box(finstack_quant_valuations::instruments::Instrument::value(
+                    &option,
+                    black_box(&market),
+                    black_box(as_of),
+                ))
+                .unwrap()
+            })
+        },
+    );
     group.finish();
 }
 

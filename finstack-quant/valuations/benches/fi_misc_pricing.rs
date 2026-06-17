@@ -21,6 +21,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::cmo::AgencyCmo;
 use finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;
 use finstack_quant_valuations::instruments::fixed_income::fi_trs::FIIndexTotalReturnSwap;
+use finstack_quant_valuations::instruments::fixed_income::fi_trs::TrsScheduleSpec;
 use finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
@@ -237,8 +238,21 @@ fn bench_fi_trs_pv(c: &mut Criterion) {
 
     for (label, years) in [("1Y", 1), ("3Y", 3), ("5Y", 5)] {
         let maturity = Date::from_calendar_date(as_of.year() + years, as_of.month(), 1).unwrap();
-        let trs = FIIndexTotalReturnSwap::example().unwrap();
-        let _ = (label, maturity); // tenor controlled by example; label documents intent
+        let mut trs = FIIndexTotalReturnSwap::example().unwrap();
+        trs.schedule = TrsScheduleSpec::from_params(
+            as_of,
+            maturity,
+            finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::quarterly(),
+                dc: DayCount::Act360,
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
+        );
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
             b.iter(|| black_box(trs.value(black_box(&market), black_box(as_of))).unwrap())
         });
@@ -264,7 +278,8 @@ fn bench_cmo_waterfall_pv(c: &mut Criterion) {
     let disc = test_utils::flat_discount("USD-OIS", as_of, 0.05);
     let market = MarketContext::new().insert(disc);
 
-    for (label, n_tranches) in [("3t", 3_usize), ("5t", 5), ("8t", 8)] {
+    {
+        let (label, n_tranches) = ("5t", 5_usize);
         let tranches: Vec<CmoTranche> = (0..n_tranches)
             .map(|i| {
                 // Keep total coupon demand under the ~4% collateral

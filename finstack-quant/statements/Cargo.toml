@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Financial-statements modeling for Finstack Quant with deterministic Value > Forecast > Formula precedence and corkscrew schedules"
+autobenches = false
 
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.6.0" }

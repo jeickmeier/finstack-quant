@@ -1,12 +1,10 @@
 //! Credit factor model calibration benchmarks (PR-12).
 //!
 //! Measures the end-to-end cost of [`CreditCalibrator::calibrate`] at
-//! increasing scales: 10 × 24 months × 1 level, 50 × 36 months × 2 levels,
-//! and 500 × 60 months × 3 levels.  All panels are synthetic but structurally
-//! representative.
+//! a representative 50 × 36 months × 2 levels synthetic panel.
 //!
 //! Group name: `"credit_factor_calibration"`.
-//! Bench IDs: `"n_issuers/<N>"`.
+//! Bench ID: `"n_issuers/50"`.
 //!
 //! These benchmarks are **non-gating**: they compile and run via `cargo bench`
 //! but are not wired into CI.
@@ -156,33 +154,27 @@ fn build_config(n_levels: usize) -> CreditCalibrationConfig {
 // Benchmark entry point
 // ---------------------------------------------------------------------------
 
-const BENCH_SCENARIOS: &[(usize, usize, usize)] = &[
-    (10, 24, 1),  // tiny
-    (50, 36, 2),  // medium
-    (500, 60, 3), // large (spec requirement)
-];
-
 fn bench_credit_factor_calibration(c: &mut Criterion) {
     let mut group = c.benchmark_group("credit_factor_calibration");
-    // Scale down sample count for the large scenario.
     group.sample_size(10);
 
-    for &(n_issuers, n_months, n_levels) in BENCH_SCENARIOS {
-        let inputs = build_inputs(n_issuers, n_months, n_levels);
-        let config = build_config(n_levels);
-        let calibrator = CreditCalibrator::new(config);
+    let n_issuers = 50;
+    let n_months = 36;
+    let n_levels = 2;
+    let inputs = build_inputs(n_issuers, n_months, n_levels);
+    let config = build_config(n_levels);
+    let calibrator = CreditCalibrator::new(config);
 
-        group.throughput(Throughput::Elements(n_issuers as u64));
+    group.throughput(Throughput::Elements(n_issuers as u64));
 
-        let bench_id = BenchmarkId::new("n_issuers", n_issuers);
-        group.bench_with_input(bench_id, &(calibrator, inputs), |b, (cal, inp)| {
-            b.iter_batched(
-                || inp.clone(),
-                |inp| cal.calibrate(inp).unwrap(),
-                BatchSize::SmallInput,
-            );
-        });
-    }
+    let bench_id = BenchmarkId::new("n_issuers", n_issuers);
+    group.bench_with_input(bench_id, &(calibrator, inputs), |b, (cal, inp)| {
+        b.iter_batched(
+            || inp.clone(),
+            |inp| cal.calibrate(inp).unwrap(),
+            BatchSize::SmallInput,
+        );
+    });
 
     group.finish();
 }

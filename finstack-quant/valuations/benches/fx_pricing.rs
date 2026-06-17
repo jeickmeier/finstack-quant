@@ -226,21 +226,7 @@ fn bench_ndf_pv(c: &mut Criterion) {
     let market = create_market();
     let as_of = base_date();
 
-    let fixing_date = Date::from_calendar_date(2025, Month::June, 15).unwrap();
-    let settlement_date = Date::from_calendar_date(2025, Month::June, 17).unwrap();
-
-    let ndf = Ndf::builder()
-        .id(InstrumentId::new("CNYUSD-NDF"))
-        .base_currency(Currency::CNY)
-        .settlement_currency(Currency::USD)
-        .fixing_date(fixing_date)
-        .maturity(settlement_date)
-        .notional(Money::new(10_000_000.0, Currency::CNY))
-        .contract_rate(7.25)
-        .domestic_discount_curve_id(CurveId::new("USD-OIS"))
-        .attributes(Attributes::new())
-        .build()
-        .unwrap();
+    let ndf = Ndf::example();
 
     group.bench_function("cnyusd", |b| {
         b.iter(|| ndf.value(black_box(&market), black_box(as_of)));

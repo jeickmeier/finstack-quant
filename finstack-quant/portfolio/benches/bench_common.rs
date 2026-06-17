@@ -149,7 +149,9 @@ pub fn create_market_context() -> MarketContext {
 ///
 /// Used by attribution benchmarks to simulate a realistic day-over-day move.
 pub fn create_t1_market_context() -> MarketContext {
-    build_market_context(t1_date(), 0.001)
+    // Keep curve base dates at T0 so floating coupons observed on the
+    // attribution start date can be resolved when valuing at T1.
+    build_market_context(base_date(), 0.001)
 }
 
 fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
@@ -201,7 +203,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .build()
         .unwrap();
 
-    let hazard_knots = [(0.0, 0.0), (1.0, 0.01), (5.0, 0.02), (10.0, 0.025)];
+    let hazard_knots = [(0.0, 0.01), (1.0, 0.01), (5.0, 0.02), (10.0, 0.025)];
     let hazard = HazardCurve::builder("CORP-HAZARD")
         .base_date(base)
         .knots(hazard_knots)
@@ -672,13 +674,14 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
     // 9. Swaptions
     for i in 0..positions_per_derivative.min(3) {
         let swaption_id = format!("SWAPTION_{}", i);
-        let expiry = base + time::Duration::days(180);
+        let expiry = Date::from_calendar_date(2025, Month::July, 1).unwrap();
+        let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
         let params = SwaptionParams::payer(
             Money::new(5_000_000.0, Currency::USD),
             0.04,
             expiry,
             expiry,
-            maturity_5y(),
+            swap_end,
         )
         .expect("valid benchmark swaption params");
         let swaption = Swaption::new_payer(
@@ -1042,6 +1045,35 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             .unwrap(),
         );
         position_id += 1;
+    }
+
+    builder.build().unwrap()
+}
+
+/// Build a portfolio suited to generic P&L attribution benchmarks.
+///
+/// CDS tranches are covered by valuation and metrics benchmarks, but the generic
+/// attribution path builds intermediate market states that do not preserve
+/// credit-index aggregates. Excluding them keeps this benchmark focused on
+/// portfolio attribution mechanics across instruments with direct dependencies.
+pub fn create_attribution_portfolio(num_positions: usize) -> Portfolio {
+    let portfolio = create_institutional_portfolio(num_positions);
+    let mut builder = PortfolioBuilder::new(format!("ATTRIBUTION_{}", num_positions))
+        .name("Attribution Benchmark Portfolio")
+        .base_ccy(portfolio.base_ccy)
+        .as_of(portfolio.as_of);
+
+    for entity in portfolio.entities.values().cloned() {
+        builder = builder.entity(entity);
+    }
+
+    for position in portfolio
+        .positions()
+        .iter()
+        .filter(|position| !position.instrument_id.as_str().starts_with("CDSTRANCHE_"))
+        .cloned()
+    {
+        builder = builder.position(position);
     }
 
     builder.build().unwrap()

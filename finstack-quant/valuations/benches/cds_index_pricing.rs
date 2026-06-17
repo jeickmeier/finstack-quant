@@ -146,7 +146,8 @@ fn bench_cds_index_pv_constituents(c: &mut Criterion) {
     let tenor = 5;
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    for num_names in [10, 25, 50, 125].iter() {
+    {
+        let num_names = &50;
         let index = create_cds_index_constituents(tenor, *num_names);
         let market = create_market_constituents(*num_names);
 

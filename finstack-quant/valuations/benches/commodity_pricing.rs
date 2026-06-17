@@ -176,20 +176,13 @@ fn bench_commodity_forward_pv(c: &mut Criterion) {
     let market = create_commodity_market();
     let as_of = base_date();
 
-    let fwd_3m = forward_contract(
-        "WTI-FWD-3M",
-        Date::from_calendar_date(2025, Month::April, 1).unwrap(),
-    );
     let fwd_6m = forward_contract(
         "WTI-FWD-6M",
         Date::from_calendar_date(2025, Month::July, 1).unwrap(),
     );
-    let fwd_1y = forward_contract(
-        "WTI-FWD-1Y",
-        Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-    );
 
-    for (label, fwd) in [("3M", &fwd_3m), ("6M", &fwd_6m), ("1Y", &fwd_1y)] {
+    {
+        let (label, fwd) = ("6M", &fwd_6m);
         group.bench_with_input(BenchmarkId::from_parameter(label), fwd, |b, fwd| {
             b.iter(|| fwd.value(black_box(&market), black_box(as_of)));
         });
@@ -202,20 +195,13 @@ fn bench_commodity_swap_pv(c: &mut Criterion) {
     let market = create_commodity_market();
     let as_of = base_date();
 
-    let swap_1y = commodity_swap_contract(
-        "WTI-SWAP-1Y",
-        Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-    );
     let swap_2y = commodity_swap_contract(
         "WTI-SWAP-2Y",
         Date::from_calendar_date(2027, Month::January, 1).unwrap(),
     );
-    let swap_5y = commodity_swap_contract(
-        "WTI-SWAP-5Y",
-        Date::from_calendar_date(2030, Month::January, 1).unwrap(),
-    );
 
-    for (label, swap) in [("1Y", &swap_1y), ("2Y", &swap_2y), ("5Y", &swap_5y)] {
+    {
+        let (label, swap) = ("2Y", &swap_2y);
         group.bench_with_input(BenchmarkId::from_parameter(label), swap, |b, swap| {
             b.iter(|| swap.value(black_box(&market), black_box(as_of)));
         });
@@ -228,20 +214,13 @@ fn bench_commodity_option_pv(c: &mut Criterion) {
     let market = create_commodity_market();
     let as_of = base_date();
 
-    let opt_3m = commodity_call_option(
-        "WTI-OPT-3M",
-        Date::from_calendar_date(2025, Month::April, 1).unwrap(),
-    );
     let opt_6m = commodity_call_option(
         "WTI-OPT-6M",
         Date::from_calendar_date(2025, Month::July, 1).unwrap(),
     );
-    let opt_12m = commodity_call_option(
-        "WTI-OPT-12M",
-        Date::from_calendar_date(2026, Month::January, 1).unwrap(),
-    );
 
-    for (label, opt) in [("3M", &opt_3m), ("6M", &opt_6m), ("12M", &opt_12m)] {
+    {
+        let (label, opt) = ("6M", &opt_6m);
         group.bench_with_input(BenchmarkId::from_parameter(label), opt, |b, opt| {
             b.iter(|| opt.value(black_box(&market), black_box(as_of)));
         });
@@ -292,7 +271,8 @@ fn bench_commodity_asian_option_obs_count(c: &mut Criterion) {
     let as_of = base_date();
 
     let mut group = c.benchmark_group("commodity_asian_option/obs_count");
-    for n_obs in [3_usize, 6, 12, 24] {
+    {
+        let n_obs = 12_usize;
         // Generate `n_obs` monthly fixing dates starting 1 month from as_of
         let fixing_dates: Vec<Date> = (1..=n_obs)
             .map(|i| {
@@ -392,7 +372,8 @@ fn bench_commodity_spread_option_pv(c: &mut Criterion) {
     let as_of = base_date();
 
     let mut group = c.benchmark_group("commodity_spread_option/tenor");
-    for (label, months) in [("3M", 3_i64), ("6M", 6), ("12M", 12)] {
+    {
+        let (label, months) = ("6M", 6_i64);
         let expiry = as_of + time::Duration::days(months * 30);
         let spread_opt = CommoditySpreadOption::builder()
             .id(InstrumentId::new("CRACK-SPREAD-BENCH"))
@@ -433,7 +414,8 @@ fn bench_commodity_swaption_pv(c: &mut Criterion) {
     let as_of = base_date();
 
     let mut group = c.benchmark_group("commodity_swaption/swap_tenor");
-    for (label, swap_years) in [("1Y", 1_i32), ("2Y", 2), ("3Y", 3)] {
+    {
+        let (label, swap_years) = ("2Y", 2_i32);
         let expiry = Date::from_calendar_date(as_of.year() + 1, as_of.month(), 1).unwrap();
         let swap_start = expiry + time::Duration::days(2);
         let swap_end =

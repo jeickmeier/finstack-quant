@@ -8,9 +8,9 @@
 //!   - Number of GL nodes     (integration accuracy)
 //!
 //! Scenarios:
-//! - CMS cap/floor: period count scaling (4 / 8 / 20 / 40 quarterly fixings)
-//! - CMS cap: CMS tenor scaling (5Y / 10Y / 20Y)
-//! - CmsSwap: period count scaling (same dims)
+//! - CMS cap/floor: representative 20 quarterly fixings
+//! - CMS cap: representative 10Y CMS tenor
+//! - CmsSwap: representative 20 quarterly fixings
 
 #![allow(clippy::unwrap_used)]
 
@@ -133,19 +133,18 @@ fn bench_cms_option_period_count(c: &mut Criterion) {
     let as_of = base_date();
     let market = create_market(as_of);
 
-    for n in [4usize, 8, 20, 40] {
-        let cap = make_cms_option(as_of, n, 10.0);
+    let n = 20;
+    let cap = make_cms_option(as_of, n, 10.0);
 
-        group.throughput(Throughput::Elements(n as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| {
-                black_box(&cap)
-                    .value(black_box(&market), black_box(as_of))
-                    .unwrap()
-                    .amount()
-            });
+    group.throughput(Throughput::Elements(n as u64));
+    group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+        b.iter(|| {
+            black_box(&cap)
+                .value(black_box(&market), black_box(as_of))
+                .unwrap()
+                .amount()
         });
-    }
+    });
 
     group.finish();
 }
@@ -159,18 +158,18 @@ fn bench_cms_option_cms_tenor(c: &mut Criterion) {
     let as_of = base_date();
     let market = create_market(as_of);
 
-    for (label, cms_tenor) in [("5Y", 5.0f64), ("10Y", 10.0), ("20Y", 20.0)] {
-        let cap = make_cms_option(as_of, 20, cms_tenor);
+    let label = "10Y";
+    let cms_tenor = 10.0;
+    let cap = make_cms_option(as_of, 20, cms_tenor);
 
-        group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| {
-                black_box(&cap)
-                    .value(black_box(&market), black_box(as_of))
-                    .unwrap()
-                    .amount()
-            });
+    group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
+        b.iter(|| {
+            black_box(&cap)
+                .value(black_box(&market), black_box(as_of))
+                .unwrap()
+                .amount()
         });
-    }
+    });
 
     group.finish();
 }
@@ -184,42 +183,41 @@ fn bench_cms_swap_period_count(c: &mut Criterion) {
     let as_of = base_date();
     let market = create_market(as_of);
 
-    for n in [4usize, 8, 20, 40] {
-        let end_days = n as i64 * 91;
-        let start = as_of;
-        let end = as_of + time::Duration::days(end_days);
+    let n = 20;
+    let end_days = n as i64 * 91;
+    let start = as_of;
+    let end = as_of + time::Duration::days(end_days);
 
-        let swap = CmsSwap::from_schedule(
-            "CMSSWAP-BENCH",
-            start,
-            end,
-            Tenor::quarterly(),
-            10.0,
-            0.0,
-            FundingLegSpec::Fixed {
-                rate: 0.03,
-                day_count: DayCount::Thirty360,
-            },
-            Money::new(10_000_000.0, Currency::USD),
-            DayCount::Act360,
-            IRSConvention::USDStandard,
-            PayReceive::Receive,
-            "USD-OIS",
-            "USD-LIBOR-3M",
-            "USD-CMS10Y-VOL",
-        )
-        .unwrap();
+    let swap = CmsSwap::from_schedule(
+        "CMSSWAP-BENCH",
+        start,
+        end,
+        Tenor::quarterly(),
+        10.0,
+        0.0,
+        FundingLegSpec::Fixed {
+            rate: 0.03,
+            day_count: DayCount::Thirty360,
+        },
+        Money::new(10_000_000.0, Currency::USD),
+        DayCount::Act360,
+        IRSConvention::USDStandard,
+        PayReceive::Receive,
+        "USD-OIS",
+        "USD-LIBOR-3M",
+        "USD-CMS10Y-VOL",
+    )
+    .unwrap();
 
-        group.throughput(Throughput::Elements(n as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| {
-                black_box(&swap)
-                    .value(black_box(&market), black_box(as_of))
-                    .unwrap()
-                    .amount()
-            });
+    group.throughput(Throughput::Elements(n as u64));
+    group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+        b.iter(|| {
+            black_box(&swap)
+                .value(black_box(&market), black_box(as_of))
+                .unwrap()
+                .amount()
         });
-    }
+    });
 
     group.finish();
 }

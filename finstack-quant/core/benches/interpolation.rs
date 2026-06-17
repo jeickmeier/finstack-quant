@@ -10,7 +10,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::math::interp::{
     CubicHermiteStrategy, ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy,
-    LogLinearStrategy, MonotoneConvexStrategy, ValidationPolicy,
+    LogLinearStrategy, MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy, ValidationPolicy,
 };
 use std::hint::black_box;
 
@@ -43,7 +43,8 @@ fn bench_linear_interp(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("interp_linear_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.1).collect();
             b.iter(|| {
@@ -73,7 +74,8 @@ fn bench_log_linear_interp(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("interp_log_linear_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.1).collect();
             b.iter(|| {
@@ -103,7 +105,8 @@ fn bench_cubic_hermite_interp(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("interp_cubic_hermite_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.1).collect();
             b.iter(|| {
@@ -133,37 +136,8 @@ fn bench_monotone_convex_interp(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("interp_monotone_convex_batch");
-    for size in [10, 50, 100, 500] {
-        group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
-            let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.1).collect();
-            b.iter(|| {
-                let values: Vec<_> = times.iter().map(|&t| interp.interp(t)).collect();
-                black_box(values);
-            })
-        });
-    }
-    group.finish();
-}
-
-fn bench_log_linear_batch(c: &mut Criterion) {
-    let (knots, dfs) = create_test_curve(20);
-    let interp = Interpolator::<LogLinearStrategy>::new(
-        knots,
-        dfs,
-        ExtrapolationPolicy::FlatZero,
-        ValidationPolicy::Strict,
-    )
-    .unwrap();
-
-    c.bench_function("interp_log_linear_single", |b| {
-        b.iter(|| {
-            let value = black_box(&interp).interp(black_box(2.5));
-            black_box(value);
-        })
-    });
-
-    let mut group = c.benchmark_group("interp_log_linear_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.1).collect();
             b.iter(|| {
@@ -207,7 +181,7 @@ fn bench_interp_comparison(c: &mut Criterion) {
         ValidationPolicy::Strict,
     )
     .unwrap();
-    let flat_fwd = Interpolator::<LogLinearStrategy>::new(
+    let piecewise_quadratic_forward = Interpolator::<PiecewiseQuadraticForwardStrategy>::new(
         knots,
         dfs,
         ExtrapolationPolicy::FlatZero,
@@ -251,9 +225,12 @@ fn bench_interp_comparison(c: &mut Criterion) {
         })
     });
 
-    group.bench_function("LogLinear", |b| {
+    group.bench_function("PiecewiseQuadraticForward", |b| {
         b.iter(|| {
-            let values: Vec<_> = test_times.iter().map(|&t| flat_fwd.interp(t)).collect();
+            let values: Vec<_> = test_times
+                .iter()
+                .map(|&t| piecewise_quadratic_forward.interp(t))
+                .collect();
             black_box(values);
         })
     });
@@ -313,7 +290,6 @@ criterion_group!(
     bench_log_linear_interp,
     bench_cubic_hermite_interp,
     bench_monotone_convex_interp,
-    bench_log_linear_batch,
     bench_interp_comparison,
     bench_interp_extrapolation,
 );

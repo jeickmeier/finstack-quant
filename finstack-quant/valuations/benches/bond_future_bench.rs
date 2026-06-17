@@ -170,27 +170,25 @@ fn bench_npv(c: &mut Criterion) {
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let cf = 0.8234; // Pre-calculated conversion factor
 
-    // Test different position sizes
-    for num_contracts in [1, 10, 100].iter() {
-        let mut sized_future = future.clone();
-        sized_future.notional = Money::new(*num_contracts as f64 * 100_000.0, Currency::USD);
+    let num_contracts = 10;
+    let mut sized_future = future;
+    sized_future.notional = Money::new(num_contracts as f64 * 100_000.0, Currency::USD);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}contracts", num_contracts)),
-            num_contracts,
-            |b, _| {
-                b.iter(|| {
-                    finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuturePricer::calculate_npv(
-                        black_box(&sized_future),
-                        black_box(&ctd_bond),
-                        black_box(cf),
-                        black_box(&market),
-                        black_box(as_of),
-                    )
-                });
-            },
-        );
-    }
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{}contracts", num_contracts)),
+        &num_contracts,
+        |b, _| {
+            b.iter(|| {
+                finstack_quant_valuations::instruments::fixed_income::bond_future::BondFuturePricer::calculate_npv(
+                    black_box(&sized_future),
+                    black_box(&ctd_bond),
+                    black_box(cf),
+                    black_box(&market),
+                    black_box(as_of),
+                )
+            });
+        },
+    );
 
     group.finish();
 }

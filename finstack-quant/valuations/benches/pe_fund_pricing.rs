@@ -151,14 +151,13 @@ fn bench_pe_waterfall_event_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("pe_fund_waterfall_events");
     let spec = standard_waterfall();
 
-    for n in [10usize, 30, 60, 100] {
-        let fund = make_fund(make_events(n), spec.clone(), false);
+    let n = 30;
+    let fund = make_fund(make_events(n), spec, false);
 
-        group.throughput(Throughput::Elements(n as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| black_box(&fund).run_waterfall().unwrap());
-        });
-    }
+    group.throughput(Throughput::Elements(n as u64));
+    group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+        b.iter(|| black_box(&fund).run_waterfall().unwrap());
+    });
 
     group.finish();
 }
@@ -219,19 +218,18 @@ fn bench_pe_fund_full_pricing(c: &mut Criterion) {
     let as_of = date!(2025 - 01 - 01);
     let spec = standard_waterfall();
 
-    for n in [10usize, 30, 60] {
-        let fund = make_fund(make_events(n), spec.clone(), true);
+    let n = 30;
+    let fund = make_fund(make_events(n), spec, true);
 
-        group.throughput(Throughput::Elements(n as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
-            b.iter(|| {
-                black_box(&fund)
-                    .value(black_box(&market), black_box(as_of))
-                    .unwrap()
-                    .amount()
-            });
+    group.throughput(Throughput::Elements(n as u64));
+    group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
+        b.iter(|| {
+            black_box(&fund)
+                .value(black_box(&market), black_box(as_of))
+                .unwrap()
+                .amount()
         });
-    }
+    });
 
     group.finish();
 }

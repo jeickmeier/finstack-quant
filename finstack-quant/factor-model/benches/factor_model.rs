@@ -8,6 +8,7 @@
 //! - CascadeMatcher chain evaluation
 //! - Scaling behavior with increasing factor/rule counts
 
+#[path = "support/bench_utils.rs"]
 mod bench_utils;
 
 use bench_utils::bench_iter;
@@ -42,7 +43,8 @@ fn make_psd_matrix(n: usize) -> Vec<f64> {
 fn bench_covariance_construction(c: &mut Criterion) {
     let mut group = c.benchmark_group("covariance_construction");
 
-    for n in [5, 10, 25, 50, 100] {
+    {
+        let n = 50;
         let ids = make_factor_ids(n);
         let data = make_psd_matrix(n);
         group.bench_with_input(BenchmarkId::new("validated", n), &n, |b, _| {
@@ -61,7 +63,8 @@ fn bench_covariance_construction(c: &mut Criterion) {
 fn bench_covariance_lookups(c: &mut Criterion) {
     let mut group = c.benchmark_group("covariance_lookups");
 
-    for n in [10, 50, 100] {
+    {
+        let n = 50;
         let ids = make_factor_ids(n);
         let data = make_psd_matrix(n);
         let matrix = FactorCovarianceMatrix::new(ids.clone(), data).unwrap();
@@ -87,7 +90,8 @@ fn bench_covariance_lookups(c: &mut Criterion) {
 fn bench_covariance_batch_lookups(c: &mut Criterion) {
     let mut group = c.benchmark_group("covariance_batch_lookups");
 
-    for n in [10, 50, 100] {
+    {
+        let n = 50;
         let ids = make_factor_ids(n);
         let data = make_psd_matrix(n);
         let matrix = FactorCovarianceMatrix::new(ids.clone(), data).unwrap();
@@ -132,7 +136,8 @@ fn make_mapping_rules(n: usize) -> Vec<MappingRule> {
 fn bench_mapping_table_matcher(c: &mut Criterion) {
     let mut group = c.benchmark_group("mapping_table_matcher");
 
-    for n in [5, 20, 50, 100] {
+    {
+        let n = 50;
         let rules = make_mapping_rules(n);
         let matcher = MappingTableMatcher::new(rules);
         let attrs = Attributes::default();

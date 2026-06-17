@@ -196,7 +196,8 @@ fn inflation_swap_pv(c: &mut Criterion) {
     let market = create_inflation_market();
     let as_of = base_date();
 
-    for (label, years) in [("2Y", 2_i32), ("5Y", 5), ("10Y", 10)] {
+    {
+        let (label, years) = ("5Y", 5_i32);
         let maturity = Date::from_calendar_date(2025 + years, Month::January, 1).unwrap();
         let swap = inflation_swap(as_of, maturity, &format!("ZCINF-BENCH-{label}"));
         group.bench_with_input(BenchmarkId::new("pv", label), &years, |b, _| {
@@ -210,16 +211,6 @@ fn inflation_cap_floor_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("inflation_cap_floor_pv");
     let market = create_inflation_market();
     let as_of = base_date();
-
-    let cap_2y = inflation_cap_floor(
-        "INF-CAP-2Y",
-        InflationCapFloorType::Cap,
-        as_of,
-        Date::from_calendar_date(2027, Month::January, 1).unwrap(),
-    );
-    group.bench_function("cap_2y_pv", |b| {
-        b.iter(|| cap_2y.value(black_box(&market), black_box(as_of)));
-    });
 
     let cap_5y = inflation_cap_floor(
         "INF-CAP-5Y",
@@ -255,14 +246,6 @@ fn inflation_linked_bond_pv(c: &mut Criterion) {
     );
     group.bench_function("tips_5y_pv", |b| {
         b.iter(|| tips_5y.value(black_box(&market), black_box(as_of)));
-    });
-
-    let tips_10y = tips_benchmark(
-        "TIPS-10Y-BENCH",
-        Date::from_calendar_date(2035, Month::January, 15).unwrap(),
-    );
-    group.bench_function("tips_10y_pv", |b| {
-        b.iter(|| tips_10y.value(black_box(&market), black_box(as_of)));
     });
 
     group.finish();

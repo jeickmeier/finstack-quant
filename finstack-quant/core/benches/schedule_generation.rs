@@ -8,6 +8,7 @@
 //! - Business day adjustment overhead
 //! - Long-tenor schedule scaling (5Y, 10Y, 30Y)
 
+#[path = "support/bench_utils.rs"]
 mod bench_utils;
 
 use bench_utils::bench_iter;

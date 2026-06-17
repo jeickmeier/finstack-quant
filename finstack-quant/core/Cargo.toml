@@ -7,6 +7,7 @@ authors.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Core primitives for Finstack Quant: Decimal-safe Amount/Currency/FX, dates and calendars, expression engine, and Polars-backed time series"
+autobenches = false
 
 [dependencies]
 # Serde is a core public dependency: we rely on derive macros across the crate.
@@ -54,15 +55,7 @@ proptest = "1.11.0"
 finstack-quant-test-utils = { path = "../test-utils", version = "0.6.0" }
 
 [[bench]]
-name = "money_operations"
-harness = false
-
-[[bench]]
 name = "daycount_operations"
-harness = false
-
-[[bench]]
-name = "calendar_operations"
 harness = false
 
 [[bench]]
@@ -74,31 +67,11 @@ name = "curve_operations"
 harness = false
 
 [[bench]]
-name = "expr_dag"
-harness = false
-
-[[bench]]
 name = "rolling"
 harness = false
 
 [[bench]]
 name = "solver_operations"
-harness = false
-
-[[bench]]
-name = "market_context"
-harness = false
-
-[[bench]]
-name = "vol_surface"
-harness = false
-
-[[bench]]
-name = "integration"
-harness = false
-
-[[bench]]
-name = "statistical_functions"
 harness = false
 
 [[bench]]
@@ -111,10 +84,6 @@ harness = false
 
 [[bench]]
 name = "schedule_generation"
-harness = false
-
-[[bench]]
-name = "contention"
 harness = false
 
 [package.metadata.docs.rs]

@@ -160,7 +160,8 @@ fn bench_cashflow_generation(c: &mut Criterion) {
     let market = create_market();
     let as_of = test_date();
 
-    for num_assets in [10, 25, 50, 100].iter() {
+    {
+        let num_assets = &50;
         let deal = create_deal(DealType::CLO, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
@@ -230,7 +231,8 @@ fn bench_cs01(c: &mut Criterion) {
     let market = create_market();
     let as_of = test_date();
 
-    for num_assets in [10, 25, 50].iter() {
+    {
+        let num_assets = &50;
         let deal = create_deal(DealType::CLO, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
@@ -266,7 +268,8 @@ fn bench_pool_metrics(c: &mut Criterion) {
         MetricId::CloDiversity,
     ];
 
-    for num_assets in [10, 50, 100, 200].iter() {
+    {
+        let num_assets = &100;
         let deal = create_deal(DealType::CLO, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
@@ -291,7 +294,8 @@ fn bench_warf_calculation(c: &mut Criterion) {
     let market = create_market();
     let as_of = test_date();
 
-    for num_assets in [25, 50, 100, 200].iter() {
+    {
+        let num_assets = &100;
         let deal = create_deal(DealType::CLO, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),
@@ -387,7 +391,8 @@ fn bench_scaling_with_pool_size(c: &mut Criterion) {
     let market = create_market();
     let as_of = test_date();
 
-    for num_assets in [10, 25, 50, 100, 200, 500].iter() {
+    {
+        let num_assets = &100;
         let deal = create_deal(DealType::CLO, *num_assets);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}assets", num_assets)),

@@ -68,28 +68,27 @@ fn bench_bond_cashflow_generation(c: &mut Criterion) {
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    for tenor in [2, 5, 10, 30].iter() {
-        let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-        let maturity = Date::from_calendar_date(2025 + tenor, Month::January, 1).unwrap();
+    let tenor = 5;
+    let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let maturity = Date::from_calendar_date(2025 + tenor, Month::January, 1).unwrap();
 
-        let bond = Bond::fixed(
-            format!("BOND-{}Y", tenor),
-            Money::new(1_000_000.0, Currency::USD),
-            0.05,
-            issue,
-            maturity,
-            "USD-OIS",
-        )
-        .expect("Bond::fixed should succeed with valid parameters");
+    let bond = Bond::fixed(
+        format!("BOND-{}Y", tenor),
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        issue,
+        maturity,
+        "USD-OIS",
+    )
+    .expect("Bond::fixed should succeed with valid parameters");
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| bond.dated_cashflows(black_box(&market), black_box(as_of)));
-            },
-        );
-    }
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{}Y", tenor)),
+        &tenor,
+        |b, _| {
+            b.iter(|| bond.dated_cashflows(black_box(&market), black_box(as_of)));
+        },
+    );
     group.finish();
 }
 
@@ -98,93 +97,89 @@ fn bench_swap_cashflow_generation(c: &mut Criterion) {
     let market = create_market();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
 
-    for tenor in [2, 5, 10, 30].iter() {
-        let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-        let end = Date::from_calendar_date(2025 + tenor, Month::January, 1).unwrap();
+    let tenor = 5;
+    let start = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let end = Date::from_calendar_date(2025 + tenor, Month::January, 1).unwrap();
 
-        let swap = test_utils::usd_irs_swap(
-            InstrumentId::new(format!("IRS-{}Y", tenor)),
-            Money::new(10_000_000.0, Currency::USD),
-            0.04,
-            start,
-            end,
-            finstack_quant_valuations::instruments::rates::irs::PayReceive::Pay,
-        )
-        .expect("Failed to create swap for benchmark");
+    let swap = test_utils::usd_irs_swap(
+        InstrumentId::new(format!("IRS-{}Y", tenor)),
+        Money::new(10_000_000.0, Currency::USD),
+        0.04,
+        start,
+        end,
+        finstack_quant_valuations::instruments::rates::irs::PayReceive::Pay,
+    )
+    .expect("Failed to create swap for benchmark");
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| swap.dated_cashflows(black_box(&market), black_box(as_of)));
-            },
-        );
-    }
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{}Y", tenor)),
+        &tenor,
+        |b, _| {
+            b.iter(|| swap.dated_cashflows(black_box(&market), black_box(as_of)));
+        },
+    );
     group.finish();
 }
 
 fn bench_schedule_builder_fixed(c: &mut Criterion) {
     let mut group = c.benchmark_group("schedule_builder_fixed");
 
-    for tenor in [2, 5, 10, 30].iter() {
-        let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-        let maturity = Date::from_calendar_date(2025 + tenor, Month::January, 1).unwrap();
+    let tenor = 5;
+    let issue = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let maturity = Date::from_calendar_date(2025 + tenor, Month::January, 1).unwrap();
 
-        let fixed_spec = FixedCouponSpec {
-            coupon_type: CouponType::Cash,
-            rate: dec!(0.05),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Thirty360,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
-        };
+    let fixed_spec = FixedCouponSpec {
+        coupon_type: CouponType::Cash,
+        rate: dec!(0.05),
+        freq: Tenor::semi_annual(),
+        dc: DayCount::Thirty360,
+        bdc: BusinessDayConvention::Following,
+        calendar_id: "weekends_only".to_string(),
+        stub: StubKind::None,
+        end_of_month: false,
+        payment_lag_days: 0,
+    };
 
-        let init = Money::new(1_000_000.0, Currency::USD);
+    let init = Money::new(1_000_000.0, Currency::USD);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}Y", tenor)),
-            tenor,
-            |b, _| {
-                b.iter(|| {
-                    let mut builder = CashFlowSchedule::builder();
-                    let _ = builder
-                        .principal(black_box(init), black_box(issue), black_box(maturity))
-                        .fixed_cf(black_box(fixed_spec.clone()));
-                    builder.build_with_curves(None)
-                });
-            },
-        );
-    }
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{}Y", tenor)),
+        &tenor,
+        |b, _| {
+            b.iter(|| {
+                let mut builder = CashFlowSchedule::builder();
+                let _ = builder
+                    .principal(black_box(init), black_box(issue), black_box(maturity))
+                    .fixed_cf(black_box(fixed_spec.clone()));
+                builder.build_with_curves(None)
+            });
+        },
+    );
     group.finish();
 }
 
 fn bench_kahan_summation(c: &mut Criterion) {
     let mut group = c.benchmark_group("kahan_summation");
 
-    // Generate cashflow legs of varying lengths
-    for num_flows in [10, 20, 50, 100, 200].iter() {
-        let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
-        let flows: Vec<(Date, Money)> = (0..*num_flows)
-            .map(|i| {
-                let months = i * 6; // Semi-annual
-                let date = base + time::Duration::days(months * 30);
-                (date, Money::new(1000.0, Currency::USD))
-            })
-            .collect();
+    let num_flows = 50;
+    let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let flows: Vec<(Date, Money)> = (0..num_flows)
+        .map(|i| {
+            let months = i * 6; // Semi-annual
+            let date = base + time::Duration::days(months * 30);
+            (date, Money::new(1000.0, Currency::USD))
+        })
+        .collect();
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}flows", num_flows)),
-            num_flows,
-            |b, _| {
-                b.iter(|| {
-                    let _ = aggregate_cashflows_checked(black_box(&flows), Currency::USD).unwrap();
-                });
-            },
-        );
-    }
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{}flows", num_flows)),
+        &num_flows,
+        |b, _| {
+            b.iter(|| {
+                let _ = aggregate_cashflows_checked(black_box(&flows), Currency::USD).unwrap();
+            });
+        },
+    );
     group.finish();
 }
 

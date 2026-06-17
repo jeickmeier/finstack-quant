@@ -78,7 +78,8 @@ fn bench_discount_curve_df(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("curve_discount_df_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.05).collect();
             b.iter(|| {
@@ -101,7 +102,8 @@ fn bench_discount_curve_zero(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("curve_discount_zero_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.05).collect();
             b.iter(|| {
@@ -126,7 +128,8 @@ fn bench_discount_curve_forward(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("curve_discount_forward_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<(f64, f64)> = (0..size)
                 .map(|i| {
@@ -158,7 +161,8 @@ fn bench_forward_curve(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("curve_forward_rate_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.05).collect();
             b.iter(|| {
@@ -190,7 +194,8 @@ fn bench_hazard_curve(c: &mut Criterion) {
     });
 
     let mut group = c.benchmark_group("curve_hazard_survival_batch");
-    for size in [10, 50, 100, 500] {
+    {
+        let size = 100;
         group.bench_with_input(BenchmarkId::from_parameter(size), &size, |b, &size| {
             let times: Vec<f64> = (0..size).map(|i| (i as f64) * 0.05).collect();
             b.iter(|| {
@@ -234,7 +239,8 @@ fn bench_curve_interp_styles(c: &mut Criterion) {
 fn bench_curve_building(c: &mut Criterion) {
     let mut group = c.benchmark_group("curve_building");
 
-    for num_points in [5, 10, 20, 50, 100] {
+    {
+        let num_points = 50;
         group.bench_with_input(
             BenchmarkId::new("discount_curve", num_points),
             &num_points,

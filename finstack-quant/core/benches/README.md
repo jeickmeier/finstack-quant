@@ -5,7 +5,9 @@ Criterion benchmark suites for `finstack-quant-core`.
 The benchmark sources are the ground truth. This README explains what is
 measured and how to run the suites. It intentionally avoids hard latency,
 allocation, or "all targets met" claims unless you have current benchmark
-results to back them up.
+results to back them up. The suite is manifest-driven (`autobenches = false`) so
+new files do not expand benchmark runtime unless they are deliberately added to
+`Cargo.toml`.
 
 ## Running Benchmarks
 
@@ -14,25 +16,17 @@ results to back them up.
 cargo bench --package finstack-quant-core
 
 # Run selected suites
-cargo bench --package finstack-quant-core --bench money_operations
 cargo bench --package finstack-quant-core --bench daycount_operations
-cargo bench --package finstack-quant-core --bench calendar_operations
 cargo bench --package finstack-quant-core --bench interpolation
 cargo bench --package finstack-quant-core --bench curve_operations
-cargo bench --package finstack-quant-core --bench expr_dag
 cargo bench --package finstack-quant-core --bench rolling
 cargo bench --package finstack-quant-core --bench solver_operations
-cargo bench --package finstack-quant-core --bench market_context
-cargo bench --package finstack-quant-core --bench vol_surface
-cargo bench --package finstack-quant-core --bench integration
-cargo bench --package finstack-quant-core --bench statistical_functions
 cargo bench --package finstack-quant-core --bench rate_conversions
 cargo bench --package finstack-quant-core --bench cashflow_operations
 cargo bench --package finstack-quant-core --bench schedule_generation
-cargo bench --package finstack-quant-core --bench factor_model
 
 # Compile benchmark targets without running them
-cargo bench --package finstack-quant-core --bench expr_dag --bench market_context --no-run
+cargo bench --package finstack-quant-core --bench interpolation --bench curve_operations --no-run
 
 # Save and compare Criterion baselines
 cargo bench --package finstack-quant-core -- --save-baseline baseline_name
@@ -41,25 +35,11 @@ cargo bench --package finstack-quant-core -- --baseline baseline_name
 
 ## Benchmark Coverage
 
-### `money_operations.rs`
-
-- Money construction and arithmetic
-- FX-backed conversion paths
-- Batch monetary operations
-- Formatting overhead
-
 ### `daycount_operations.rs`
 
 - Year-fraction calculations across supported day-count conventions
 - Batch date-period calculations
 - More complex conventions such as `ActActIsma` and `Bus252`
-
-### `calendar_operations.rs`
-
-- Holiday and business-day checks
-- Business-day adjustments
-- Composite calendar behavior
-- Batch date checks and counting loops
 
 ### `interpolation.rs`
 
@@ -73,13 +53,6 @@ cargo bench --package finstack-quant-core -- --baseline baseline_name
 - Batch evaluation across multiple tenors
 - Curve construction overhead
 
-### `expr_dag.rs`
-
-- Complex DAG evaluation without planning
-- Planned DAG execution
-- Cached DAG execution
-- Row-scaling behavior for larger series
-
 ### `rolling.rs`
 
 - Rolling mean, median, and standard deviation
@@ -91,30 +64,6 @@ cargo bench --package finstack-quant-core -- --baseline baseline_name
 - Newton and Brent root finding
 - IRR/XIRR solver paths
 - Multi-dimensional solver scenarios where present
-
-### `market_context.rs`
-
-- Typed curve and surface lookups
-- Batch lookups
-- Context cloning
-- Bump operations
-- Credit-index rebinding-sensitive bump scenarios
-
-### `vol_surface.rs`
-
-- Vol-surface construction
-- Interpolation and boundary handling
-- Bump operations
-
-### `integration.rs`
-
-- Simpson, adaptive Simpson, trapezoidal, Gauss-Legendre, and Gauss-Hermite paths
-
-### `statistical_functions.rs`
-
-- Distribution helpers
-- Random sampling utilities
-- Basic statistics and probability primitives
 
 ### `rate_conversions.rs`
 
@@ -142,15 +91,6 @@ cargo bench --package finstack-quant-core -- --baseline baseline_name
 - IMM and CDS-IMM schedule generation
 - Business day adjustment with calendar lookup
 - Schedule iteration and collection
-
-### `factor_model.rs`
-
-- FactorCovarianceMatrix validated construction (5 to 100 factors)
-- Variance, covariance, and correlation lookups by factor ID
-- Batch variance and full correlation matrix extraction
-- MappingTableMatcher with first-hit, last-hit, and miss scenarios
-- HierarchicalMatcher tree traversal at varying depths
-- CascadeMatcher multi-stage chain evaluation
 
 ## Reading Results
 

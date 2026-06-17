@@ -11,7 +11,7 @@
 //!
 //! * `liquidity::scoring::PARALLEL_SCORING_THRESHOLD` (512) — would need a
 //!   built `Portfolio` and per-position `LiquidityProfile` fixture; defer to
-//!   `portfolio_metrics`-style bench infrastructure.
+//!   portfolio-scale fixture work if the threshold becomes contentious.
 //! * `valuation::REVALUE_AFFECTED_PARALLEL_MIN_AFFECTED` (64) — already
 //!   exercised indirectly by `portfolio_valuation` benches with a varying
 //!   `affected_indices` slice; would only need a dedicated bench if the
@@ -40,7 +40,7 @@ fn bench_historical_tail_threshold(c: &mut Criterion) {
     let n_scenarios: usize = 4_000; // n_tail = 200
     let confidence = 0.95;
 
-    for n_positions in [50_usize, 250, 500, 1_000].iter() {
+    for n_positions in [500_usize].iter() {
         let n = *n_positions;
         let n_tail_times_n = (n_scenarios as f64 * (1.0 - confidence)) as usize * n;
         group.throughput(Throughput::Elements(n_tail_times_n as u64));

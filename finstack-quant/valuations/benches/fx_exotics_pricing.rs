@@ -320,14 +320,13 @@ fn bench_barrier_option_tenor(c: &mut Criterion) {
     let market = create_market(as_of);
 
     let mut group = c.benchmark_group("fx_barrier_option/tenor");
-    for years in [1, 2, 5] {
-        let inst = make_barrier(as_of, years, BarrierType::UpAndOut);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{years}Y")),
-            &years,
-            |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
-        );
-    }
+    let years = 2;
+    let inst = make_barrier(as_of, years, BarrierType::UpAndOut);
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{years}Y")),
+        &years,
+        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+    );
     group.finish();
 }
 
@@ -359,14 +358,13 @@ fn bench_touch_option_tenor(c: &mut Criterion) {
     let market = create_market(as_of);
 
     let mut group = c.benchmark_group("fx_touch_option/tenor");
-    for years in [1, 2, 5] {
-        let inst = make_touch(as_of, years, TouchType::OneTouch);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{years}Y")),
-            &years,
-            |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
-        );
-    }
+    let years = 2;
+    let inst = make_touch(as_of, years, TouchType::OneTouch);
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{years}Y")),
+        &years,
+        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+    );
     group.finish();
 }
 
@@ -415,14 +413,13 @@ fn bench_variance_swap_tenor(c: &mut Criterion) {
     let market = create_market(as_of);
 
     let mut group = c.benchmark_group("fx_variance_swap/tenor");
-    for years in [1, 2, 5] {
-        let inst = make_variance_swap(as_of, years);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{years}Y")),
-            &years,
-            |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
-        );
-    }
+    let years = 2;
+    let inst = make_variance_swap(as_of, years);
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{years}Y")),
+        &years,
+        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+    );
     group.finish();
 }
 
@@ -434,14 +431,13 @@ fn bench_quanto_option_tenor(c: &mut Criterion) {
     let market = create_market(as_of);
 
     let mut group = c.benchmark_group("fx_quanto_option/tenor");
-    for years in [1, 2, 5] {
-        let inst = make_quanto(as_of, years);
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{years}Y")),
-            &years,
-            |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
-        );
-    }
+    let years = 2;
+    let inst = make_quanto(as_of, years);
+    group.bench_with_input(
+        BenchmarkId::from_parameter(format!("{years}Y")),
+        &years,
+        |b, _| b.iter(|| black_box(inst.value(black_box(&market), black_box(as_of))).unwrap()),
+    );
     group.finish();
 }
 

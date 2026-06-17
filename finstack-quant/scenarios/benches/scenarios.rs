@@ -226,7 +226,8 @@ fn create_scenarios_for_composition(count: usize) -> Vec<ScenarioSpec> {
 fn bench_scenario_composition(c: &mut Criterion) {
     let mut group = c.benchmark_group("scenario_composition");
 
-    for scenario_count in [2, 5, 10, 20] {
+    {
+        let scenario_count = 10;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}_scenarios", scenario_count)),
             &scenario_count,
@@ -296,7 +297,7 @@ fn bench_curve_node_shock(c: &mut Criterion) {
 
     let base_date = date!(2025 - 01 - 01);
 
-    for num_nodes in [2, 5, 10] {
+    for num_nodes in [5] {
         let mut nodes = Vec::new();
         for i in 0..num_nodes {
             let tenor = format!("{}Y", i + 1);
@@ -394,17 +395,15 @@ fn bench_equity_shock(c: &mut Criterion) {
 
     let base_date = date!(2025 - 01 - 01);
 
-    for num_equities in [1, 3, 5] {
+    {
+        let num_equities = 3;
         let ids: Vec<String> = (0..num_equities).map(|i| format!("EQUITY_{}", i)).collect();
 
         let scenario = ScenarioSpec {
             id: "equity_shock".into(),
             name: None,
             description: None,
-            operations: vec![OperationSpec::EquityPricePct {
-                ids: ids.clone(),
-                pct: -10.0,
-            }],
+            operations: vec![OperationSpec::EquityPricePct { ids, pct: -10.0 }],
             priority: 0,
             resolution_mode: Default::default(),
         };
@@ -486,7 +485,7 @@ fn bench_vol_surface_shock(c: &mut Criterion) {
         operations: vec![OperationSpec::VolSurfaceBucketPct {
             surface_kind: VolSurfaceKind::Equity,
             surface_id: "SPX_VOL".into(),
-            tenors: Some(vec!["1M".into(), "3M".into()]),
+            tenors: Some(vec!["3M".into(), "6M".into()]),
             strikes: Some(vec![90.0, 100.0, 110.0]),
             pct: 15.0,
         }],
@@ -677,7 +676,7 @@ fn bench_complex_multi_operation(c: &mut Criterion) {
 
     let base_date = date!(2025 - 01 - 01);
 
-    for num_ops in [5, 10, 20] {
+    for num_ops in [10] {
         let mut operations = Vec::new();
 
         // Mix of different operation types
@@ -772,13 +771,13 @@ fn bench_serde_roundtrip(c: &mut Criterion) {
             OperationSpec::CurveParallelBp {
                 curve_kind: CurveKind::ParCDS,
                 curve_id: "CDX_IG_HAZARD".into(),
-                discount_curve_id: None,
+                discount_curve_id: Some("USD_SOFR".into()),
                 bp: 75.0,
             },
             OperationSpec::CurveNodeBp {
                 curve_kind: CurveKind::ParCDS,
                 curve_id: "CDX_HY_HAZARD".into(),
-                discount_curve_id: None,
+                discount_curve_id: Some("USD_SOFR".into()),
                 nodes: vec![("3Y".into(), 100.0), ("5Y".into(), 150.0)],
                 match_mode: TenorMatchMode::Interpolate,
             },
@@ -915,7 +914,7 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
         operations: vec![OperationSpec::CurveParallelBp {
             curve_kind: CurveKind::ParCDS,
             curve_id: "CDX_IG_HAZARD".into(),
-            discount_curve_id: None,
+            discount_curve_id: Some("USD_SOFR".into()),
             bp: 50.0, // +50bp widening
         }],
         priority: 0,
@@ -951,7 +950,7 @@ fn bench_hazard_curve_shock(c: &mut Criterion) {
         operations: vec![OperationSpec::CurveNodeBp {
             curve_kind: CurveKind::ParCDS,
             curve_id: "CDX_HY_HAZARD".into(),
-            discount_curve_id: None,
+            discount_curve_id: Some("USD_SOFR".into()),
             nodes: vec![("3Y".into(), 100.0), ("5Y".into(), 150.0)],
             match_mode: TenorMatchMode::Interpolate,
         }],
@@ -1127,13 +1126,13 @@ fn bench_comprehensive_credit_scenario(c: &mut Criterion) {
             OperationSpec::CurveParallelBp {
                 curve_kind: CurveKind::ParCDS,
                 curve_id: "CDX_IG_HAZARD".into(),
-                discount_curve_id: None,
+                discount_curve_id: Some("USD_SOFR".into()),
                 bp: 75.0,
             },
             OperationSpec::CurveParallelBp {
                 curve_kind: CurveKind::ParCDS,
                 curve_id: "CDX_HY_HAZARD".into(),
-                discount_curve_id: None,
+                discount_curve_id: Some("USD_SOFR".into()),
                 bp: 200.0,
             },
             // Increase credit vol

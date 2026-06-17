@@ -21,7 +21,8 @@ fn bench_aggregate_full_cashflows(c: &mut Criterion) {
     let mut group = c.benchmark_group("portfolio_cashflows_full");
     let market = create_market_context();
 
-    for num_positions in [50usize, 100, 250, 500, 2000] {
+    {
+        let num_positions = 250usize;
         let portfolio = create_institutional_portfolio(num_positions);
 
         group.bench_with_input(

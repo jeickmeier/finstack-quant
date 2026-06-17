@@ -644,9 +644,9 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
     // 9. Swaptions (options on swaps)
     for i in 0..positions_per_derivative.min(3) {
         let swaption_id = format!("SWAPTION_{}", i);
-        let expiry = base + time::Duration::days(180); // 6M expiry
+        let expiry = Date::from_calendar_date(2025, Month::July, 1).unwrap();
         let swap_start = expiry;
-        let swap_end = maturity_5y();
+        let swap_end = Date::from_calendar_date(2030, Month::July, 1).unwrap();
 
         let params = SwaptionParams::payer(
             Money::new(5_000_000.0, Currency::USD),
@@ -1063,7 +1063,8 @@ fn bench_portfolio_valuation(c: &mut Criterion) {
     let market = create_market_context();
     let config = FinstackConfig::default();
 
-    for num_positions in [10, 50, 100, 250, 500].iter() {
+    {
+        let num_positions = &250;
         let portfolio = create_institutional_portfolio(*num_positions);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
@@ -1092,7 +1093,8 @@ fn bench_entity_aggregation(c: &mut Criterion) {
     let market = create_market_context();
     let config = FinstackConfig::default();
 
-    for num_positions in [50, 100, 250].iter() {
+    {
+        let num_positions = &250;
         let portfolio = create_institutional_portfolio(*num_positions);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
@@ -1174,7 +1176,8 @@ fn bench_portfolio_with_metrics(c: &mut Criterion) {
     let config = FinstackConfig::default();
     let as_of = base_date();
 
-    for num_positions in [50usize, 100, 250] {
+    {
+        let num_positions = 250usize;
         let portfolio = create_institutional_portfolio(num_positions);
         let valuation = value_portfolio(&portfolio, &market, &config, &Default::default()).unwrap();
 
@@ -1206,7 +1209,8 @@ fn bench_portfolio_scaling(c: &mut Criterion) {
     let market = create_market_context();
     let config = FinstackConfig::default();
 
-    for num_positions in [10, 25, 50, 100, 250, 500, 1000].iter() {
+    {
+        let num_positions = &250;
         let portfolio = create_institutional_portfolio(*num_positions);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
@@ -1257,7 +1261,7 @@ fn bench_revalue_affected(c: &mut Criterion) {
         ("hazard_curve", &hazard_curve),
     ];
 
-    for num_positions in [100usize, 250, 500] {
+    for num_positions in [250usize] {
         let portfolio = create_institutional_portfolio(num_positions);
         let prior = value_portfolio(&portfolio, &market, &config, &Default::default()).unwrap();
 

@@ -254,12 +254,7 @@ fn bench_deposit_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("deposit_pv");
     let market = create_rates_market();
     let as_of = base_date();
-    let maturities = [
-        ("1M", test_utils::date(2025, 2, 1)),
-        ("3M", test_utils::date(2025, 4, 1)),
-        ("6M", test_utils::date(2025, 7, 1)),
-        ("1Y", test_utils::date(2026, 1, 1)),
-    ];
+    let maturities = [("3M", test_utils::date(2025, 4, 1))];
     for (label, mat) in maturities {
         let dep = deposit(&format!("DEP-{label}"), mat);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
@@ -273,23 +268,11 @@ fn bench_fra_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("fra_pv");
     let market = create_rates_market();
     let as_of = base_date();
-    let cases = [
-        (
-            "3x6",
-            test_utils::date(2025, 4, 1),
-            test_utils::date(2025, 7, 1),
-        ),
-        (
-            "6x9",
-            test_utils::date(2025, 7, 1),
-            test_utils::date(2025, 10, 1),
-        ),
-        (
-            "6x12",
-            test_utils::date(2025, 7, 1),
-            test_utils::date(2026, 1, 1),
-        ),
-    ];
+    let cases = [(
+        "6x9",
+        test_utils::date(2025, 7, 1),
+        test_utils::date(2025, 10, 1),
+    )];
     for (label, start, end) in cases {
         let f = fra(&format!("FRA-{label}"), start, end);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
@@ -303,11 +286,7 @@ fn bench_basis_swap_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("basis_swap_pv");
     let market = create_rates_market();
     let as_of = base_date();
-    let cases = [
-        ("2Y", test_utils::date(2027, 1, 1)),
-        ("5Y", test_utils::date(2030, 1, 1)),
-        ("10Y", test_utils::date(2035, 1, 1)),
-    ];
+    let cases = [("5Y", test_utils::date(2030, 1, 1))];
     for (label, end) in cases {
         let swap = basis_swap(&format!("BASIS-{label}"), end);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
@@ -321,10 +300,8 @@ fn bench_cap_floor_pv(c: &mut Criterion) {
     let mut group = c.benchmark_group("cap_floor_pv");
     let market = create_rates_market();
     let as_of = base_date();
-    for (label, mat) in [
-        ("2Y", test_utils::date(2027, 1, 1)),
-        ("5Y", test_utils::date(2030, 1, 1)),
-    ] {
+    {
+        let (label, mat) = ("5Y", test_utils::date(2030, 1, 1));
         let cap = interest_rate_cap(&format!("CAP-{label}"), mat);
         group.bench_with_input(BenchmarkId::from_parameter(label), &label, |b, _| {
             b.iter(|| cap.value(black_box(&market), black_box(as_of)));

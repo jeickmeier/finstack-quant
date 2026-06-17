@@ -16,7 +16,7 @@
 mod bench_common;
 
 use bench_common::{
-    base_date, create_institutional_portfolio, create_market_context, create_t1_market_context,
+    base_date, create_attribution_portfolio, create_market_context, create_t1_market_context,
     t1_date,
 };
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -40,8 +40,9 @@ fn bench_attribution_parallel(c: &mut Criterion) {
     let as_of_t0 = base_date();
     let as_of_t1 = t1_date();
 
-    for num_positions in [20usize, 50, 100, 250, 500, 2000] {
-        let portfolio = create_institutional_portfolio(num_positions);
+    {
+        let num_positions = 250usize;
+        let portfolio = create_attribution_portfolio(num_positions);
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),
@@ -80,8 +81,9 @@ fn bench_attribution_metrics_based(c: &mut Criterion) {
     let as_of_t0 = base_date();
     let as_of_t1 = t1_date();
 
-    for num_positions in [20usize, 50, 100, 250, 500, 2000] {
-        let portfolio = create_institutional_portfolio(num_positions);
+    {
+        let num_positions = 250usize;
+        let portfolio = create_attribution_portfolio(num_positions);
 
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}pos", num_positions)),

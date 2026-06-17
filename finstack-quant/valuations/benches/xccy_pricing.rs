@@ -9,7 +9,7 @@
 //! No existing `rates_pricing.rs` bench covers XccySwap.
 //!
 //! Scenarios:
-//! - Tenor scaling: 2Y / 5Y / 10Y / 20Y (coupon count ≈ 8/20/40/80 per leg)
+//! - Representative 5Y tenor (coupon count ≈ 20 per leg)
 //! - Notional exchange: None / Final / Initial+Final
 //! - Reporting in USD (one leg local, one converted via FxMatrix)
 
@@ -154,21 +154,21 @@ fn bench_xccy_tenor(c: &mut Criterion) {
     let base = base_date();
     let market = create_market();
 
-    for (label, years) in [("2Y", 2i32), ("5Y", 5), ("10Y", 10), ("20Y", 20)] {
-        let maturity = Date::from_calendar_date(2025 + years, Month::January, 2).unwrap();
-        let swap = make_xccy(base, maturity, NotionalExchange::InitialAndFinal);
-        let n_periods = years as u64 * 4 * 2; // 4 Q/yr × 2 legs
+    let label = "5Y";
+    let years = 5;
+    let maturity = Date::from_calendar_date(2025 + years, Month::January, 2).unwrap();
+    let swap = make_xccy(base, maturity, NotionalExchange::InitialAndFinal);
+    let n_periods = years as u64 * 4 * 2; // 4 Q/yr × 2 legs
 
-        group.throughput(Throughput::Elements(n_periods));
-        group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| {
-                black_box(&swap)
-                    .value(black_box(&market), black_box(base))
-                    .unwrap()
-                    .amount()
-            });
+    group.throughput(Throughput::Elements(n_periods));
+    group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
+        b.iter(|| {
+            black_box(&swap)
+                .value(black_box(&market), black_box(base))
+                .unwrap()
+                .amount()
         });
-    }
+    });
 
     group.finish();
 }

@@ -231,7 +231,8 @@ fn bench_equity_trs_pv(c: &mut Criterion) {
     let market = create_equity_market();
     let as_of = base_date();
 
-    for years in [1, 3, 5] {
+    {
+        let years = 3;
         let trs = equity_trs(years);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{years}Y")),
@@ -251,17 +252,10 @@ fn bench_equity_index_future_pv(c: &mut Criterion) {
 
     let near_expiry = Date::from_calendar_date(2025, Month::June, 20).unwrap();
     let near_last = Date::from_calendar_date(2025, Month::June, 19).unwrap();
-    let far_expiry = Date::from_calendar_date(2027, Month::June, 18).unwrap();
-    let far_last = Date::from_calendar_date(2027, Month::June, 17).unwrap();
-
     let near = equity_index_future(near_expiry, near_last, "ES-NEAR");
-    let far = equity_index_future(far_expiry, far_last, "ES-FAR");
 
     group.bench_function("near_expiry", |b| {
         b.iter(|| near.value(black_box(&market), black_box(as_of)));
-    });
-    group.bench_function("far_expiry", |b| {
-        b.iter(|| far.value(black_box(&market), black_box(as_of)));
     });
     group.finish();
 }
@@ -271,7 +265,8 @@ fn bench_variance_swap_pv(c: &mut Criterion) {
     let market = create_equity_market();
     let as_of = base_date();
 
-    for months in [3, 6, 12] {
+    {
+        let months = 6;
         let swap = variance_swap(months);
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{months}M")),
@@ -297,7 +292,8 @@ fn bench_vol_index_future_pv(c: &mut Criterion) {
     let as_of = base_date();
 
     let mut group = c.benchmark_group("vol_index_future/tenor");
-    for (label, months) in [("1M", 1_i64), ("3M", 3), ("6M", 6)] {
+    {
+        let (label, months) = ("3M", 3_i64);
         let expiry = as_of + time::Duration::days(months * 30);
         let fut = VolatilityIndexFuture::builder()
             .id(InstrumentId::new(format!("VIX-FUT-{label}")))
@@ -329,7 +325,8 @@ fn bench_vol_index_option_pv(c: &mut Criterion) {
     let as_of = base_date();
 
     let mut group = c.benchmark_group("vol_index_option/type");
-    for (label, opt_type) in [("call", OptionType::Call), ("put", OptionType::Put)] {
+    {
+        let (label, opt_type) = ("call", OptionType::Call);
         let expiry = as_of + time::Duration::days(90);
         let opt = VolatilityIndexOption::builder()
             .id(InstrumentId::new(format!("VIX-OPT-{label}")))

@@ -29,7 +29,8 @@ fn bench_metrics_only(c: &mut Criterion) {
     let config = FinstackConfig::default();
     let as_of = base_date();
 
-    for num_positions in [50usize, 100, 250, 500, 2000] {
+    {
+        let num_positions = 250usize;
         let portfolio = create_institutional_portfolio(num_positions);
         let valuation = value_portfolio(&portfolio, &market, &config, &Default::default()).unwrap();
 
@@ -62,7 +63,8 @@ fn bench_value_and_metrics(c: &mut Criterion) {
     let config = FinstackConfig::default();
     let as_of = base_date();
 
-    for num_positions in [50usize, 100, 250] {
+    {
+        let num_positions = 250usize;
         let portfolio = create_institutional_portfolio(num_positions);
 
         group.bench_with_input(

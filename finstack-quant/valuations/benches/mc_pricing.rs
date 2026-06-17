@@ -37,7 +37,7 @@ fn build_swaption(as_of: Date) -> BermudanSwaption {
         settlement:
             finstack_quant_valuations::instruments::rates::swaption::SwaptionSettlement::Physical,
         discount_curve_id: CurveId::new("USD-OIS"),
-        forward_curve_id: CurveId::new("USD-SOFR"),
+        forward_curve_id: CurveId::new("USD-OIS"),
         vol_surface_id: CurveId::new("USD-VOL"),
         bermudan_schedule: BermudanSchedule::co_terminal(
             first_exercise,
@@ -77,7 +77,8 @@ fn bench_bermudan_lsmc(c: &mut Criterion) {
     let swaption = build_swaption(as_of);
     let market = build_market(as_of);
 
-    for num_paths in [10_000, 50_000, 100_000] {
+    {
+        let num_paths = 50_000;
         group.throughput(Throughput::Elements(num_paths as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(num_paths),

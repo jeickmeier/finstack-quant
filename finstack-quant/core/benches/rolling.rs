@@ -9,8 +9,9 @@ use std::hint::black_box;
 fn bench_rolling_median(c: &mut Criterion) {
     let mut group = c.benchmark_group("rolling_median");
 
-    for data_size in [100, 500, 1000] {
-        for window_size in [5, 10, 20] {
+    for data_size in [500] {
+        {
+            let window_size = 10;
             group.bench_with_input(
                 BenchmarkId::new(format!("data_{}", data_size), window_size),
                 &(data_size, window_size),
@@ -42,8 +43,9 @@ fn bench_rolling_median(c: &mut Criterion) {
 fn bench_rolling_mean(c: &mut Criterion) {
     let mut group = c.benchmark_group("rolling_mean");
 
-    for data_size in [100, 500, 1000] {
-        for window_size in [5, 10, 20] {
+    for data_size in [500] {
+        {
+            let window_size = 10;
             group.bench_with_input(
                 BenchmarkId::new(format!("data_{}", data_size), window_size),
                 &(data_size, window_size),
@@ -73,7 +75,8 @@ fn bench_rolling_mean(c: &mut Criterion) {
 fn bench_rolling_std(c: &mut Criterion) {
     let mut group = c.benchmark_group("rolling_std");
 
-    for data_size in [100, 500, 1000] {
+    {
+        let data_size = 500;
         group.bench_with_input(
             BenchmarkId::from_parameter(data_size),
             &data_size,

@@ -203,7 +203,8 @@ fn bench_sort_flows(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_sort_flows");
     let base = base_date();
 
-    for n in [20usize, 120, 360] {
+    {
+        let n = 120usize;
         group.throughput(Throughput::Elements(n as u64));
 
         group.bench_with_input(BenchmarkId::new("unsorted", n), &n, |b, &n| {
@@ -239,7 +240,8 @@ fn bench_pv_by_period(c: &mut Criterion) {
     let market = make_market(base);
     let disc = market.get_discount("USD-OIS").unwrap();
 
-    for (years, label) in [(2i32, "2y_20cf"), (5, "5y_40cf"), (30, "30y_360cf")] {
+    {
+        let (years, label) = (5i32, "5y_40cf");
         let schedule = make_fixed_schedule(base, years, Tenor::quarterly());
         let n_quarters = (years * 4) as u32 + 4;
         let periods = make_quarterly_periods(base, n_quarters);
@@ -282,7 +284,8 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
     use finstack_quant_cashflows::aggregation::DateContext;
     use finstack_quant_core::market_data::traits::Survival;
 
-    for (years, label) in [(5i32, "5y_40cf"), (30, "30y_360cf")] {
+    {
+        let (years, label) = (5i32, "5y_40cf");
         let schedule = make_fixed_schedule(base, years, Tenor::quarterly());
         let n_quarters = (years * 4) as u32 + 4;
         let periods = make_quarterly_periods(base, n_quarters);
@@ -342,11 +345,8 @@ fn bench_period_dataframe(c: &mut Criterion) {
     let base = base_date();
     let market = make_market(base);
 
-    for (years, n_periods, label) in [
-        (5i32, 20u32, "5y_40cf_20p"),
-        (10, 40, "10y_80cf_40p"),
-        (30, 120, "30y_360cf_120p"),
-    ] {
+    {
+        let (years, n_periods, label) = (10i32, 40u32, "10y_80cf_40p");
         let schedule = make_fixed_schedule(base, years, Tenor::quarterly());
         let periods = make_quarterly_periods(base, n_periods);
 
@@ -400,13 +400,8 @@ fn bench_build_fixed_schedule(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_build_fixed");
     let base = base_date();
 
-    for (years, freq, label) in [
-        (2i32, Tenor::semi_annual(), "2y_sa"),
-        (5, Tenor::quarterly(), "5y_q"),
-        (10, Tenor::semi_annual(), "10y_sa"),
-        (30, Tenor::semi_annual(), "30y_sa"),
-        (30, Tenor::monthly(), "30y_m"),
-    ] {
+    {
+        let (years, freq, label) = (5i32, Tenor::quarterly(), "5y_q");
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
                 let maturity = Date::from_calendar_date(2025 + years, Month::January, 15).unwrap();
@@ -444,12 +439,8 @@ fn bench_aggregate_by_period(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_aggregate_by_period");
     let base = base_date();
 
-    for (n_flows, n_periods, label) in [
-        (40usize, 8u32, "40f_8p"),
-        (120, 20, "120f_20p"),
-        (400, 40, "400f_40p"),
-        (1000, 80, "1000f_80p"),
-    ] {
+    {
+        let (n_flows, n_periods, label) = (120usize, 20u32, "120f_20p");
         let flows = make_dated_flows(n_flows, base);
         let periods = make_quarterly_periods(base, n_periods);
 
@@ -470,7 +461,8 @@ fn bench_aggregate_precise(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_aggregate_precise");
     let base = base_date();
 
-    for n in [40usize, 120, 400, 1000] {
+    {
+        let n = 120usize;
         let flows = make_dated_flows(n, base);
         group.throughput(Throughput::Elements(n as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, _| {
@@ -491,7 +483,8 @@ fn bench_npv(c: &mut Criterion) {
     let market = make_market(base);
     let disc = market.get_discount("USD-OIS").unwrap();
 
-    for (years, label) in [(2i32, "2y"), (5, "5y"), (30, "30y")] {
+    {
+        let (years, label) = (5i32, "5y");
         let schedule = make_fixed_schedule(base, years, Tenor::semi_annual());
 
         group.throughput(Throughput::Elements(schedule.flows.len() as u64));
@@ -520,7 +513,8 @@ fn bench_merge_schedules(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_merge_schedules");
     let base = base_date();
 
-    for k in [5usize, 20, 50, 100] {
+    {
+        let k = 20usize;
         let schedules: Vec<CashFlowSchedule> = (0..k)
             .map(|_| make_fixed_schedule(base, 5, Tenor::semi_annual()))
             .collect();
@@ -551,7 +545,8 @@ fn bench_outstanding_by_date(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_outstanding_by_date");
     let base = base_date();
 
-    for n in [8usize, 20, 40, 120] {
+    {
+        let n = 40usize;
         let schedule = make_amortizing_schedule(base, n);
 
         group.throughput(Throughput::Elements(n as u64));
@@ -571,7 +566,8 @@ fn bench_wal(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_wal");
     let base = base_date();
 
-    for n in [8usize, 20, 40, 120] {
+    {
+        let n = 40usize;
         let schedule = make_amortizing_schedule(base, n);
 
         group.throughput(Throughput::Elements(n as u64));
@@ -595,7 +591,8 @@ fn bench_normalize_public(c: &mut Criterion) {
     let mut group = c.benchmark_group("cashflow_normalize_public");
     let base = base_date();
 
-    for (years, label) in [(5i32, "5y"), (30, "30y")] {
+    {
+        let (years, label) = (5i32, "5y");
         let schedule = make_fixed_schedule(base, years, Tenor::semi_annual());
 
         group.throughput(Throughput::Elements(schedule.flows.len() as u64));

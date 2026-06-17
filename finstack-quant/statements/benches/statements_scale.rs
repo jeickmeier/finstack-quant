@@ -60,7 +60,8 @@ fn bench_monte_carlo_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("monte_carlo_scaling");
     group.sample_size(10); // long runs — keep the matrix wall-clock manageable
 
-    for &n_paths in &[100usize, 1_000, 5_000] {
+    {
+        let &n_paths = &1_000usize;
         group.throughput(Throughput::Elements(n_paths as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(n_paths),
@@ -122,7 +123,8 @@ fn build_rolling_model(n_rolling: usize, n_periods: usize) -> FinancialModelSpec
 fn bench_rolling_window_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("rolling_window_scaling");
 
-    for &n_rolling in &[5usize, 25, 100] {
+    {
+        let &n_rolling = &25usize;
         let model = build_rolling_model(n_rolling, 24);
         group.throughput(Throughput::Elements(n_rolling as u64));
         group.bench_with_input(
@@ -195,7 +197,8 @@ fn bench_large_lbo_model(c: &mut Criterion) {
     let mut group = c.benchmark_group("large_lbo_model");
     group.sample_size(10);
 
-    for &(n_nodes, n_months) in &[(50usize, 24usize), (100, 60), (200, 60)] {
+    {
+        let &(n_nodes, n_months) = &(100usize, 60usize);
         let model = build_large_lbo_model(n_nodes, n_months);
         let label = format!("{}x{}", n_nodes, n_months);
         group.throughput(Throughput::Elements((n_nodes * n_months) as u64));

@@ -142,7 +142,8 @@ fn bench_metrics_scaling(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("metrics_scaling");
 
-    for num_metrics in [1, 3, 5, 10] {
+    {
+        let num_metrics = 5;
         let metric_ids: Vec<MetricId> = all_metrics.iter().take(num_metrics).cloned().collect();
 
         group.bench_with_input(

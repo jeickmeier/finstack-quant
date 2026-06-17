@@ -38,10 +38,7 @@ const CONVERSION_RATIO: f64 = 10.0;
 const COUPON_RATE: f64 = 0.05;
 const SPOT_PRICE: f64 = 150.0;
 const SPOT_ATM: f64 = 100.0;
-const SPOT_OTM: f64 = 50.0;
 const VOL_STANDARD: f64 = 0.25;
-const VOL_LOW: f64 = 0.10;
-const VOL_HIGH: f64 = 0.50;
 const DIV_YIELD: f64 = 0.02;
 
 fn issue_date() -> Date {
@@ -173,7 +170,8 @@ fn bench_npv_binomial(c: &mut Criterion) {
     let bond = create_standard_convertible();
     let market = create_market_context(SPOT_PRICE, VOL_STANDARD, DIV_YIELD);
 
-    for steps in [25, 50, 100, 200].iter() {
+    {
+        let steps = &100;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}steps", steps)),
             steps,
@@ -197,7 +195,8 @@ fn bench_npv_trinomial(c: &mut Criterion) {
     let bond = create_standard_convertible();
     let market = create_market_context(SPOT_PRICE, VOL_STANDARD, DIV_YIELD);
 
-    for steps in [25, 50, 100, 200].iter() {
+    {
+        let steps = &100;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}steps", steps)),
             steps,
@@ -224,7 +223,8 @@ fn bench_npv_by_moneyness(c: &mut Criterion) {
     let mut group = c.benchmark_group("convertible_npv_moneyness");
     let bond = create_standard_convertible();
 
-    for (label, spot) in [("OTM", SPOT_OTM), ("ATM", SPOT_ATM), ("ITM", SPOT_PRICE)].iter() {
+    {
+        let (label, spot) = &("ATM", SPOT_ATM);
         let market = create_market_context(*spot, VOL_STANDARD, DIV_YIELD);
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
@@ -298,7 +298,8 @@ fn bench_npv_volatility(c: &mut Criterion) {
     let mut group = c.benchmark_group("convertible_npv_volatility");
     let bond = create_standard_convertible();
 
-    for (label, vol) in [("low", VOL_LOW), ("std", VOL_STANDARD), ("high", VOL_HIGH)].iter() {
+    {
+        let (label, vol) = &("std", VOL_STANDARD);
         let market = create_market_context(SPOT_PRICE, *vol, DIV_YIELD);
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
@@ -323,7 +324,8 @@ fn bench_greeks_calculation(c: &mut Criterion) {
     let bond = create_standard_convertible();
     let market = create_market_context(SPOT_PRICE, VOL_STANDARD, DIV_YIELD);
 
-    for steps in [25, 50, 100].iter() {
+    {
+        let steps = &100;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}steps", steps)),
             steps,
@@ -347,7 +349,8 @@ fn bench_greeks_by_moneyness(c: &mut Criterion) {
     let mut group = c.benchmark_group("convertible_greeks_moneyness");
     let bond = create_standard_convertible();
 
-    for (label, spot) in [("OTM", SPOT_OTM), ("ATM", SPOT_ATM), ("ITM", SPOT_PRICE)].iter() {
+    {
+        let (label, spot) = &("ATM", SPOT_ATM);
         let market = create_market_context(*spot, VOL_STANDARD, DIV_YIELD);
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
@@ -404,7 +407,8 @@ fn bench_parity_calculation(c: &mut Criterion) {
     let mut group = c.benchmark_group("convertible_parity");
     let bond = create_standard_convertible();
 
-    for (label, spot) in [("OTM", SPOT_OTM), ("ATM", SPOT_ATM), ("ITM", SPOT_PRICE)].iter() {
+    {
+        let (label, spot) = &("ATM", SPOT_ATM);
         let market = create_market_context(*spot, VOL_STANDARD, DIV_YIELD);
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| bond.parity(black_box(&market)));
@@ -422,8 +426,8 @@ fn bench_tree_convergence(c: &mut Criterion) {
     let bond = create_standard_convertible();
     let market = create_market_context(SPOT_PRICE, VOL_STANDARD, DIV_YIELD);
 
-    // Test convergence with increasing steps
-    for steps in [10, 25, 50, 100, 200, 500].iter() {
+    {
+        let steps = &100;
         group.bench_with_input(
             BenchmarkId::from_parameter(format!("{}steps", steps)),
             steps,

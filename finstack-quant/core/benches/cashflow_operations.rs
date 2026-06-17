@@ -6,6 +6,7 @@
 //! - Discountable trait dispatch
 //! - Neumaier compensated summation at scale
 
+#[path = "support/bench_utils.rs"]
 mod bench_utils;
 
 use bench_utils::bench_iter;
@@ -73,7 +74,8 @@ fn bench_npv_flat_curve(c: &mut Criterion) {
     let mut group = c.benchmark_group("npv_flat_curve");
     let curve = flat_curve(0.05_f64.ln_1p());
 
-    for size in [4, 20, 60, 120, 240] {
+    {
+        let size = 60;
         let flows = money_flows(size);
         group.bench_with_input(BenchmarkId::new("money", size), &size, |b, _| {
             b.iter(|| {
@@ -90,7 +92,8 @@ fn bench_npv_shaped_curve(c: &mut Criterion) {
     let mut group = c.benchmark_group("npv_shaped_curve");
     let curve = shaped_curve();
 
-    for size in [4, 20, 60, 120, 240] {
+    {
+        let size = 60;
         let flows = money_flows(size);
         group.bench_with_input(BenchmarkId::new("money", size), &size, |b, _| {
             b.iter(|| {
@@ -106,7 +109,8 @@ fn bench_npv_shaped_curve(c: &mut Criterion) {
 fn bench_npv_amounts(c: &mut Criterion) {
     let mut group = c.benchmark_group("npv_amounts_scalar");
 
-    for size in [4, 20, 60, 120, 240] {
+    {
+        let size = 60;
         let flows = scalar_flows(size);
         group.bench_with_input(BenchmarkId::new("scalar", size), &size, |b, _| {
             b.iter(|| {

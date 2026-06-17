@@ -269,25 +269,24 @@ fn hazard_envelope(
 }
 
 // ---------------------------------------------------------------------------
-// Benchmark: GlobalSolve discount curve — quote count scaling
+// Benchmark: GlobalSolve discount curve — representative quote count
 // ---------------------------------------------------------------------------
 
 fn bench_global_discount_quote_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("global_discount_curve");
 
-    for n in [8usize, 16, 22] {
-        let quotes = make_discount_quotes(n);
-        let env = discount_envelope(
-            quotes,
-            CalibrationMethod::GlobalSolve {
-                use_analytical_jacobian: false,
-            },
-            &format!("{n}q"),
-        );
-        group.bench_with_input(BenchmarkId::new("numeric_jac", n), &n, |b, _| {
-            b.iter(|| engine::execute(black_box(&env)).unwrap());
-        });
-    }
+    let n = 16;
+    let quotes = make_discount_quotes(n);
+    let env = discount_envelope(
+        quotes,
+        CalibrationMethod::GlobalSolve {
+            use_analytical_jacobian: false,
+        },
+        &format!("{n}q"),
+    );
+    group.bench_with_input(BenchmarkId::new("numeric_jac", n), &n, |b, _| {
+        b.iter(|| engine::execute(black_box(&env)).unwrap());
+    });
 
     group.finish();
 }
@@ -326,74 +325,70 @@ fn bench_global_discount_jacobian(c: &mut Criterion) {
 }
 
 // ---------------------------------------------------------------------------
-// Benchmark: Bootstrap vs. GlobalSolve head-to-head (8 and 16 quotes)
+// Benchmark: Bootstrap vs. GlobalSolve head-to-head (16 quotes)
 // ---------------------------------------------------------------------------
 
 fn bench_global_vs_bootstrap(c: &mut Criterion) {
     let mut group = c.benchmark_group("global_vs_bootstrap");
 
-    for n in [8usize, 16] {
-        let quotes = make_discount_quotes(n);
+    let n = 16;
+    let quotes = make_discount_quotes(n);
 
-        let env_bootstrap = discount_envelope(
-            quotes.clone(),
-            CalibrationMethod::Bootstrap,
-            &format!("bs_{n}q"),
-        );
-        let env_global = discount_envelope(
-            quotes,
-            CalibrationMethod::GlobalSolve {
-                use_analytical_jacobian: true,
-            },
-            &format!("gs_{n}q"),
-        );
+    let env_bootstrap = discount_envelope(
+        quotes.clone(),
+        CalibrationMethod::Bootstrap,
+        &format!("bs_{n}q"),
+    );
+    let env_global = discount_envelope(
+        quotes,
+        CalibrationMethod::GlobalSolve {
+            use_analytical_jacobian: true,
+        },
+        &format!("gs_{n}q"),
+    );
 
-        group.bench_with_input(BenchmarkId::new("bootstrap", n), &n, |b, _| {
-            b.iter(|| engine::execute(black_box(&env_bootstrap)).unwrap());
-        });
-        group.bench_with_input(BenchmarkId::new("global_solve", n), &n, |b, _| {
-            b.iter(|| engine::execute(black_box(&env_global)).unwrap());
-        });
-    }
+    group.bench_with_input(BenchmarkId::new("bootstrap", n), &n, |b, _| {
+        b.iter(|| engine::execute(black_box(&env_bootstrap)).unwrap());
+    });
+    group.bench_with_input(BenchmarkId::new("global_solve", n), &n, |b, _| {
+        b.iter(|| engine::execute(black_box(&env_global)).unwrap());
+    });
 
     group.finish();
 }
 
 // ---------------------------------------------------------------------------
-// Benchmark: Hazard curve GlobalSolve — tenor count scaling
+// Benchmark: Hazard curve GlobalSolve — representative tenor count
 // ---------------------------------------------------------------------------
 
 fn bench_global_hazard_tenor_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("global_hazard_curve");
     let disc_quotes = make_discount_quotes(8);
 
-    for m in [3usize, 6] {
-        let cds_quotes = make_cds_quotes(m);
-        let env = hazard_envelope(
-            disc_quotes.clone(),
-            cds_quotes,
-            CalibrationMethod::GlobalSolve {
-                use_analytical_jacobian: true,
-            },
-            &format!("{m}t"),
-        );
-        group.bench_with_input(BenchmarkId::new("global_solve", m), &m, |b, _| {
-            b.iter(|| engine::execute(black_box(&env)).unwrap());
-        });
-    }
+    let m = 6;
+    let cds_quotes = make_cds_quotes(m);
+    let env = hazard_envelope(
+        disc_quotes.clone(),
+        cds_quotes,
+        CalibrationMethod::GlobalSolve {
+            use_analytical_jacobian: true,
+        },
+        &format!("{m}t"),
+    );
+    group.bench_with_input(BenchmarkId::new("global_solve", m), &m, |b, _| {
+        b.iter(|| engine::execute(black_box(&env)).unwrap());
+    });
 
-    for m in [3usize, 6] {
-        let cds_quotes = make_cds_quotes(m);
-        let env = hazard_envelope(
-            disc_quotes.clone(),
-            cds_quotes,
-            CalibrationMethod::Bootstrap,
-            &format!("bs_{m}t"),
-        );
-        group.bench_with_input(BenchmarkId::new("bootstrap", m), &m, |b, _| {
-            b.iter(|| engine::execute(black_box(&env)).unwrap());
-        });
-    }
+    let cds_quotes = make_cds_quotes(m);
+    let env = hazard_envelope(
+        disc_quotes,
+        cds_quotes,
+        CalibrationMethod::Bootstrap,
+        &format!("bs_{m}t"),
+    );
+    group.bench_with_input(BenchmarkId::new("bootstrap", m), &m, |b, _| {
+        b.iter(|| engine::execute(black_box(&env)).unwrap());
+    });
 
     group.finish();
 }

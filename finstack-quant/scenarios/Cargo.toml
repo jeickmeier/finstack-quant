@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 description = "Deterministic scenario DSL for Finstack Quant with preview, composition, and phase-ordered apply across market/statements/valuations"
+autobenches = false
 
 [dependencies]
 finstack-quant-attribution = { path = "../attribution", version = "0.6.0" }

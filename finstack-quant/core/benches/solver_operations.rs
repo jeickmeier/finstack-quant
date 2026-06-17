@@ -239,7 +239,7 @@ fn benchmark_irr_periodic(c: &mut Criterion) {
 
 fn benchmark_lm_global_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("lm_global");
-    let cases = [("30x30", 30, 30), ("100x50", 50, 100), ("200x80", 80, 200)];
+    let cases = [("100x50", 50, 100)];
 
     for (label, n_params, n_residuals) in cases {
         let system = DenseSystem::new(n_params, n_residuals);

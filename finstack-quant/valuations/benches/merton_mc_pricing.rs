@@ -6,8 +6,8 @@
 //! benchmark coverage in `mc_pricing.rs` (which only covers Bermudan LSMC).
 //!
 //! Scenarios:
-//! - Path count scaling (1K / 5K / 10K / 50K) — isolates Monte Carlo cost
-//! - Tenor scaling (3Y / 5Y / 10Y) — isolates schedule loop cost
+//! - Representative path count (10K) — isolates Monte Carlo cost
+//! - Representative tenor (5Y) — isolates schedule loop cost
 //! - Antithetic variates on vs. off
 //! - PIK mode: cash vs. PIK vs. PIK-toggle
 //! - Barrier type: terminal vs. first-passage (Brownian bridge)
@@ -53,29 +53,28 @@ fn first_passage_merton() -> MertonModel {
 fn bench_merton_mc_path_count(c: &mut Criterion) {
     let mut group = c.benchmark_group("merton_mc_paths");
 
-    for n_paths in [1_000usize, 5_000, 10_000, 50_000] {
-        let config = MertonMcConfig::new(reference_merton())
-            .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-            .num_paths(n_paths)
-            .seed(42)
-            .antithetic(true);
+    let n_paths = 10_000;
+    let config = MertonMcConfig::new(reference_merton())
+        .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
+        .num_paths(n_paths)
+        .seed(42)
+        .antithetic(true);
 
-        group.throughput(Throughput::Elements(n_paths as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(n_paths), &n_paths, |b, _| {
-            b.iter(|| {
-                MertonMcEngine::price(
-                    black_box(100.0),
-                    black_box(0.08),
-                    black_box(5.0),
-                    black_box(2),
-                    black_box(&config),
-                    black_box(0.04),
-                )
-                .unwrap()
-                .clean_price_pct
-            });
+    group.throughput(Throughput::Elements(n_paths as u64));
+    group.bench_with_input(BenchmarkId::from_parameter(n_paths), &n_paths, |b, _| {
+        b.iter(|| {
+            MertonMcEngine::price(
+                black_box(100.0),
+                black_box(0.08),
+                black_box(5.0),
+                black_box(2),
+                black_box(&config),
+                black_box(0.04),
+            )
+            .unwrap()
+            .clean_price_pct
         });
-    }
+    });
 
     group.finish();
 }
@@ -88,31 +87,31 @@ fn bench_merton_mc_tenor(c: &mut Criterion) {
     let mut group = c.benchmark_group("merton_mc_tenor");
     const PATHS: usize = 10_000;
 
-    for (label, maturity_years) in [("3Y", 3.0f64), ("5Y", 5.0), ("10Y", 10.0)] {
-        let config = MertonMcConfig::new(reference_merton())
-            .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
-            .num_paths(PATHS)
-            .seed(42);
+    let label = "5Y";
+    let maturity_years = 5.0;
+    let config = MertonMcConfig::new(reference_merton())
+        .pik_schedule(PikSchedule::Uniform(PikMode::Pik))
+        .num_paths(PATHS)
+        .seed(42);
 
-        group.bench_with_input(
-            BenchmarkId::from_parameter(label),
-            &maturity_years,
-            |b, &mat| {
-                b.iter(|| {
-                    MertonMcEngine::price(
-                        black_box(100.0),
-                        black_box(0.08),
-                        black_box(mat),
-                        black_box(2),
-                        black_box(&config),
-                        black_box(0.04),
-                    )
-                    .unwrap()
-                    .clean_price_pct
-                });
-            },
-        );
-    }
+    group.bench_with_input(
+        BenchmarkId::from_parameter(label),
+        &maturity_years,
+        |b, &mat| {
+            b.iter(|| {
+                MertonMcEngine::price(
+                    black_box(100.0),
+                    black_box(0.08),
+                    black_box(mat),
+                    black_box(2),
+                    black_box(&config),
+                    black_box(0.04),
+                )
+                .unwrap()
+                .clean_price_pct
+            });
+        },
+    );
 
     group.finish();
 }
