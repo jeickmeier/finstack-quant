@@ -30,6 +30,7 @@ mod metrics_based_convexity;
 mod model_params_attribution;
 mod no_model_compatibility;
 mod quantlib_parity;
+mod return_contribution;
 mod rounding_policy;
 mod scalars_attribution;
 mod serialization_roundtrip;

@@ -8,9 +8,11 @@ __all__: list[str] = [
     "PnlAttribution",
     "attribute_pnl",
     "attribute_pnl_from_spec",
+    "attribute_return_contribution",
     "default_attribution_metrics",
     "default_waterfall_order",
     "validate_attribution_json",
+    "validate_return_contribution_json",
 ]
 
 # ---------------------------------------------------------------------------
@@ -375,6 +377,17 @@ def attribute_pnl_from_spec(spec_json: str) -> str:
     """
     ...
 
+def attribute_return_contribution(spec_json: str) -> str:
+    """Compute single-period return contribution attribution.
+
+    Args:
+        spec_json: JSON-serialized return contribution specification.
+
+    Returns:
+        JSON-serialized return contribution result.
+    """
+    ...
+
 def validate_attribution_json(json: str) -> str:
     """Validate an attribution specification JSON.
 
@@ -386,6 +399,14 @@ def validate_attribution_json(json: str) -> str:
 
     Returns:
         Canonical compact JSON.
+    """
+    ...
+
+def validate_return_contribution_json(spec_json: str) -> None:
+    """Validate a return contribution specification JSON.
+
+    Args:
+        spec_json: JSON-serialized return contribution specification.
     """
     ...
 

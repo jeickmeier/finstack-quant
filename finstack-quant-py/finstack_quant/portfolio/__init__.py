@@ -66,6 +66,8 @@ aggregate_metrics = _portfolio.aggregate_metrics
 value_portfolio = _portfolio.value_portfolio
 aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 apply_scenario_and_revalue = _portfolio.apply_scenario_and_revalue
+allocate_weights = _portfolio.allocate_weights
+validate_allocation_json = _portfolio.validate_allocation_json
 optimize_portfolio = _portfolio.optimize_portfolio
 replay_portfolio = _portfolio.replay_portfolio
 parametric_var_decomposition = _portfolio.parametric_var_decomposition
@@ -192,6 +194,7 @@ __all__: list[str] = [
     "WhatIfResult",
     "aggregate_full_cashflows",
     "aggregate_metrics",
+    "allocate_weights",
     "almgren_chriss_impact",
     "amihud_illiquidity",
     "apply_scenario_and_revalue",
@@ -223,5 +226,6 @@ __all__: list[str] = [
     "roll_effective_spread",
     "twrr_linked",
     "twrr_modified_dietz",
+    "validate_allocation_json",
     "value_portfolio",
 ]

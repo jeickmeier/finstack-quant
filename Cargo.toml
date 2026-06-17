@@ -20,6 +20,7 @@ members = [
     "finstack-quant/valuations",
     "finstack-quant/valuations/macros",
     "finstack-quant/factor-model",
+    "finstack-quant/features",
     "finstack-quant/portfolio",
     "finstack-quant/scenarios",
     "finstack-quant/test-utils",
@@ -42,6 +43,7 @@ default-members = [
     "finstack-quant/statements-analytics",
     "finstack-quant/valuations",
     "finstack-quant/factor-model",
+    "finstack-quant/features",
     "finstack-quant/portfolio",
     "finstack-quant/scenarios",
     "finstack-quant"

@@ -341,6 +341,7 @@ pub(crate) mod helpers;
 pub(crate) mod metrics_based;
 pub(crate) mod model_params;
 pub(crate) mod parallel;
+pub(crate) mod return_contribution;
 pub(crate) mod spec;
 pub(crate) mod target_ccy;
 pub mod taylor;
@@ -367,6 +368,12 @@ pub use model_params::{
     measure_prepayment_shift, measure_recovery_shift, with_model_params,
 };
 pub use parallel::attribute_pnl_parallel;
+pub use return_contribution::{
+    attribute_return_contribution, validate_return_contribution_json,
+    BenchmarkRelativeContribution, FactorContribution, GroupContribution, InstrumentContribution,
+    ReturnContributionFactor, ReturnContributionPosition, ReturnContributionResult,
+    ReturnContributionSpec, ReturnContributionWeighting,
+};
 pub use spec::{
     default_attribution_metrics, AttributionConfig, AttributionEnvelope, AttributionResult,
     AttributionResultEnvelope, AttributionSpec, ATTRIBUTION_SCHEMA_V1,

@@ -230,6 +230,10 @@ pub use dataframe::{
     aggregated_metrics_to_table, entities_to_table, metrics_to_table, positions_to_table,
 };
 pub use dependencies::{flatten_dependencies, DependencyIndex, MarketFactorKey};
+pub use factor_model::{
+    allocate_weights, validate_allocation_json, AllocationDiagnostics, AllocationScheme,
+    StrategyAllocation, StrategyAllocationInput, WeightAllocationResult, WeightAllocationSpec,
+};
 pub use margin::{
     CurrencyMismatchError, NettingSet, NettingSetManager, NettingSetMargin,
     PortfolioMarginAggregator, PortfolioMarginResult,

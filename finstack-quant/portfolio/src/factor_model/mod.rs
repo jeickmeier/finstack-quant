@@ -45,6 +45,7 @@ mod risk_budget;
 mod simulation;
 mod traits;
 mod types;
+mod weight_allocation;
 mod whatif;
 
 pub use assignment::{FactorAssignmentReport, PositionAssignment, UnmatchedEntry};
@@ -65,6 +66,10 @@ pub use traits::RiskDecomposer;
 pub use types::{
     FactorContribution, PositionFactorContribution, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
+};
+pub use weight_allocation::{
+    allocate_weights, validate_allocation_json, AllocationDiagnostics, AllocationScheme,
+    StrategyAllocation, StrategyAllocationInput, WeightAllocationResult, WeightAllocationSpec,
 };
 pub use whatif::{
     FactorContributionDelta, PositionChange, StressResult, WhatIfEngine, WhatIfResult,

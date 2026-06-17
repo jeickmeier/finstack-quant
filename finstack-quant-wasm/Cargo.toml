@@ -17,6 +17,7 @@ finstack-quant-attribution = { path = "../finstack-quant/attribution", version =
 finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.6.0" }
 finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.6.0" }
 finstack-quant-core = { path = "../finstack-quant/core", version = "0.6.0" }
+finstack-quant-features = { path = "../finstack-quant/features", version = "0.6.0" }
 finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.6.0" }
 finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.6.0" }
 finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.6.0" }

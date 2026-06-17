@@ -5,6 +5,7 @@
 //! result extraction via serde round-trips, and end-to-end pipeline functions
 //! that build the runtime portfolio internally.
 
+mod allocation;
 mod brinson;
 mod factor_model;
 mod json_bridge;
@@ -52,6 +53,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     pipeline::register(py, &m)?;
     optimization::register(py, &m)?;
     optimization_spec::register(py, &m)?;
+    allocation::register(py, &m)?;
     replay::register(py, &m)?;
     position_risk::register(py, &m)?;
     factor_model::register(py, &m)?;
@@ -77,6 +79,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "value_portfolio",
         "aggregate_full_cashflows",
         "apply_scenario_and_revalue",
+        "allocate_weights",
         "optimize_portfolio",
         "replay_portfolio",
         "parametric_var_decomposition",
@@ -128,6 +131,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "parametric_var_decomposition_typed",
         "historical_var_decomposition_typed",
         "evaluate_risk_budget_typed",
+        "validate_allocation_json",
         "position_component_var",
         // optimization spec/result classes (Slice 9)
         "WeightingScheme",

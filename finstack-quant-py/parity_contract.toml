@@ -497,9 +497,11 @@ public = [
     "PnlAttribution",
     "attribute_pnl",
     "attribute_pnl_from_spec",
+    "attribute_return_contribution",
     "default_attribution_metrics",
     "default_waterfall_order",
     "validate_attribution_json",
+    "validate_return_contribution_json",
 ]
 
 # WASM attribution subset
@@ -681,6 +683,43 @@ score_relative_value = "scoreRelativeValue"
 symbols = ["traceDependencies"]
 
 # ---------------------------------------------------------------------------
+# finstack-quant-features  →  finstack_quant.features
+# ---------------------------------------------------------------------------
+[crates.features]
+rust_crate = "finstack-quant-features"
+rust_lib   = "finstack-quant/features/src/lib.rs"
+python_package = "finstack_quant.features"
+visibility = "pub"
+status = "exists"
+
+[crates.features.symbols]
+public = [
+    "transform_cross_sectional",
+    "transform_panel",
+    "transform_timeseries",
+]
+
+# WASM features subset
+#
+# Python and WASM expose the same three canonical transform functions. WASM
+# accepts JS arrays/objects at the boundary, then delegates directly to the Rust
+# crate with camelCase facade names.
+# ---------------------------------------------------------------------------
+[wasm_features_subset]
+rust_module_root = "../finstack-quant-wasm/src/api/features/"
+js_export_file   = "../finstack-quant-wasm/exports/features.js"
+root_exports = [
+    "transformCrossSectional",
+    "transformPanel",
+    "transformTimeseries",
+]
+
+[wasm_features_subset.python_js_map]
+transform_cross_sectional = "transformCrossSectional"
+transform_panel = "transformPanel"
+transform_timeseries = "transformTimeseries"
+
+# ---------------------------------------------------------------------------
 # finstack-quant-portfolio  →  finstack_quant.portfolio
 # ---------------------------------------------------------------------------
 [crates.portfolio]
@@ -699,7 +738,7 @@ cashflows    = { python = "finstack_quant.portfolio.cashflows",    status = "mis
 dataframe    = { python = "finstack_quant.portfolio.dataframe",    status = "missing", note = "Table-envelope helpers are currently exported from finstack_quant.portfolio root" }
 dependencies = { python = "finstack_quant.portfolio.dependencies", status = "missing" }
 error        = { python = "finstack_quant.portfolio.error",        status = "missing" }
-factor_model = { python = "finstack_quant.portfolio",              status = "flattened", note = "Result types (RiskDecomposition, PositionRiskDecomposition, RiskBudgetResult, WhatIfResult, StressResult, StressAttribution, FactorAssignmentReport, CreditVolReport, VolHorizon, DecompositionConfig, ...) plus typed sibling functions (parametric/historical_var_decomposition_typed, evaluate_risk_budget_typed) are exported flat on finstack_quant.portfolio; engine/builder types remain Rust-only for now" }
+factor_model = { python = "finstack_quant.portfolio",              status = "flattened", note = "Result types (RiskDecomposition, PositionRiskDecomposition, RiskBudgetResult, WhatIfResult, StressResult, StressAttribution, FactorAssignmentReport, CreditVolReport, VolHorizon, DecompositionConfig, ...) plus allocation/risk functions (allocate_weights, validate_allocation_json, parametric/historical_var_decomposition_typed, evaluate_risk_budget_typed) are exported flat on finstack_quant.portfolio; engine/builder types remain Rust-only for now" }
 grouping     = { python = "finstack_quant.portfolio.grouping",     status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
 margin       = { python = "finstack_quant.portfolio.margin",       status = "missing", note = "Portfolio margin helpers are not materialized as a dedicated submodule" }
 metrics      = { python = "finstack_quant.portfolio.metrics",      status = "missing", note = "Bindings are currently exported from finstack_quant.portfolio root" }
@@ -769,6 +808,7 @@ names = [
     "core",
     "covenants",
     "factor_model",
+    "features",
     "margin",
     "monte_carlo",
     "portfolio",
@@ -794,6 +834,7 @@ namespaces = [
     "core",
     "covenants",
     "factor_model",
+    "features",
     "margin",
     "monte_carlo",
     "portfolio",

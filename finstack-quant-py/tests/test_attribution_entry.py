@@ -15,7 +15,9 @@ import pytest
 from finstack_quant.attribution import (
     PnlAttribution,
     attribute_pnl,
+    attribute_return_contribution,
     validate_attribution_json,
+    validate_return_contribution_json,
 )
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 
@@ -167,3 +169,39 @@ def test_empty_detail_dataframes_keep_schema_columns() -> None:
         assert list(df.columns) == expected_columns or len(df) > 0, (
             f"empty detail frame must carry schema columns, got {list(df.columns)}"
         )
+
+
+def test_attribute_return_contribution_json_entrypoint() -> None:
+    spec = {
+        "as_of": "2026-01-02",
+        "weighting": "gross",
+        "positions": [
+            {
+                "id": "AAPL.XNAS",
+                "market_value": 9000.0,
+                "return": 0.012,
+                "groups": {"sector": "tech", "strategy": "value:1"},
+                "benchmark_weight": 0.85,
+                "benchmark_return": 0.010,
+            },
+            {
+                "id": "XOM.XNYS",
+                "market_value": 1000.0,
+                "return": -0.004,
+                "groups": {"sector": "energy"},
+                "benchmark_weight": 0.15,
+                "benchmark_return": -0.002,
+            },
+        ],
+        "factors": [{"factor": "value", "exposure": 0.10, "factor_return": 0.02}],
+    }
+
+    validate_return_contribution_json(json.dumps(spec))
+    result = json.loads(attribute_return_contribution(json.dumps(spec)))
+
+    assert result["portfolio_return"] == pytest.approx(0.0104)
+    assert result["instrument_contribution"][0]["id"] == "AAPL.XNAS"
+    assert any(row["key"] == "unknown" for row in result["group_contribution"]["strategy"])
+    relative = result["benchmark_relative"]
+    assert relative is not None
+    assert relative["residual"] == pytest.approx(0.0, abs=1e-12)

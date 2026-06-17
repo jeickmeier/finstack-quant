@@ -129,6 +129,22 @@ pub(crate) fn attribute_pnl_from_spec(py: Python<'_>, spec_json: &str) -> PyResu
     serde_json::to_string(&result_envelope).map_err(display_to_py)
 }
 
+/// Compute single-period return contribution attribution from JSON.
+///
+/// Parameters
+/// ----------
+/// spec_json : str
+///     JSON-serialized return contribution specification.
+///
+/// Returns
+/// -------
+/// str
+///     JSON-serialized return contribution result.
+#[pyfunction]
+pub(crate) fn attribute_return_contribution(spec_json: &str) -> PyResult<String> {
+    finstack_quant_attribution::attribute_return_contribution(spec_json).map_err(core_to_py)
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -161,6 +177,17 @@ pub(crate) fn validate_attribution_json(json: &str) -> PyResult<String> {
         )));
     }
     serde_json::to_string(&envelope).map_err(display_to_py)
+}
+
+/// Validate a return contribution specification JSON.
+///
+/// Parameters
+/// ----------
+/// spec_json : str
+///     JSON-serialized return contribution specification.
+#[pyfunction]
+pub(crate) fn validate_return_contribution_json(spec_json: &str) -> PyResult<()> {
+    finstack_quant_attribution::validate_return_contribution_json(spec_json).map_err(core_to_py)
 }
 
 /// Return the default waterfall factor ordering.

@@ -22,6 +22,7 @@ __all__ = [
     "almgren_chriss_impact",
     "amihud_illiquidity",
     "apply_scenario_and_revalue",
+    "allocate_weights",
     "brinson_fachler",
     "build_portfolio_from_spec",
     "carino_link",
@@ -42,6 +43,7 @@ __all__ = [
     "roll_effective_spread",
     "twrr_linked",
     "twrr_modified_dietz",
+    "validate_allocation_json",
     "value_portfolio",
     # factor_model typed result classes
     "FactorContribution",
@@ -124,14 +126,31 @@ class Portfolio:
         ...
 
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """Portfolio identifier."""
+        ...
+
     @property
-    def as_of(self) -> str: ...
+    def as_of(self) -> str:
+        """Portfolio as-of date as an ISO 8601 string."""
+        ...
+
     @property
-    def base_ccy(self) -> str: ...
-    def __len__(self) -> int: ...
-    def to_spec_json(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def base_ccy(self) -> str:
+        """Base currency code used for valuation and aggregation."""
+        ...
+
+    def __len__(self) -> int:
+        """Number of positions in the built portfolio."""
+        ...
+
+    def to_spec_json(self) -> str:
+        """Serialize the portfolio back to its canonical ``PortfolioSpec`` JSON."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PortfolioValuation:
     """Typed wrapper around a ``PortfolioValuation`` result.
@@ -141,16 +160,36 @@ class PortfolioValuation:
     """
 
     @staticmethod
-    def from_json(valuation_json: str) -> PortfolioValuation: ...
-    def to_json(self) -> str: ...
+    def from_json(valuation_json: str) -> PortfolioValuation:
+        """Deserialize a ``PortfolioValuation`` from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this valuation to canonical JSON."""
+        ...
+
     @property
-    def total_value(self) -> float: ...
+    def total_value(self) -> float:
+        """Total portfolio value in ``base_ccy``."""
+        ...
+
     @property
-    def base_ccy(self) -> str: ...
+    def base_ccy(self) -> str:
+        """Base currency code for this valuation."""
+        ...
+
     @property
-    def as_of(self) -> str: ...
-    def __len__(self) -> int: ...
-    def __repr__(self) -> str: ...
+    def as_of(self) -> str:
+        """Valuation date as an ISO 8601 string."""
+        ...
+
+    def __len__(self) -> int:
+        """Number of valued positions."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PortfolioCashflows:
     """Typed wrapper around a ``PortfolioCashflows`` ladder.
@@ -161,13 +200,34 @@ class PortfolioCashflows:
     """
 
     @staticmethod
-    def from_json(cashflows_json: str) -> PortfolioCashflows: ...
-    def to_json(self) -> str: ...
-    def events_json(self) -> str: ...
-    def by_date_json(self) -> str: ...
-    def issues_json(self) -> str: ...
-    def num_positions(self) -> int: ...
-    def num_issues(self) -> int: ...
+    def from_json(cashflows_json: str) -> PortfolioCashflows:
+        """Deserialize a cashflow ladder from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize the full cashflow ladder to canonical JSON."""
+        ...
+
+    def events_json(self) -> str:
+        """Return all dated cashflow events as JSON."""
+        ...
+
+    def by_date_json(self) -> str:
+        """Return cashflows grouped by date as JSON."""
+        ...
+
+    def issues_json(self) -> str:
+        """Return cashflow aggregation or FX-conversion issues as JSON."""
+        ...
+
+    def num_positions(self) -> int:
+        """Number of positions represented in the ladder."""
+        ...
+
+    def num_issues(self) -> int:
+        """Number of diagnostic issues recorded on the ladder."""
+        ...
+
     def collapse_to_base_by_date_kind(
         self,
         market: MarketContext | str,
@@ -181,8 +241,13 @@ class PortfolioCashflows:
         """
         ...
 
-    def __len__(self) -> int: ...
-    def __repr__(self) -> str: ...
+    def __len__(self) -> int:
+        """Number of cashflow events."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PortfolioResult:
     """Typed wrapper around a ``PortfolioResult`` envelope.
@@ -192,13 +257,30 @@ class PortfolioResult:
     """
 
     @staticmethod
-    def from_json(result_json: str) -> PortfolioResult: ...
-    def to_json(self) -> str: ...
+    def from_json(result_json: str) -> PortfolioResult:
+        """Deserialize a portfolio result envelope from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this result envelope to canonical JSON."""
+        ...
+
     @property
-    def total_value(self) -> float: ...
-    def get_metric(self, metric_id: str) -> float | None: ...
-    def require_metric(self, metric_id: str) -> float: ...
-    def __repr__(self) -> str: ...
+    def total_value(self) -> float:
+        """Total value stored in the result envelope."""
+        ...
+
+    def get_metric(self, metric_id: str) -> float | None:
+        """Return a metric value, or ``None`` when it is absent."""
+        ...
+
+    def require_metric(self, metric_id: str) -> float:
+        """Return a metric value, raising ``KeyError`` when it is absent."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 def parse_portfolio_spec(json_str: str) -> str:
     """Parse and canonicalize a ``PortfolioSpec`` from JSON."""
@@ -273,6 +355,42 @@ def apply_scenario_and_revalue(
     """
     ...
 
+def allocate_weights(spec_json: str) -> str:
+    """Allocate strategy weights from a JSON specification.
+
+    The specification contains a ``scheme`` (for example
+    ``"inverse_volatility"``), ``total_capital``, and a list of strategy
+    objects with ``id`` and return/history fields required by the selected
+    scheme. The Rust allocator computes normalized weights and money amounts;
+    Python only passes the JSON through.
+
+    Args:
+        spec_json: JSON-serialized allocation specification.
+
+    Returns:
+        JSON allocation result with the selected scheme and per-strategy
+        ``id``, ``weight``, and allocated capital fields.
+
+    Raises:
+        ValueError: If the JSON is malformed, required fields are missing, the
+            scheme is unsupported, or the selected scheme cannot be evaluated.
+    """
+    ...
+
+def validate_allocation_json(spec_json: str) -> None:
+    """Validate a strategy allocation JSON specification.
+
+    Performs the same Rust-side parse and semantic validation used by
+    :func:`allocate_weights` without computing allocations.
+
+    Args:
+        spec_json: JSON-serialized allocation specification.
+
+    Raises:
+        ValueError: If the specification is malformed or invalid.
+    """
+    ...
+
 def optimize_portfolio(spec_json: str, market: MarketContext | str) -> str:
     """Optimize portfolio weights using the LP-based optimizer.
 
@@ -287,46 +405,191 @@ def replay_portfolio(
     portfolio: Portfolio | str,
     snapshots_json: str,
     config_json: str,
-) -> str: ...
+) -> str:
+    """Replay a portfolio through dated market snapshots.
+
+    Args:
+        portfolio: Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
+        snapshots_json: JSON array or envelope of market snapshots.
+        config_json: JSON replay configuration controlling dates, valuation
+            options, and output detail.
+
+    Returns:
+        JSON replay result containing dated valuations and diagnostics.
+
+    Raises:
+        PortfolioError: If the portfolio, snapshots, or replay config are
+            invalid, or if a snapshot valuation fails.
+    """
+    ...
+
 def parametric_var_decomposition(
     position_ids: list[str],
     weights: list[float],
     covariance: list[list[float]],
     confidence: float = 0.95,
-) -> dict[str, object]: ...
+) -> dict[str, object]:
+    """Decompose portfolio parametric VaR across positions.
+
+    Args:
+        position_ids: Position identifiers aligned with ``weights``.
+        weights: Portfolio weights or exposures.
+        covariance: Square covariance matrix aligned with ``position_ids``.
+        confidence: VaR confidence level in ``(0, 1)``.
+
+    Returns:
+        Dict containing portfolio VaR and per-position component, marginal, and
+        relative VaR contributions.
+
+    Raises:
+        ValueError: If dimensions do not match, covariance is malformed, or the
+            confidence level is invalid.
+    """
+    ...
+
 def parametric_es_decomposition(
     position_ids: list[str],
     weights: list[float],
     covariance: list[list[float]],
     confidence: float = 0.95,
-) -> dict[str, object]: ...
+) -> dict[str, object]:
+    """Decompose portfolio parametric expected shortfall across positions.
+
+    Args:
+        position_ids: Position identifiers aligned with ``weights``.
+        weights: Portfolio weights or exposures.
+        covariance: Square covariance matrix aligned with ``position_ids``.
+        confidence: ES confidence level in ``(0, 1)``.
+
+    Returns:
+        Dict containing portfolio ES and per-position component, marginal, and
+        relative ES contributions.
+
+    Raises:
+        ValueError: If dimensions do not match, covariance is malformed, or the
+            confidence level is invalid.
+    """
+    ...
+
 def historical_var_decomposition(
     position_ids: list[str],
     position_pnls: list[list[float]],
     confidence: float = 0.95,
-) -> dict[str, object]: ...
+) -> dict[str, object]:
+    """Decompose historical VaR from scenario or realized position P&Ls.
+
+    Args:
+        position_ids: Position identifiers.
+        position_pnls: Matrix of position P&Ls, one scenario row per list and
+            one column per ``position_ids`` entry.
+        confidence: Historical VaR confidence level in ``(0, 1)``.
+
+    Returns:
+        Dict containing portfolio historical VaR and per-position contribution
+        estimates.
+
+    Raises:
+        ValueError: If the P&L matrix is empty, ragged, dimensionally
+            inconsistent, or the confidence level is invalid.
+    """
+    ...
+
 def evaluate_risk_budget(
     position_ids: list[str],
     actual_var: list[float],
     target_var_pct: list[float],
     portfolio_var: float,
     utilization_threshold: float = 1.20,
-) -> dict[str, object]: ...
-def roll_effective_spread(returns: list[float]) -> float | None: ...
-def amihud_illiquidity(returns: list[float], volumes: list[float]) -> float | None: ...
+) -> dict[str, object]:
+    """Compare actual position VaR against target risk-budget shares.
+
+    Args:
+        position_ids: Position identifiers aligned with ``actual_var`` and
+            ``target_var_pct``.
+        actual_var: Position component VaR amounts.
+        target_var_pct: Target share of total portfolio VaR per position.
+        portfolio_var: Total portfolio VaR used to convert target percentages
+            into target VaR amounts.
+        utilization_threshold: Breach threshold for actual / target
+            utilization.
+
+    Returns:
+        Dict with per-position utilization, excess VaR, total over-budget risk,
+        and breach flag.
+
+    Raises:
+        ValueError: If input lengths differ or risk-budget inputs are invalid.
+    """
+    ...
+
+def roll_effective_spread(returns: list[float]) -> float | None:
+    """Estimate the Roll effective bid-ask spread from returns.
+
+    Returns ``None`` when there are too few observations or the first-order
+    autocovariance does not imply a positive spread.
+    """
+    ...
+
+def amihud_illiquidity(returns: list[float], volumes: list[float]) -> float | None:
+    """Compute Amihud illiquidity from absolute returns and traded volumes.
+
+    Args:
+        returns: Period returns.
+        volumes: Traded volumes aligned with ``returns``.
+
+    Returns:
+        Average ``abs(return) / volume`` over positive-volume observations, or
+        ``None`` when no valid observations are available.
+    """
+    ...
+
 def days_to_liquidate(
     position_value: float,
     avg_daily_volume: float,
     participation_rate: float,
-) -> float: ...
-def liquidity_tier(days_to_liquidate: float) -> str: ...
+) -> float:
+    """Estimate liquidation horizon in trading days.
+
+    Args:
+        position_value: Position market value to liquidate.
+        avg_daily_volume: Average daily market volume in the same notional
+            units.
+        participation_rate: Maximum fraction of daily volume the liquidation
+            may consume.
+
+    Returns:
+        ``position_value / (avg_daily_volume * participation_rate)``.
+
+    Raises:
+        ValueError: If volume or participation inputs are non-positive.
+    """
+    ...
+
+def liquidity_tier(days_to_liquidate: float) -> str:
+    """Classify liquidation horizon into the Rust liquidity-tier labels."""
+    ...
+
 def lvar_bangia(
     var: float,
     spread_mean: float,
     spread_vol: float,
     confidence: float,
     position_value: float,
-) -> dict[str, float]: ...
+) -> dict[str, float]:
+    """Compute Bangia-style liquidity-adjusted VaR.
+
+    Args:
+        var: Base market VaR.
+        spread_mean: Mean bid-ask spread.
+        spread_vol: Spread volatility.
+        confidence: Confidence level for the liquidity adjustment.
+        position_value: Position value used to scale spread cost.
+
+    Returns:
+        Dict containing the base VaR, liquidity add-on, and adjusted LVaR.
+    """
+    ...
+
 def almgren_chriss_impact(
     position_size: float,
     avg_daily_volume: float,
@@ -335,8 +598,32 @@ def almgren_chriss_impact(
     permanent_impact_coef: float,
     temporary_impact_coef: float,
     reference_price: float | None = None,
-) -> dict[str, float]: ...
-def kyle_lambda(volumes: list[float], returns: list[float]) -> float | None: ...
+) -> dict[str, float]:
+    """Estimate Almgren-Chriss execution impact components.
+
+    Args:
+        position_size: Trade size in shares or notional units.
+        avg_daily_volume: Average daily volume in matching units.
+        volatility: Asset volatility used for risk scaling.
+        execution_horizon_days: Execution horizon in trading days.
+        permanent_impact_coef: Permanent impact coefficient.
+        temporary_impact_coef: Temporary impact coefficient.
+        reference_price: Optional price used to convert share impact to
+            notional impact.
+
+    Returns:
+        Dict of permanent, temporary, and total impact estimates.
+    """
+    ...
+
+def kyle_lambda(volumes: list[float], returns: list[float]) -> float | None:
+    """Estimate Kyle's lambda from volume and return observations.
+
+    Returns ``None`` when the aligned sample has too few valid observations or
+    cannot support the regression-style estimate.
+    """
+    ...
+
 def brinson_fachler(sectors_json: str) -> str:
     """Compute single-period Brinson-Fachler attribution from sector JSON."""
     ...
@@ -365,245 +652,551 @@ class FactorContribution:
     """Aggregate contribution of a single factor to portfolio risk."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> FactorContribution: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> FactorContribution:
+        """Deserialize a factor contribution from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this factor contribution to JSON."""
+        ...
+
     @property
-    def factor_id(self) -> str: ...
+    def factor_id(self) -> str:
+        """Factor identifier."""
+        ...
+
     @property
-    def absolute_risk(self) -> float: ...
+    def absolute_risk(self) -> float:
+        """Absolute risk contribution."""
+        ...
+
     @property
-    def relative_risk(self) -> float: ...
+    def relative_risk(self) -> float:
+        """Share of total portfolio risk."""
+        ...
+
     @property
-    def marginal_risk(self) -> float: ...
-    def __repr__(self) -> str: ...
+    def marginal_risk(self) -> float:
+        """Marginal risk contribution."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionFactorContribution:
     """Per-position contribution to a specific factor bucket."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionFactorContribution: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionFactorContribution:
+        """Deserialize a position-factor contribution from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this position-factor contribution to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def factor_id(self) -> str: ...
+    def factor_id(self) -> str:
+        """Factor identifier."""
+        ...
+
     @property
-    def risk_contribution(self) -> float: ...
-    def __repr__(self) -> str: ...
+    def risk_contribution(self) -> float:
+        """Risk contribution for this position-factor pair."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionResidualContribution:
     """Annualized residual variance contributed by a single position."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionResidualContribution: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionResidualContribution:
+        """Deserialize a residual contribution from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this residual contribution to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def residual_variance(self) -> float: ...
+    def residual_variance(self) -> float:
+        """Residual variance assigned to this position."""
+        ...
+
     @property
-    def source_kind(self) -> str: ...
+    def source_kind(self) -> str:
+        """Source category used to derive residual risk."""
+        ...
+
     @property
-    def source_issuer_id(self) -> str | None: ...
-    def __repr__(self) -> str: ...
+    def source_issuer_id(self) -> str | None:
+        """Issuer identifier for issuer-sourced residual risk, if present."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class RiskDecomposition:
     """Portfolio-level risk decomposition across factors and residuals."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> RiskDecomposition: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> RiskDecomposition:
+        """Deserialize a risk decomposition from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this risk decomposition to JSON."""
+        ...
+
     @property
-    def total_risk(self) -> float: ...
+    def total_risk(self) -> float:
+        """Total portfolio risk under the decomposition measure."""
+        ...
+
     @property
-    def measure_json(self) -> str: ...
+    def measure_json(self) -> str:
+        """Risk measure specification as JSON."""
+        ...
+
     @property
-    def residual_risk(self) -> float: ...
+    def residual_risk(self) -> float:
+        """Residual risk not explained by factor contributions."""
+        ...
+
     @property
-    def factor_contributions(self) -> list[FactorContribution]: ...
+    def factor_contributions(self) -> list[FactorContribution]:
+        """Factor-level risk contributions."""
+        ...
+
     @property
-    def position_factor_contributions(self) -> list[PositionFactorContribution]: ...
+    def position_factor_contributions(self) -> list[PositionFactorContribution]:
+        """Position-by-factor risk contributions."""
+        ...
+
     @property
-    def position_residual_contributions(self) -> list[PositionResidualContribution]: ...
-    def __repr__(self) -> str: ...
+    def position_residual_contributions(self) -> list[PositionResidualContribution]:
+        """Per-position residual risk contributions."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionVarContribution:
     """Per-position component / marginal VaR."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionVarContribution: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionVarContribution:
+        """Deserialize a position VaR contribution from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this position VaR contribution to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def component_var(self) -> float: ...
+    def component_var(self) -> float:
+        """Component VaR assigned to this position."""
+        ...
+
     @property
-    def relative_var(self) -> float: ...
+    def relative_var(self) -> float:
+        """Share of total portfolio VaR."""
+        ...
+
     @property
-    def marginal_var(self) -> float | None: ...
+    def marginal_var(self) -> float | None:
+        """Marginal VaR, if computed."""
+        ...
+
     @property
-    def incremental_var(self) -> float | None: ...
-    def __repr__(self) -> str: ...
+    def incremental_var(self) -> float | None:
+        """Incremental VaR, if requested in the decomposition config."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionEsContribution:
     """Per-position component / marginal ES."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionEsContribution: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionEsContribution:
+        """Deserialize a position ES contribution from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this position ES contribution to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def component_es(self) -> float: ...
+    def component_es(self) -> float:
+        """Component expected shortfall assigned to this position."""
+        ...
+
     @property
-    def relative_es(self) -> float: ...
+    def relative_es(self) -> float:
+        """Share of total portfolio expected shortfall."""
+        ...
+
     @property
-    def marginal_es(self) -> float | None: ...
-    def __repr__(self) -> str: ...
+    def marginal_es(self) -> float | None:
+        """Marginal expected shortfall, if computed."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionRiskDecomposition:
     """Complete position-level risk decomposition."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionRiskDecomposition: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionRiskDecomposition:
+        """Deserialize a position risk decomposition from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this position risk decomposition to JSON."""
+        ...
+
     @property
-    def portfolio_var(self) -> float: ...
+    def portfolio_var(self) -> float:
+        """Portfolio VaR."""
+        ...
+
     @property
-    def portfolio_es(self) -> float: ...
+    def portfolio_es(self) -> float:
+        """Portfolio expected shortfall."""
+        ...
+
     @property
-    def confidence(self) -> float: ...
+    def confidence(self) -> float:
+        """Confidence level used for VaR/ES."""
+        ...
+
     @property
-    def n_positions(self) -> int: ...
+    def n_positions(self) -> int:
+        """Number of positions included in the decomposition."""
+        ...
+
     @property
-    def method(self) -> str: ...
+    def method(self) -> str:
+        """Decomposition method label."""
+        ...
+
     @property
-    def euler_residual(self) -> float | None: ...
+    def euler_residual(self) -> float | None:
+        """Euler allocation residual, if reported."""
+        ...
+
     @property
-    def var_contributions(self) -> list[PositionVarContribution]: ...
+    def var_contributions(self) -> list[PositionVarContribution]:
+        """Per-position VaR contributions."""
+        ...
+
     @property
-    def es_contributions(self) -> list[PositionEsContribution]: ...
-    def __repr__(self) -> str: ...
+    def es_contributions(self) -> list[PositionEsContribution]:
+        """Per-position expected shortfall contributions."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionBudgetEntry:
     """Per-position budget comparison entry."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionBudgetEntry: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionBudgetEntry:
+        """Deserialize a risk-budget entry from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this risk-budget entry to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def actual_component_var(self) -> float: ...
+    def actual_component_var(self) -> float:
+        """Actual component VaR for this position."""
+        ...
+
     @property
-    def target_component_var(self) -> float: ...
+    def target_component_var(self) -> float:
+        """Target component VaR for this position."""
+        ...
+
     @property
-    def utilization(self) -> float: ...
+    def utilization(self) -> float:
+        """Actual-to-target utilization ratio."""
+        ...
+
     @property
-    def excess(self) -> float: ...
-    def __repr__(self) -> str: ...
+    def excess(self) -> float:
+        """Actual component VaR less target component VaR."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class RiskBudgetResult:
     """Budget evaluation result across positions."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> RiskBudgetResult: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> RiskBudgetResult:
+        """Deserialize a risk-budget result from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this risk-budget result to JSON."""
+        ...
+
     @property
-    def total_overbudget(self) -> float: ...
+    def total_overbudget(self) -> float:
+        """Total amount above target risk budgets."""
+        ...
+
     @property
-    def has_breach(self) -> bool: ...
+    def has_breach(self) -> bool:
+        """Whether any position exceeds the utilization threshold."""
+        ...
+
     @property
-    def positions(self) -> list[PositionBudgetEntry]: ...
-    def __repr__(self) -> str: ...
+    def positions(self) -> list[PositionBudgetEntry]:
+        """Per-position risk-budget entries."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class FactorContributionDelta:
     """Per-factor contribution change between a baseline and a scenario."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> FactorContributionDelta: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> FactorContributionDelta:
+        """Deserialize a factor contribution delta from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this factor contribution delta to JSON."""
+        ...
+
     @property
-    def factor_id(self) -> str: ...
+    def factor_id(self) -> str:
+        """Factor identifier."""
+        ...
+
     @property
-    def absolute_change(self) -> float: ...
+    def absolute_change(self) -> float:
+        """Absolute contribution change."""
+        ...
+
     @property
-    def relative_change(self) -> float: ...
-    def __repr__(self) -> str: ...
+    def relative_change(self) -> float:
+        """Relative contribution change."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class WhatIfResult:
     """Result of a position what-if scenario."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> WhatIfResult: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> WhatIfResult:
+        """Deserialize a what-if result from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this what-if result to JSON."""
+        ...
+
     @property
-    def before(self) -> RiskDecomposition: ...
+    def before(self) -> RiskDecomposition:
+        """Baseline risk decomposition."""
+        ...
+
     @property
-    def after(self) -> RiskDecomposition: ...
+    def after(self) -> RiskDecomposition:
+        """Post-scenario risk decomposition."""
+        ...
+
     @property
-    def delta(self) -> list[FactorContributionDelta]: ...
-    def __repr__(self) -> str: ...
+    def delta(self) -> list[FactorContributionDelta]:
+        """Per-factor contribution changes."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class StressResult:
     """Result of a factor-stress scenario."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> StressResult: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> StressResult:
+        """Deserialize a stress result from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this stress result to JSON."""
+        ...
+
     @property
-    def total_pnl(self) -> float: ...
+    def total_pnl(self) -> float:
+        """Total portfolio P&L under the stress scenario."""
+        ...
+
     @property
-    def position_pnl(self) -> list[tuple[str, float]]: ...
+    def position_pnl(self) -> list[tuple[str, float]]:
+        """Per-position P&L pairs."""
+        ...
+
     @property
-    def stressed_decomposition(self) -> RiskDecomposition: ...
-    def __repr__(self) -> str: ...
+    def stressed_decomposition(self) -> RiskDecomposition:
+        """Risk decomposition after applying the stress."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class StressPositionEntry:
     """Single position's contribution to tail stress."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> StressPositionEntry: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> StressPositionEntry:
+        """Deserialize a stress position entry from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this stress position entry to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def avg_tail_pnl(self) -> float: ...
+    def avg_tail_pnl(self) -> float:
+        """Average P&L across tail scenarios."""
+        ...
+
     @property
-    def pct_of_tail_loss(self) -> float: ...
+    def pct_of_tail_loss(self) -> float:
+        """Share of aggregate tail loss."""
+        ...
+
     @property
-    def worst_scenario_pnl(self) -> float: ...
-    def __repr__(self) -> str: ...
+    def worst_scenario_pnl(self) -> float:
+        """Worst single-scenario P&L for this position."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class TailScenarioBreakdown:
     """Breakdown of a single tail scenario."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> TailScenarioBreakdown: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> TailScenarioBreakdown:
+        """Deserialize a tail scenario breakdown from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this tail scenario breakdown to JSON."""
+        ...
+
     @property
-    def scenario_index(self) -> int: ...
+    def scenario_index(self) -> int:
+        """Scenario index in the source P&L matrix."""
+        ...
+
     @property
-    def portfolio_pnl(self) -> float: ...
+    def portfolio_pnl(self) -> float:
+        """Portfolio P&L for this tail scenario."""
+        ...
+
     @property
-    def position_pnls(self) -> list[tuple[str, float]]: ...
-    def __repr__(self) -> str: ...
+    def position_pnls(self) -> list[tuple[str, float]]:
+        """Per-position P&L pairs for this scenario."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class StressAttribution:
     """Per-position attribution of portfolio losses in tail scenarios."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> StressAttribution: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> StressAttribution:
+        """Deserialize stress attribution from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this stress attribution to JSON."""
+        ...
+
     @property
-    def var_threshold(self) -> float: ...
+    def var_threshold(self) -> float:
+        """VaR threshold used to select tail scenarios."""
+        ...
+
     @property
-    def n_tail_scenarios(self) -> int: ...
+    def n_tail_scenarios(self) -> int:
+        """Number of scenarios classified as tail scenarios."""
+        ...
+
     @property
-    def position_contributions(self) -> list[StressPositionEntry]: ...
+    def position_contributions(self) -> list[StressPositionEntry]:
+        """Per-position tail-loss contributions."""
+        ...
+
     @property
-    def tail_scenarios(self) -> list[TailScenarioBreakdown]: ...
-    def __repr__(self) -> str: ...
+    def tail_scenarios(self) -> list[TailScenarioBreakdown]:
+        """Detailed tail scenario breakdowns."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionAssignment:
     """Matched factor assignments for a single portfolio position.
@@ -614,122 +1207,270 @@ class PositionAssignment:
     """
 
     @classmethod
-    def from_json(cls, json_str: str) -> PositionAssignment: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionAssignment:
+        """Deserialize a position assignment from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this position assignment to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def n_mappings(self) -> int: ...
-    def mappings_json(self) -> str: ...
+    def n_mappings(self) -> int:
+        """Number of dependency-to-factor mappings."""
+        ...
+
+    def mappings_json(self) -> str:
+        """Return detailed dependency-to-factor mappings as JSON."""
+        ...
+
     @property
-    def factor_ids(self) -> list[str]: ...
-    def __repr__(self) -> str: ...
+    def factor_ids(self) -> list[str]:
+        """Matched factor identifiers."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class UnmatchedEntry:
     """Single unmatched dependency surfaced during assignment."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> UnmatchedEntry: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> UnmatchedEntry:
+        """Deserialize an unmatched dependency entry from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this unmatched entry to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
-    def dependency_json(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
+    def dependency_json(self) -> str:
+        """Return the unmatched dependency payload as JSON."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class FactorAssignmentReport:
     """Assignment results for a portfolio-level factor mapping pass."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> FactorAssignmentReport: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> FactorAssignmentReport:
+        """Deserialize a factor assignment report from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this factor assignment report to JSON."""
+        ...
+
     @property
-    def assignments(self) -> list[PositionAssignment]: ...
+    def assignments(self) -> list[PositionAssignment]:
+        """Matched assignments by position."""
+        ...
+
     @property
-    def unmatched(self) -> list[UnmatchedEntry]: ...
-    def __repr__(self) -> str: ...
+    def unmatched(self) -> list[UnmatchedEntry]:
+        """Dependencies that could not be mapped to factors."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class LevelVolContribution:
     """Aggregated risk contribution for a single hierarchy level."""
 
     @property
-    def level_name(self) -> str: ...
+    def level_name(self) -> str:
+        """Hierarchy level name."""
+        ...
+
     @property
-    def total(self) -> float: ...
+    def total(self) -> float:
+        """Total contribution for this level."""
+        ...
+
     @property
-    def by_bucket(self) -> dict[str, float]: ...
-    def __repr__(self) -> str: ...
+    def by_bucket(self) -> dict[str, float]:
+        """Contribution by hierarchy bucket."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionVolContribution:
     """Per-position vol breakdown under :class:`CreditVolReport`."""
 
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def factor_total(self) -> float: ...
+    def factor_total(self) -> float:
+        """Factor-driven volatility contribution."""
+        ...
+
     @property
-    def idiosyncratic(self) -> float: ...
+    def idiosyncratic(self) -> float:
+        """Idiosyncratic volatility contribution."""
+        ...
+
     @property
-    def total(self) -> float: ...
-    def __repr__(self) -> str: ...
+    def total(self) -> float:
+        """Total position volatility contribution."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class CreditVolReport:
     """Aggregated vol report grouped by hierarchy level."""
 
     @property
-    def total(self) -> float: ...
+    def total(self) -> float:
+        """Total portfolio volatility under the report measure."""
+        ...
+
     @property
-    def measure_json(self) -> str: ...
+    def measure_json(self) -> str:
+        """Risk measure specification as JSON."""
+        ...
+
     @property
-    def generic(self) -> float: ...
+    def generic(self) -> float:
+        """Generic factor contribution."""
+        ...
+
     @property
-    def idiosyncratic_total(self) -> float: ...
+    def idiosyncratic_total(self) -> float:
+        """Aggregate idiosyncratic contribution."""
+        ...
+
     @property
-    def by_level(self) -> list[LevelVolContribution]: ...
+    def by_level(self) -> list[LevelVolContribution]:
+        """Volatility contribution by hierarchy level."""
+        ...
+
     @property
-    def by_position(self) -> list[PositionVolContribution] | None: ...
-    def __repr__(self) -> str: ...
+    def by_position(self) -> list[PositionVolContribution] | None:
+        """Optional per-position volatility contributions."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class VolHorizon:
     """Forecast horizon used to scale a calibrated `Sample` vol estimate."""
 
     @classmethod
-    def one_step(cls) -> VolHorizon: ...
+    def one_step(cls) -> VolHorizon:
+        """Use the calibrated one-step forecast horizon."""
+        ...
+
     @classmethod
-    def unconditional(cls) -> VolHorizon: ...
+    def unconditional(cls) -> VolHorizon:
+        """Use the unconditional long-run forecast horizon."""
+        ...
+
     @classmethod
-    def n_steps(cls, n: int) -> VolHorizon: ...
+    def n_steps(cls, n: int) -> VolHorizon:
+        """Scale the forecast to ``n`` discrete steps."""
+        ...
+
     @classmethod
-    def years(cls, years: float) -> VolHorizon: ...
+    def years(cls, years: float) -> VolHorizon:
+        """Scale the forecast to a year fraction."""
+        ...
+
     @classmethod
-    def parse(cls, s: str) -> VolHorizon: ...
+    def parse(cls, s: str) -> VolHorizon:
+        """Parse a horizon string accepted by the Rust factor model."""
+        ...
+
     @property
-    def kind(self) -> str: ...
+    def kind(self) -> str:
+        """Horizon variant label."""
+        ...
+
     @property
-    def n(self) -> int | None: ...
+    def n(self) -> int | None:
+        """Step count for ``n_steps`` horizons."""
+        ...
+
     @property
-    def years_value(self) -> float | None: ...
-    def __repr__(self) -> str: ...
+    def years_value(self) -> float | None:
+        """Year fraction for ``years`` horizons."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class DecompositionConfig:
     """Configuration for position-level VaR decomposition."""
 
     @classmethod
-    def parametric_95(cls) -> DecompositionConfig: ...
+    def parametric_95(cls) -> DecompositionConfig:
+        """Default 95% parametric VaR decomposition config."""
+        ...
+
     @classmethod
-    def parametric_99(cls) -> DecompositionConfig: ...
+    def parametric_99(cls) -> DecompositionConfig:
+        """Default 99% parametric VaR decomposition config."""
+        ...
+
     @classmethod
-    def historical(cls, confidence: float) -> DecompositionConfig: ...
-    def with_incremental(self) -> DecompositionConfig: ...
-    def with_seed(self, seed: int) -> DecompositionConfig: ...
+    def historical(cls, confidence: float) -> DecompositionConfig:
+        """Historical decomposition config at ``confidence``."""
+        ...
+
+    def with_incremental(self) -> DecompositionConfig:
+        """Return a copy that requests incremental VaR."""
+        ...
+
+    def with_seed(self, seed: int) -> DecompositionConfig:
+        """Return a copy with deterministic simulation/randomization seed."""
+        ...
+
     @property
-    def confidence(self) -> float: ...
+    def confidence(self) -> float:
+        """VaR/ES confidence level."""
+        ...
+
     @property
-    def method(self) -> str: ...
+    def method(self) -> str:
+        """Decomposition method label."""
+        ...
+
     @property
-    def compute_incremental(self) -> bool: ...
+    def compute_incremental(self) -> bool:
+        """Whether incremental VaR is requested."""
+        ...
+
     @property
-    def seed(self) -> int | None: ...
-    def __repr__(self) -> str: ...
+    def seed(self) -> int | None:
+        """Optional deterministic seed."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 def parametric_var_decomposition_typed(
     position_ids: list[str],
@@ -774,80 +1515,165 @@ class WeightingScheme:
     """How optimization weights are defined."""
 
     @classmethod
-    def value_weight(cls) -> WeightingScheme: ...
+    def value_weight(cls) -> WeightingScheme:
+        """Weight positions by market value."""
+        ...
+
     @classmethod
-    def notional_weight(cls) -> WeightingScheme: ...
+    def notional_weight(cls) -> WeightingScheme:
+        """Weight positions by notional."""
+        ...
+
     @classmethod
-    def unit_scaling(cls) -> WeightingScheme: ...
+    def unit_scaling(cls) -> WeightingScheme:
+        """Use unit scaling rather than value/notional scaling."""
+        ...
+
     @property
-    def label(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def label(self) -> str:
+        """Rust enum label for this weighting scheme."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class MissingMetricPolicy:
     """Policy for handling positions missing required metrics."""
 
     @classmethod
-    def zero(cls) -> MissingMetricPolicy: ...
+    def zero(cls) -> MissingMetricPolicy:
+        """Treat missing metric values as zero."""
+        ...
+
     @classmethod
-    def exclude(cls) -> MissingMetricPolicy: ...
+    def exclude(cls) -> MissingMetricPolicy:
+        """Exclude positions with missing required metrics."""
+        ...
+
     @classmethod
-    def strict(cls) -> MissingMetricPolicy: ...
+    def strict(cls) -> MissingMetricPolicy:
+        """Reject optimization when required metrics are missing."""
+        ...
+
     @property
-    def label(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def label(self) -> str:
+        """Rust enum label for this policy."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class Inequality:
     """Inequality / equality operator (`<=`, `>=`, `==`)."""
 
     @classmethod
-    def le(cls) -> Inequality: ...
+    def le(cls) -> Inequality:
+        """Less-than-or-equal inequality."""
+        ...
+
     @classmethod
-    def ge(cls) -> Inequality: ...
+    def ge(cls) -> Inequality:
+        """Greater-than-or-equal inequality."""
+        ...
+
     @classmethod
-    def eq(cls) -> Inequality: ...
+    def eq(cls) -> Inequality:
+        """Equality constraint."""
+        ...
+
     @property
-    def label(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def label(self) -> str:
+        """Operator label."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class TradeDirection:
     """Trade direction (buy/sell/hold)."""
 
     @classmethod
-    def buy(cls) -> TradeDirection: ...
+    def buy(cls) -> TradeDirection:
+        """Buy direction."""
+        ...
+
     @classmethod
-    def sell(cls) -> TradeDirection: ...
+    def sell(cls) -> TradeDirection:
+        """Sell direction."""
+        ...
+
     @classmethod
-    def hold(cls) -> TradeDirection: ...
+    def hold(cls) -> TradeDirection:
+        """Hold/no-trade direction."""
+        ...
+
     @property
-    def label(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def label(self) -> str:
+        """Direction label."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class TradeType:
     """Trade type (existing/new-position/close-out)."""
 
     @classmethod
-    def existing(cls) -> TradeType: ...
+    def existing(cls) -> TradeType:
+        """Trade an existing position."""
+        ...
+
     @classmethod
-    def new_position(cls) -> TradeType: ...
+    def new_position(cls) -> TradeType:
+        """Open a new candidate position."""
+        ...
+
     @classmethod
-    def close_out(cls) -> TradeType: ...
+    def close_out(cls) -> TradeType:
+        """Close an existing position."""
+        ...
+
     @property
-    def label(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def label(self) -> str:
+        """Trade-type label."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PerPositionMetric:
     """Per-position metric source for optimization expressions."""
 
     @classmethod
-    def metric(cls, metric_id: str) -> PerPositionMetric: ...
+    def metric(cls, metric_id: str) -> PerPositionMetric:
+        """Use a valuation metric by metric ID."""
+        ...
+
     @classmethod
-    def custom_key(cls, key: str) -> PerPositionMetric: ...
+    def custom_key(cls, key: str) -> PerPositionMetric:
+        """Use a custom per-position metric key."""
+        ...
+
     @classmethod
-    def pv_base(cls) -> PerPositionMetric: ...
+    def pv_base(cls) -> PerPositionMetric:
+        """Use present value converted to portfolio base currency."""
+        ...
+
     @classmethod
-    def pv_native(cls) -> PerPositionMetric: ...
+    def pv_native(cls) -> PerPositionMetric:
+        """Use present value in the instrument native currency."""
+        ...
+
     @classmethod
-    def attribute(cls, key: str) -> PerPositionMetric: ...
+    def attribute(cls, key: str) -> PerPositionMetric:
+        """Use a position attribute as a metric source."""
+        ...
+
     @classmethod
     def attribute_indicator(
         cls,
@@ -855,23 +1681,46 @@ class PerPositionMetric:
         op: str,
         text: str | None = None,
         number: float | None = None,
-    ) -> PerPositionMetric: ...
+    ) -> PerPositionMetric:
+        """Use a boolean position-attribute comparison as an indicator metric."""
+        ...
+
     @classmethod
-    def constant(cls, value: float) -> PerPositionMetric: ...
+    def constant(cls, value: float) -> PerPositionMetric:
+        """Use a constant metric value for every selected position."""
+        ...
+
     @classmethod
-    def from_json(cls, json_str: str) -> PerPositionMetric: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PerPositionMetric:
+        """Deserialize a per-position metric expression from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this per-position metric expression to JSON."""
+        ...
+
     @property
-    def kind(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def kind(self) -> str:
+        """Metric-source variant label."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PositionFilter:
     """Declarative filter for selecting which positions a rule applies to."""
 
     @classmethod
-    def all(cls) -> PositionFilter: ...
+    def all(cls) -> PositionFilter:
+        """Select all positions."""
+        ...
+
     @classmethod
-    def by_entity_id(cls, entity_id: str) -> PositionFilter: ...
+    def by_entity_id(cls, entity_id: str) -> PositionFilter:
+        """Select positions for one entity ID."""
+        ...
+
     @classmethod
     def by_attribute(
         cls,
@@ -879,21 +1728,47 @@ class PositionFilter:
         op: str,
         text: str | None = None,
         number: float | None = None,
-    ) -> PositionFilter: ...
+    ) -> PositionFilter:
+        """Select positions by attribute comparison."""
+        ...
+
     @classmethod
-    def by_position_ids(cls, position_ids: list[str]) -> PositionFilter: ...
+    def by_position_ids(cls, position_ids: list[str]) -> PositionFilter:
+        """Select positions by explicit position IDs."""
+        ...
+
     @classmethod
-    def not_(cls, inner: PositionFilter) -> PositionFilter: ...
+    def not_(cls, inner: PositionFilter) -> PositionFilter:
+        """Negate another filter."""
+        ...
+
     @classmethod
-    def and_(cls, filters: list[PositionFilter]) -> PositionFilter: ...
+    def and_(cls, filters: list[PositionFilter]) -> PositionFilter:
+        """Select positions matching all child filters."""
+        ...
+
     @classmethod
-    def or_(cls, filters: list[PositionFilter]) -> PositionFilter: ...
+    def or_(cls, filters: list[PositionFilter]) -> PositionFilter:
+        """Select positions matching any child filter."""
+        ...
+
     @classmethod
-    def from_json(cls, json_str: str) -> PositionFilter: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PositionFilter:
+        """Deserialize a position filter from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this position filter to JSON."""
+        ...
+
     @property
-    def kind(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def kind(self) -> str:
+        """Filter variant label."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class MetricExpr:
     """Portfolio-level metric expression."""
@@ -903,35 +1778,72 @@ class MetricExpr:
         cls,
         metric: PerPositionMetric,
         filter: PositionFilter | None = None,
-    ) -> MetricExpr: ...
+    ) -> MetricExpr:
+        """Build a weighted-sum portfolio metric expression."""
+        ...
+
     @classmethod
     def value_weighted_average(
         cls,
         metric: PerPositionMetric,
         filter: PositionFilter | None = None,
-    ) -> MetricExpr: ...
+    ) -> MetricExpr:
+        """Build a value-weighted-average portfolio metric expression."""
+        ...
+
     @classmethod
-    def from_json(cls, json_str: str) -> MetricExpr: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> MetricExpr:
+        """Deserialize a metric expression from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this metric expression to JSON."""
+        ...
+
     @property
-    def kind(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def kind(self) -> str:
+        """Metric-expression variant label."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class Objective:
     """Optimization direction and target."""
 
     @classmethod
-    def maximize(cls, expr: MetricExpr) -> Objective: ...
+    def maximize(cls, expr: MetricExpr) -> Objective:
+        """Maximize the supplied metric expression."""
+        ...
+
     @classmethod
-    def minimize(cls, expr: MetricExpr) -> Objective: ...
+    def minimize(cls, expr: MetricExpr) -> Objective:
+        """Minimize the supplied metric expression."""
+        ...
+
     @classmethod
-    def from_json(cls, json_str: str) -> Objective: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> Objective:
+        """Deserialize an optimization objective from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this optimization objective to JSON."""
+        ...
+
     @property
-    def direction(self) -> str: ...
+    def direction(self) -> str:
+        """Optimization direction label."""
+        ...
+
     @property
-    def expr(self) -> MetricExpr: ...
-    def __repr__(self) -> str: ...
+    def expr(self) -> MetricExpr:
+        """Metric expression being optimized."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class Constraint:
     """Declarative constraint specification."""
@@ -943,7 +1855,10 @@ class Constraint:
         op: Inequality,
         rhs: float,
         label: str | None = None,
-    ) -> Constraint: ...
+    ) -> Constraint:
+        """Constrain a metric expression against a right-hand side."""
+        ...
+
     @classmethod
     def weight_bounds(
         cls,
@@ -951,15 +1866,24 @@ class Constraint:
         min: float,
         max: float,
         label: str | None = None,
-    ) -> Constraint: ...
+    ) -> Constraint:
+        """Constrain selected position weights to a min/max interval."""
+        ...
+
     @classmethod
     def max_turnover(
         cls,
         max_turnover: float,
         label: str | None = None,
-    ) -> Constraint: ...
+    ) -> Constraint:
+        """Constrain total portfolio turnover."""
+        ...
+
     @classmethod
-    def budget(cls, rhs: float) -> Constraint: ...
+    def budget(cls, rhs: float) -> Constraint:
+        """Constrain total portfolio budget/weight to ``rhs``."""
+        ...
+
     @classmethod
     def exposure_limit(
         cls,
@@ -967,7 +1891,10 @@ class Constraint:
         value: str,
         max_share: float,
         label: str | None = None,
-    ) -> Constraint: ...
+    ) -> Constraint:
+        """Constrain maximum exposure share for an attribute key/value."""
+        ...
+
     @classmethod
     def exposure_minimum(
         cls,
@@ -975,16 +1902,36 @@ class Constraint:
         value: str,
         min_share: float,
         label: str | None = None,
-    ) -> Constraint: ...
-    def with_label(self, label: str) -> Constraint: ...
+    ) -> Constraint:
+        """Constrain minimum exposure share for an attribute key/value."""
+        ...
+
+    def with_label(self, label: str) -> Constraint:
+        """Return a copy with a human-readable label."""
+        ...
+
     @classmethod
-    def from_json(cls, json_str: str) -> Constraint: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> Constraint:
+        """Deserialize an optimization constraint from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this optimization constraint to JSON."""
+        ...
+
     @property
-    def kind(self) -> str: ...
+    def kind(self) -> str:
+        """Constraint variant label."""
+        ...
+
     @property
-    def label(self) -> str | None: ...
-    def __repr__(self) -> str: ...
+    def label(self) -> str | None:
+        """Optional human-readable label."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class CandidatePosition:
     """Candidate instrument that could be added to the portfolio.
@@ -994,83 +1941,187 @@ class CandidatePosition:
     """
 
     @property
-    def id(self) -> str: ...
+    def id(self) -> str:
+        """Candidate position identifier."""
+        ...
+
     @property
-    def entity_id(self) -> str: ...
+    def entity_id(self) -> str:
+        """Candidate entity identifier."""
+        ...
+
     @property
-    def max_weight(self) -> float: ...
+    def max_weight(self) -> float:
+        """Maximum allowed candidate weight."""
+        ...
+
     @property
-    def min_weight(self) -> float: ...
+    def min_weight(self) -> float:
+        """Minimum allowed candidate weight."""
+        ...
+
     @property
-    def instrument_id(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def instrument_id(self) -> str:
+        """Underlying instrument identifier."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class TradeUniverse:
     """Universe of tradeable existing positions and candidate additions."""
 
     @classmethod
-    def all_positions(cls) -> TradeUniverse: ...
+    def all_positions(cls) -> TradeUniverse:
+        """Make every existing position tradeable."""
+        ...
+
     @property
-    def tradeable_filter(self) -> PositionFilter: ...
+    def tradeable_filter(self) -> PositionFilter:
+        """Filter selecting tradeable positions."""
+        ...
+
     @property
-    def held_filter(self) -> PositionFilter | None: ...
+    def held_filter(self) -> PositionFilter | None:
+        """Optional filter selecting held positions."""
+        ...
+
     @property
-    def candidates(self) -> list[CandidatePosition]: ...
+    def candidates(self) -> list[CandidatePosition]:
+        """Candidate new positions."""
+        ...
+
     @property
-    def allow_short_candidates(self) -> bool: ...
-    def __repr__(self) -> str: ...
+    def allow_short_candidates(self) -> bool:
+        """Whether candidates may receive negative weights."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class OptimizationStatus:
     """Status of an optimization run."""
 
     @classmethod
-    def optimal(cls) -> OptimizationStatus: ...
+    def optimal(cls) -> OptimizationStatus:
+        """Successful optimal solve."""
+        ...
+
     @classmethod
-    def feasible_but_suboptimal(cls) -> OptimizationStatus: ...
+    def feasible_but_suboptimal(cls) -> OptimizationStatus:
+        """Feasible solution that did not prove optimality."""
+        ...
+
     @classmethod
-    def unbounded(cls) -> OptimizationStatus: ...
+    def unbounded(cls) -> OptimizationStatus:
+        """Optimization problem is unbounded."""
+        ...
+
     @classmethod
-    def infeasible(cls, conflicting_constraints: list[str]) -> OptimizationStatus: ...
+    def infeasible(cls, conflicting_constraints: list[str]) -> OptimizationStatus:
+        """Optimization problem is infeasible with the listed constraints."""
+        ...
+
     @classmethod
-    def error(cls, message: str) -> OptimizationStatus: ...
+    def error(cls, message: str) -> OptimizationStatus:
+        """Solver or model-building error status."""
+        ...
+
     @classmethod
-    def from_json(cls, json_str: str) -> OptimizationStatus: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> OptimizationStatus:
+        """Deserialize an optimization status from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this optimization status to JSON."""
+        ...
+
     @property
-    def kind(self) -> str: ...
+    def kind(self) -> str:
+        """Status variant label."""
+        ...
+
     @property
-    def is_feasible(self) -> bool: ...
+    def is_feasible(self) -> bool:
+        """Whether the status includes a feasible solution."""
+        ...
+
     @property
-    def conflicting_constraints(self) -> list[str]: ...
+    def conflicting_constraints(self) -> list[str]:
+        """Constraint labels implicated in infeasibility."""
+        ...
+
     @property
-    def message(self) -> str | None: ...
-    def __repr__(self) -> str: ...
+    def message(self) -> str | None:
+        """Error or diagnostic message, if present."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class TradeSpec:
     """Trade specification for a single position."""
 
     @classmethod
-    def from_json(cls, json_str: str) -> TradeSpec: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> TradeSpec:
+        """Deserialize a trade specification from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this trade specification to JSON."""
+        ...
+
     @property
-    def position_id(self) -> str: ...
+    def position_id(self) -> str:
+        """Portfolio position identifier."""
+        ...
+
     @property
-    def instrument_id(self) -> str: ...
+    def instrument_id(self) -> str:
+        """Underlying instrument identifier."""
+        ...
+
     @property
-    def trade_type(self) -> TradeType: ...
+    def trade_type(self) -> TradeType:
+        """Trade type."""
+        ...
+
     @property
-    def direction(self) -> TradeDirection: ...
+    def direction(self) -> TradeDirection:
+        """Trade direction."""
+        ...
+
     @property
-    def current_quantity(self) -> float: ...
+    def current_quantity(self) -> float:
+        """Current quantity."""
+        ...
+
     @property
-    def target_quantity(self) -> float: ...
+    def target_quantity(self) -> float:
+        """Target quantity."""
+        ...
+
     @property
-    def delta_quantity(self) -> float: ...
+    def delta_quantity(self) -> float:
+        """Target quantity less current quantity."""
+        ...
+
     @property
-    def current_weight(self) -> float: ...
+    def current_weight(self) -> float:
+        """Current portfolio weight."""
+        ...
+
     @property
-    def target_weight(self) -> float: ...
-    def __repr__(self) -> str: ...
+    def target_weight(self) -> float:
+        """Target portfolio weight."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PortfolioOptimizationSpec:
     """JSON-serializable portfolio optimization specification."""
@@ -1080,58 +2131,149 @@ class PortfolioOptimizationSpec:
         cls,
         portfolio_spec_json: str,
         objective: Objective,
-    ) -> PortfolioOptimizationSpec: ...
-    def with_constraint(self, constraint: Constraint) -> PortfolioOptimizationSpec: ...
-    def with_objective(self, objective: Objective) -> PortfolioOptimizationSpec: ...
-    def with_weighting(self, weighting: WeightingScheme) -> PortfolioOptimizationSpec: ...
-    def with_missing_metric_policy(self, policy: MissingMetricPolicy) -> PortfolioOptimizationSpec: ...
-    def with_label(self, label: str) -> PortfolioOptimizationSpec: ...
+    ) -> PortfolioOptimizationSpec:
+        """Create a portfolio optimization specification from portfolio JSON and objective."""
+        ...
+
+    def with_constraint(self, constraint: Constraint) -> PortfolioOptimizationSpec:
+        """Return a copy with an additional constraint."""
+        ...
+
+    def with_objective(self, objective: Objective) -> PortfolioOptimizationSpec:
+        """Return a copy with a replacement objective."""
+        ...
+
+    def with_weighting(self, weighting: WeightingScheme) -> PortfolioOptimizationSpec:
+        """Return a copy with a replacement weighting scheme."""
+        ...
+
+    def with_missing_metric_policy(self, policy: MissingMetricPolicy) -> PortfolioOptimizationSpec:
+        """Return a copy with a replacement missing-metric policy."""
+        ...
+
+    def with_label(self, label: str) -> PortfolioOptimizationSpec:
+        """Return a copy with a human-readable label."""
+        ...
+
     @classmethod
-    def from_json(cls, json_str: str) -> PortfolioOptimizationSpec: ...
-    def to_json(self) -> str: ...
+    def from_json(cls, json_str: str) -> PortfolioOptimizationSpec:
+        """Deserialize an optimization specification from JSON."""
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this optimization specification to JSON."""
+        ...
+
     @property
-    def objective(self) -> Objective: ...
+    def objective(self) -> Objective:
+        """Optimization objective."""
+        ...
+
     @property
-    def constraints(self) -> list[Constraint]: ...
+    def constraints(self) -> list[Constraint]:
+        """Optimization constraints."""
+        ...
+
     @property
-    def weighting(self) -> WeightingScheme: ...
+    def weighting(self) -> WeightingScheme:
+        """Weighting scheme used by the optimization."""
+        ...
+
     @property
-    def missing_metric_policy(self) -> MissingMetricPolicy: ...
+    def missing_metric_policy(self) -> MissingMetricPolicy:
+        """Policy for missing per-position metrics."""
+        ...
+
     @property
-    def label(self) -> str | None: ...
-    def portfolio_spec_json(self) -> str: ...
-    def __repr__(self) -> str: ...
+    def label(self) -> str | None:
+        """Optional human-readable label."""
+        ...
+
+    def portfolio_spec_json(self) -> str:
+        """Return the embedded portfolio specification JSON."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class PortfolioOptimizationResult:
     """Result of an optimization run (Serialize-only; no ``from_json``)."""
 
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """Serialize this optimization result to JSON."""
+        ...
+
     @property
-    def status(self) -> OptimizationStatus: ...
+    def status(self) -> OptimizationStatus:
+        """Optimization status."""
+        ...
+
     @property
-    def is_feasible(self) -> bool: ...
+    def is_feasible(self) -> bool:
+        """Whether the solver returned a feasible portfolio."""
+        ...
+
     @property
-    def objective_value(self) -> float: ...
+    def objective_value(self) -> float:
+        """Objective value at the solution."""
+        ...
+
     @property
-    def current_weights(self) -> dict[str, float]: ...
+    def current_weights(self) -> dict[str, float]:
+        """Current weights by position ID."""
+        ...
+
     @property
-    def optimal_weights(self) -> dict[str, float]: ...
+    def optimal_weights(self) -> dict[str, float]:
+        """Optimized target weights by position ID."""
+        ...
+
     @property
-    def weight_deltas(self) -> dict[str, float]: ...
+    def weight_deltas(self) -> dict[str, float]:
+        """Target less current weight by position ID."""
+        ...
+
     @property
-    def implied_quantities(self) -> dict[str, float]: ...
+    def implied_quantities(self) -> dict[str, float]:
+        """Implied target quantities by position ID."""
+        ...
+
     @property
-    def metric_values(self) -> dict[str, float]: ...
+    def metric_values(self) -> dict[str, float]:
+        """Portfolio metric values at the solution."""
+        ...
+
     @property
-    def dual_values(self) -> dict[str, float]: ...
+    def dual_values(self) -> dict[str, float]:
+        """Dual values by constraint label when available."""
+        ...
+
     @property
-    def constraint_slacks(self) -> dict[str, float]: ...
+    def constraint_slacks(self) -> dict[str, float]:
+        """Constraint slack values by constraint label."""
+        ...
+
     @property
-    def turnover(self) -> float: ...
-    def to_trade_list(self) -> list[TradeSpec]: ...
-    def new_position_trades(self) -> list[TradeSpec]: ...
-    def binding_constraints(self) -> list[tuple[str, float]]: ...
-    def __repr__(self) -> str: ...
+    def turnover(self) -> float:
+        """Total turnover implied by the solution."""
+        ...
+
+    def to_trade_list(self) -> list[TradeSpec]:
+        """Convert weight deltas into trade specifications."""
+        ...
+
+    def new_position_trades(self) -> list[TradeSpec]:
+        """Return trade specs for new candidate positions only."""
+        ...
+
+    def binding_constraints(self) -> list[tuple[str, float]]:
+        """Return constraints with near-zero slack as ``(label, slack)`` pairs."""
+        ...
+
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 def optimize_portfolio_typed(
     spec: PortfolioOptimizationSpec,
@@ -1224,7 +2366,9 @@ class SensitivityMatrix:
         """
         ...
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 class FactorPnlProfile:
     """P&L profile for one factor across a scenario grid.
@@ -1269,7 +2413,9 @@ class FactorPnlProfile:
         """
         ...
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 def compute_factor_sensitivities(
     positions_json: str,
@@ -1406,7 +2552,9 @@ class FactorRiskDecomposition:
         """
         ...
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return a concise debug representation."""
+        ...
 
 def decompose_factor_risk(
     sensitivities: SensitivityMatrix,

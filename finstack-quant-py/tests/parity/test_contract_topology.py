@@ -399,6 +399,7 @@ def test_cashflows_cross_crate_symbols_recorded() -> None:
 
 
 WASM_NAMESPACE_SUBSETS = [
+    ("wasm_features_subset", "features", "finstack_quant.features"),
     ("wasm_statements_subset", "statements", "finstack_quant.statements"),
     ("wasm_statements_analytics_subset", "statements_analytics", "finstack_quant.statements_analytics"),
 ]

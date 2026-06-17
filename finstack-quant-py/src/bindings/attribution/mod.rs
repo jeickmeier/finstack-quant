@@ -10,8 +10,9 @@ mod pnl_attribution;
 pub(crate) use pnl_attribution::PyPnlAttribution;
 
 use entry::{
-    attribute_pnl, attribute_pnl_from_spec, default_attribution_metrics, default_waterfall_order,
-    validate_attribution_json,
+    attribute_pnl, attribute_pnl_from_spec, attribute_return_contribution,
+    default_attribution_metrics, default_waterfall_order, validate_attribution_json,
+    validate_return_contribution_json,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyList;
@@ -23,7 +24,12 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPnlAttribution>()?;
     m.add_function(pyo3::wrap_pyfunction!(attribute_pnl, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(attribute_pnl_from_spec, &m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(attribute_return_contribution, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(validate_attribution_json, &m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        validate_return_contribution_json,
+        &m
+    )?)?;
     m.add_function(pyo3::wrap_pyfunction!(default_waterfall_order, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(default_attribution_metrics, &m)?)?;
     let all = PyList::new(
@@ -32,9 +38,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "PnlAttribution",
             "attribute_pnl",
             "attribute_pnl_from_spec",
+            "attribute_return_contribution",
             "default_attribution_metrics",
             "default_waterfall_order",
             "validate_attribution_json",
+            "validate_return_contribution_json",
         ],
     )?;
     m.setattr("__all__", all)?;

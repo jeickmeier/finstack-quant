@@ -828,6 +828,40 @@ export interface FactorModelNamespace {
 
 export declare const factor_model: FactorModelNamespace;
 
+// --- features ---------------------------------------------------------------
+
+export type FeatureValue = number | null;
+export type FeatureParams = Record<string, unknown>;
+
+/**
+ * Vectorized panel feature transforms.
+ *
+ * `values` accepts finite numbers or `null`; non-finite values are treated as
+ * missing by the Rust crate. Time-series transforms are grouped by `entity` and
+ * sorted by `order`; cross-sectional transforms partition by `timeKey`.
+ */
+export interface FeaturesNamespace {
+  /** Transform a time-series panel column per entity. */
+  transformTimeseries(
+    values: FeatureValue[],
+    entity: string[],
+    order: string[],
+    op: string,
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Transform a cross-section per timestamp. */
+  transformCrossSectional(
+    values: FeatureValue[],
+    timeKey: string[],
+    op: string,
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Apply a JSON panel transform pipeline and return JSON result columns. */
+  transformPanel(specJson: string): string;
+}
+
+export declare const features: FeaturesNamespace;
+
 // --- valuations.correlation -------------------------------------------------
 
 export interface Copula {

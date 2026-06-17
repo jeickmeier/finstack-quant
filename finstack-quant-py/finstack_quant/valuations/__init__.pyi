@@ -1033,15 +1033,30 @@ class SabrParameters:
         ...
 
     @property
-    def alpha(self) -> float: ...
+    def alpha(self) -> float:
+        """SABR alpha level parameter."""
+        ...
+
     @property
-    def beta(self) -> float: ...
+    def beta(self) -> float:
+        """SABR beta elasticity parameter in ``[0, 1]``."""
+        ...
+
     @property
-    def nu(self) -> float: ...
+    def nu(self) -> float:
+        """Volatility-of-volatility parameter."""
+        ...
+
     @property
-    def rho(self) -> float: ...
+    def rho(self) -> float:
+        """Forward/volatility correlation parameter in ``[-1, 1]``."""
+        ...
+
     @property
-    def shift(self) -> float | None: ...
+    def shift(self) -> float | None:
+        """Optional positive shift used for negative-rate smiles."""
+        ...
+
     def is_shifted(self) -> bool:
         """``True`` when parameters include a non-zero shift (negative-rate support)."""
         ...
@@ -1049,14 +1064,22 @@ class SabrParameters:
 class SabrModel:
     """Hagan-2002 SABR volatility model."""
 
-    def __init__(self, params: SabrParameters) -> None: ...
+    def __init__(self, params: SabrParameters) -> None:
+        """Create a SABR model from validated parameters."""
+        ...
+
     def implied_vol(self, forward: float, strike: float, t: float) -> float:
         """Black-style implied volatility under the Hagan-2002 expansion."""
         ...
 
     @property
-    def params(self) -> SabrParameters: ...
-    def supports_negative_rates(self) -> bool: ...
+    def params(self) -> SabrParameters:
+        """Parameters used by this model."""
+        ...
+
+    def supports_negative_rates(self) -> bool:
+        """Return ``True`` when the model has a positive shift."""
+        ...
 
 class SabrSmile:
     """Volatility smile generator for a fixed ``(forward, t)`` pair."""
@@ -1066,10 +1089,22 @@ class SabrSmile:
         params: SabrParameters,
         forward: float,
         t: float,
-    ) -> None: ...
-    def atm_vol(self) -> float: ...
-    def implied_vol(self, strike: float) -> float: ...
-    def generate_smile(self, strikes: list[float]) -> list[float]: ...
+    ) -> None:
+        """Create a smile helper for one forward and expiry."""
+        ...
+
+    def atm_vol(self) -> float:
+        """Return the ATM implied volatility."""
+        ...
+
+    def implied_vol(self, strike: float) -> float:
+        """Return implied volatility at ``strike``."""
+        ...
+
+    def generate_smile(self, strikes: list[float]) -> list[float]:
+        """Return implied volatilities for all supplied strikes."""
+        ...
+
     def arbitrage_diagnostics(
         self,
         strikes: list[float],
@@ -1086,13 +1121,19 @@ class SabrSmile:
 class SabrCalibrator:
     """SABR calibrator (Levenberg-Marquardt with beta fixed)."""
 
-    def __init__(self) -> None: ...
+    def __init__(self) -> None:
+        """Create a default SABR calibrator."""
+        ...
+
     @staticmethod
     def high_precision() -> SabrCalibrator:
         """Tighter tolerance and higher iteration cap for production fits."""
         ...
 
-    def with_tolerance(self, tolerance: float) -> SabrCalibrator: ...
+    def with_tolerance(self, tolerance: float) -> SabrCalibrator:
+        """Return a copy with an overridden convergence tolerance."""
+        ...
+
     def calibrate(
         self,
         forward: float,

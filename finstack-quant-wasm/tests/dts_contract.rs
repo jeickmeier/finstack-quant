@@ -274,6 +274,7 @@ fn package_dts_documents_hand_facade_over_raw_wasm_bindgen_types() {
     assert!(dts.contains("export declare const core: CoreNamespace;"));
     assert!(dts.contains("export declare const analytics: AnalyticsNamespace;"));
     assert!(dts.contains("export declare const factor_model: FactorModelNamespace;"));
+    assert!(dts.contains("export declare const features: FeaturesNamespace;"));
     assert!(dts.contains("export declare const valuations: ValuationsNamespace;"));
     assert!(dts.contains("export declare const portfolio: PortfolioNamespace;"));
     assert!(dts.contains("generated `types/generated/*` files"));
@@ -420,6 +421,27 @@ fn factor_model_dts_exposes_credit_namespace() {
     assert!(!factor_model.contains("CreditFactorModel"));
     assert!(!factor_model.contains("decomposeLevels"));
     assert!(dts.contains("export declare const factor_model: FactorModelNamespace;"));
+}
+
+#[test]
+fn features_dts_matches_transform_surface() {
+    let dts = index_dts();
+    let features = interface_block(&dts, "FeaturesNamespace");
+
+    assert!(dts.contains("export type FeatureValue = number | null;"));
+    assert!(contains_signature(
+        features,
+        "transformTimeseries(values: FeatureValue[], entity: string[], order: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "transformCrossSectional(values: FeatureValue[], timeKey: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "transformPanel(specJson: string): string;"
+    ));
+    assert!(dts.contains("export declare const features: FeaturesNamespace;"));
 }
 
 #[test]
