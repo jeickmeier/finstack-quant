@@ -64,6 +64,17 @@ pub(crate) fn f64_param(params: Option<&Value>, key: &str, default: f64) -> Resu
     }
 }
 
+pub(crate) fn bool_param(params: Option<&Value>, key: &str, default: bool) -> Result<bool> {
+    match params.and_then(|value| value.get(key)) {
+        Some(value) => value.as_bool().ok_or_else(|| {
+            Error::Validation(format!(
+                "panel transform parameter '{key}' must be a boolean"
+            ))
+        }),
+        None => Ok(default),
+    }
+}
+
 pub(crate) fn mean(values: &[f64]) -> Option<f64> {
     if values.is_empty() {
         return None;

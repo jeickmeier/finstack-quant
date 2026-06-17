@@ -439,6 +439,42 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
+        "transformCrossSectionalGrouped(values: FeatureValue[], timeKey: string[], groups: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "neutralize(values: FeatureValue[], timeKey: string[], exposures: FeatureValue[][], params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "transformTimeseriesPairwise(values: FeatureValue[], other: FeatureValue[], entity: string[], order: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "rollingRegressionResidual(values: FeatureValue[], exposures: FeatureValue[][], entity: string[], order: string[], params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "riskScaledWeights(values: FeatureValue[], timeKey: string[], volatility: FeatureValue[], params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "cleanSignal(values: FeatureValue[], timeKey: string[], params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "normalizeSignal(values: FeatureValue[], timeKey: string[], params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "rankToWeights(values: FeatureValue[], timeKey: string[], params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
+        "neutralizeAndZscore(values: FeatureValue[], timeKey: string[], exposures: FeatureValue[][], params?: FeatureParams | null): FeatureValue[];"
+    ));
+    assert!(contains_signature(
+        features,
         "transformPanel(specJson: string): string;"
     ));
     assert!(dts.contains("export declare const features: FeaturesNamespace;"));

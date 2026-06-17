@@ -179,12 +179,25 @@ Do not use `.unwrap()` or `.expect()` in non-test binding code.
 
 ### `.pyi` stub minimum bar
 
-Every public binding needs a `.pyi` entry with:
+The `.pyi` is the primary IDE-facing doc surface (hover, signature help, mypy),
+and Python users cannot see the Rust source. Every public binding needs a `.pyi`
+entry with:
 
 - Full type annotations on every parameter and return.
-- A docstring matching the binding's `///` comment (NumPy-style is preferred).
+- A **detailed** docstring — summary line plus documented parameters, return
+  value, raised exceptions, and behavioral notes (units, conventions,
+  missing-data handling, supported `op`/`method` strings). Do not ship one-line
+  summaries for non-trivial bindings, even thin wrappers that delegate to Rust.
+  The stub should at least match the binding's `///` comment and may exceed it.
+- NumPy-style sections are preferred, but match the flavor already used in the
+  module (some modules, e.g. `features`, use Google-style `Args:`/`Returns:`).
 - Inclusion in the module's `__all__` list.
 - Consistency with `finstack-quant-py/parity_contract.toml`.
+
+Pure-Python modules in `finstack_quant/**` (e.g. `features/dataframe.py`) have
+no separate stub — their function and class docstrings are the only IDE surface,
+so hold them to the same bar (summary, parameters, returns, raises, notes). Thin
+re-export shims that only rebind compiled types need just a module docstring.
 
 ### Templates
 
@@ -303,4 +316,4 @@ When changing an existing binding:
 2. Update the `.pyi` docstring and stubs.
 3. Re-run parity tests.
 
-When the binding's behaviour matches the Rust API exactly (the common case), keep the docstrings short — the canonical reference is the Rust source. When the Python surface diverges (in-place builders, dunder-method conventions, error type mapping), document the difference loudly so users don't bounce off it.
+When the binding's behaviour matches the Rust API exactly (the common case), the Rust `///` comment can stay short — but the `.pyi` stub should still carry full parameter/return/raises detail, since the Rust source is not visible to Python users. When the Python surface diverges (in-place builders, dunder-method conventions, error type mapping), document the difference loudly so users don't bounce off it.

@@ -110,9 +110,34 @@ pub fn fallible_function() -> Result<T, Error> {
 
 ## Python documentation conventions
 
+### `.pyi` stub completeness
+
+The `.pyi` stub is the primary IDE-facing doc surface (hover, signature help,
+mypy), and the Rust source is invisible to Python users. Every public binding
+needs a detailed stub docstring, not a one-line summary — even thin wrappers
+that delegate to Rust. A complete stub documents:
+
+- a one-line summary,
+- every parameter (meaning, units/conventions, length/shape constraints),
+- the return value (shape, alignment, units),
+- raised exceptions and when they occur,
+- behavioral notes: supported `op`/`method` strings, missing-data handling,
+  defaults, and any divergence from the Rust API.
+
+Match the docstring flavor already used in the module (NumPy `Parameters`
+sections or Google `Args:` sections); do not mix flavors within one module.
+
+Pure-Python binding modules (`.py` files, e.g. pandas convenience layers like
+`features/dataframe.py`) have no separate stub; document them to the same bar
+directly in their function and class docstrings, since those are the only IDE
+surface. Thin re-export shims that only rebind compiled types need just a module
+docstring — the symbol docs come from the compiled extension.
+
 ### NumPy docstring style
 
-This project uses NumPy-style docstrings for Python.
+This project uses NumPy-style docstrings for Python in most modules; some
+modules (e.g. `features`, `portfolio`, `monte_carlo`) use Google-style
+`Args:`/`Returns:`/`Raises:` sections. Follow the module you are editing.
 
 ### Class documentation
 

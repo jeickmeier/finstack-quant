@@ -21,8 +21,9 @@ pipeline without sentinel values.
 All three return `finstack_quant_core::Result`. Outputs preserve input order and
 length; element `i` of the output corresponds to element `i` of `values`.
 The string/JSON entrypoints are retained for Python and WASM bindings. Rust
-callers can use `TimeSeriesOp`, `CrossSectionalOp`, `PanelTransformSpec`,
-`PanelOperation`, and `PanelTransformResult` to avoid string dispatch.
+callers can use `TimeSeriesOp`, `CrossSectionalOp`, `PairwiseOp`,
+`PanelTransformSpec`, `PanelOperation`, and `PanelTransformResult` to avoid
+string dispatch.
 
 ## Time-series operations
 
@@ -34,22 +35,40 @@ tie-break), and applies `op` within the group.
 |------|-------------------|----------|
 | `returns` | `periods` (1) | Simple return `v_t / v_{t-periods} - 1` |
 | `log_returns` | `periods` (1) | `ln(v_t / v_{t-periods})`; `None` when the ratio is not positive |
+| `diff` | `periods` (1) | Difference `v_t - v_{t-periods}` |
 | `lag` | `periods` (1) | Value shifted forward by `periods` |
 | `rolling_mean` | `window` (1), `min_periods` (`window`) | Mean over the trailing window |
 | `rolling_sum` | `window` (1), `min_periods` (`window`) | Sum over the trailing window |
 | `rolling_std` | `window` (1), `min_periods` (`window`) | Sample (Bessel-corrected) std; requires at least 2 finite points |
 | `rolling_min` | `window` (1), `min_periods` (`window`) | Minimum over the trailing window |
 | `rolling_max` | `window` (1), `min_periods` (`window`) | Maximum over the trailing window |
-| `ewma` | `span` (required) | Exponentially weighted mean with `alpha = 2 / (span + 1)` |
+| `rolling_zscore` | `window` (1), `min_periods` (`window`) | Current value z-score against the trailing window |
+| `rolling_rank` | `window` (1), `min_periods` (`window`) | Current value percentile rank against the trailing window |
+| `rolling_quantile` | `window` (1), `min_periods` (`window`), `quantile` (0.5) | Quantile over the trailing window |
+| `rolling_skew` | `window` (1), `min_periods` (`window`) | Skewness over the trailing window |
+| `rolling_kurtosis` | `window` (1), `min_periods` (`window`) | Excess kurtosis over the trailing window |
+| `rolling_slope` | `window` (1), `min_periods` (`window`) | Linear trend slope over the trailing window |
+| `rolling_sharpe` | `window` (1), `min_periods` (`window`) | Mean divided by sample std over the trailing window |
+| `rolling_winsorize` | `window` (1), `min_periods` (`window`), `lower` (0.01), `upper` (0.99) | Clamp current value to trailing quantile bounds |
+| `drawdown` | — | Current drawdown from the running peak |
+| `hampel_filter` | `window` (1), `min_periods` (`window`), `threshold` (3.0) | Replace outliers with trailing median |
+| `exponential_decay_weights` | `window` (1), `half_life` (required) | Current row's normalized exponential-decay weight |
+| `ewma_mean` | `span` (required) | Exponentially weighted mean with `alpha = 2 / (span + 1)` |
+| `ewma_vol` | `span` (required) | Exponentially weighted volatility of the input series |
+| `ewma_zscore` | `span` (required) | Current value z-score against EWMA mean/variance state |
 
 Notes:
 
 - `returns` and `log_returns` yield `None` when the prior value's magnitude is
   at or below `1e-12`, avoiding division by (near-)zero.
 - Rolling windows count only finite points; a row is `None` until at least
-  `min_periods` finite values are present. `rolling_std` raises its effective
-  minimum to 2.
-- `ewma` requires a finite, positive `span` and carries its state across only
+  `min_periods` finite values are present. Some operations raise the effective
+  minimum: `rolling_std`, `rolling_zscore`, `rolling_slope`, and
+  `rolling_sharpe` require at least 2 finite points; `rolling_skew` and
+  `rolling_kurtosis` require at least 3.
+- `drawdown` expects a positive level series (e.g. cumulative value); it reports
+  `value / running_peak - 1` and yields `None` for non-positive inputs.
+- EWMA operations require a finite, positive `span` and carry state across only
   the finite observations within an entity.
 
 ## Cross-sectional operations
@@ -63,10 +82,47 @@ processed in sorted-key order).
 | `zscore` | — | `(v - mean) / std` using the population std; `0.0` when std is at or below `1e-12` |
 | `demean` | — | `v - mean` |
 | `rank` | — | Percentile rank in `[0, 1]`; ties share the lowest rank; a single element maps to `0.0` |
+| `percentile_rank` | — | Open-interval percentile rank using average tied positions |
+| `quantile_bucket` | `buckets` (10) | Integer bucket label from `0` to `buckets - 1` |
+| `robust_zscore` | — | Median/MAD z-score with normal-consistency scaling |
+| `minmax_scale` | — | Scale finite values to `[0, 1]` within the partition |
+| `clip` | `lower` (`-inf`), `upper` (`inf`) | Clamp to explicit value bounds |
+| `clip_by_sigma` | `sigma` (3.0) | Clamp to `mean ± sigma * population_std` |
+| `clip_by_quantile` | `lower` (0.01), `upper` (0.99) | Alias for `winsorize` |
+| `normal_score_transform` | — | Map open-interval percentile ranks to standard-normal scores |
+| `long_short_weights` | — | Demean signal values and normalize by gross absolute exposure |
+| `dollar_neutral_weights` | — | Alias for dollar-neutral long/short weights |
+| `cap_weights` | `max_abs` (1.0) | Cap centered weights before gross normalization |
+| `fill_missing` | `value` (0.0) | Replace missing or non-finite values with a constant |
+| `is_finite` | — | Emit `1.0` for finite inputs and `0.0` otherwise |
+| `nan_mask` | — | Emit `1.0` for missing/non-finite inputs and `0.0` otherwise |
 | `winsorize` | `lower` (0.01), `upper` (0.99) | Clamp to the linearly interpolated `lower`/`upper` sample quantiles |
 
 `winsorize` requires `0 <= lower <= upper <= 1` and returns a validation error
 otherwise.
+
+## Multi-input and pipeline helpers
+
+| Function | Role |
+|----------|------|
+| `transform_cross_sectional_grouped` | Apply a cross-sectional op within `(time_key, group)` sub-partitions |
+| `neutralize` | Cross-sectional OLS residualization against exposure columns |
+| `transform_timeseries_pairwise` | Rolling covariance, correlation, and beta between two columns |
+| `rolling_regression_residual` | Per-entity rolling OLS residuals against exposure columns |
+| `risk_scaled_weights` | Convert signal values into inverse-volatility-scaled weights |
+| `clean_signal` | Default cross-sectional signal cleaning via quantile clipping |
+| `normalize_signal` | Normalize with a selected cross-sectional op (`method`, default `zscore`) |
+| `rank_to_weights` | Convert ranks into gross-normalized long/short weights |
+| `neutralize_and_zscore` | Residualize against exposures, then cross-sectional z-score |
+
+Python additionally exposes `finstack_quant.features.dataframe`, a pure-Python
+pandas convenience layer. These helpers accept a DataFrame plus key selectors and
+return a `pd.Series` aligned to the input index (or a `pd.DataFrame` for
+`panel`). A key selector can be a DataFrame column name, an index level name, or
+an integer index level position. Cross-sectional `time_key` and time-series
+`order` may be omitted when `df.index` is a `DatetimeIndex`; for `MultiIndex`
+inputs, pass the relevant level name or position explicitly. If a selector is
+both a column and an index level, the helper raises rather than guessing.
 
 ## Quick examples
 

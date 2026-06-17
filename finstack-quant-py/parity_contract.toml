@@ -694,30 +694,60 @@ status = "exists"
 
 [crates.features.symbols]
 public = [
+    "clean_signal",
+    "neutralize",
+    "risk_scaled_weights",
+    "neutralize_and_zscore",
+    "normalize_signal",
+    "rank_to_weights",
+    "rolling_regression_residual",
     "transform_cross_sectional",
+    "transform_cross_sectional_grouped",
     "transform_panel",
     "transform_timeseries",
+    "transform_timeseries_pairwise",
 ]
+
+[crates.features.modules]
+dataframe = { python = "finstack_quant.features.dataframe", status = "exists", note = "Pandas convenience wrappers; pure-Python, optional pandas dependency" }
 
 # WASM features subset
 #
-# Python and WASM expose the same three canonical transform functions. WASM
-# accepts JS arrays/objects at the boundary, then delegates directly to the Rust
-# crate with camelCase facade names.
+# Python and WASM expose the canonical transform functions. WASM accepts JS
+# arrays/objects at the boundary, then delegates directly to the Rust crate with
+# camelCase facade names.
 # ---------------------------------------------------------------------------
 [wasm_features_subset]
 rust_module_root = "../finstack-quant-wasm/src/api/features/"
 js_export_file   = "../finstack-quant-wasm/exports/features.js"
 root_exports = [
+    "cleanSignal",
+    "neutralize",
+    "neutralizeAndZscore",
+    "normalizeSignal",
+    "rankToWeights",
+    "riskScaledWeights",
+    "rollingRegressionResidual",
     "transformCrossSectional",
+    "transformCrossSectionalGrouped",
     "transformPanel",
     "transformTimeseries",
+    "transformTimeseriesPairwise",
 ]
 
 [wasm_features_subset.python_js_map]
+clean_signal = "cleanSignal"
+neutralize = "neutralize"
+neutralize_and_zscore = "neutralizeAndZscore"
+normalize_signal = "normalizeSignal"
+rank_to_weights = "rankToWeights"
+risk_scaled_weights = "riskScaledWeights"
+rolling_regression_residual = "rollingRegressionResidual"
 transform_cross_sectional = "transformCrossSectional"
+transform_cross_sectional_grouped = "transformCrossSectionalGrouped"
 transform_panel = "transformPanel"
 transform_timeseries = "transformTimeseries"
+transform_timeseries_pairwise = "transformTimeseriesPairwise"
 
 # ---------------------------------------------------------------------------
 # finstack-quant-portfolio  →  finstack_quant.portfolio

@@ -856,6 +856,70 @@ export interface FeaturesNamespace {
     op: string,
     params?: FeatureParams | null
   ): FeatureValue[];
+  /** Transform a cross-section within each time/group sub-partition. */
+  transformCrossSectionalGrouped(
+    values: FeatureValue[],
+    timeKey: string[],
+    groups: string[],
+    op: string,
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Return cross-sectional OLS residuals after regressing on exposures. */
+  neutralize(
+    values: FeatureValue[],
+    timeKey: string[],
+    exposures: FeatureValue[][],
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Transform two time-series panel columns per entity. */
+  transformTimeseriesPairwise(
+    values: FeatureValue[],
+    other: FeatureValue[],
+    entity: string[],
+    order: string[],
+    op: string,
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Return rolling OLS residuals per entity. */
+  rollingRegressionResidual(
+    values: FeatureValue[],
+    exposures: FeatureValue[][],
+    entity: string[],
+    order: string[],
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Convert a signal to inverse-risk-scaled weights per timestamp. */
+  riskScaledWeights(
+    values: FeatureValue[],
+    timeKey: string[],
+    volatility: FeatureValue[],
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Apply the default cross-sectional signal-cleaning pass. */
+  cleanSignal(
+    values: FeatureValue[],
+    timeKey: string[],
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Normalize a signal cross-sectionally. */
+  normalizeSignal(
+    values: FeatureValue[],
+    timeKey: string[],
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Convert cross-sectional ranks into long/short weights. */
+  rankToWeights(
+    values: FeatureValue[],
+    timeKey: string[],
+    params?: FeatureParams | null
+  ): FeatureValue[];
+  /** Neutralize a signal against exposures and z-score residuals. */
+  neutralizeAndZscore(
+    values: FeatureValue[],
+    timeKey: string[],
+    exposures: FeatureValue[][],
+    params?: FeatureParams | null
+  ): FeatureValue[];
   /** Apply a JSON panel transform pipeline and return JSON result columns. */
   transformPanel(specJson: string): string;
 }

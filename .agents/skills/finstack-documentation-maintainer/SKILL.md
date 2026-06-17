@@ -13,6 +13,10 @@ Use this skill to make documentation accurate, concise, source-backed, and usefu
 
 Use when public Rust/Python/WASM APIs lack descriptions, arguments, returns, examples, error behavior, or references. Public financial/math APIs should cite canonical sources through `docs/REFERENCES.md` when applicable.
 
+Python `.pyi` stubs are the primary IDE-facing surface (hover, signature help, mypy), and Python users cannot see the Rust source. Give every public binding a detailed stub docstring — summary plus documented parameters, return value, raised exceptions, and behavioral notes (units, conventions, missing-data handling, supported `op`/`method` strings) — not a one-line summary, even for thin wrappers that delegate to Rust. Match the docstring flavor (NumPy or Google) already used in the module.
+
+The same bar applies to pure-Python binding modules (`.py` files such as pandas convenience layers): they have no separate stub, so their own function and class docstrings are the only IDE help and must document parameters, returns, raises, and behavioral notes in full.
+
 ### Cleanup And Stale-Reference Audit
 
 Use when docs contain stale paths, outdated commands, AI/process/meta language, duplicated explanations, or unverified claims.
