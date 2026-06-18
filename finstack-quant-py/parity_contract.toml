@@ -512,12 +512,12 @@ rates              = { python = "finstack_quant.valuations.instruments.rates",  
 [crates.valuations.instruments.commodity]
 python_package = "finstack_quant.valuations.instruments.commodity"
 public = [
-    "CommodityOption",
     "CommodityAsianOption",
     "CommodityForward",
+    "CommodityOption",
+    "CommoditySpreadOption",
     "CommoditySwap",
     "CommoditySwaption",
-    "CommoditySpreadOption",
 ]
 
 [crates.valuations.instruments.credit_derivatives]
@@ -532,19 +532,19 @@ public = [
 [crates.valuations.instruments.equity]
 python_package = "finstack_quant.valuations.instruments.equity"
 public = [
-    "Equity",
-    "EquityOption",
-    "VarianceSwap",
-    "EquityIndexFuture",
-    "VolatilityIndexFuture",
-    "VolatilityIndexOption",
     "Autocallable",
     "CliquetOption",
+    "DiscountedCashFlow",
+    "Equity",
+    "EquityIndexFuture",
+    "EquityOption",
     "EquityTotalReturnSwap",
+    "LeveredRealEstateEquity",
     "PrivateMarketsFund",
     "RealEstateAsset",
-    "LeveredRealEstateEquity",
-    "DiscountedCashFlow",
+    "VarianceSwap",
+    "VolatilityIndexFuture",
+    "VolatilityIndexOption",
 ]
 
 [crates.valuations.instruments.exotics]
@@ -559,18 +559,18 @@ public = [
 [crates.valuations.instruments.fixed_income]
 python_package = "finstack_quant.valuations.instruments.fixed_income"
 public = [
-    "Bond",
-    "ConvertibleBond",
-    "InflationLinkedBond",
-    "TermLoan",
-    "RevolvingCredit",
-    "BondFuture",
+    "AgencyCmo",
     "AgencyMbsPassthrough",
     "AgencyTba",
-    "AgencyCmo",
+    "Bond",
+    "BondFuture",
+    "ConvertibleBond",
     "DollarRoll",
     "FIIndexTotalReturnSwap",
+    "InflationLinkedBond",
+    "RevolvingCredit",
     "StructuredCredit",
+    "TermLoan",
 ]
 
 [crates.valuations.instruments.fx]
@@ -591,27 +591,27 @@ public = [
 [crates.valuations.instruments.rates]
 python_package = "finstack_quant.valuations.instruments.rates"
 public = [
-    "InterestRateSwap",
     "BasisSwap",
-    "XccySwap",
-    "InflationSwap",
-    "YoYInflationSwap",
-    "InflationCapFloor",
-    "ForwardRateAgreement",
-    "Swaption",
     "BermudanSwaption",
-    "InterestRateFuture",
-    "CapFloor",
-    "CmsSwap",
-    "CmsOption",
-    "IrFutureOption",
-    "Deposit",
-    "Repo",
-    "RangeAccrual",
-    "Tarn",
-    "Snowball",
-    "CmsSpreadOption",
     "CallableRangeAccrual",
+    "CapFloor",
+    "CmsOption",
+    "CmsSpreadOption",
+    "CmsSwap",
+    "Deposit",
+    "ForwardRateAgreement",
+    "InflationCapFloor",
+    "InflationSwap",
+    "InterestRateFuture",
+    "InterestRateSwap",
+    "IrFutureOption",
+    "RangeAccrual",
+    "Repo",
+    "Snowball",
+    "Swaption",
+    "Tarn",
+    "XccySwap",
+    "YoYInflationSwap",
 ]
 
 [crates.valuations.models]
