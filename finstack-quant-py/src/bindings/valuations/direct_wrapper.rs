@@ -214,9 +214,14 @@ pub(super) fn tranche_scenario_table(
     let tranche_id = tranche_id.to_owned();
     let grid = grid.to_owned();
     py.detach(move || {
-        let result =
-            structured_credit_tranche_scenario_table_json(&json, &tranche_id, &market, &as_of, &grid)
-                .map_err(display_to_py)?;
+        let result = structured_credit_tranche_scenario_table_json(
+            &json,
+            &tranche_id,
+            &market,
+            &as_of,
+            &grid,
+        )
+        .map_err(display_to_py)?;
         serde_json::to_string(&result).map_err(display_to_py)
     })
 }
