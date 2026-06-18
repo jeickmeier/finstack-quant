@@ -142,19 +142,37 @@ pub fn apply_step_down<'w>(
 ///
 /// Returns `base` unchanged (borrowed) unless a shifting-interest spec is
 /// configured, in which case it returns a copy whose principal tiers are
-/// pro-rata with the senior tranche weighted by its scheduled share for the
-/// deal's current age (the remainder split equally across the other debt
-/// tranches).
+/// pro-rata with the senior tranche weighted by an *effective* share, and the
+/// remainder split equally across the other debt tranches.
+///
+/// # Scheduled vs prepayment split
+///
+/// The shifting-interest schedule lock-out applies only to *unscheduled*
+/// principal (prepayments and recovery/liquidation proceeds); *scheduled*
+/// amortization is always paid pro-rata. The effective senior weight blends the
+/// two by the period's unscheduled fraction `u`:
+///
+/// ```text
+/// w_senior = senior_prorata_share · (1 − u) + schedule_senior_pct · u
+/// ```
+///
+/// where `senior_prorata_share` is the senior's pro-rata share by current
+/// balance. With `u = 1` (no scheduled principal, e.g. a bullet pool) this
+/// reduces to the pure schedule share; with `u = 0` it is fully pro-rata.
 pub fn apply_shifting_interest<'w>(
     base: &'w Waterfall,
     rules: Option<&WaterfallRules>,
     months_from_closing: u32,
+    senior_prorata_share: f64,
+    unscheduled_fraction: f64,
 ) -> Cow<'w, Waterfall> {
     let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) else {
         return Cow::Borrowed(base);
     };
 
-    let senior_pct = senior_share(&si.schedule, months_from_closing);
+    let schedule_senior_pct = senior_share(&si.schedule, months_from_closing);
+    let u = unscheduled_fraction.clamp(0.0, 1.0);
+    let senior_pct = (senior_prorata_share * (1.0 - u) + schedule_senior_pct * u).clamp(0.0, 1.0);
 
     let mut waterfall = base.clone();
     for tier in &mut waterfall.tiers {

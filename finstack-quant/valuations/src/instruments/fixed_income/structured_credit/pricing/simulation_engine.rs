@@ -2720,12 +2720,46 @@ fn simulate_period(
             waterfall,
             &state.tranche_balances,
         )
-    } else if rules.is_some_and(|r| r.shifting_interest.is_some()) {
+    } else if let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) {
         let months_from_closing = state.closing_date.months_until(pay_date);
+        // Senior's pro-rata share (by current balance) governs scheduled
+        // principal; the schedule lock-out governs unscheduled principal.
+        let senior_bal = state
+            .tranche_balances
+            .get(si.senior_id.as_str())
+            .map_or(0.0, |m| m.amount());
+        let total_debt: f64 = state
+            .tranches
+            .tranches
+            .iter()
+            .filter(|t| t.seniority != TrancheSeniority::Equity)
+            .map(|t| {
+                state
+                    .tranche_balances
+                    .get(t.id.as_str())
+                    .map_or(0.0, |m| m.amount())
+            })
+            .sum();
+        let senior_prorata_share = if total_debt > 0.0 {
+            senior_bal / total_debt
+        } else {
+            0.0
+        };
+        // Unscheduled (prepayment + recovery) fraction of distributable principal.
+        let scheduled = pool_flows.scheduled_principal.amount().max(0.0);
+        let unscheduled =
+            pool_flows.prepayment.amount().max(0.0) + released_recoveries.amount().max(0.0);
+        let unscheduled_fraction = if scheduled + unscheduled > 0.0 {
+            unscheduled / (scheduled + unscheduled)
+        } else {
+            1.0
+        };
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_shifting_interest(
             waterfall,
             rules,
             months_from_closing,
+            senior_prorata_share,
+            unscheduled_fraction,
         )
     } else {
         let metrics = step_down_metrics(state);

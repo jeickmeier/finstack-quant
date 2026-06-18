@@ -1020,10 +1020,11 @@ mod shifting_interest_tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::InstrumentId;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        run_simulation, AssetPool, DealType, PoolAsset, ShiftingInterestSpec, ShiftingInterestStep,
-        StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
-        WaterfallRules,
+        run_simulation, AssetPool, AssetType, DealType, PoolAsset, ShiftingInterestSpec,
+        ShiftingInterestStep, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority,
+        TrancheStructure, WaterfallRules,
     };
     use time::Month;
 
@@ -1144,6 +1145,108 @@ mod shifting_interest_tests {
         assert!(
             after > 1.0,
             "sub must receive principal once the senior share steps down (after={after})"
+        );
+    }
+
+    /// Deal backed by an *amortizing* (level-pay) mortgage, so the pool throws
+    /// off scheduled principal every period in addition to prepayments.
+    fn amortizing_deal(shifting: Option<ShiftingInterestSpec>) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::RMBS, Currency::USD);
+        pool.assets.push(PoolAsset {
+            id: InstrumentId::new("M1"),
+            asset_type: AssetType::SingleFamilyMortgage { ltv: Some(0.8) },
+            balance: Money::new(1_000_000.0, Currency::USD),
+            rate: 0.06,
+            spread_bps: None,
+            index_id: None,
+            maturity: maturity(),
+            credit_quality: None,
+            industry: None,
+            obligor_id: None,
+            is_defaulted: false,
+            recovery_amount: None,
+            purchase_price: None,
+            acquisition_date: Some(closing()),
+            day_count: DayCount::Thirty360,
+            smm_override: None,
+            mdr_override: None,
+        });
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                70.0,
+                TrancheSeniority::Senior,
+                Money::new(700_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.04 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "SUB",
+                70.0,
+                90.0,
+                TrancheSeniority::Mezzanine,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                90.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(100_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_rmbs("RMBS-SI", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if let Some(si) = shifting {
+            sc.waterfall_rules = Some(WaterfallRules {
+                shifting_interest: Some(si),
+                ..Default::default()
+            });
+        }
+        sc
+    }
+
+    fn sub_principal_amortizing(sc: &StructuredCredit, before: Date) -> f64 {
+        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let sub = results.get("SUB").expect("SUB results");
+        sub.principal_flows
+            .iter()
+            .filter(|(d, _)| *d < before)
+            .map(|(_, m)| m.amount())
+            .sum()
+    }
+
+    #[test]
+    fn scheduled_principal_paid_pro_rata_during_lockout() {
+        // Full senior lockout (100% senior share) over the whole window. The
+        // shift applies only to *prepayments*; the sub still receives its
+        // pro-rata share of *scheduled* amortization, so on an amortizing pool
+        // it gets a positive principal amount even under a 100% lockout.
+        let locked = amortizing_deal(Some(ShiftingInterestSpec {
+            senior_id: "SR".to_string(),
+            schedule: vec![ShiftingInterestStep {
+                months_from_closing: 0,
+                senior_pct: 1.0,
+            }],
+        }));
+        let sub_scheduled = sub_principal_amortizing(&locked, release_date());
+        assert!(
+            sub_scheduled > 5_000.0,
+            "the sub must receive its pro-rata share of scheduled principal even \
+             under a full senior lockout (got {sub_scheduled})"
         );
     }
 }
