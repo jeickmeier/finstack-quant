@@ -23,9 +23,9 @@ pub use pricing::{
     WalCalculator,
 };
 pub use risk::{
-    calculate_tranche_cs01, calculate_tranche_duration, calculate_tranche_z_spread, Cs01Calculator,
-    MacaulayDurationCalculator, ModifiedDurationCalculator, SpreadDurationCalculator,
-    YtmCalculator, ZSpreadCalculator,
+    calculate_tranche_cs01, calculate_tranche_discount_margin, calculate_tranche_duration,
+    calculate_tranche_z_spread, Cs01Calculator, MacaulayDurationCalculator,
+    ModifiedDurationCalculator, SpreadDurationCalculator, YtmCalculator, ZSpreadCalculator,
 };
 
 // Standalone tranche metric functions are included in the explicit lists above.

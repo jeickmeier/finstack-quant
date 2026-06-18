@@ -139,6 +139,7 @@ pub use pricing::waterfall::WaterfallContext;
 
 pub use metrics::{
     calculate_tranche_cs01,
+    calculate_tranche_discount_margin,
     calculate_tranche_duration,
     calculate_tranche_wal,
     calculate_tranche_z_spread,

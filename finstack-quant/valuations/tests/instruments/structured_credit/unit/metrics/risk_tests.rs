@@ -123,3 +123,148 @@ fn test_cs01_negative_for_long_position() {
         cs01
     );
 }
+
+/// Discount margin (DM) for floating-rate structured-credit tranches.
+mod discount_margin_tests {
+    use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        calculate_tranche_discount_margin, AssetPool, DealType, PoolAsset, StructuredCredit,
+        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2026, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .unwrap();
+        // Floating tranches need their index forward; flat 4% SOFR-3M.
+        let sofr = ForwardCurve::builder("SOFR-3M", 0.25)
+            .base_date(closing())
+            .day_count(DayCount::Act365F)
+            .knots([(0.25, 0.04), (1.0, 0.04), (2.5, 0.04)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc).insert(sofr)
+    }
+
+    fn floating_spec() -> FloatingRateSpec {
+        FloatingRateSpec {
+            index_id: CurveId::new("SOFR-3M"),
+            spread_bp: rust_decimal_macros::dec!(150),
+            gearing: rust_decimal_macros::dec!(1),
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            all_in_floor_bp: None,
+            all_in_cap_bp: None,
+            index_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_freq: Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 2,
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: "nyse".to_string(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            overnight_compounding: None,
+            overnight_basis: None,
+            fallback: Default::default(),
+        }
+    }
+
+    fn deal(floating_senior: bool) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let senior_coupon = if floating_senior {
+            TrancheCoupon::Floating(floating_spec())
+        } else {
+            TrancheCoupon::Fixed { rate: 0.05 }
+        };
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                senior_coupon,
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        StructuredCredit::new_abs("ABS-DM", pool, tranches, closing(), maturity(), "USD-OIS")
+            .with_payment_calendar("nyse")
+    }
+
+    #[test]
+    fn discount_margin_is_zero_at_base_pv() {
+        let sc = deal(true);
+        let mkt = market();
+        let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
+        let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), pv).unwrap();
+        assert!(dm.abs() < 1e-6, "DM at base PV should be ~0, got {dm}");
+    }
+
+    #[test]
+    fn discount_margin_sign_tracks_target_price() {
+        let sc = deal(true);
+        let mkt = market();
+        let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
+        // A richer target (higher PV) needs a wider margin (positive DM);
+        // a cheaper target (lower PV) needs a tighter margin (negative DM).
+        let richer = Money::new(pv.amount() * 1.002, pv.currency());
+        let cheaper = Money::new(pv.amount() * 0.998, pv.currency());
+        let dm_rich =
+            calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), richer).unwrap();
+        let dm_cheap =
+            calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), cheaper).unwrap();
+        assert!(dm_rich > 0.0, "richer target -> positive DM, got {dm_rich}");
+        assert!(
+            dm_cheap < 0.0,
+            "cheaper target -> negative DM, got {dm_cheap}"
+        );
+    }
+
+    #[test]
+    fn discount_margin_errors_on_fixed_tranche() {
+        let sc = deal(false);
+        let mkt = market();
+        let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
+        let result = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), pv);
+        assert!(result.is_err(), "DM on a fixed-rate tranche must error");
+    }
+}
