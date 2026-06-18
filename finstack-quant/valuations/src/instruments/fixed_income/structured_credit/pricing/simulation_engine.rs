@@ -508,6 +508,64 @@ fn release_spread_account(
     Ok(())
 }
 
+/// Release any residual controlled-accumulation funding-account balance at deal
+/// end, paying it down the capital structure senior-first.
+///
+/// During the accumulation period collected pool principal is held in the
+/// funding account and normally released as a bullet at the bullet date. If the
+/// deal terminates before then (cleanup call, pool exhaustion, or a bullet date
+/// beyond the last payment), the in-period bullet never fires; this terminal
+/// sweep distributes the residual to the outstanding tranches (most-senior
+/// first), so the accumulated principal is never stranded. A no-op when no
+/// accumulation rule is configured or the account is already empty (the normal
+/// bullet-release path).
+fn release_principal_funding_account(
+    state: &mut SimulationState<'_>,
+    instrument: &StructuredCredit,
+) -> Result<()> {
+    if instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.controlled_accumulation.as_ref())
+        .is_none()
+    {
+        return Ok(());
+    }
+    let mut remaining = state.principal_funding_account.amount();
+    if remaining <= 0.0 {
+        return Ok(());
+    }
+
+    let release_date = state.prev_date.unwrap_or(state.closing_date);
+    // Outstanding tranches, most-senior first by payment priority.
+    let mut order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
+    order.sort_by_key(|&i| state.tranches.tranches[i].payment_priority);
+
+    for i in order {
+        if remaining <= 0.0 {
+            break;
+        }
+        let id = state.tranches.tranches[i].id.as_str().to_string();
+        let balance = state.tranche_balances.get(&id).map_or(0.0, |m| m.amount());
+        if balance <= 0.0 {
+            continue;
+        }
+        let pay = remaining.min(balance);
+        state
+            .tranche_balances
+            .insert(id.clone(), Money::new(balance - pay, state.base_ccy));
+        if let Some(res) = state.results.get_mut(&id) {
+            let amount = Money::new(pay, state.base_ccy);
+            res.cashflows.push((release_date, amount));
+            res.principal_flows.push((release_date, amount));
+            res.total_principal = res.total_principal.checked_add(amount)?;
+        }
+        remaining -= pay;
+    }
+    state.principal_funding_account = Money::new(0.0, state.base_ccy);
+    Ok(())
+}
+
 /// Run full cashflow simulation for a structured credit instrument.
 ///
 /// Returns detailed cashflow results for each tranche.
@@ -772,6 +830,12 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     // Release any unused spread-account balance to equity at deal end (unless a
     // cumulative-loss trap trigger retains it as consumed enhancement).
     release_spread_account(&mut state, instrument)?;
+
+    // Release any controlled-accumulation funding-account balance that was never
+    // paid out as a bullet — e.g. the deal hit a cleanup call or its scheduled
+    // end before the bullet date. Prevents the accumulated principal from being
+    // silently stranded.
+    release_principal_funding_account(&mut state, instrument)?;
 
     Ok(state.finalize())
 }

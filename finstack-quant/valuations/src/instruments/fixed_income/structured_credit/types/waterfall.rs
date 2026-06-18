@@ -289,7 +289,11 @@ pub struct EarlyAmortizationSpec {
 ///
 /// `start_date` is typically the revolving-period end and `bullet_date` the
 /// note's expected maturity (and at/before the legal final maturity, so the
-/// release occurs before the deal winds down).
+/// release occurs before the deal winds down). If the deal terminates before
+/// the bullet date (cleanup call, pool exhaustion, or a bullet date beyond the
+/// last payment), any residual funding-account balance is swept to the
+/// outstanding tranches senior-first at deal end, so accumulated principal is
+/// never stranded.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ControlledAccumulationSpec {
     /// First date principal is accumulated into the funding account.

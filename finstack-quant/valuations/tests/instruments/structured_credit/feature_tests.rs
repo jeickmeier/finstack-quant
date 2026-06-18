@@ -1515,4 +1515,23 @@ mod controlled_accumulation_tests {
              (got {sp_bullet})"
         );
     }
+
+    #[test]
+    fn accumulation_residual_released_at_deal_end() {
+        // Bullet date set after maturity: the in-period bullet never fires, so
+        // the accumulated principal must still be released to the senior by deal
+        // end. Without the terminal release the funding account would be
+        // stranded and the senior would receive almost no principal.
+        let late_bullet = Date::from_calendar_date(2031, Month::January, 1).unwrap();
+        let accum = deal(Some(ControlledAccumulationSpec {
+            start_date: closing(),
+            bullet_date: late_bullet,
+        }));
+        let sr_principal = senior_principal_between(&accum, closing(), late_bullet);
+        assert!(
+            sr_principal > 300_000.0,
+            "accumulated principal must be released to the senior by deal end, \
+             not stranded in the funding account (got {sr_principal})"
+        );
+    }
 }
