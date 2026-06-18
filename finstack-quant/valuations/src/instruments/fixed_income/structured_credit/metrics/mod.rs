@@ -11,6 +11,7 @@ pub(crate) mod pool;
 pub(crate) mod pricing;
 pub(crate) mod risk;
 pub(crate) mod scenario;
+pub(crate) mod summary;
 
 // Re-export all calculators for convenience
 pub use deal_specific::{
@@ -31,6 +32,7 @@ pub use risk::{
     ZSpreadCalculator,
 };
 pub use scenario::{scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
+pub use summary::{calculate_tranche_metrics, TrancheMetrics};
 
 // Standalone tranche metric functions are included in the explicit lists above.
 

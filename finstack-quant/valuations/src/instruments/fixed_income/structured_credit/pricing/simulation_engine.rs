@@ -1128,6 +1128,18 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use time::Month;
 
+    #[test]
+    fn reinvestment_par_build_scales_inversely_with_price() {
+        // At par, $1 of cash buys $1 of par.
+        assert!((par_acquired_at_price(100.0, 1.0) - 100.0).abs() < 1e-9);
+        // At a 97 price, $100 of cash buys 100 / 0.97 ≈ 103.09 of par (par build).
+        assert!((par_acquired_at_price(100.0, 0.97) - 100.0 / 0.97).abs() < 1e-9);
+        // A premium price (> par) acquires less par than cash spent.
+        assert!(par_acquired_at_price(100.0, 1.02) < 100.0);
+        // Degenerate non-positive price falls back to 1:1 par recycling.
+        assert!((par_acquired_at_price(100.0, 0.0) - 100.0).abs() < 1e-9);
+    }
+
     fn empty_tranche_cashflows(id: &str, currency: Currency) -> TrancheCashflows {
         TrancheCashflows {
             tranche_id: id.to_string(),
@@ -2661,7 +2673,18 @@ fn simulate_period(
         let recyclable = pool_flows.scheduled_principal.amount().max(0.0)
             + pool_flows.prepayment.amount().max(0.0);
         if recyclable.is_finite() && recyclable > 0.0 {
-            recycle_reinvestment_principal(state, recyclable);
+            // Reinvestment price (`behavior_overrides.reinvestment_price`, % of
+            // par): collected principal buys new collateral at this price, so
+            // $1 of cash acquires `1 / price_fraction` of par. Defaults to par
+            // (100%) when unset, which reproduces the prior 1:1 recycling.
+            // Clamped to a sane (1%, 200%] band.
+            let price_pct = instrument
+                .behavior_overrides
+                .reinvestment_price
+                .filter(|p| p.is_finite() && *p > 0.0)
+                .unwrap_or(100.0)
+                .clamp(1.0, 200.0);
+            recycle_reinvestment_principal(state, recyclable, price_pct / 100.0);
         }
     }
 
@@ -3343,7 +3366,17 @@ fn debug_assert_cash_conserved(
 /// the cash cannot be placed into new collateral and the recycle is a no-op;
 /// the deal is structurally at its end and the cleanup/exhaustion logic takes
 /// over.
-fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) {
+///
+/// `price_fraction` is the reinvestment price as a fraction of par (e.g. `0.97`
+/// for a 97-price). Reinvesting `recyclable` cash at a discount buys
+/// `recyclable / price_fraction` of par, so a sub-par price builds par (and the
+/// extra interest-earning collateral that benefits the residual/equity);
+/// `1.0` reproduces 1:1 par recycling.
+fn recycle_reinvestment_principal(
+    state: &mut SimulationState,
+    recyclable: f64,
+    price_fraction: f64,
+) {
     let performing_total: f64 = state
         .pool_state
         .is_defaulted
@@ -3358,6 +3391,9 @@ fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) 
         return;
     }
 
+    // Par acquired by spending `recyclable` cash at the reinvestment price.
+    let par_acquired = par_acquired_at_price(recyclable, price_fraction);
+
     let n = state.pool_state.len();
     for i in 0..n {
         if state.pool_state.is_defaulted[i] {
@@ -3368,7 +3404,21 @@ fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) 
             continue;
         }
         let share = balance / performing_total;
-        state.pool_state.balances[i] = balance + recyclable * share;
+        state.pool_state.balances[i] = balance + par_acquired * share;
+    }
+}
+
+/// Par acquired when reinvesting `cash` at `price_fraction` (a fraction of par).
+///
+/// Buying at a discount price `p < 1` acquires `cash / p` of par (par build);
+/// at par (`p == 1`) it is `cash`. Falls back to par recycling for a
+/// non-positive price.
+#[inline]
+fn par_acquired_at_price(cash: f64, price_fraction: f64) -> f64 {
+    if price_fraction > 0.0 {
+        cash / price_fraction
+    } else {
+        cash
     }
 }
 

@@ -187,7 +187,8 @@ fn price_instrument_structured_credit_waterfall_rules() {
 fn structured_credit_tranche_metrics_through_json() {
     use finstack_quant_wasm::api::valuations::structured_credit::{
         structured_credit_tranche_breakeven_cdr, structured_credit_tranche_discount_margin,
-        structured_credit_tranche_oas, structured_credit_tranche_scenario_table,
+        structured_credit_tranche_metrics, structured_credit_tranche_oas,
+        structured_credit_tranche_scenario_table,
     };
 
     let inst = structured_credit_instrument_json();
@@ -215,6 +216,19 @@ fn structured_credit_tranche_metrics_through_json() {
         .expect("scenario table");
     let table_parsed: serde_json::Value = serde_json::from_str(&table).unwrap();
     assert_eq!(table_parsed["cells"].as_array().expect("cells").len(), 2);
+
+    // Per-tranche metrics bundle: model-price z-spread ~ 0, widening at a cheaper price.
+    let tm = structured_credit_tranche_metrics(&inst, &mkt, "2024-01-01", "SR", None)
+        .expect("tranche metrics");
+    let tm_parsed: serde_json::Value = serde_json::from_str(&tm).unwrap();
+    assert_eq!(tm_parsed["tranche_id"], "SR");
+    assert!(tm_parsed["pv"].as_f64().expect("pv") > 0.0);
+    let tm_cheap = structured_credit_tranche_metrics(&inst, &mkt, "2024-01-01", "SR", Some(95.0))
+        .expect("tranche metrics @95");
+    let cheap_parsed: serde_json::Value = serde_json::from_str(&tm_cheap).unwrap();
+    assert!(
+        cheap_parsed["z_spread_bp"].as_f64().expect("z") > tm_parsed["z_spread_bp"].as_f64().expect("z")
+    );
 }
 
 #[wasm_bindgen_test]

@@ -99,3 +99,29 @@ pub fn structured_credit_tranche_scenario_table(
     .map_err(|e| to_js_error(&e))?;
     serde_json::to_string(&result).map_err(to_js_err)
 }
+
+/// Per-tranche risk/spread metrics (PV, price, WAL, z-spread, CS01, spread/
+/// modified duration, convexity) computed from one tranche's own cashflows.
+///
+/// `marketPricePct`, when provided, is the quoted price (% of original balance)
+/// the z-spread and CS01 are solved against; otherwise the tranche's own model
+/// price is used (zero z-spread). Returns a JSON-serialized `TrancheMetrics`.
+#[wasm_bindgen(js_name = structuredCreditTrancheMetrics)]
+pub fn structured_credit_tranche_metrics(
+    instrument_json: &str,
+    market_json: &str,
+    as_of: &str,
+    tranche_id: &str,
+    market_price_pct: Option<f64>,
+) -> Result<String, JsValue> {
+    let market = parse_market_json(market_json)?;
+    let result = finstack_quant_valuations::pricer::structured_credit_tranche_metrics_json(
+        instrument_json,
+        tranche_id,
+        &market,
+        as_of,
+        market_price_pct,
+    )
+    .map_err(|e| to_js_error(&e))?;
+    serde_json::to_string(&result).map_err(to_js_err)
+}

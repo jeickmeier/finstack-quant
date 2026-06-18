@@ -13,4 +13,5 @@ export const instruments = {
   structuredCreditTrancheBreakevenCdr: wasm.structuredCreditTrancheBreakevenCdr,
   structuredCreditTrancheOas: wasm.structuredCreditTrancheOas,
   structuredCreditTrancheScenarioTable: wasm.structuredCreditTrancheScenarioTable,
+  structuredCreditTrancheMetrics: wasm.structuredCreditTrancheMetrics,
 };

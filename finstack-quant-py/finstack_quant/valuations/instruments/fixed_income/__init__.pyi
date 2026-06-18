@@ -283,6 +283,36 @@ class StructuredCredit(_FixedIncomeInstrument):
         """
         ...
 
+    def tranche_metrics(
+        self,
+        market: MarketContext | str,
+        as_of: str,
+        tranche_id: str,
+        market_price_pct: float | None = None,
+    ) -> str:
+        """Per-tranche risk/spread metrics from the tranche's own cashflows.
+
+        Parameters
+        ----------
+        market : MarketContext or str
+            Market context object or JSON string.
+        as_of : str
+            Valuation date (``"YYYY-MM-DD"``).
+        tranche_id : str
+            Id of the tranche.
+        market_price_pct : float or None
+            Quoted price (% of original balance) the z-spread and CS01 are solved
+            against. When ``None``, the tranche's model price is used (zero z-spread).
+
+        Returns
+        -------
+        str
+            JSON-serialized ``TrancheMetrics`` (``pv``, ``price_pct``, ``wal``,
+            ``z_spread_bp``, ``cs01``, ``spread_duration``, ``modified_duration``,
+            ``convexity``, ``target_price_pct``).
+        """
+        ...
+
 __all__: list[str] = [
     "Bond",
     "ConvertibleBond",

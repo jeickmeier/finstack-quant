@@ -1445,6 +1445,13 @@ export interface ValuationInstrumentsNamespace {
     trancheId: string,
     grid: string
   ): string;
+  structuredCreditTrancheMetrics(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    trancheId: string,
+    marketPricePct?: number | null
+  ): string;
 }
 
 export type FxInstrumentSpec = Record<string, unknown> | string;

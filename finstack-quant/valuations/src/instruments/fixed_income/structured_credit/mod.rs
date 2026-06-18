@@ -152,6 +152,7 @@ pub use metrics::{
     calculate_tranche_cs01,
     calculate_tranche_discount_margin,
     calculate_tranche_duration,
+    calculate_tranche_metrics,
     calculate_tranche_oas,
     calculate_tranche_wal,
     calculate_tranche_z_spread,
@@ -187,6 +188,7 @@ pub use metrics::{
     ScenarioGrid,
     ScenarioTable,
     SpreadDurationCalculator,
+    TrancheMetrics,
     WalCalculator,
     // AssetPool metrics
     WamCalculator,

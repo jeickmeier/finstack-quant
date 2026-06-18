@@ -1394,6 +1394,7 @@ instruments = [
     "priceInstrumentWithMetricsAndMarket",
     "structuredCreditTrancheBreakevenCdr",
     "structuredCreditTrancheDiscountMargin",
+    "structuredCreditTrancheMetrics",
     "structuredCreditTrancheOas",
     "structuredCreditTrancheScenarioTable",
     "validateInstrumentJson",

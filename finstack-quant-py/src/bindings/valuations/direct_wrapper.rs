@@ -8,8 +8,8 @@ use finstack_quant_valuations::pricer::{
     metric_value_from_instrument_json, present_standard_option_greeks_from_instrument_json,
     pretty_instrument_json, price_instrument_json, price_instrument_json_with_metrics_and_history,
     structured_credit_tranche_breakeven_cdr_json, structured_credit_tranche_discount_margin_json,
-    structured_credit_tranche_oas_json, structured_credit_tranche_scenario_table_json,
-    validate_instrument_json,
+    structured_credit_tranche_metrics_json, structured_credit_tranche_oas_json,
+    structured_credit_tranche_scenario_table_json, validate_instrument_json,
 };
 use finstack_quant_valuations::results::ValuationResult;
 use pyo3::prelude::*;
@@ -220,6 +220,31 @@ pub(super) fn tranche_scenario_table(
             &market,
             &as_of,
             &grid,
+        )
+        .map_err(core_to_py)?;
+        serde_json::to_string(&result).map_err(display_to_py)
+    })
+}
+
+pub(super) fn tranche_metrics(
+    py: Python<'_>,
+    json: &str,
+    market: &Bound<'_, PyAny>,
+    as_of: &str,
+    tranche_id: &str,
+    market_price_pct: Option<f64>,
+) -> PyResult<String> {
+    let market = extract_market(market)?;
+    let json = json.to_owned();
+    let as_of = as_of.to_owned();
+    let tranche_id = tranche_id.to_owned();
+    py.detach(move || {
+        let result = structured_credit_tranche_metrics_json(
+            &json,
+            &tranche_id,
+            &market,
+            &as_of,
+            market_price_pct,
         )
         .map_err(core_to_py)?;
         serde_json::to_string(&result).map_err(display_to_py)

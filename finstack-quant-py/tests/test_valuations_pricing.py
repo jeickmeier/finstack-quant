@@ -596,6 +596,19 @@ def test_structured_credit_tranche_metric_methods() -> None:
     table = json.loads(sc.scenario_table(market, "2024-01-01", "SR", grid))
     assert len(table["cells"]) == 2
 
+    # Per-tranche metrics bundle: PV/WAL and the credit z-spread/CS01 computed
+    # from this tranche's own cashflows (meaningful per note).
+    tm = json.loads(sc.tranche_metrics(market, "2024-01-01", "SR"))
+    assert tm["tranche_id"] == "SR"
+    assert tm["pv"] > 0
+    assert tm["wal"] >= 0.0
+    # Solved against its own model price -> z-spread ~ 0.
+    assert abs(tm["z_spread_bp"]) < 1.0
+    # Against a cheaper market price the z-spread must widen (positive).
+    tm_cheap = json.loads(sc.tranche_metrics(market, "2024-01-01", "SR", 95.0))
+    assert tm_cheap["z_spread_bp"] > tm["z_spread_bp"]
+    assert tm_cheap["target_price_pct"] == 95.0
+
     # Discount margin requires a floating-rate tranche; the fixed-rate senior
     # here must raise, exercising the method dispatch and error mapping.
     with pytest.raises(ValueError, match="floating-rate"):

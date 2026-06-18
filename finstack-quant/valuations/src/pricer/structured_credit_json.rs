@@ -21,8 +21,9 @@
 //! ```
 
 use crate::instruments::fixed_income::structured_credit::{
-    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_oas,
-    scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable, StructuredCredit,
+    calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
+    calculate_tranche_oas, scenario_table, OasConfig, OasResult, ScenarioGrid, ScenarioTable,
+    StructuredCredit, TrancheMetrics,
 };
 use crate::instruments::InstrumentJson;
 use finstack_quant_core::currency::Currency;
@@ -133,6 +134,31 @@ pub fn structured_credit_tranche_oas_json(
         None => OasConfig::default(),
     };
     calculate_tranche_oas(&deal, tranche_id, market_price_pct, market, as_of, &config)
+}
+
+/// Per-tranche risk/spread metrics ([`TrancheMetrics`]) for a tranche from
+/// tagged instrument JSON — PV, price, WAL, z-spread, CS01, spread/modified
+/// duration and convexity, all computed from that tranche's own cashflows.
+///
+/// `market_price_pct`, when present, is the quoted price (% of original balance)
+/// the z-spread and CS01 are solved against; when `None` the tranche's own model
+/// price is used (giving a zero z-spread).
+///
+/// # Errors
+///
+/// Returns an error if the JSON is not a structured-credit deal, the as-of date
+/// is malformed, the tranche or discount curve is missing, or a metric fails to
+/// compute.
+pub fn structured_credit_tranche_metrics_json(
+    instrument_json: &str,
+    tranche_id: &str,
+    market: &MarketContext,
+    as_of: &str,
+    market_price_pct: Option<f64>,
+) -> Result<TrancheMetrics> {
+    let deal = structured_credit_from_json(instrument_json)?;
+    let as_of = parse_iso_date(as_of)?;
+    calculate_tranche_metrics(&deal, tranche_id, market, as_of, market_price_pct)
 }
 
 /// Scenario (CPR × CDR × severity) price/WAL/writedown table for a tranche from

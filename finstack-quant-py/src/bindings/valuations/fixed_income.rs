@@ -256,6 +256,47 @@ impl PyStructuredCredit {
             py, &self.json, market, as_of, tranche_id, grid,
         )
     }
+
+    /// Per-tranche risk/spread metrics, computed from the tranche's own
+    /// cashflows (meaningful per note, unlike the deal-level aggregates).
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     A ``MarketContext`` object or a JSON string.
+    /// as_of : str
+    ///     Valuation date (``"YYYY-MM-DD"``).
+    /// tranche_id : str
+    ///     Id of the tranche.
+    /// market_price_pct : float | None
+    ///     Quoted price (% of original balance) the z-spread and CS01 are solved
+    ///     against. When ``None``, the tranche's own model price is used (giving a
+    ///     zero z-spread); CS01, duration and convexity remain meaningful.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     JSON-serialized ``TrancheMetrics`` (``pv``, ``price_pct``, ``wal``,
+    ///     ``z_spread_bp``, ``cs01``, ``spread_duration``, ``modified_duration``,
+    ///     ``convexity``, ``target_price_pct``).
+    #[pyo3(signature = (market, as_of, tranche_id, market_price_pct=None))]
+    fn tranche_metrics(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &str,
+        tranche_id: &str,
+        market_price_pct: Option<f64>,
+    ) -> PyResult<String> {
+        super::direct_wrapper::tranche_metrics(
+            py,
+            &self.json,
+            market,
+            as_of,
+            tranche_id,
+            market_price_pct,
+        )
+    }
 }
 
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
