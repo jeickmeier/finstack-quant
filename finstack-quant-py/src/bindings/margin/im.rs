@@ -3,148 +3,13 @@
 //! These bindings expose the explicit calculator helper methods that do not
 //! require a Python representation of the Rust `Marginable` trait.
 
-use super::calculators::{
-    imresult_from_amount, imresult_from_parts, money_from_amount, PyImResult,
-};
+use super::calculators::{money_from_amount, PyImResult};
 use super::types::{PyCollateralAssetClass, PyEligibleCollateralSchedule};
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_margin as fm;
 use pyo3::prelude::*;
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
-struct SimmSensitivitiesJson {
-    base_currency: Currency,
-    #[serde(default)]
-    ir_delta: Vec<(Currency, String, f64)>,
-    #[serde(default)]
-    ir_vega: Vec<(Currency, String, f64)>,
-    #[serde(default)]
-    credit_qualifying_delta: Vec<(String, String, f64)>,
-    #[serde(default)]
-    credit_non_qualifying_delta: Vec<(String, String, f64)>,
-    #[serde(default)]
-    equity_delta: Vec<(String, f64)>,
-    #[serde(default)]
-    equity_vega: Vec<(String, f64)>,
-    #[serde(default)]
-    fx_delta: Vec<(Currency, f64)>,
-    #[serde(default)]
-    fx_vega: Vec<(Currency, Currency, f64)>,
-    #[serde(default)]
-    commodity_delta: Vec<(String, f64)>,
-    #[serde(default)]
-    curvature: Vec<(fm::SimmRiskClass, f64)>,
-    #[serde(default)]
-    credit_qualifying_delta_bucketed: Vec<(fm::SimmCreditSector, String, String, f64)>,
-}
-
-impl From<&fm::SimmSensitivities> for SimmSensitivitiesJson {
-    fn from(sens: &fm::SimmSensitivities) -> Self {
-        Self {
-            base_currency: sens.base_currency,
-            ir_delta: sens
-                .ir_delta
-                .iter()
-                .map(|((currency, tenor), amount)| (*currency, tenor.clone(), *amount))
-                .collect(),
-            ir_vega: sens
-                .ir_vega
-                .iter()
-                .map(|((currency, tenor), amount)| (*currency, tenor.clone(), *amount))
-                .collect(),
-            credit_qualifying_delta: sens
-                .credit_qualifying_delta
-                .iter()
-                .map(|((name, tenor), amount)| (name.clone(), tenor.clone(), *amount))
-                .collect(),
-            credit_non_qualifying_delta: sens
-                .credit_non_qualifying_delta
-                .iter()
-                .map(|((name, tenor), amount)| (name.clone(), tenor.clone(), *amount))
-                .collect(),
-            equity_delta: sens
-                .equity_delta
-                .iter()
-                .map(|(underlier, amount)| (underlier.clone(), *amount))
-                .collect(),
-            equity_vega: sens
-                .equity_vega
-                .iter()
-                .map(|(underlier, amount)| (underlier.clone(), *amount))
-                .collect(),
-            fx_delta: sens
-                .fx_delta
-                .iter()
-                .map(|(currency, amount)| (*currency, *amount))
-                .collect(),
-            fx_vega: sens
-                .fx_vega
-                .iter()
-                .map(|((ccy1, ccy2), amount)| (*ccy1, *ccy2, *amount))
-                .collect(),
-            commodity_delta: sens
-                .commodity_delta
-                .iter()
-                .map(|(bucket, amount)| (bucket.clone(), *amount))
-                .collect(),
-            curvature: sens
-                .curvature
-                .iter()
-                .map(|(risk_class, amount)| (*risk_class, *amount))
-                .collect(),
-            credit_qualifying_delta_bucketed: sens
-                .credit_qualifying_delta_bucketed
-                .iter()
-                .map(|((sector, name, tenor), amount)| {
-                    (*sector, name.clone(), tenor.clone(), *amount)
-                })
-                .collect(),
-        }
-    }
-}
-
-impl From<SimmSensitivitiesJson> for fm::SimmSensitivities {
-    fn from(value: SimmSensitivitiesJson) -> Self {
-        let mut sens = fm::SimmSensitivities::new(value.base_currency);
-        for (currency, tenor, amount) in value.ir_delta {
-            sens.add_ir_delta(currency, tenor, amount);
-        }
-        for (currency, tenor, amount) in value.ir_vega {
-            sens.add_ir_vega(currency, tenor, amount);
-        }
-        for (name, tenor, amount) in value.credit_qualifying_delta {
-            sens.add_credit_delta(name, true, tenor, amount);
-        }
-        for (name, tenor, amount) in value.credit_non_qualifying_delta {
-            sens.add_credit_delta(name, false, tenor, amount);
-        }
-        for (underlier, amount) in value.equity_delta {
-            sens.add_equity_delta(underlier, amount);
-        }
-        for (underlier, amount) in value.equity_vega {
-            sens.add_equity_vega(underlier, amount);
-        }
-        for (currency, amount) in value.fx_delta {
-            sens.add_fx_delta(currency, amount);
-        }
-        for (ccy1, ccy2, amount) in value.fx_vega {
-            *sens.fx_vega.entry((ccy1, ccy2)).or_insert(0.0) += amount;
-        }
-        for (bucket, amount) in value.commodity_delta {
-            *sens.commodity_delta.entry(bucket).or_insert(0.0) += amount;
-        }
-        for (risk_class, amount) in value.curvature {
-            *sens.curvature.entry(risk_class).or_insert(0.0) += amount;
-        }
-        for (sector, name, tenor, amount) in value.credit_qualifying_delta_bucketed {
-            sens.add_credit_delta_bucketed(sector, name, tenor, amount);
-        }
-        sens
-    }
-}
 
 fn parse_currency(code: &str) -> PyResult<Currency> {
     code.parse::<Currency>().map_err(display_to_py)
@@ -158,89 +23,21 @@ fn parse_date(year: i32, month: u8, day: u8) -> PyResult<Date> {
 }
 
 fn parse_simm_version(version: &str) -> PyResult<fm::SimmVersion> {
-    match version
-        .trim()
-        .to_ascii_lowercase()
-        .replace([' ', '-', '.'], "_")
-        .as_str()
-    {
-        "v2_5" | "2_5" | "simm_v2_5" | "simm2_5" => Ok(fm::SimmVersion::V2_5),
-        "v2_6" | "2_6" | "simm_v2_6" | "simm2_6" => Ok(fm::SimmVersion::V2_6),
-        other => Err(crate::errors::value_error(format!(
-            "unknown SIMM version '{other}' (expected 'v2_5' or 'v2_6')"
-        ))),
-    }
-}
-
-fn simm_version_label(version: fm::SimmVersion) -> &'static str {
-    match version {
-        fm::SimmVersion::V2_5 => "v2_5",
-        fm::SimmVersion::V2_6 => "v2_6",
-        _ => "unknown",
-    }
+    version
+        .parse::<fm::SimmVersion>()
+        .map_err(crate::errors::value_error)
 }
 
 fn parse_credit_sector(sector: &str) -> PyResult<fm::SimmCreditSector> {
-    match sector
-        .trim()
-        .to_ascii_lowercase()
-        .replace([' ', '-'], "_")
-        .as_str()
-    {
-        "sovereign" | "ig_sovereign" => Ok(fm::SimmCreditSector::Sovereign),
-        "financial" | "ig_financial" => Ok(fm::SimmCreditSector::Financial),
-        "basic_materials" | "energy_industrials" | "ig_basic_materials" => {
-            Ok(fm::SimmCreditSector::BasicMaterials)
-        }
-        "consumer_goods" | "ig_consumer_goods" => Ok(fm::SimmCreditSector::ConsumerGoods),
-        "technology_media" | "technology" | "telecom" | "ig_technology_media" => {
-            Ok(fm::SimmCreditSector::TechnologyMedia)
-        }
-        "health_care" | "healthcare" | "utilities" | "ig_health_care" => {
-            Ok(fm::SimmCreditSector::HealthCare)
-        }
-        "high_yield_sovereign" | "hy_sovereign" => Ok(fm::SimmCreditSector::HighYieldSovereign),
-        "high_yield_financial" | "hy_financial" => Ok(fm::SimmCreditSector::HighYieldFinancial),
-        "high_yield_basic_materials" | "hy_basic_materials" => {
-            Ok(fm::SimmCreditSector::HighYieldBasicMaterials)
-        }
-        "high_yield_consumer_goods" | "hy_consumer_goods" => {
-            Ok(fm::SimmCreditSector::HighYieldConsumerGoods)
-        }
-        "high_yield_technology_media" | "hy_technology_media" => {
-            Ok(fm::SimmCreditSector::HighYieldTechnologyMedia)
-        }
-        "high_yield_health_care" | "hy_health_care" | "hy_healthcare" => {
-            Ok(fm::SimmCreditSector::HighYieldHealthCare)
-        }
-        "index" => Ok(fm::SimmCreditSector::Index),
-        "securitized" | "securitised" => Ok(fm::SimmCreditSector::Securitized),
-        "residual" | "other" => Ok(fm::SimmCreditSector::Residual),
-        other => Err(crate::errors::value_error(format!(
-            "unknown SIMM credit sector '{other}'"
-        ))),
-    }
+    sector
+        .parse::<fm::SimmCreditSector>()
+        .map_err(crate::errors::value_error)
 }
 
 fn parse_risk_class(risk_class: &str) -> PyResult<fm::SimmRiskClass> {
-    match risk_class
-        .trim()
-        .to_ascii_lowercase()
-        .replace([' ', '-'], "_")
-        .as_str()
-    {
-        "interest_rate" | "ir" | "rates" => Ok(fm::SimmRiskClass::InterestRate),
-        "credit_qualifying" | "credit_qual" | "cq" => Ok(fm::SimmRiskClass::CreditQualifying),
-        "credit_non_qualifying" | "credit_nonqual" | "cnq" => {
-            Ok(fm::SimmRiskClass::CreditNonQualifying)
-        }
-        "equity" | "eq" => Ok(fm::SimmRiskClass::Equity),
-        "commodity" | "comm" => Ok(fm::SimmRiskClass::Commodity),
-        "fx" | "foreign_exchange" => Ok(fm::SimmRiskClass::Fx),
-        other => Err(crate::errors::value_error(format!(
-            "unknown SIMM risk class '{other}'"
-        ))),
-    }
+    risk_class
+        .parse::<fm::SimmRiskClass>()
+        .map_err(crate::errors::value_error)
 }
 
 fn parse_schedule_asset_class(asset_class: &str) -> PyResult<fm::ScheduleAssetClass> {
@@ -274,15 +71,13 @@ impl PySimmSensitivities {
     /// Construct from a JSON serialization of `SimmSensitivities`.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let dto: SimmSensitivitiesJson = serde_json::from_str(json).map_err(display_to_py)?;
-        let inner = fm::SimmSensitivities::from(dto);
+        let inner = fm::SimmSensitivities::from_json(json).map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
     /// Serialize to a JSON string.
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string_pretty(&SimmSensitivitiesJson::from(&self.inner))
-            .map_err(display_to_py)
+        self.inner.to_json_pretty().map_err(core_to_py)
     }
 
     /// Add an interest-rate delta sensitivity (DV01-style currency amount).
@@ -343,29 +138,22 @@ impl PySimmSensitivities {
     /// Add an FX vega sensitivity for a currency pair.
     #[pyo3(signature = (ccy1, ccy2, amount))]
     fn add_fx_vega(&mut self, ccy1: &str, ccy2: &str, amount: f64) -> PyResult<()> {
-        let key = (parse_currency(ccy1)?, parse_currency(ccy2)?);
-        *self.inner.fx_vega.entry(key).or_insert(0.0) += amount;
+        self.inner
+            .add_fx_vega(parse_currency(ccy1)?, parse_currency(ccy2)?, amount);
         Ok(())
     }
 
     /// Add a commodity delta sensitivity bucket.
     #[pyo3(signature = (bucket, amount))]
     fn add_commodity_delta(&mut self, bucket: &str, amount: f64) {
-        *self
-            .inner
-            .commodity_delta
-            .entry(bucket.to_string())
-            .or_insert(0.0) += amount;
+        self.inner.add_commodity_delta(bucket, amount);
     }
 
     /// Add a curvature contribution for a SIMM risk class.
     #[pyo3(signature = (risk_class, amount))]
     fn add_curvature(&mut self, risk_class: &str, amount: f64) -> PyResult<()> {
-        *self
-            .inner
-            .curvature
-            .entry(parse_risk_class(risk_class)?)
-            .or_insert(0.0) += amount;
+        self.inner
+            .add_curvature(parse_risk_class(risk_class)?, amount);
         Ok(())
     }
 
@@ -409,7 +197,7 @@ impl PySimmCalculator {
     /// SIMM version label (`"v2_5"` or `"v2_6"`).
     #[getter]
     fn version(&self) -> &'static str {
-        simm_version_label(self.inner.version())
+        self.inner.version().as_str()
     }
 
     /// Margin period of risk in calendar days.
@@ -430,16 +218,9 @@ impl PySimmCalculator {
     ) -> PyResult<PyImResult> {
         let ccy = parse_currency(currency)?;
         let as_of = parse_date(year, month, day)?;
-        let (amount, breakdown) = self
-            .inner
-            .calculate_from_sensitivities(&sensitivities.inner, ccy);
-        let amount = money_from_amount(amount, ccy)?;
-        Ok(imresult_from_parts(
-            amount,
-            fm::ImMethodology::Simm,
-            as_of,
-            self.inner.mpor_days(),
-            breakdown,
+        Ok(PyImResult::from_inner(
+            self.inner
+                .calculate_from_sensitivities_result(&sensitivities.inner, ccy, as_of),
         ))
     }
 }
@@ -499,6 +280,7 @@ impl PyScheduleImCalculator {
 
     /// Calculate gross schedule IM from an explicit notional amount.
     #[pyo3(signature = (notional, currency, asset_class, maturity_years, year, month, day))]
+    #[allow(clippy::too_many_arguments)]
     fn calculate_for_notional(
         &self,
         notional: f64,
@@ -512,22 +294,19 @@ impl PyScheduleImCalculator {
         let ccy = parse_currency(currency)?;
         let as_of = parse_date(year, month, day)?;
         let asset_class = parse_schedule_asset_class(asset_class)?;
-        let amount = self.inner.calculate_for_notional(
-            money_from_amount(notional, ccy)?,
-            asset_class.clone(),
-            maturity_years,
-        );
-        Ok(imresult_from_amount(
-            amount,
-            fm::ImMethodology::Schedule,
-            as_of,
-            self.inner.mpor_days,
-            asset_class.to_string(),
+        Ok(PyImResult::from_inner(
+            self.inner.calculate_for_notional_result(
+                money_from_amount(notional, ccy)?,
+                asset_class,
+                maturity_years,
+                as_of,
+            ),
         ))
     }
 
     /// Calculate schedule IM for a single-asset-class netting set using NGR.
     #[pyo3(signature = (positions, currency, asset_class, maturity_years, year, month, day))]
+    #[allow(clippy::too_many_arguments)]
     fn calculate_netting_set_with_ngr(
         &self,
         positions: Vec<(f64, f64)>,
@@ -552,16 +331,13 @@ impl PyScheduleImCalculator {
             .collect::<PyResult<_>>()?;
         Ok(self
             .inner
-            .calculate_netting_set_with_ngr(&money_positions, asset_class.clone(), maturity_years)
-            .map(|amount| {
-                imresult_from_amount(
-                    amount,
-                    fm::ImMethodology::Schedule,
-                    as_of,
-                    self.inner.mpor_days,
-                    format!("{}_ngr", asset_class),
-                )
-            }))
+            .calculate_netting_set_with_ngr_result(
+                &money_positions,
+                asset_class,
+                maturity_years,
+                as_of,
+            )
+            .map(PyImResult::from_inner))
     }
 }
 
@@ -631,6 +407,7 @@ impl PyHaircutImCalculator {
 
     /// Calculate haircut IM from explicit collateral value and asset class.
     #[pyo3(signature = (collateral_value, currency, asset_class, currency_mismatch, year, month, day))]
+    #[allow(clippy::too_many_arguments)]
     fn calculate_for_collateral(
         &self,
         collateral_value: f64,
@@ -643,20 +420,15 @@ impl PyHaircutImCalculator {
     ) -> PyResult<PyImResult> {
         let ccy = parse_currency(currency)?;
         let as_of = parse_date(year, month, day)?;
-        let amount = self
-            .inner
-            .calculate_for_collateral(
-                money_from_amount(collateral_value, ccy)?,
-                &asset_class.inner,
-                currency_mismatch,
-            )
-            .map_err(core_to_py)?;
-        Ok(imresult_from_amount(
-            amount,
-            fm::ImMethodology::Haircut,
-            as_of,
-            2,
-            asset_class.inner.to_string(),
+        Ok(PyImResult::from_inner(
+            self.inner
+                .calculate_for_collateral_result(
+                    money_from_amount(collateral_value, ccy)?,
+                    &asset_class.inner,
+                    currency_mismatch,
+                    as_of,
+                )
+                .map_err(core_to_py)?,
         ))
     }
 }

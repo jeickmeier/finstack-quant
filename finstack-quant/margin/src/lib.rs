@@ -51,5 +51,5 @@ pub use types::{
     EligibleCollateralSchedule, ImMethodology, ImParameters, InstrumentMarginResult, MarginCall,
     MarginCallTiming, MarginCallType, MarginTenor, MaturityConstraints, NettingSetId,
     OtcMarginSpec, RepoMarginSpec, RepoMarginType, SimmCreditSector, SimmRiskClass,
-    SimmSensitivities, VmParameters,
+    SimmSensitivities, SimmSensitivitiesJson, VmParameters,
 };

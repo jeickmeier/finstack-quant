@@ -1491,37 +1491,293 @@ class ImResult:
 class SimmSensitivities:
     """ISDA SIMM sensitivity portfolio.
 
-    Values are signed currency sensitivities loaded by SIMM risk class. Use
-    ``from_json``/``to_json`` for full-fidelity interop or the ``add_*`` helpers
-    for interactive notebooks.
+    Stores signed sensitivity amounts by SIMM risk class and bucket. Amounts
+    are currency amounts, not percentages or spot levels. Rate and credit
+    delta inputs are DV01/CS01-style amounts per 1bp move, and the
+    ``base_currency`` records the currency context in which those amounts were
+    produced.
+
+    Use ``from_json``/``to_json`` for full-fidelity interop with the canonical
+    Rust JSON shape, or the ``add_*`` helpers for notebook-style construction.
     """
 
-    def __init__(self, base_currency: str = "USD") -> None: ...
+    def __init__(self, base_currency: str = "USD") -> None:
+        """Create an empty SIMM sensitivity set.
+
+        Parameters
+        ----------
+        base_currency : str, default "USD"
+            ISO currency code for the currency in which the sensitivity
+            amounts are expressed.
+
+        Raises
+        ------
+        ValueError
+            If ``base_currency`` is not a known currency code.
+        """
+        ...
+
     @staticmethod
-    def from_json(json: str) -> SimmSensitivities: ...
-    def to_json(self) -> str: ...
-    def add_ir_delta(self, currency: str, tenor: str, amount: float) -> None: ...
-    def add_ir_vega(self, currency: str, tenor: str, amount: float) -> None: ...
-    def add_credit_delta(self, name: str, qualifying: bool, tenor: str, amount: float) -> None: ...
-    def add_credit_delta_bucketed(self, sector: str, name: str, tenor: str, amount: float) -> None: ...
-    def add_equity_delta(self, underlier: str, amount: float) -> None: ...
-    def add_equity_vega(self, underlier: str, amount: float) -> None: ...
-    def add_fx_delta(self, currency: str, amount: float) -> None: ...
-    def add_fx_vega(self, ccy1: str, ccy2: str, amount: float) -> None: ...
-    def add_commodity_delta(self, bucket: str, amount: float) -> None: ...
-    def add_curvature(self, risk_class: str, amount: float) -> None: ...
-    def is_empty(self) -> bool: ...
+    def from_json(json: str) -> SimmSensitivities:
+        """Deserialize SIMM sensitivities from the canonical JSON shape.
+
+        Parameters
+        ----------
+        json : str
+            JSON string produced by ``to_json`` or by Rust
+            ``SimmSensitivities::to_json_pretty``. Tuple-keyed Rust maps are
+            represented as arrays such as ``[currency, tenor, amount]``.
+
+        Returns
+        -------
+        SimmSensitivities
+            Sensitivity set populated from the JSON payload.
+
+        Raises
+        ------
+        ValueError
+            If the payload is not valid JSON or does not match the SIMM
+            sensitivity schema.
+        """
+        ...
+
+    def to_json(self) -> str:
+        """Serialize sensitivities to the canonical pretty-printed JSON shape.
+
+        Returns
+        -------
+        str
+            JSON string containing all populated buckets and the base currency.
+        """
+        ...
+
+    def add_ir_delta(self, currency: str, tenor: str, amount: float) -> None:
+        """Add an interest-rate delta bucket.
+
+        Parameters
+        ----------
+        currency : str
+            Currency risk factor, such as ``"USD"``.
+        tenor : str
+            SIMM tenor bucket, such as ``"2W"``, ``"1Y"``, ``"5Y"``, or
+            ``"30Y"``.
+        amount : float
+            Signed DV01-style currency amount per 1bp move.
+
+        Raises
+        ------
+        ValueError
+            If ``currency`` is not a known currency code.
+        """
+        ...
+
+    def add_ir_vega(self, currency: str, tenor: str, amount: float) -> None:
+        """Add an interest-rate vega bucket.
+
+        Parameters
+        ----------
+        currency : str
+            Currency risk factor, such as ``"USD"``.
+        tenor : str
+            SIMM tenor bucket.
+        amount : float
+            Signed currency vega amount compatible with SIMM vega weights.
+
+        Raises
+        ------
+        ValueError
+            If ``currency`` is not a known currency code.
+        """
+        ...
+
+    def add_credit_delta(self, name: str, qualifying: bool, tenor: str, amount: float) -> None:
+        """Add a credit delta bucket.
+
+        Parameters
+        ----------
+        name : str
+            Issuer, index, or reference-entity identifier.
+        qualifying : bool
+            ``True`` for SIMM credit qualifying, ``False`` for credit
+            non-qualifying.
+        tenor : str
+            Credit tenor bucket, such as ``"5Y"``.
+        amount : float
+            Signed CS01-style currency amount per 1bp move.
+        """
+        ...
+
+    def add_credit_delta_bucketed(self, sector: str, name: str, tenor: str, amount: float) -> None:
+        """Add a bucketed credit-qualifying delta sensitivity.
+
+        Parameters
+        ----------
+        sector : str
+            SIMM credit sector alias. Supported aliases include
+            ``"sovereign"``, ``"financial"``, ``"basic_materials"``,
+            ``"technology_media"``, ``"health_care"``, ``"hy_financial"``,
+            ``"index"``, ``"securitized"``, and ``"residual"``.
+        name : str
+            Issuer, index, or reference-entity identifier.
+        tenor : str
+            Credit tenor bucket, such as ``"5Y"``.
+        amount : float
+            Signed CS01-style currency amount per 1bp move.
+
+        Raises
+        ------
+        ValueError
+            If ``sector`` is not recognized.
+        """
+        ...
+
+    def add_equity_delta(self, underlier: str, amount: float) -> None:
+        """Add an equity delta bucket.
+
+        Parameters
+        ----------
+        underlier : str
+            Equity underlier or index identifier.
+        amount : float
+            Signed currency sensitivity amount.
+        """
+        ...
+
+    def add_equity_vega(self, underlier: str, amount: float) -> None:
+        """Add an equity vega bucket.
+
+        Parameters
+        ----------
+        underlier : str
+            Equity underlier or index identifier.
+        amount : float
+            Signed currency vega amount.
+        """
+        ...
+
+    def add_fx_delta(self, currency: str, amount: float) -> None:
+        """Add an FX delta bucket.
+
+        Parameters
+        ----------
+        currency : str
+            FX risk-factor currency.
+        amount : float
+            Signed currency sensitivity amount.
+
+        Raises
+        ------
+        ValueError
+            If ``currency`` is not a known currency code.
+        """
+        ...
+
+    def add_fx_vega(self, ccy1: str, ccy2: str, amount: float) -> None:
+        """Add an FX vega bucket for a currency pair.
+
+        Parameters
+        ----------
+        ccy1 : str
+            First currency in the FX pair.
+        ccy2 : str
+            Second currency in the FX pair.
+        amount : float
+            Signed currency vega amount.
+
+        Raises
+        ------
+        ValueError
+            If either currency code is unknown.
+        """
+        ...
+
+    def add_commodity_delta(self, bucket: str, amount: float) -> None:
+        """Add a commodity delta bucket.
+
+        Parameters
+        ----------
+        bucket : str
+            Commodity bucket label expected by the configured SIMM registry,
+            such as ``"energy"``.
+        amount : float
+            Signed currency sensitivity amount.
+        """
+        ...
+
+    def add_curvature(self, risk_class: str, amount: float) -> None:
+        """Add a curvature contribution for a SIMM risk class.
+
+        Parameters
+        ----------
+        risk_class : str
+            SIMM risk class alias. Supported aliases include
+            ``"interest_rate"``, ``"rates"``, ``"credit_qualifying"``,
+            ``"credit_non_qualifying"``, ``"equity"``, ``"commodity"``,
+            and ``"fx"``.
+        amount : float
+            Signed curvature contribution in currency units before the SIMM
+            curvature scale factor is applied.
+
+        Raises
+        ------
+        ValueError
+            If ``risk_class`` is not recognized.
+        """
+        ...
+
+    def is_empty(self) -> bool:
+        """Return whether no sensitivity buckets have been populated.
+
+        Returns
+        -------
+        bool
+            ``True`` when every SIMM bucket map is empty. A populated bucket
+            with a zero net amount still makes the container non-empty.
+        """
+        ...
+
     @property
-    def base_currency(self) -> str: ...
+    def base_currency(self) -> str:
+        """Currency context in which sensitivity amounts are expressed."""
+        ...
 
 class SimmCalculator:
-    """ISDA SIMM initial-margin calculator."""
+    """ISDA SIMM initial-margin calculator.
 
-    def __init__(self, version: str = "v2_6", mpor_days: int | None = None) -> None: ...
+    Loads registry-backed SIMM parameters for the requested rule version and
+    calculates initial margin from explicit ``SimmSensitivities``.
+    """
+
+    def __init__(self, version: str = "v2_6", mpor_days: int | None = None) -> None:
+        """Create a SIMM calculator from the embedded margin registry.
+
+        Parameters
+        ----------
+        version : str, default "v2_6"
+            SIMM version alias. Supported values include ``"v2_5"``,
+            ``"2.5"``, ``"SIMM 2.5"``, ``"v2_6"``, ``"2.6"``, and
+            ``"SIMM 2.6"``.
+        mpor_days : int | None, optional
+            Optional margin period of risk override in calendar days. When
+            omitted, the registry default for the SIMM version is used.
+
+        Raises
+        ------
+        ValueError
+            If the version is unknown or registry parameters cannot be loaded.
+        """
+        ...
+
     @property
-    def version(self) -> str: ...
+    def version(self) -> str:
+        """Stable SIMM version label, either ``"v2_5"`` or ``"v2_6"``."""
+        ...
+
     @property
-    def mpor_days(self) -> int: ...
+    def mpor_days(self) -> int:
+        """Margin period of risk in calendar days."""
+        ...
+
     def calculate_from_sensitivities(
         self,
         sensitivities: SimmSensitivities,
@@ -1529,18 +1785,139 @@ class SimmCalculator:
         year: int,
         month: int,
         day: int,
-    ) -> ImResult: ...
+    ) -> ImResult:
+        """Calculate SIMM from explicit sensitivities.
+
+        Parameters
+        ----------
+        sensitivities : SimmSensitivities
+            Sensitivity set to aggregate.
+        currency : str
+            Reporting currency for the resulting margin amount.
+        year : int
+            Calculation year.
+        month : int
+            Calculation month, from 1 to 12.
+        day : int
+            Calculation day of month.
+
+        Returns
+        -------
+        ImResult
+            Initial-margin amount, methodology, MPOR, calculation date, and
+            risk-class breakdown.
+
+        Raises
+        ------
+        ValueError
+            If the reporting currency or date is invalid.
+        """
+        ...
 
 class ScheduleImCalculator:
-    """BCBS-IOSCO regulatory schedule initial-margin calculator."""
+    """BCBS-IOSCO regulatory schedule initial-margin calculator.
+
+    Applies registry-backed schedule rates to explicit notionals or to a
+    single-asset-class netting set with the BCBS-IOSCO net-to-gross ratio
+    reduction.
+    """
 
     @staticmethod
-    def bcbs_standard() -> ScheduleImCalculator: ...
+    def bcbs_standard() -> ScheduleImCalculator:
+        """Create the embedded BCBS-IOSCO standard schedule calculator.
+
+        Returns
+        -------
+        ScheduleImCalculator
+            Calculator configured with the standard embedded schedule grid.
+
+        Raises
+        ------
+        ValueError
+            If embedded registry data cannot be loaded.
+        """
+        ...
+
     @staticmethod
-    def from_registry_id(schedule_id: str) -> ScheduleImCalculator: ...
-    def with_asset_class(self, asset_class: str) -> ScheduleImCalculator: ...
-    def with_maturity(self, years: float) -> ScheduleImCalculator: ...
-    def rate(self, asset_class: str, maturity_years: float) -> float: ...
+    def from_registry_id(schedule_id: str) -> ScheduleImCalculator:
+        """Create a schedule calculator from a registry identifier.
+
+        Parameters
+        ----------
+        schedule_id : str
+            Schedule identifier in the embedded margin registry.
+
+        Returns
+        -------
+        ScheduleImCalculator
+            Calculator configured from the matching registry entry.
+
+        Raises
+        ------
+        ValueError
+            If ``schedule_id`` is unknown or registry data is invalid.
+        """
+        ...
+
+    def with_asset_class(self, asset_class: str) -> ScheduleImCalculator:
+        """Return a copy with a new default schedule asset class.
+
+        Parameters
+        ----------
+        asset_class : str
+            Schedule asset class alias such as ``"interest_rate"``,
+            ``"credit"``, ``"equity"``, ``"commodity"``, ``"fx"``, or
+            ``"other"``.
+
+        Returns
+        -------
+        ScheduleImCalculator
+            Copy of this calculator with the default asset class changed.
+
+        Raises
+        ------
+        ValueError
+            If ``asset_class`` is not recognized.
+        """
+        ...
+
+    def with_maturity(self, years: float) -> ScheduleImCalculator:
+        """Return a copy with a new default maturity.
+
+        Parameters
+        ----------
+        years : float
+            Representative remaining maturity in years.
+
+        Returns
+        -------
+        ScheduleImCalculator
+            Copy of this calculator with the default maturity changed.
+        """
+        ...
+
+    def rate(self, asset_class: str, maturity_years: float) -> float:
+        """Look up a decimal schedule rate.
+
+        Parameters
+        ----------
+        asset_class : str
+            Schedule asset class alias.
+        maturity_years : float
+            Remaining maturity in years.
+
+        Returns
+        -------
+        float
+            Decimal IM rate, e.g. ``0.01`` for 1%.
+
+        Raises
+        ------
+        ValueError
+            If ``asset_class`` is not recognized.
+        """
+        ...
+
     def calculate_for_notional(
         self,
         notional: float,
@@ -1550,7 +1927,40 @@ class ScheduleImCalculator:
         year: int,
         month: int,
         day: int,
-    ) -> ImResult: ...
+    ) -> ImResult:
+        """Calculate gross schedule IM from an explicit notional.
+
+        Parameters
+        ----------
+        notional : float
+            Regulatory notional or caller-supplied exposure base. The schedule
+            formula uses ``abs(notional)``.
+        currency : str
+            Currency code for the notional and result.
+        asset_class : str
+            Schedule asset class alias.
+        maturity_years : float
+            Remaining maturity used for the schedule-rate lookup.
+        year : int
+            Calculation year.
+        month : int
+            Calculation month, from 1 to 12.
+        day : int
+            Calculation day of month.
+
+        Returns
+        -------
+        ImResult
+            Gross schedule IM with a breakdown key equal to the normalized
+            asset class.
+
+        Raises
+        ------
+        ValueError
+            If the currency, asset class, amount, or date is invalid.
+        """
+        ...
+
     def calculate_netting_set_with_ngr(
         self,
         positions: list[tuple[float, float]],
@@ -1560,20 +1970,159 @@ class ScheduleImCalculator:
         year: int,
         month: int,
         day: int,
-    ) -> ImResult | None: ...
+    ) -> ImResult | None:
+        """Calculate schedule IM for a netting set using NGR.
+
+        Applies the BCBS-IOSCO reduction ``0.4 + 0.6 * NGR`` to a
+        single-asset-class set of ``(signed_mtm, gross_notional)`` positions.
+        The binding assumes every tuple is in ``currency`` and that the set has
+        already been partitioned by asset class.
+
+        Parameters
+        ----------
+        positions : list[tuple[float, float]]
+            ``(signed_mtm, gross_notional)`` pairs. MTM signs drive the NGR
+            numerator; gross notionals are summed as absolute values.
+        currency : str
+            Reporting currency for every MTM, notional, and result.
+        asset_class : str
+            Schedule asset class applied uniformly to all positions.
+        maturity_years : float
+            Representative remaining maturity used for the rate lookup.
+        year : int
+            Calculation year.
+        month : int
+            Calculation month, from 1 to 12.
+        day : int
+            Calculation day of month.
+
+        Returns
+        -------
+        ImResult | None
+            NGR-adjusted schedule IM. Returns ``None`` for an empty position
+            list, zero gross notionals, or inconsistent currencies after
+            conversion to Rust money values.
+
+        Raises
+        ------
+        ValueError
+            If the currency, asset class, amount, or date is invalid.
+        """
+        ...
 
 class HaircutImCalculator:
-    """Haircut-based initial-margin calculator."""
+    """Haircut-based initial-margin calculator.
+
+    Applies eligible-collateral haircuts and optional FX add-ons to explicit
+    collateral values. This path is intended for repo and securities-financing
+    style collateral IM rather than SIMM sensitivities.
+    """
 
     @staticmethod
-    def bcbs_standard() -> HaircutImCalculator: ...
+    def bcbs_standard() -> HaircutImCalculator:
+        """Create a haircut calculator with the BCBS-IOSCO schedule.
+
+        Returns
+        -------
+        HaircutImCalculator
+            Calculator using the embedded BCBS-IOSCO collateral haircuts.
+
+        Raises
+        ------
+        ValueError
+            If embedded registry data cannot be loaded.
+        """
+        ...
+
     @staticmethod
-    def us_treasuries() -> HaircutImCalculator: ...
+    def us_treasuries() -> HaircutImCalculator:
+        """Create a haircut calculator for US Treasury collateral.
+
+        Returns
+        -------
+        HaircutImCalculator
+            Calculator using the embedded US Treasuries haircut schedule.
+
+        Raises
+        ------
+        ValueError
+            If embedded registry data cannot be loaded.
+        """
+        ...
+
     @staticmethod
-    def from_schedule(schedule: EligibleCollateralSchedule) -> HaircutImCalculator: ...
-    def with_default_asset_class(self, asset_class: CollateralAssetClass) -> HaircutImCalculator: ...
-    def with_posted_collateral_currency(self, currency: str) -> HaircutImCalculator: ...
-    def haircut_for(self, asset_class: CollateralAssetClass) -> float: ...
+    def from_schedule(schedule: EligibleCollateralSchedule) -> HaircutImCalculator:
+        """Create a haircut calculator from an eligible-collateral schedule.
+
+        Parameters
+        ----------
+        schedule : EligibleCollateralSchedule
+            Collateral eligibility and haircut schedule.
+
+        Returns
+        -------
+        HaircutImCalculator
+            Calculator backed by ``schedule``.
+        """
+        ...
+
+    def with_default_asset_class(self, asset_class: CollateralAssetClass) -> HaircutImCalculator:
+        """Return a copy configured with a default collateral asset class.
+
+        Parameters
+        ----------
+        asset_class : CollateralAssetClass
+            Asset class used by trait-based calculations.
+
+        Returns
+        -------
+        HaircutImCalculator
+            Copy of this calculator with the default asset class changed.
+        """
+        ...
+
+    def with_posted_collateral_currency(self, currency: str) -> HaircutImCalculator:
+        """Return a copy configured with a posted-collateral currency.
+
+        Parameters
+        ----------
+        currency : str
+            Currency code used to detect FX mismatch in trait-based
+            calculations.
+
+        Returns
+        -------
+        HaircutImCalculator
+            Copy of this calculator with the collateral currency configured.
+
+        Raises
+        ------
+        ValueError
+            If ``currency`` is not a known currency code.
+        """
+        ...
+
+    def haircut_for(self, asset_class: CollateralAssetClass) -> float:
+        """Look up the decimal haircut for a collateral asset class.
+
+        Parameters
+        ----------
+        asset_class : CollateralAssetClass
+            Collateral asset class.
+
+        Returns
+        -------
+        float
+            Decimal haircut including only the base haircut, not the optional
+            FX add-on.
+
+        Raises
+        ------
+        ValueError
+            If no schedule or standard haircut exists for ``asset_class``.
+        """
+        ...
+
     def calculate_for_collateral(
         self,
         collateral_value: float,
@@ -1583,7 +2132,39 @@ class HaircutImCalculator:
         year: int,
         month: int,
         day: int,
-    ) -> ImResult: ...
+    ) -> ImResult:
+        """Calculate haircut IM from explicit collateral value and asset class.
+
+        Parameters
+        ----------
+        collateral_value : float
+            Collateral market value in ``currency``.
+        currency : str
+            Currency code for the collateral value and result.
+        asset_class : CollateralAssetClass
+            Collateral asset class used for the haircut lookup.
+        currency_mismatch : bool
+            Whether to add the asset-class FX mismatch add-on.
+        year : int
+            Calculation year.
+        month : int
+            Calculation month, from 1 to 12.
+        day : int
+            Calculation day of month.
+
+        Returns
+        -------
+        ImResult
+            Haircut IM result. The MPOR is the Rust canonical repo haircut
+            horizon, currently 2 calendar days.
+
+        Raises
+        ------
+        ValueError
+            If the currency, amount, date, haircut, or FX add-on cannot be
+            resolved.
+        """
+        ...
 
 class FundingConfig:
     """Funding cost/benefit configuration for FVA calculation.

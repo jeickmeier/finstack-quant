@@ -383,6 +383,34 @@ impl ScheduleImCalculator {
         Money::new(notional.amount().abs(), notional.currency()) * rate
     }
 
+    /// Calculate gross schedule IM and return a full [`ImResult`].
+    ///
+    /// # Arguments
+    ///
+    /// * `notional` - Regulatory notional or caller-supplied exposure base.
+    ///   The calculation uses `abs(notional)`.
+    /// * `asset_class` - Schedule asset class used for the rate lookup and
+    ///   result breakdown key.
+    /// * `maturity_years` - Remaining maturity as a year fraction.
+    /// * `as_of` - Calculation date stored on the returned result.
+    ///
+    /// # Returns
+    ///
+    /// An [`ImResult`] with methodology [`ImMethodology::Schedule`], the
+    /// calculator's registry-backed MPOR, and one breakdown entry keyed by
+    /// `asset_class`.
+    #[must_use]
+    pub fn calculate_for_notional_result(
+        &self,
+        notional: Money,
+        asset_class: ScheduleAssetClass,
+        maturity_years: f64,
+        as_of: Date,
+    ) -> ImResult {
+        let amount = self.calculate_for_notional(notional, asset_class.clone(), maturity_years);
+        self.result_from_amount(amount, as_of, asset_class.to_string())
+    }
+
     /// BCBS-IOSCO Schedule IM with the Net-to-Gross Ratio (NGR) reduction
     /// factor applied to a netting set of positions.
     ///
@@ -478,6 +506,43 @@ impl ScheduleImCalculator {
         ))
     }
 
+    /// Canonical schedule IM breakdown key for NGR-reduced netting-set results.
+    #[must_use]
+    pub fn ngr_breakdown_key(asset_class: &ScheduleAssetClass) -> String {
+        format!("{asset_class}_ngr")
+    }
+
+    /// Calculate schedule IM with NGR reduction and return a full [`ImResult`].
+    ///
+    /// # Arguments
+    ///
+    /// * `positions` - `(signed_mtm, gross_notional)` pairs in one reporting
+    ///   currency.
+    /// * `asset_class` - Schedule asset class applied uniformly to the whole
+    ///   netting set.
+    /// * `maturity_years` - Representative remaining maturity for the rate
+    ///   lookup.
+    /// * `as_of` - Calculation date stored on the returned result.
+    ///
+    /// # Returns
+    ///
+    /// `Some(ImResult)` when a non-empty, same-currency netting set has
+    /// positive gross notional. The result breakdown key is
+    /// [`Self::ngr_breakdown_key`]. Returns `None` for empty inputs, zero gross
+    /// notionals, or mixed currencies.
+    #[must_use]
+    pub fn calculate_netting_set_with_ngr_result(
+        &self,
+        positions: &[(Money, Money)],
+        asset_class: ScheduleAssetClass,
+        maturity_years: f64,
+        as_of: Date,
+    ) -> Option<ImResult> {
+        let amount =
+            self.calculate_netting_set_with_ngr(positions, asset_class.clone(), maturity_years)?;
+        Some(self.result_from_amount(amount, as_of, Self::ngr_breakdown_key(&asset_class)))
+    }
+
     /// Get the decimal schedule rate for an asset class and maturity.
     ///
     /// # Arguments
@@ -491,6 +556,23 @@ impl ScheduleImCalculator {
     #[must_use]
     pub fn rate(&self, asset_class: ScheduleAssetClass, maturity_years: f64) -> f64 {
         self.schedule.rate(asset_class, maturity_years)
+    }
+
+    fn result_from_amount(
+        &self,
+        amount: Money,
+        as_of: Date,
+        breakdown_key: impl Into<String>,
+    ) -> ImResult {
+        let mut breakdown = HashMap::default();
+        breakdown.insert(breakdown_key.into(), amount);
+        ImResult::with_breakdown(
+            amount,
+            ImMethodology::Schedule,
+            as_of,
+            self.mpor_days,
+            breakdown,
+        )
     }
 }
 

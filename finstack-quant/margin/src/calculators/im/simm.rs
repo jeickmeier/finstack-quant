@@ -81,11 +81,41 @@ pub enum SimmVersion {
     V2_6,
 }
 
+impl SimmVersion {
+    /// Stable lowercase identifier used in machine-readable APIs.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::V2_5 => "v2_5",
+            Self::V2_6 => "v2_6",
+        }
+    }
+}
+
 impl std::fmt::Display for SimmVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SimmVersion::V2_5 => write!(f, "SIMM v2.5"),
             SimmVersion::V2_6 => write!(f, "SIMM v2.6"),
+        }
+    }
+}
+
+impl std::str::FromStr for SimmVersion {
+    type Err = String;
+
+    fn from_str(raw: &str) -> std::result::Result<Self, Self::Err> {
+        match raw
+            .trim()
+            .to_ascii_lowercase()
+            .replace([' ', '-', '.'], "_")
+            .as_str()
+        {
+            "v2_5" | "2_5" | "simm_v2_5" | "simm_2_5" | "simm2_5" => Ok(Self::V2_5),
+            "v2_6" | "2_6" | "simm_v2_6" | "simm_2_6" | "simm2_6" => Ok(Self::V2_6),
+            other => Err(format!(
+                "unknown SIMM version '{other}' (expected 'v2_5' or 'v2_6')"
+            )),
         }
     }
 }
@@ -1295,6 +1325,30 @@ impl SimmCalculator {
         (total_im, breakdown)
     }
 
+    /// Calculate SIMM from explicit sensitivities and return a full [`ImResult`].
+    ///
+    /// # Arguments
+    ///
+    /// * `sensitivities` - SIMM sensitivity container.
+    /// * `currency` - Reporting currency for the margin result.
+    /// * `as_of` - Calculation date.
+    #[must_use]
+    pub fn calculate_from_sensitivities_result(
+        &self,
+        sensitivities: &SimmSensitivities,
+        currency: Currency,
+        as_of: Date,
+    ) -> ImResult {
+        let (amount, breakdown) = self.calculate_from_sensitivities(sensitivities, currency);
+        ImResult::with_breakdown(
+            Money::new(amount, currency),
+            ImMethodology::Simm,
+            as_of,
+            self.mpor_days(),
+            breakdown,
+        )
+    }
+
     /// Aggregate risk class margins with the SIMM inter-risk-class correlation matrix.
     ///
     /// `Total = sqrt(sum_i sum_j rho(i,j) * K_i * K_j)`
@@ -1389,6 +1443,11 @@ mod tests {
     #[test]
     fn simm_version_display() {
         assert_eq!(SimmVersion::V2_6.to_string(), "SIMM v2.6");
+        assert_eq!(SimmVersion::V2_6.as_str(), "v2_6");
+        assert_eq!(
+            "SIMM 2.5".parse::<SimmVersion>().expect("version alias"),
+            SimmVersion::V2_5
+        );
     }
 
     #[test]

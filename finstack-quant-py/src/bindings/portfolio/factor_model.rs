@@ -102,7 +102,7 @@ fn parse_position_changes(
                     })
                 }
                 "add" => Err(crate::errors::value_error(
-                    "position_what_if does not support add changes yet; use remove or resize",
+                    "Python position_what_if changes currently support remove or resize only",
                 )),
                 other => Err(crate::errors::value_error(format!(
                     "unknown position change kind '{other}' (expected 'remove' or 'resize')"
@@ -2001,7 +2001,11 @@ fn position_what_if(
     Ok(PyWhatIfResult::from_inner(result))
 }
 
-/// Build tail-scenario stress attribution from per-position scenario P&Ls.
+/// Build tail-scenario stress attribution from position x scenario P&Ls.
+///
+/// Python input is one row per position, where every row contains that
+/// position's P&L across all scenarios. The binding transposes that ergonomic
+/// shape into Rust's row-major scenario x position buffer.
 #[pyfunction]
 #[pyo3(signature = (position_ids, position_pnls, confidence = 0.95))]
 fn build_stress_attribution(

@@ -11,6 +11,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
+/// Margin period of risk used for haircut-based repo IM.
+pub const HAIRCUT_MPOR_DAYS: u32 = 2;
+
 /// Haircut-based initial margin calculator.
 ///
 /// Calculates IM based on collateral value and asset-class-specific haircuts.
@@ -144,12 +147,65 @@ impl HaircutImCalculator {
         Ok(collateral_value * total_haircut)
     }
 
+    /// Calculate haircut IM and return a full [`ImResult`].
+    ///
+    /// # Arguments
+    ///
+    /// * `collateral_value` - Collateral market value.
+    /// * `asset_class` - Collateral asset class used for haircut lookup and
+    ///   the result breakdown key.
+    /// * `currency_mismatch` - Whether to add the asset-class FX mismatch
+    ///   add-on.
+    /// * `as_of` - Calculation date stored on the returned result.
+    ///
+    /// # Returns
+    ///
+    /// An [`ImResult`] with methodology [`ImMethodology::Haircut`], the
+    /// canonical repo haircut MPOR, and one breakdown entry keyed by
+    /// `asset_class`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the asset class has no configured or standard
+    /// haircut, or if the FX add-on cannot be resolved.
+    pub fn calculate_for_collateral_result(
+        &self,
+        collateral_value: Money,
+        asset_class: &CollateralAssetClass,
+        currency_mismatch: bool,
+        as_of: Date,
+    ) -> Result<ImResult> {
+        let amount =
+            self.calculate_for_collateral(collateral_value, asset_class, currency_mismatch)?;
+        Ok(Self::result_from_amount(
+            amount,
+            as_of,
+            asset_class.to_string(),
+        ))
+    }
+
     /// Get the haircut for an asset class.
     pub fn haircut_for(&self, asset_class: &CollateralAssetClass) -> Result<f64> {
         match self.eligible_collateral.haircut_for(asset_class) {
             Some(h) => Ok(h),
             None => asset_class.standard_haircut(),
         }
+    }
+
+    fn result_from_amount(
+        amount: Money,
+        as_of: Date,
+        breakdown_key: impl Into<String>,
+    ) -> ImResult {
+        let mut breakdown = finstack_quant_core::HashMap::default();
+        breakdown.insert(breakdown_key.into(), amount);
+        ImResult::with_breakdown(
+            amount,
+            ImMethodology::Haircut,
+            as_of,
+            HAIRCUT_MPOR_DAYS,
+            breakdown,
+        )
     }
 }
 
@@ -188,7 +244,7 @@ impl ImCalculator for HaircutImCalculator {
             im_amount,
             ImMethodology::Haircut,
             as_of,
-            2, // Short MPOR for repos
+            HAIRCUT_MPOR_DAYS,
             breakdown,
         ))
     }

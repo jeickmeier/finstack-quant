@@ -39,6 +39,6 @@ pub use repo_cashflows::{
 pub use repo_margin::{RepoMarginSpec, RepoMarginType};
 pub use simm_types::{
     ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair, SimmCreditSector,
-    SimmRiskClass, SimmSensitivities,
+    SimmRiskClass, SimmSensitivities, SimmSensitivitiesJson,
 };
 pub use thresholds::{ImParameters, VmParameters};

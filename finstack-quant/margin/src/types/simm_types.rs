@@ -8,6 +8,12 @@ use core::hash::Hash;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::HashMap;
 
+fn normalize_simm_label(raw: &str) -> String {
+    raw.trim()
+        .to_ascii_lowercase()
+        .replace([' ', '-', '.'], "_")
+}
+
 /// Add every `(key, value)` from `source` into `target`, accumulating
 /// values for keys that already exist.
 ///
@@ -111,6 +117,206 @@ impl std::fmt::Display for SimmRiskClass {
             SimmRiskClass::Commodity => write!(f, "Commodity"),
             SimmRiskClass::Fx => write!(f, "FX"),
         }
+    }
+}
+
+impl std::str::FromStr for SimmRiskClass {
+    type Err = String;
+
+    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+        match normalize_simm_label(raw).as_str() {
+            "interest_rate" | "ir" | "rates" => Ok(Self::InterestRate),
+            "credit_qualifying" | "credit_qual" | "cq" => Ok(Self::CreditQualifying),
+            "credit_non_qualifying" | "credit_nonqual" | "cnq" => Ok(Self::CreditNonQualifying),
+            "equity" | "eq" => Ok(Self::Equity),
+            "commodity" | "comm" => Ok(Self::Commodity),
+            "fx" | "foreign_exchange" => Ok(Self::Fx),
+            other => Err(format!("unknown SIMM risk class '{other}'")),
+        }
+    }
+}
+
+impl std::str::FromStr for SimmCreditSector {
+    type Err = String;
+
+    fn from_str(raw: &str) -> Result<Self, Self::Err> {
+        match normalize_simm_label(raw).as_str() {
+            "sovereign" | "ig_sovereign" => Ok(Self::Sovereign),
+            "financial" | "ig_financial" => Ok(Self::Financial),
+            "basic_materials" | "energy_industrials" | "ig_basic_materials" => {
+                Ok(Self::BasicMaterials)
+            }
+            "consumer_goods" | "ig_consumer_goods" => Ok(Self::ConsumerGoods),
+            "technology_media" | "technology" | "telecom" | "ig_technology_media" => {
+                Ok(Self::TechnologyMedia)
+            }
+            "health_care" | "healthcare" | "utilities" | "ig_health_care" => Ok(Self::HealthCare),
+            "high_yield_sovereign" | "hy_sovereign" => Ok(Self::HighYieldSovereign),
+            "high_yield_financial" | "hy_financial" => Ok(Self::HighYieldFinancial),
+            "high_yield_basic_materials" | "hy_basic_materials" => {
+                Ok(Self::HighYieldBasicMaterials)
+            }
+            "high_yield_consumer_goods" | "hy_consumer_goods" => Ok(Self::HighYieldConsumerGoods),
+            "high_yield_technology_media" | "hy_technology_media" => {
+                Ok(Self::HighYieldTechnologyMedia)
+            }
+            "high_yield_health_care" | "hy_health_care" | "hy_healthcare" => {
+                Ok(Self::HighYieldHealthCare)
+            }
+            "index" => Ok(Self::Index),
+            "securitized" | "securitised" => Ok(Self::Securitized),
+            "residual" | "other" => Ok(Self::Residual),
+            other => Err(format!("unknown SIMM credit sector '{other}'")),
+        }
+    }
+}
+
+/// JSON-friendly representation of [`SimmSensitivities`].
+///
+/// Tuple-keyed maps cannot be represented directly as JSON object keys, so this
+/// DTO stores each bucket as an array of tuples. It is the canonical JSON shape
+/// used by language bindings and examples.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+pub struct SimmSensitivitiesJson {
+    /// Base currency for the sensitivities.
+    pub base_currency: Currency,
+    /// Interest-rate delta buckets as `(currency, tenor, amount)`.
+    #[serde(default)]
+    pub ir_delta: Vec<(Currency, String, f64)>,
+    /// Interest-rate vega buckets as `(currency, tenor, amount)`.
+    #[serde(default)]
+    pub ir_vega: Vec<(Currency, String, f64)>,
+    /// Credit qualifying delta buckets as `(name, tenor, amount)`.
+    #[serde(default)]
+    pub credit_qualifying_delta: Vec<(String, String, f64)>,
+    /// Credit non-qualifying delta buckets as `(name, tenor, amount)`.
+    #[serde(default)]
+    pub credit_non_qualifying_delta: Vec<(String, String, f64)>,
+    /// Equity delta buckets as `(underlier, amount)`.
+    #[serde(default)]
+    pub equity_delta: Vec<(String, f64)>,
+    /// Equity vega buckets as `(underlier, amount)`.
+    #[serde(default)]
+    pub equity_vega: Vec<(String, f64)>,
+    /// FX delta buckets as `(currency, amount)`.
+    #[serde(default)]
+    pub fx_delta: Vec<(Currency, f64)>,
+    /// FX vega buckets as `(ccy1, ccy2, amount)`.
+    #[serde(default)]
+    pub fx_vega: Vec<(Currency, Currency, f64)>,
+    /// Commodity delta buckets as `(bucket, amount)`.
+    #[serde(default)]
+    pub commodity_delta: Vec<(String, f64)>,
+    /// Curvature buckets as `(risk_class, amount)`.
+    #[serde(default)]
+    pub curvature: Vec<(SimmRiskClass, f64)>,
+    /// Bucketed credit qualifying deltas as `(sector, name, tenor, amount)`.
+    #[serde(default)]
+    pub credit_qualifying_delta_bucketed: Vec<(SimmCreditSector, String, String, f64)>,
+}
+
+impl From<&SimmSensitivities> for SimmSensitivitiesJson {
+    fn from(sens: &SimmSensitivities) -> Self {
+        Self {
+            base_currency: sens.base_currency,
+            ir_delta: sens
+                .ir_delta
+                .iter()
+                .map(|((currency, tenor), amount)| (*currency, tenor.clone(), *amount))
+                .collect(),
+            ir_vega: sens
+                .ir_vega
+                .iter()
+                .map(|((currency, tenor), amount)| (*currency, tenor.clone(), *amount))
+                .collect(),
+            credit_qualifying_delta: sens
+                .credit_qualifying_delta
+                .iter()
+                .map(|((name, tenor), amount)| (name.clone(), tenor.clone(), *amount))
+                .collect(),
+            credit_non_qualifying_delta: sens
+                .credit_non_qualifying_delta
+                .iter()
+                .map(|((name, tenor), amount)| (name.clone(), tenor.clone(), *amount))
+                .collect(),
+            equity_delta: sens
+                .equity_delta
+                .iter()
+                .map(|(underlier, amount)| (underlier.clone(), *amount))
+                .collect(),
+            equity_vega: sens
+                .equity_vega
+                .iter()
+                .map(|(underlier, amount)| (underlier.clone(), *amount))
+                .collect(),
+            fx_delta: sens
+                .fx_delta
+                .iter()
+                .map(|(currency, amount)| (*currency, *amount))
+                .collect(),
+            fx_vega: sens
+                .fx_vega
+                .iter()
+                .map(|((ccy1, ccy2), amount)| (*ccy1, *ccy2, *amount))
+                .collect(),
+            commodity_delta: sens
+                .commodity_delta
+                .iter()
+                .map(|(bucket, amount)| (bucket.clone(), *amount))
+                .collect(),
+            curvature: sens
+                .curvature
+                .iter()
+                .map(|(risk_class, amount)| (*risk_class, *amount))
+                .collect(),
+            credit_qualifying_delta_bucketed: sens
+                .credit_qualifying_delta_bucketed
+                .iter()
+                .map(|((sector, name, tenor), amount)| {
+                    (*sector, name.clone(), tenor.clone(), *amount)
+                })
+                .collect(),
+        }
+    }
+}
+
+impl From<SimmSensitivitiesJson> for SimmSensitivities {
+    fn from(value: SimmSensitivitiesJson) -> Self {
+        let mut sens = Self::new(value.base_currency);
+        for (currency, tenor, amount) in value.ir_delta {
+            sens.add_ir_delta(currency, tenor, amount);
+        }
+        for (currency, tenor, amount) in value.ir_vega {
+            sens.add_ir_vega(currency, tenor, amount);
+        }
+        for (name, tenor, amount) in value.credit_qualifying_delta {
+            sens.add_credit_delta(name, true, tenor, amount);
+        }
+        for (name, tenor, amount) in value.credit_non_qualifying_delta {
+            sens.add_credit_delta(name, false, tenor, amount);
+        }
+        for (underlier, amount) in value.equity_delta {
+            sens.add_equity_delta(underlier, amount);
+        }
+        for (underlier, amount) in value.equity_vega {
+            sens.add_equity_vega(underlier, amount);
+        }
+        for (currency, amount) in value.fx_delta {
+            sens.add_fx_delta(currency, amount);
+        }
+        for (ccy1, ccy2, amount) in value.fx_vega {
+            sens.add_fx_vega(ccy1, ccy2, amount);
+        }
+        for (bucket, amount) in value.commodity_delta {
+            sens.add_commodity_delta(bucket, amount);
+        }
+        for (risk_class, amount) in value.curvature {
+            sens.add_curvature(risk_class, amount);
+        }
+        for (sector, name, tenor, amount) in value.credit_qualifying_delta_bucketed {
+            sens.add_credit_delta_bucketed(sector, name, tenor, amount);
+        }
+        sens
     }
 }
 
@@ -340,6 +546,50 @@ impl SimmSensitivities {
         *self.fx_delta.entry(currency).or_insert(0.0) += delta;
     }
 
+    /// Add an FX vega sensitivity bucket.
+    pub fn add_fx_vega(&mut self, ccy1: Currency, ccy2: Currency, vega: f64) {
+        *self.fx_vega.entry((ccy1, ccy2)).or_insert(0.0) += vega;
+    }
+
+    /// Add a commodity delta sensitivity bucket.
+    pub fn add_commodity_delta(&mut self, bucket: impl Into<String>, delta: f64) {
+        let key = bucket.into();
+        *self.commodity_delta.entry(key).or_insert(0.0) += delta;
+    }
+
+    /// Add a curvature contribution for a SIMM risk class.
+    pub fn add_curvature(&mut self, risk_class: SimmRiskClass, amount: f64) {
+        *self.curvature.entry(risk_class).or_insert(0.0) += amount;
+    }
+
+    /// Construct sensitivities from the canonical JSON representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the JSON cannot be deserialized.
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        serde_json::from_str::<SimmSensitivitiesJson>(json)
+            .map(Self::from)
+            .map_err(|e| {
+                finstack_quant_core::Error::Validation(format!(
+                    "invalid SIMM sensitivities JSON: {e}"
+                ))
+            })
+    }
+
+    /// Serialize sensitivities to the canonical JSON representation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if serialization fails.
+    pub fn to_json_pretty(&self) -> finstack_quant_core::Result<String> {
+        serde_json::to_string_pretty(&SimmSensitivitiesJson::from(self)).map_err(|e| {
+            finstack_quant_core::Error::Validation(format!(
+                "failed to serialize SIMM sensitivities: {e}"
+            ))
+        })
+    }
+
     /// Check if sensitivities are empty.
     ///
     /// Returns true if no sensitivity buckets exist across any risk class.
@@ -517,10 +767,56 @@ mod tests {
         sens.add_ir_delta(Currency::USD, "5Y", 100_000.0);
         sens.add_ir_delta(Currency::USD, "10Y", 50_000.0);
         sens.add_credit_delta("ACME_CORP", true, "5Y", 25_000.0);
+        sens.add_fx_vega(Currency::EUR, Currency::USD, 1_000.0);
+        sens.add_commodity_delta("energy", 2_000.0);
+        sens.add_curvature(SimmRiskClass::Equity, 3_000.0);
 
         assert!(!sens.is_empty());
         assert_eq!(sens.total_ir_delta(), 150_000.0);
         assert_eq!(sens.total_credit_delta(), 25_000.0);
+        assert_eq!(sens.fx_vega[&(Currency::EUR, Currency::USD)], 1_000.0);
+        assert_eq!(sens.commodity_delta["energy"], 2_000.0);
+        assert_eq!(sens.curvature[&SimmRiskClass::Equity], 3_000.0);
+    }
+
+    #[test]
+    fn simm_enum_parsers_accept_binding_aliases() {
+        assert_eq!(
+            "rates".parse::<SimmRiskClass>().expect("risk class alias"),
+            SimmRiskClass::InterestRate
+        );
+        assert_eq!(
+            "hy_financial"
+                .parse::<SimmCreditSector>()
+                .expect("credit sector alias"),
+            SimmCreditSector::HighYieldFinancial
+        );
+        assert_eq!(
+            "securitised"
+                .parse::<SimmCreditSector>()
+                .expect("UK spelling alias"),
+            SimmCreditSector::Securitized
+        );
+    }
+
+    #[test]
+    fn simm_sensitivities_json_round_trips_canonical_shape() {
+        let mut sens = SimmSensitivities::new(Currency::USD);
+        sens.add_ir_delta(Currency::USD, "5Y", 100.0);
+        sens.add_fx_vega(Currency::EUR, Currency::USD, 25.0);
+        sens.add_commodity_delta("energy", 10.0);
+        sens.add_curvature(SimmRiskClass::Equity, 5.0);
+
+        let json = sens.to_json_pretty().expect("serialize sensitivities");
+        let round_tripped = SimmSensitivities::from_json(&json).expect("deserialize sensitivities");
+
+        assert_eq!(
+            round_tripped.ir_delta[&(Currency::USD, "5Y".to_string())],
+            100.0
+        );
+        assert_eq!(round_tripped.fx_vega[&(Currency::EUR, Currency::USD)], 25.0);
+        assert_eq!(round_tripped.commodity_delta["energy"], 10.0);
+        assert_eq!(round_tripped.curvature[&SimmRiskClass::Equity], 5.0);
     }
 
     #[test]

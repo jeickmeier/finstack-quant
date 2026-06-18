@@ -7,6 +7,7 @@ from typing import Any
 import pandas as pd
 
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.factor_model.credit import CreditFactorModel
 
 __all__ = [
     "FinstackFxError",
@@ -1511,7 +1512,34 @@ def factor_stress(
     as_of: str,
     stresses: list[tuple[str, float]],
 ) -> StressResult:
-    """Run a factor-stress scenario and revalue the portfolio under the stressed market."""
+    """Run a factor-stress scenario and revalue the portfolio.
+
+    Builds the Rust factor model from ``factor_model_config_json``, analyzes
+    the base portfolio, computes sensitivities, applies the requested factor
+    shifts, and returns the stressed result.
+
+    Args:
+        portfolio: Portfolio instance or JSON portfolio specification accepted
+            by the compiled portfolio extractor.
+        market: MarketContext instance or JSON market context accepted by the
+            compiled market extractor.
+        factor_model_config_json: JSON-encoded
+            ``finstack_quant_factor_model::FactorModelConfig``.
+        as_of: ISO calculation date, ``YYYY-MM-DD``.
+        stresses: ``(factor_id, shift)`` pairs. Factor IDs must match the
+            configured model; shifts use the Rust factor model's units for that
+            factor.
+
+    Returns:
+        StressResult containing base/stressed portfolio risk and per-factor
+        deltas.
+
+    Raises:
+        ValueError: If JSON parsing, date parsing, model construction, market
+            lookup, or portfolio valuation fails.
+        TypeError: If ``portfolio`` or ``market`` cannot be converted to the
+            expected Rust types.
+    """
     ...
 
 def position_what_if(
@@ -1521,7 +1549,36 @@ def position_what_if(
     as_of: str,
     changes: list[dict[str, Any]],
 ) -> WhatIfResult:
-    """Run position remove/resize what-if analysis from a factor-model config."""
+    """Run position remove/resize what-if analysis.
+
+    The Python binding accepts JSON-like dictionaries for remove and resize
+    changes, then delegates the sensitivity reallocation and result generation
+    to Rust.
+
+    Args:
+        portfolio: Portfolio instance or JSON portfolio specification accepted
+            by the compiled portfolio extractor.
+        market: MarketContext instance or JSON market context accepted by the
+            compiled market extractor.
+        factor_model_config_json: JSON-encoded
+            ``finstack_quant_factor_model::FactorModelConfig``.
+        as_of: ISO calculation date, ``YYYY-MM-DD``.
+        changes: List of dictionaries. Remove changes use
+            ``{"kind": "remove", "position_id": "..."}``; resize changes use
+            ``{"kind": "resize", "position_id": "...", "new_quantity": 123.0}``.
+            Add changes are not supported by this JSON-shaped Python helper
+            because adding requires a typed Rust position object.
+
+    Returns:
+        WhatIfResult with base and scenario risk decomposition deltas.
+
+    Raises:
+        ValueError: If a change kind is unknown, resize omits
+            ``new_quantity``, add is requested, JSON/config parsing fails, or
+            Rust factor-model evaluation fails.
+        TypeError: If ``portfolio`` or ``market`` cannot be converted to the
+            expected Rust types.
+    """
     ...
 
 def build_stress_attribution(
@@ -1529,15 +1586,51 @@ def build_stress_attribution(
     position_pnls: list[list[float]],
     confidence: float = 0.95,
 ) -> StressAttribution:
-    """Build tail-scenario stress attribution from per-position scenario P&Ls."""
+    """Build tail-scenario stress attribution from position P&Ls.
+
+    Python input is position-major: one row per position, and each row contains
+    that position's P&L across all scenarios. The binding transposes this into
+    Rust's scenario-major buffer before selecting tail scenarios.
+
+    Args:
+        position_ids: Position identifiers, one per row in ``position_pnls``.
+        position_pnls: Matrix shaped ``len(position_ids) x n_scenarios``.
+            Every row must have the same number of finite scenario P&Ls.
+        confidence: Tail confidence level in ``(0.5, 1)``. The Rust engine
+            selects ``floor((1 - confidence) * n_scenarios)`` tail scenarios.
+
+    Returns:
+        StressAttribution containing VaR threshold, tail scenario count,
+        per-position tail contributions, and scenario-level P&L breakdowns.
+
+    Raises:
+        ValueError: If dimensions are inconsistent, confidence is outside
+            ``(0.5, 1)``, the requested tail has zero scenarios, or any P&L is
+            non-finite.
+    """
     ...
 
 def build_credit_vol_report(
     decomposition: RiskDecomposition,
-    model: Any,
+    model: CreditFactorModel,
     by_position: bool = False,
 ) -> CreditVolReport:
-    """Build a credit volatility report from a risk decomposition and credit model."""
+    """Build a credit volatility report from decomposition outputs.
+
+    Aggregates a Rust ``RiskDecomposition`` against the supplied credit factor
+    model hierarchy into generic, level, idiosyncratic, and optional
+    per-position volatility contributions.
+
+    Args:
+        decomposition: Factor risk decomposition to summarize.
+        model: Credit factor model whose hierarchy and factor taxonomy label
+            the report levels and buckets.
+        by_position: Include per-position contribution rows when ``True``.
+
+    Returns:
+        CreditVolReport with total, generic, level, idiosyncratic, and optional
+        position-level volatility contribution fields.
+    """
     ...
 
 def position_component_var(
