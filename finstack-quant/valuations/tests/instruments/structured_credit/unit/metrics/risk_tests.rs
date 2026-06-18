@@ -511,3 +511,133 @@ mod scenario_table_tests {
         );
     }
 }
+
+/// Option-adjusted spread (rate/credit/both coupling).
+mod oas_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        calculate_tranche_oas, calculate_tranche_z_spread, AssetPool, DealType, OasConfig,
+        PoolAsset, StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2029, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (10.0, 0.70)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    fn deal() -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-OAS", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        sc
+    }
+
+    #[test]
+    fn deterministic_oas_matches_z_spread() {
+        // With neither dimension stochastic, OAS is a single curve-discounted
+        // scenario over the deterministic cashflows — i.e. the z-spread.
+        let sc = deal();
+        let mkt = market();
+        let as_of = closing();
+        let pv = sc.value_tranche("SR", &mkt, as_of).unwrap();
+        let original = 800_000.0;
+        // Quote 2% below the model's own price so the spread is non-trivial.
+        let market_price = 0.98 * pv.amount() / original * 100.0;
+        let target_pv = Money::new(market_price / 100.0 * original, Currency::USD);
+
+        let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
+        let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
+        let z_bps =
+            calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap();
+
+        let config = OasConfig {
+            stochastic_rates: false,
+            stochastic_credit: false,
+            ..Default::default()
+        };
+        let oas = calculate_tranche_oas(&sc, "SR", market_price, &mkt, as_of, &config).unwrap();
+
+        assert!(
+            (oas.oas - z_bps / 10_000.0).abs() < 1e-4,
+            "deterministic OAS {} should equal z-spread {} (decimal)",
+            oas.oas,
+            z_bps / 10_000.0
+        );
+    }
+
+    #[test]
+    fn stochastic_oas_converges_to_market_price() {
+        // Rate + credit coupling both on: the solver should still reprice the
+        // tranche to the quoted price, with a finite OAS and non-negative MC SE.
+        let sc = deal();
+        let mkt = market();
+        let config = OasConfig {
+            num_paths: 64,
+            stochastic_rates: true,
+            stochastic_credit: true,
+            ..Default::default()
+        };
+        let oas = calculate_tranche_oas(&sc, "SR", 99.0, &mkt, closing(), &config).unwrap();
+        assert!(oas.oas.is_finite(), "OAS must be finite, got {}", oas.oas);
+        assert!(oas.price_std_error >= 0.0);
+        assert!(
+            (oas.model_price - 99.0).abs() < 0.5,
+            "model price {} should reprice to the 99.0 quote",
+            oas.model_price
+        );
+    }
+}

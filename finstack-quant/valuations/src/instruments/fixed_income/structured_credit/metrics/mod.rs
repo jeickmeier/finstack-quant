@@ -25,9 +25,10 @@ pub use pricing::{
 };
 pub use risk::{
     calculate_tranche_breakeven_cdr, calculate_tranche_convexity, calculate_tranche_cs01,
-    calculate_tranche_discount_margin, calculate_tranche_duration, calculate_tranche_z_spread,
-    ConvexityCalculator, Cs01Calculator, MacaulayDurationCalculator, ModifiedDurationCalculator,
-    SpreadDurationCalculator, YtmCalculator, ZSpreadCalculator,
+    calculate_tranche_discount_margin, calculate_tranche_duration, calculate_tranche_oas,
+    calculate_tranche_z_spread, ConvexityCalculator, Cs01Calculator, MacaulayDurationCalculator,
+    ModifiedDurationCalculator, OasConfig, OasResult, SpreadDurationCalculator, YtmCalculator,
+    ZSpreadCalculator,
 };
 pub use scenario::{scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
 

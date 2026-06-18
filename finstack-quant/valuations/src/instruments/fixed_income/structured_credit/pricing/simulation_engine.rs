@@ -79,6 +79,101 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
     }
 }
 
+/// Pool-flow source for option-adjusted-spread (OAS) scenario pricing.
+///
+/// For one Monte-Carlo scenario this modulates the deal's base prepayment and
+/// default rates by an optional Hull-White short-rate path (rate-dependent
+/// prepayment) and/or an optional systematic credit factor `z` (correlated
+/// stress on default and prepayment), then defers to the deterministic
+/// pool-flow engine. Discounting — including the trial OAS spread — is applied
+/// by the caller to the resulting cashflows, not here.
+///
+/// Computing the shock per period (from the request's `pay_date`/seasoning)
+/// rather than from a pre-built vector keeps it automatically aligned to the
+/// engine's payment schedule.
+pub(crate) struct OasPathFlowSource {
+    as_of: Date,
+    /// Monthly short-rate path from `as_of` (`None` ⇒ rates not stochastic).
+    rate_path: Option<Vec<f64>>,
+    /// Systematic credit factor for the scenario (`None` ⇒ credit not stochastic).
+    credit_z: Option<f64>,
+    /// Rate-dependent prepayment sensitivity (β in `exp(-β·(r-r₀))`).
+    prepay_beta: f64,
+    /// Base (initial) short rate `r₀`.
+    base_rate: f64,
+    /// Credit factor loading for the lognormal default/prepayment shocks.
+    credit_loading: f64,
+}
+
+impl OasPathFlowSource {
+    pub(crate) fn new(
+        as_of: Date,
+        rate_path: Option<Vec<f64>>,
+        credit_z: Option<f64>,
+        prepay_beta: f64,
+        base_rate: f64,
+        credit_loading: f64,
+    ) -> Self {
+        Self {
+            as_of,
+            rate_path,
+            credit_z,
+            prepay_beta,
+            base_rate,
+            credit_loading,
+        }
+    }
+}
+
+impl PoolFlowSource for OasPathFlowSource {
+    fn calculate_pool_flows(&mut self, request: PoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
+        const RATE_CLAMP: f64 = 0.9999;
+        let base_smm = request
+            .instrument
+            .calculate_prepayment_rate(request.pay_date, request.seasoning_months)?;
+        let base_mdr = request
+            .instrument
+            .calculate_default_rate(request.pay_date, request.seasoning_months)?;
+
+        let mut smm = base_smm;
+        let mut mdr = base_mdr;
+
+        // Rate-dependent prepayment: higher rates slow prepayment.
+        if let Some(rate_path) = &self.rate_path {
+            let month = self.as_of.months_until(request.pay_date) as usize;
+            let r = rate_path.get(month).copied().unwrap_or(self.base_rate);
+            let mult = (-self.prepay_beta * (r - self.base_rate)).exp();
+            smm = (smm * mult).clamp(0.0, RATE_CLAMP);
+        }
+
+        // Systematic credit stress (canonical convention: low `z` is the stress
+        // state). Mean-corrected lognormal multipliers keep `E[shock] ≈ 1`, so
+        // the stochastic credit dimension adds dispersion without biasing the
+        // mean cashflows (and hence the OAS).
+        if let Some(z) = self.credit_z {
+            let l = self.credit_loading;
+            let mdr_mult = (-l * z - 0.5 * l * l).exp();
+            let smm_mult = (l * z - 0.5 * l * l).exp();
+            mdr = (mdr * mdr_mult).clamp(0.0, RATE_CLAMP);
+            smm = (smm * smm_mult).clamp(0.0, RATE_CLAMP);
+        }
+
+        calculate_pool_flows_with_rates(RatedPoolFlowRequest {
+            state: request.state,
+            pay_date: request.pay_date,
+            prev_date: request.prev_date,
+            months_per_period: request.months_per_period,
+            context: request.context,
+            rates: PoolFlowRates {
+                smm,
+                mdr,
+                recovery_rate: request.instrument.credit_model.recovery_spec.rate,
+            },
+            copula_outcome: None,
+        })
+    }
+}
+
 /// Per-period systematic inputs for finite-pool per-name copula default
 /// simulation.
 ///

@@ -150,6 +150,7 @@ pub use metrics::{
     calculate_tranche_cs01,
     calculate_tranche_discount_margin,
     calculate_tranche_duration,
+    calculate_tranche_oas,
     calculate_tranche_wal,
     calculate_tranche_z_spread,
     scenario_table,
@@ -175,6 +176,8 @@ pub use metrics::{
     // Risk metrics
     MacaulayDurationCalculator,
     ModifiedDurationCalculator,
+    OasConfig,
+    OasResult,
     RmbsFicoCalculator,
     RmbsLtvCalculator,
     RmbsWalCalculator,
