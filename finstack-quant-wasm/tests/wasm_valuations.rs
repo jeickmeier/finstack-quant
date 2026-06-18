@@ -167,6 +167,23 @@ fn price_instrument_structured_credit_stochastic_returns_details() {
 }
 
 #[wasm_bindgen_test]
+fn price_instrument_structured_credit_waterfall_rules() {
+    // `waterfall_rules` is an additive serde-default field on the deal; the
+    // rebuilt wasm binding must accept and price a deal that configures it (an
+    // available-funds cap on the senior), reachable through the existing
+    // price_instrument entry point with no binding code change.
+    let mut value: serde_json::Value =
+        serde_json::from_str(&structured_credit_instrument_json()).unwrap();
+    value["spec"]["waterfall_rules"] = serde_json::json!({ "afc": { "capped_tranches": ["SR"] } });
+    let inst = serde_json::to_string(&value).unwrap();
+    let mkt = market_context_json();
+    let result =
+        price_instrument(&inst, &mkt, "2024-01-01", "structured_credit_stochastic").expect("price");
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+}
+
+#[wasm_bindgen_test]
 fn price_instrument_structured_credit_stochastic_missing_market_data_errors() {
     let inst = structured_credit_instrument_json();
     let empty_market =

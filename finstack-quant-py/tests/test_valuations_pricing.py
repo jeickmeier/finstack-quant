@@ -557,3 +557,21 @@ def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:
             "2024-01-01",
             "structured_credit_stochastic",
         )
+
+
+def test_structured_credit_waterfall_rules_prices_through_json() -> None:
+    # `waterfall_rules` is an additive serde-default field on the deal; the
+    # rebuilt binding must accept and price a deal that configures it (here an
+    # available-funds cap on the senior). Before the field existed the
+    # deny-unknown-fields deserialization rejected this payload.
+    payload = json.loads(_structured_credit_json())
+    payload["spec"]["waterfall_rules"] = {"afc": {"capped_tranches": ["SR"]}}
+    result = json.loads(
+        price_instrument(
+            json.dumps(payload),
+            _market_json(),
+            "2024-01-01",
+            "structured_credit_stochastic",
+        )
+    )
+    assert float(result["value"]["amount"]) > 0
