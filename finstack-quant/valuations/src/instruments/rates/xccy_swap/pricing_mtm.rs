@@ -208,11 +208,13 @@ pub(crate) fn pv_mtm_reset(
             require_positive_df(df_r_pay, &swap.id, "resetting-leg", period.payment_date)?;
 
         // 1. Constant-leg floating coupon (notional N_C).
-        let rate_c = rate_period_on_dates(
-            fwd_c.as_ref(),
-            period.reset_date.unwrap_or(period.accrual_start),
-            period.accrual_end,
-        )?;
+        // Project the index forward over the accrual interval
+        // [accrual_start, accrual_end] — the index tenor. The reset_date is the
+        // observation/fixing date, not the start of the projection window; using
+        // it (when a fixing lag places reset_date < accrual_start) projects a
+        // longer-than-index window and overstates the coupon on a steep curve.
+        let rate_c =
+            rate_period_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?;
         let coupon_c = constant_leg.side.coupon_sign()
             * n_c
             * rate_c
@@ -228,7 +230,9 @@ pub(crate) fn pv_mtm_reset(
         //    NOT n_r_prev which is the prior period's notional). Includes the basis spread.
         let rate_r = rate_period_on_dates(
             fwd_r.as_ref(),
-            period.reset_date.unwrap_or(period.accrual_start),
+            // Project over the accrual interval (index tenor), not from the
+            // observation date — see the constant-leg note above.
+            period.accrual_start,
             period.accrual_end,
         )?;
         let spread_decimal =
@@ -403,7 +407,9 @@ pub(crate) fn mtm_resetting_leg_schedule(
         if period.payment_date > as_of {
             let rate_r = crate::instruments::common_impl::pricing::time::rate_period_on_dates(
                 fwd_r.as_ref(),
-                period.reset_date.unwrap_or(period.accrual_start),
+                // Project over the accrual interval (index tenor), not from the
+                // observation date — see the coupon-pricing note above.
+                period.accrual_start,
                 period.accrual_end,
             )?;
             let coupon_amount = resetting_leg.side.coupon_sign()

@@ -44,9 +44,17 @@ impl AsianOptionHestonMcPricer {
         }
     }
 
-    /// Extract a Heston parameter from market scalars with a fallback default.
-    fn heston_scalar(market: &MarketContext, key: &str, default: f64) -> f64 {
-        crate::instruments::common_impl::helpers::get_unitless_scalar(market, key, default)
+    /// Extract a **required** Heston parameter from market scalars.
+    ///
+    /// Errors when the scalar is absent or mistyped, mirroring the closed-form
+    /// Heston pricer's `from_market_strict`. A silent default would price the
+    /// Asian with arbitrary SPX-like parameters when the surface is missing.
+    fn heston_scalar(market: &MarketContext, key: &str) -> finstack_quant_core::Result<f64> {
+        crate::instruments::common_impl::helpers::get_unitless_scalar_strict(
+            market,
+            key,
+            "Heston Asian MC",
+        )
     }
 
     /// Price an Asian option using Heston Monte Carlo.
@@ -115,11 +123,11 @@ impl AsianOptionHestonMcPricer {
         )?;
 
         // Fetch Heston parameters
-        let kappa = Self::heston_scalar(market, "HESTON_KAPPA", 2.0);
-        let theta = Self::heston_scalar(market, "HESTON_THETA", 0.04);
-        let sigma_v = Self::heston_scalar(market, "HESTON_SIGMA_V", 0.3);
-        let rho = Self::heston_scalar(market, "HESTON_RHO", -0.7);
-        let v0 = Self::heston_scalar(market, "HESTON_V0", 0.04);
+        let kappa = Self::heston_scalar(market, "HESTON_KAPPA")?;
+        let theta = Self::heston_scalar(market, "HESTON_THETA")?;
+        let sigma_v = Self::heston_scalar(market, "HESTON_SIGMA_V")?;
+        let rho = Self::heston_scalar(market, "HESTON_RHO")?;
+        let v0 = Self::heston_scalar(market, "HESTON_V0")?;
 
         let heston_params = HestonParams::new(r, q, kappa, theta, sigma_v, rho, v0)?;
         let process = HestonProcess::new(heston_params);

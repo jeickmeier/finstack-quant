@@ -163,9 +163,13 @@ fn bump_market_for_target(
                 .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                     id: "iterative_breakeven: no vol surface found for instrument".into(),
                 })?;
-            // delta is in vol points (e.g. 0.01 = 1 vol point); the sensitivity
-            // metric (Vega) is per-1-vol-point, so convert with * 0.0001.
-            let bump_abs = delta * 0.0001;
+            // `delta` is the breakeven expressed in **vol points** (consistent
+            // with `initial_guess = -carry / Vega_per_vol_point` and the Linear
+            // mode output). One vol point = 0.01 absolute vol, so convert vol
+            // points -> absolute vol with * 0.01. (Using * 0.0001 applied only
+            // 1/100th of a vol point per unit, making the iterative implied-vol
+            // breakeven ~100x the Linear value.)
+            let bump_abs = delta * 0.01;
             crate::metrics::bump_surface_vol_absolute(
                 context.curves.as_ref(),
                 vol_surface_id.as_str(),

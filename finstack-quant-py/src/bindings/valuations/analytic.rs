@@ -303,7 +303,7 @@ fn asian_option_wrapper(
     averaging: &str,
     is_call: bool,
 ) -> PyResult<f64> {
-    Ok(match (averaging, is_call) {
+    let value = match (averaging, is_call) {
         ("arithmetic", true) => arithmetic_asian_call_tw(spot, strike, t, r, q, sigma, num_fixings),
         ("arithmetic", false) => arithmetic_asian_put_tw(spot, strike, t, r, q, sigma, num_fixings),
         ("geometric", true) => geometric_asian_call(spot, strike, t, r, q, sigma, num_fixings),
@@ -313,7 +313,10 @@ fn asian_option_wrapper(
                 "unknown averaging '{averaging}'; expected 'arithmetic' or 'geometric'"
             )))
         }
-    })
+    };
+    // Reject non-finite results (e.g. degenerate sigma=0 / t=0 / num_fixings=0)
+    // at the host boundary, matching the barrier/quanto wrappers.
+    checked_closed_form_value(value, "asian option price").map_err(display_to_py)
 }
 
 /// Conze-Viswanathan lookback option price.
@@ -344,7 +347,7 @@ fn lookback_option_wrapper(
     strike_type: &str,
     is_call: bool,
 ) -> PyResult<f64> {
-    Ok(match (strike_type, is_call) {
+    let value = match (strike_type, is_call) {
         ("fixed", true) => fixed_strike_lookback_call(spot, strike, t, r, q, sigma, extremum),
         ("fixed", false) => fixed_strike_lookback_put(spot, strike, t, r, q, sigma, extremum),
         ("floating", true) => floating_strike_lookback_call(spot, t, r, q, sigma, extremum),
@@ -354,7 +357,9 @@ fn lookback_option_wrapper(
                 "unknown strike_type '{strike_type}'; expected 'fixed' or 'floating'"
             )))
         }
-    })
+    };
+    // Reject non-finite results at the host boundary, matching barrier/quanto.
+    checked_closed_form_value(value, "lookback option price").map_err(display_to_py)
 }
 
 /// Quanto option (cross-currency, FX-adjusted) price in domestic currency.

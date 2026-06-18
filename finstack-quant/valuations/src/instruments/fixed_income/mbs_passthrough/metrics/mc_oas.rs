@@ -271,7 +271,12 @@ fn price_on_path(
             break;
         }
 
-        let current_rate = path.rates[month + 1];
+        // Beginning-of-period (left-endpoint) short rate for the step. Path
+        // discount factors follow the left-Riemann convention r(t)·dt over
+        // [t, t+dt] (Glasserman 2003 §3.3); using the end-of-period rate
+        // path.rates[month + 1] introduced a systematic O(σ²·dt) bias that
+        // accumulated over the 360 monthly steps (~3 bp on price).
+        let current_rate = path.rates[month];
 
         // Discount factor for this step: exp(-(r + oas) × dt)
         let step_df = (-(current_rate + oas) * dt).exp();

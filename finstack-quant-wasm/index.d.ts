@@ -1496,17 +1496,17 @@ export interface SabrModelConstructor {
 }
 
 export interface SabrSmileArbitrageResult {
-  arbitrageFree: boolean;
-  butterflyViolations: Array<{
+  arbitrage_free: boolean;
+  butterfly_violations: Array<{
     strike: number;
-    butterflyValue: number;
-    severityPct: number;
+    butterfly_value: number;
+    severity_pct: number;
   }>;
-  monotonicityViolations: Array<{
-    strikeLow: number;
-    strikeHigh: number;
-    priceLow: number;
-    priceHigh: number;
+  monotonicity_violations: Array<{
+    strike_low: number;
+    strike_high: number;
+    price_low: number;
+    price_high: number;
   }>;
 }
 
@@ -1677,7 +1677,7 @@ export interface ValuationsNamespace {
     isCall: boolean
   ): number;
   /** Black-Scholes / Garman-Kohlhagen Greeks as a dict
-   *  `{delta, gamma, vega, theta, rho, rhoQ}`. `vega` and both rho values are
+   *  `{delta, gamma, vega, theta, rho, rho_q}`. `vega` and both rho values are
    *  per 1% move; `theta` is per-day under the `thetaDays` day-count. */
   bsGreeks(
     spot: number,
@@ -1694,7 +1694,7 @@ export interface ValuationsNamespace {
     vega: number;
     theta: number;
     rho: number;
-    rhoQ: number;
+    rho_q: number;
   };
   /** Solve for Black-Scholes implied volatility given a target price. */
   bsImpliedVol(

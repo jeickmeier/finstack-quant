@@ -485,6 +485,23 @@ impl MertonMcEngine {
                 config.num_paths
             )));
         }
+        // A non-positive maturity yields `dt = maturity_years / total_steps <= 0`
+        // (with `total_steps` floored at 1), so `sqrt_dt` becomes 0 or NaN and the
+        // simulation degenerates into zero-variance paths with a divide-by-zero in
+        // the Brownian-bridge crossing probability — returning a garbage price
+        // rather than an error. Expired / same-day bonds must be rejected here (the
+        // calibration path already guards this); price them as PV = 0 upstream.
+        if !maturity_years.is_finite() || maturity_years <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Merton MC requires maturity_years > 0 (got {maturity_years}); \
+                 an expired or same-day bond has PV = 0 and cannot be simulated"
+            )));
+        }
+        if !notional.is_finite() || notional <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Merton MC requires a positive finite notional (got {notional})"
+            )));
+        }
 
         let num_paths = config.num_paths;
         // Size the grid so it ends EXACTLY at maturity: rounding the step

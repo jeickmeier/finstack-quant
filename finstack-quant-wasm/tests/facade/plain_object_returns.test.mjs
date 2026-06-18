@@ -47,9 +47,9 @@ test('SabrSmile.arbitrageDiagnostics returns a plain object', () => {
   const smile = new wasm.SabrSmile(params, 100.0, 1.0);
   const diag = smile.arbitrageDiagnostics([80, 90, 100, 110, 120]);
   assertPlainObject(diag, 'arbitrageDiagnostics result');
-  assert.equal(typeof diag.arbitrageFree, 'boolean');
-  assert.ok(Array.isArray(diag.butterflyViolations));
-  assert.ok(Array.isArray(diag.monotonicityViolations));
+  assert.equal(typeof diag.arbitrage_free, 'boolean');
+  assert.ok(Array.isArray(diag.butterfly_violations));
+  assert.ok(Array.isArray(diag.monotonicity_violations));
 });
 
 test('listStandardMetricsGrouped returns a plain object of string arrays', () => {

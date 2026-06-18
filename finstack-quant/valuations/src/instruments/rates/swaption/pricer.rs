@@ -62,13 +62,24 @@ impl Pricer for SimpleSwaptionBlackPricer {
                         )
                     })?
                 } else {
-                    let time_to_expiry = year_fraction(swaption.day_count, as_of, swaption.expiry)
-                        .map_err(|e| {
-                            PricingError::model_failure_with_context(
-                                e.to_string(),
-                                PricingErrorContext::default(),
-                            )
-                        })?;
+                    // Use Act/365F for the option time-to-expiry so the vol-surface
+                    // pillar lookup is on the SAME time axis that `price_black` /
+                    // `price_normal` use internally (Swaption::time_to_expiry
+                    // hardcodes Act/365F). Using `swaption.day_count` here indexed
+                    // the surface at a different tenor for non-Act/365F swaptions
+                    // (e.g. Act/360 -> ~1.4% relative-vol error and a mis-pillared
+                    // calibration).
+                    let time_to_expiry = year_fraction(
+                        finstack_quant_core::dates::DayCount::Act365F,
+                        as_of,
+                        swaption.expiry,
+                    )
+                    .map_err(|e| {
+                        PricingError::model_failure_with_context(
+                            e.to_string(),
+                            PricingErrorContext::default(),
+                        )
+                    })?;
                     let forward = swaption.forward_swap_rate(market, as_of).map_err(|e| {
                         PricingError::model_failure_with_context(
                             e.to_string(),

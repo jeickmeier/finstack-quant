@@ -382,10 +382,17 @@ impl CDSPricer {
         let protection_pv = self.pv_protection_leg(cds, disc, surv, as_of)?;
         let denom = self.par_spread_denominator(cds, disc, surv, as_of)?;
 
-        if denom.abs() < numerical::RATE_COMPARISON_TOLERANCE {
+        // Guard `denom < tolerance` (not `denom.abs() < tolerance`): for the
+        // clean (Bloomberg) convention the denominator is `risky_annuity -
+        // accrued` and can go negative for a seasoned CDS near a coupon date.
+        // An `abs()` guard would let a negative denominator through and produce
+        // a negative par spread, violating the par-spread positivity invariant.
+        if denom < numerical::RATE_COMPARISON_TOLERANCE {
             return Err(Error::Validation(
-                "Par spread denominator is too small (risky annuity ≈ 0). \
-                 This may indicate zero survival probability or expired CDS."
+                "Par spread denominator is non-positive or too small (risky \
+                 annuity ≈ 0, or clean denominator went negative for a seasoned \
+                 CDS). This may indicate zero survival probability, an expired \
+                 CDS, or accrued exceeding the remaining risky annuity."
                     .to_string(),
             ));
         }

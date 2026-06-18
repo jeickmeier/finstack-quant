@@ -66,7 +66,7 @@ pub fn bs_price(
         .map_err(to_js_err)
 }
 
-/// Black-Scholes / Garman-Kohlhagen Greeks as a `{delta, gamma, vega, theta, rho, rhoQ}` object.
+/// Black-Scholes / Garman-Kohlhagen Greeks as a `{delta, gamma, vega, theta, rho, rho_q}` object.
 ///
 /// @param spot - Spot price of the underlying.
 /// @param strike - Strike of the option.
@@ -78,7 +78,8 @@ pub fn bs_price(
 /// @param isCall - `true` for a call, `false` for a put.
 /// @param thetaDays - Day-count denominator for theta. Default `365`.
 /// Pass `252` for trading-day theta.
-/// @returns Object `{ delta, gamma, vega, theta, rho, rhoQ }`. `vega` and
+/// @returns Object `{ delta, gamma, vega, theta, rho, rho_q }` (snake_case keys
+/// matching the Rust/Python canonical names). `vega` and
 /// both rho values are **per 1% move**; `theta` is **per day** under
 /// `thetaDays`.
 /// @throws If serialization to JS fails (should not happen on valid inputs).
@@ -122,7 +123,10 @@ pub fn bs_greeks(
     js_sys::Reflect::set(&obj, &"vega".into(), &g.vega.into())?;
     js_sys::Reflect::set(&obj, &"theta".into(), &g.theta.into())?;
     js_sys::Reflect::set(&obj, &"rho".into(), &g.rho_r.into())?;
-    js_sys::Reflect::set(&obj, &"rhoQ".into(), &g.rho_q.into())?;
+    // snake_case to match the Rust canonical field (`rho_q`) and the Python
+    // binding; the camelCase `rhoQ` was an outlier that yielded `undefined`
+    // for any cross-binding consumer reading `rho_q`.
+    js_sys::Reflect::set(&obj, &"rho_q".into(), &g.rho_q.into())?;
     Ok(obj.into())
 }
 

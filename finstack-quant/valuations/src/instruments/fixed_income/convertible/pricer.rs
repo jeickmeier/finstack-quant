@@ -500,17 +500,21 @@ impl ConvertibleBondValuator {
             Some(ref trigger) => {
                 let nominal_trigger = self.conversion_price * (trigger.threshold_pct / 100.0);
 
-                let window_years = trigger.observation_days as f64 / 252.0;
                 let required_fraction =
                     trigger.required_days_above as f64 / trigger.observation_days.max(1) as f64;
 
                 // BGK β = −ζ(1/2) / √(2π), taken from the canonical
                 // definition in the MC crate so the analytical and MC stacks
-                // cannot drift apart. Scaled by `required_fraction` for the
-                // sustained observation requirement (heuristic extension).
+                // cannot drift apart. The single-observation BGK shift uses the
+                // **per-observation monitoring interval** dt (daily monitoring =
+                // 1 business day = 1/252y), NOT the full observation-window length
+                // — using the window inflated the shift by ≈√(observation_days).
+                // Scaled by `required_fraction` (k/n) for the sustained
+                // "k-of-n days above" requirement (heuristic extension).
                 const BGK_BETA: f64 =
                     finstack_quant_monte_carlo::barriers::corrections::GOBET_MIRI_BETA;
-                let adj = BGK_BETA * required_fraction * self.volatility * window_years.sqrt();
+                const MONITORING_DT: f64 = 1.0 / 252.0;
+                let adj = BGK_BETA * required_fraction * self.volatility * MONITORING_DT.sqrt();
                 let effective_trigger = nominal_trigger * (1.0 + adj);
 
                 node_spot >= effective_trigger

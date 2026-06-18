@@ -374,6 +374,10 @@ pub(crate) fn compounded_forward_projection(
     calendar_id: Option<&str>,
     index_floor: Option<f64>,
     index_cap: Option<f64>,
+    // When `true`, accumulate the day-count-weighted **arithmetic** average
+    // `Σ(rᵢ·dᵢ)/τ` (`CompoundingMethod::Average`, e.g. Fed-Funds-average swaps)
+    // instead of the geometric daily compound `(∏(1+rᵢ·dᵢ)−1)/τ`.
+    arithmetic_average: bool,
 ) -> Result<f64> {
     // A zero- or negative-length accrual period is a malformed instrument, not
     // a "use the spot rate" signal. Fail loudly rather than silently emitting a
@@ -413,8 +417,9 @@ pub(crate) fn compounded_forward_projection(
     // of on every business-day step (see `resolve_overnight_calendar`).
     let cal = resolve_overnight_calendar(calendar_id)?;
 
-    // ∏(1 + rᵢ·dᵢ) over the daily sub-periods.
+    // Geometric: ∏(1 + rᵢ·dᵢ). Arithmetic-average: Σ(rᵢ·dᵢ).
     let mut compound_factor = 1.0_f64;
+    let mut weighted_sum = 0.0_f64;
 
     let mut d = accrual_start;
     while d < accrual_end {
@@ -458,12 +463,20 @@ pub(crate) fn compounded_forward_projection(
             r = r.min(cap);
         }
 
-        compound_factor *= 1.0 + r * dcf;
+        if arithmetic_average {
+            weighted_sum += r * dcf;
+        } else {
+            compound_factor *= 1.0 + r * dcf;
+        }
         d = next_d;
     }
 
-    // Equivalent simple rate: R · τ = CF − 1.
-    Ok((compound_factor - 1.0) / period_year_fraction)
+    // Arithmetic-average rate: Σ(rᵢ·dᵢ)/τ. Geometric: R·τ = CF − 1.
+    if arithmetic_average {
+        Ok(weighted_sum / period_year_fraction)
+    } else {
+        Ok((compound_factor - 1.0) / period_year_fraction)
+    }
 }
 
 /// Compute the daily-compounded equivalent rate for an OIS / RFR coupon period
@@ -541,6 +554,10 @@ pub(crate) fn compounded_spliced_projection(
     calendar_id: Option<&str>,
     index_floor: Option<f64>,
     index_cap: Option<f64>,
+    // When `true`, accumulate the day-count-weighted **arithmetic** average
+    // `Σ(rᵢ·dᵢ)/τ` (`CompoundingMethod::Average`) over the spliced
+    // realized/projected daily fixings instead of the geometric daily compound.
+    arithmetic_average: bool,
 ) -> Result<f64> {
     if accrual_end <= accrual_start {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -589,8 +606,10 @@ pub(crate) fn compounded_spliced_projection(
     // of on every business-day step (see `resolve_overnight_calendar`).
     let cal = resolve_overnight_calendar(calendar_id)?;
 
-    // ∏(1 + rᵢ·dᵢ) over the daily sub-periods, splicing realized and projected.
+    // Geometric: ∏(1 + rᵢ·dᵢ), splicing realized and projected. Arithmetic-
+    // average: Σ(rᵢ·dᵢ) over the same spliced daily fixings.
     let mut compound_factor = 1.0_f64;
+    let mut weighted_sum = 0.0_f64;
 
     let mut d = accrual_start;
     while d < accrual_end {
@@ -640,12 +659,20 @@ pub(crate) fn compounded_spliced_projection(
             r = r.min(cap);
         }
 
-        compound_factor *= 1.0 + r * dcf;
+        if arithmetic_average {
+            weighted_sum += r * dcf;
+        } else {
+            compound_factor *= 1.0 + r * dcf;
+        }
         d = next_d;
     }
 
-    // Equivalent simple rate: R · τ = CF − 1.
-    Ok((compound_factor - 1.0) / period_year_fraction)
+    // Arithmetic-average rate: Σ(rᵢ·dᵢ)/τ. Geometric: R·τ = CF − 1.
+    if arithmetic_average {
+        Ok(weighted_sum / period_year_fraction)
+    } else {
+        Ok((compound_factor - 1.0) / period_year_fraction)
+    }
 }
 
 /// Parameters for pricing a floating rate leg.
@@ -920,6 +947,7 @@ where
                 params.calendar_id.as_deref(),
                 index_floor_decimal,
                 index_cap_decimal,
+                matches!(params.compounding_method, CompoundingMethod::Average),
             )?
         } else if reset_date < as_of {
             // Past reset, term-rate (`Simple`) leg: require a single historical
@@ -959,8 +987,10 @@ where
         } else {
             // Future reset, OIS / genuinely-compounding leg (`Compounded`,
             // `CompoundedWithShift`, `Average`) whose accrual period is entirely
-            // in the future: the coupon is true daily compounding
-            // `(∏(1+rᵢ·dᵢ)−1)/τ` with the ISDA observation shift applied.
+            // in the future. `Compounded`/`CompoundedWithShift` use true daily
+            // compounding `(∏(1+rᵢ·dᵢ)−1)/τ`; `Average` uses the day-count-
+            // weighted arithmetic mean `Σ(rᵢ·dᵢ)/τ` (Fed-Funds-average style),
+            // with the ISDA observation shift applied in both cases.
             //
             // The index floor/cap (if any) are applied per daily fixing here;
             // they are stripped below so `calculate_floating_rate` does not
@@ -974,6 +1004,7 @@ where
                 params.calendar_id.as_deref(),
                 index_floor_decimal,
                 index_cap_decimal,
+                matches!(params.compounding_method, CompoundingMethod::Average),
             )?
         };
 

@@ -177,7 +177,20 @@ fn solve_anchor_spread(cached: &[CachedFlow], compounds_per_year: f64, target: f
     let solver = BrentSolver::new()
         .tolerance(1e-10)
         .initial_bracket_size(Some(0.05)); // ±500 bp
-    solver.solve(objective, 0.0).unwrap_or(0.0)
+                                           // A failed anchor solve must not silently anchor CS01 at the model-PV point
+                                           // (z=0): that computes the bucket sensitivities at the wrong base spread with
+                                           // no signal to the caller. Surface the failure as a warning before falling
+                                           // back so a bad mark / illiquid quote is observable in production.
+    solver.solve(objective, 0.0).unwrap_or_else(|err| {
+        tracing::warn!(
+            error = %err,
+            target,
+            "Z-spread anchor solve failed to converge; falling back to z=0.0 \
+             (CS01 buckets will be anchored at the model-PV point, not the \
+             quoted price)"
+        );
+        0.0
+    })
 }
 
 /// Resolve the anchor spread for an instrument: solve to the quoted price when

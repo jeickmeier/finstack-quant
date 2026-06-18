@@ -188,8 +188,9 @@ impl WasmSabrSmile {
 
     /// Butterfly + monotonicity arbitrage diagnostics.
     ///
-    /// Returns a JSON object with `arbitrageFree`, `butterflyViolations`,
-    /// and `monotonicityViolations` arrays.
+    /// Returns a JSON object with `arbitrage_free`, `butterfly_violations`,
+    /// and `monotonicity_violations` arrays (snake_case keys matching the Rust
+    /// canonical fields and the Python binding).
     #[wasm_bindgen(js_name = arbitrageDiagnostics)]
     pub fn arbitrage_diagnostics(
         &self,
@@ -201,17 +202,17 @@ impl WasmSabrSmile {
             .inner
             .validate_no_arbitrage(&strikes, r.unwrap_or(0.0), q.unwrap_or(0.0))
             .map_err(to_js_err)?;
-        // Re-map nested violation keys to camelCase so the whole payload
-        // follows the JS naming convention (the Rust structs serialize
-        // snake_case).
+        // Keep snake_case keys matching the Rust canonical fields and the Python
+        // binding so cross-binding consumers and parity tests read the same
+        // names (the earlier camelCase remap diverged from Python).
         let butterfly: Vec<serde_json::Value> = result
             .butterfly_violations
             .iter()
             .map(|v| {
                 serde_json::json!({
                     "strike": v.strike,
-                    "butterflyValue": v.butterfly_value,
-                    "severityPct": v.severity_pct,
+                    "butterfly_value": v.butterfly_value,
+                    "severity_pct": v.severity_pct,
                 })
             })
             .collect();
@@ -220,17 +221,17 @@ impl WasmSabrSmile {
             .iter()
             .map(|v| {
                 serde_json::json!({
-                    "strikeLow": v.strike_low,
-                    "strikeHigh": v.strike_high,
-                    "priceLow": v.price_low,
-                    "priceHigh": v.price_high,
+                    "strike_low": v.strike_low,
+                    "strike_high": v.strike_high,
+                    "price_low": v.price_low,
+                    "price_high": v.price_high,
                 })
             })
             .collect();
         let out = serde_json::json!({
-            "arbitrageFree": result.is_arbitrage_free(),
-            "butterflyViolations": butterfly,
-            "monotonicityViolations": monotonicity,
+            "arbitrage_free": result.is_arbitrage_free(),
+            "butterfly_violations": butterfly,
+            "monotonicity_violations": monotonicity,
         });
         to_js_value(&out)
     }

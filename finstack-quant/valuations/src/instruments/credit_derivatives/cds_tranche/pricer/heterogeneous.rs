@@ -609,9 +609,21 @@ impl CDSTranchePricer {
             return norm_cdf(default_threshold);
         }
         if correlation > 1.0 - NUMERICAL_TOLERANCE {
-            // Near-perfect correlation: deterministic case
-            let threshold_adj = default_threshold - market_factor;
-            return norm_cdf(threshold_adj);
+            // Perfect-correlation limit: the latent variable Aᵢ = √ρ·Z +
+            // √(1−ρ)·εᵢ → Z, so default (Aᵢ ≤ Φ⁻¹(PD)) becomes the deterministic
+            // step 1{Z ≤ Φ⁻¹(PD)}. The previous `Φ(Φ⁻¹(PD) − Z)` was the wrong
+            // limit (it dropped the 1/√(1−ρ) divisor).
+            //
+            // Reachability: `smooth_correlation_boundary` caps ρ at
+            // DEFAULT_MAX_CORRELATION (0.99), so this branch is currently
+            // unreachable; the exact limit is kept for correctness should the cap
+            // ever be relaxed. The 0.99 cap is a deliberate numerical-stability
+            // choice and means the exact ρ = 1 comonotonic limit is not priced.
+            return if market_factor < default_threshold {
+                1.0
+            } else {
+                0.0
+            };
         }
 
         // Enhanced calculation with overflow protection

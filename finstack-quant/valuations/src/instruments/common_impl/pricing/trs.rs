@@ -101,6 +101,7 @@ fn financing_period_rate(
                     obs_calendar,
                     None,
                     None,
+                    false, // TRS funding leg always compounds geometrically
                 )
             } else {
                 // Fully-future period: project entirely from the forward curve.
@@ -113,6 +114,7 @@ fn financing_period_rate(
                     obs_calendar,
                     None,
                     None,
+                    false, // TRS funding leg always compounds geometrically
                 )
             }
         }
