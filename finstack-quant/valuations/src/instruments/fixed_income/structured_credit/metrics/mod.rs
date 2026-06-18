@@ -10,6 +10,7 @@ pub(crate) mod deal_specific;
 pub(crate) mod pool;
 pub(crate) mod pricing;
 pub(crate) mod risk;
+pub(crate) mod scenario;
 
 // Re-export all calculators for convenience
 pub use deal_specific::{
@@ -28,6 +29,7 @@ pub use risk::{
     ConvexityCalculator, Cs01Calculator, MacaulayDurationCalculator, ModifiedDurationCalculator,
     SpreadDurationCalculator, YtmCalculator, ZSpreadCalculator,
 };
+pub use scenario::{scenario_table, ScenarioCell, ScenarioGrid, ScenarioTable};
 
 // Standalone tranche metric functions are included in the explicit lists above.
 

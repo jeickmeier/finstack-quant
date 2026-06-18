@@ -406,3 +406,108 @@ mod breakeven_cdr_tests {
         );
     }
 }
+
+/// Scenario / yield table for structured-credit tranches.
+mod scenario_table_tests {
+    use finstack_quant_cashflows::builder::{PrepaymentModelSpec, RecoveryModelSpec};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        scenario_table, AssetPool, DealType, PoolAsset, ScenarioGrid, StructuredCredit, Tranche,
+        TrancheCoupon, TrancheSeniority, TrancheStructure,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2026, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    fn deal() -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-SCN", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        sc
+    }
+
+    #[test]
+    fn scenario_table_sweeps_grid_and_is_monotone_in_cdr() {
+        let sc = deal();
+        let mkt = market();
+        let grid = ScenarioGrid {
+            cprs: vec![0.0, 0.10],
+            cdrs: vec![0.0, 0.50],
+            severities: vec![0.60],
+        };
+        let table = scenario_table(&sc, "SR", &mkt, closing(), &grid).unwrap();
+
+        // 2 CPR x 2 CDR x 1 severity, in CPR-major then CDR order:
+        // [0]=(0,0) [1]=(0,0.5) [2]=(0.1,0) [3]=(0.1,0.5).
+        assert_eq!(table.cells.len(), 4);
+        assert_eq!(table.tranche_id, "SR");
+
+        // Zero-default cells (cdr = 0) are loss-remote with a positive price.
+        for cell in [&table.cells[0], &table.cells[2]] {
+            assert!(cell.writedown.abs() < 1.0, "no defaults -> no writedown");
+            assert!(cell.price > 0.0, "price should be positive");
+        }
+
+        // Holding CPR fixed, a higher CDR cannot reduce the writedown.
+        assert!(
+            table.cells[1].writedown >= table.cells[0].writedown,
+            "writedown must be non-decreasing in CDR at cpr=0"
+        );
+        assert!(
+            table.cells[3].writedown >= table.cells[2].writedown,
+            "writedown must be non-decreasing in CDR at cpr=0.10"
+        );
+    }
+}

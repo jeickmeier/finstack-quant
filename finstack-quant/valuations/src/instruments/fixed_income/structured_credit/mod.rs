@@ -145,6 +145,7 @@ pub use metrics::{
     calculate_tranche_duration,
     calculate_tranche_wal,
     calculate_tranche_z_spread,
+    scenario_table,
     // Deal-specific metrics
     AbsChargeOffCalculator,
     AbsCreditEnhancementCalculator,
@@ -170,6 +171,9 @@ pub use metrics::{
     RmbsFicoCalculator,
     RmbsLtvCalculator,
     RmbsWalCalculator,
+    ScenarioCell,
+    ScenarioGrid,
+    ScenarioTable,
     SpreadDurationCalculator,
     WalCalculator,
     // AssetPool metrics
