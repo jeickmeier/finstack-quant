@@ -192,6 +192,127 @@ class FIIndexTotalReturnSwap(_FixedIncomeInstrument):
 class StructuredCredit(_FixedIncomeInstrument):
     """Structured credit deal wrapper for ABS, RMBS, CMBS, or CLO tranches."""
 
+    def discount_margin(self, market: MarketContext | str, as_of: str, tranche_id: str, target_pv: float) -> float:
+        """Discount margin (decimal) for a floating-rate tranche.
+
+        Parameters
+        ----------
+        market : MarketContext or str
+            Market context object or JSON string.
+        as_of : str
+            Valuation date (``"YYYY-MM-DD"``).
+        tranche_id : str
+            Id of the floating-rate tranche.
+        target_pv : float
+            Target present value in the tranche's currency.
+
+        Returns
+        -------
+        float
+            Discount margin as a decimal (``0.01`` = 100 bps).
+        """
+        ...
+
+    def breakeven_cdr(self, market: MarketContext | str, as_of: str, tranche_id: str) -> float:
+        """Break-even constant default rate (CDR, decimal) for a tranche.
+
+        Parameters
+        ----------
+        market : MarketContext or str
+            Market context object or JSON string.
+        as_of : str
+            Valuation date (``"YYYY-MM-DD"``).
+        tranche_id : str
+            Id of the tranche.
+
+        Returns
+        -------
+        float
+            Highest CDR at which the tranche takes no writedown, as a decimal.
+        """
+        ...
+
+    def oas(
+        self,
+        market: MarketContext | str,
+        as_of: str,
+        tranche_id: str,
+        market_price_pct: float,
+        config: str | None = None,
+    ) -> str:
+        """Option-adjusted spread for a tranche.
+
+        Parameters
+        ----------
+        market : MarketContext or str
+            Market context object or JSON string.
+        as_of : str
+            Valuation date (``"YYYY-MM-DD"``).
+        tranche_id : str
+            Id of the tranche.
+        market_price_pct : float
+            Quoted price as a percentage of original balance.
+        config : str, optional
+            JSON string of ``OasConfig``; the default config is used when omitted.
+
+        Returns
+        -------
+        str
+            JSON-serialized ``OasResult``.
+        """
+        ...
+
+    def scenario_table(self, market: MarketContext | str, as_of: str, tranche_id: str, grid: str) -> str:
+        """Scenario (CPR x CDR x severity) table for a tranche.
+
+        Parameters
+        ----------
+        market : MarketContext or str
+            Market context object or JSON string.
+        as_of : str
+            Valuation date (``"YYYY-MM-DD"``).
+        tranche_id : str
+            Id of the tranche.
+        grid : str
+            JSON string of ``ScenarioGrid`` (``cprs``, ``cdrs``, ``severities``).
+
+        Returns
+        -------
+        str
+            JSON-serialized ``ScenarioTable``.
+        """
+        ...
+
+    def tranche_metrics(
+        self,
+        market: MarketContext | str,
+        as_of: str,
+        tranche_id: str,
+        market_price_pct: float | None = None,
+    ) -> str:
+        """Per-tranche risk/spread metrics from the tranche's own cashflows.
+
+        Parameters
+        ----------
+        market : MarketContext or str
+            Market context object or JSON string.
+        as_of : str
+            Valuation date (``"YYYY-MM-DD"``).
+        tranche_id : str
+            Id of the tranche.
+        market_price_pct : float or None
+            Quoted price (% of original balance) the z-spread and CS01 are solved
+            against. When ``None``, the tranche's model price is used (zero z-spread).
+
+        Returns
+        -------
+        str
+            JSON-serialized ``TrancheMetrics`` (``pv``, ``price_pct``, ``wal``,
+            ``z_spread_bp``, ``cs01``, ``spread_duration``, ``modified_duration``,
+            ``convexity``, ``target_price_pct``).
+        """
+        ...
+
 __all__: list[str] = [
     "Bond",
     "ConvertibleBond",

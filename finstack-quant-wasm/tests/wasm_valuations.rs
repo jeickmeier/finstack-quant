@@ -167,6 +167,72 @@ fn price_instrument_structured_credit_stochastic_returns_details() {
 }
 
 #[wasm_bindgen_test]
+fn price_instrument_structured_credit_waterfall_rules() {
+    // `waterfall_rules` is an additive serde-default field on the deal; the
+    // rebuilt wasm binding must accept and price a deal that configures it (an
+    // available-funds cap on the senior), reachable through the existing
+    // price_instrument entry point with no binding code change.
+    let mut value: serde_json::Value =
+        serde_json::from_str(&structured_credit_instrument_json()).unwrap();
+    value["spec"]["waterfall_rules"] = serde_json::json!({ "afc": { "capped_tranches": ["SR"] } });
+    let inst = serde_json::to_string(&value).unwrap();
+    let mkt = market_context_json();
+    let result =
+        price_instrument(&inst, &mkt, "2024-01-01", "structured_credit_stochastic").expect("price");
+    let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
+    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+}
+
+#[wasm_bindgen_test]
+fn structured_credit_tranche_metrics_through_json() {
+    use finstack_quant_wasm::api::valuations::structured_credit::{
+        structured_credit_tranche_breakeven_cdr, structured_credit_tranche_discount_margin,
+        structured_credit_tranche_metrics, structured_credit_tranche_oas,
+        structured_credit_tranche_scenario_table,
+    };
+
+    let inst = structured_credit_instrument_json();
+    let mkt = market_context_json();
+
+    let breakeven = structured_credit_tranche_breakeven_cdr(&inst, &mkt, "2024-01-01", "SR")
+        .expect("breakeven cdr");
+    assert!(breakeven >= 0.0);
+
+    // Discount margin is only defined for floating-rate tranches; "SR" is
+    // fixed-rate, so the binding must surface the validation error rather than
+    // silently returning a value (parity with the Python negative test).
+    let dm_err =
+        structured_credit_tranche_discount_margin(&inst, &mkt, "2024-01-01", "SR", 1_000.0)
+            .expect_err("discount margin on a fixed-rate tranche should error");
+    assert!(format!("{dm_err:?}").to_lowercase().contains("floating"));
+
+    let oas = structured_credit_tranche_oas(&inst, &mkt, "2024-01-01", "SR", 99.0, None)
+        .expect("tranche oas");
+    let oas_parsed: serde_json::Value = serde_json::from_str(&oas).unwrap();
+    assert!(oas_parsed["model_price"].as_f64().expect("model_price") > 0.0);
+
+    let grid = r#"{"cprs":[0.10,0.20],"cdrs":[0.02],"severities":[0.40]}"#;
+    let table = structured_credit_tranche_scenario_table(&inst, &mkt, "2024-01-01", "SR", grid)
+        .expect("scenario table");
+    let table_parsed: serde_json::Value = serde_json::from_str(&table).unwrap();
+    assert_eq!(table_parsed["cells"].as_array().expect("cells").len(), 2);
+
+    // Per-tranche metrics bundle: model-price z-spread ~ 0, widening at a cheaper price.
+    let tm = structured_credit_tranche_metrics(&inst, &mkt, "2024-01-01", "SR", None)
+        .expect("tranche metrics");
+    let tm_parsed: serde_json::Value = serde_json::from_str(&tm).unwrap();
+    assert_eq!(tm_parsed["tranche_id"], "SR");
+    assert!(tm_parsed["pv"].as_f64().expect("pv") > 0.0);
+    let tm_cheap = structured_credit_tranche_metrics(&inst, &mkt, "2024-01-01", "SR", Some(95.0))
+        .expect("tranche metrics @95");
+    let cheap_parsed: serde_json::Value = serde_json::from_str(&tm_cheap).unwrap();
+    assert!(
+        cheap_parsed["z_spread_bp"].as_f64().expect("z")
+            > tm_parsed["z_spread_bp"].as_f64().expect("z")
+    );
+}
+
+#[wasm_bindgen_test]
 fn price_instrument_structured_credit_stochastic_missing_market_data_errors() {
     let inst = structured_credit_instrument_json();
     let empty_market =

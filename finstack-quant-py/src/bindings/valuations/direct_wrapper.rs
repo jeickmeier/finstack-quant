@@ -2,12 +2,14 @@
 
 use crate::bindings::extract::extract_market;
 use crate::bindings::module_utils::py_to_json_value;
-use crate::errors::display_to_py;
+use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::pricer::{
     canonical_instrument_json, canonical_instrument_json_from_str,
     metric_value_from_instrument_json, present_standard_option_greeks_from_instrument_json,
     pretty_instrument_json, price_instrument_json, price_instrument_json_with_metrics_and_history,
-    validate_instrument_json,
+    structured_credit_tranche_breakeven_cdr_json, structured_credit_tranche_discount_margin_json,
+    structured_credit_tranche_metrics_json, structured_credit_tranche_oas_json,
+    structured_credit_tranche_scenario_table_json, validate_instrument_json,
 };
 use finstack_quant_valuations::results::ValuationResult;
 use pyo3::prelude::*;
@@ -126,6 +128,126 @@ pub(super) fn metric_value(
     py.detach(move || {
         metric_value_from_instrument_json(&json, &market, &as_of, &model, &metric)
             .map_err(display_to_py)
+    })
+}
+
+pub(super) fn tranche_discount_margin(
+    py: Python<'_>,
+    json: &str,
+    market: &Bound<'_, PyAny>,
+    as_of: &str,
+    tranche_id: &str,
+    target_pv: f64,
+) -> PyResult<f64> {
+    let market = extract_market(market)?;
+    let json = json.to_owned();
+    let as_of = as_of.to_owned();
+    let tranche_id = tranche_id.to_owned();
+    py.detach(move || {
+        structured_credit_tranche_discount_margin_json(
+            &json,
+            &tranche_id,
+            &market,
+            &as_of,
+            target_pv,
+        )
+        .map_err(core_to_py)
+    })
+}
+
+pub(super) fn tranche_breakeven_cdr(
+    py: Python<'_>,
+    json: &str,
+    market: &Bound<'_, PyAny>,
+    as_of: &str,
+    tranche_id: &str,
+) -> PyResult<f64> {
+    let market = extract_market(market)?;
+    let json = json.to_owned();
+    let as_of = as_of.to_owned();
+    let tranche_id = tranche_id.to_owned();
+    py.detach(move || {
+        structured_credit_tranche_breakeven_cdr_json(&json, &tranche_id, &market, &as_of)
+            .map_err(core_to_py)
+    })
+}
+
+pub(super) fn tranche_oas(
+    py: Python<'_>,
+    json: &str,
+    market: &Bound<'_, PyAny>,
+    as_of: &str,
+    tranche_id: &str,
+    market_price_pct: f64,
+    config: Option<&str>,
+) -> PyResult<String> {
+    let market = extract_market(market)?;
+    let json = json.to_owned();
+    let as_of = as_of.to_owned();
+    let tranche_id = tranche_id.to_owned();
+    let config = config.map(str::to_owned);
+    py.detach(move || {
+        let result = structured_credit_tranche_oas_json(
+            &json,
+            &tranche_id,
+            market_price_pct,
+            &market,
+            &as_of,
+            config.as_deref(),
+        )
+        .map_err(core_to_py)?;
+        serde_json::to_string(&result).map_err(display_to_py)
+    })
+}
+
+pub(super) fn tranche_scenario_table(
+    py: Python<'_>,
+    json: &str,
+    market: &Bound<'_, PyAny>,
+    as_of: &str,
+    tranche_id: &str,
+    grid: &str,
+) -> PyResult<String> {
+    let market = extract_market(market)?;
+    let json = json.to_owned();
+    let as_of = as_of.to_owned();
+    let tranche_id = tranche_id.to_owned();
+    let grid = grid.to_owned();
+    py.detach(move || {
+        let result = structured_credit_tranche_scenario_table_json(
+            &json,
+            &tranche_id,
+            &market,
+            &as_of,
+            &grid,
+        )
+        .map_err(core_to_py)?;
+        serde_json::to_string(&result).map_err(display_to_py)
+    })
+}
+
+pub(super) fn tranche_metrics(
+    py: Python<'_>,
+    json: &str,
+    market: &Bound<'_, PyAny>,
+    as_of: &str,
+    tranche_id: &str,
+    market_price_pct: Option<f64>,
+) -> PyResult<String> {
+    let market = extract_market(market)?;
+    let json = json.to_owned();
+    let as_of = as_of.to_owned();
+    let tranche_id = tranche_id.to_owned();
+    py.detach(move || {
+        let result = structured_credit_tranche_metrics_json(
+            &json,
+            &tranche_id,
+            &market,
+            &as_of,
+            market_price_pct,
+        )
+        .map_err(core_to_py)?;
+        serde_json::to_string(&result).map_err(display_to_py)
     })
 }
 

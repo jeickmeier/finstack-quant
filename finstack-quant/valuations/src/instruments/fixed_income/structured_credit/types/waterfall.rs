@@ -112,6 +112,350 @@ pub enum PaymentCalculation {
         /// Target reserve balance the account should be replenished to.
         target_balance: Money,
     },
+    /// Tranche interest with the coupon rate capped (available-funds / net-WAC cap).
+    ///
+    /// Identical to [`PaymentCalculation::TrancheInterest`] except the effective
+    /// annualized coupon is capped at `cap_rate`, modelling an available-funds
+    /// cap where a tranche cannot be paid more interest than the collateral's
+    /// net weighted-average coupon supports. The capped shortfall is unpaid
+    /// (no carryforward in this variant).
+    CappedTrancheInterest {
+        /// Tranche id.
+        tranche_id: String,
+        /// Cap on the annualized coupon rate (decimal, e.g. `0.03` = 3%).
+        cap_rate: f64,
+        /// Rounding convention.
+        rounding: Option<RoundingConvention>,
+    },
+}
+
+/// Declarative, additively-applied waterfall rules layered onto a deal's base
+/// waterfall.
+///
+/// Each sub-spec is optional; when none are present the resolved waterfall is
+/// identical to the base waterfall. Applied by
+/// [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct WaterfallRules {
+    /// Available-funds / net-WAC cap on named tranches' interest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub afc: Option<AfcSpec>,
+    /// Excess-spread (spread-account) capture and draw.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excess_spread: Option<ExcessSpreadSpec>,
+    /// Step-down: switch principal allocation to pro-rata after a date when the
+    /// step-down trigger passes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step_down: Option<StepDownSpec>,
+    /// Shifting interest: senior receives a scheduled (declining) share of
+    /// principal. Mutually exclusive with `step_down` (both govern principal
+    /// allocation); `shifting_interest` takes precedence when both are set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shifting_interest: Option<ShiftingInterestSpec>,
+    /// Early amortization: end a revolving period early on a performance breach
+    /// (master-trust style), switching the deal into amortization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub early_amortization: Option<EarlyAmortizationSpec>,
+    /// Controlled accumulation: accumulate principal into a funding account and
+    /// repay the investor as a bullet at the accumulation end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub controlled_accumulation: Option<ControlledAccumulationSpec>,
+}
+
+impl WaterfallRules {
+    /// Validate the declarative rules against the deal's tranche structure.
+    ///
+    /// A malformed rule set otherwise misprices *silently*: an unresolved
+    /// tranche-id reference makes its cap/lock-out a no-op, and an out-of-range
+    /// fraction (e.g. `5` entered for `5%`) never trips its trigger. This guard
+    /// converts those into explicit `Error::Validation`s at deal-build / pricing
+    /// time. Checked here:
+    ///
+    /// - `afc.capped_tranches` and `shifting_interest.senior_id` resolve to real
+    ///   tranches; `afc.net_wac_fee_bps` is finite and non-negative.
+    /// - Loss/enhancement/share fractions (`trap_loss_pct`,
+    ///   `MaxCumulativeLoss`, `MinCreditEnhancement`, `senior_pct`,
+    ///   `max_cumulative_loss_pct`) lie in `[0, 1]`; `MinOcRatio` is finite and
+    ///   non-negative (a ratio, so it may exceed 1).
+    /// - `excess_spread.target_balance` is non-negative.
+    /// - The shifting-interest schedule is non-empty and strictly ascending in
+    ///   `months_from_closing` (so [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`]'s
+    ///   step lookup is unambiguous).
+    /// - `controlled_accumulation.start_date <= bullet_date`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` describing the first violation found.
+    pub(crate) fn validate(
+        &self,
+        tranches: &super::tranches::TrancheStructure,
+    ) -> finstack_quant_core::Result<()> {
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+        let has_tranche = |id: &str| tranches.tranches.iter().any(|t| t.id.as_str() == id);
+        let unit = |v: f64, what: &str| -> finstack_quant_core::Result<()> {
+            if !v.is_finite() || !(0.0..=1.0).contains(&v) {
+                return Err(invalid(format!(
+                    "waterfall_rules: {what} must be a fraction in [0, 1], got {v}"
+                )));
+            }
+            Ok(())
+        };
+
+        if let Some(afc) = &self.afc {
+            for id in &afc.capped_tranches {
+                if !has_tranche(id) {
+                    return Err(invalid(format!(
+                        "waterfall_rules: afc.capped_tranches references unknown tranche '{id}'"
+                    )));
+                }
+            }
+            if let Some(bps) = afc.net_wac_fee_bps {
+                if !bps.is_finite() || bps < 0.0 {
+                    return Err(invalid(format!(
+                        "waterfall_rules: afc.net_wac_fee_bps must be finite and non-negative, got {bps}"
+                    )));
+                }
+            }
+        }
+
+        if let Some(es) = &self.excess_spread {
+            if es.target_balance.amount() < 0.0 {
+                return Err(invalid(format!(
+                    "waterfall_rules: excess_spread.target_balance must be non-negative, got {}",
+                    es.target_balance.amount()
+                )));
+            }
+            if let Some(trap) = es.trap_loss_pct {
+                unit(trap, "excess_spread.trap_loss_pct")?;
+            }
+        }
+
+        if let Some(sd) = &self.step_down {
+            for trigger in &sd.triggers {
+                match trigger {
+                    StepDownTrigger::MaxCumulativeLoss(v) => {
+                        unit(*v, "step_down trigger MaxCumulativeLoss")?;
+                    }
+                    StepDownTrigger::MinCreditEnhancement(v) => {
+                        unit(*v, "step_down trigger MinCreditEnhancement")?;
+                    }
+                    StepDownTrigger::MinOcRatio(v) => {
+                        if !v.is_finite() || *v < 0.0 {
+                            return Err(invalid(format!(
+                                "waterfall_rules: step_down trigger MinOcRatio must be finite and non-negative, got {v}"
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(si) = &self.shifting_interest {
+            if !has_tranche(&si.senior_id) {
+                return Err(invalid(format!(
+                    "waterfall_rules: shifting_interest.senior_id references unknown tranche '{}'",
+                    si.senior_id
+                )));
+            }
+            if si.schedule.is_empty() {
+                return Err(invalid(
+                    "waterfall_rules: shifting_interest.schedule must have at least one step"
+                        .to_string(),
+                ));
+            }
+            let mut prev: Option<u32> = None;
+            for step in &si.schedule {
+                unit(step.senior_pct, "shifting_interest senior_pct")?;
+                if let Some(p) = prev {
+                    if step.months_from_closing <= p {
+                        return Err(invalid(format!(
+                            "waterfall_rules: shifting_interest.schedule must be strictly ascending in \
+                             months_from_closing (found {} after {p})",
+                            step.months_from_closing
+                        )));
+                    }
+                }
+                prev = Some(step.months_from_closing);
+            }
+        }
+
+        if let Some(ea) = &self.early_amortization {
+            unit(
+                ea.max_cumulative_loss_pct,
+                "early_amortization.max_cumulative_loss_pct",
+            )?;
+        }
+
+        if let Some(ca) = &self.controlled_accumulation {
+            if ca.start_date > ca.bullet_date {
+                return Err(invalid(format!(
+                    "waterfall_rules: controlled_accumulation.start_date ({}) must be on or before \
+                     bullet_date ({})",
+                    ca.start_date, ca.bullet_date
+                )));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Available-funds cap (net-WAC cap) specification.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AfcSpec {
+    /// Ids of tranches whose interest coupon is capped at the collateral's
+    /// (net) weighted-average coupon.
+    pub capped_tranches: Vec<String>,
+    /// Senior fee load (annualized basis points) ranking ahead of the capped
+    /// interest — typically servicing plus trustee fees. Subtracted from the
+    /// gross collateral WAC to form the **net**-WAC cap. When `None` the cap is
+    /// the gross collateral WAC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub net_wac_fee_bps: Option<f64>,
+}
+
+/// Excess-spread / spread-account specification.
+///
+/// Each period the account captures residual interest (that would otherwise be
+/// distributed to equity) up to `target_balance`, and draws down to cover debt
+/// tranche interest shortfalls — providing credit enhancement from excess
+/// spread. Any balance unused at deal end is released back to equity, unless a
+/// cumulative-loss trap trigger is breached.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ExcessSpreadSpec {
+    /// Target funded balance of the spread account (currency units).
+    pub target_balance: Money,
+    /// Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the
+    /// original pool) at or above which any remaining spread-account balance is
+    /// *retained* in the deal at maturity rather than released to equity. When
+    /// `None`, the unused balance is always released to equity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trap_loss_pct: Option<f64>,
+}
+
+/// A single step-down performance trigger.
+///
+/// Each variant is a per-period *health check* the deal must pass (in addition
+/// to seasoning past the step-down date) for principal to switch to pro-rata.
+/// All configured triggers must pass simultaneously; while any is breached the
+/// deal reverts to sequential, so the switch is re-evaluated every period.
+///
+/// Conventions (all evaluated on *current* balances each period):
+/// - cumulative loss is a fraction of the *original* pool balance;
+/// - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
+/// - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
+///   where the senior note is the *single* most-senior tranche by payment
+///   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
+///   lowest-priority one is taken as the reference.
+///
+/// Delinquency triggers are intentionally absent: the simulation engine models
+/// defaults and recoveries but not a separate delinquency state, so there is no
+/// delinquency rate to test against.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[non_exhaustive]
+pub enum StepDownTrigger {
+    /// Passes while cumulative losses (fraction of the original pool) are at or
+    /// below this level.
+    MaxCumulativeLoss(f64),
+    /// Passes while the overcollateralization ratio (current pool ÷ rated note
+    /// balance) is at or above this level.
+    MinOcRatio(f64),
+    /// Passes while senior credit enhancement (`(pool − senior note) ÷ pool`) is
+    /// at or above this level.
+    MinCreditEnhancement(f64),
+}
+
+/// Step-down specification for senior/subordinate principal allocation.
+///
+/// Principal is paid sequentially (senior first) until the deal seasons past
+/// `step_down_date`; from then on, *if* every configured [`StepDownTrigger`]
+/// passes, principal switches to pro-rata across the debt tranches, releasing
+/// subordination to the juniors. While any trigger is breached the deal reverts
+/// to sequential, so the switch is re-evaluated every period (non-sticky). An
+/// empty `triggers` list steps down purely on the date.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StepDownSpec {
+    /// Earliest date principal may switch to pro-rata.
+    #[schemars(with = "String")]
+    pub step_down_date: Date,
+    /// Performance triggers; all must pass for the step-down to take effect.
+    pub triggers: Vec<StepDownTrigger>,
+}
+
+/// One step of a shifting-interest schedule: the senior's share of principal
+/// from `months_from_closing` onward (until the next step).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ShiftingInterestStep {
+    /// Months from closing at which this senior share takes effect.
+    pub months_from_closing: u32,
+    /// Senior share of principal (decimal, `1.0` = 100% lockout) from this step.
+    pub senior_pct: f64,
+}
+
+/// Shifting-interest principal allocation (non-agency senior/sub RMBS).
+///
+/// The senior tranche receives `senior_pct` of principal (the rest split across
+/// the remaining debt tranches), where `senior_pct` follows a declining
+/// schedule by deal age. A `1.0` lockout early routes all principal to the
+/// senior; later steps release principal to the subordinates. Modelled as a
+/// per-period weighted pro-rata of *all* principal (a first-order treatment;
+/// agency-style scheduled-vs-prepayment splitting is a refinement).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ShiftingInterestSpec {
+    /// Id of the senior tranche that receives the scheduled principal share.
+    pub senior_id: String,
+    /// Declining senior-share schedule, ascending by `months_from_closing`.
+    pub schedule: Vec<ShiftingInterestStep>,
+}
+
+/// Early-amortization specification for revolving (master-trust) deals.
+///
+/// While a deal's reinvestment/revolving period is active, principal is recycled
+/// and the investor (tranche) balances are held flat. If cumulative losses reach
+/// `max_cumulative_loss_pct`, an early-amortization event is triggered: the
+/// revolving period ends immediately and the deal begins paying principal down
+/// (amortizing) even before its scheduled revolving-period end.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EarlyAmortizationSpec {
+    /// Cumulative-loss fraction (decimal, of the original pool balance) at or
+    /// above which the revolving period ends early and amortization begins.
+    pub max_cumulative_loss_pct: f64,
+}
+
+/// Controlled-accumulation specification for revolving (master-trust) deals.
+///
+/// Between `start_date` and `bullet_date` the deal is in its controlled-
+/// accumulation period: collected pool principal is held in a principal funding
+/// account (investor balances stay flat, no pass-through paydown) rather than
+/// recycled or distributed. At the first payment date on or after `bullet_date`
+/// the entire account is released into the waterfall as a single bullet
+/// principal payment. Accumulation is suspended while a revolving/reinvestment
+/// period is still active (which recycles principal) and on early amortization
+/// (which pays principal down immediately).
+///
+/// `start_date` is typically the revolving-period end and `bullet_date` the
+/// note's expected maturity (and at/before the legal final maturity, so the
+/// release occurs before the deal winds down). If the deal terminates before
+/// the bullet date (cleanup call, pool exhaustion, or a bullet date beyond the
+/// last payment), any residual funding-account balance is swept to the
+/// outstanding tranches senior-first at deal end, so accumulated principal is
+/// never stranded.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ControlledAccumulationSpec {
+    /// First date principal is accumulated into the funding account.
+    #[schemars(with = "String")]
+    pub start_date: Date,
+    /// Date the accumulated funding account is released as a bullet payment.
+    #[schemars(with = "String")]
+    pub bullet_date: Date,
 }
 
 /// Allocation mode within a tier

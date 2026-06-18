@@ -9,10 +9,12 @@
 
 pub(crate) mod coverage_tests;
 pub(crate) mod diversion;
+pub(crate) mod resolve;
 pub(crate) mod simulation_engine;
 pub(crate) mod stochastic;
 pub(crate) mod waterfall;
 
+pub use resolve::resolve_waterfall;
 pub use waterfall::{execute_waterfall, execute_waterfall_with_workspace};
 
 use crate::cashflow::traits::DatedFlows;

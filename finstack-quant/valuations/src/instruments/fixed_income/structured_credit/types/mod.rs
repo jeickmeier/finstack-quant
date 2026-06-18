@@ -61,9 +61,11 @@ pub use reinvestment::ReinvestmentManager;
 // Waterfall types
 pub(crate) use waterfall::DiversionRecord;
 pub use waterfall::{
-    AllocationMode, CoverageTestType, ManagementFeeType, PaymentCalculation, PaymentRecord,
-    PaymentType, Recipient, RecipientType, RoundingConvention, Waterfall, WaterfallBuilder,
-    WaterfallDistribution, WaterfallTier, WaterfallWorkspace,
+    AfcSpec, AllocationMode, ControlledAccumulationSpec, CoverageTestType, EarlyAmortizationSpec,
+    ExcessSpreadSpec, ManagementFeeType, PaymentCalculation, PaymentRecord, PaymentType, Recipient,
+    RecipientType, RoundingConvention, ShiftingInterestSpec, ShiftingInterestStep, StepDownSpec,
+    StepDownTrigger, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
+    WaterfallTier, WaterfallWorkspace,
 };
 
 // Result types
@@ -382,6 +384,13 @@ pub struct StructuredCredit {
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cleanup_call_pct: Option<f64>,
+
+    /// Declarative waterfall rules (available-funds caps, etc.) layered onto the
+    /// base waterfall by `resolve_waterfall`. `None` reproduces the base
+    /// waterfall exactly.
+    #[builder(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waterfall_rules: Option<WaterfallRules>,
 }
 
 impl StructuredCredit {

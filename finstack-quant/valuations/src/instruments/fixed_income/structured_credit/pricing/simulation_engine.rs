@@ -11,8 +11,8 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::de
     PerNameCopulaDefault, PoolGranularity,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    AssetPool, PoolState, RecipientType, StructuredCredit, TrancheCashflows, TrancheSeniority,
-    TrancheStructure, Waterfall, WaterfallDistribution,
+    AssetPool, PoolState, RecipientType, StructuredCredit, Tranche, TrancheCashflows,
+    TrancheSeniority, TrancheStructure, Waterfall, WaterfallDistribution,
 };
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -63,6 +63,101 @@ impl PoolFlowSource for DeterministicPoolFlowSource {
         let mdr = request
             .instrument
             .calculate_default_rate(request.pay_date, request.seasoning_months)?;
+        calculate_pool_flows_with_rates(RatedPoolFlowRequest {
+            state: request.state,
+            pay_date: request.pay_date,
+            prev_date: request.prev_date,
+            months_per_period: request.months_per_period,
+            context: request.context,
+            rates: PoolFlowRates {
+                smm,
+                mdr,
+                recovery_rate: request.instrument.credit_model.recovery_spec.rate,
+            },
+            copula_outcome: None,
+        })
+    }
+}
+
+/// Pool-flow source for option-adjusted-spread (OAS) scenario pricing.
+///
+/// For one Monte-Carlo scenario this modulates the deal's base prepayment and
+/// default rates by an optional Hull-White short-rate path (rate-dependent
+/// prepayment) and/or an optional systematic credit factor `z` (correlated
+/// stress on default and prepayment), then defers to the deterministic
+/// pool-flow engine. Discounting — including the trial OAS spread — is applied
+/// by the caller to the resulting cashflows, not here.
+///
+/// Computing the shock per period (from the request's `pay_date`/seasoning)
+/// rather than from a pre-built vector keeps it automatically aligned to the
+/// engine's payment schedule.
+pub(crate) struct OasPathFlowSource {
+    as_of: Date,
+    /// Monthly short-rate path from `as_of` (`None` ⇒ rates not stochastic).
+    rate_path: Option<Vec<f64>>,
+    /// Systematic credit factor for the scenario (`None` ⇒ credit not stochastic).
+    credit_z: Option<f64>,
+    /// Rate-dependent prepayment sensitivity (β in `exp(-β·(r-r₀))`).
+    prepay_beta: f64,
+    /// Base (initial) short rate `r₀`.
+    base_rate: f64,
+    /// Credit factor loading for the lognormal default/prepayment shocks.
+    credit_loading: f64,
+}
+
+impl OasPathFlowSource {
+    pub(crate) fn new(
+        as_of: Date,
+        rate_path: Option<Vec<f64>>,
+        credit_z: Option<f64>,
+        prepay_beta: f64,
+        base_rate: f64,
+        credit_loading: f64,
+    ) -> Self {
+        Self {
+            as_of,
+            rate_path,
+            credit_z,
+            prepay_beta,
+            base_rate,
+            credit_loading,
+        }
+    }
+}
+
+impl PoolFlowSource for OasPathFlowSource {
+    fn calculate_pool_flows(&mut self, request: PoolFlowRequest<'_, '_>) -> Result<PoolFlows> {
+        const RATE_CLAMP: f64 = 0.9999;
+        let base_smm = request
+            .instrument
+            .calculate_prepayment_rate(request.pay_date, request.seasoning_months)?;
+        let base_mdr = request
+            .instrument
+            .calculate_default_rate(request.pay_date, request.seasoning_months)?;
+
+        let mut smm = base_smm;
+        let mut mdr = base_mdr;
+
+        // Rate-dependent prepayment: higher rates slow prepayment.
+        if let Some(rate_path) = &self.rate_path {
+            let month = self.as_of.months_until(request.pay_date) as usize;
+            let r = rate_path.get(month).copied().unwrap_or(self.base_rate);
+            let mult = (-self.prepay_beta * (r - self.base_rate)).exp();
+            smm = (smm * mult).clamp(0.0, RATE_CLAMP);
+        }
+
+        // Systematic credit stress (canonical convention: low `z` is the stress
+        // state). Mean-corrected lognormal multipliers keep `E[shock] ≈ 1`, so
+        // the stochastic credit dimension adds dispersion without biasing the
+        // mean cashflows (and hence the OAS).
+        if let Some(z) = self.credit_z {
+            let l = self.credit_loading;
+            let mdr_mult = (-l * z - 0.5 * l * l).exp();
+            let smm_mult = (l * z - 0.5 * l * l).exp();
+            mdr = (mdr * mdr_mult).clamp(0.0, RATE_CLAMP);
+            smm = (smm * smm_mult).clamp(0.0, RATE_CLAMP);
+        }
+
         calculate_pool_flows_with_rates(RatedPoolFlowRequest {
             state: request.state,
             pay_date: request.pay_date,
@@ -355,6 +450,228 @@ impl PoolFlowSource for StochasticPathFlowSource {
 // PUBLIC API
 // ============================================================================
 
+/// Release the unused spread-account balance to equity at deal end.
+///
+/// Record a residual principal distribution to a tranche at deal end: appends
+/// the flow to the tranche's cashflows and principal flows and bumps its
+/// `total_principal`. No-op if the tranche has no results entry. Shared by the
+/// excess-spread and controlled-accumulation terminal sweeps.
+fn append_residual_principal(
+    state: &mut SimulationState<'_>,
+    tranche_id: &str,
+    amount: Money,
+    date: Date,
+) -> Result<()> {
+    if let Some(res) = state.results.get_mut(tranche_id) {
+        res.cashflows.push((date, amount));
+        res.principal_flows.push((date, amount));
+        res.total_principal = res.total_principal.checked_add(amount)?;
+    }
+    Ok(())
+}
+
+/// If the deal configures `excess_spread` and the account holds a positive
+/// balance after the final period, that balance is distributed to the equity
+/// tranche as a residual flow — unless a cumulative-loss trap trigger
+/// (`trap_loss_pct`) is breached, in which case the balance is retained in the
+/// deal (consumed enhancement) and permanently reduces equity. No-op when no
+/// `excess_spread` rule is configured (identity).
+///
+/// The release is booked via [`append_residual_principal`] (i.e. as a principal
+/// flow), matching the engine-wide convention that equity/residual distributions
+/// are recorded as principal: the equity tranche carries no coupon, so its Step-5
+/// interest claim is zero and every residual it receives is already classified as
+/// principal. Routing the spread release the same way keeps equity's
+/// interest/principal split internally consistent; the choice is PV-neutral
+/// (NPV, yield and IRR use the total cashflow, not the interest/principal split).
+fn release_spread_account(
+    state: &mut SimulationState<'_>,
+    instrument: &StructuredCredit,
+) -> Result<()> {
+    let Some(es) = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.excess_spread.as_ref())
+    else {
+        return Ok(());
+    };
+
+    let balance = state.spread_account;
+    if balance.amount() <= 0.0 {
+        return Ok(());
+    }
+
+    // Retain (do not release) if the cumulative-loss trap trigger is breached.
+    if let Some(trap) = es.trap_loss_pct {
+        let denom = state.total_pool_balance.amount();
+        let loss_fraction = if denom > 0.0 {
+            state.cumulative_realized_loss / denom
+        } else {
+            0.0
+        };
+        if loss_fraction >= trap {
+            state.spread_account = Money::new(0.0, state.base_ccy);
+            return Ok(());
+        }
+    }
+
+    // Release to the equity tranche as a residual principal flow.
+    let equity_id = state
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.seniority == TrancheSeniority::Equity)
+        .map(|t| t.id.as_str().to_string());
+    if let Some(eq_id) = equity_id {
+        let release_date = state.prev_date.unwrap_or(state.closing_date);
+        append_residual_principal(state, &eq_id, balance, release_date)?;
+    }
+    state.spread_account = Money::new(0.0, state.base_ccy);
+    Ok(())
+}
+
+/// Release any residual controlled-accumulation funding-account balance at deal
+/// end, paying it down the capital structure senior-first.
+///
+/// During the accumulation period collected pool principal is held in the
+/// funding account and normally released as a bullet at the bullet date. If the
+/// deal terminates before then (cleanup call, pool exhaustion, or a bullet date
+/// beyond the last payment), the in-period bullet never fires; this terminal
+/// sweep distributes the residual to the outstanding tranches (most-senior
+/// first), so the accumulated principal is never stranded. A no-op when no
+/// accumulation rule is configured or the account is already empty (the normal
+/// bullet-release path).
+fn release_principal_funding_account(
+    state: &mut SimulationState<'_>,
+    instrument: &StructuredCredit,
+) -> Result<()> {
+    if instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.controlled_accumulation.as_ref())
+        .is_none()
+    {
+        return Ok(());
+    }
+    let mut remaining = state.principal_funding_account.amount();
+    if remaining <= 0.0 {
+        return Ok(());
+    }
+
+    let release_date = state.prev_date.unwrap_or(state.closing_date);
+    // Outstanding tranches, most-senior first by payment priority.
+    let mut order: Vec<usize> = (0..state.tranches.tranches.len()).collect();
+    order.sort_by_key(|&i| state.tranches.tranches[i].payment_priority);
+
+    for i in order {
+        if remaining <= 0.0 {
+            break;
+        }
+        let id = state.tranches.tranches[i].id.as_str().to_string();
+        let balance = state.tranche_balances.get(&id).map_or(0.0, |m| m.amount());
+        if balance <= 0.0 {
+            continue;
+        }
+        let pay = remaining.min(balance);
+        state
+            .tranche_balances
+            .insert(id.clone(), Money::new(balance - pay, state.base_ccy));
+        append_residual_principal(state, &id, Money::new(pay, state.base_ccy), release_date)?;
+        remaining -= pay;
+    }
+    // Any balance beyond the outstanding capital structure (accumulated cash
+    // exceeding every remaining note balance) is residual value to the
+    // most-junior / equity tranche — routed there rather than silently destroyed
+    // by zeroing the account, which would break cash conservation.
+    if remaining > WRITEDOWN_DE_MINIMIS {
+        let residual_id = state
+            .tranches
+            .tranches
+            .iter()
+            .max_by_key(|t| t.payment_priority)
+            .map(|t| t.id.as_str().to_string());
+        if let Some(id) = residual_id {
+            append_residual_principal(
+                state,
+                &id,
+                Money::new(remaining, state.base_ccy),
+                release_date,
+            )?;
+        }
+    }
+    state.principal_funding_account = Money::new(0.0, state.base_ccy);
+    Ok(())
+}
+
+/// Live collateral weighted-average coupon from the *current* pool state:
+/// balance-weighted `rate` over performing (non-defaulted, positive-balance)
+/// assets. Mirrors [`crate::instruments::fixed_income::structured_credit::AssetPool::weighted_avg_coupon`]
+/// but on the current balances, so a net-WAC cap tracks collateral that has
+/// amortized, prepaid or defaulted heterogeneously instead of being frozen at
+/// closing. Returns `0.0` for an empty/exhausted performing pool.
+fn current_collateral_wac(state: &SimulationState) -> f64 {
+    let mut weighted = 0.0_f64;
+    let mut balance = 0.0_f64;
+    for i in 0..state.pool_state.len() {
+        if state.pool_state.is_defaulted[i] {
+            continue;
+        }
+        let b = state.pool_state.balances[i];
+        if b <= 0.0 {
+            continue;
+        }
+        weighted += state.pool_state.rates[i] * b;
+        balance += b;
+    }
+    if balance > 0.0 {
+        weighted / balance
+    } else {
+        0.0
+    }
+}
+
+/// Live available-funds cap rate: the current collateral WAC
+/// ([`current_collateral_wac`]) less the AFC spec's net-WAC fee load (servicing
+/// plus trustee bps ranking ahead of the capped interest). Returns `0.0` when no
+/// AFC rule is configured (cap unused).
+fn live_afc_cap_rate(instrument: &StructuredCredit, state: &SimulationState) -> f64 {
+    match instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.afc.as_ref())
+    {
+        Some(afc) => {
+            (current_collateral_wac(state) - afc.net_wac_fee_bps.unwrap_or(0.0) / 10_000.0).max(0.0)
+        }
+        None => 0.0,
+    }
+}
+
+/// Current-period interest due on one tranche: `balance · coupon · accrual`,
+/// with the coupon capped at `afc_cap` when `afc_capped` is set (available-funds
+/// cap). Single source of truth for tranche interest-due, shared by the
+/// excess-spread surplus check and the Step-5 interest recording so the two
+/// cannot diverge on day-count, index fixing, or the AFC cap.
+fn tranche_period_interest_due(
+    tranche: &Tranche,
+    balance: f64,
+    period_start: Date,
+    pay_date: Date,
+    context: &MarketContext,
+    afc_cap: f64,
+    afc_capped: bool,
+) -> Result<f64> {
+    let raw = tranche
+        .coupon
+        .try_current_rate_with_index(pay_date, context)?;
+    let rate = if afc_capped { raw.min(afc_cap) } else { raw };
+    let accrual =
+        tranche
+            .day_count
+            .year_fraction(period_start, pay_date, DayCountContext::default())?;
+    Ok(balance * rate * accrual)
+}
+
 /// Run full cashflow simulation for a structured credit instrument.
 ///
 /// Returns detailed cashflow results for each tranche.
@@ -369,6 +686,14 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
 
     if pool.total_balance()?.amount() <= 0.0 {
         return Ok(HashMap::default());
+    }
+
+    // Reject malformed declarative rules up front: an unresolved tranche-id
+    // reference or an out-of-range trigger fraction would otherwise misprice
+    // the deal *silently* (the cap/lock-out becomes a no-op). See
+    // `WaterfallRules::validate`.
+    if let Some(rules) = instrument.waterfall_rules.as_ref() {
+        rules.validate(tranches)?;
     }
 
     // Validate and extract months per period
@@ -389,7 +714,10 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         instrument.credit_model.recovery_spec.recovery_lag,
     )?;
 
-    // Create waterfall
+    // Concrete base waterfall. The available-funds cap is *not* baked here:
+    // it is layered onto the per-period waterfall inside `simulate_period` using
+    // the live collateral WAC (`live_afc_cap_rate`), so the cap tracks pool
+    // amortization/prepayment/defaults rather than being frozen at closing.
     let waterfall = instrument.create_waterfall();
 
     // Resolve payment calendar - required for structured credit deals.
@@ -486,8 +814,16 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                 // (they fund the redemption below); drain the queue so the
                 // end-of-simulation drain cannot release them a second time.
                 let _ = state.recovery_queue.drain_pending();
+                // Any controlled-accumulation funding account holds collected
+                // pool principal not yet released as a bullet. At the cleanup call
+                // it is real cash available to redeem the notes; fold it into the
+                // redemption and zero the account so the post-loop terminal sweep
+                // (`release_principal_funding_account`) cannot double-count or
+                // mis-allocate it across the (now-redeemed) balances.
+                let funding_balance = state.principal_funding_account.amount();
+                state.principal_funding_account = Money::new(0.0, state.base_ccy);
                 let mut available_for_redemption =
-                    state.pool_outstanding.amount() + pending_recoveries.amount();
+                    state.pool_outstanding.amount() + pending_recoveries.amount() + funding_balance;
 
                 // Stub-period start for accrued-interest calculation: the last
                 // payment date (or closing) up to this cleanup-call date.
@@ -606,6 +942,16 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     // released at the later of the final simulated date and its own
     // default-date + recovery lag, business-day adjusted.
     drain_pending_recoveries_at_end(&mut state, calendar, convention)?;
+
+    // Release any unused spread-account balance to equity at deal end (unless a
+    // cumulative-loss trap trigger retains it as consumed enhancement).
+    release_spread_account(&mut state, instrument)?;
+
+    // Release any controlled-accumulation funding-account balance that was never
+    // paid out as a bullet — e.g. the deal hit a cleanup call or its scheduled
+    // end before the bullet date. Prevents the accumulated principal from being
+    // silently stranded.
+    release_principal_funding_account(&mut state, instrument)?;
 
     Ok(state.finalize())
 }
@@ -781,6 +1127,18 @@ mod tests {
     };
     use finstack_quant_core::currency::Currency;
     use time::Month;
+
+    #[test]
+    fn reinvestment_par_build_scales_inversely_with_price() {
+        // At par, $1 of cash buys $1 of par.
+        assert!((par_acquired_at_price(100.0, 1.0) - 100.0).abs() < 1e-9);
+        // At a 97 price, $100 of cash buys 100 / 0.97 ≈ 103.09 of par (par build).
+        assert!((par_acquired_at_price(100.0, 0.97) - 100.0 / 0.97).abs() < 1e-9);
+        // A premium price (> par) acquires less par than cash spent.
+        assert!(par_acquired_at_price(100.0, 1.02) < 100.0);
+        // Degenerate non-positive price falls back to 1:1 par recycling.
+        assert!((par_acquired_at_price(100.0, 0.0) - 100.0).abs() < 1e-9);
+    }
 
     fn empty_tranche_cashflows(id: &str, currency: Currency) -> TrancheCashflows {
         TrancheCashflows {
@@ -1867,14 +2225,17 @@ pub(crate) struct SimulationState<'a> {
     /// Whether reinvestment was active in the previous period.
     /// Used to detect the reinvestment-end transition and reconcile pool_outstanding.
     was_reinvestment_active: bool,
-    /// Cumulative expected net losses (default_amount * (1 - recovery_rate)).
+    /// Cumulative net loss realized in this scenario
+    /// (`default_amount * (1 - recovery_rate)`), accumulated period by period.
     ///
-    /// Uses the expected recovery at the point of default rather than lagged
-    /// realized recoveries. This is the INTEX/Moody's Analytics convention:
-    /// loss allocation should reflect economic loss at default, not cash-timing
-    /// of recovery receipts. Lagged recoveries affect waterfall cash, not
-    /// loss allocation.
-    cumulative_expected_loss: f64,
+    /// "Realized" here means realized *within the simulated path*: it uses the
+    /// expected recovery at the point of default rather than lagged cash
+    /// recoveries (the INTEX/Moody's Analytics convention — loss allocation
+    /// reflects economic loss at default, not the cash-timing of recovery
+    /// receipts). It is a running realized loss, not a forward-looking expected
+    /// loss; trap/early-amortization/step-down triggers key off it as a fraction
+    /// of the original pool.
+    cumulative_realized_loss: f64,
     /// Cumulative net loss that exceeds the structure's total absorbable
     /// notional (every tranche fully written down). Surfaced rather than
     /// silently dropped by the loss-allocation `min(...)` cap, so the
@@ -1898,6 +2259,66 @@ pub(crate) struct SimulationState<'a> {
     pool_wala_months: u32,
     /// Current reserve account balance.
     reserve_balance: Money,
+    /// Current excess-spread (spread-account) balance. Carries period to period:
+    /// funded from captured residual interest and drawn to cover debt interest
+    /// shortfalls. See `ExcessSpreadSpec`.
+    spread_account: Money,
+    /// Current controlled-accumulation principal funding account balance. During
+    /// the accumulation period, collected pool principal is held here (investor
+    /// balances flat) and released as a bullet at the accumulation end. See
+    /// `ControlledAccumulationSpec`.
+    principal_funding_account: Money,
+}
+
+/// Deal-health metrics for this period's step-down trigger evaluation.
+///
+/// Computes, on current balances: cumulative loss (fraction of the *original*
+/// pool), the overcollateralization ratio (pool ÷ rated non-equity notes), and
+/// senior credit enhancement (`(pool − senior note) ÷ pool`, the senior note
+/// being the lowest payment-priority tranche). See [`StepDownTrigger`].
+///
+/// [`StepDownTrigger`]: crate::instruments::fixed_income::structured_credit::StepDownTrigger
+fn step_down_metrics(
+    state: &SimulationState,
+) -> crate::instruments::fixed_income::structured_credit::pricing::resolve::StepDownMetrics {
+    let pool = state.pool_outstanding.amount();
+    let cumulative_loss_fraction = if state.total_pool_balance.amount() > 0.0 {
+        state.cumulative_realized_loss / state.total_pool_balance.amount()
+    } else {
+        0.0
+    };
+    let rated_note_balance: f64 = state
+        .tranches
+        .tranches
+        .iter()
+        .filter(|t| t.seniority != TrancheSeniority::Equity)
+        .map(|t| {
+            state
+                .tranche_balances
+                .get(t.id.as_str())
+                .map_or(0.0, |m| m.amount())
+        })
+        .sum();
+    let senior_note_balance = state
+        .tranches
+        .tranches
+        .iter()
+        .min_by_key(|t| t.payment_priority)
+        .and_then(|t| state.tranche_balances.get(t.id.as_str()))
+        .map_or(0.0, |m| m.amount());
+    crate::instruments::fixed_income::structured_credit::pricing::resolve::StepDownMetrics {
+        cumulative_loss_fraction,
+        oc_ratio: if rated_note_balance > 0.0 {
+            pool / rated_note_balance
+        } else {
+            f64::INFINITY
+        },
+        credit_enhancement: if pool > 0.0 {
+            (pool - senior_note_balance) / pool
+        } else {
+            0.0
+        },
+    }
 }
 
 impl<'a> SimulationState<'a> {
@@ -2030,13 +2451,15 @@ impl<'a> SimulationState<'a> {
             pool_balance_cleanup_threshold,
             tranche_recipient_keys,
             was_reinvestment_active: initial_reinvestment_active,
-            cumulative_expected_loss: 0.0,
+            cumulative_realized_loss: 0.0,
             cumulative_loss_unallocated: 0.0,
             total_pool_balance,
             performing_pool_balance,
             loss_alloc_order,
             pool_wala_months,
             reserve_balance: pool.reserve_account,
+            spread_account: Money::new(0.0, base_ccy),
+            principal_funding_account: Money::new(0.0, base_ccy),
         })
     }
 
@@ -2097,6 +2520,15 @@ impl<'a> SimulationState<'a> {
                     });
                 }
             }
+
+            // `detailed_flows` is assembled by category (interest, then
+            // principal, then write-downs); sort by date so downstream consumers
+            // see a single chronologically-ordered stream. Stable so flows that
+            // share a date keep their category order. NPV is unaffected (each
+            // flow carries its own date), but any consumer assuming date order —
+            // e.g. terminal residual sweeps dated at the last pay date — no
+            // longer sees them interleaved out of order.
+            res.detailed_flows.sort_by_key(|cf| cf.date);
         }
 
         self.results
@@ -2139,13 +2571,58 @@ fn simulate_period(
     // Capture period start before updating prev_date (for accrual calculations)
     let period_start = state.prev_date.unwrap_or(state.closing_date);
 
-    // Reinvestment logic -- determined before pool flows so reconciliation
-    // can snap pool_outstanding to the correct pre-flow asset balances.
-    let is_reinvestment_active = state
-        .pool
-        .reinvestment_period
+    // Live available-funds cap for this period: the current collateral WAC (net
+    // of the AFC fee load), read from the start-of-period pool state before this
+    // period's pool flows amortize it. `0.0` when no AFC rule is configured. Used
+    // for both the cash *routed* to capped tranches (the per-period AFC waterfall
+    // below) and the interest *recorded* (Step 5), so the two cannot diverge.
+    let live_afc_cap = live_afc_cap_rate(instrument, state);
+
+    // Early amortization (master-trust style): once cumulative losses reach the
+    // configured threshold, the revolving period ends immediately and the deal
+    // begins amortizing, regardless of the scheduled revolving-period end.
+    let early_amortization = instrument
+        .waterfall_rules
         .as_ref()
-        .is_some_and(|period| pay_date <= period.end_date);
+        .and_then(|rules| rules.early_amortization.as_ref())
+        .is_some_and(|spec| {
+            let denom = state.total_pool_balance.amount();
+            let loss_fraction = if denom > 0.0 {
+                state.cumulative_realized_loss / denom
+            } else {
+                0.0
+            };
+            loss_fraction >= spec.max_cumulative_loss_pct
+        });
+
+    // Reinvestment/revolving logic -- determined before pool flows so
+    // reconciliation can snap pool_outstanding to the correct pre-flow asset
+    // balances. The revolving period also ends early on an early-amortization
+    // event.
+    let is_reinvestment_active = !early_amortization
+        && state
+            .pool
+            .reinvestment_period
+            .as_ref()
+            .is_some_and(|period| pay_date <= period.end_date);
+
+    // Controlled accumulation (master-trust style): after any revolving period
+    // and before the bullet date, collected pool principal is held in a funding
+    // account (investor balances flat) and released as a bullet at the
+    // accumulation end. Suspended while reinvestment recycles principal and on
+    // early amortization (which pays down immediately). `principal_diverted`
+    // unifies the two phases where pool principal is withheld from the waterfall.
+    let accumulation_spec = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.controlled_accumulation.as_ref());
+    let is_accumulating = accumulation_spec.is_some_and(|spec| {
+        !early_amortization
+            && !is_reinvestment_active
+            && pay_date >= spec.start_date
+            && pay_date < spec.bullet_date
+    });
+    let principal_diverted = is_reinvestment_active || is_accumulating;
 
     // Reconciliation: When reinvestment transitions from active → inactive,
     // snap pool_outstanding to the actual sum of asset balances BEFORE this
@@ -2196,7 +2673,18 @@ fn simulate_period(
         let recyclable = pool_flows.scheduled_principal.amount().max(0.0)
             + pool_flows.prepayment.amount().max(0.0);
         if recyclable.is_finite() && recyclable > 0.0 {
-            recycle_reinvestment_principal(state, recyclable);
+            // Reinvestment price (`behavior_overrides.reinvestment_price`, % of
+            // par): collected principal buys new collateral at this price, so
+            // $1 of cash acquires `1 / price_fraction` of par. Defaults to par
+            // (100%) when unset, which reproduces the prior 1:1 recycling.
+            // Clamped to a sane (1%, 200%] band.
+            let price_pct = instrument
+                .behavior_overrides
+                .reinvestment_price
+                .filter(|p| p.is_finite() && *p > 0.0)
+                .unwrap_or(100.0)
+                .clamp(1.0, 200.0);
+            recycle_reinvestment_principal(state, recyclable, price_pct / 100.0);
         }
     }
 
@@ -2228,9 +2716,9 @@ fn simulate_period(
     // This is a permanent, irreversible write-down.
     let period_expected_loss =
         (pool_flows.default.amount() - pool_flows.recovery.amount()).max(0.0);
-    state.cumulative_expected_loss += period_expected_loss;
+    state.cumulative_realized_loss += period_expected_loss;
 
-    if state.cumulative_expected_loss > WRITEDOWN_DE_MINIMIS
+    if state.cumulative_realized_loss > WRITEDOWN_DE_MINIMIS
         && state.performing_pool_balance.amount() > 0.0
     {
         // Allocate the *period's* expected net loss bottom-up using the
@@ -2255,7 +2743,7 @@ fn simulate_period(
             .values()
             .map(|r| r.total_writedown.amount())
             .sum();
-        let mut remaining_loss = (state.cumulative_expected_loss - already_allocated).max(0.0);
+        let mut remaining_loss = (state.cumulative_realized_loss - already_allocated).max(0.0);
         // Clone loss_alloc_order to avoid borrow conflict with state
         let loss_order = state.loss_alloc_order.clone();
         for &idx in &loss_order {
@@ -2341,19 +2829,230 @@ fn simulate_period(
         .scheduled_principal
         .checked_add(pool_flows.prepayment)?;
 
-    // During reinvestment, principal collections are reinvested into new assets.
+    // During reinvestment, principal collections are reinvested into new assets;
+    // during controlled accumulation they are held in the funding account. Either
+    // way pool principal is withheld from the waterfall (`principal_diverted`).
     // Recoveries are CASH and always flow through the waterfall.
-    let principal_available_for_waterfall = if is_reinvestment_active {
+    let mut principal_available_for_waterfall = if principal_diverted {
         released_recoveries
     } else {
         total_principal_from_pool.checked_add(released_recoveries)?
     };
 
-    let total_cash_for_waterfall = pool_flows
+    let mut total_cash_for_waterfall = pool_flows
         .interest
         .checked_add(principal_available_for_waterfall)?;
 
+    // Excess-spread (spread-account) capture/draw, applied to the cash entering
+    // the waterfall. Capturing *here* — before the single sequential waterfall
+    // can sweep surplus interest into senior principal — is what lets the
+    // account fund from excess interest mid-deal and later draw to cover debt
+    // interest shortfalls. No-op (identity) when no `excess_spread` is set.
+    // `spread_net_capture` is the net cash diverted into the account this period
+    // (negative when drawing), reconciled by the cash-conservation check.
+    let mut spread_net_capture = 0.0_f64;
+    if let Some(es) = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.excess_spread.as_ref())
+    {
+        // Snapshot the account balance before any capture/draw, to independently
+        // reconcile the recorded net capture against the actual balance move.
+        let spread_before = state.spread_account.amount();
+
+        // Total interest the waterfall owes debt (non-equity) tranches this
+        // period: the current-period coupon (shared helper, so the surplus
+        // measured here matches what Step 5 records, including the live AFC cap)
+        // PLUS each tranche's outstanding non-PIK deferred interest — a senior
+        // claim the waterfall must also satisfy. Omitting the deferred piece
+        // would let the account capture interest it should instead leave behind
+        // to cure that shortfall.
+        let afc = instrument
+            .waterfall_rules
+            .as_ref()
+            .and_then(|rules| rules.afc.as_ref());
+        let mut debt_interest_due = 0.0_f64;
+        for tranche in &state.tranches.tranches {
+            if tranche.seniority == TrancheSeniority::Equity {
+                continue;
+            }
+            let bal = state
+                .tranche_balances
+                .get(tranche.id.as_str())
+                .map_or(0.0, Money::amount);
+            let afc_capped = afc.is_some_and(|spec| {
+                spec.capped_tranches
+                    .iter()
+                    .any(|t| t == tranche.id.as_str())
+            });
+            debt_interest_due += tranche_period_interest_due(
+                tranche,
+                bal,
+                period_start,
+                pay_date,
+                context,
+                live_afc_cap,
+                afc_capped,
+            )?;
+            if !tranche.pik_enabled {
+                debt_interest_due += state
+                    .deferred_interest
+                    .get(tranche.id.as_str())
+                    .map_or(0.0, Money::amount);
+            }
+        }
+
+        let interest_avail = pool_flows.interest.amount();
+        if interest_avail > debt_interest_due {
+            // Capture surplus interest into the account, up to the target.
+            let room = (es.target_balance.amount() - state.spread_account.amount()).max(0.0);
+            let capture = (interest_avail - debt_interest_due).min(room).max(0.0);
+            // `capture <= interest_avail <= total_cash_for_waterfall`, so the
+            // withdrawal is non-negative; assert the floor is a no-op so a future
+            // divergence between this surplus check and the waterfall cash cannot
+            // silently leak cash into (or out of) the account.
+            let net_after = total_cash_for_waterfall.amount() - capture;
+            debug_assert!(
+                net_after >= -WRITEDOWN_DE_MINIMIS,
+                "excess-spread capture {capture} overdrew waterfall cash {}",
+                total_cash_for_waterfall.amount()
+            );
+            state.spread_account = state
+                .spread_account
+                .checked_add(Money::new(capture, state.base_ccy))?;
+            total_cash_for_waterfall = Money::new(net_after.max(0.0), state.base_ccy);
+            spread_net_capture = capture;
+        } else {
+            // Draw from the account to cover the interest shortfall (bounded by
+            // the account balance, so the subtraction stays non-negative).
+            let draw = (debt_interest_due - interest_avail)
+                .min(state.spread_account.amount())
+                .max(0.0);
+            let draw_money = Money::new(draw, state.base_ccy);
+            state.spread_account = state.spread_account.checked_sub(draw_money)?;
+            total_cash_for_waterfall = total_cash_for_waterfall.checked_add(draw_money)?;
+            spread_net_capture = -draw;
+        }
+
+        // Independent reconciliation: the account balance actually moved by
+        // exactly the recorded net capture (catches a future edit that updates
+        // one but not the other). `spread_before` is read only here, so it is
+        // unused in release builds where `debug_assert!` is compiled out.
+        let _ = spread_before;
+        debug_assert!(
+            ((state.spread_account.amount() - spread_before) - spread_net_capture).abs()
+                <= WRITEDOWN_DE_MINIMIS,
+            "spread-account delta {} != recorded net capture {spread_net_capture}",
+            state.spread_account.amount() - spread_before
+        );
+    }
+
+    // Controlled-accumulation funding account. During accumulation, divert this
+    // period's pool principal into the account (kept out of the waterfall above
+    // via `principal_diverted`, so investor balances stay flat). At the bullet
+    // date, release the whole account into the waterfall as principal. Applied
+    // after the excess-spread block so the spread account never captures the
+    // bullet principal as if it were surplus interest. `funding_net_release`
+    // (cash added back from the account) reconciles the cash-conservation check.
+    let mut funding_net_release = 0.0_f64;
+    if let Some(spec) = accumulation_spec {
+        if is_accumulating {
+            let captured = total_principal_from_pool.amount().max(0.0);
+            state.principal_funding_account = Money::new(
+                state.principal_funding_account.amount() + captured,
+                state.base_ccy,
+            );
+        } else if !early_amortization
+            && pay_date >= spec.bullet_date
+            && state.principal_funding_account.amount() > 0.0
+        {
+            funding_net_release = state.principal_funding_account.amount();
+            state.principal_funding_account = Money::new(0.0, state.base_ccy);
+            let release = Money::new(funding_net_release, state.base_ccy);
+            principal_available_for_waterfall =
+                principal_available_for_waterfall.checked_add(release)?;
+            total_cash_for_waterfall = total_cash_for_waterfall.checked_add(release)?;
+        }
+    }
+
     // ── Step 4: Execute Waterfall on post-loss balances ──────────────
+    // Per-period step-down: switch principal to pro-rata once the deal has
+    // seasoned past the step-down date with cumulative losses below the trigger.
+    // Borrowed (zero-cost) when no step-down rule applies.
+    let rules = instrument.waterfall_rules.as_ref();
+    // Controlled accumulation locks out investor principal (held flat) and takes
+    // precedence; otherwise shifting interest and step-down govern principal
+    // allocation, with shifting interest winning when both are configured.
+    let period_waterfall = if is_accumulating {
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_accumulation_lockout(
+            waterfall,
+            &state.tranche_balances,
+        )
+    } else if let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) {
+        let months_from_closing = state.closing_date.months_until(pay_date);
+        // Senior's pro-rata share (by current balance) governs scheduled
+        // principal; the schedule lock-out governs unscheduled principal.
+        let senior_bal = state
+            .tranche_balances
+            .get(si.senior_id.as_str())
+            .map_or(0.0, |m| m.amount());
+        let total_debt: f64 = state
+            .tranches
+            .tranches
+            .iter()
+            .filter(|t| t.seniority != TrancheSeniority::Equity)
+            .map(|t| {
+                state
+                    .tranche_balances
+                    .get(t.id.as_str())
+                    .map_or(0.0, |m| m.amount())
+            })
+            .sum();
+        let senior_prorata_share = if total_debt > 0.0 {
+            senior_bal / total_debt
+        } else {
+            0.0
+        };
+        // Unscheduled (prepayment + recovery) fraction of distributable principal.
+        let scheduled = pool_flows.scheduled_principal.amount().max(0.0);
+        let unscheduled =
+            pool_flows.prepayment.amount().max(0.0) + released_recoveries.amount().max(0.0);
+        let unscheduled_fraction = if scheduled + unscheduled > 0.0 {
+            unscheduled / (scheduled + unscheduled)
+        } else {
+            1.0
+        };
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_shifting_interest(
+            waterfall,
+            rules,
+            months_from_closing,
+            senior_prorata_share,
+            unscheduled_fraction,
+            &state.tranche_balances,
+        )
+    } else {
+        let metrics = step_down_metrics(state);
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_step_down(
+            waterfall, rules, pay_date, &metrics,
+        )
+    };
+
+    // Layer the available-funds cap onto the per-period waterfall using the live
+    // cap rate, so the cash *routed* to capped tranches' interest matches the
+    // interest *recorded* in Step 5 (both keyed on `live_afc_cap`). Identity (no
+    // clone) when no AFC rule is configured.
+    let period_waterfall = if rules.and_then(|r| r.afc.as_ref()).is_some() {
+        std::borrow::Cow::Owned(
+            crate::instruments::fixed_income::structured_credit::pricing::resolve::resolve_waterfall(
+                &period_waterfall,
+                rules,
+                live_afc_cap,
+            ),
+        )
+    } else {
+        period_waterfall
+    };
+
     let waterfall_context =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext {
             available_cash: total_cash_for_waterfall,
@@ -2371,7 +3070,7 @@ fn simulate_period(
 
     let waterfall_result =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::execute_waterfall(
-            waterfall,
+            &period_waterfall,
             state.tranches,
             state.pool,
             waterfall_context,
@@ -2384,6 +3083,18 @@ fn simulate_period(
         }
     }
 
+    // Available-funds cap: for AFC tranches, cap the recorded coupon at the
+    // collateral weighted-average coupon. Combined with the capped waterfall
+    // allocation (`resolve_waterfall`), this caps both the interest *due*
+    // (recorded below) and the cash routed to the interest recipient, so the
+    // excess spread above the cap flows on through the waterfall rather than
+    // inflating this tranche's interest.
+    let afc_spec = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.afc.as_ref());
+    let afc_cap = live_afc_cap;
+
     // ── Step 5: Record flows and update balances ─────────────────────
     for (idx, tranche) in state.tranches.tranches.iter().enumerate() {
         let recipient_key = &state.tranche_recipient_keys[idx];
@@ -2394,15 +3105,6 @@ fn simulate_period(
             .get(tranche_id_str)
             .copied()
             .unwrap_or(Money::new(0.0, state.base_ccy));
-        let coupon_rate = tranche
-            .coupon
-            .try_current_rate_with_index(pay_date, context)?;
-
-        // Use tranche's day-count convention for proper accrual calculation
-        let accrual_factor =
-            tranche
-                .day_count
-                .year_fraction(period_start, pay_date, DayCountContext::default())?;
 
         let existing_deferred = state
             .deferred_interest
@@ -2410,11 +3112,22 @@ fn simulate_period(
             .copied()
             .unwrap_or(Money::new(0.0, state.base_ccy));
 
-        // Current-period interest due on post-writedown balance. Non-PIK
-        // deferred interest is a separate senior interest claim and is passed
-        // into the waterfall context before execution.
+        // Current-period interest due on post-writedown balance, via the shared
+        // helper (consistent AFC cap, day-count and index fixing with the
+        // excess-spread surplus check). Non-PIK deferred interest is a separate
+        // senior interest claim passed into the waterfall context before execution.
+        let afc_capped =
+            afc_spec.is_some_and(|spec| spec.capped_tranches.iter().any(|t| t == tranche_id_str));
         let current_interest_due = Money::new(
-            current_balance.amount() * coupon_rate * accrual_factor,
+            tranche_period_interest_due(
+                tranche,
+                current_balance.amount(),
+                period_start,
+                pay_date,
+                context,
+                afc_cap,
+                afc_capped,
+            )?,
             state.base_ccy,
         );
         let total_interest_claim = if tranche.pik_enabled {
@@ -2542,12 +3255,17 @@ fn simulate_period(
     // debug/test-only assertion (zero release-build cost) that catches
     // accounting regressions in the waterfall and the engine's pool-flow
     // aggregation.
+    // Net cash diverted out of the waterfall into side accounts this period:
+    // the excess-spread net capture less any controlled-accumulation bullet
+    // release (which adds cash back from the funding account).
+    let side_net_capture = spread_net_capture - funding_net_release;
     debug_assert_cash_conserved(
         total_cash_for_waterfall,
         &pool_flows,
         released_recoveries,
-        is_reinvestment_active,
+        principal_diverted,
         &waterfall_result,
+        side_net_capture,
     );
 
     Ok(())
@@ -2575,8 +3293,9 @@ fn debug_assert_cash_conserved(
     total_cash_for_waterfall: Money,
     pool_flows: &PoolFlows,
     released_recoveries: Money,
-    is_reinvestment_active: bool,
+    principal_diverted: bool,
     waterfall_result: &WaterfallDistribution,
+    side_net_capture: f64,
 ) {
     if !cfg!(debug_assertions) {
         return;
@@ -2586,27 +3305,31 @@ fn debug_assert_cash_conserved(
     // waterfall rounds to the currency's smallest unit per recipient.
     let tol = (total_cash_for_waterfall.amount().abs() * 1e-9).max(1.0);
 
-    // Identity 1: input to the waterfall == distributable pool cash.
-    let expected_input = if is_reinvestment_active {
+    // Identity 1: input to the waterfall == distributable pool cash, net of any
+    // cash diverted into (or supplied from) the side accounts (excess-spread and
+    // controlled-accumulation funding). When pool principal is diverted (an
+    // active revolving period recycles it, or controlled accumulation holds it)
+    // it is not part of this period's distributable cash.
+    let expected_input = if principal_diverted {
         pool_flows.interest.amount() + released_recoveries.amount()
     } else {
         pool_flows.interest.amount()
             + pool_flows.scheduled_principal.amount()
             + pool_flows.prepayment.amount()
             + released_recoveries.amount()
-    };
+    } - side_net_capture;
     debug_assert!(
         (total_cash_for_waterfall.amount() - expected_input).abs() <= tol,
         "cash-conservation (input): waterfall received {} but distributable \
          pool cash is {} (interest={}, scheduled={}, prepay={}, recoveries={}, \
-         reinvesting={})",
+         principal_diverted={})",
         total_cash_for_waterfall.amount(),
         expected_input,
         pool_flows.interest.amount(),
         pool_flows.scheduled_principal.amount(),
         pool_flows.prepayment.amount(),
         released_recoveries.amount(),
-        is_reinvestment_active,
+        principal_diverted,
     );
 
     // Identity 2: the waterfall neither creates nor destroys cash.
@@ -2643,7 +3366,17 @@ fn debug_assert_cash_conserved(
 /// the cash cannot be placed into new collateral and the recycle is a no-op;
 /// the deal is structurally at its end and the cleanup/exhaustion logic takes
 /// over.
-fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) {
+///
+/// `price_fraction` is the reinvestment price as a fraction of par (e.g. `0.97`
+/// for a 97-price). Reinvesting `recyclable` cash at a discount buys
+/// `recyclable / price_fraction` of par, so a sub-par price builds par (and the
+/// extra interest-earning collateral that benefits the residual/equity);
+/// `1.0` reproduces 1:1 par recycling.
+fn recycle_reinvestment_principal(
+    state: &mut SimulationState,
+    recyclable: f64,
+    price_fraction: f64,
+) {
     let performing_total: f64 = state
         .pool_state
         .is_defaulted
@@ -2658,6 +3391,9 @@ fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) 
         return;
     }
 
+    // Par acquired by spending `recyclable` cash at the reinvestment price.
+    let par_acquired = par_acquired_at_price(recyclable, price_fraction);
+
     let n = state.pool_state.len();
     for i in 0..n {
         if state.pool_state.is_defaulted[i] {
@@ -2668,7 +3404,21 @@ fn recycle_reinvestment_principal(state: &mut SimulationState, recyclable: f64) 
             continue;
         }
         let share = balance / performing_total;
-        state.pool_state.balances[i] = balance + recyclable * share;
+        state.pool_state.balances[i] = balance + par_acquired * share;
+    }
+}
+
+/// Par acquired when reinvesting `cash` at `price_fraction` (a fraction of par).
+///
+/// Buying at a discount price `p < 1` acquires `cash / p` of par (par build);
+/// at par (`p == 1`) it is `cash`. Falls back to par recycling for a
+/// non-positive price.
+#[inline]
+fn par_acquired_at_price(cash: f64, price_fraction: f64) -> f64 {
+    if price_fraction > 0.0 {
+        cash / price_fraction
+    } else {
+        cash
     }
 }
 

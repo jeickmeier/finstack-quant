@@ -1417,6 +1417,41 @@ export interface ValuationInstrumentsNamespace {
   ): string;
   listStandardMetrics(): string[];
   listStandardMetricsGrouped(): Record<string, string[]>;
+  structuredCreditTrancheDiscountMargin(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    trancheId: string,
+    targetPv: number
+  ): number;
+  structuredCreditTrancheBreakevenCdr(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    trancheId: string
+  ): number;
+  structuredCreditTrancheOas(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    trancheId: string,
+    marketPricePct: number,
+    config?: string | null
+  ): string;
+  structuredCreditTrancheScenarioTable(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    trancheId: string,
+    grid: string
+  ): string;
+  structuredCreditTrancheMetrics(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    trancheId: string,
+    marketPricePct?: number | null
+  ): string;
 }
 
 export type FxInstrumentSpec = Record<string, unknown> | string;

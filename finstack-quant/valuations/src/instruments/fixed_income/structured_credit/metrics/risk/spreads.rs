@@ -5,8 +5,10 @@ use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::fixed_income::structured_credit::types::constants::{
     Z_SPREAD_INITIAL_BRACKET, Z_SPREAD_SOLVER_TOLERANCE,
 };
+use crate::instruments::fixed_income::structured_credit::{StructuredCredit, TrancheCoupon};
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::money::Money;
@@ -75,18 +77,21 @@ impl MetricCalculator for ZSpreadCalculator {
         })?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-        let base_date = disc.base_date();
+        let as_of = context.as_of;
         let day_count = finstack_quant_core::dates::DayCount::Act365F;
 
         // Pre-compute (t, df, amount) for deterministic, fallible date handling.
+        // Discount from the valuation date `as_of` (settlement convention) so the
+        // PV matches the as-of base value the target price is derived from; this
+        // keeps the metric-registry z-spread consistent with the standalone
+        // `calculate_tranche_z_spread` even when `as_of != curve.base_date()`.
         let cached_flows: Vec<(f64, f64, f64)> = flows
             .iter()
-            .filter(|(date, _)| *date > context.as_of)
+            .filter(|(date, _)| *date > as_of)
             .map(
                 |(date, amount)| -> finstack_quant_core::Result<(f64, f64, f64)> {
-                    let t =
-                        day_count.year_fraction(base_date, *date, DayCountContext::default())?;
-                    let df = disc.df_on_date_curve(*date)?;
+                    let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+                    let df = disc.df_between_dates(as_of, *date)?;
                     Ok((t, df, amount.amount()))
                 },
             )
@@ -224,21 +229,22 @@ impl MetricCalculator for Cs01Calculator {
         })?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-        let base_date = disc.base_date();
+        let as_of = context.as_of;
         let day_count = finstack_quant_core::dates::DayCount::Act365F;
 
         // CS01 must be marginal: PV(z) - PV(z + 1bp), not PV(0) - PV(z + 1bp).
         // Compute both base PV (at Z-spread) and bumped PV (at Z-spread + 1bp).
+        // Discount from `as_of` to stay consistent with the z-spread that fed it.
         let mut base_npv_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         let mut bumped_npv_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
 
         for (date, amount) in flows {
-            if *date <= context.as_of {
+            if *date <= as_of {
                 continue;
             }
 
-            let t = day_count.year_fraction(base_date, *date, DayCountContext::default())?;
-            let df = disc.df_on_date_curve(*date)?;
+            let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+            let df = disc.df_between_dates(as_of, *date)?;
             let amt = amount.amount();
 
             let df_base = df * (-base_spread * t).exp();
@@ -436,6 +442,105 @@ pub fn calculate_tranche_cs01(
     Ok(bumped_pv.total() - base_pv.total())
 }
 
+/// Calculate the discount margin to price (DM) for a floating-rate tranche.
+///
+/// The discount margin is the **absolute** constant spread (returned in decimal;
+/// `0.01` = 100 bps) over the tranche's reference index such that projecting the
+/// tranche's floating coupon at that margin and repricing on the deal's discount
+/// curve reproduces `target_pv`. Following the full-reprice convention, the
+/// margin flows through coupon projection, so the result is consistent with the
+/// tranche's actual cashflow structure rather than a pure discounting spread.
+///
+/// Unlike an *incremental* spread to the quoted coupon, this is the total
+/// margin-to-price: a `target_pv` equal to the tranche's own base PV returns the
+/// tranche's quoted margin; a richer (higher) target returns a wider margin and
+/// a cheaper (lower) target a tighter one.
+///
+/// # Arguments
+///
+/// * `deal` - The structured-credit deal owning the tranche.
+/// * `tranche_id` - Identifier of the floating-rate tranche to solve for.
+/// * `context` - Market context (discount curve plus any index forwards).
+/// * `as_of` - Valuation date.
+/// * `target_pv` - The observed/target present value (price) to match.
+///
+/// # Returns
+///
+/// Discount margin in decimal units (e.g. `0.0125` = 125 bps).
+///
+/// # Errors
+///
+/// Returns an error if the tranche is missing, is not floating-rate, or the
+/// solver fails to converge within reasonable bounds (±5000 bp).
+pub fn calculate_tranche_discount_margin(
+    deal: &StructuredCredit,
+    tranche_id: &str,
+    context: &MarketContext,
+    as_of: Date,
+    target_pv: Money,
+) -> Result<f64> {
+    use rust_decimal::prelude::ToPrimitive;
+
+    let tranche = deal
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.id.as_str() == tranche_id)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
+                id: format!("tranche:{tranche_id}"),
+            })
+        })?;
+
+    let TrancheCoupon::Floating(spec) = &tranche.coupon else {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "DiscountMargin is only defined for floating-rate tranches; '{tranche_id}' is fixed-rate"
+        )));
+    };
+    // Quoted margin (bp), used as the solver's starting point.
+    let quoted_bp = spec.spread_bp.to_f64().unwrap_or(0.0);
+
+    let target = target_pv.amount();
+
+    // Objective: PV(tranche whose margin is *set* to `dm_bp`) - target_pv. The
+    // margin is set (not bumped), so the solved value is the absolute discount
+    // margin to price. NAN on pricing/conversion failure so the solver does not
+    // converge to a spurious root on artificial values.
+    let objective = |dm_bp: f64| -> f64 {
+        let mut repriced = deal.clone();
+        if let Some(t) = repriced
+            .tranches
+            .tranches
+            .iter_mut()
+            .find(|t| t.id.as_str() == tranche_id)
+        {
+            if let TrancheCoupon::Floating(spec) = &mut t.coupon {
+                match rust_decimal::Decimal::try_from(dm_bp) {
+                    Ok(d) => spec.spread_bp = d,
+                    Err(_) => return f64::NAN,
+                }
+            }
+        }
+        match repriced.value_tranche(tranche_id, context, as_of) {
+            Ok(pv) => pv.amount() - target,
+            Err(_) => f64::NAN,
+        }
+    };
+
+    let solver = BrentSolver::new()
+        .tolerance(1e-8)
+        .initial_bracket_size(Some(50.0));
+    let dm_bp = solver.solve(objective, quoted_bp)?;
+
+    if dm_bp.abs() > 5000.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Discount margin {dm_bp} bp exceeds reasonable bounds (±5000 bp)"
+        )));
+    }
+
+    Ok(dm_bp * 1e-4)
+}
+
 /// Locate the tenor bucket(s) for year fraction `t`, with a triangular weight.
 ///
 /// Returns `(lo, hi, w_hi)`: `t`'s sensitivity is split `(1 - w_hi)` to
@@ -507,15 +612,15 @@ impl MetricCalculator for BucketedCs01Calculator {
                 })
             })?;
             let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-            let base_date = disc.base_date();
             let day_count = DayCount::Act365F;
+            // Discount from `as_of` (settlement) so bucketed CS01 reconciles to the
+            // parallel z-spread CS01, which now uses the same convention.
             flows
                 .iter()
                 .filter(|(date, _)| *date > as_of)
                 .map(|(date, amount)| -> Result<(f64, f64, f64)> {
-                    let t =
-                        day_count.year_fraction(base_date, *date, DayCountContext::default())?;
-                    let df = disc.df_on_date_curve(*date)?;
+                    let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+                    let df = disc.df_between_dates(as_of, *date)?;
                     Ok((t, df, amount.amount()))
                 })
                 .collect::<Result<Vec<_>>>()?

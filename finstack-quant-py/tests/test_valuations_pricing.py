@@ -557,3 +557,59 @@ def test_structured_credit_stochastic_json_missing_market_data_raises() -> None:
             "2024-01-01",
             "structured_credit_stochastic",
         )
+
+
+def test_structured_credit_waterfall_rules_prices_through_json() -> None:
+    # `waterfall_rules` is an additive serde-default field on the deal; the
+    # rebuilt binding must accept and price a deal that configures it (here an
+    # available-funds cap on the senior). Before the field existed the
+    # deny-unknown-fields deserialization rejected this payload.
+    payload = json.loads(_structured_credit_json())
+    payload["spec"]["waterfall_rules"] = {"afc": {"capped_tranches": ["SR"]}}
+    result = json.loads(
+        price_instrument(
+            json.dumps(payload),
+            _market_json(),
+            "2024-01-01",
+            "structured_credit_stochastic",
+        )
+    )
+    assert float(result["value"]["amount"]) > 0
+
+
+def test_structured_credit_tranche_metric_methods() -> None:
+    # The standalone tranche metrics are exposed as methods on the
+    # StructuredCredit wrapper, mirroring `price` / `price_with_metrics`.
+    from finstack_quant.valuations.instruments.fixed_income import StructuredCredit
+
+    sc = StructuredCredit.from_json(_structured_credit_json())
+    market = _market_json()
+
+    oas = json.loads(sc.oas(market, "2024-01-01", "SR", 99.0))
+    assert oas["model_price"] > 0
+    assert oas["oas"] == oas["oas"]  # finite (not NaN)
+
+    breakeven = sc.breakeven_cdr(market, "2024-01-01", "SR")
+    assert breakeven >= 0.0
+
+    grid = json.dumps({"cprs": [0.10, 0.20], "cdrs": [0.02], "severities": [0.40]})
+    table = json.loads(sc.scenario_table(market, "2024-01-01", "SR", grid))
+    assert len(table["cells"]) == 2
+
+    # Per-tranche metrics bundle: PV/WAL and the credit z-spread/CS01 computed
+    # from this tranche's own cashflows (meaningful per note).
+    tm = json.loads(sc.tranche_metrics(market, "2024-01-01", "SR"))
+    assert tm["tranche_id"] == "SR"
+    assert tm["pv"] > 0
+    assert tm["wal"] >= 0.0
+    # Solved against its own model price -> z-spread ~ 0.
+    assert abs(tm["z_spread_bp"]) < 1.0
+    # Against a cheaper market price the z-spread must widen (positive).
+    tm_cheap = json.loads(sc.tranche_metrics(market, "2024-01-01", "SR", 95.0))
+    assert tm_cheap["z_spread_bp"] > tm["z_spread_bp"]
+    assert tm_cheap["target_price_pct"] == 95.0
+
+    # Discount margin requires a floating-rate tranche; the fixed-rate senior
+    # here must raise, exercising the method dispatch and error mapping.
+    with pytest.raises(ValueError, match="floating-rate"):
+        sc.discount_margin(market, "2024-01-01", "SR", 800_000.0)

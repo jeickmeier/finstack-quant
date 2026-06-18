@@ -125,6 +125,180 @@ fixed_income_class!(
 );
 fixed_income_class!("StructuredCredit", PyStructuredCredit, "structured_credit");
 
+#[pymethods]
+impl PyStructuredCredit {
+    /// Discount margin (decimal) for a floating-rate tranche.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     A ``MarketContext`` object or a JSON string.
+    /// as_of : str
+    ///     Valuation date (``"YYYY-MM-DD"``).
+    /// tranche_id : str
+    ///     Id of the floating-rate tranche.
+    /// target_pv : float
+    ///     Target present value, in the tranche's currency.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Discount margin as a decimal (``0.01`` = 100 bps).
+    #[pyo3(signature = (market, as_of, tranche_id, target_pv))]
+    fn discount_margin(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &str,
+        tranche_id: &str,
+        target_pv: f64,
+    ) -> PyResult<f64> {
+        super::direct_wrapper::tranche_discount_margin(
+            py, &self.json, market, as_of, tranche_id, target_pv,
+        )
+    }
+
+    /// Break-even constant default rate (CDR, decimal) for a tranche — the
+    /// highest CDR at which the tranche takes no principal writedown.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     A ``MarketContext`` object or a JSON string.
+    /// as_of : str
+    ///     Valuation date (``"YYYY-MM-DD"``).
+    /// tranche_id : str
+    ///     Id of the tranche.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Break-even CDR as a decimal.
+    #[pyo3(signature = (market, as_of, tranche_id))]
+    fn breakeven_cdr(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &str,
+        tranche_id: &str,
+    ) -> PyResult<f64> {
+        super::direct_wrapper::tranche_breakeven_cdr(py, &self.json, market, as_of, tranche_id)
+    }
+
+    /// Option-adjusted spread for a tranche.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     A ``MarketContext`` object or a JSON string.
+    /// as_of : str
+    ///     Valuation date (``"YYYY-MM-DD"``).
+    /// tranche_id : str
+    ///     Id of the tranche.
+    /// market_price_pct : float
+    ///     Quoted price as a percentage of original balance.
+    /// config : str | None
+    ///     Optional JSON string of ``OasConfig`` (stochastic rate/credit
+    ///     coupling and Monte-Carlo settings); the default is used when omitted.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     JSON-serialized ``OasResult``.
+    #[pyo3(signature = (market, as_of, tranche_id, market_price_pct, config=None))]
+    fn oas(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &str,
+        tranche_id: &str,
+        market_price_pct: f64,
+        config: Option<&str>,
+    ) -> PyResult<String> {
+        super::direct_wrapper::tranche_oas(
+            py,
+            &self.json,
+            market,
+            as_of,
+            tranche_id,
+            market_price_pct,
+            config,
+        )
+    }
+
+    /// Scenario (CPR × CDR × severity) price/WAL/writedown table for a tranche.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     A ``MarketContext`` object or a JSON string.
+    /// as_of : str
+    ///     Valuation date (``"YYYY-MM-DD"``).
+    /// tranche_id : str
+    ///     Id of the tranche.
+    /// grid : str
+    ///     JSON string of ``ScenarioGrid`` (``cprs``, ``cdrs``, ``severities``).
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     JSON-serialized ``ScenarioTable``.
+    #[pyo3(signature = (market, as_of, tranche_id, grid))]
+    fn scenario_table(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &str,
+        tranche_id: &str,
+        grid: &str,
+    ) -> PyResult<String> {
+        super::direct_wrapper::tranche_scenario_table(
+            py, &self.json, market, as_of, tranche_id, grid,
+        )
+    }
+
+    /// Per-tranche risk/spread metrics, computed from the tranche's own
+    /// cashflows (meaningful per note, unlike the deal-level aggregates).
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     A ``MarketContext`` object or a JSON string.
+    /// as_of : str
+    ///     Valuation date (``"YYYY-MM-DD"``).
+    /// tranche_id : str
+    ///     Id of the tranche.
+    /// market_price_pct : float | None
+    ///     Quoted price (% of original balance) the z-spread and CS01 are solved
+    ///     against. When ``None``, the tranche's own model price is used (giving a
+    ///     zero z-spread); CS01, duration and convexity remain meaningful.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     JSON-serialized ``TrancheMetrics`` (``pv``, ``price_pct``, ``wal``,
+    ///     ``z_spread_bp``, ``cs01``, ``spread_duration``, ``modified_duration``,
+    ///     ``convexity``, ``target_price_pct``).
+    #[pyo3(signature = (market, as_of, tranche_id, market_price_pct=None))]
+    fn tranche_metrics(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &str,
+        tranche_id: &str,
+        market_price_pct: Option<f64>,
+    ) -> PyResult<String> {
+        super::direct_wrapper::tranche_metrics(
+            py,
+            &self.json,
+            market,
+            as_of,
+            tranche_id,
+            market_price_pct,
+        )
+    }
+}
+
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "fixed_income")?;
     m.setattr(

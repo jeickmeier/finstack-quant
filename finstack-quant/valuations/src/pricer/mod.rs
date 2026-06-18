@@ -30,6 +30,7 @@ mod errors;
 pub mod json;
 mod keys;
 mod registry;
+pub mod structured_credit_json;
 
 pub use crate::instruments::cashflow_export::instrument_cashflows_json;
 pub(crate) use errors::actionable_unknown_pricer_message;
@@ -44,6 +45,11 @@ pub use json::{
 };
 pub use keys::{InstrumentType, ModelKey, PricerKey};
 pub use registry::{expect_inst, Pricer, PricerRegistry};
+pub use structured_credit_json::{
+    structured_credit_tranche_breakeven_cdr_json, structured_credit_tranche_discount_margin_json,
+    structured_credit_tranche_metrics_json, structured_credit_tranche_oas_json,
+    structured_credit_tranche_scenario_table_json,
+};
 
 // Fourier pricing via the Fang-Oosterlee (2008) COS method.
 //

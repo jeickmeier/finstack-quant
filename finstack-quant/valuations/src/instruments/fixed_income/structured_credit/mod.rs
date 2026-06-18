@@ -42,6 +42,7 @@ pub mod waterfall {
 pub use types::{
     // AssetPool types
     calculate_pool_stats,
+    AfcSpec,
     // Waterfall types
     AllocationMode,
     AssetPool,
@@ -50,6 +51,7 @@ pub use types::{
     // Metadata
     ConcentrationCheckResult,
     ConcentrationViolation,
+    ControlledAccumulationSpec,
     // Stochastic specs
     CorrelationStructure,
     // Configuration
@@ -64,6 +66,8 @@ pub use types::{
     DealFees,
     DealType,
     DefaultAssumptions,
+    EarlyAmortizationSpec,
+    ExcessSpreadSpec,
     ManagementFeeType,
     Metadata,
     Overrides,
@@ -81,6 +85,10 @@ pub use types::{
     ReinvestmentPeriod,
     RepLine,
     RoundingConvention,
+    ShiftingInterestSpec,
+    ShiftingInterestStep,
+    StepDownSpec,
+    StepDownTrigger,
     StochasticDefaultSpec,
     StochasticPrepaySpec,
     // Main instrument
@@ -98,6 +106,7 @@ pub use types::{
     Waterfall,
     WaterfallBuilder,
     WaterfallDistribution,
+    WaterfallRules,
     WaterfallTier,
     WaterfallWorkspace,
 };
@@ -123,7 +132,7 @@ pub use utils::{
 
 pub use pricing::{
     execute_waterfall, execute_waterfall_with_workspace, generate_cashflows,
-    generate_tranche_cashflows, run_simulation,
+    generate_tranche_cashflows, resolve_waterfall, run_simulation,
 };
 
 pub use pricing::coverage_tests::{CoverageTest, TestContext, TestResult};
@@ -138,10 +147,16 @@ pub use pricing::waterfall::WaterfallContext;
 // ============================================================================
 
 pub use metrics::{
+    calculate_tranche_breakeven_cdr,
+    calculate_tranche_convexity,
     calculate_tranche_cs01,
+    calculate_tranche_discount_margin,
     calculate_tranche_duration,
+    calculate_tranche_metrics,
+    calculate_tranche_oas,
     calculate_tranche_wal,
     calculate_tranche_z_spread,
+    scenario_table,
     // Deal-specific metrics
     AbsChargeOffCalculator,
     AbsCreditEnhancementCalculator,
@@ -157,16 +172,23 @@ pub use metrics::{
     CloWasCalculator,
     CmbsDscrCalculator,
     CmbsLtvCalculator,
+    ConvexityCalculator,
     CprCalculator,
     Cs01Calculator,
     DirtyPriceCalculator,
     // Risk metrics
     MacaulayDurationCalculator,
     ModifiedDurationCalculator,
+    OasConfig,
+    OasResult,
     RmbsFicoCalculator,
     RmbsLtvCalculator,
     RmbsWalCalculator,
+    ScenarioCell,
+    ScenarioGrid,
+    ScenarioTable,
     SpreadDurationCalculator,
+    TrancheMetrics,
     WalCalculator,
     // AssetPool metrics
     WamCalculator,

@@ -631,57 +631,35 @@ fn allocate_pro_rata(
         available
     };
 
-    // Penny-safe allocation using largest remainder method
+    // Penny-safe weighted allocation. Each recipient is capped at its own request;
+    // the capped excess from a recipient whose weight-share exceeds its request is
+    // *water-filled* onto the recipients still below their caps, so the full
+    // `tier_available` is distributed instead of leaking to the next tier (which,
+    // for a single combined principal tier, is the residual/equity tier). Without
+    // this redistribution a small-balance senior carrying a large shifting-interest
+    // weight would drop its excess past outstanding junior debt — a subordination
+    // inversion.
     let scale = currency_scale_factor(base_currency);
     let tier_available_units = to_currency_units(tier_available.amount(), scale)?;
 
-    let mut allocations_data: Vec<(usize, &Recipient, Money, i64, f64)> =
-        Vec::with_capacity(recipient_requests.len());
-
-    for (idx, (recipient, requested)) in recipient_requests.iter().enumerate() {
-        let weight = recipient.weight.unwrap_or(1.0);
-        let pro_rata_share = if total_weight > 0.0 {
-            weight / total_weight
-        } else {
-            1.0 / recipients.len() as f64
-        };
-
-        let ideal_units = tier_available_units as f64 * pro_rata_share;
-        let floor_units = ideal_units.floor() as i64;
-        let remainder = ideal_units - floor_units as f64;
-
-        allocations_data.push((idx, recipient, *requested, floor_units, remainder));
-    }
-
-    let total_floor_units: i64 = allocations_data.iter().map(|(_, _, _, fu, _)| fu).sum();
-    let mut remainder_units = tier_available_units - total_floor_units;
-
-    let mut indices_by_remainder: Vec<usize> = (0..allocations_data.len()).collect();
-    indices_by_remainder.sort_by(|&a, &b| {
-        allocations_data[b]
-            .4
-            .partial_cmp(&allocations_data[a].4)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
-
-    let mut final_units: Vec<i64> = allocations_data
+    let weights: Vec<f64> = recipient_requests
         .iter()
-        .map(|(_, _, _, fu, _)| *fu)
+        .map(|(recipient, _)| recipient.weight.unwrap_or(1.0))
         .collect();
-    for &idx in &indices_by_remainder {
-        if remainder_units <= 0 {
-            break;
-        }
-        final_units[idx] += 1;
-        remainder_units -= 1;
-    }
+    let caps: Vec<i64> = recipient_requests
+        .iter()
+        .map(|(_, requested)| to_currency_units(requested.amount(), scale))
+        .collect::<Result<Vec<_>>>()?;
+
+    let final_units = water_fill_allocation(tier_available_units, &weights, &caps);
 
     let mut tier_total = Money::new(0.0, base_currency);
 
-    for (idx, (_, recipient, requested, _, _)) in allocations_data.iter().enumerate() {
-        let allocated_units = final_units[idx];
-        let allocated = Money::new(allocated_units as f64 / scale, base_currency);
+    for (idx, (recipient, requested)) in recipient_requests.iter().enumerate() {
+        let allocated = Money::new(final_units[idx] as f64 / scale, base_currency);
 
+        // `water_fill_allocation` never allocates above a recipient's cap
+        // (`requested`); the `min` is retained as a defensive floor.
         let paid = if allocated.amount() <= requested.amount() {
             allocated
         } else {
@@ -762,6 +740,122 @@ fn allocate_pro_rata(
     }
 
     Ok(tier_total)
+}
+
+/// Penny-exact weighted water-filling of `total_units` across recipients, each
+/// capped at `caps[i]` (its request in currency units), in proportion to
+/// `weights[i]`.
+///
+/// A recipient whose proportional share exceeds its cap is filled to the cap and
+/// the freed units are redistributed across the recipients still below their
+/// caps, iterating until either all units are placed or every recipient is at
+/// its cap. The integer remainder left by flooring is handed out one unit at a
+/// time to the still-open recipients with the largest fractional shares (each
+/// such recipient has at least one unit of headroom, so a cap is never
+/// exceeded).
+///
+/// The returned allocation sums to `min(total_units, Σ caps)` (up to currency
+/// rounding); any shortfall means every recipient is already at its request, so
+/// the unplaced cash correctly remains for the next tier. This is the fix for
+/// the subordination inversion where weight-capped excess used to leak straight
+/// to the residual tier.
+fn water_fill_allocation(total_units: i64, weights: &[f64], caps: &[i64]) -> Vec<i64> {
+    let n = weights.len();
+    let mut alloc = vec![0i64; n];
+    if n == 0 || total_units <= 0 {
+        return alloc;
+    }
+
+    let mut open: Vec<usize> = (0..n).filter(|&i| caps[i] > 0).collect();
+    let mut remaining = total_units;
+
+    loop {
+        if remaining <= 0 || open.is_empty() {
+            break;
+        }
+
+        let active_weight: f64 = open.iter().map(|&i| weights[i].max(0.0)).sum();
+
+        // Degenerate weights (all zero/negative on the open set): spread the
+        // remaining units as evenly as possible across the open recipients,
+        // respecting caps. Bulk-allocate the even base first (capping iterates),
+        // then hand out the sub-`open.len()` remainder one unit each.
+        if active_weight <= 0.0 {
+            let m = open.len() as i64;
+            let base = remaining / m;
+            let mut progressed = false;
+            if base > 0 {
+                for &i in &open {
+                    let add = base.min(caps[i] - alloc[i]);
+                    if add > 0 {
+                        alloc[i] += add;
+                        remaining -= add;
+                        progressed = true;
+                    }
+                }
+            }
+            for &i in &open {
+                if remaining <= 0 {
+                    break;
+                }
+                if alloc[i] < caps[i] {
+                    alloc[i] += 1;
+                    remaining -= 1;
+                    progressed = true;
+                }
+            }
+            open.retain(|&i| alloc[i] < caps[i]);
+            if !progressed {
+                break;
+            }
+            continue;
+        }
+
+        let remaining_f = remaining as f64;
+        // Provisional floor allocation proportional to weight, tracking the
+        // fractional part for the largest-remainder tie-break below.
+        let mut provisional: Vec<(usize, i64, f64)> = open
+            .iter()
+            .map(|&i| {
+                let want = remaining_f * (weights[i].max(0.0) / active_weight);
+                let floor = want.floor() as i64;
+                (i, floor, want - floor as f64)
+            })
+            .collect();
+
+        let mut any_capped = false;
+        let mut placed = 0i64;
+        for &(i, floor, _) in &provisional {
+            let headroom = caps[i] - alloc[i];
+            let add = floor.min(headroom);
+            alloc[i] += add;
+            placed += add;
+            if floor >= headroom {
+                any_capped = true;
+            }
+        }
+        remaining -= placed;
+        open.retain(|&i| alloc[i] < caps[i]);
+
+        if !any_capped {
+            // No recipient hit its cap this round, so the leftover (< open.len()
+            // units, lost only to flooring) goes one unit at a time to the
+            // largest fractional shares. Each still-open recipient has >= 1 unit
+            // of headroom, so caps continue to hold.
+            provisional.retain(|&(i, _, _)| alloc[i] < caps[i]);
+            provisional.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+            for &(i, _, _) in &provisional {
+                if remaining <= 0 {
+                    break;
+                }
+                alloc[i] += 1;
+                remaining -= 1;
+            }
+            break;
+        }
+    }
+
+    alloc
 }
 
 // ============================================================================
@@ -944,6 +1038,41 @@ fn calculate_payment_amount(
             let rate = tranche
                 .coupon
                 .try_current_rate_with_index(payment_date, market)?;
+            let accrual_fraction = tranche.day_count.year_fraction(
+                period_start,
+                payment_date,
+                DayCountContext::default(),
+            )?;
+            let carried = deferred_interest
+                .and_then(|d| d.get(tranche_id.as_str()))
+                .map(|m| m.amount())
+                .unwrap_or(0.0);
+            (
+                balance.amount() * rate * accrual_fraction + carried,
+                *rounding,
+            )
+        }
+
+        PaymentCalculation::CappedTrancheInterest {
+            tranche_id,
+            cap_rate,
+            rounding,
+        } => {
+            let idx = *tranche_index.get(tranche_id.as_str()).ok_or_else(|| {
+                CoreError::from(finstack_quant_core::InputError::NotFound {
+                    id: format!("tranche:{}", tranche_id),
+                })
+            })?;
+            let tranche = &tranches.tranches[idx];
+            let balance = tranche_balances
+                .and_then(|b| b.get(tranche_id.as_str()))
+                .copied()
+                .unwrap_or(tranche.current_balance);
+            // Available-funds cap: the effective coupon cannot exceed `cap_rate`.
+            let rate = tranche
+                .coupon
+                .try_current_rate_with_index(payment_date, market)?
+                .min(*cap_rate);
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
                 payment_date,
@@ -1625,5 +1754,62 @@ mod ic_diversion_tests {
              balance {class_a_balance:.2}: diversion used a stale \
              period-start balance and over-paid principal"
         );
+    }
+}
+
+#[cfg(test)]
+mod water_fill_tests {
+    use super::water_fill_allocation;
+
+    /// The subordination-inversion case: a small-balance senior carrying a large
+    /// weight must not leak its capped excess to the residual tier; the freed
+    /// units water-fill onto the outstanding junior.
+    #[test]
+    fn capped_senior_excess_redistributes_to_junior() {
+        // available = 100 units; senior weight 0.8 but cap 10; junior weight 0.2
+        // cap 1000. Senior takes 10, junior absorbs the remaining 90.
+        let alloc = water_fill_allocation(100, &[0.8, 0.2], &[10, 1000]);
+        assert_eq!(alloc, vec![10, 90]);
+        assert_eq!(alloc.iter().sum::<i64>(), 100);
+    }
+
+    /// Equal-weight pro-rata with unequal balances: the small recipient is
+    /// capped and the large recipient takes the rest — nothing leaks.
+    #[test]
+    fn equal_weight_unequal_caps_no_leak() {
+        let alloc = water_fill_allocation(100, &[1.0, 1.0], &[10, 1000]);
+        assert_eq!(alloc, vec![10, 90]);
+        assert_eq!(alloc.iter().sum::<i64>(), 100);
+    }
+
+    /// When every recipient's request is fully covered (available >= total
+    /// requested), each receives exactly its cap and the rest stays unplaced
+    /// (to flow to the next tier).
+    #[test]
+    fn all_requests_covered_leaves_residual() {
+        let alloc = water_fill_allocation(100, &[1.0, 1.0], &[30, 40]);
+        assert_eq!(alloc, vec![30, 40]);
+        assert_eq!(alloc.iter().sum::<i64>(), 70); // 30 residual flows on
+    }
+
+    /// Conservation under tight caps: the allocation never exceeds total_units
+    /// and never exceeds any per-recipient cap.
+    #[test]
+    fn conserves_and_respects_caps() {
+        let caps = [13, 27, 5, 200];
+        let alloc = water_fill_allocation(101, &[0.4, 0.3, 0.2, 0.1], &caps);
+        let total: i64 = alloc.iter().sum();
+        assert_eq!(total, 101, "all available units distributed");
+        for (a, c) in alloc.iter().zip(caps.iter()) {
+            assert!(*a <= *c, "allocation {a} exceeded cap {c}");
+        }
+    }
+
+    /// Zero-weight recipients still receive an even split (degenerate fallback).
+    #[test]
+    fn zero_weights_split_evenly() {
+        let alloc = water_fill_allocation(10, &[0.0, 0.0], &[100, 100]);
+        assert_eq!(alloc.iter().sum::<i64>(), 10);
+        assert!((alloc[0] - alloc[1]).abs() <= 1);
     }
 }
