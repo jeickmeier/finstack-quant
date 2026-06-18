@@ -42,6 +42,7 @@ pub mod waterfall {
 pub use types::{
     // AssetPool types
     calculate_pool_stats,
+    AfcSpec,
     // Waterfall types
     AllocationMode,
     AssetPool,
@@ -98,6 +99,7 @@ pub use types::{
     Waterfall,
     WaterfallBuilder,
     WaterfallDistribution,
+    WaterfallRules,
     WaterfallTier,
     WaterfallWorkspace,
 };
@@ -123,7 +125,7 @@ pub use utils::{
 
 pub use pricing::{
     execute_waterfall, execute_waterfall_with_workspace, generate_cashflows,
-    generate_tranche_cashflows, run_simulation,
+    generate_tranche_cashflows, resolve_waterfall, run_simulation,
 };
 
 pub use pricing::coverage_tests::{CoverageTest, TestContext, TestResult};

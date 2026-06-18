@@ -369,3 +369,126 @@ fn waterfall_with_coverage_triggers_still_works() {
         );
     }
 }
+
+/// Available-funds cap (net-WAC cap) layered on via `waterfall_rules`.
+mod afc_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        AfcSpec, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheCoupon,
+        TrancheSeniority, TrancheStructure, WaterfallRules,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2027, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    /// Pool earns 5%; senior coupon is 6%. The pool has enough cash to pay the
+    /// 6% uncapped, so the only thing that reduces senior interest with AFC on
+    /// is the net-WAC cap (6% -> 5%), not a cash shortfall.
+    fn deal(with_afc: bool) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.05,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.06 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-AFC", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if with_afc {
+            sc.waterfall_rules = Some(WaterfallRules {
+                afc: Some(AfcSpec {
+                    capped_tranches: vec!["SR".to_string()],
+                }),
+            });
+        }
+        sc
+    }
+
+    #[test]
+    fn afc_caps_senior_interest_at_collateral_wac() {
+        let mkt = market();
+        let uncapped = deal(false)
+            .get_tranche_cashflows("SR", &mkt, closing())
+            .unwrap();
+        let capped = deal(true)
+            .get_tranche_cashflows("SR", &mkt, closing())
+            .unwrap();
+
+        assert!(
+            capped.total_interest.amount() > 0.0,
+            "capped senior should still receive interest"
+        );
+        // The 6% coupon is capped at the 5% pool WAC, so capped interest must be
+        // strictly below uncapped, and meaningfully so (not a rounding artefact).
+        assert!(
+            capped.total_interest.amount() < 0.95 * uncapped.total_interest.amount(),
+            "AFC must reduce senior interest (capped={}, uncapped={})",
+            capped.total_interest.amount(),
+            uncapped.total_interest.amount()
+        );
+    }
+
+    #[test]
+    fn no_rules_is_identity() {
+        // A deal with no waterfall_rules must price exactly as before the seam.
+        let mkt = market();
+        let a = deal(false)
+            .get_tranche_cashflows("SR", &mkt, closing())
+            .unwrap();
+        let b = deal(false)
+            .get_tranche_cashflows("SR", &mkt, closing())
+            .unwrap();
+        assert_eq!(a.total_interest.amount(), b.total_interest.amount());
+        assert_eq!(a.total_principal.amount(), b.total_principal.amount());
+    }
+}

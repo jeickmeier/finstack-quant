@@ -959,6 +959,41 @@ fn calculate_payment_amount(
             )
         }
 
+        PaymentCalculation::CappedTrancheInterest {
+            tranche_id,
+            cap_rate,
+            rounding,
+        } => {
+            let idx = *tranche_index.get(tranche_id.as_str()).ok_or_else(|| {
+                CoreError::from(finstack_quant_core::InputError::NotFound {
+                    id: format!("tranche:{}", tranche_id),
+                })
+            })?;
+            let tranche = &tranches.tranches[idx];
+            let balance = tranche_balances
+                .and_then(|b| b.get(tranche_id.as_str()))
+                .copied()
+                .unwrap_or(tranche.current_balance);
+            // Available-funds cap: the effective coupon cannot exceed `cap_rate`.
+            let rate = tranche
+                .coupon
+                .try_current_rate_with_index(payment_date, market)?
+                .min(*cap_rate);
+            let accrual_fraction = tranche.day_count.year_fraction(
+                period_start,
+                payment_date,
+                DayCountContext::default(),
+            )?;
+            let carried = deferred_interest
+                .and_then(|d| d.get(tranche_id.as_str()))
+                .map(|m| m.amount())
+                .unwrap_or(0.0);
+            (
+                balance.amount() * rate * accrual_fraction + carried,
+                *rounding,
+            )
+        }
+
         PaymentCalculation::TranchePrincipal {
             tranche_id,
             target_balance,

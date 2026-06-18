@@ -187,6 +187,8 @@ impl StructuredCredit {
             // Hedge swaps default to empty
             hedge_swaps: Vec::new(),
             cleanup_call_pct: None,
+            // No declarative waterfall rules by default.
+            waterfall_rules: None,
         }
     }
 

@@ -389,8 +389,17 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         instrument.credit_model.recovery_spec.recovery_lag,
     )?;
 
-    // Create waterfall
-    let waterfall = instrument.create_waterfall();
+    // Create the base waterfall, then layer on any declarative rules (e.g.
+    // available-funds caps). With no rules this is the identity. The AFC cap
+    // rate is the collateral weighted-average coupon, effectively constant over
+    // the deal's life, so resolution runs once here rather than per period.
+    let base_waterfall = instrument.create_waterfall();
+    let waterfall =
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::resolve_waterfall(
+            &base_waterfall,
+            instrument.waterfall_rules.as_ref(),
+            instrument.pool.weighted_avg_coupon(),
+        );
 
     // Resolve payment calendar - required for structured credit deals.
     // Silent fallback to weekends-only would shift coupons around holidays,
@@ -2384,6 +2393,22 @@ fn simulate_period(
         }
     }
 
+    // Available-funds cap: for AFC tranches, cap the recorded coupon at the
+    // collateral weighted-average coupon. Combined with the capped waterfall
+    // allocation (`resolve_waterfall`), this caps both the interest *due*
+    // (recorded below) and the cash routed to the interest recipient, so the
+    // excess spread above the cap flows on through the waterfall rather than
+    // inflating this tranche's interest.
+    let afc_spec = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.afc.as_ref());
+    let afc_cap_rate = if afc_spec.is_some() {
+        instrument.pool.weighted_avg_coupon()
+    } else {
+        0.0
+    };
+
     // ── Step 5: Record flows and update balances ─────────────────────
     for (idx, tranche) in state.tranches.tranches.iter().enumerate() {
         let recipient_key = &state.tranche_recipient_keys[idx];
@@ -2394,9 +2419,17 @@ fn simulate_period(
             .get(tranche_id_str)
             .copied()
             .unwrap_or(Money::new(0.0, state.base_ccy));
-        let coupon_rate = tranche
-            .coupon
-            .try_current_rate_with_index(pay_date, context)?;
+        let coupon_rate = {
+            let raw = tranche
+                .coupon
+                .try_current_rate_with_index(pay_date, context)?;
+            match afc_spec {
+                Some(spec) if spec.capped_tranches.iter().any(|t| t == tranche_id_str) => {
+                    raw.min(afc_cap_rate)
+                }
+                _ => raw,
+            }
+        };
 
         // Use tranche's day-count convention for proper accrual calculation
         let accrual_factor =

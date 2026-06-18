@@ -112,6 +112,42 @@ pub enum PaymentCalculation {
         /// Target reserve balance the account should be replenished to.
         target_balance: Money,
     },
+    /// Tranche interest with the coupon rate capped (available-funds / net-WAC cap).
+    ///
+    /// Identical to [`PaymentCalculation::TrancheInterest`] except the effective
+    /// annualized coupon is capped at `cap_rate`, modelling an available-funds
+    /// cap where a tranche cannot be paid more interest than the collateral's
+    /// net weighted-average coupon supports. The capped shortfall is unpaid
+    /// (no carryforward in this variant).
+    CappedTrancheInterest {
+        /// Tranche id.
+        tranche_id: String,
+        /// Cap on the annualized coupon rate (decimal, e.g. `0.03` = 3%).
+        cap_rate: f64,
+        /// Rounding convention.
+        rounding: Option<RoundingConvention>,
+    },
+}
+
+/// Declarative, additively-applied waterfall rules layered onto a deal's base
+/// waterfall.
+///
+/// Each sub-spec is optional; when none are present the resolved waterfall is
+/// identical to the base waterfall. Applied by
+/// [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct WaterfallRules {
+    /// Available-funds / net-WAC cap on named tranches' interest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub afc: Option<AfcSpec>,
+}
+
+/// Available-funds cap (net-WAC cap) specification.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct AfcSpec {
+    /// Ids of tranches whose interest coupon is capped at the collateral's
+    /// weighted-average coupon.
+    pub capped_tranches: Vec<String>,
 }
 
 /// Allocation mode within a tier
