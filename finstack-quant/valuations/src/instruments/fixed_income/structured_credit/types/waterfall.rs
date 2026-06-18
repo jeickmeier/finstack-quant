@@ -152,6 +152,10 @@ pub struct WaterfallRules {
     /// allocation); `shifting_interest` takes precedence when both are set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shifting_interest: Option<ShiftingInterestSpec>,
+    /// Early amortization: end a revolving period early on a performance breach
+    /// (master-trust style), switching the deal into amortization.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub early_amortization: Option<EarlyAmortizationSpec>,
 }
 
 /// Available-funds cap (net-WAC cap) specification.
@@ -223,6 +227,20 @@ pub struct ShiftingInterestSpec {
     pub senior_id: String,
     /// Declining senior-share schedule, ascending by `months_from_closing`.
     pub schedule: Vec<ShiftingInterestStep>,
+}
+
+/// Early-amortization specification for revolving (master-trust) deals.
+///
+/// While a deal's reinvestment/revolving period is active, principal is recycled
+/// and the investor (tranche) balances are held flat. If cumulative losses reach
+/// `max_cumulative_loss_pct`, an early-amortization event is triggered: the
+/// revolving period ends immediately and the deal begins paying principal down
+/// (amortizing) even before its scheduled revolving-period end.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct EarlyAmortizationSpec {
+    /// Cumulative-loss fraction (decimal, of the original pool balance) at or
+    /// above which the revolving period ends early and amortization begins.
+    pub max_cumulative_loss_pct: f64,
 }
 
 /// Allocation mode within a tier

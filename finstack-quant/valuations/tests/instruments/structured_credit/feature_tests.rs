@@ -452,6 +452,7 @@ mod afc_tests {
                 excess_spread: None,
                 step_down: None,
                 shifting_interest: None,
+                early_amortization: None,
             });
         }
         sc
@@ -576,6 +577,7 @@ mod excess_spread_tests {
                 excess_spread: Some(es),
                 step_down: None,
                 shifting_interest: None,
+                early_amortization: None,
             });
         }
         sc
@@ -719,6 +721,7 @@ mod excess_spread_tests {
                 }),
                 step_down: None,
                 shifting_interest: None,
+                early_amortization: None,
             });
         }
         sc
@@ -852,6 +855,7 @@ mod step_down_tests {
                 excess_spread: None,
                 step_down: Some(sd),
                 shifting_interest: None,
+                early_amortization: None,
             });
         }
         sc
@@ -1011,6 +1015,7 @@ mod shifting_interest_tests {
                 excess_spread: None,
                 step_down: None,
                 shifting_interest: Some(si),
+                early_amortization: None,
             });
         }
         sc
@@ -1051,6 +1056,136 @@ mod shifting_interest_tests {
         assert!(
             after > 1.0,
             "sub must receive principal once the senior share steps down (after={after})"
+        );
+    }
+}
+
+/// Early amortization: a revolving (master-trust) deal ends its revolving
+/// period early on a cumulative-loss breach and begins amortizing.
+mod early_amortization_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        run_simulation, AssetPool, DealType, EarlyAmortizationSpec, PoolAsset,
+        ReinvestmentCriteria, ReinvestmentPeriod, StructuredCredit, Tranche, TrancheCoupon,
+        TrancheSeniority, TrancheStructure, WaterfallRules,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn revolving_end() -> Date {
+        Date::from_calendar_date(2028, Month::January, 1).unwrap() // 4y revolving
+    }
+
+    fn cutoff() -> Date {
+        Date::from_calendar_date(2026, Month::January, 1).unwrap() // year 2, well inside revolving
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2030, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (10.0, 0.80)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    /// Revolving deal (4y reinvestment period). `early_am_threshold` sets the
+    /// cumulative-loss early-amortization trigger when provided.
+    fn deal(early_am_threshold: Option<f64>, cdr: f64) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::Card, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.10,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        pool.reinvestment_period = Some(ReinvestmentPeriod {
+            end_date: revolving_end(),
+            is_active: true,
+            criteria: ReinvestmentCriteria::default(),
+        });
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.04 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-EA", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if let Some(threshold) = early_am_threshold {
+            sc.waterfall_rules = Some(WaterfallRules {
+                afc: None,
+                excess_spread: None,
+                step_down: None,
+                shifting_interest: None,
+                early_amortization: Some(EarlyAmortizationSpec {
+                    max_cumulative_loss_pct: threshold,
+                }),
+            });
+        }
+        sc
+    }
+
+    fn senior_principal_before(sc: &StructuredCredit, cutoff: Date) -> f64 {
+        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let sr = results.get("SR").expect("SR results");
+        sr.principal_flows
+            .iter()
+            .filter(|(d, _)| *d < cutoff)
+            .map(|(_, m)| m.amount())
+            .sum()
+    }
+
+    #[test]
+    fn early_amortization_starts_paydown_before_revolving_end() {
+        // Same CDR; only the early-am threshold differs. The low threshold is
+        // breached by realized losses, ending the revolving period early so the
+        // senior amortizes before year 2; the high threshold keeps the deal
+        // revolving (senior held flat) until the scheduled revolving end.
+        let breaching = deal(Some(0.02), 0.10);
+        let revolving = deal(Some(0.50), 0.10);
+        let sr_breaching = senior_principal_before(&breaching, cutoff());
+        let sr_revolving = senior_principal_before(&revolving, cutoff());
+        assert!(
+            sr_breaching > sr_revolving + 1.0,
+            "early amortization must pay senior principal before the revolving end \
+             (breaching={sr_breaching}, revolving={sr_revolving})"
         );
     }
 }

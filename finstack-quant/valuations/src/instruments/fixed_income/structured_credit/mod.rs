@@ -65,6 +65,7 @@ pub use types::{
     DealFees,
     DealType,
     DefaultAssumptions,
+    EarlyAmortizationSpec,
     ExcessSpreadSpec,
     ManagementFeeType,
     Metadata,

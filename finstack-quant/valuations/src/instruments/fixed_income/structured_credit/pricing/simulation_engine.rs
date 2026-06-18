@@ -2215,13 +2215,33 @@ fn simulate_period(
     // Capture period start before updating prev_date (for accrual calculations)
     let period_start = state.prev_date.unwrap_or(state.closing_date);
 
-    // Reinvestment logic -- determined before pool flows so reconciliation
-    // can snap pool_outstanding to the correct pre-flow asset balances.
-    let is_reinvestment_active = state
-        .pool
-        .reinvestment_period
+    // Early amortization (master-trust style): once cumulative losses reach the
+    // configured threshold, the revolving period ends immediately and the deal
+    // begins amortizing, regardless of the scheduled revolving-period end.
+    let early_amortization = instrument
+        .waterfall_rules
         .as_ref()
-        .is_some_and(|period| pay_date <= period.end_date);
+        .and_then(|rules| rules.early_amortization.as_ref())
+        .is_some_and(|spec| {
+            let denom = state.total_pool_balance.amount();
+            let loss_fraction = if denom > 0.0 {
+                state.cumulative_expected_loss / denom
+            } else {
+                0.0
+            };
+            loss_fraction >= spec.max_cumulative_loss_pct
+        });
+
+    // Reinvestment/revolving logic -- determined before pool flows so
+    // reconciliation can snap pool_outstanding to the correct pre-flow asset
+    // balances. The revolving period also ends early on an early-amortization
+    // event.
+    let is_reinvestment_active = !early_amortization
+        && state
+            .pool
+            .reinvestment_period
+            .as_ref()
+            .is_some_and(|period| pay_date <= period.end_date);
 
     // Reconciliation: When reinvestment transitions from active → inactive,
     // snap pool_outstanding to the actual sum of asset balances BEFORE this
