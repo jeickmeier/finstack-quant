@@ -206,6 +206,22 @@
       "properties": {
         "spec": {
           "$defs": {
+            "AfcSpec": {
+              "description": "Available-funds cap (net-WAC cap) specification.",
+              "properties": {
+                "capped_tranches": {
+                  "description": "Ids of tranches whose interest coupon is capped at the collateral's\nweighted-average coupon.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "capped_tranches"
+              ],
+              "type": "object"
+            },
             "AssetPool": {
               "additionalProperties": false,
               "description": "Main asset pool structure",
@@ -2631,6 +2647,20 @@
               ],
               "type": "object"
             },
+            "EarlyAmortizationSpec": {
+              "description": "Early-amortization specification for revolving (master-trust) deals.\n\nWhile a deal's reinvestment/revolving period is active, principal is recycled\nand the investor (tranche) balances are held flat. If cumulative losses reach\n`max_cumulative_loss_pct`, an early-amortization event is triggered: the\nrevolving period ends immediately and the deal begins paying principal down\n(amortizing) even before its scheduled revolving-period end.",
+              "properties": {
+                "max_cumulative_loss_pct": {
+                  "description": "Cumulative-loss fraction (decimal, of the original pool balance) at or\nabove which the revolving period ends early and amortization begins.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "max_cumulative_loss_pct"
+              ],
+              "type": "object"
+            },
             "EligibleCollateralSchedule": {
               "additionalProperties": false,
               "description": "Eligible collateral schedule with haircuts.\n\nDefines the complete set of collateral types accepted under a CSA\nor margin agreement, along with associated haircuts and constraints.\n\n# Example\n\n```ignore\nuse finstack_quant_margin::{CollateralEligibility, EligibleCollateralSchedule};\n\n// Start from a standard schedule (BCBS-IOSCO compliant)\nlet schedule = EligibleCollateralSchedule::bcbs_standard()?;\n# let _ = schedule;\n# Ok::<(), finstack_quant_core::Error>(())\n```",
@@ -2658,6 +2688,27 @@
               },
               "required": [
                 "eligible"
+              ],
+              "type": "object"
+            },
+            "ExcessSpreadSpec": {
+              "description": "Excess-spread / spread-account specification.\n\nEach period the account captures residual interest (that would otherwise be\ndistributed to equity) up to `target_balance`, and draws down to cover debt\ntranche interest shortfalls — providing credit enhancement from excess\nspread. Any balance unused at deal end is released back to equity, unless a\ncumulative-loss trap trigger is breached.",
+              "properties": {
+                "target_balance": {
+                  "$ref": "#/$defs/Money",
+                  "description": "Target funded balance of the spread account (currency units)."
+                },
+                "trap_loss_pct": {
+                  "description": "Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the\noriginal pool) at or above which any remaining spread-account balance is\n*retained* in the deal at maturity rather than released to equity. When\n`None`, the unused balance is always released to equity.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "target_balance"
               ],
               "type": "object"
             },
@@ -4561,6 +4612,67 @@
               ],
               "type": "object"
             },
+            "ShiftingInterestSpec": {
+              "description": "Shifting-interest principal allocation (non-agency senior/sub RMBS).\n\nThe senior tranche receives `senior_pct` of principal (the rest split across\nthe remaining debt tranches), where `senior_pct` follows a declining\nschedule by deal age. A `1.0` lockout early routes all principal to the\nsenior; later steps release principal to the subordinates. Modelled as a\nper-period weighted pro-rata of *all* principal (a first-order treatment;\nagency-style scheduled-vs-prepayment splitting is a refinement).",
+              "properties": {
+                "schedule": {
+                  "description": "Declining senior-share schedule, ascending by `months_from_closing`.",
+                  "items": {
+                    "$ref": "#/$defs/ShiftingInterestStep"
+                  },
+                  "type": "array"
+                },
+                "senior_id": {
+                  "description": "Id of the senior tranche that receives the scheduled principal share.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "senior_id",
+                "schedule"
+              ],
+              "type": "object"
+            },
+            "ShiftingInterestStep": {
+              "description": "One step of a shifting-interest schedule: the senior's share of principal\nfrom `months_from_closing` onward (until the next step).",
+              "properties": {
+                "months_from_closing": {
+                  "description": "Months from closing at which this senior share takes effect.",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "senior_pct": {
+                  "description": "Senior share of principal (decimal, `1.0` = 100% lockout) from this step.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "months_from_closing",
+                "senior_pct"
+              ],
+              "type": "object"
+            },
+            "StepDownSpec": {
+              "description": "Step-down specification for senior/subordinate principal allocation.\n\nPrincipal is paid sequentially (senior first) until the deal seasons past\n`step_down_date`; from then on, *if* cumulative losses remain below\n`max_cumulative_loss_pct` (the step-down trigger), principal switches to\npro-rata across the debt tranches, releasing subordination to the juniors.\nWhile the loss trigger is breached the deal reverts to sequential, so the\nswitch is re-evaluated every period (non-sticky).",
+              "properties": {
+                "max_cumulative_loss_pct": {
+                  "description": "Cumulative-loss fraction (decimal, of the original pool balance) at or\nabove which the step-down trigger fails and principal stays sequential.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "step_down_date": {
+                  "description": "Earliest date principal may switch to pro-rata.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "step_down_date",
+                "max_cumulative_loss_pct"
+              ],
+              "type": "object"
+            },
             "StochasticDefaultSpec": {
               "description": "Stochastic default model specification.\n\nAllows default model selection and configuration without\nconstructing the full model.",
               "oneOf": [
@@ -5394,6 +5506,67 @@
                   "type": "string"
                 }
               ]
+            },
+            "WaterfallRules": {
+              "description": "Declarative, additively-applied waterfall rules layered onto a deal's base\nwaterfall.\n\nEach sub-spec is optional; when none are present the resolved waterfall is\nidentical to the base waterfall. Applied by\n[`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].",
+              "properties": {
+                "afc": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/AfcSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Available-funds / net-WAC cap on named tranches' interest."
+                },
+                "early_amortization": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/EarlyAmortizationSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Early amortization: end a revolving period early on a performance breach\n(master-trust style), switching the deal into amortization."
+                },
+                "excess_spread": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ExcessSpreadSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Excess-spread (spread-account) capture and draw."
+                },
+                "shifting_interest": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ShiftingInterestSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Shifting interest: senior receives a scheduled (declining) share of\nprincipal. Mutually exclusive with `step_down` (both govern principal\nallocation); `shifting_interest` takes precedence when both are set."
+                },
+                "step_down": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/StepDownSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Step-down: switch principal allocation to pro-rata after a date when the\nstep-down trigger passes."
+                }
+              },
+              "type": "object"
             }
           },
           "additionalProperties": false,
@@ -5645,6 +5818,17 @@
             "tranches": {
               "$ref": "#/$defs/TrancheStructure",
               "description": "Tranche structure."
+            },
+            "waterfall_rules": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/WaterfallRules"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Declarative waterfall rules (available-funds caps, etc.) layered onto the\nbase waterfall by `resolve_waterfall`. `None` reproduces the base\nwaterfall exactly."
             }
           },
           "required": [

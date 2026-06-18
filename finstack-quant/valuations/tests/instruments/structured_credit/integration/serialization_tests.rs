@@ -643,3 +643,86 @@ fn test_structured_credit_full_example_json_file_roundtrip() {
         other => panic!("Unexpected instrument variant: {:?}", other),
     }
 }
+
+/// Binding-parity: a deal configured with the new `waterfall_rules` round-trips
+/// through the tagged instrument JSON the Python/WASM bindings wrap, and prices
+/// through the same `price_instrument_json` entry point. Proves the structural
+/// features are reachable from the JSON bindings without any binding code change
+/// (validation and deserialization are serde-based on the Rust type).
+#[test]
+fn waterfall_rules_round_trip_and_price_through_json() {
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        AfcSpec, WaterfallRules,
+    };
+    use finstack_quant_valuations::pricer::price_instrument_json;
+
+    let closing = Date::from_calendar_date(2024, Month::January, 1).unwrap();
+    let mat = Date::from_calendar_date(2027, Month::January, 1).unwrap();
+    let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+    pool.assets.push(PoolAsset::fixed_rate_bond(
+        "A1",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        mat,
+        DayCount::Thirty360,
+    ));
+    let tranches = TrancheStructure::new(vec![
+        Tranche::new(
+            "SR",
+            0.0,
+            80.0,
+            TrancheSeniority::Senior,
+            Money::new(800_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.06 },
+            mat,
+        )
+        .unwrap(),
+        Tranche::new(
+            "EQ",
+            80.0,
+            100.0,
+            TrancheSeniority::Equity,
+            Money::new(200_000.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.0 },
+            mat,
+        )
+        .unwrap(),
+    ])
+    .unwrap();
+    let mut sc = StructuredCredit::new_abs("ABS-WF", pool, tranches, closing, mat, "USD-OIS")
+        .with_payment_calendar("nyse");
+    sc.waterfall_rules = Some(WaterfallRules {
+        afc: Some(AfcSpec {
+            capped_tranches: vec!["SR".to_string()],
+        }),
+        excess_spread: None,
+        step_down: None,
+        shifting_interest: None,
+        early_amortization: None,
+    });
+
+    // Round-trip through the tagged JSON the bindings serialize.
+    let json =
+        serde_json::to_string(&InstrumentJson::StructuredCredit(Box::new(sc))).expect("serialize");
+    assert!(
+        json.contains("waterfall_rules") && json.contains("capped_tranches"),
+        "the AFC rule must appear in the wire format"
+    );
+    let parsed: InstrumentJson = serde_json::from_str(&json).expect("deserialize");
+    let json2 = serde_json::to_string(&parsed).expect("re-serialize");
+    assert_eq!(json, json2, "waterfall_rules wire format must be stable");
+
+    // Price through the entry point the Python/WASM bindings wrap.
+    let market = MarketContext::new().insert(
+        DiscountCurve::builder("USD-OIS")
+            .base_date(closing)
+            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .unwrap(),
+    );
+    price_instrument_json(&json, &market, "2024-01-01", "default")
+        .expect("a waterfall_rules deal must price through the JSON binding path");
+}
