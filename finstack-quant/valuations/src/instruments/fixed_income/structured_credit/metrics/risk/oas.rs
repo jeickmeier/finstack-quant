@@ -4,8 +4,12 @@
 //! PV — discounted at each scenario's discount factors times `exp(-s·t)` —
 //! equals a quoted market price. Either stochastic dimension can be enabled:
 //!
-//! - **Stochastic rates**: a Hull-White 1-factor short-rate path per scenario
-//!   drives both rate-dependent prepayment and the discount factors.
+//! - **Stochastic rates**: a Hull-White 1-factor short rate, decomposed as the
+//!   discount curve's deterministic forwards plus a mean-zero Ornstein-Uhlenbeck
+//!   deviation, `r(t) = f(0,t) + x(t)`. The absolute path drives rate-dependent
+//!   prepayment; discounting applies the *exact* curve discount factor times the
+//!   OU factor `exp(-∫x)`, so the model is curve-consistent (no-arbitrage) and
+//!   collapses to the curve when volatility is zero — no flat-rate proxy.
 //! - **Stochastic credit**: a systematic factor per scenario applies correlated
 //!   (mean-corrected lognormal) stress to default and prepayment.
 //! - **Both**: each scenario carries an independent rate path and credit factor.
@@ -142,16 +146,28 @@ pub fn calculate_tranche_oas(
     };
     let rng = PhiloxRng::new(config.seed);
 
+    // Hull-White is decomposed into the curve's deterministic forwards plus a
+    // mean-zero Ornstein-Uhlenbeck deviation `x`. The forwards anchor the
+    // rate-dependent prepayment path; discounting always uses the *exact* curve
+    // discount factor times `exp(-∫x)`, so with zero volatility (x≡0) the model
+    // reproduces the curve exactly (no-arbitrage), unlike a flat-rate proxy.
+    let forwards = if config.stochastic_rates {
+        Some(monthly_forwards(disc.as_ref(), num_months))
+    } else {
+        None
+    };
+
     // For each scenario, the per-cashflow `(year fraction t, CF·base_df)`. The
     // trial OAS only multiplies in `exp(-s·t)`, so the expensive simulation runs
     // once per scenario and the Brent solve over `s` is cheap.
     let mut scenarios: Vec<Vec<(f64, f64)>> = Vec::with_capacity(num_paths);
 
     for path in 0..num_paths {
-        let rate_path = if config.stochastic_rates {
+        // Mean-zero OU deviation `x` for this scenario; the absolute rate path
+        // fed to prepayment is `forward + x`.
+        let deviation = if config.stochastic_rates {
             let mut sub = rng.substream(2 * path as u64);
-            Some(simulate_hw1f_path(
-                base_rate,
+            Some(simulate_ou_deviation(
                 config.hw_kappa,
                 config.hw_sigma,
                 num_months,
@@ -159,6 +175,10 @@ pub fn calculate_tranche_oas(
             ))
         } else {
             None
+        };
+        let rate_path = match (&forwards, &deviation) {
+            (Some(fwd), Some(dev)) => Some(absolute_rate_path(fwd, dev)),
+            _ => None,
         };
         let credit_z = if config.stochastic_credit {
             let mut sub = rng.substream(2 * path as u64 + 1);
@@ -169,7 +189,7 @@ pub fn calculate_tranche_oas(
 
         let mut source = OasPathFlowSource::new(
             as_of,
-            rate_path.clone(),
+            rate_path,
             credit_z,
             config.prepay_beta,
             base_rate,
@@ -191,10 +211,12 @@ pub fn calculate_tranche_oas(
                 continue;
             }
             let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-            let base_df = match &rate_path {
-                Some(rp) => path_discount_factor(rp, as_of.months_until(*date) as usize),
-                None => disc.df_between_dates(as_of, *date)?,
-            };
+            // Exact curve discount factor (no-arbitrage), times the OU stochastic
+            // factor when rates are stochastic.
+            let mut base_df = disc.df_between_dates(as_of, *date)?;
+            if let Some(dev) = &deviation {
+                base_df *= ou_discount_factor(dev, as_of.months_until(*date) as usize);
+            }
             entries.push((t, amount.amount() * base_df));
         }
         scenarios.push(entries);
@@ -268,10 +290,24 @@ fn initial_short_rate(
     Ok(-df.ln() / t)
 }
 
-/// Simulate a monthly Hull-White 1-factor short-rate path mean-reverting to
-/// `base_rate` (a flat `θ`). Exact Ornstein-Uhlenbeck discretization.
-fn simulate_hw1f_path(
-    base_rate: f64,
+/// Monthly continuously-compounded forward rates from the discount curve over
+/// `[m/12, (m+1)/12]` for `m` in `0..num_months`. These are the deterministic
+/// term-structure anchor for the Hull-White short rate `r(t) = forward(t) + x(t)`.
+fn monthly_forwards(curve: &DiscountCurve, num_months: usize) -> Vec<f64> {
+    let dt = 1.0 / 12.0;
+    (0..num_months)
+        .map(|m| {
+            let t1 = m as f64 * dt;
+            let t2 = (m + 1) as f64 * dt;
+            // `forward` only errors on a non-positive interval, impossible here.
+            curve.forward(t1, t2).unwrap_or_else(|_| curve.zero(t2))
+        })
+        .collect()
+}
+
+/// Simulate a monthly mean-zero Ornstein-Uhlenbeck deviation `x` (the stochastic
+/// part of the Hull-White short rate), `x₀ = 0`. Exact OU discretization.
+fn simulate_ou_deviation(
     kappa: f64,
     sigma: f64,
     num_months: usize,
@@ -284,22 +320,33 @@ fn simulate_hw1f_path(
     } else {
         sigma * dt.sqrt()
     };
-    let mut rates = Vec::with_capacity(num_months + 1);
-    let mut r = base_rate;
-    rates.push(r);
+    let mut deviation = Vec::with_capacity(num_months + 1);
+    let mut x = 0.0;
+    deviation.push(x);
     for _ in 0..num_months {
         let z = rng.next_std_normal();
-        r = r * exp_k + base_rate * (1.0 - exp_k) + vol * z;
-        rates.push(r);
+        x = x * exp_k + vol * z;
+        deviation.push(x);
     }
-    rates
+    deviation
 }
 
-/// Cumulative discount factor to `month` along a monthly short-rate path:
-/// `exp(-Δt · Σ_{m<month} r_m)`.
-fn path_discount_factor(rate_path: &[f64], month: usize) -> f64 {
+/// Absolute monthly short-rate path `r_m = forward_m + x_m` for the prepayment
+/// model. Length matches `forwards`.
+fn absolute_rate_path(forwards: &[f64], deviation: &[f64]) -> Vec<f64> {
+    forwards
+        .iter()
+        .enumerate()
+        .map(|(m, f)| f + deviation.get(m).copied().unwrap_or(0.0))
+        .collect()
+}
+
+/// Stochastic (OU) contribution to the discount factor at `month`:
+/// `exp(-Δt · Σ_{m<month} x_m)`. The curve discount factor is applied
+/// separately, so this is `1.0` when the deviation is identically zero.
+fn ou_discount_factor(deviation: &[f64], month: usize) -> f64 {
     let dt = 1.0 / 12.0;
-    let last = month.min(rate_path.len());
-    let acc: f64 = rate_path[..last].iter().map(|r| -r * dt).sum();
+    let last = month.min(deviation.len());
+    let acc: f64 = deviation[..last].iter().map(|x| -x * dt).sum();
     acc.exp()
 }

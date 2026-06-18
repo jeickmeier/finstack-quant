@@ -545,6 +545,25 @@ mod oas_tests {
         MarketContext::new().insert(disc)
     }
 
+    /// A steeply curved discount curve (sharp short-end roll-down then a flat
+    /// long end): a flat-rate proxy mis-prices it badly, so it cleanly separates
+    /// curve-consistent discounting from a single-rate approximation.
+    fn steep_market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![
+                (0.0, 1.0),
+                (0.5, 0.94),
+                (1.0, 0.90),
+                (2.0, 0.875),
+                (5.0, 0.86),
+                (10.0, 0.85),
+            ])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
     fn deal() -> StructuredCredit {
         let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
         pool.assets.push(PoolAsset::fixed_rate_bond(
@@ -614,6 +633,44 @@ mod oas_tests {
         assert!(
             (oas.oas - z_bps / 10_000.0).abs() < 1e-4,
             "deterministic OAS {} should equal z-spread {} (decimal)",
+            oas.oas,
+            z_bps / 10_000.0
+        );
+    }
+
+    #[test]
+    fn zero_vol_stochastic_rates_reproduce_the_curve() {
+        // Curve-consistency (no-arbitrage) anchor for the Hull-White discounting:
+        // with stochastic rates enabled but zero HW volatility and zero prepay
+        // sensitivity, the rate path collapses to the deterministic forward curve
+        // and modulates nothing, so discounting must reproduce the curve exactly —
+        // OAS equals the z-spread even for a steeply curved discount curve.
+        let sc = deal();
+        let mkt = steep_market();
+        let as_of = closing();
+        let pv = sc.value_tranche("SR", &mkt, as_of).unwrap();
+        let original = 800_000.0;
+        let market_price = 0.98 * pv.amount() / original * 100.0;
+        let target_pv = Money::new(market_price / 100.0 * original, Currency::USD);
+
+        let cf = sc.get_tranche_cashflows("SR", &mkt, as_of).unwrap();
+        let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
+        let z_bps =
+            calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap();
+
+        let config = OasConfig {
+            num_paths: 4,
+            stochastic_rates: true,
+            stochastic_credit: false,
+            hw_sigma: 0.0,
+            prepay_beta: 0.0,
+            ..Default::default()
+        };
+        let oas = calculate_tranche_oas(&sc, "SR", market_price, &mkt, as_of, &config).unwrap();
+        assert!(
+            (oas.oas - z_bps / 10_000.0).abs() < 1e-4,
+            "zero-vol stochastic-rate OAS {} should equal the z-spread {} (decimal) \
+             when discounting is curve-consistent",
             oas.oas,
             z_bps / 10_000.0
         );
