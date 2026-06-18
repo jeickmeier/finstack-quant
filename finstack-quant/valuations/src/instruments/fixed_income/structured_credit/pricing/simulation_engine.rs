@@ -2068,6 +2068,11 @@ pub(crate) struct SimulationState<'a> {
     /// funded from captured residual interest and drawn to cover debt interest
     /// shortfalls. See `ExcessSpreadSpec`.
     spread_account: Money,
+    /// Current controlled-accumulation principal funding account balance. During
+    /// the accumulation period, collected pool principal is held here (investor
+    /// balances flat) and released as a bullet at the accumulation end. See
+    /// `ControlledAccumulationSpec`.
+    principal_funding_account: Money,
 }
 
 /// Deal-health metrics for this period's step-down trigger evaluation.
@@ -2259,6 +2264,7 @@ impl<'a> SimulationState<'a> {
             pool_wala_months,
             reserve_balance: pool.reserve_account,
             spread_account: Money::new(0.0, base_ccy),
+            principal_funding_account: Money::new(0.0, base_ccy),
         })
     }
 
@@ -2388,6 +2394,24 @@ fn simulate_period(
             .reinvestment_period
             .as_ref()
             .is_some_and(|period| pay_date <= period.end_date);
+
+    // Controlled accumulation (master-trust style): after any revolving period
+    // and before the bullet date, collected pool principal is held in a funding
+    // account (investor balances flat) and released as a bullet at the
+    // accumulation end. Suspended while reinvestment recycles principal and on
+    // early amortization (which pays down immediately). `principal_diverted`
+    // unifies the two phases where pool principal is withheld from the waterfall.
+    let accumulation_spec = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.controlled_accumulation.as_ref());
+    let is_accumulating = accumulation_spec.is_some_and(|spec| {
+        !early_amortization
+            && !is_reinvestment_active
+            && pay_date >= spec.start_date
+            && pay_date < spec.bullet_date
+    });
+    let principal_diverted = is_reinvestment_active || is_accumulating;
 
     // Reconciliation: When reinvestment transitions from active → inactive,
     // snap pool_outstanding to the actual sum of asset balances BEFORE this
@@ -2583,9 +2607,11 @@ fn simulate_period(
         .scheduled_principal
         .checked_add(pool_flows.prepayment)?;
 
-    // During reinvestment, principal collections are reinvested into new assets.
+    // During reinvestment, principal collections are reinvested into new assets;
+    // during controlled accumulation they are held in the funding account. Either
+    // way pool principal is withheld from the waterfall (`principal_diverted`).
     // Recoveries are CASH and always flow through the waterfall.
-    let principal_available_for_waterfall = if is_reinvestment_active {
+    let mut principal_available_for_waterfall = if principal_diverted {
         released_recoveries
     } else {
         total_principal_from_pool.checked_add(released_recoveries)?
@@ -2653,14 +2679,48 @@ fn simulate_period(
         }
     }
 
+    // Controlled-accumulation funding account. During accumulation, divert this
+    // period's pool principal into the account (kept out of the waterfall above
+    // via `principal_diverted`, so investor balances stay flat). At the bullet
+    // date, release the whole account into the waterfall as principal. Applied
+    // after the excess-spread block so the spread account never captures the
+    // bullet principal as if it were surplus interest. `funding_net_release`
+    // (cash added back from the account) reconciles the cash-conservation check.
+    let mut funding_net_release = 0.0_f64;
+    if let Some(spec) = accumulation_spec {
+        if is_accumulating {
+            let captured = total_principal_from_pool.amount().max(0.0);
+            state.principal_funding_account = Money::new(
+                state.principal_funding_account.amount() + captured,
+                state.base_ccy,
+            );
+        } else if !early_amortization
+            && pay_date >= spec.bullet_date
+            && state.principal_funding_account.amount() > 0.0
+        {
+            funding_net_release = state.principal_funding_account.amount();
+            state.principal_funding_account = Money::new(0.0, state.base_ccy);
+            let release = Money::new(funding_net_release, state.base_ccy);
+            principal_available_for_waterfall =
+                principal_available_for_waterfall.checked_add(release)?;
+            total_cash_for_waterfall = total_cash_for_waterfall.checked_add(release)?;
+        }
+    }
+
     // ── Step 4: Execute Waterfall on post-loss balances ──────────────
     // Per-period step-down: switch principal to pro-rata once the deal has
     // seasoned past the step-down date with cumulative losses below the trigger.
     // Borrowed (zero-cost) when no step-down rule applies.
     let rules = instrument.waterfall_rules.as_ref();
-    // Shifting interest and step-down both govern principal allocation; shifting
-    // interest takes precedence when both are configured.
-    let period_waterfall = if rules.is_some_and(|r| r.shifting_interest.is_some()) {
+    // Controlled accumulation locks out investor principal (held flat) and takes
+    // precedence; otherwise shifting interest and step-down govern principal
+    // allocation, with shifting interest winning when both are configured.
+    let period_waterfall = if is_accumulating {
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_accumulation_lockout(
+            waterfall,
+            &state.tranche_balances,
+        )
+    } else if rules.is_some_and(|r| r.shifting_interest.is_some()) {
         let months_from_closing = state.closing_date.months_until(pay_date);
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_shifting_interest(
             waterfall,
@@ -2886,13 +2946,17 @@ fn simulate_period(
     // debug/test-only assertion (zero release-build cost) that catches
     // accounting regressions in the waterfall and the engine's pool-flow
     // aggregation.
+    // Net cash diverted out of the waterfall into side accounts this period:
+    // the excess-spread net capture less any controlled-accumulation bullet
+    // release (which adds cash back from the funding account).
+    let side_net_capture = spread_net_capture - funding_net_release;
     debug_assert_cash_conserved(
         total_cash_for_waterfall,
         &pool_flows,
         released_recoveries,
-        is_reinvestment_active,
+        principal_diverted,
         &waterfall_result,
-        spread_net_capture,
+        side_net_capture,
     );
 
     Ok(())
@@ -2920,9 +2984,9 @@ fn debug_assert_cash_conserved(
     total_cash_for_waterfall: Money,
     pool_flows: &PoolFlows,
     released_recoveries: Money,
-    is_reinvestment_active: bool,
+    principal_diverted: bool,
     waterfall_result: &WaterfallDistribution,
-    spread_net_capture: f64,
+    side_net_capture: f64,
 ) {
     if !cfg!(debug_assertions) {
         return;
@@ -2933,27 +2997,30 @@ fn debug_assert_cash_conserved(
     let tol = (total_cash_for_waterfall.amount().abs() * 1e-9).max(1.0);
 
     // Identity 1: input to the waterfall == distributable pool cash, net of any
-    // cash diverted into (or supplied from) the excess-spread account.
-    let expected_input = if is_reinvestment_active {
+    // cash diverted into (or supplied from) the side accounts (excess-spread and
+    // controlled-accumulation funding). When pool principal is diverted (an
+    // active revolving period recycles it, or controlled accumulation holds it)
+    // it is not part of this period's distributable cash.
+    let expected_input = if principal_diverted {
         pool_flows.interest.amount() + released_recoveries.amount()
     } else {
         pool_flows.interest.amount()
             + pool_flows.scheduled_principal.amount()
             + pool_flows.prepayment.amount()
             + released_recoveries.amount()
-    } - spread_net_capture;
+    } - side_net_capture;
     debug_assert!(
         (total_cash_for_waterfall.amount() - expected_input).abs() <= tol,
         "cash-conservation (input): waterfall received {} but distributable \
          pool cash is {} (interest={}, scheduled={}, prepay={}, recoveries={}, \
-         reinvesting={})",
+         principal_diverted={})",
         total_cash_for_waterfall.amount(),
         expected_input,
         pool_flows.interest.amount(),
         pool_flows.scheduled_principal.amount(),
         pool_flows.prepayment.amount(),
         released_recoveries.amount(),
-        is_reinvestment_active,
+        principal_diverted,
     );
 
     // Identity 2: the waterfall neither creates nor destroys cash.

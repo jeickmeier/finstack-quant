@@ -453,6 +453,7 @@ mod afc_tests {
                 step_down: None,
                 shifting_interest: None,
                 early_amortization: None,
+                controlled_accumulation: None,
             });
         }
         sc
@@ -578,6 +579,7 @@ mod excess_spread_tests {
                 step_down: None,
                 shifting_interest: None,
                 early_amortization: None,
+                controlled_accumulation: None,
             });
         }
         sc
@@ -722,6 +724,7 @@ mod excess_spread_tests {
                 step_down: None,
                 shifting_interest: None,
                 early_amortization: None,
+                controlled_accumulation: None,
             });
         }
         sc
@@ -857,6 +860,7 @@ mod step_down_tests {
                 step_down: Some(sd),
                 shifting_interest: None,
                 early_amortization: None,
+                controlled_accumulation: None,
             });
         }
         sc
@@ -1099,6 +1103,7 @@ mod shifting_interest_tests {
                 step_down: None,
                 shifting_interest: Some(si),
                 early_amortization: None,
+                controlled_accumulation: None,
             });
         }
         sc
@@ -1240,6 +1245,7 @@ mod early_amortization_tests {
                 early_amortization: Some(EarlyAmortizationSpec {
                     max_cumulative_loss_pct: threshold,
                 }),
+                controlled_accumulation: None,
             });
         }
         sc
@@ -1269,6 +1275,141 @@ mod early_amortization_tests {
             sr_breaching > sr_revolving + 1.0,
             "early amortization must pay senior principal before the revolving end \
              (breaching={sr_breaching}, revolving={sr_revolving})"
+        );
+    }
+}
+
+/// Controlled accumulation: principal held in a funding account until a bullet.
+mod controlled_accumulation_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        run_simulation, AssetPool, ControlledAccumulationSpec, DealType, PoolAsset,
+        StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        WaterfallRules,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn bullet() -> Date {
+        Date::from_calendar_date(2027, Month::January, 1).unwrap() // 3y accumulation
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2030, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (10.0, 0.80)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    /// 80/20 senior/equity ABS throwing off a 20% CPR. With a controlled
+    /// accumulation spec, principal accumulates into a funding account until the
+    /// bullet date instead of amortizing the senior.
+    fn deal(accumulation: Option<ControlledAccumulationSpec>) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::Card, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.10,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.04 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-CA", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if let Some(spec) = accumulation {
+            sc.waterfall_rules = Some(WaterfallRules {
+                controlled_accumulation: Some(spec),
+                ..Default::default()
+            });
+        }
+        sc
+    }
+
+    /// Senior principal paid in the half-open window `[lo, hi)`.
+    fn senior_principal_between(sc: &StructuredCredit, lo: Date, hi: Date) -> f64 {
+        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let sr = results.get("SR").expect("SR results");
+        sr.principal_flows
+            .iter()
+            .filter(|(d, _)| *d >= lo && *d < hi)
+            .map(|(_, m)| m.amount())
+            .sum()
+    }
+
+    #[test]
+    fn accumulation_holds_senior_flat_until_bullet() {
+        // CDR 0. During accumulation the senior receives no principal (it is held
+        // in the funding account), whereas the plain amortizing deal pays the
+        // senior down from prepayments throughout.
+        let accum = deal(Some(ControlledAccumulationSpec {
+            start_date: closing(),
+            bullet_date: bullet(),
+        }));
+        let plain = deal(None);
+        let sp_accum = senior_principal_between(&accum, closing(), bullet());
+        let sp_plain = senior_principal_between(&plain, closing(), bullet());
+        assert!(
+            sp_accum < 1.0 && sp_accum < sp_plain - 1.0,
+            "accumulation must hold the senior flat until the bullet \
+             (accum={sp_accum}, plain={sp_plain})"
+        );
+    }
+
+    #[test]
+    fn bullet_releases_accumulated_principal() {
+        // The principal accumulated over the 3y window is released to the senior
+        // as a bullet at/after the bullet date.
+        let accum = deal(Some(ControlledAccumulationSpec {
+            start_date: closing(),
+            bullet_date: bullet(),
+        }));
+        let sp_bullet = senior_principal_between(&accum, bullet(), maturity());
+        assert!(
+            sp_bullet > 300_000.0,
+            "the bullet must release the accumulated principal to the senior \
+             (got {sp_bullet})"
         );
     }
 }

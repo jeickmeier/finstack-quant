@@ -156,6 +156,10 @@ pub struct WaterfallRules {
     /// (master-trust style), switching the deal into amortization.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub early_amortization: Option<EarlyAmortizationSpec>,
+    /// Controlled accumulation: accumulate principal into a funding account and
+    /// repay the investor as a bullet at the accumulation end.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub controlled_accumulation: Option<ControlledAccumulationSpec>,
 }
 
 /// Available-funds cap (net-WAC cap) specification.
@@ -270,6 +274,30 @@ pub struct EarlyAmortizationSpec {
     /// Cumulative-loss fraction (decimal, of the original pool balance) at or
     /// above which the revolving period ends early and amortization begins.
     pub max_cumulative_loss_pct: f64,
+}
+
+/// Controlled-accumulation specification for revolving (master-trust) deals.
+///
+/// Between `start_date` and `bullet_date` the deal is in its controlled-
+/// accumulation period: collected pool principal is held in a principal funding
+/// account (investor balances stay flat, no pass-through paydown) rather than
+/// recycled or distributed. At the first payment date on or after `bullet_date`
+/// the entire account is released into the waterfall as a single bullet
+/// principal payment. Accumulation is suspended while a revolving/reinvestment
+/// period is still active (which recycles principal) and on early amortization
+/// (which pays principal down immediately).
+///
+/// `start_date` is typically the revolving-period end and `bullet_date` the
+/// note's expected maturity (and at/before the legal final maturity, so the
+/// release occurs before the deal winds down).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ControlledAccumulationSpec {
+    /// First date principal is accumulated into the funding account.
+    #[schemars(with = "String")]
+    pub start_date: Date,
+    /// Date the accumulated funding account is released as a bullet payment.
+    #[schemars(with = "String")]
+    pub bullet_date: Date,
 }
 
 /// Allocation mode within a tier

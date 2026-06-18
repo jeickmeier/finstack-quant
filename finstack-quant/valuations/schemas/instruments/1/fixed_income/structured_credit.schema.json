@@ -1121,6 +1121,24 @@
               ],
               "type": "object"
             },
+            "ControlledAccumulationSpec": {
+              "description": "Controlled-accumulation specification for revolving (master-trust) deals.\n\nBetween `start_date` and `bullet_date` the deal is in its controlled-\naccumulation period: collected pool principal is held in a principal funding\naccount (investor balances stay flat, no pass-through paydown) rather than\nrecycled or distributed. At the first payment date on or after `bullet_date`\nthe entire account is released into the waterfall as a single bullet\nprincipal payment. Accumulation is suspended while a revolving/reinvestment\nperiod is still active (which recycles principal) and on early amortization\n(which pays principal down immediately).\n\n`start_date` is typically the revolving-period end and `bullet_date` the\nnote's expected maturity (and at/before the legal final maturity, so the\nrelease occurs before the deal winds down).",
+              "properties": {
+                "bullet_date": {
+                  "description": "Date the accumulated funding account is released as a bullet payment.",
+                  "type": "string"
+                },
+                "start_date": {
+                  "description": "First date principal is accumulated into the funding account.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "start_date",
+                "bullet_date"
+              ],
+              "type": "object"
+            },
             "CopulaSpec": {
               "description": "Copula model specification for configuration and serialization.\n\nAllows copula selection without constructing the full model,\nenabling deferred construction with market data.",
               "oneOf": [
@@ -5569,6 +5587,17 @@
                     }
                   ],
                   "description": "Available-funds / net-WAC cap on named tranches' interest."
+                },
+                "controlled_accumulation": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/ControlledAccumulationSpec"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "description": "Controlled accumulation: accumulate principal into a funding account and\nrepay the investor as a bullet at the accumulation end."
                 },
                 "early_amortization": {
                   "anyOf": [

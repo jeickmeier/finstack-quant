@@ -702,6 +702,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
         step_down: None,
         shifting_interest: None,
         early_amortization: None,
+        controlled_accumulation: None,
     });
 
     // Round-trip through the tagged JSON the bindings serialize.

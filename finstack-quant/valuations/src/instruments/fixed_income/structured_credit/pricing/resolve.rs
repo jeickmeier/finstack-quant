@@ -15,7 +15,9 @@ use crate::instruments::fixed_income::structured_credit::types::{
     StepDownTrigger, Waterfall, WaterfallRules,
 };
 use finstack_quant_core::dates::Date;
+use finstack_quant_core::money::Money;
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 /// Resolve `base` into the concrete waterfall for a deal, applying any rules.
 ///
@@ -178,6 +180,40 @@ pub fn apply_shifting_interest<'w>(
                 } else {
                     other_weight
                 });
+            }
+        }
+    }
+    Cow::Owned(waterfall)
+}
+
+/// Lock out investor principal during a controlled-accumulation period.
+///
+/// Sets every `TranchePrincipal` recipient's target to the tranche's *current*
+/// balance, so the principal tier requests nothing this period and the investor
+/// balances stay flat. Residual cash (including excess interest that would
+/// otherwise sweep into senior principal) flows on to the equity/residual tier.
+/// Pool principal itself is withheld from the waterfall separately (held in the
+/// accumulation funding account) and released as a bullet at the accumulation
+/// end. Always returns an owned waterfall (only called while accumulating).
+pub fn apply_accumulation_lockout<'w, S: std::hash::BuildHasher>(
+    base: &'w Waterfall,
+    tranche_balances: &HashMap<String, Money, S>,
+) -> Cow<'w, Waterfall> {
+    let mut waterfall = base.clone();
+    for tier in &mut waterfall.tiers {
+        if tier.payment_type != PaymentType::Principal {
+            continue;
+        }
+        for recipient in &mut tier.recipients {
+            if let PaymentCalculation::TranchePrincipal {
+                tranche_id,
+                target_balance,
+                ..
+            } = &mut recipient.calculation
+            {
+                if let Some(balance) = tranche_balances.get(tranche_id.as_str()) {
+                    *target_balance = Some(*balance);
+                }
             }
         }
     }
