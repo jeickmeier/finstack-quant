@@ -227,7 +227,8 @@ fn structured_credit_tranche_metrics_through_json() {
         .expect("tranche metrics @95");
     let cheap_parsed: serde_json::Value = serde_json::from_str(&tm_cheap).unwrap();
     assert!(
-        cheap_parsed["z_spread_bp"].as_f64().expect("z") > tm_parsed["z_spread_bp"].as_f64().expect("z")
+        cheap_parsed["z_spread_bp"].as_f64().expect("z")
+            > tm_parsed["z_spread_bp"].as_f64().expect("z")
     );
 }
 

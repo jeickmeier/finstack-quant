@@ -89,16 +89,24 @@ pub fn calculate_tranche_metrics(
     let original_balance = tranche.original_balance.amount();
 
     let cashflows = deal.get_tranche_cashflows(tranche_id, market, as_of)?;
-    let pv_money = deal.value_tranche(tranche_id, market, as_of)?;
-    let pv = pv_money.amount();
+    let disc = market.get_discount(deal.discount_curve_id.as_str())?;
+    let curve = disc.as_ref();
+
+    // PV from the already-projected cashflows. (Calling `value_tranche` here would
+    // re-run the full waterfall simulation a second time — the projection is the
+    // expensive step — so discount the flows we already have instead.)
+    let mut pv = 0.0_f64;
+    for (date, amount) in &cashflows.cashflows {
+        if *date > as_of {
+            pv += amount.amount() * curve.df_between_dates(as_of, *date)?;
+        }
+    }
+    let pv_money = Money::new(pv, deal.pool.base_currency());
     let price_pct = if original_balance > 0.0 {
         pv / original_balance * 100.0
     } else {
         0.0
     };
-
-    let disc = market.get_discount(deal.discount_curve_id.as_str())?;
-    let curve = disc.as_ref();
 
     let wal = calculate_tranche_wal(&cashflows, as_of)?;
     let modified_duration =
