@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from finstack_quant.valuations import exotics
+from finstack_quant.valuations.instruments import exotics
 
 
 def _asian_option_spec() -> dict[str, object]:

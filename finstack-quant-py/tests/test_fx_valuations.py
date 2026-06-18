@@ -7,7 +7,7 @@ import json
 import pytest
 
 from finstack_quant.core.market_data import MarketContext
-from finstack_quant.valuations import fx
+from finstack_quant.valuations.instruments import fx
 
 
 def _fx_spot_spec() -> dict[str, object]:
