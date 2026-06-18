@@ -147,6 +147,11 @@ pub struct WaterfallRules {
     /// step-down trigger passes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub step_down: Option<StepDownSpec>,
+    /// Shifting interest: senior receives a scheduled (declining) share of
+    /// principal. Mutually exclusive with `step_down` (both govern principal
+    /// allocation); `shifting_interest` takes precedence when both are set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shifting_interest: Option<ShiftingInterestSpec>,
 }
 
 /// Available-funds cap (net-WAC cap) specification.
@@ -192,6 +197,32 @@ pub struct StepDownSpec {
     /// Cumulative-loss fraction (decimal, of the original pool balance) at or
     /// above which the step-down trigger fails and principal stays sequential.
     pub max_cumulative_loss_pct: f64,
+}
+
+/// One step of a shifting-interest schedule: the senior's share of principal
+/// from `months_from_closing` onward (until the next step).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ShiftingInterestStep {
+    /// Months from closing at which this senior share takes effect.
+    pub months_from_closing: u32,
+    /// Senior share of principal (decimal, `1.0` = 100% lockout) from this step.
+    pub senior_pct: f64,
+}
+
+/// Shifting-interest principal allocation (non-agency senior/sub RMBS).
+///
+/// The senior tranche receives `senior_pct` of principal (the rest split across
+/// the remaining debt tranches), where `senior_pct` follows a declining
+/// schedule by deal age. A `1.0` lockout early routes all principal to the
+/// senior; later steps release principal to the subordinates. Modelled as a
+/// per-period weighted pro-rata of *all* principal (a first-order treatment;
+/// agency-style scheduled-vs-prepayment splitting is a refinement).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ShiftingInterestSpec {
+    /// Id of the senior tranche that receives the scheduled principal share.
+    pub senior_id: String,
+    /// Declining senior-share schedule, ascending by `months_from_closing`.
+    pub schedule: Vec<ShiftingInterestStep>,
 }
 
 /// Allocation mode within a tier

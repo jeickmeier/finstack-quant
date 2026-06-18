@@ -451,6 +451,7 @@ mod afc_tests {
                 }),
                 excess_spread: None,
                 step_down: None,
+                shifting_interest: None,
             });
         }
         sc
@@ -574,6 +575,7 @@ mod excess_spread_tests {
                 afc: None,
                 excess_spread: Some(es),
                 step_down: None,
+                shifting_interest: None,
             });
         }
         sc
@@ -716,6 +718,7 @@ mod excess_spread_tests {
                     trap_loss_pct: None,
                 }),
                 step_down: None,
+                shifting_interest: None,
             });
         }
         sc
@@ -848,6 +851,7 @@ mod step_down_tests {
                 afc: None,
                 excess_spread: None,
                 step_down: Some(sd),
+                shifting_interest: None,
             });
         }
         sc
@@ -911,6 +915,142 @@ mod step_down_tests {
             sub_pass > sub_breach + 1.0,
             "a breached step-down trigger must keep principal sequential, paying the \
              sub less early (passing={sub_pass}, breached={sub_breach})"
+        );
+    }
+}
+
+/// Shifting interest: scheduled senior principal share (lockout then release).
+mod shifting_interest_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        run_simulation, AssetPool, DealType, PoolAsset, ShiftingInterestSpec, ShiftingInterestStep,
+        StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        WaterfallRules,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn release_date() -> Date {
+        Date::from_calendar_date(2026, Month::January, 1).unwrap() // closing + 24 months
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2029, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (10.0, 0.80)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    fn deal(shifting: Option<ShiftingInterestSpec>) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                70.0,
+                TrancheSeniority::Senior,
+                Money::new(700_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.04 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "SUB",
+                70.0,
+                90.0,
+                TrancheSeniority::Mezzanine,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                90.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(100_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-SI", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if let Some(si) = shifting {
+            sc.waterfall_rules = Some(WaterfallRules {
+                afc: None,
+                excess_spread: None,
+                step_down: None,
+                shifting_interest: Some(si),
+            });
+        }
+        sc
+    }
+
+    fn sub_principal(sc: &StructuredCredit, before: bool, cutoff: Date) -> f64 {
+        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let sub = results.get("SUB").expect("SUB results");
+        sub.principal_flows
+            .iter()
+            .filter(|(d, _)| if before { *d < cutoff } else { *d >= cutoff })
+            .map(|(_, m)| m.amount())
+            .sum()
+    }
+
+    #[test]
+    fn shifting_interest_locks_out_sub_then_releases() {
+        // 100% senior share for the first 24 months (full lockout), then 50%.
+        let sc = deal(Some(ShiftingInterestSpec {
+            senior_id: "SR".to_string(),
+            schedule: vec![
+                ShiftingInterestStep {
+                    months_from_closing: 0,
+                    senior_pct: 1.0,
+                },
+                ShiftingInterestStep {
+                    months_from_closing: 24,
+                    senior_pct: 0.5,
+                },
+            ],
+        }));
+        let before = sub_principal(&sc, true, release_date());
+        let after = sub_principal(&sc, false, release_date());
+        assert!(
+            before < 1.0,
+            "sub must be locked out of principal before the shift date (before={before})"
+        );
+        assert!(
+            after > 1.0,
+            "sub must receive principal once the senior share steps down (after={after})"
         );
     }
 }

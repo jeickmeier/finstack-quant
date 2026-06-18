@@ -2496,13 +2496,24 @@ fn simulate_period(
     } else {
         0.0
     };
-    let period_waterfall =
+    let rules = instrument.waterfall_rules.as_ref();
+    // Shifting interest and step-down both govern principal allocation; shifting
+    // interest takes precedence when both are configured.
+    let period_waterfall = if rules.is_some_and(|r| r.shifting_interest.is_some()) {
+        let months_from_closing = state.closing_date.months_until(pay_date);
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_shifting_interest(
+            waterfall,
+            rules,
+            months_from_closing,
+        )
+    } else {
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_step_down(
             waterfall,
-            instrument.waterfall_rules.as_ref(),
+            rules,
             pay_date,
             cumulative_loss_fraction,
-        );
+        )
+    };
 
     let waterfall_context =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext {

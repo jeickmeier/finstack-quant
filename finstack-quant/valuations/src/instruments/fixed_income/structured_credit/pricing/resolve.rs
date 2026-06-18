@@ -11,7 +11,8 @@
 //! revolving phases) will call this per period with the evolving deal state.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, PaymentCalculation, PaymentType, Waterfall, WaterfallRules,
+    AllocationMode, PaymentCalculation, PaymentType, Recipient, ShiftingInterestStep, Waterfall,
+    WaterfallRules,
 };
 use finstack_quant_core::dates::Date;
 use std::borrow::Cow;
@@ -101,4 +102,75 @@ pub fn apply_step_down<'w>(
         }
     }
     Cow::Owned(waterfall)
+}
+
+/// Apply per-period shifting-interest weights to the principal tiers.
+///
+/// Returns `base` unchanged (borrowed) unless a shifting-interest spec is
+/// configured, in which case it returns a copy whose principal tiers are
+/// pro-rata with the senior tranche weighted by its scheduled share for the
+/// deal's current age (the remainder split equally across the other debt
+/// tranches).
+pub fn apply_shifting_interest<'w>(
+    base: &'w Waterfall,
+    rules: Option<&WaterfallRules>,
+    months_from_closing: u32,
+) -> Cow<'w, Waterfall> {
+    let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) else {
+        return Cow::Borrowed(base);
+    };
+
+    let senior_pct = senior_share(&si.schedule, months_from_closing);
+
+    let mut waterfall = base.clone();
+    for tier in &mut waterfall.tiers {
+        if tier.payment_type != PaymentType::Principal {
+            continue;
+        }
+        tier.allocation_mode = AllocationMode::ProRata;
+        let others = tier
+            .recipients
+            .iter()
+            .filter(|r| principal_tranche_id(r).is_some_and(|id| id != si.senior_id.as_str()))
+            .count();
+        let other_weight = if others > 0 {
+            (1.0 - senior_pct) / others as f64
+        } else {
+            0.0
+        };
+        for recipient in &mut tier.recipients {
+            let id = principal_tranche_id(recipient).map(str::to_string);
+            if let Some(id) = id {
+                recipient.weight = Some(if id == si.senior_id {
+                    senior_pct
+                } else {
+                    other_weight
+                });
+            }
+        }
+    }
+    Cow::Owned(waterfall)
+}
+
+/// Senior share in effect at `months`: the `senior_pct` of the latest schedule
+/// step whose `months_from_closing` is `<= months` (or the first step's share
+/// when the deal is younger than every step).
+fn senior_share(schedule: &[ShiftingInterestStep], months: u32) -> f64 {
+    let mut pct = schedule.first().map_or(1.0, |s| s.senior_pct);
+    for step in schedule {
+        if step.months_from_closing <= months {
+            pct = step.senior_pct;
+        } else {
+            break;
+        }
+    }
+    pct
+}
+
+/// Tranche id of a principal recipient, if it pays tranche principal.
+fn principal_tranche_id(recipient: &Recipient) -> Option<&str> {
+    match &recipient.calculation {
+        PaymentCalculation::TranchePrincipal { tranche_id, .. } => Some(tranche_id.as_str()),
+        _ => None,
+    }
 }
