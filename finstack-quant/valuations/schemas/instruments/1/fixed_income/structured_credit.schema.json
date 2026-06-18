@@ -210,11 +210,19 @@
               "description": "Available-funds cap (net-WAC cap) specification.",
               "properties": {
                 "capped_tranches": {
-                  "description": "Ids of tranches whose interest coupon is capped at the collateral's\nweighted-average coupon.",
+                  "description": "Ids of tranches whose interest coupon is capped at the collateral's\n(net) weighted-average coupon.",
                   "items": {
                     "type": "string"
                   },
                   "type": "array"
+                },
+                "net_wac_fee_bps": {
+                  "description": "Senior fee load (annualized basis points) ranking ahead of the capped\ninterest — typically servicing plus trustee fees. Subtracted from the\ngross collateral WAC to form the **net**-WAC cap. When `None` the cap is\nthe gross collateral WAC.",
+                  "format": "double",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -1122,7 +1130,7 @@
               "type": "object"
             },
             "ControlledAccumulationSpec": {
-              "description": "Controlled-accumulation specification for revolving (master-trust) deals.\n\nBetween `start_date` and `bullet_date` the deal is in its controlled-\naccumulation period: collected pool principal is held in a principal funding\naccount (investor balances stay flat, no pass-through paydown) rather than\nrecycled or distributed. At the first payment date on or after `bullet_date`\nthe entire account is released into the waterfall as a single bullet\nprincipal payment. Accumulation is suspended while a revolving/reinvestment\nperiod is still active (which recycles principal) and on early amortization\n(which pays principal down immediately).\n\n`start_date` is typically the revolving-period end and `bullet_date` the\nnote's expected maturity (and at/before the legal final maturity, so the\nrelease occurs before the deal winds down).",
+              "description": "Controlled-accumulation specification for revolving (master-trust) deals.\n\nBetween `start_date` and `bullet_date` the deal is in its controlled-\naccumulation period: collected pool principal is held in a principal funding\naccount (investor balances stay flat, no pass-through paydown) rather than\nrecycled or distributed. At the first payment date on or after `bullet_date`\nthe entire account is released into the waterfall as a single bullet\nprincipal payment. Accumulation is suspended while a revolving/reinvestment\nperiod is still active (which recycles principal) and on early amortization\n(which pays principal down immediately).\n\n`start_date` is typically the revolving-period end and `bullet_date` the\nnote's expected maturity (and at/before the legal final maturity, so the\nrelease occurs before the deal winds down). If the deal terminates before\nthe bullet date (cleanup call, pool exhaustion, or a bullet date beyond the\nlast payment), any residual funding-account balance is swept to the\noutstanding tranches senior-first at deal end, so accumulated principal is\nnever stranded.",
               "properties": {
                 "bullet_date": {
                   "description": "Date the accumulated funding account is released as a bullet payment.",

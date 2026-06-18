@@ -143,7 +143,8 @@ pub fn apply_step_down<'w>(
 /// Returns `base` unchanged (borrowed) unless a shifting-interest spec is
 /// configured, in which case it returns a copy whose principal tiers are
 /// pro-rata with the senior tranche weighted by an *effective* share, and the
-/// remainder split equally across the other debt tranches.
+/// remainder split across the other debt tranches **pro-rata by current
+/// balance** (`tranche_balances`).
 ///
 /// # Scheduled vs prepayment split
 ///
@@ -159,12 +160,13 @@ pub fn apply_step_down<'w>(
 /// where `senior_prorata_share` is the senior's pro-rata share by current
 /// balance. With `u = 1` (no scheduled principal, e.g. a bullet pool) this
 /// reduces to the pure schedule share; with `u = 0` it is fully pro-rata.
-pub fn apply_shifting_interest<'w>(
+pub fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
     base: &'w Waterfall,
     rules: Option<&WaterfallRules>,
     months_from_closing: u32,
     senior_prorata_share: f64,
     unscheduled_fraction: f64,
+    tranche_balances: &HashMap<String, Money, S>,
 ) -> Cow<'w, Waterfall> {
     let Some(si) = rules.and_then(|r| r.shifting_interest.as_ref()) else {
         return Cow::Borrowed(base);
@@ -180,24 +182,34 @@ pub fn apply_shifting_interest<'w>(
             continue;
         }
         tier.allocation_mode = AllocationMode::ProRata;
-        let others = tier
+        // Total current balance of the non-senior principal recipients, used to
+        // split the remaining `(1 − senior_pct)` pro-rata. Falls back to an
+        // equal split when balances are unavailable/zero.
+        let other_ids: Vec<String> = tier
             .recipients
             .iter()
-            .filter(|r| principal_tranche_id(r).is_some_and(|id| id != si.senior_id.as_str()))
-            .count();
-        let other_weight = if others > 0 {
-            (1.0 - senior_pct) / others as f64
-        } else {
-            0.0
-        };
+            .filter_map(|r| principal_tranche_id(r))
+            .filter(|id| *id != si.senior_id.as_str())
+            .map(str::to_string)
+            .collect();
+        let other_total: f64 = other_ids
+            .iter()
+            .map(|id| tranche_balances.get(id).map_or(0.0, |m| m.amount()))
+            .sum();
         for recipient in &mut tier.recipients {
             let id = principal_tranche_id(recipient).map(str::to_string);
             if let Some(id) = id {
-                recipient.weight = Some(if id == si.senior_id {
+                let weight = if id == si.senior_id {
                     senior_pct
+                } else if other_total > 0.0 {
+                    (1.0 - senior_pct) * tranche_balances.get(&id).map_or(0.0, |m| m.amount())
+                        / other_total
+                } else if !other_ids.is_empty() {
+                    (1.0 - senior_pct) / other_ids.len() as f64
                 } else {
-                    other_weight
-                });
+                    0.0
+                };
+                recipient.weight = Some(weight);
             }
         }
     }

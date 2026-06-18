@@ -448,6 +448,7 @@ mod afc_tests {
             sc.waterfall_rules = Some(WaterfallRules {
                 afc: Some(AfcSpec {
                     capped_tranches: vec!["SR".to_string()],
+                    net_wac_fee_bps: None,
                 }),
                 excess_spread: None,
                 step_down: None,
@@ -495,6 +496,83 @@ mod afc_tests {
             .unwrap();
         assert_eq!(a.total_interest.amount(), b.total_interest.amount());
         assert_eq!(a.total_principal.amount(), b.total_principal.amount());
+    }
+
+    /// Pool WAC 6%, senior coupon 5.8%: the gross-WAC cap (6%) does not bind, but
+    /// a net-WAC fee lowers the cap below the coupon, so it does.
+    fn net_wac_deal(net_wac_fee_bps: Option<f64>) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.058 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc = StructuredCredit::new_abs(
+            "ABS-AFC-NET",
+            pool,
+            tranches,
+            closing(),
+            maturity(),
+            "USD-OIS",
+        )
+        .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        sc.waterfall_rules = Some(WaterfallRules {
+            afc: Some(AfcSpec {
+                capped_tranches: vec!["SR".to_string()],
+                net_wac_fee_bps,
+            }),
+            ..Default::default()
+        });
+        sc
+    }
+
+    #[test]
+    fn afc_net_wac_fee_lowers_the_cap() {
+        // With no fee the 6% gross cap does not bind (coupon 5.8%); a 50bp
+        // net-WAC fee lowers the cap to 5.5%, which does — reducing senior
+        // interest below the gross-cap case.
+        let mkt = market();
+        let gross = net_wac_deal(None)
+            .get_tranche_cashflows("SR", &mkt, closing())
+            .unwrap();
+        let net = net_wac_deal(Some(50.0))
+            .get_tranche_cashflows("SR", &mkt, closing())
+            .unwrap();
+        assert!(
+            net.total_interest.amount() < 0.99 * gross.total_interest.amount(),
+            "a net-WAC fee must lower the cap and reduce senior interest \
+             (net={}, gross={})",
+            net.total_interest.amount(),
+            gross.total_interest.amount()
+        );
     }
 }
 
@@ -1247,6 +1325,106 @@ mod shifting_interest_tests {
             sub_scheduled > 5_000.0,
             "the sub must receive its pro-rata share of scheduled principal even \
              under a full senior lockout (got {sub_scheduled})"
+        );
+    }
+
+    /// Senior + two subordinate tranches (200k and 100k) under shifting interest.
+    fn two_sub_deal() -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                60.0,
+                TrancheSeniority::Senior,
+                Money::new(600_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.04 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "SUBA",
+                60.0,
+                80.0,
+                TrancheSeniority::Mezzanine,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "SUBB",
+                80.0,
+                90.0,
+                TrancheSeniority::Subordinated,
+                Money::new(100_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.06 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                90.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(100_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-SI2", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        sc.waterfall_rules = Some(WaterfallRules {
+            shifting_interest: Some(ShiftingInterestSpec {
+                senior_id: "SR".to_string(),
+                schedule: vec![ShiftingInterestStep {
+                    months_from_closing: 0,
+                    senior_pct: 0.4,
+                }],
+            }),
+            ..Default::default()
+        });
+        sc
+    }
+
+    #[test]
+    fn subordinate_split_is_pro_rata_by_balance() {
+        // The non-senior principal share (1 − 0.4 = 0.6) must be split pro-rata
+        // by current balance: the 200k SUBA should receive meaningfully more than
+        // the 100k SUBB (≈2:1), not an equal split.
+        let sc = two_sub_deal();
+        let results = run_simulation(&sc, &market(), closing()).unwrap();
+        let suba: f64 = results
+            .get("SUBA")
+            .expect("SUBA")
+            .principal_flows
+            .iter()
+            .map(|(_, m)| m.amount())
+            .sum();
+        let subb: f64 = results
+            .get("SUBB")
+            .expect("SUBB")
+            .principal_flows
+            .iter()
+            .map(|(_, m)| m.amount())
+            .sum();
+        assert!(
+            suba > 1.5 * subb,
+            "the larger subordinate must receive principal pro-rata to its balance \
+             (SUBA={suba}, SUBB={subb})"
         );
     }
 }

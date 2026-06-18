@@ -11,8 +11,8 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::de
     PerNameCopulaDefault, PoolGranularity,
 };
 use crate::instruments::fixed_income::structured_credit::types::{
-    AssetPool, PoolState, RecipientType, StructuredCredit, TrancheCashflows, TrancheSeniority,
-    TrancheStructure, Waterfall, WaterfallDistribution,
+    AssetPool, PoolState, RecipientType, StructuredCredit, Tranche, TrancheCashflows,
+    TrancheSeniority, TrancheStructure, Waterfall, WaterfallDistribution,
 };
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
@@ -566,6 +566,49 @@ fn release_principal_funding_account(
     Ok(())
 }
 
+/// Available-funds cap rate for the deal: the collateral weighted-average
+/// coupon less the AFC spec's net-WAC fee load (servicing + trustee bps ranking
+/// ahead of the capped interest). Falls back to the gross WAC when no fee is set.
+/// Returns `0.0` when no AFC rule is configured (cap unused).
+fn afc_cap_rate(instrument: &StructuredCredit) -> f64 {
+    match instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.afc.as_ref())
+    {
+        Some(afc) => {
+            let gross = instrument.pool.weighted_avg_coupon();
+            (gross - afc.net_wac_fee_bps.unwrap_or(0.0) / 10_000.0).max(0.0)
+        }
+        None => 0.0,
+    }
+}
+
+/// Current-period interest due on one tranche: `balance · coupon · accrual`,
+/// with the coupon capped at `afc_cap` when `afc_capped` is set (available-funds
+/// cap). Single source of truth for tranche interest-due, shared by the
+/// excess-spread surplus check and the Step-5 interest recording so the two
+/// cannot diverge on day-count, index fixing, or the AFC cap.
+fn tranche_period_interest_due(
+    tranche: &Tranche,
+    balance: f64,
+    period_start: Date,
+    pay_date: Date,
+    context: &MarketContext,
+    afc_cap: f64,
+    afc_capped: bool,
+) -> Result<f64> {
+    let raw = tranche
+        .coupon
+        .try_current_rate_with_index(pay_date, context)?;
+    let rate = if afc_capped { raw.min(afc_cap) } else { raw };
+    let accrual =
+        tranche
+            .day_count
+            .year_fraction(period_start, pay_date, DayCountContext::default())?;
+    Ok(balance * rate * accrual)
+}
+
 /// Run full cashflow simulation for a structured credit instrument.
 ///
 /// Returns detailed cashflow results for each tranche.
@@ -609,7 +652,7 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
         crate::instruments::fixed_income::structured_credit::pricing::resolve::resolve_waterfall(
             &base_waterfall,
             instrument.waterfall_rules.as_ref(),
-            instrument.pool.weighted_avg_coupon(),
+            afc_cap_rate(instrument),
         );
 
     // Resolve payment calendar - required for structured credit deals.
@@ -2698,7 +2741,14 @@ fn simulate_period(
         .as_ref()
         .and_then(|rules| rules.excess_spread.as_ref())
     {
-        // Current-period interest due across all debt (non-equity) tranches.
+        // Current-period interest due across all debt (non-equity) tranches,
+        // using the shared helper so the surplus measured here matches the
+        // interest the engine actually records (including any AFC cap).
+        let afc = instrument
+            .waterfall_rules
+            .as_ref()
+            .and_then(|rules| rules.afc.as_ref());
+        let afc_cap = afc_cap_rate(instrument);
         let mut debt_interest_due = 0.0_f64;
         for tranche in &state.tranches.tranches {
             if tranche.seniority == TrancheSeniority::Equity {
@@ -2708,15 +2758,20 @@ fn simulate_period(
                 .tranche_balances
                 .get(tranche.id.as_str())
                 .map_or(0.0, Money::amount);
-            let rate = tranche
-                .coupon
-                .try_current_rate_with_index(pay_date, context)?;
-            let accrual = tranche.day_count.year_fraction(
+            let afc_capped = afc.is_some_and(|spec| {
+                spec.capped_tranches
+                    .iter()
+                    .any(|t| t == tranche.id.as_str())
+            });
+            debt_interest_due += tranche_period_interest_due(
+                tranche,
+                bal,
                 period_start,
                 pay_date,
-                DayCountContext::default(),
+                context,
+                afc_cap,
+                afc_capped,
             )?;
-            debt_interest_due += bal * rate * accrual;
         }
 
         let interest_avail = pool_flows.interest.amount();
@@ -2824,6 +2879,7 @@ fn simulate_period(
             months_from_closing,
             senior_prorata_share,
             unscheduled_fraction,
+            &state.tranche_balances,
         )
     } else {
         let metrics = step_down_metrics(state);
@@ -2872,11 +2928,7 @@ fn simulate_period(
         .waterfall_rules
         .as_ref()
         .and_then(|rules| rules.afc.as_ref());
-    let afc_cap_rate = if afc_spec.is_some() {
-        instrument.pool.weighted_avg_coupon()
-    } else {
-        0.0
-    };
+    let afc_cap = afc_cap_rate(instrument);
 
     // ── Step 5: Record flows and update balances ─────────────────────
     for (idx, tranche) in state.tranches.tranches.iter().enumerate() {
@@ -2888,23 +2940,6 @@ fn simulate_period(
             .get(tranche_id_str)
             .copied()
             .unwrap_or(Money::new(0.0, state.base_ccy));
-        let coupon_rate = {
-            let raw = tranche
-                .coupon
-                .try_current_rate_with_index(pay_date, context)?;
-            match afc_spec {
-                Some(spec) if spec.capped_tranches.iter().any(|t| t == tranche_id_str) => {
-                    raw.min(afc_cap_rate)
-                }
-                _ => raw,
-            }
-        };
-
-        // Use tranche's day-count convention for proper accrual calculation
-        let accrual_factor =
-            tranche
-                .day_count
-                .year_fraction(period_start, pay_date, DayCountContext::default())?;
 
         let existing_deferred = state
             .deferred_interest
@@ -2912,11 +2947,22 @@ fn simulate_period(
             .copied()
             .unwrap_or(Money::new(0.0, state.base_ccy));
 
-        // Current-period interest due on post-writedown balance. Non-PIK
-        // deferred interest is a separate senior interest claim and is passed
-        // into the waterfall context before execution.
+        // Current-period interest due on post-writedown balance, via the shared
+        // helper (consistent AFC cap, day-count and index fixing with the
+        // excess-spread surplus check). Non-PIK deferred interest is a separate
+        // senior interest claim passed into the waterfall context before execution.
+        let afc_capped =
+            afc_spec.is_some_and(|spec| spec.capped_tranches.iter().any(|t| t == tranche_id_str));
         let current_interest_due = Money::new(
-            current_balance.amount() * coupon_rate * accrual_factor,
+            tranche_period_interest_due(
+                tranche,
+                current_balance.amount(),
+                period_start,
+                pay_date,
+                context,
+                afc_cap,
+                afc_capped,
+            )?,
             state.base_ccy,
         );
         let total_interest_claim = if tranche.pik_enabled {

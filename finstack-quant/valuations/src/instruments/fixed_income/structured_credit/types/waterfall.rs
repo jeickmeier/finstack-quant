@@ -166,8 +166,14 @@ pub struct WaterfallRules {
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct AfcSpec {
     /// Ids of tranches whose interest coupon is capped at the collateral's
-    /// weighted-average coupon.
+    /// (net) weighted-average coupon.
     pub capped_tranches: Vec<String>,
+    /// Senior fee load (annualized basis points) ranking ahead of the capped
+    /// interest — typically servicing plus trustee fees. Subtracted from the
+    /// gross collateral WAC to form the **net**-WAC cap. When `None` the cap is
+    /// the gross collateral WAC.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub net_wac_fee_bps: Option<f64>,
 }
 
 /// Excess-spread / spread-account specification.

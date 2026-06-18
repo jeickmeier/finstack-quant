@@ -697,6 +697,7 @@ fn waterfall_rules_round_trip_and_price_through_json() {
     sc.waterfall_rules = Some(WaterfallRules {
         afc: Some(AfcSpec {
             capped_tranches: vec!["SR".to_string()],
+            net_wac_fee_bps: None,
         }),
         excess_spread: None,
         step_down: None,
