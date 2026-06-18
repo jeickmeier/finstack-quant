@@ -497,13 +497,14 @@ mod afc_tests {
 /// Excess-spread / spread-account capture, trigger-gated retention, and release.
 mod excess_spread_tests {
     use finstack_quant_cashflows::builder::{
-        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+        DefaultModelSpec, FloatingRateSpec, PrepaymentModelSpec, RecoveryModelSpec,
     };
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         run_simulation, AssetPool, DealType, ExcessSpreadSpec, PoolAsset, StructuredCredit,
         Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
@@ -597,17 +598,153 @@ mod excess_spread_tests {
     }
 
     #[test]
-    fn untrapped_spread_releases_back_to_equity() {
-        // With no trap trigger, captured spread is released to equity at deal
-        // end, so total equity cash matches the no-account baseline.
-        let baseline = equity_cash(&deal(None));
+    fn untrapped_spread_releases_more_to_equity_than_trapped() {
+        // Same deal, same target: with no trap trigger the account is released
+        // to equity at deal end; with the trap breached it is retained. So the
+        // released case must leave equity strictly better off than the trapped
+        // case (by roughly the retained account balance).
+        let trapped = equity_cash(&deal(Some(ExcessSpreadSpec {
+            target_balance: Money::new(20_000.0, Currency::USD),
+            trap_loss_pct: Some(0.01),
+        })));
         let released = equity_cash(&deal(Some(ExcessSpreadSpec {
             target_balance: Money::new(20_000.0, Currency::USD),
             trap_loss_pct: None,
         })));
         assert!(
-            (released - baseline).abs() < 1.0,
-            "released spread must return to equity (released={released}, baseline={baseline})"
+            released > trapped + 1.0,
+            "releasing the account must return more to equity than trapping it \
+             (released={released}, trapped={trapped})"
+        );
+    }
+
+    /// Rising-rate market: a SOFR-3M forward climbing from 2% to 10% over the
+    /// deal, plus a flat discount curve.
+    fn draw_market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .unwrap();
+        let sofr = ForwardCurve::builder("SOFR-3M", 0.25)
+            .base_date(closing())
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 0.02), (1.0, 0.05), (2.0, 0.08), (3.0, 0.10)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc).insert(sofr)
+    }
+
+    fn floating_senior_spec() -> FloatingRateSpec {
+        FloatingRateSpec {
+            index_id: CurveId::new("SOFR-3M"),
+            spread_bp: rust_decimal_macros::dec!(100),
+            gearing: rust_decimal_macros::dec!(1),
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            all_in_floor_bp: None,
+            all_in_cap_bp: None,
+            index_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_freq: Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 2,
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: "nyse".to_string(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            overnight_compounding: None,
+            overnight_basis: None,
+            fallback: Default::default(),
+        }
+    }
+
+    /// Draw-path deal: a fixed 6% collateral pool funds a floating senior
+    /// (SOFR-3M + 100bps). Early, with SOFR ~2%, the senior coupon (~3%) is
+    /// below the collateral, so excess spread funds the account; later, as SOFR
+    /// climbs past the 6% collateral, the senior coupon exceeds available
+    /// collateral interest and the account draws down to cover the shortfall.
+    /// No defaults, so the senior is never written down — its interest due is
+    /// driven by the rising index, not by balance erosion.
+    fn draw_deal(with_account: bool) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Floating(floating_senior_spec()),
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-DRAW", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if with_account {
+            sc.waterfall_rules = Some(WaterfallRules {
+                afc: None,
+                excess_spread: Some(ExcessSpreadSpec {
+                    target_balance: Money::new(1_000_000.0, Currency::USD),
+                    trap_loss_pct: None,
+                }),
+            });
+        }
+        sc
+    }
+
+    #[test]
+    fn draw_covers_senior_interest_shortfall() {
+        let mkt = draw_market();
+        let base = run_simulation(&draw_deal(false), &mkt, closing()).unwrap();
+        let with_acct = run_simulation(&draw_deal(true), &mkt, closing()).unwrap();
+        let sr_base = base.get("SR").expect("SR results");
+        let sr_with = with_acct.get("SR").expect("SR results");
+
+        // Sanity: without the account the senior runs an interest shortfall.
+        assert!(
+            sr_base.total_pik.amount() > 1.0,
+            "test setup must produce a senior interest shortfall (got pik={})",
+            sr_base.total_pik.amount()
+        );
+        // The account draws to cover part of that shortfall: more senior interest
+        // is paid, and less is deferred, than without the account.
+        assert!(
+            sr_with.total_interest.amount() > sr_base.total_interest.amount() + 1.0,
+            "spread account must cover senior interest shortfalls (with={}, base={})",
+            sr_with.total_interest.amount(),
+            sr_base.total_interest.amount()
+        );
+        assert!(
+            sr_with.total_pik.amount() < sr_base.total_pik.amount() - 1.0,
+            "covered shortfall must reduce deferred interest (with={}, base={})",
+            sr_with.total_pik.amount(),
+            sr_base.total_pik.amount()
         );
     }
 }

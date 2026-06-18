@@ -2425,9 +2425,67 @@ fn simulate_period(
         total_principal_from_pool.checked_add(released_recoveries)?
     };
 
-    let total_cash_for_waterfall = pool_flows
+    let mut total_cash_for_waterfall = pool_flows
         .interest
         .checked_add(principal_available_for_waterfall)?;
+
+    // Excess-spread (spread-account) capture/draw, applied to the cash entering
+    // the waterfall. Capturing *here* — before the single sequential waterfall
+    // can sweep surplus interest into senior principal — is what lets the
+    // account fund from excess interest mid-deal and later draw to cover debt
+    // interest shortfalls. No-op (identity) when no `excess_spread` is set.
+    // `spread_net_capture` is the net cash diverted into the account this period
+    // (negative when drawing), reconciled by the cash-conservation check.
+    let mut spread_net_capture = 0.0_f64;
+    if let Some(es) = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.excess_spread.as_ref())
+    {
+        // Current-period interest due across all debt (non-equity) tranches.
+        let mut debt_interest_due = 0.0_f64;
+        for tranche in &state.tranches.tranches {
+            if tranche.seniority == TrancheSeniority::Equity {
+                continue;
+            }
+            let bal = state
+                .tranche_balances
+                .get(tranche.id.as_str())
+                .map_or(0.0, Money::amount);
+            let rate = tranche
+                .coupon
+                .try_current_rate_with_index(pay_date, context)?;
+            let accrual = tranche.day_count.year_fraction(
+                period_start,
+                pay_date,
+                DayCountContext::default(),
+            )?;
+            debt_interest_due += bal * rate * accrual;
+        }
+
+        let interest_avail = pool_flows.interest.amount();
+        if interest_avail > debt_interest_due {
+            // Capture surplus interest into the account, up to the target.
+            let room = (es.target_balance.amount() - state.spread_account.amount()).max(0.0);
+            let capture = (interest_avail - debt_interest_due).min(room).max(0.0);
+            state.spread_account =
+                Money::new(state.spread_account.amount() + capture, state.base_ccy);
+            total_cash_for_waterfall = Money::new(
+                (total_cash_for_waterfall.amount() - capture).max(0.0),
+                state.base_ccy,
+            );
+            spread_net_capture = capture;
+        } else {
+            // Draw from the account to cover the interest shortfall.
+            let draw = (debt_interest_due - interest_avail)
+                .min(state.spread_account.amount())
+                .max(0.0);
+            state.spread_account = Money::new(state.spread_account.amount() - draw, state.base_ccy);
+            total_cash_for_waterfall =
+                Money::new(total_cash_for_waterfall.amount() + draw, state.base_ccy);
+            spread_net_capture = -draw;
+        }
+    }
 
     // ── Step 4: Execute Waterfall on post-loss balances ──────────────
     let waterfall_context =
@@ -2475,12 +2533,6 @@ fn simulate_period(
     } else {
         0.0
     };
-
-    // Excess-spread (spread-account) rule, if configured.
-    let excess_spread_spec = instrument
-        .waterfall_rules
-        .as_ref()
-        .and_then(|rules| rules.excess_spread.as_ref());
 
     // ── Step 5: Record flows and update balances ─────────────────────
     for (idx, tranche) in state.tranches.tranches.iter().enumerate() {
@@ -2561,61 +2613,22 @@ fn simulate_period(
             .checked_sub(interest_paid)
             .unwrap_or(Money::new(0.0, state.base_ccy));
 
-        // Spread account: a debt tranche draws from it to cover an interest
-        // shortfall (extra interest, sourced from the account); the equity
-        // tranche's residual is captured into it up to the target balance.
-        // With no `excess_spread` rule both are zero and booking is identical.
-        let is_equity = tranche.seniority == TrancheSeniority::Equity;
-        let (spread_draw, spread_capture) = match excess_spread_spec {
-            Some(es) if is_equity => {
-                let room = (es.target_balance.amount() - state.spread_account.amount()).max(0.0);
-                (0.0, principal_payment.amount().min(room))
-            }
-            Some(_) => (
-                current_interest_shortfall
-                    .amount()
-                    .min(state.spread_account.amount())
-                    .max(0.0),
-                0.0,
-            ),
-            None => (0.0, 0.0),
-        };
-        state.spread_account = Money::new(
-            state.spread_account.amount() + spread_capture - spread_draw,
-            state.base_ccy,
-        );
-
-        // Booked amounts after the spread-account adjustment.
-        let booked_interest = Money::new(interest_paid.amount() + spread_draw, state.base_ccy);
-        let booked_principal = Money::new(
-            (principal_payment.amount() - spread_capture).max(0.0),
-            state.base_ccy,
-        );
-        let booked_cashflow = Money::new(
-            (payment_received.amount() + spread_draw - spread_capture).max(0.0),
-            state.base_ccy,
-        );
-        let booked_shortfall = Money::new(
-            (current_interest_shortfall.amount() - spread_draw).max(0.0),
-            state.base_ccy,
-        );
-
         if let Some(res) = state.results.get_mut(tranche_id_str) {
-            if booked_cashflow.amount() > 0.0 {
-                res.cashflows.push((pay_date, booked_cashflow));
+            if payment_received.amount() > 0.0 {
+                res.cashflows.push((pay_date, payment_received));
             }
-            if booked_interest.amount() > 0.0 {
-                res.interest_flows.push((pay_date, booked_interest));
-                res.total_interest = res.total_interest.checked_add(booked_interest)?;
+            if interest_paid.amount() > 0.0 {
+                res.interest_flows.push((pay_date, interest_paid));
+                res.total_interest = res.total_interest.checked_add(interest_paid)?;
             }
-            if booked_principal.amount() > 0.0 {
-                res.principal_flows.push((pay_date, booked_principal));
-                res.total_principal = res.total_principal.checked_add(booked_principal)?;
+            if principal_payment.amount() > 0.0 {
+                res.principal_flows.push((pay_date, principal_payment));
+                res.total_principal = res.total_principal.checked_add(principal_payment)?;
             }
             // Record PIK (interest shortfall deferred to future periods)
-            if booked_shortfall.amount() > 0.0 {
-                res.pik_flows.push((pay_date, booked_shortfall));
-                res.total_pik = res.total_pik.checked_add(booked_shortfall)?;
+            if current_interest_shortfall.amount() > 0.0 {
+                res.pik_flows.push((pay_date, current_interest_shortfall));
+                res.total_pik = res.total_pik.checked_add(current_interest_shortfall)?;
             }
         }
 
@@ -2625,7 +2638,7 @@ fn simulate_period(
             existing_deferred
                 .checked_sub(deferred_repaid)
                 .unwrap_or(Money::new(0.0, state.base_ccy))
-                .checked_add(booked_shortfall)?
+                .checked_add(current_interest_shortfall)?
         };
         state
             .deferred_interest
@@ -2652,8 +2665,8 @@ fn simulate_period(
             } else {
                 after_principal
             };
-            if tranche.pik_enabled && booked_shortfall.amount() > 0.0 {
-                *current = after_principal.checked_add(booked_shortfall)?;
+            if tranche.pik_enabled && current_interest_shortfall.amount() > 0.0 {
+                *current = after_principal.checked_add(current_interest_shortfall)?;
             } else {
                 *current = after_principal;
             }
@@ -2693,6 +2706,7 @@ fn simulate_period(
         released_recoveries,
         is_reinvestment_active,
         &waterfall_result,
+        spread_net_capture,
     );
 
     Ok(())
@@ -2722,6 +2736,7 @@ fn debug_assert_cash_conserved(
     released_recoveries: Money,
     is_reinvestment_active: bool,
     waterfall_result: &WaterfallDistribution,
+    spread_net_capture: f64,
 ) {
     if !cfg!(debug_assertions) {
         return;
@@ -2731,7 +2746,8 @@ fn debug_assert_cash_conserved(
     // waterfall rounds to the currency's smallest unit per recipient.
     let tol = (total_cash_for_waterfall.amount().abs() * 1e-9).max(1.0);
 
-    // Identity 1: input to the waterfall == distributable pool cash.
+    // Identity 1: input to the waterfall == distributable pool cash, net of any
+    // cash diverted into (or supplied from) the excess-spread account.
     let expected_input = if is_reinvestment_active {
         pool_flows.interest.amount() + released_recoveries.amount()
     } else {
@@ -2739,7 +2755,7 @@ fn debug_assert_cash_conserved(
             + pool_flows.scheduled_principal.amount()
             + pool_flows.prepayment.amount()
             + released_recoveries.amount()
-    };
+    } - spread_net_capture;
     debug_assert!(
         (total_cash_for_waterfall.amount() - expected_input).abs() <= tol,
         "cash-conservation (input): waterfall received {} but distributable \
