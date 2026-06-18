@@ -301,3 +301,108 @@ mod discount_margin_tests {
         assert!(result.is_err(), "DM on a fixed-rate tranche must error");
     }
 }
+
+/// Break-even CDR for structured-credit tranches.
+mod breakeven_cdr_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        calculate_tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
+        TrancheCoupon, TrancheSeniority, TrancheStructure,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2026, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    /// 80% senior / 20% equity ABS, no prepayment, 40% recovery: the senior is
+    /// loss-remote until cumulative collateral loss exceeds the 20% subordination.
+    fn deal() -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-BE", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        sc
+    }
+
+    fn senior_writedown(sc: &StructuredCredit, mkt: &MarketContext, cdr: f64) -> f64 {
+        let mut d = sc.clone();
+        d.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
+        d.get_tranche_cashflows("SR", mkt, closing())
+            .unwrap()
+            .total_writedown
+            .amount()
+    }
+
+    #[test]
+    fn breakeven_cdr_brackets_first_senior_writedown() {
+        let sc = deal();
+        let mkt = market();
+        let be = calculate_tranche_breakeven_cdr(&sc, "SR", &mkt, closing()).unwrap();
+        assert!(
+            be > 0.0 && be < 1.0,
+            "break-even CDR should be interior, got {be}"
+        );
+        // Just above the break-even there is a writedown; just below there is not.
+        assert!(
+            senior_writedown(&sc, &mkt, be + 0.02) > 1.0,
+            "above break-even the senior must take a writedown"
+        );
+        assert!(
+            senior_writedown(&sc, &mkt, (be - 0.02).max(0.0)) <= 1.0,
+            "below break-even the senior must be loss-remote"
+        );
+    }
+}

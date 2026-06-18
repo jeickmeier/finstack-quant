@@ -138,6 +138,7 @@ pub use pricing::waterfall::WaterfallContext;
 // ============================================================================
 
 pub use metrics::{
+    calculate_tranche_breakeven_cdr,
     calculate_tranche_convexity,
     calculate_tranche_cs01,
     calculate_tranche_discount_margin,
