@@ -138,6 +138,7 @@ pub use pricing::waterfall::WaterfallContext;
 // ============================================================================
 
 pub use metrics::{
+    calculate_tranche_convexity,
     calculate_tranche_cs01,
     calculate_tranche_discount_margin,
     calculate_tranche_duration,
@@ -158,6 +159,7 @@ pub use metrics::{
     CloWasCalculator,
     CmbsDscrCalculator,
     CmbsLtvCalculator,
+    ConvexityCalculator,
     CprCalculator,
     Cs01Calculator,
     DirtyPriceCalculator,

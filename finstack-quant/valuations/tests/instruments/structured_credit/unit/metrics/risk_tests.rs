@@ -10,7 +10,8 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    calculate_tranche_cs01, calculate_tranche_duration, calculate_tranche_z_spread,
+    calculate_tranche_convexity, calculate_tranche_cs01, calculate_tranche_duration,
+    calculate_tranche_z_spread,
 };
 use time::Month;
 
@@ -121,6 +122,38 @@ fn test_cs01_negative_for_long_position() {
         cs01 < 0.0,
         "CS01 should be negative for a long position (wider spreads reduce PV), got {}",
         cs01
+    );
+}
+
+#[test]
+fn test_tranche_convexity_matches_analytic() {
+    let as_of = base_date();
+    let curve = flat_discount_curve(0.05);
+    let flows = sample_cashflows();
+
+    // Independent oracle: continuous-compounding convexity Σ(PV_i · t_i²) / PV.
+    let day_count = DayCount::Act365F;
+    let mut pv = 0.0;
+    let mut weighted_t2 = 0.0;
+    for (date, amount) in &flows {
+        let t = day_count
+            .year_fraction(as_of, *date, DayCountContext::default())
+            .unwrap();
+        let df = curve.df_between_dates(as_of, *date).unwrap();
+        let flow_pv = amount.amount() * df;
+        pv += flow_pv;
+        weighted_t2 += flow_pv * t * t;
+    }
+    let expected = weighted_t2 / pv;
+
+    let convexity = calculate_tranche_convexity(&flows, &curve, as_of).unwrap();
+    assert!(
+        convexity > 0.0,
+        "convexity should be positive, got {convexity}"
+    );
+    assert!(
+        (convexity - expected).abs() < 1e-3,
+        "convexity {convexity} should match analytic {expected}"
     );
 }
 
