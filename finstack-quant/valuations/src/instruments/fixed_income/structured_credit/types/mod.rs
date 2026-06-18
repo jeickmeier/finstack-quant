@@ -63,8 +63,8 @@ pub(crate) use waterfall::DiversionRecord;
 pub use waterfall::{
     AfcSpec, AllocationMode, CoverageTestType, ExcessSpreadSpec, ManagementFeeType,
     PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention,
-    Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
-    WaterfallWorkspace,
+    StepDownSpec, Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules,
+    WaterfallTier, WaterfallWorkspace,
 };
 
 // Result types

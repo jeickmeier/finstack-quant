@@ -143,6 +143,10 @@ pub struct WaterfallRules {
     /// Excess-spread (spread-account) capture and draw.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub excess_spread: Option<ExcessSpreadSpec>,
+    /// Step-down: switch principal allocation to pro-rata after a date when the
+    /// step-down trigger passes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub step_down: Option<StepDownSpec>,
 }
 
 /// Available-funds cap (net-WAC cap) specification.
@@ -170,6 +174,24 @@ pub struct ExcessSpreadSpec {
     /// `None`, the unused balance is always released to equity.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trap_loss_pct: Option<f64>,
+}
+
+/// Step-down specification for senior/subordinate principal allocation.
+///
+/// Principal is paid sequentially (senior first) until the deal seasons past
+/// `step_down_date`; from then on, *if* cumulative losses remain below
+/// `max_cumulative_loss_pct` (the step-down trigger), principal switches to
+/// pro-rata across the debt tranches, releasing subordination to the juniors.
+/// While the loss trigger is breached the deal reverts to sequential, so the
+/// switch is re-evaluated every period (non-sticky).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct StepDownSpec {
+    /// Earliest date principal may switch to pro-rata.
+    #[schemars(with = "String")]
+    pub step_down_date: Date,
+    /// Cumulative-loss fraction (decimal, of the original pool balance) at or
+    /// above which the step-down trigger fails and principal stays sequential.
+    pub max_cumulative_loss_pct: f64,
 }
 
 /// Allocation mode within a tier

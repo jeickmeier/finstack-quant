@@ -2488,6 +2488,22 @@ fn simulate_period(
     }
 
     // ── Step 4: Execute Waterfall on post-loss balances ──────────────
+    // Per-period step-down: switch principal to pro-rata once the deal has
+    // seasoned past the step-down date with cumulative losses below the trigger.
+    // Borrowed (zero-cost) when no step-down rule applies.
+    let cumulative_loss_fraction = if state.total_pool_balance.amount() > 0.0 {
+        state.cumulative_expected_loss / state.total_pool_balance.amount()
+    } else {
+        0.0
+    };
+    let period_waterfall =
+        crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_step_down(
+            waterfall,
+            instrument.waterfall_rules.as_ref(),
+            pay_date,
+            cumulative_loss_fraction,
+        );
+
     let waterfall_context =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::WaterfallContext {
             available_cash: total_cash_for_waterfall,
@@ -2505,7 +2521,7 @@ fn simulate_period(
 
     let waterfall_result =
         crate::instruments::fixed_income::structured_credit::pricing::waterfall::execute_waterfall(
-            waterfall,
+            &period_waterfall,
             state.tranches,
             state.pool,
             waterfall_context,

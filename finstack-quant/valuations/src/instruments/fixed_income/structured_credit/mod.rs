@@ -83,6 +83,7 @@ pub use types::{
     ReinvestmentPeriod,
     RepLine,
     RoundingConvention,
+    StepDownSpec,
     StochasticDefaultSpec,
     StochasticPrepaySpec,
     // Main instrument
@@ -125,7 +126,7 @@ pub use utils::{
 // ============================================================================
 
 pub use pricing::{
-    execute_waterfall, execute_waterfall_with_workspace, generate_cashflows,
+    apply_step_down, execute_waterfall, execute_waterfall_with_workspace, generate_cashflows,
     generate_tranche_cashflows, resolve_waterfall, run_simulation,
 };
 

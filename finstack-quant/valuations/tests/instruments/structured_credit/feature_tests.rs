@@ -450,6 +450,7 @@ mod afc_tests {
                     capped_tranches: vec!["SR".to_string()],
                 }),
                 excess_spread: None,
+                step_down: None,
             });
         }
         sc
@@ -572,6 +573,7 @@ mod excess_spread_tests {
             sc.waterfall_rules = Some(WaterfallRules {
                 afc: None,
                 excess_spread: Some(es),
+                step_down: None,
             });
         }
         sc
@@ -713,6 +715,7 @@ mod excess_spread_tests {
                     target_balance: Money::new(1_000_000.0, Currency::USD),
                     trap_loss_pct: None,
                 }),
+                step_down: None,
             });
         }
         sc
@@ -745,6 +748,169 @@ mod excess_spread_tests {
             "covered shortfall must reduce deferred interest (with={}, base={})",
             sr_with.total_pik.amount(),
             sr_base.total_pik.amount()
+        );
+    }
+}
+
+/// Step-down: trigger-gated switch of principal allocation to pro-rata.
+mod step_down_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        run_simulation, AssetPool, DealType, PoolAsset, StepDownSpec, StructuredCredit, Tranche,
+        TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn step_date() -> Date {
+        Date::from_calendar_date(2025, Month::January, 1).unwrap() // closing + 1y
+    }
+
+    fn cutoff() -> Date {
+        Date::from_calendar_date(2026, Month::July, 1).unwrap() // mid-deal
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2029, Month::January, 1).unwrap() // 5y
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (10.0, 0.80)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    /// 70/20/10 senior/sub/equity ABS with a 20% CPR throwing off prepayment
+    /// principal each period.
+    fn deal(step_down: Option<StepDownSpec>, cdr: f64) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.06,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                70.0,
+                TrancheSeniority::Senior,
+                Money::new(700_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.04 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "SUB",
+                70.0,
+                90.0,
+                TrancheSeniority::Mezzanine,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                90.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(100_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-SD", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if let Some(sd) = step_down {
+            sc.waterfall_rules = Some(WaterfallRules {
+                afc: None,
+                excess_spread: None,
+                step_down: Some(sd),
+            });
+        }
+        sc
+    }
+
+    /// Principal paid to the subordinate tranche before `cutoff`.
+    fn sub_principal_before(sc: &StructuredCredit, cutoff: Date) -> f64 {
+        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let sub = results.get("SUB").expect("SUB results");
+        sub.principal_flows
+            .iter()
+            .filter(|(d, _)| *d < cutoff)
+            .map(|(_, m)| m.amount())
+            .sum()
+    }
+
+    #[test]
+    fn step_down_switches_principal_to_pro_rata() {
+        // CDR 0: losses stay below the trigger, so after the step-down date
+        // principal is pro-rata and the sub receives principal earlier than
+        // under the always-sequential (no step-down) deal.
+        let with_sd = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                max_cumulative_loss_pct: 0.05,
+            }),
+            0.0,
+        );
+        let sequential = deal(None, 0.0);
+        let sub_with = sub_principal_before(&with_sd, cutoff());
+        let sub_seq = sub_principal_before(&sequential, cutoff());
+        assert!(
+            sub_with > sub_seq + 1.0,
+            "step-down (pro-rata) must pay the sub principal earlier than sequential \
+             (with={sub_with}, sequential={sub_seq})"
+        );
+    }
+
+    #[test]
+    fn breached_loss_trigger_stays_sequential() {
+        // Same CDR; only the loss threshold differs. The low threshold is
+        // breached by realized losses, so principal stays sequential and the sub
+        // gets less early principal than the passing (pro-rata) case.
+        let passing = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                max_cumulative_loss_pct: 0.50,
+            }),
+            0.02,
+        );
+        let breached = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                max_cumulative_loss_pct: 0.001,
+            }),
+            0.02,
+        );
+        let sub_pass = sub_principal_before(&passing, cutoff());
+        let sub_breach = sub_principal_before(&breached, cutoff());
+        assert!(
+            sub_pass > sub_breach + 1.0,
+            "a breached step-down trigger must keep principal sequential, paying the \
+             sub less early (passing={sub_pass}, breached={sub_breach})"
         );
     }
 }

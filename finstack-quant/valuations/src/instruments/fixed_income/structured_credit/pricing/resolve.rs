@@ -11,8 +11,10 @@
 //! revolving phases) will call this per period with the evolving deal state.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    PaymentCalculation, Waterfall, WaterfallRules,
+    AllocationMode, PaymentCalculation, PaymentType, Waterfall, WaterfallRules,
 };
+use finstack_quant_core::dates::Date;
+use std::borrow::Cow;
 
 /// Resolve `base` into the concrete waterfall for a deal, applying any rules.
 ///
@@ -66,4 +68,37 @@ pub fn resolve_waterfall(
     }
 
     waterfall
+}
+
+/// Apply per-period step-down to the waterfall's principal allocation.
+///
+/// Returns `base` unchanged (borrowed) unless a `StepDownSpec` is configured
+/// and the step-down condition holds this period — on or after the step-down
+/// date with cumulative losses below the trigger — in which case it returns a
+/// copy with every principal tier switched to pro-rata allocation, releasing
+/// subordination to the junior tranches. While the loss trigger is breached the
+/// deal reverts to sequential (the switch is re-evaluated every period).
+pub fn apply_step_down<'w>(
+    base: &'w Waterfall,
+    rules: Option<&WaterfallRules>,
+    date: Date,
+    cumulative_loss_fraction: f64,
+) -> Cow<'w, Waterfall> {
+    let Some(sd) = rules.and_then(|r| r.step_down.as_ref()) else {
+        return Cow::Borrowed(base);
+    };
+
+    let stepped_down =
+        date >= sd.step_down_date && cumulative_loss_fraction < sd.max_cumulative_loss_pct;
+    if !stepped_down {
+        return Cow::Borrowed(base);
+    }
+
+    let mut waterfall = base.clone();
+    for tier in &mut waterfall.tiers {
+        if tier.payment_type == PaymentType::Principal {
+            tier.allocation_mode = AllocationMode::ProRata;
+        }
+    }
+    Cow::Owned(waterfall)
 }
