@@ -452,6 +452,24 @@ impl PoolFlowSource for StochasticPathFlowSource {
 
 /// Release the unused spread-account balance to equity at deal end.
 ///
+/// Record a residual principal distribution to a tranche at deal end: appends
+/// the flow to the tranche's cashflows and principal flows and bumps its
+/// `total_principal`. No-op if the tranche has no results entry. Shared by the
+/// excess-spread and controlled-accumulation terminal sweeps.
+fn append_residual_principal(
+    state: &mut SimulationState<'_>,
+    tranche_id: &str,
+    amount: Money,
+    date: Date,
+) -> Result<()> {
+    if let Some(res) = state.results.get_mut(tranche_id) {
+        res.cashflows.push((date, amount));
+        res.principal_flows.push((date, amount));
+        res.total_principal = res.total_principal.checked_add(amount)?;
+    }
+    Ok(())
+}
+
 /// If the deal configures `excess_spread` and the account holds a positive
 /// balance after the final period, that balance is distributed to the equity
 /// tranche as a residual principal flow — unless a cumulative-loss trap trigger
@@ -498,11 +516,7 @@ fn release_spread_account(
         .map(|t| t.id.as_str().to_string());
     if let Some(eq_id) = equity_id {
         let release_date = state.prev_date.unwrap_or(state.closing_date);
-        if let Some(res) = state.results.get_mut(&eq_id) {
-            res.cashflows.push((release_date, balance));
-            res.principal_flows.push((release_date, balance));
-            res.total_principal = res.total_principal.checked_add(balance)?;
-        }
+        append_residual_principal(state, &eq_id, balance, release_date)?;
     }
     state.spread_account = Money::new(0.0, state.base_ccy);
     Ok(())
@@ -554,12 +568,7 @@ fn release_principal_funding_account(
         state
             .tranche_balances
             .insert(id.clone(), Money::new(balance - pay, state.base_ccy));
-        if let Some(res) = state.results.get_mut(&id) {
-            let amount = Money::new(pay, state.base_ccy);
-            res.cashflows.push((release_date, amount));
-            res.principal_flows.push((release_date, amount));
-            res.total_principal = res.total_principal.checked_add(amount)?;
-        }
+        append_residual_principal(state, &id, Money::new(pay, state.base_ccy), release_date)?;
         remaining -= pay;
     }
     state.principal_funding_account = Money::new(0.0, state.base_ccy);
