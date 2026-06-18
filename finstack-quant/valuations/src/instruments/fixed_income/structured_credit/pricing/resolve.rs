@@ -78,7 +78,7 @@ pub fn resolve_waterfall(
 /// All fields are computed on the *current* period's balances. See
 /// [`StepDownTrigger`] for the exact conventions of each.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct StepDownMetrics {
+pub(crate) struct StepDownMetrics {
     /// Cumulative loss as a fraction of the original pool balance.
     pub cumulative_loss_fraction: f64,
     /// Overcollateralization ratio: current pool ÷ rated (non-equity) notes.
@@ -115,7 +115,7 @@ fn step_down_active(spec: &StepDownSpec, date: Date, metrics: &StepDownMetrics) 
 /// which case it returns a copy with every principal tier switched to pro-rata
 /// allocation, releasing subordination to the junior tranches. While any
 /// trigger is breached the deal reverts to sequential (re-evaluated each period).
-pub fn apply_step_down<'w>(
+pub(crate) fn apply_step_down<'w>(
     base: &'w Waterfall,
     rules: Option<&WaterfallRules>,
     date: Date,
@@ -160,7 +160,7 @@ pub fn apply_step_down<'w>(
 /// where `senior_prorata_share` is the senior's pro-rata share by current
 /// balance. With `u = 1` (no scheduled principal, e.g. a bullet pool) this
 /// reduces to the pure schedule share; with `u = 0` it is fully pro-rata.
-pub fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
+pub(crate) fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
     base: &'w Waterfall,
     rules: Option<&WaterfallRules>,
     months_from_closing: u32,
@@ -225,7 +225,7 @@ pub fn apply_shifting_interest<'w, S: std::hash::BuildHasher>(
 /// Pool principal itself is withheld from the waterfall separately (held in the
 /// accumulation funding account) and released as a bullet at the accumulation
 /// end. Always returns an owned waterfall (only called while accumulating).
-pub fn apply_accumulation_lockout<'w, S: std::hash::BuildHasher>(
+pub(crate) fn apply_accumulation_lockout<'w, S: std::hash::BuildHasher>(
     base: &'w Waterfall,
     tranche_balances: &HashMap<String, Money, S>,
 ) -> Cow<'w, Waterfall> {

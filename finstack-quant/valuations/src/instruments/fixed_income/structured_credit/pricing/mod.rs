@@ -14,9 +14,7 @@ pub(crate) mod simulation_engine;
 pub(crate) mod stochastic;
 pub(crate) mod waterfall;
 
-pub use resolve::{
-    apply_accumulation_lockout, apply_shifting_interest, apply_step_down, resolve_waterfall,
-};
+pub use resolve::resolve_waterfall;
 pub use waterfall::{execute_waterfall, execute_waterfall_with_workspace};
 
 use crate::cashflow::traits::DatedFlows;

@@ -131,9 +131,8 @@ pub use utils::{
 // ============================================================================
 
 pub use pricing::{
-    apply_accumulation_lockout, apply_shifting_interest, apply_step_down, execute_waterfall,
-    execute_waterfall_with_workspace, generate_cashflows, generate_tranche_cashflows,
-    resolve_waterfall, run_simulation,
+    execute_waterfall, execute_waterfall_with_workspace, generate_cashflows,
+    generate_tranche_cashflows, resolve_waterfall, run_simulation,
 };
 
 pub use pricing::coverage_tests::{CoverageTest, TestContext, TestResult};
