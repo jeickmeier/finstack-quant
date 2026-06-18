@@ -769,8 +769,9 @@ mod step_down_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-        run_simulation, AssetPool, DealType, PoolAsset, StepDownSpec, StructuredCredit, Tranche,
-        TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
+        run_simulation, AssetPool, DealType, PoolAsset, StepDownSpec, StepDownTrigger,
+        StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
+        WaterfallRules,
     };
     use time::Month;
 
@@ -880,7 +881,7 @@ mod step_down_tests {
         let with_sd = deal(
             Some(StepDownSpec {
                 step_down_date: step_date(),
-                max_cumulative_loss_pct: 0.05,
+                triggers: vec![StepDownTrigger::MaxCumulativeLoss(0.05)],
             }),
             0.0,
         );
@@ -902,14 +903,14 @@ mod step_down_tests {
         let passing = deal(
             Some(StepDownSpec {
                 step_down_date: step_date(),
-                max_cumulative_loss_pct: 0.50,
+                triggers: vec![StepDownTrigger::MaxCumulativeLoss(0.50)],
             }),
             0.02,
         );
         let breached = deal(
             Some(StepDownSpec {
                 step_down_date: step_date(),
-                max_cumulative_loss_pct: 0.001,
+                triggers: vec![StepDownTrigger::MaxCumulativeLoss(0.001)],
             }),
             0.02,
         );
@@ -919,6 +920,88 @@ mod step_down_tests {
             sub_pass > sub_breach + 1.0,
             "a breached step-down trigger must keep principal sequential, paying the \
              sub less early (passing={sub_pass}, breached={sub_breach})"
+        );
+    }
+
+    #[test]
+    fn oc_ratio_trigger_gates_step_down() {
+        // CDR 0 (no losses). A reachable minimum OC ratio (the 70/20 rated notes
+        // start at pool/notes = 1.11) lets the deal step down to pro-rata; an
+        // unreachable OC ratio keeps it sequential, so the sub gets less early
+        // principal.
+        let passing = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                triggers: vec![StepDownTrigger::MinOcRatio(1.05)],
+            }),
+            0.0,
+        );
+        let blocked = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                triggers: vec![StepDownTrigger::MinOcRatio(10.0)],
+            }),
+            0.0,
+        );
+        let sub_pass = sub_principal_before(&passing, cutoff());
+        let sub_block = sub_principal_before(&blocked, cutoff());
+        assert!(
+            sub_pass > sub_block + 1.0,
+            "a passing OC-ratio trigger must step down (pro-rata, sub paid earlier) \
+             while an unreachable one stays sequential (passing={sub_pass}, blocked={sub_block})"
+        );
+    }
+
+    #[test]
+    fn credit_enhancement_trigger_gates_step_down() {
+        // CDR 0. Senior credit enhancement (pool minus senior note, over pool)
+        // starts at 0.30. A reachable minimum lets the deal step down; an
+        // unreachable one (0.99) keeps it sequential.
+        let passing = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                triggers: vec![StepDownTrigger::MinCreditEnhancement(0.10)],
+            }),
+            0.0,
+        );
+        let blocked = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                triggers: vec![StepDownTrigger::MinCreditEnhancement(0.99)],
+            }),
+            0.0,
+        );
+        let sub_pass = sub_principal_before(&passing, cutoff());
+        let sub_block = sub_principal_before(&blocked, cutoff());
+        assert!(
+            sub_pass > sub_block + 1.0,
+            "a passing credit-enhancement trigger must step down while an unreachable \
+             one stays sequential (passing={sub_pass}, blocked={sub_block})"
+        );
+    }
+
+    #[test]
+    fn all_triggers_must_pass_to_step_down() {
+        // Both triggers configured: a reachable loss bound AND an unreachable OC
+        // ratio. Because every trigger must pass, the unreachable OC blocks the
+        // step-down even though the loss trigger passes — same as fully blocked.
+        let one_unreachable = deal(
+            Some(StepDownSpec {
+                step_down_date: step_date(),
+                triggers: vec![
+                    StepDownTrigger::MaxCumulativeLoss(0.50),
+                    StepDownTrigger::MinOcRatio(10.0),
+                ],
+            }),
+            0.0,
+        );
+        let sequential = deal(None, 0.0);
+        let sub_gated = sub_principal_before(&one_unreachable, cutoff());
+        let sub_seq = sub_principal_before(&sequential, cutoff());
+        assert!(
+            (sub_gated - sub_seq).abs() < 1.0,
+            "one failing trigger must block the step-down entirely \
+             (gated={sub_gated}, sequential={sub_seq})"
         );
     }
 }

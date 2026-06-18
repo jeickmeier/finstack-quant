@@ -17838,23 +17838,72 @@
               "type": "object"
             },
             "StepDownSpec": {
-              "description": "Step-down specification for senior/subordinate principal allocation.\n\nPrincipal is paid sequentially (senior first) until the deal seasons past\n`step_down_date`; from then on, *if* cumulative losses remain below\n`max_cumulative_loss_pct` (the step-down trigger), principal switches to\npro-rata across the debt tranches, releasing subordination to the juniors.\nWhile the loss trigger is breached the deal reverts to sequential, so the\nswitch is re-evaluated every period (non-sticky).",
+              "description": "Step-down specification for senior/subordinate principal allocation.\n\nPrincipal is paid sequentially (senior first) until the deal seasons past\n`step_down_date`; from then on, *if* every configured [`StepDownTrigger`]\npasses, principal switches to pro-rata across the debt tranches, releasing\nsubordination to the juniors. While any trigger is breached the deal reverts\nto sequential, so the switch is re-evaluated every period (non-sticky). An\nempty `triggers` list steps down purely on the date.",
               "properties": {
-                "max_cumulative_loss_pct": {
-                  "description": "Cumulative-loss fraction (decimal, of the original pool balance) at or\nabove which the step-down trigger fails and principal stays sequential.",
-                  "format": "double",
-                  "type": "number"
-                },
                 "step_down_date": {
                   "description": "Earliest date principal may switch to pro-rata.",
                   "type": "string"
+                },
+                "triggers": {
+                  "description": "Performance triggers; all must pass for the step-down to take effect.",
+                  "items": {
+                    "$ref": "#/$defs/StepDownTrigger"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
                 "step_down_date",
-                "max_cumulative_loss_pct"
+                "triggers"
               ],
               "type": "object"
+            },
+            "StepDownTrigger": {
+              "description": "A single step-down performance trigger.\n\nEach variant is a per-period *health check* the deal must pass (in addition\nto seasoning past the step-down date) for principal to switch to pro-rata.\nAll configured triggers must pass simultaneously; while any is breached the\ndeal reverts to sequential, so the switch is re-evaluated every period.\n\nConventions (all evaluated on *current* balances each period):\n- cumulative loss is a fraction of the *original* pool balance;\n- the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;\n- credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,\n  where the senior note is the most-senior tranche by payment priority.\n\nDelinquency triggers are intentionally absent: the simulation engine models\ndefaults and recoveries but not a separate delinquency state, so there is no\ndelinquency rate to test against.",
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "Passes while cumulative losses (fraction of the original pool) are at or\nbelow this level.",
+                  "properties": {
+                    "MaxCumulativeLoss": {
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "MaxCumulativeLoss"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "Passes while the overcollateralization ratio (current pool ÷ rated note\nbalance) is at or above this level.",
+                  "properties": {
+                    "MinOcRatio": {
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "MinOcRatio"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "Passes while senior credit enhancement (`(pool − senior note) ÷ pool`) is\nat or above this level.",
+                  "properties": {
+                    "MinCreditEnhancement": {
+                      "format": "double",
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "MinCreditEnhancement"
+                  ],
+                  "type": "object"
+                }
+              ]
             },
             "StepUpCouponSpec": {
               "additionalProperties": false,

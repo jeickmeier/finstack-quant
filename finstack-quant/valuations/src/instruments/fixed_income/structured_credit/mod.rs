@@ -87,6 +87,7 @@ pub use types::{
     ShiftingInterestSpec,
     ShiftingInterestStep,
     StepDownSpec,
+    StepDownTrigger,
     StochasticDefaultSpec,
     StochasticPrepaySpec,
     // Main instrument

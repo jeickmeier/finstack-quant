@@ -185,22 +185,51 @@ pub struct ExcessSpreadSpec {
     pub trap_loss_pct: Option<f64>,
 }
 
+/// A single step-down performance trigger.
+///
+/// Each variant is a per-period *health check* the deal must pass (in addition
+/// to seasoning past the step-down date) for principal to switch to pro-rata.
+/// All configured triggers must pass simultaneously; while any is breached the
+/// deal reverts to sequential, so the switch is re-evaluated every period.
+///
+/// Conventions (all evaluated on *current* balances each period):
+/// - cumulative loss is a fraction of the *original* pool balance;
+/// - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
+/// - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
+///   where the senior note is the most-senior tranche by payment priority.
+///
+/// Delinquency triggers are intentionally absent: the simulation engine models
+/// defaults and recoveries but not a separate delinquency state, so there is no
+/// delinquency rate to test against.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[non_exhaustive]
+pub enum StepDownTrigger {
+    /// Passes while cumulative losses (fraction of the original pool) are at or
+    /// below this level.
+    MaxCumulativeLoss(f64),
+    /// Passes while the overcollateralization ratio (current pool ÷ rated note
+    /// balance) is at or above this level.
+    MinOcRatio(f64),
+    /// Passes while senior credit enhancement (`(pool − senior note) ÷ pool`) is
+    /// at or above this level.
+    MinCreditEnhancement(f64),
+}
+
 /// Step-down specification for senior/subordinate principal allocation.
 ///
 /// Principal is paid sequentially (senior first) until the deal seasons past
-/// `step_down_date`; from then on, *if* cumulative losses remain below
-/// `max_cumulative_loss_pct` (the step-down trigger), principal switches to
-/// pro-rata across the debt tranches, releasing subordination to the juniors.
-/// While the loss trigger is breached the deal reverts to sequential, so the
-/// switch is re-evaluated every period (non-sticky).
+/// `step_down_date`; from then on, *if* every configured [`StepDownTrigger`]
+/// passes, principal switches to pro-rata across the debt tranches, releasing
+/// subordination to the juniors. While any trigger is breached the deal reverts
+/// to sequential, so the switch is re-evaluated every period (non-sticky). An
+/// empty `triggers` list steps down purely on the date.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct StepDownSpec {
     /// Earliest date principal may switch to pro-rata.
     #[schemars(with = "String")]
     pub step_down_date: Date,
-    /// Cumulative-loss fraction (decimal, of the original pool balance) at or
-    /// above which the step-down trigger fails and principal stays sequential.
-    pub max_cumulative_loss_pct: f64,
+    /// Performance triggers; all must pass for the step-down to take effect.
+    pub triggers: Vec<StepDownTrigger>,
 }
 
 /// One step of a shifting-interest schedule: the senior's share of principal

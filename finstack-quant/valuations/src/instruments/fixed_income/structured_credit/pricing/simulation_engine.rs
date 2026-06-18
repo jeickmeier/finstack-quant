@@ -2070,6 +2070,57 @@ pub(crate) struct SimulationState<'a> {
     spread_account: Money,
 }
 
+/// Deal-health metrics for this period's step-down trigger evaluation.
+///
+/// Computes, on current balances: cumulative loss (fraction of the *original*
+/// pool), the overcollateralization ratio (pool ÷ rated non-equity notes), and
+/// senior credit enhancement (`(pool − senior note) ÷ pool`, the senior note
+/// being the lowest payment-priority tranche). See [`StepDownTrigger`].
+///
+/// [`StepDownTrigger`]: crate::instruments::fixed_income::structured_credit::StepDownTrigger
+fn step_down_metrics(
+    state: &SimulationState,
+) -> crate::instruments::fixed_income::structured_credit::pricing::resolve::StepDownMetrics {
+    let pool = state.pool_outstanding.amount();
+    let cumulative_loss_fraction = if state.total_pool_balance.amount() > 0.0 {
+        state.cumulative_expected_loss / state.total_pool_balance.amount()
+    } else {
+        0.0
+    };
+    let rated_note_balance: f64 = state
+        .tranches
+        .tranches
+        .iter()
+        .filter(|t| t.seniority != TrancheSeniority::Equity)
+        .map(|t| {
+            state
+                .tranche_balances
+                .get(t.id.as_str())
+                .map_or(0.0, |m| m.amount())
+        })
+        .sum();
+    let senior_note_balance = state
+        .tranches
+        .tranches
+        .iter()
+        .min_by_key(|t| t.payment_priority)
+        .and_then(|t| state.tranche_balances.get(t.id.as_str()))
+        .map_or(0.0, |m| m.amount());
+    crate::instruments::fixed_income::structured_credit::pricing::resolve::StepDownMetrics {
+        cumulative_loss_fraction,
+        oc_ratio: if rated_note_balance > 0.0 {
+            pool / rated_note_balance
+        } else {
+            f64::INFINITY
+        },
+        credit_enhancement: if pool > 0.0 {
+            (pool - senior_note_balance) / pool
+        } else {
+            0.0
+        },
+    }
+}
+
 impl<'a> SimulationState<'a> {
     fn new(
         pool: &'a AssetPool,
@@ -2606,11 +2657,6 @@ fn simulate_period(
     // Per-period step-down: switch principal to pro-rata once the deal has
     // seasoned past the step-down date with cumulative losses below the trigger.
     // Borrowed (zero-cost) when no step-down rule applies.
-    let cumulative_loss_fraction = if state.total_pool_balance.amount() > 0.0 {
-        state.cumulative_expected_loss / state.total_pool_balance.amount()
-    } else {
-        0.0
-    };
     let rules = instrument.waterfall_rules.as_ref();
     // Shifting interest and step-down both govern principal allocation; shifting
     // interest takes precedence when both are configured.
@@ -2622,11 +2668,9 @@ fn simulate_period(
             months_from_closing,
         )
     } else {
+        let metrics = step_down_metrics(state);
         crate::instruments::fixed_income::structured_credit::pricing::resolve::apply_step_down(
-            waterfall,
-            rules,
-            pay_date,
-            cumulative_loss_fraction,
+            waterfall, rules, pay_date, &metrics,
         )
     };
 

@@ -11,8 +11,8 @@
 //! revolving phases) will call this per period with the evolving deal state.
 
 use crate::instruments::fixed_income::structured_credit::types::{
-    AllocationMode, PaymentCalculation, PaymentType, Recipient, ShiftingInterestStep, Waterfall,
-    WaterfallRules,
+    AllocationMode, PaymentCalculation, PaymentType, Recipient, ShiftingInterestStep, StepDownSpec,
+    StepDownTrigger, Waterfall, WaterfallRules,
 };
 use finstack_quant_core::dates::Date;
 use std::borrow::Cow;
@@ -71,27 +71,59 @@ pub fn resolve_waterfall(
     waterfall
 }
 
+/// Per-period deal-health metrics evaluated against [`StepDownTrigger`]s.
+///
+/// All fields are computed on the *current* period's balances. See
+/// [`StepDownTrigger`] for the exact conventions of each.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StepDownMetrics {
+    /// Cumulative loss as a fraction of the original pool balance.
+    pub cumulative_loss_fraction: f64,
+    /// Overcollateralization ratio: current pool ÷ rated (non-equity) notes.
+    pub oc_ratio: f64,
+    /// Senior credit enhancement: `(pool − senior note) ÷ pool`.
+    pub credit_enhancement: f64,
+}
+
+/// Whether a single trigger passes given this period's metrics.
+fn trigger_passes(trigger: &StepDownTrigger, metrics: &StepDownMetrics) -> bool {
+    match trigger {
+        StepDownTrigger::MaxCumulativeLoss(max) => metrics.cumulative_loss_fraction <= *max,
+        StepDownTrigger::MinOcRatio(min) => metrics.oc_ratio >= *min,
+        StepDownTrigger::MinCreditEnhancement(min) => metrics.credit_enhancement >= *min,
+    }
+}
+
+/// Whether the step-down condition holds this period: seasoned past the
+/// step-down date and every configured trigger passing (vacuously true for an
+/// empty trigger list).
+fn step_down_active(spec: &StepDownSpec, date: Date, metrics: &StepDownMetrics) -> bool {
+    date >= spec.step_down_date
+        && spec
+            .triggers
+            .iter()
+            .all(|trigger| trigger_passes(trigger, metrics))
+}
+
 /// Apply per-period step-down to the waterfall's principal allocation.
 ///
 /// Returns `base` unchanged (borrowed) unless a `StepDownSpec` is configured
 /// and the step-down condition holds this period — on or after the step-down
-/// date with cumulative losses below the trigger — in which case it returns a
-/// copy with every principal tier switched to pro-rata allocation, releasing
-/// subordination to the junior tranches. While the loss trigger is breached the
-/// deal reverts to sequential (the switch is re-evaluated every period).
+/// date with every [`StepDownTrigger`] passing for the given `metrics` — in
+/// which case it returns a copy with every principal tier switched to pro-rata
+/// allocation, releasing subordination to the junior tranches. While any
+/// trigger is breached the deal reverts to sequential (re-evaluated each period).
 pub fn apply_step_down<'w>(
     base: &'w Waterfall,
     rules: Option<&WaterfallRules>,
     date: Date,
-    cumulative_loss_fraction: f64,
+    metrics: &StepDownMetrics,
 ) -> Cow<'w, Waterfall> {
     let Some(sd) = rules.and_then(|r| r.step_down.as_ref()) else {
         return Cow::Borrowed(base);
     };
 
-    let stepped_down =
-        date >= sd.step_down_date && cumulative_loss_fraction < sd.max_cumulative_loss_pct;
-    if !stepped_down {
+    if !step_down_active(sd, date, metrics) {
         return Cow::Borrowed(base);
     }
 
