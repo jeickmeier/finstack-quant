@@ -438,15 +438,19 @@ pub fn calculate_tranche_cs01(
     Ok(bumped_pv.total() - base_pv.total())
 }
 
-/// Calculate the discount margin (DM) for a floating-rate tranche.
+/// Calculate the discount margin to price (DM) for a floating-rate tranche.
 ///
-/// The discount margin is the additive spread (returned in decimal;
-/// `0.01` = 100 bps) applied to the tranche's quoted floating spread such that
-/// repricing the tranche's projected cashflows on the deal's discount curve
-/// reproduces `target_pv`. This mirrors the full-reprice term-loan DM
-/// convention ([`crate::instruments::fixed_income::term_loan`]): the spread bump
-/// flows through coupon projection, so the result is consistent with the
+/// The discount margin is the **absolute** constant spread (returned in decimal;
+/// `0.01` = 100 bps) over the tranche's reference index such that projecting the
+/// tranche's floating coupon at that margin and repricing on the deal's discount
+/// curve reproduces `target_pv`. Following the full-reprice convention, the
+/// margin flows through coupon projection, so the result is consistent with the
 /// tranche's actual cashflow structure rather than a pure discounting spread.
+///
+/// Unlike an *incremental* spread to the quoted coupon, this is the total
+/// margin-to-price: a `target_pv` equal to the tranche's own base PV returns the
+/// tranche's quoted margin; a richer (higher) target returns a wider margin and
+/// a cheaper (lower) target a tighter one.
 ///
 /// # Arguments
 ///
@@ -454,13 +458,11 @@ pub fn calculate_tranche_cs01(
 /// * `tranche_id` - Identifier of the floating-rate tranche to solve for.
 /// * `context` - Market context (discount curve plus any index forwards).
 /// * `as_of` - Valuation date.
-/// * `target_pv` - The observed/target present value to match.
+/// * `target_pv` - The observed/target present value (price) to match.
 ///
 /// # Returns
 ///
-/// Discount margin in decimal units (e.g. `0.0125` = 125 bps). A `target_pv`
-/// equal to the base PV returns `~0`; a richer target returns a positive
-/// (wider) margin and a cheaper target a negative (tighter) one.
+/// Discount margin in decimal units (e.g. `0.0125` = 125 bps).
 ///
 /// # Errors
 ///
@@ -473,6 +475,8 @@ pub fn calculate_tranche_discount_margin(
     as_of: Date,
     target_pv: Money,
 ) -> Result<f64> {
+    use rust_decimal::prelude::ToPrimitive;
+
     let tranche = deal
         .tranches
         .tranches
@@ -484,20 +488,23 @@ pub fn calculate_tranche_discount_margin(
             })
         })?;
 
-    if !matches!(tranche.coupon, TrancheCoupon::Floating(_)) {
+    let TrancheCoupon::Floating(spec) = &tranche.coupon else {
         return Err(finstack_quant_core::Error::Validation(format!(
             "DiscountMargin is only defined for floating-rate tranches; '{tranche_id}' is fixed-rate"
         )));
-    }
+    };
+    // Quoted margin (bp), used as the solver's starting point.
+    let quoted_bp = spec.spread_bp.to_f64().unwrap_or(0.0);
 
     let target = target_pv.amount();
 
-    // Objective: PV(tranche with spread bumped by `dm_bp`) - target_pv.
-    // NAN on pricing/conversion failure so the solver does not converge to a
-    // spurious root on artificial values.
+    // Objective: PV(tranche whose margin is *set* to `dm_bp`) - target_pv. The
+    // margin is set (not bumped), so the solved value is the absolute discount
+    // margin to price. NAN on pricing/conversion failure so the solver does not
+    // converge to a spurious root on artificial values.
     let objective = |dm_bp: f64| -> f64 {
-        let mut bumped = deal.clone();
-        if let Some(t) = bumped
+        let mut repriced = deal.clone();
+        if let Some(t) = repriced
             .tranches
             .tranches
             .iter_mut()
@@ -505,12 +512,12 @@ pub fn calculate_tranche_discount_margin(
         {
             if let TrancheCoupon::Floating(spec) = &mut t.coupon {
                 match rust_decimal::Decimal::try_from(dm_bp) {
-                    Ok(d) => spec.spread_bp += d,
+                    Ok(d) => spec.spread_bp = d,
                     Err(_) => return f64::NAN,
                 }
             }
         }
-        match bumped.value_tranche(tranche_id, context, as_of) {
+        match repriced.value_tranche(tranche_id, context, as_of) {
             Ok(pv) => pv.amount() - target,
             Err(_) => f64::NAN,
         }
@@ -519,7 +526,7 @@ pub fn calculate_tranche_discount_margin(
     let solver = BrentSolver::new()
         .tolerance(1e-8)
         .initial_bracket_size(Some(50.0));
-    let dm_bp = solver.solve(objective, 0.0)?;
+    let dm_bp = solver.solve(objective, quoted_bp)?;
 
     if dm_bp.abs() > 5000.0 {
         return Err(finstack_quant_core::Error::Validation(format!(

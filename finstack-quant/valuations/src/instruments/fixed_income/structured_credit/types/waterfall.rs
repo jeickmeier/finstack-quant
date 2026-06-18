@@ -206,7 +206,9 @@ pub struct ExcessSpreadSpec {
 /// - cumulative loss is a fraction of the *original* pool balance;
 /// - the OC ratio is `current pool balance ÷ rated (non-equity) note balance`;
 /// - credit enhancement is the senior cushion `(pool − senior note) ÷ pool`,
-///   where the senior note is the most-senior tranche by payment priority.
+///   where the senior note is the *single* most-senior tranche by payment
+///   priority — for pari-passu senior classes (e.g. A-1/A-2) only the
+///   lowest-priority one is taken as the reference.
 ///
 /// Delinquency triggers are intentionally absent: the simulation engine models
 /// defaults and recoveries but not a separate delinquency state, so there is no

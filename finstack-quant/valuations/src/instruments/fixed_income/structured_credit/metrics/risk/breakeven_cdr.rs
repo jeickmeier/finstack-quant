@@ -9,6 +9,15 @@
 //! Tranche writedown is monotonic non-decreasing in CDR, so the crossing is
 //! located by bisection on a single deterministic re-projection of the tranche
 //! cashflows per CDR.
+//!
+//! # Assumption
+//!
+//! The bisection assumes writedown is monotone in CDR. This holds for ordinary
+//! sequential/pro-rata structures. It can be violated by turbo or excess-spread
+//! mechanisms where a higher CDR diverts more cash to de-lever a tranche and so
+//! *reduces* its writedown over part of the range; for such deals the bisection
+//! returns one crossing of a possibly non-monotone curve and should be treated
+//! as indicative.
 
 use crate::cashflow::builder::DefaultModelSpec;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;

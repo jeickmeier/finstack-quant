@@ -264,32 +264,42 @@ mod discount_margin_tests {
     }
 
     #[test]
-    fn discount_margin_is_zero_at_base_pv() {
+    fn discount_margin_equals_quoted_margin_at_base_pv() {
+        // The absolute discount margin to price equals the tranche's own quoted
+        // margin (150 bp) when the target is the tranche's base PV.
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
         let dm = calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), pv).unwrap();
-        assert!(dm.abs() < 1e-6, "DM at base PV should be ~0, got {dm}");
+        assert!(
+            (dm - 0.015).abs() < 1e-6,
+            "DM at base PV should equal the 150 bp quoted margin, got {dm}"
+        );
     }
 
     #[test]
-    fn discount_margin_sign_tracks_target_price() {
+    fn discount_margin_widens_with_price() {
         let sc = deal(true);
         let mkt = market();
         let pv = sc.value_tranche("SR", &mkt, closing()).unwrap();
-        // A richer target (higher PV) needs a wider margin (positive DM);
-        // a cheaper target (lower PV) needs a tighter margin (negative DM).
+        // PV increases with the coupon margin, so a richer (higher) target needs
+        // a wider absolute margin and a cheaper (lower) target a tighter one,
+        // both straddling the 150 bp quoted margin.
         let richer = Money::new(pv.amount() * 1.002, pv.currency());
         let cheaper = Money::new(pv.amount() * 0.998, pv.currency());
         let dm_rich =
             calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), richer).unwrap();
         let dm_cheap =
             calculate_tranche_discount_margin(&sc, "SR", &mkt, closing(), cheaper).unwrap();
-        assert!(dm_rich > 0.0, "richer target -> positive DM, got {dm_rich}");
         assert!(
-            dm_cheap < 0.0,
-            "cheaper target -> negative DM, got {dm_cheap}"
+            dm_rich > 0.015,
+            "richer target -> wider margin, got {dm_rich}"
         );
+        assert!(
+            dm_cheap < 0.015,
+            "cheaper target -> tighter margin, got {dm_cheap}"
+        );
+        assert!(dm_rich > dm_cheap);
     }
 
     #[test]
@@ -510,6 +520,7 @@ mod scenario_table_tests {
             cprs: vec![0.0, 0.10],
             cdrs: vec![0.0, 0.50],
             severities: vec![0.60],
+            recovery_lag: None,
         };
         let table = scenario_table(&sc, "SR", &mkt, closing(), &grid).unwrap();
 
@@ -532,6 +543,36 @@ mod scenario_table_tests {
         assert!(
             table.cells[3].writedown >= table.cells[2].writedown,
             "writedown must be non-decreasing in CDR at cpr=0.10"
+        );
+    }
+
+    #[test]
+    fn scenario_table_honors_deal_recovery_lag_and_override() {
+        // The deal carries a 24-month recovery lag. With no grid override the
+        // scenario must inherit it; an explicit override of 0 settles recoveries
+        // immediately — different recovery timing, so the SR price/WAL differ.
+        let mut sc = deal();
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.50, 24);
+        let mkt = market();
+        let inherited = ScenarioGrid {
+            cprs: vec![0.0],
+            cdrs: vec![0.30],
+            severities: vec![0.50],
+            recovery_lag: None,
+        };
+        let overridden = ScenarioGrid {
+            cprs: vec![0.0],
+            cdrs: vec![0.30],
+            severities: vec![0.50],
+            recovery_lag: Some(0),
+        };
+        let a = scenario_table(&sc, "SR", &mkt, closing(), &inherited).unwrap();
+        let b = scenario_table(&sc, "SR", &mkt, closing(), &overridden).unwrap();
+        let d_price = (a.cells[0].price - b.cells[0].price).abs();
+        let d_wal = (a.cells[0].wal - b.cells[0].wal).abs();
+        assert!(
+            d_price > 1e-6 || d_wal > 1e-6,
+            "recovery lag must affect the scenario (Δprice={d_price}, Δwal={d_wal})"
         );
     }
 }
@@ -772,6 +813,7 @@ mod oas_tests {
             cprs: vec![0.10, 0.20],
             cdrs: vec![0.02],
             severities: vec![0.40],
+            recovery_lag: None,
         };
         let direct_st = scenario_table(&sc, "SR", &mkt, as_of, &grid).unwrap();
         let grid_json = serde_json::to_string(&grid).unwrap();

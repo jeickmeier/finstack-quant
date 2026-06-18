@@ -23,6 +23,11 @@ pub struct ScenarioGrid {
     pub cdrs: Vec<f64>,
     /// Loss severities (decimal); recovery = `1 - severity`.
     pub severities: Vec<f64>,
+    /// Recovery lag (months) applied in every scenario. When `None`, the deal's
+    /// own recovery lag is used; set it to override (e.g. `Some(0)` for
+    /// immediate recoveries).
+    #[serde(default)]
+    pub recovery_lag: Option<u32>,
 }
 
 /// One evaluated cell of the scenario table.
@@ -95,8 +100,12 @@ pub fn scenario_table(
                 let mut scenario = deal.clone();
                 scenario.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
                 scenario.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
+                // Inherit the deal's recovery lag unless the grid overrides it.
+                let lag = grid
+                    .recovery_lag
+                    .unwrap_or(deal.credit_model.recovery_spec.recovery_lag);
                 scenario.credit_model.recovery_spec =
-                    RecoveryModelSpec::with_lag((1.0 - severity).clamp(0.0, 1.0), 0);
+                    RecoveryModelSpec::with_lag((1.0 - severity).clamp(0.0, 1.0), lag);
 
                 let cashflows = scenario.get_tranche_cashflows(tranche_id, context, as_of)?;
                 let pv = scenario.value_tranche(tranche_id, context, as_of)?;

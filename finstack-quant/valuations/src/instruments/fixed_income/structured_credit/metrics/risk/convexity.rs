@@ -1,4 +1,4 @@
-//! Effective convexity for structured-credit tranches.
+//! Modified convexity for structured-credit tranches.
 //!
 //! Convexity is the second-order sensitivity of price to a parallel shift in
 //! the discount rate. It is computed by a central second difference of the
@@ -9,10 +9,13 @@
 //! Convexity = (PV(+Δy) + PV(-Δy) - 2·PV(0)) / (PV(0) · Δy²)
 //! ```
 //!
-//! For vanilla amortizing cashflows this is positive; premium tranches whose
-//! prepayment optionality shortens duration as rates fall can exhibit negative
-//! *effective* convexity once the projected cashflows respond to rates (handled
-//! upstream in cashflow projection). Units are years².
+//! This is the *modified* convexity of the tranche's already-projected
+//! cashflows: the bump is applied to discounting only, holding the cashflows
+//! fixed (mirroring [`super::duration`]), so it is always non-negative. It is
+//! **not** an *effective* convexity — it does not re-project the cashflows under
+//! the rate shift, so prepayment-driven negative convexity does not appear here;
+//! an effective measure would reprice through the cashflow engine at ±Δy. Units
+//! are years².
 
 use crate::cashflow::traits::DatedFlows;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
@@ -28,7 +31,7 @@ use finstack_quant_core::Result;
 /// truncation tolerance.
 const CONVEXITY_BUMP: f64 = 1e-3;
 
-/// Calculate the effective convexity of a tranche from its cashflows.
+/// Calculate the modified convexity of a tranche from its (fixed) cashflows.
 ///
 /// # Arguments
 ///
@@ -74,7 +77,7 @@ pub fn calculate_tranche_convexity(
     Ok((pv_up.total() + pv_dn.total() - 2.0 * p0) / (p0 * CONVEXITY_BUMP * CONVEXITY_BUMP))
 }
 
-/// Effective convexity calculator for structured credit.
+/// Modified convexity calculator for structured credit.
 ///
 /// Reads the tranche's projected cashflows and discount curve from the metric
 /// context and returns convexity in years² via

@@ -255,11 +255,13 @@ pub fn calculate_tranche_oas(
         0.0
     };
     let price_std_error = if num_paths > 1 && original_balance > 0.0 {
+        // Unbiased (Bessel-corrected) sample variance, then the standard error
+        // of the mean = sqrt(var / n).
         let var = path_pvs
             .iter()
             .map(|pv| (pv - mean_pv).powi(2))
             .sum::<f64>()
-            / path_count;
+            / (path_count - 1.0);
         (var / path_count).sqrt() / original_balance * 100.0
     } else {
         0.0
