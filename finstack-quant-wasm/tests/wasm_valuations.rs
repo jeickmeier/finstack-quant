@@ -186,8 +186,8 @@ fn price_instrument_structured_credit_waterfall_rules() {
 #[wasm_bindgen_test]
 fn structured_credit_tranche_metrics_through_json() {
     use finstack_quant_wasm::api::valuations::structured_credit::{
-        structured_credit_tranche_breakeven_cdr, structured_credit_tranche_oas,
-        structured_credit_tranche_scenario_table,
+        structured_credit_tranche_breakeven_cdr, structured_credit_tranche_discount_margin,
+        structured_credit_tranche_oas, structured_credit_tranche_scenario_table,
     };
 
     let inst = structured_credit_instrument_json();
@@ -196,6 +196,14 @@ fn structured_credit_tranche_metrics_through_json() {
     let breakeven = structured_credit_tranche_breakeven_cdr(&inst, &mkt, "2024-01-01", "SR")
         .expect("breakeven cdr");
     assert!(breakeven >= 0.0);
+
+    // Discount margin is only defined for floating-rate tranches; "SR" is
+    // fixed-rate, so the binding must surface the validation error rather than
+    // silently returning a value (parity with the Python negative test).
+    let dm_err =
+        structured_credit_tranche_discount_margin(&inst, &mkt, "2024-01-01", "SR", 1_000.0)
+            .expect_err("discount margin on a fixed-rate tranche should error");
+    assert!(format!("{dm_err:?}").to_lowercase().contains("floating"));
 
     let oas = structured_credit_tranche_oas(&inst, &mkt, "2024-01-01", "SR", 99.0, None)
         .expect("tranche oas");

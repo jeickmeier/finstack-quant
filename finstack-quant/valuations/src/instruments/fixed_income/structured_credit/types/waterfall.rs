@@ -136,6 +136,7 @@ pub enum PaymentCalculation {
 /// identical to the base waterfall. Applied by
 /// [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct WaterfallRules {
     /// Available-funds / net-WAC cap on named tranches' interest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -162,8 +163,147 @@ pub struct WaterfallRules {
     pub controlled_accumulation: Option<ControlledAccumulationSpec>,
 }
 
+impl WaterfallRules {
+    /// Validate the declarative rules against the deal's tranche structure.
+    ///
+    /// A malformed rule set otherwise misprices *silently*: an unresolved
+    /// tranche-id reference makes its cap/lock-out a no-op, and an out-of-range
+    /// fraction (e.g. `5` entered for `5%`) never trips its trigger. This guard
+    /// converts those into explicit `Error::Validation`s at deal-build / pricing
+    /// time. Checked here:
+    ///
+    /// - `afc.capped_tranches` and `shifting_interest.senior_id` resolve to real
+    ///   tranches; `afc.net_wac_fee_bps` is finite and non-negative.
+    /// - Loss/enhancement/share fractions (`trap_loss_pct`,
+    ///   `MaxCumulativeLoss`, `MinCreditEnhancement`, `senior_pct`,
+    ///   `max_cumulative_loss_pct`) lie in `[0, 1]`; `MinOcRatio` is finite and
+    ///   non-negative (a ratio, so it may exceed 1).
+    /// - `excess_spread.target_balance` is non-negative.
+    /// - The shifting-interest schedule is non-empty and strictly ascending in
+    ///   `months_from_closing` (so [`crate::instruments::fixed_income::structured_credit::resolve_waterfall`]'s
+    ///   step lookup is unambiguous).
+    /// - `controlled_accumulation.start_date <= bullet_date`.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` describing the first violation found.
+    pub(crate) fn validate(
+        &self,
+        tranches: &super::tranches::TrancheStructure,
+    ) -> finstack_quant_core::Result<()> {
+        let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
+        let has_tranche = |id: &str| tranches.tranches.iter().any(|t| t.id.as_str() == id);
+        let unit = |v: f64, what: &str| -> finstack_quant_core::Result<()> {
+            if !v.is_finite() || !(0.0..=1.0).contains(&v) {
+                return Err(invalid(format!(
+                    "waterfall_rules: {what} must be a fraction in [0, 1], got {v}"
+                )));
+            }
+            Ok(())
+        };
+
+        if let Some(afc) = &self.afc {
+            for id in &afc.capped_tranches {
+                if !has_tranche(id) {
+                    return Err(invalid(format!(
+                        "waterfall_rules: afc.capped_tranches references unknown tranche '{id}'"
+                    )));
+                }
+            }
+            if let Some(bps) = afc.net_wac_fee_bps {
+                if !bps.is_finite() || bps < 0.0 {
+                    return Err(invalid(format!(
+                        "waterfall_rules: afc.net_wac_fee_bps must be finite and non-negative, got {bps}"
+                    )));
+                }
+            }
+        }
+
+        if let Some(es) = &self.excess_spread {
+            if es.target_balance.amount() < 0.0 {
+                return Err(invalid(format!(
+                    "waterfall_rules: excess_spread.target_balance must be non-negative, got {}",
+                    es.target_balance.amount()
+                )));
+            }
+            if let Some(trap) = es.trap_loss_pct {
+                unit(trap, "excess_spread.trap_loss_pct")?;
+            }
+        }
+
+        if let Some(sd) = &self.step_down {
+            for trigger in &sd.triggers {
+                match trigger {
+                    StepDownTrigger::MaxCumulativeLoss(v) => {
+                        unit(*v, "step_down trigger MaxCumulativeLoss")?;
+                    }
+                    StepDownTrigger::MinCreditEnhancement(v) => {
+                        unit(*v, "step_down trigger MinCreditEnhancement")?;
+                    }
+                    StepDownTrigger::MinOcRatio(v) => {
+                        if !v.is_finite() || *v < 0.0 {
+                            return Err(invalid(format!(
+                                "waterfall_rules: step_down trigger MinOcRatio must be finite and non-negative, got {v}"
+                            )));
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(si) = &self.shifting_interest {
+            if !has_tranche(&si.senior_id) {
+                return Err(invalid(format!(
+                    "waterfall_rules: shifting_interest.senior_id references unknown tranche '{}'",
+                    si.senior_id
+                )));
+            }
+            if si.schedule.is_empty() {
+                return Err(invalid(
+                    "waterfall_rules: shifting_interest.schedule must have at least one step"
+                        .to_string(),
+                ));
+            }
+            let mut prev: Option<u32> = None;
+            for step in &si.schedule {
+                unit(step.senior_pct, "shifting_interest senior_pct")?;
+                if let Some(p) = prev {
+                    if step.months_from_closing <= p {
+                        return Err(invalid(format!(
+                            "waterfall_rules: shifting_interest.schedule must be strictly ascending in \
+                             months_from_closing (found {} after {p})",
+                            step.months_from_closing
+                        )));
+                    }
+                }
+                prev = Some(step.months_from_closing);
+            }
+        }
+
+        if let Some(ea) = &self.early_amortization {
+            unit(
+                ea.max_cumulative_loss_pct,
+                "early_amortization.max_cumulative_loss_pct",
+            )?;
+        }
+
+        if let Some(ca) = &self.controlled_accumulation {
+            if ca.start_date > ca.bullet_date {
+                return Err(invalid(format!(
+                    "waterfall_rules: controlled_accumulation.start_date ({}) must be on or before \
+                     bullet_date ({})",
+                    ca.start_date, ca.bullet_date
+                )));
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Available-funds cap (net-WAC cap) specification.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct AfcSpec {
     /// Ids of tranches whose interest coupon is capped at the collateral's
     /// (net) weighted-average coupon.
@@ -184,6 +324,7 @@ pub struct AfcSpec {
 /// spread. Any balance unused at deal end is released back to equity, unless a
 /// cumulative-loss trap trigger is breached.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ExcessSpreadSpec {
     /// Target funded balance of the spread account (currency units).
     pub target_balance: Money,
@@ -236,6 +377,7 @@ pub enum StepDownTrigger {
 /// to sequential, so the switch is re-evaluated every period (non-sticky). An
 /// empty `triggers` list steps down purely on the date.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct StepDownSpec {
     /// Earliest date principal may switch to pro-rata.
     #[schemars(with = "String")]
@@ -247,6 +389,7 @@ pub struct StepDownSpec {
 /// One step of a shifting-interest schedule: the senior's share of principal
 /// from `months_from_closing` onward (until the next step).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ShiftingInterestStep {
     /// Months from closing at which this senior share takes effect.
     pub months_from_closing: u32,
@@ -263,6 +406,7 @@ pub struct ShiftingInterestStep {
 /// per-period weighted pro-rata of *all* principal (a first-order treatment;
 /// agency-style scheduled-vs-prepayment splitting is a refinement).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ShiftingInterestSpec {
     /// Id of the senior tranche that receives the scheduled principal share.
     pub senior_id: String,
@@ -278,6 +422,7 @@ pub struct ShiftingInterestSpec {
 /// revolving period ends immediately and the deal begins paying principal down
 /// (amortizing) even before its scheduled revolving-period end.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct EarlyAmortizationSpec {
     /// Cumulative-loss fraction (decimal, of the original pool balance) at or
     /// above which the revolving period ends early and amortization begins.
@@ -303,6 +448,7 @@ pub struct EarlyAmortizationSpec {
 /// outstanding tranches senior-first at deal end, so accumulated principal is
 /// never stranded.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ControlledAccumulationSpec {
     /// First date principal is accumulated into the funding account.
     #[schemars(with = "String")]

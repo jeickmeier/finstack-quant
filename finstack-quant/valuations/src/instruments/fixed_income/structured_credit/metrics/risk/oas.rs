@@ -157,6 +157,23 @@ pub fn calculate_tranche_oas(
         None
     };
 
+    // Hull-White convexity adjustment for the stochastic discount factor. Each
+    // path discounts by `curve_df · exp(-∫x)`, but `E[exp(-∫x)] = exp(+½·Var(∫x))
+    // ≠ 1` (Jensen), so the *average* stochastic discount factor would exceed the
+    // curve discount factor and bias PV (and the solved OAS) upward. The
+    // deterministic, path-independent correction `exp(-½·Var(∫x to t))` makes
+    // `E[stochastic DF] = curve DF` exactly (no-arbitrage), collapsing to 1 at
+    // zero volatility. Computed once; applied per cashflow below.
+    let rate_convexity_adj = if config.stochastic_rates {
+        Some(ou_integral_convexity_adjustments(
+            config.hw_kappa,
+            config.hw_sigma,
+            num_months,
+        ))
+    } else {
+        None
+    };
+
     // For each scenario, the per-cashflow `(year fraction t, CF·base_df)`. The
     // trial OAS only multiplies in `exp(-s·t)`, so the expensive simulation runs
     // once per scenario and the Brent solve over `s` is cheap.
@@ -212,10 +229,19 @@ pub fn calculate_tranche_oas(
             }
             let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
             // Exact curve discount factor (no-arbitrage), times the OU stochastic
-            // factor when rates are stochastic.
+            // factor when rates are stochastic, de-biased by the Hull-White
+            // convexity adjustment so the average stochastic DF matches the curve.
             let mut base_df = disc.df_between_dates(as_of, *date)?;
             if let Some(dev) = &deviation {
-                base_df *= ou_discount_factor(dev, as_of.months_until(*date) as usize);
+                let month = as_of.months_until(*date) as usize;
+                base_df *= ou_discount_factor(dev, month);
+                if let Some(adj) = &rate_convexity_adj {
+                    base_df *= adj
+                        .get(month)
+                        .copied()
+                        .or_else(|| adj.last().copied())
+                        .unwrap_or(1.0);
+                }
             }
             entries.push((t, amount.amount() * base_df));
         }
@@ -351,4 +377,96 @@ fn ou_discount_factor(deviation: &[f64], month: usize) -> f64 {
     let last = month.min(deviation.len());
     let acc: f64 = deviation[..last].iter().map(|x| -x * dt).sum();
     acc.exp()
+}
+
+/// Per-month Hull-White convexity adjustments `exp(-½·Var(∫₀ᵗ x ds))` for the
+/// discretised integrated OU deviation used by [`ou_discount_factor`].
+///
+/// `adj[m]` corresponds to a cashflow `m` months out (whose stochastic discount
+/// factor uses `W_m = Σ_{j<m} x_j`, the left-Riemann sum `Δt·W_m ≈ ∫x`). Because
+/// `Δt·W_m` is exactly Gaussian, multiplying `exp(-Δt·W_m)` by
+/// `exp(-½·Var(Δt·W_m))` makes its expectation exactly `1`, removing the
+/// Jensen/convexity bias so the model is martingale-consistent (the average
+/// stochastic discount factor reproduces the curve discount factor).
+///
+/// The variance recursion tracks `Var(x_m)`, `Cov(W_m, x_m)` and `Var(W_m)`
+/// along the exact OU step `x_{m+1} = a·x_m + b·z_m` (`a = e^{-κΔt}`, `b` the
+/// exact OU step volatility), so it is exact for the discretised process and
+/// needs no closed-form integral. Returns `num_months + 1` factors (`m = 0..=num_months`);
+/// every factor is `1.0` at zero volatility.
+///
+/// # References
+/// - Brigo & Mercurio (2006), *Interest Rate Models — Theory and Practice*,
+///   §3.3 (Hull-White bond reconstitution / convexity).
+fn ou_integral_convexity_adjustments(kappa: f64, sigma: f64, num_months: usize) -> Vec<f64> {
+    let dt = 1.0 / 12.0;
+    let a = (-kappa * dt).exp();
+    let b = if kappa > 0.0 {
+        sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
+    } else {
+        sigma * dt.sqrt()
+    };
+
+    let mut adj = Vec::with_capacity(num_months + 1);
+    let (mut var_x, mut cov_wx, mut var_w) = (0.0_f64, 0.0_f64, 0.0_f64);
+    for _ in 0..=num_months {
+        adj.push((-0.5 * dt * dt * var_w).exp());
+        // Advance to the next month: W_{m+1} = W_m + x_m, x_{m+1} = a·x_m + b·z.
+        let new_var_w = var_w + 2.0 * cov_wx + var_x;
+        let new_cov_wx = a * (cov_wx + var_x);
+        let new_var_x = a * a * var_x + b * b;
+        var_w = new_var_w;
+        cov_wx = new_cov_wx;
+        var_x = new_var_x;
+    }
+    adj
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// With the convexity correction, the Monte-Carlo mean of the stochastic
+    /// discount factor `exp(-∫x)·adj` must equal 1 (so `E[stochastic DF] = curve
+    /// DF`, no-arbitrage) across horizons. Deterministic seed → stable.
+    #[test]
+    fn convexity_adjustment_makes_discount_factor_a_martingale() {
+        let kappa = 0.05;
+        let sigma = 0.01;
+        let num_months = 120;
+        let adj = ou_integral_convexity_adjustments(kappa, sigma, num_months);
+        let rng = PhiloxRng::new(12_345);
+        let n_paths = 20_000;
+        for &month in &[12usize, 60, 120] {
+            let mut sum = 0.0;
+            for p in 0..n_paths {
+                let mut sub = rng.substream(p as u64);
+                let dev = simulate_ou_deviation(kappa, sigma, num_months, &mut sub);
+                sum += ou_discount_factor(&dev, month) * adj[month];
+            }
+            let mean = sum / f64::from(n_paths);
+            assert!(
+                (mean - 1.0).abs() < 1e-2,
+                "month {month}: mean stochastic DF {mean} is not a martingale (expected ~1)"
+            );
+        }
+    }
+
+    /// At zero volatility every adjustment is exactly the identity.
+    #[test]
+    fn zero_vol_convexity_adjustment_is_identity() {
+        let adj = ou_integral_convexity_adjustments(0.05, 0.0, 24);
+        assert!(adj.iter().all(|&a| (a - 1.0).abs() < 1e-15));
+    }
+
+    /// The adjustment is non-increasing in the horizon (variance accumulates),
+    /// and strictly below 1 once volatility is positive and time has elapsed.
+    #[test]
+    fn convexity_adjustment_decreases_with_horizon() {
+        let adj = ou_integral_convexity_adjustments(0.05, 0.01, 60);
+        for w in adj.windows(2) {
+            assert!(w[1] <= w[0] + 1e-15, "adjustment must be non-increasing");
+        }
+        assert!(*adj.last().unwrap() < 1.0);
+    }
 }

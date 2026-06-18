@@ -250,19 +250,22 @@ pub(crate) fn apply_accumulation_lockout<'w, S: std::hash::BuildHasher>(
     Cow::Owned(waterfall)
 }
 
-/// Senior share in effect at `months`: the `senior_pct` of the latest schedule
-/// step whose `months_from_closing` is `<= months` (or the first step's share
-/// when the deal is younger than every step).
+/// Senior share in effect at `months`: the `senior_pct` of the schedule step
+/// with the greatest `months_from_closing` not exceeding `months` (or the
+/// earliest step's share when the deal is younger than every step, defaulting to
+/// full lock-out for an empty schedule).
+///
+/// Scanning for the max-qualifying step — rather than breaking on the first
+/// later step — keeps the result correct even if the schedule is not sorted
+/// ascending. (`WaterfallRules::validate` enforces a strictly-ascending
+/// schedule, so this is defense-in-depth for any direct caller.)
 fn senior_share(schedule: &[ShiftingInterestStep], months: u32) -> f64 {
-    let mut pct = schedule.first().map_or(1.0, |s| s.senior_pct);
-    for step in schedule {
-        if step.months_from_closing <= months {
-            pct = step.senior_pct;
-        } else {
-            break;
-        }
-    }
-    pct
+    schedule
+        .iter()
+        .filter(|s| s.months_from_closing <= months)
+        .max_by_key(|s| s.months_from_closing)
+        .or_else(|| schedule.iter().min_by_key(|s| s.months_from_closing))
+        .map_or(1.0, |s| s.senior_pct)
 }
 
 /// Tranche id of a principal recipient, if it pays tranche principal.

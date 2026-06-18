@@ -2,7 +2,7 @@
 
 use crate::bindings::extract::extract_market;
 use crate::bindings::module_utils::py_to_json_value;
-use crate::errors::display_to_py;
+use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::pricer::{
     canonical_instrument_json, canonical_instrument_json_from_str,
     metric_value_from_instrument_json, present_standard_option_greeks_from_instrument_json,
@@ -151,7 +151,7 @@ pub(super) fn tranche_discount_margin(
             &as_of,
             target_pv,
         )
-        .map_err(display_to_py)
+        .map_err(core_to_py)
     })
 }
 
@@ -168,7 +168,7 @@ pub(super) fn tranche_breakeven_cdr(
     let tranche_id = tranche_id.to_owned();
     py.detach(move || {
         structured_credit_tranche_breakeven_cdr_json(&json, &tranche_id, &market, &as_of)
-            .map_err(display_to_py)
+            .map_err(core_to_py)
     })
 }
 
@@ -195,7 +195,7 @@ pub(super) fn tranche_oas(
             &as_of,
             config.as_deref(),
         )
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
         serde_json::to_string(&result).map_err(display_to_py)
     })
 }
@@ -221,7 +221,7 @@ pub(super) fn tranche_scenario_table(
             &as_of,
             &grid,
         )
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
         serde_json::to_string(&result).map_err(display_to_py)
     })
 }

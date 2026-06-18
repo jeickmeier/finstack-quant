@@ -77,18 +77,21 @@ impl MetricCalculator for ZSpreadCalculator {
         })?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-        let base_date = disc.base_date();
+        let as_of = context.as_of;
         let day_count = finstack_quant_core::dates::DayCount::Act365F;
 
         // Pre-compute (t, df, amount) for deterministic, fallible date handling.
+        // Discount from the valuation date `as_of` (settlement convention) so the
+        // PV matches the as-of base value the target price is derived from; this
+        // keeps the metric-registry z-spread consistent with the standalone
+        // `calculate_tranche_z_spread` even when `as_of != curve.base_date()`.
         let cached_flows: Vec<(f64, f64, f64)> = flows
             .iter()
-            .filter(|(date, _)| *date > context.as_of)
+            .filter(|(date, _)| *date > as_of)
             .map(
                 |(date, amount)| -> finstack_quant_core::Result<(f64, f64, f64)> {
-                    let t =
-                        day_count.year_fraction(base_date, *date, DayCountContext::default())?;
-                    let df = disc.df_on_date_curve(*date)?;
+                    let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+                    let df = disc.df_between_dates(as_of, *date)?;
                     Ok((t, df, amount.amount()))
                 },
             )
@@ -226,21 +229,22 @@ impl MetricCalculator for Cs01Calculator {
         })?;
 
         let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-        let base_date = disc.base_date();
+        let as_of = context.as_of;
         let day_count = finstack_quant_core::dates::DayCount::Act365F;
 
         // CS01 must be marginal: PV(z) - PV(z + 1bp), not PV(0) - PV(z + 1bp).
         // Compute both base PV (at Z-spread) and bumped PV (at Z-spread + 1bp).
+        // Discount from `as_of` to stay consistent with the z-spread that fed it.
         let mut base_npv_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
         let mut bumped_npv_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
 
         for (date, amount) in flows {
-            if *date <= context.as_of {
+            if *date <= as_of {
                 continue;
             }
 
-            let t = day_count.year_fraction(base_date, *date, DayCountContext::default())?;
-            let df = disc.df_on_date_curve(*date)?;
+            let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+            let df = disc.df_between_dates(as_of, *date)?;
             let amt = amount.amount();
 
             let df_base = df * (-base_spread * t).exp();
@@ -608,15 +612,15 @@ impl MetricCalculator for BucketedCs01Calculator {
                 })
             })?;
             let disc = context.curves.get_discount(disc_curve_id.as_str())?;
-            let base_date = disc.base_date();
             let day_count = DayCount::Act365F;
+            // Discount from `as_of` (settlement) so bucketed CS01 reconciles to the
+            // parallel z-spread CS01, which now uses the same convention.
             flows
                 .iter()
                 .filter(|(date, _)| *date > as_of)
                 .map(|(date, amount)| -> Result<(f64, f64, f64)> {
-                    let t =
-                        day_count.year_fraction(base_date, *date, DayCountContext::default())?;
-                    let df = disc.df_on_date_curve(*date)?;
+                    let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
+                    let df = disc.df_between_dates(as_of, *date)?;
                     Ok((t, df, amount.amount()))
                 })
                 .collect::<Result<Vec<_>>>()?
