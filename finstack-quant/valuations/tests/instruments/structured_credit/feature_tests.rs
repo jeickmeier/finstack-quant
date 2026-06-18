@@ -449,6 +449,7 @@ mod afc_tests {
                 afc: Some(AfcSpec {
                     capped_tranches: vec!["SR".to_string()],
                 }),
+                excess_spread: None,
             });
         }
         sc
@@ -490,5 +491,123 @@ mod afc_tests {
             .unwrap();
         assert_eq!(a.total_interest.amount(), b.total_interest.amount());
         assert_eq!(a.total_principal.amount(), b.total_principal.amount());
+    }
+}
+
+/// Excess-spread / spread-account capture, trigger-gated retention, and release.
+mod excess_spread_tests {
+    use finstack_quant_cashflows::builder::{
+        DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec,
+    };
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
+        run_simulation, AssetPool, DealType, ExcessSpreadSpec, PoolAsset, StructuredCredit,
+        Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure, WaterfallRules,
+    };
+    use time::Month;
+
+    fn closing() -> Date {
+        Date::from_calendar_date(2024, Month::January, 1).unwrap()
+    }
+
+    fn maturity() -> Date {
+        Date::from_calendar_date(2027, Month::January, 1).unwrap()
+    }
+
+    fn market() -> MarketContext {
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(closing())
+            .knots(vec![(0.0, 1.0), (5.0, 0.90)])
+            .build()
+            .unwrap();
+        MarketContext::new().insert(disc)
+    }
+
+    /// Pool earns 8%, senior pays 5%, so ~3% excess spread flows to equity each
+    /// period. A 2% CDR drives cumulative losses well above any 1% trap trigger.
+    fn deal(excess: Option<ExcessSpreadSpec>) -> StructuredCredit {
+        let mut pool = AssetPool::new("POOL", DealType::ABS, Currency::USD);
+        pool.assets.push(PoolAsset::fixed_rate_bond(
+            "A1",
+            Money::new(1_000_000.0, Currency::USD),
+            0.08,
+            maturity(),
+            DayCount::Thirty360,
+        ));
+        let tranches = TrancheStructure::new(vec![
+            Tranche::new(
+                "SR",
+                0.0,
+                80.0,
+                TrancheSeniority::Senior,
+                Money::new(800_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.05 },
+                maturity(),
+            )
+            .unwrap(),
+            Tranche::new(
+                "EQ",
+                80.0,
+                100.0,
+                TrancheSeniority::Equity,
+                Money::new(200_000.0, Currency::USD),
+                TrancheCoupon::Fixed { rate: 0.0 },
+                maturity(),
+            )
+            .unwrap(),
+        ])
+        .unwrap();
+        let mut sc =
+            StructuredCredit::new_abs("ABS-ES", pool, tranches, closing(), maturity(), "USD-OIS")
+                .with_payment_calendar("nyse");
+        sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
+        sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);
+        sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
+        if let Some(es) = excess {
+            sc.waterfall_rules = Some(WaterfallRules {
+                afc: None,
+                excess_spread: Some(es),
+            });
+        }
+        sc
+    }
+
+    fn equity_cash(sc: &StructuredCredit) -> f64 {
+        let results = run_simulation(sc, &market(), closing()).unwrap();
+        let eq = results.get("EQ").expect("equity results");
+        eq.total_interest.amount() + eq.total_principal.amount()
+    }
+
+    #[test]
+    fn trap_retains_spread_and_reduces_equity() {
+        let baseline = equity_cash(&deal(None));
+        let trapped = equity_cash(&deal(Some(ExcessSpreadSpec {
+            target_balance: Money::new(20_000.0, Currency::USD),
+            trap_loss_pct: Some(0.01),
+        })));
+        assert!(
+            trapped < baseline - 1.0,
+            "trap-breached spread account must retain enhancement and reduce equity \
+             (trapped={trapped}, baseline={baseline})"
+        );
+    }
+
+    #[test]
+    fn untrapped_spread_releases_back_to_equity() {
+        // With no trap trigger, captured spread is released to equity at deal
+        // end, so total equity cash matches the no-account baseline.
+        let baseline = equity_cash(&deal(None));
+        let released = equity_cash(&deal(Some(ExcessSpreadSpec {
+            target_balance: Money::new(20_000.0, Currency::USD),
+            trap_loss_pct: None,
+        })));
+        assert!(
+            (released - baseline).abs() < 1.0,
+            "released spread must return to equity (released={released}, baseline={baseline})"
+        );
     }
 }

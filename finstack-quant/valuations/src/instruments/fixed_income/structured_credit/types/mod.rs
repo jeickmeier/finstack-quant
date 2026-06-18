@@ -61,9 +61,10 @@ pub use reinvestment::ReinvestmentManager;
 // Waterfall types
 pub(crate) use waterfall::DiversionRecord;
 pub use waterfall::{
-    AfcSpec, AllocationMode, CoverageTestType, ManagementFeeType, PaymentCalculation,
-    PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention, Waterfall,
-    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier, WaterfallWorkspace,
+    AfcSpec, AllocationMode, CoverageTestType, ExcessSpreadSpec, ManagementFeeType,
+    PaymentCalculation, PaymentRecord, PaymentType, Recipient, RecipientType, RoundingConvention,
+    Waterfall, WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
+    WaterfallWorkspace,
 };
 
 // Result types

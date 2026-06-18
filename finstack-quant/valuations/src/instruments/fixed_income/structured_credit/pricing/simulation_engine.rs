@@ -355,6 +355,64 @@ impl PoolFlowSource for StochasticPathFlowSource {
 // PUBLIC API
 // ============================================================================
 
+/// Release the unused spread-account balance to equity at deal end.
+///
+/// If the deal configures `excess_spread` and the account holds a positive
+/// balance after the final period, that balance is distributed to the equity
+/// tranche as a residual principal flow — unless a cumulative-loss trap trigger
+/// (`trap_loss_pct`) is breached, in which case the balance is retained in the
+/// deal (consumed enhancement) and permanently reduces equity. No-op when no
+/// `excess_spread` rule is configured (identity).
+fn release_spread_account(
+    state: &mut SimulationState<'_>,
+    instrument: &StructuredCredit,
+) -> Result<()> {
+    let Some(es) = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.excess_spread.as_ref())
+    else {
+        return Ok(());
+    };
+
+    let balance = state.spread_account;
+    if balance.amount() <= 0.0 {
+        return Ok(());
+    }
+
+    // Retain (do not release) if the cumulative-loss trap trigger is breached.
+    if let Some(trap) = es.trap_loss_pct {
+        let denom = state.total_pool_balance.amount();
+        let loss_fraction = if denom > 0.0 {
+            state.cumulative_expected_loss / denom
+        } else {
+            0.0
+        };
+        if loss_fraction >= trap {
+            state.spread_account = Money::new(0.0, state.base_ccy);
+            return Ok(());
+        }
+    }
+
+    // Release to the equity tranche as a residual principal flow.
+    let equity_id = state
+        .tranches
+        .tranches
+        .iter()
+        .find(|t| t.seniority == TrancheSeniority::Equity)
+        .map(|t| t.id.as_str().to_string());
+    if let Some(eq_id) = equity_id {
+        let release_date = state.prev_date.unwrap_or(state.closing_date);
+        if let Some(res) = state.results.get_mut(&eq_id) {
+            res.cashflows.push((release_date, balance));
+            res.principal_flows.push((release_date, balance));
+            res.total_principal = res.total_principal.checked_add(balance)?;
+        }
+    }
+    state.spread_account = Money::new(0.0, state.base_ccy);
+    Ok(())
+}
+
 /// Run full cashflow simulation for a structured credit instrument.
 ///
 /// Returns detailed cashflow results for each tranche.
@@ -615,6 +673,10 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     // released at the later of the final simulated date and its own
     // default-date + recovery lag, business-day adjusted.
     drain_pending_recoveries_at_end(&mut state, calendar, convention)?;
+
+    // Release any unused spread-account balance to equity at deal end (unless a
+    // cumulative-loss trap trigger retains it as consumed enhancement).
+    release_spread_account(&mut state, instrument)?;
 
     Ok(state.finalize())
 }
@@ -1907,6 +1969,10 @@ pub(crate) struct SimulationState<'a> {
     pool_wala_months: u32,
     /// Current reserve account balance.
     reserve_balance: Money,
+    /// Current excess-spread (spread-account) balance. Carries period to period:
+    /// funded from captured residual interest and drawn to cover debt interest
+    /// shortfalls. See `ExcessSpreadSpec`.
+    spread_account: Money,
 }
 
 impl<'a> SimulationState<'a> {
@@ -2046,6 +2112,7 @@ impl<'a> SimulationState<'a> {
             loss_alloc_order,
             pool_wala_months,
             reserve_balance: pool.reserve_account,
+            spread_account: Money::new(0.0, base_ccy),
         })
     }
 
@@ -2409,6 +2476,12 @@ fn simulate_period(
         0.0
     };
 
+    // Excess-spread (spread-account) rule, if configured.
+    let excess_spread_spec = instrument
+        .waterfall_rules
+        .as_ref()
+        .and_then(|rules| rules.excess_spread.as_ref());
+
     // ── Step 5: Record flows and update balances ─────────────────────
     for (idx, tranche) in state.tranches.tranches.iter().enumerate() {
         let recipient_key = &state.tranche_recipient_keys[idx];
@@ -2488,22 +2561,61 @@ fn simulate_period(
             .checked_sub(interest_paid)
             .unwrap_or(Money::new(0.0, state.base_ccy));
 
+        // Spread account: a debt tranche draws from it to cover an interest
+        // shortfall (extra interest, sourced from the account); the equity
+        // tranche's residual is captured into it up to the target balance.
+        // With no `excess_spread` rule both are zero and booking is identical.
+        let is_equity = tranche.seniority == TrancheSeniority::Equity;
+        let (spread_draw, spread_capture) = match excess_spread_spec {
+            Some(es) if is_equity => {
+                let room = (es.target_balance.amount() - state.spread_account.amount()).max(0.0);
+                (0.0, principal_payment.amount().min(room))
+            }
+            Some(_) => (
+                current_interest_shortfall
+                    .amount()
+                    .min(state.spread_account.amount())
+                    .max(0.0),
+                0.0,
+            ),
+            None => (0.0, 0.0),
+        };
+        state.spread_account = Money::new(
+            state.spread_account.amount() + spread_capture - spread_draw,
+            state.base_ccy,
+        );
+
+        // Booked amounts after the spread-account adjustment.
+        let booked_interest = Money::new(interest_paid.amount() + spread_draw, state.base_ccy);
+        let booked_principal = Money::new(
+            (principal_payment.amount() - spread_capture).max(0.0),
+            state.base_ccy,
+        );
+        let booked_cashflow = Money::new(
+            (payment_received.amount() + spread_draw - spread_capture).max(0.0),
+            state.base_ccy,
+        );
+        let booked_shortfall = Money::new(
+            (current_interest_shortfall.amount() - spread_draw).max(0.0),
+            state.base_ccy,
+        );
+
         if let Some(res) = state.results.get_mut(tranche_id_str) {
-            if payment_received.amount() > 0.0 {
-                res.cashflows.push((pay_date, payment_received));
+            if booked_cashflow.amount() > 0.0 {
+                res.cashflows.push((pay_date, booked_cashflow));
             }
-            if interest_paid.amount() > 0.0 {
-                res.interest_flows.push((pay_date, interest_paid));
-                res.total_interest = res.total_interest.checked_add(interest_paid)?;
+            if booked_interest.amount() > 0.0 {
+                res.interest_flows.push((pay_date, booked_interest));
+                res.total_interest = res.total_interest.checked_add(booked_interest)?;
             }
-            if principal_payment.amount() > 0.0 {
-                res.principal_flows.push((pay_date, principal_payment));
-                res.total_principal = res.total_principal.checked_add(principal_payment)?;
+            if booked_principal.amount() > 0.0 {
+                res.principal_flows.push((pay_date, booked_principal));
+                res.total_principal = res.total_principal.checked_add(booked_principal)?;
             }
             // Record PIK (interest shortfall deferred to future periods)
-            if current_interest_shortfall.amount() > 0.0 {
-                res.pik_flows.push((pay_date, current_interest_shortfall));
-                res.total_pik = res.total_pik.checked_add(current_interest_shortfall)?;
+            if booked_shortfall.amount() > 0.0 {
+                res.pik_flows.push((pay_date, booked_shortfall));
+                res.total_pik = res.total_pik.checked_add(booked_shortfall)?;
             }
         }
 
@@ -2513,7 +2625,7 @@ fn simulate_period(
             existing_deferred
                 .checked_sub(deferred_repaid)
                 .unwrap_or(Money::new(0.0, state.base_ccy))
-                .checked_add(current_interest_shortfall)?
+                .checked_add(booked_shortfall)?
         };
         state
             .deferred_interest
@@ -2540,8 +2652,8 @@ fn simulate_period(
             } else {
                 after_principal
             };
-            if tranche.pik_enabled && current_interest_shortfall.amount() > 0.0 {
-                *current = after_principal.checked_add(current_interest_shortfall)?;
+            if tranche.pik_enabled && booked_shortfall.amount() > 0.0 {
+                *current = after_principal.checked_add(booked_shortfall)?;
             } else {
                 *current = after_principal;
             }

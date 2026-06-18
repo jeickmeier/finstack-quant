@@ -140,6 +140,9 @@ pub struct WaterfallRules {
     /// Available-funds / net-WAC cap on named tranches' interest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub afc: Option<AfcSpec>,
+    /// Excess-spread (spread-account) capture and draw.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excess_spread: Option<ExcessSpreadSpec>,
 }
 
 /// Available-funds cap (net-WAC cap) specification.
@@ -148,6 +151,25 @@ pub struct AfcSpec {
     /// Ids of tranches whose interest coupon is capped at the collateral's
     /// weighted-average coupon.
     pub capped_tranches: Vec<String>,
+}
+
+/// Excess-spread / spread-account specification.
+///
+/// Each period the account captures residual interest (that would otherwise be
+/// distributed to equity) up to `target_balance`, and draws down to cover debt
+/// tranche interest shortfalls — providing credit enhancement from excess
+/// spread. Any balance unused at deal end is released back to equity, unless a
+/// cumulative-loss trap trigger is breached.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ExcessSpreadSpec {
+    /// Target funded balance of the spread account (currency units).
+    pub target_balance: Money,
+    /// Optional cumulative-loss fraction (decimal, e.g. `0.05` = 5% of the
+    /// original pool) at or above which any remaining spread-account balance is
+    /// *retained* in the deal at maturity rather than released to equity. When
+    /// `None`, the unused balance is always released to equity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trap_loss_pct: Option<f64>,
 }
 
 /// Allocation mode within a tier
