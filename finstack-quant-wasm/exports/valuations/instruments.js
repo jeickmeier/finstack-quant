@@ -9,4 +9,8 @@ export const instruments = {
   instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
   listStandardMetrics: wasm.listStandardMetrics,
   listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,
+  structuredCreditTrancheDiscountMargin: wasm.structuredCreditTrancheDiscountMargin,
+  structuredCreditTrancheBreakevenCdr: wasm.structuredCreditTrancheBreakevenCdr,
+  structuredCreditTrancheOas: wasm.structuredCreditTrancheOas,
+  structuredCreditTrancheScenarioTable: wasm.structuredCreditTrancheScenarioTable,
 };

@@ -23,3 +23,4 @@ pub mod fx;
 pub mod market_handle;
 pub mod pricing;
 pub mod sabr;
+pub mod structured_credit;

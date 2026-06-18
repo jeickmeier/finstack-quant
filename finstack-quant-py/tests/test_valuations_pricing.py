@@ -575,3 +575,28 @@ def test_structured_credit_waterfall_rules_prices_through_json() -> None:
         )
     )
     assert float(result["value"]["amount"]) > 0
+
+
+def test_structured_credit_tranche_metric_methods() -> None:
+    # The standalone tranche metrics are exposed as methods on the
+    # StructuredCredit wrapper, mirroring `price` / `price_with_metrics`.
+    from finstack_quant.valuations.instruments.fixed_income import StructuredCredit
+
+    sc = StructuredCredit.from_json(_structured_credit_json())
+    market = _market_json()
+
+    oas = json.loads(sc.oas(market, "2024-01-01", "SR", 99.0))
+    assert oas["model_price"] > 0
+    assert oas["oas"] == oas["oas"]  # finite (not NaN)
+
+    breakeven = sc.breakeven_cdr(market, "2024-01-01", "SR")
+    assert breakeven >= 0.0
+
+    grid = json.dumps({"cprs": [0.10, 0.20], "cdrs": [0.02], "severities": [0.40]})
+    table = json.loads(sc.scenario_table(market, "2024-01-01", "SR", grid))
+    assert len(table["cells"]) == 2
+
+    # Discount margin requires a floating-rate tranche; the fixed-rate senior
+    # here must raise, exercising the method dispatch and error mapping.
+    with pytest.raises(ValueError, match="floating-rate"):
+        sc.discount_margin(market, "2024-01-01", "SR", 800_000.0)
