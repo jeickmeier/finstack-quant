@@ -12,7 +12,7 @@ from datetime import date
 import json
 
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve, MarketContext
-from finstack_quant.valuations.credit_derivatives import CDSOption, CreditDefaultSwap
+from finstack_quant.valuations.instruments.credit_derivatives import CDSOption, CreditDefaultSwap
 
 AS_OF = date(2025, 1, 2)
 AS_OF_STR = "2025-01-02"

@@ -132,29 +132,53 @@ class Portfolio:
 
     @property
     def id(self) -> str:
-        """Portfolio identifier."""
+        """Portfolio identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def as_of(self) -> str:
-        """Portfolio as-of date as an ISO 8601 string."""
+        """Portfolio as-of date as an ISO 8601 string.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def base_ccy(self) -> str:
-        """Base currency code used for valuation and aggregation."""
+        """Base currency code used for valuation and aggregation.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __len__(self) -> int:
-        """Number of positions in the built portfolio."""
+        """Number of positions in the built portfolio.
+        Returns
+        -------
+        int
+        """
         ...
 
     def to_spec_json(self) -> str:
-        """Serialize the portfolio back to its canonical ``PortfolioSpec`` JSON."""
+        """Serialize the portfolio back to its canonical ``PortfolioSpec`` JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PortfolioValuation:
@@ -170,30 +194,54 @@ class PortfolioValuation:
         ...
 
     def to_json(self) -> str:
-        """Serialize this valuation to canonical JSON."""
+        """Serialize this valuation to canonical JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def total_value(self) -> float:
-        """Total portfolio value in ``base_ccy``."""
+        """Total portfolio value in ``base_ccy``.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def base_ccy(self) -> str:
-        """Base currency code for this valuation."""
+        """Base currency code for this valuation.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def as_of(self) -> str:
-        """Valuation date as an ISO 8601 string."""
+        """Valuation date as an ISO 8601 string.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __len__(self) -> int:
-        """Number of valued positions."""
+        """Number of valued positions.
+        Returns
+        -------
+        int
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PortfolioCashflows:
@@ -210,27 +258,51 @@ class PortfolioCashflows:
         ...
 
     def to_json(self) -> str:
-        """Serialize the full cashflow ladder to canonical JSON."""
+        """Serialize the full cashflow ladder to canonical JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def events_json(self) -> str:
-        """Return all dated cashflow events as JSON."""
+        """Return all dated cashflow events as JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def by_date_json(self) -> str:
-        """Return cashflows grouped by date as JSON."""
+        """Return cashflows grouped by date as JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def issues_json(self) -> str:
-        """Return cashflow aggregation or FX-conversion issues as JSON."""
+        """Return cashflow aggregation or FX-conversion issues as JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def num_positions(self) -> int:
-        """Number of positions represented in the ladder."""
+        """Number of positions represented in the ladder.
+        Returns
+        -------
+        int
+        """
         ...
 
     def num_issues(self) -> int:
-        """Number of diagnostic issues recorded on the ladder."""
+        """Number of diagnostic issues recorded on the ladder.
+        Returns
+        -------
+        int
+        """
         ...
 
     def collapse_to_base_by_date_kind(
@@ -247,11 +319,19 @@ class PortfolioCashflows:
         ...
 
     def __len__(self) -> int:
-        """Number of cashflow events."""
+        """Number of cashflow events.
+        Returns
+        -------
+        int
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PortfolioResult:
@@ -267,12 +347,20 @@ class PortfolioResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize this result envelope to canonical JSON."""
+        """Serialize this result envelope to canonical JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def total_value(self) -> float:
-        """Total value stored in the result envelope."""
+        """Total value stored in the result envelope.
+        Returns
+        -------
+        float
+        """
         ...
 
     def get_metric(self, metric_id: str) -> float | None:
@@ -284,7 +372,11 @@ class PortfolioResult:
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 def parse_portfolio_spec(json_str: str) -> str:
@@ -399,10 +491,35 @@ def validate_allocation_json(spec_json: str) -> None:
 def optimize_portfolio(spec_json: str, market: MarketContext | str) -> str:
     """Optimize portfolio weights using the LP-based optimizer.
 
-    Accepts a ``PortfolioOptimizationSpec`` JSON that combines the portfolio
-    specification with an objective function, constraints, and weighting
-    scheme. Returns compact JSON — use :func:`json.dumps(json.loads(...), indent=2)`
-    to pretty-print if desired.
+    Parameters
+    ----------
+    spec_json : str
+        JSON-encoded ``PortfolioOptimizationSpec`` combining the portfolio
+        definition, objective, constraints, weighting scheme, and optional trade
+        universe.
+    market : MarketContext or str
+        Typed market context or serialized JSON with curves and scalars required
+        by metric expressions in the spec.
+
+    Returns
+    -------
+    str
+        Compact JSON-encoded ``PortfolioOptimizationResult``. Use
+        ``json.dumps(json.loads(...), indent=2)`` to pretty-print.
+
+    Raises
+    ------
+    FinstackOptimizationError
+        If the spec is infeasible, unbounded, or the solver fails.
+    FinstackValuationError
+        If a required metric cannot be valued for a candidate position.
+    ValueError
+        If ``spec_json`` or market JSON is malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import optimize_portfolio
+    >>> result_json = optimize_portfolio(spec_json, market)  # doctest: +SKIP
     """
     ...
 
@@ -630,23 +747,154 @@ def kyle_lambda(volumes: list[float], returns: list[float]) -> float | None:
     ...
 
 def brinson_fachler(sectors_json: str) -> str:
-    """Compute single-period Brinson-Fachler attribution from sector JSON."""
+    """Compute single-period Brinson-Fachler attribution from sector JSON.
+
+    Parameters
+    ----------
+    sectors_json : str
+        JSON array of ``SectorPeriod`` objects with ``sector``,
+        ``portfolio_weight``, ``benchmark_weight``, ``portfolio_return``, and
+        ``benchmark_return`` fields. Returns are simple decimal returns for the
+        period (e.g. ``0.02`` for +2%).
+
+    Returns
+    -------
+    str
+        JSON-serialized ``BrinsonPeriodResult`` with allocation, selection, and
+        interaction effects plus total active return.
+
+    Raises
+    ------
+    PortfolioError
+        If sector weights do not sum to one or returns are invalid.
+    ValueError
+        If ``sectors_json`` is malformed.
+
+    Sources
+    -------
+    See ``docs/REFERENCES.md#brinson-fachler-1985``.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import brinson_fachler
+    >>> result_json = brinson_fachler(sectors_json)  # doctest: +SKIP
+    """
     ...
 
 def carino_link(periods_json: str) -> str:
-    """Compute Carino-linked multi-period Brinson attribution from period JSON."""
+    """Compute Carino-linked multi-period Brinson attribution from period JSON.
+
+    Parameters
+    ----------
+    periods_json : str
+        JSON array of periods, where each period is an array of ``SectorPeriod``
+        objects (same schema as :func:`brinson_fachler`).
+
+    Returns
+    -------
+    str
+        JSON-serialized ``CarinoLinkedAttribution`` with linked allocation,
+        selection, and interaction effects across periods.
+
+    Raises
+    ------
+    PortfolioError
+        If any period fails Brinson validation.
+    ValueError
+        If ``periods_json`` is malformed.
+
+    Sources
+    -------
+    See ``docs/REFERENCES.md#carino-1999``.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import carino_link
+    >>> linked_json = carino_link(periods_json)  # doctest: +SKIP
+    """
     ...
 
 def twrr_modified_dietz(period_json: str) -> float | None:
-    """Compute a Modified-Dietz TWRR sub-period return from period JSON."""
+    """Compute a Modified-Dietz TWRR sub-period return from period JSON.
+
+    Parameters
+    ----------
+    period_json : str
+        JSON-encoded ``TwrrPeriod`` with beginning market value, external
+        cashflows, and ending market value for the sub-period.
+
+    Returns
+    -------
+    float or None
+        Sub-period time-weighted return as a decimal, or ``None`` when the
+        period cannot be computed (e.g. zero denominator).
+
+    Raises
+    ------
+    ValueError
+        If ``period_json`` is malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import twrr_modified_dietz
+    >>> r = twrr_modified_dietz(period_json)  # doctest: +SKIP
+    """
     ...
 
 def twrr_linked(returns_json: str, horizon_years: float) -> str | None:
-    """Geometrically link TWRR sub-period returns from returns JSON."""
+    """Geometrically link TWRR sub-period returns over a horizon.
+
+    Parameters
+    ----------
+    returns_json : str
+        JSON array of sub-period decimal returns (e.g. from Modified Dietz).
+    horizon_years : float
+        Reporting horizon in years used to annualize the linked return.
+
+    Returns
+    -------
+    str or None
+        JSON-encoded linked return result, or ``None`` when linking fails (e.g.
+        empty return series).
+
+    Raises
+    ------
+    ValueError
+        If ``returns_json`` is malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import twrr_linked
+    >>> linked = twrr_linked(returns_json, horizon_years=1.0)  # doctest: +SKIP
+    """
     ...
 
 def mwr_xirr(cashflows_json: str) -> float:
-    """Compute money-weighted return via XIRR from dated cashflow JSON."""
+    """Compute money-weighted return via XIRR from dated cashflow JSON.
+
+    Parameters
+    ----------
+    cashflows_json : str
+        JSON array of ``DatedCashflow`` objects with ISO dates and signed amounts
+        (investments negative, distributions positive).
+
+    Returns
+    -------
+    float
+        Internal rate of return as a decimal annualized rate.
+
+    Raises
+    ------
+    PortfolioError
+        If XIRR does not converge or cashflows lack a sign change.
+    ValueError
+        If ``cashflows_json`` is malformed.
+
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import mwr_xirr
+    >>> irr = mwr_xirr(cashflows_json)  # doctest: +SKIP
+    """
     ...
 
 # ---------------------------------------------------------------------------
@@ -662,31 +910,55 @@ class FactorContribution:
         ...
 
     def to_json(self) -> str:
-        """Serialize this factor contribution to JSON."""
+        """Serialize this factor contribution to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def factor_id(self) -> str:
-        """Factor identifier."""
+        """Factor identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def absolute_risk(self) -> float:
-        """Absolute risk contribution."""
+        """Absolute risk contribution.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def relative_risk(self) -> float:
-        """Share of total portfolio risk."""
+        """Share of total portfolio risk.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def marginal_risk(self) -> float:
-        """Marginal risk contribution."""
+        """Marginal risk contribution.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionFactorContribution:
@@ -698,26 +970,46 @@ class PositionFactorContribution:
         ...
 
     def to_json(self) -> str:
-        """Serialize this position-factor contribution to JSON."""
+        """Serialize this position-factor contribution to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def factor_id(self) -> str:
-        """Factor identifier."""
+        """Factor identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def risk_contribution(self) -> float:
-        """Risk contribution for this position-factor pair."""
+        """Risk contribution for this position-factor pair.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionResidualContribution:
@@ -729,31 +1021,55 @@ class PositionResidualContribution:
         ...
 
     def to_json(self) -> str:
-        """Serialize this residual contribution to JSON."""
+        """Serialize this residual contribution to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def residual_variance(self) -> float:
-        """Residual variance assigned to this position."""
+        """Residual variance assigned to this position.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def source_kind(self) -> str:
-        """Source category used to derive residual risk."""
+        """Source category used to derive residual risk.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def source_issuer_id(self) -> str | None:
-        """Issuer identifier for issuer-sourced residual risk, if present."""
+        """Issuer identifier for issuer-sourced residual risk, if present.
+        Returns
+        -------
+        str or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class RiskDecomposition:
@@ -765,41 +1081,73 @@ class RiskDecomposition:
         ...
 
     def to_json(self) -> str:
-        """Serialize this risk decomposition to JSON."""
+        """Serialize this risk decomposition to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def total_risk(self) -> float:
-        """Total portfolio risk under the decomposition measure."""
+        """Total portfolio risk under the decomposition measure.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def measure_json(self) -> str:
-        """Risk measure specification as JSON."""
+        """Risk measure specification as JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def residual_risk(self) -> float:
-        """Residual risk not explained by factor contributions."""
+        """Residual risk not explained by factor contributions.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def factor_contributions(self) -> list[FactorContribution]:
-        """Factor-level risk contributions."""
+        """Factor-level risk contributions.
+        Returns
+        -------
+        list[FactorContribution]
+        """
         ...
 
     @property
     def position_factor_contributions(self) -> list[PositionFactorContribution]:
-        """Position-by-factor risk contributions."""
+        """Position-by-factor risk contributions.
+        Returns
+        -------
+        list[PositionFactorContribution]
+        """
         ...
 
     @property
     def position_residual_contributions(self) -> list[PositionResidualContribution]:
-        """Per-position residual risk contributions."""
+        """Per-position residual risk contributions.
+        Returns
+        -------
+        list[PositionResidualContribution]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionVarContribution:
@@ -811,36 +1159,64 @@ class PositionVarContribution:
         ...
 
     def to_json(self) -> str:
-        """Serialize this position VaR contribution to JSON."""
+        """Serialize this position VaR contribution to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def component_var(self) -> float:
-        """Component VaR assigned to this position."""
+        """Component VaR assigned to this position.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def relative_var(self) -> float:
-        """Share of total portfolio VaR."""
+        """Share of total portfolio VaR.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def marginal_var(self) -> float | None:
-        """Marginal VaR, if computed."""
+        """Marginal VaR, if computed.
+        Returns
+        -------
+        float or None
+        """
         ...
 
     @property
     def incremental_var(self) -> float | None:
-        """Incremental VaR, if requested in the decomposition config."""
+        """Incremental VaR, if requested in the decomposition config.
+        Returns
+        -------
+        float or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionEsContribution:
@@ -852,31 +1228,55 @@ class PositionEsContribution:
         ...
 
     def to_json(self) -> str:
-        """Serialize this position ES contribution to JSON."""
+        """Serialize this position ES contribution to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def component_es(self) -> float:
-        """Component expected shortfall assigned to this position."""
+        """Component expected shortfall assigned to this position.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def relative_es(self) -> float:
-        """Share of total portfolio expected shortfall."""
+        """Share of total portfolio expected shortfall.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def marginal_es(self) -> float | None:
-        """Marginal expected shortfall, if computed."""
+        """Marginal expected shortfall, if computed.
+        Returns
+        -------
+        float or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionRiskDecomposition:
@@ -888,51 +1288,91 @@ class PositionRiskDecomposition:
         ...
 
     def to_json(self) -> str:
-        """Serialize this position risk decomposition to JSON."""
+        """Serialize this position risk decomposition to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def portfolio_var(self) -> float:
-        """Portfolio VaR."""
+        """Portfolio VaR.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def portfolio_es(self) -> float:
-        """Portfolio expected shortfall."""
+        """Portfolio expected shortfall.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def confidence(self) -> float:
-        """Confidence level used for VaR/ES."""
+        """Confidence level used for VaR/ES.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def n_positions(self) -> int:
-        """Number of positions included in the decomposition."""
+        """Number of positions included in the decomposition.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def method(self) -> str:
-        """Decomposition method label."""
+        """Decomposition method label.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def euler_residual(self) -> float | None:
-        """Euler allocation residual, if reported."""
+        """Euler allocation residual, if reported.
+        Returns
+        -------
+        float or None
+        """
         ...
 
     @property
     def var_contributions(self) -> list[PositionVarContribution]:
-        """Per-position VaR contributions."""
+        """Per-position VaR contributions.
+        Returns
+        -------
+        list[PositionVarContribution]
+        """
         ...
 
     @property
     def es_contributions(self) -> list[PositionEsContribution]:
-        """Per-position expected shortfall contributions."""
+        """Per-position expected shortfall contributions.
+        Returns
+        -------
+        list[PositionEsContribution]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionBudgetEntry:
@@ -944,36 +1384,64 @@ class PositionBudgetEntry:
         ...
 
     def to_json(self) -> str:
-        """Serialize this risk-budget entry to JSON."""
+        """Serialize this risk-budget entry to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def actual_component_var(self) -> float:
-        """Actual component VaR for this position."""
+        """Actual component VaR for this position.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def target_component_var(self) -> float:
-        """Target component VaR for this position."""
+        """Target component VaR for this position.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def utilization(self) -> float:
-        """Actual-to-target utilization ratio."""
+        """Actual-to-target utilization ratio.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def excess(self) -> float:
-        """Actual component VaR less target component VaR."""
+        """Actual component VaR less target component VaR.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class RiskBudgetResult:
@@ -985,26 +1453,46 @@ class RiskBudgetResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize this risk-budget result to JSON."""
+        """Serialize this risk-budget result to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def total_overbudget(self) -> float:
-        """Total amount above target risk budgets."""
+        """Total amount above target risk budgets.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def has_breach(self) -> bool:
-        """Whether any position exceeds the utilization threshold."""
+        """Whether any position exceeds the utilization threshold.
+        Returns
+        -------
+        bool
+        """
         ...
 
     @property
     def positions(self) -> list[PositionBudgetEntry]:
-        """Per-position risk-budget entries."""
+        """Per-position risk-budget entries.
+        Returns
+        -------
+        list[PositionBudgetEntry]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class FactorContributionDelta:
@@ -1016,26 +1504,46 @@ class FactorContributionDelta:
         ...
 
     def to_json(self) -> str:
-        """Serialize this factor contribution delta to JSON."""
+        """Serialize this factor contribution delta to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def factor_id(self) -> str:
-        """Factor identifier."""
+        """Factor identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def absolute_change(self) -> float:
-        """Absolute contribution change."""
+        """Absolute contribution change.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def relative_change(self) -> float:
-        """Relative contribution change."""
+        """Relative contribution change.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class WhatIfResult:
@@ -1047,26 +1555,46 @@ class WhatIfResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize this what-if result to JSON."""
+        """Serialize this what-if result to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def before(self) -> RiskDecomposition:
-        """Baseline risk decomposition."""
+        """Baseline risk decomposition.
+        Returns
+        -------
+        RiskDecomposition
+        """
         ...
 
     @property
     def after(self) -> RiskDecomposition:
-        """Post-scenario risk decomposition."""
+        """Post-scenario risk decomposition.
+        Returns
+        -------
+        RiskDecomposition
+        """
         ...
 
     @property
     def delta(self) -> list[FactorContributionDelta]:
-        """Per-factor contribution changes."""
+        """Per-factor contribution changes.
+        Returns
+        -------
+        list[FactorContributionDelta]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class StressResult:
@@ -1078,26 +1606,46 @@ class StressResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize this stress result to JSON."""
+        """Serialize this stress result to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def total_pnl(self) -> float:
-        """Total portfolio P&L under the stress scenario."""
+        """Total portfolio P&L under the stress scenario.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def position_pnl(self) -> list[tuple[str, float]]:
-        """Per-position P&L pairs."""
+        """Per-position P&L pairs.
+        Returns
+        -------
+        list[tuple[str, float]]
+        """
         ...
 
     @property
     def stressed_decomposition(self) -> RiskDecomposition:
-        """Risk decomposition after applying the stress."""
+        """Risk decomposition after applying the stress.
+        Returns
+        -------
+        RiskDecomposition
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class StressPositionEntry:
@@ -1109,31 +1657,55 @@ class StressPositionEntry:
         ...
 
     def to_json(self) -> str:
-        """Serialize this stress position entry to JSON."""
+        """Serialize this stress position entry to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def avg_tail_pnl(self) -> float:
-        """Average P&L across tail scenarios."""
+        """Average P&L across tail scenarios.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def pct_of_tail_loss(self) -> float:
-        """Share of aggregate tail loss."""
+        """Share of aggregate tail loss.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def worst_scenario_pnl(self) -> float:
-        """Worst single-scenario P&L for this position."""
+        """Worst single-scenario P&L for this position.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class TailScenarioBreakdown:
@@ -1145,26 +1717,46 @@ class TailScenarioBreakdown:
         ...
 
     def to_json(self) -> str:
-        """Serialize this tail scenario breakdown to JSON."""
+        """Serialize this tail scenario breakdown to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def scenario_index(self) -> int:
-        """Scenario index in the source P&L matrix."""
+        """Scenario index in the source P&L matrix.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def portfolio_pnl(self) -> float:
-        """Portfolio P&L for this tail scenario."""
+        """Portfolio P&L for this tail scenario.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def position_pnls(self) -> list[tuple[str, float]]:
-        """Per-position P&L pairs for this scenario."""
+        """Per-position P&L pairs for this scenario.
+        Returns
+        -------
+        list[tuple[str, float]]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class StressAttribution:
@@ -1176,31 +1768,55 @@ class StressAttribution:
         ...
 
     def to_json(self) -> str:
-        """Serialize this stress attribution to JSON."""
+        """Serialize this stress attribution to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def var_threshold(self) -> float:
-        """VaR threshold used to select tail scenarios."""
+        """VaR threshold used to select tail scenarios.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def n_tail_scenarios(self) -> int:
-        """Number of scenarios classified as tail scenarios."""
+        """Number of scenarios classified as tail scenarios.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def position_contributions(self) -> list[StressPositionEntry]:
-        """Per-position tail-loss contributions."""
+        """Per-position tail-loss contributions.
+        Returns
+        -------
+        list[StressPositionEntry]
+        """
         ...
 
     @property
     def tail_scenarios(self) -> list[TailScenarioBreakdown]:
-        """Detailed tail scenario breakdowns."""
+        """Detailed tail scenario breakdowns.
+        Returns
+        -------
+        list[TailScenarioBreakdown]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionAssignment:
@@ -1217,30 +1833,54 @@ class PositionAssignment:
         ...
 
     def to_json(self) -> str:
-        """Serialize this position assignment to JSON."""
+        """Serialize this position assignment to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def n_mappings(self) -> int:
-        """Number of dependency-to-factor mappings."""
+        """Number of dependency-to-factor mappings.
+        Returns
+        -------
+        int
+        """
         ...
 
     def mappings_json(self) -> str:
-        """Return detailed dependency-to-factor mappings as JSON."""
+        """Return detailed dependency-to-factor mappings as JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def factor_ids(self) -> list[str]:
-        """Matched factor identifiers."""
+        """Matched factor identifiers.
+        Returns
+        -------
+        list[str]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class UnmatchedEntry:
@@ -1252,20 +1892,36 @@ class UnmatchedEntry:
         ...
 
     def to_json(self) -> str:
-        """Serialize this unmatched entry to JSON."""
+        """Serialize this unmatched entry to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     def dependency_json(self) -> str:
-        """Return the unmatched dependency payload as JSON."""
+        """Return the unmatched dependency payload as JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class FactorAssignmentReport:
@@ -1277,21 +1933,37 @@ class FactorAssignmentReport:
         ...
 
     def to_json(self) -> str:
-        """Serialize this factor assignment report to JSON."""
+        """Serialize this factor assignment report to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def assignments(self) -> list[PositionAssignment]:
-        """Matched assignments by position."""
+        """Matched assignments by position.
+        Returns
+        -------
+        list[PositionAssignment]
+        """
         ...
 
     @property
     def unmatched(self) -> list[UnmatchedEntry]:
-        """Dependencies that could not be mapped to factors."""
+        """Dependencies that could not be mapped to factors.
+        Returns
+        -------
+        list[UnmatchedEntry]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class LevelVolContribution:
@@ -1299,21 +1971,37 @@ class LevelVolContribution:
 
     @property
     def level_name(self) -> str:
-        """Hierarchy level name."""
+        """Hierarchy level name.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def total(self) -> float:
-        """Total contribution for this level."""
+        """Total contribution for this level.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def by_bucket(self) -> dict[str, float]:
-        """Contribution by hierarchy bucket."""
+        """Contribution by hierarchy bucket.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionVolContribution:
@@ -1321,26 +2009,46 @@ class PositionVolContribution:
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def factor_total(self) -> float:
-        """Factor-driven volatility contribution."""
+        """Factor-driven volatility contribution.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def idiosyncratic(self) -> float:
-        """Idiosyncratic volatility contribution."""
+        """Idiosyncratic volatility contribution.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def total(self) -> float:
-        """Total position volatility contribution."""
+        """Total position volatility contribution.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class CreditVolReport:
@@ -1348,36 +2056,64 @@ class CreditVolReport:
 
     @property
     def total(self) -> float:
-        """Total portfolio volatility under the report measure."""
+        """Total portfolio volatility under the report measure.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def measure_json(self) -> str:
-        """Risk measure specification as JSON."""
+        """Risk measure specification as JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def generic(self) -> float:
-        """Generic factor contribution."""
+        """Generic factor contribution.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def idiosyncratic_total(self) -> float:
-        """Aggregate idiosyncratic contribution."""
+        """Aggregate idiosyncratic contribution.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def by_level(self) -> list[LevelVolContribution]:
-        """Volatility contribution by hierarchy level."""
+        """Volatility contribution by hierarchy level.
+        Returns
+        -------
+        list[LevelVolContribution]
+        """
         ...
 
     @property
     def by_position(self) -> list[PositionVolContribution] | None:
-        """Optional per-position volatility contributions."""
+        """Optional per-position volatility contributions.
+        Returns
+        -------
+        list[PositionVolContribution] or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class VolHorizon:
@@ -1410,21 +2146,37 @@ class VolHorizon:
 
     @property
     def kind(self) -> str:
-        """Horizon variant label."""
+        """Horizon variant label.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def n(self) -> int | None:
-        """Step count for ``n_steps`` horizons."""
+        """Step count for ``n_steps`` horizons.
+        Returns
+        -------
+        int or None
+        """
         ...
 
     @property
     def years_value(self) -> float | None:
-        """Year fraction for ``years`` horizons."""
+        """Year fraction for ``years`` horizons.
+        Returns
+        -------
+        float or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class DecompositionConfig:
@@ -1446,7 +2198,11 @@ class DecompositionConfig:
         ...
 
     def with_incremental(self) -> DecompositionConfig:
-        """Return a copy that requests incremental VaR."""
+        """Return a copy that requests incremental VaR.
+        Returns
+        -------
+        DecompositionConfig
+        """
         ...
 
     def with_seed(self, seed: int) -> DecompositionConfig:
@@ -1455,26 +2211,46 @@ class DecompositionConfig:
 
     @property
     def confidence(self) -> float:
-        """VaR/ES confidence level."""
+        """VaR/ES confidence level.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def method(self) -> str:
-        """Decomposition method label."""
+        """Decomposition method label.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def compute_incremental(self) -> bool:
-        """Whether incremental VaR is requested."""
+        """Whether incremental VaR is requested.
+        Returns
+        -------
+        bool
+        """
         ...
 
     @property
     def seed(self) -> int | None:
-        """Optional deterministic seed."""
+        """Optional deterministic seed.
+        Returns
+        -------
+        int or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 def parametric_var_decomposition_typed(
@@ -1664,11 +2440,19 @@ class WeightingScheme:
 
     @property
     def label(self) -> str:
-        """Rust enum label for this weighting scheme."""
+        """Rust enum label for this weighting scheme.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class MissingMetricPolicy:
@@ -1691,11 +2475,19 @@ class MissingMetricPolicy:
 
     @property
     def label(self) -> str:
-        """Rust enum label for this policy."""
+        """Rust enum label for this policy.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class Inequality:
@@ -1718,11 +2510,19 @@ class Inequality:
 
     @property
     def label(self) -> str:
-        """Operator label."""
+        """Operator label.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class TradeDirection:
@@ -1745,11 +2545,19 @@ class TradeDirection:
 
     @property
     def label(self) -> str:
-        """Direction label."""
+        """Direction label.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class TradeType:
@@ -1772,11 +2580,19 @@ class TradeType:
 
     @property
     def label(self) -> str:
-        """Trade-type label."""
+        """Trade-type label.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PerPositionMetric:
@@ -1829,16 +2645,28 @@ class PerPositionMetric:
         ...
 
     def to_json(self) -> str:
-        """Serialize this per-position metric expression to JSON."""
+        """Serialize this per-position metric expression to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def kind(self) -> str:
-        """Metric-source variant label."""
+        """Metric-source variant label.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PositionFilter:
@@ -1891,16 +2719,28 @@ class PositionFilter:
         ...
 
     def to_json(self) -> str:
-        """Serialize this position filter to JSON."""
+        """Serialize this position filter to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def kind(self) -> str:
-        """Filter variant label."""
+        """Filter variant label.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class MetricExpr:
@@ -1930,16 +2770,28 @@ class MetricExpr:
         ...
 
     def to_json(self) -> str:
-        """Serialize this metric expression to JSON."""
+        """Serialize this metric expression to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def kind(self) -> str:
-        """Metric-expression variant label."""
+        """Metric-expression variant label.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class Objective:
@@ -1961,21 +2813,37 @@ class Objective:
         ...
 
     def to_json(self) -> str:
-        """Serialize this optimization objective to JSON."""
+        """Serialize this optimization objective to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def direction(self) -> str:
-        """Optimization direction label."""
+        """Optimization direction label.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def expr(self) -> MetricExpr:
-        """Metric expression being optimized."""
+        """Metric expression being optimized.
+        Returns
+        -------
+        MetricExpr
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class Constraint:
@@ -2049,21 +2917,37 @@ class Constraint:
         ...
 
     def to_json(self) -> str:
-        """Serialize this optimization constraint to JSON."""
+        """Serialize this optimization constraint to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def kind(self) -> str:
-        """Constraint variant label."""
+        """Constraint variant label.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def label(self) -> str | None:
-        """Optional human-readable label."""
+        """Optional human-readable label.
+        Returns
+        -------
+        str or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class CandidatePosition:
@@ -2075,31 +2959,55 @@ class CandidatePosition:
 
     @property
     def id(self) -> str:
-        """Candidate position identifier."""
+        """Candidate position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def entity_id(self) -> str:
-        """Candidate entity identifier."""
+        """Candidate entity identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def max_weight(self) -> float:
-        """Maximum allowed candidate weight."""
+        """Maximum allowed candidate weight.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def min_weight(self) -> float:
-        """Minimum allowed candidate weight."""
+        """Minimum allowed candidate weight.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def instrument_id(self) -> str:
-        """Underlying instrument identifier."""
+        """Underlying instrument identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class TradeUniverse:
@@ -2112,26 +3020,46 @@ class TradeUniverse:
 
     @property
     def tradeable_filter(self) -> PositionFilter:
-        """Filter selecting tradeable positions."""
+        """Filter selecting tradeable positions.
+        Returns
+        -------
+        PositionFilter
+        """
         ...
 
     @property
     def held_filter(self) -> PositionFilter | None:
-        """Optional filter selecting held positions."""
+        """Optional filter selecting held positions.
+        Returns
+        -------
+        PositionFilter or None
+        """
         ...
 
     @property
     def candidates(self) -> list[CandidatePosition]:
-        """Candidate new positions."""
+        """Candidate new positions.
+        Returns
+        -------
+        list[CandidatePosition]
+        """
         ...
 
     @property
     def allow_short_candidates(self) -> bool:
-        """Whether candidates may receive negative weights."""
+        """Whether candidates may receive negative weights.
+        Returns
+        -------
+        bool
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class OptimizationStatus:
@@ -2168,31 +3096,55 @@ class OptimizationStatus:
         ...
 
     def to_json(self) -> str:
-        """Serialize this optimization status to JSON."""
+        """Serialize this optimization status to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def kind(self) -> str:
-        """Status variant label."""
+        """Status variant label.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def is_feasible(self) -> bool:
-        """Whether the status includes a feasible solution."""
+        """Whether the status includes a feasible solution.
+        Returns
+        -------
+        bool
+        """
         ...
 
     @property
     def conflicting_constraints(self) -> list[str]:
-        """Constraint labels implicated in infeasibility."""
+        """Constraint labels implicated in infeasibility.
+        Returns
+        -------
+        list[str]
+        """
         ...
 
     @property
     def message(self) -> str | None:
-        """Error or diagnostic message, if present."""
+        """Error or diagnostic message, if present.
+        Returns
+        -------
+        str or None
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class TradeSpec:
@@ -2204,56 +3156,100 @@ class TradeSpec:
         ...
 
     def to_json(self) -> str:
-        """Serialize this trade specification to JSON."""
+        """Serialize this trade specification to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def position_id(self) -> str:
-        """Portfolio position identifier."""
+        """Portfolio position identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def instrument_id(self) -> str:
-        """Underlying instrument identifier."""
+        """Underlying instrument identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def trade_type(self) -> TradeType:
-        """Trade type."""
+        """Trade type.
+        Returns
+        -------
+        TradeType
+        """
         ...
 
     @property
     def direction(self) -> TradeDirection:
-        """Trade direction."""
+        """Trade direction.
+        Returns
+        -------
+        TradeDirection
+        """
         ...
 
     @property
     def current_quantity(self) -> float:
-        """Current quantity."""
+        """Current quantity.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def target_quantity(self) -> float:
-        """Target quantity."""
+        """Target quantity.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def delta_quantity(self) -> float:
-        """Target quantity less current quantity."""
+        """Target quantity less current quantity.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def current_weight(self) -> float:
-        """Current portfolio weight."""
+        """Current portfolio weight.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def target_weight(self) -> float:
-        """Target portfolio weight."""
+        """Target portfolio weight.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PortfolioOptimizationSpec:
@@ -2294,118 +3290,214 @@ class PortfolioOptimizationSpec:
         ...
 
     def to_json(self) -> str:
-        """Serialize this optimization specification to JSON."""
+        """Serialize this optimization specification to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def objective(self) -> Objective:
-        """Optimization objective."""
+        """Optimization objective.
+        Returns
+        -------
+        Objective
+        """
         ...
 
     @property
     def constraints(self) -> list[Constraint]:
-        """Optimization constraints."""
+        """Optimization constraints.
+        Returns
+        -------
+        list[Constraint]
+        """
         ...
 
     @property
     def weighting(self) -> WeightingScheme:
-        """Weighting scheme used by the optimization."""
+        """Weighting scheme used by the optimization.
+        Returns
+        -------
+        WeightingScheme
+        """
         ...
 
     @property
     def missing_metric_policy(self) -> MissingMetricPolicy:
-        """Policy for missing per-position metrics."""
+        """Policy for missing per-position metrics.
+        Returns
+        -------
+        MissingMetricPolicy
+        """
         ...
 
     @property
     def label(self) -> str | None:
-        """Optional human-readable label."""
+        """Optional human-readable label.
+        Returns
+        -------
+        str or None
+        """
         ...
 
     def portfolio_spec_json(self) -> str:
-        """Return the embedded portfolio specification JSON."""
+        """Return the embedded portfolio specification JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class PortfolioOptimizationResult:
     """Result of an optimization run (Serialize-only; no ``from_json``)."""
 
     def to_json(self) -> str:
-        """Serialize this optimization result to JSON."""
+        """Serialize this optimization result to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def status(self) -> OptimizationStatus:
-        """Optimization status."""
+        """Optimization status.
+        Returns
+        -------
+        OptimizationStatus
+        """
         ...
 
     @property
     def is_feasible(self) -> bool:
-        """Whether the solver returned a feasible portfolio."""
+        """Whether the solver returned a feasible portfolio.
+        Returns
+        -------
+        bool
+        """
         ...
 
     @property
     def objective_value(self) -> float:
-        """Objective value at the solution."""
+        """Objective value at the solution.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def current_weights(self) -> dict[str, float]:
-        """Current weights by position ID."""
+        """Current weights by position ID.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     @property
     def optimal_weights(self) -> dict[str, float]:
-        """Optimized target weights by position ID."""
+        """Optimized target weights by position ID.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     @property
     def weight_deltas(self) -> dict[str, float]:
-        """Target less current weight by position ID."""
+        """Target less current weight by position ID.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     @property
     def implied_quantities(self) -> dict[str, float]:
-        """Implied target quantities by position ID."""
+        """Implied target quantities by position ID.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     @property
     def metric_values(self) -> dict[str, float]:
-        """Portfolio metric values at the solution."""
+        """Portfolio metric values at the solution.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     @property
     def dual_values(self) -> dict[str, float]:
-        """Dual values by constraint label when available."""
+        """Dual values by constraint label when available.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     @property
     def constraint_slacks(self) -> dict[str, float]:
-        """Constraint slack values by constraint label."""
+        """Constraint slack values by constraint label.
+        Returns
+        -------
+        dict[str, float]
+        """
         ...
 
     @property
     def turnover(self) -> float:
-        """Total turnover implied by the solution."""
+        """Total turnover implied by the solution.
+        Returns
+        -------
+        float
+        """
         ...
 
     def to_trade_list(self) -> list[TradeSpec]:
-        """Convert weight deltas into trade specifications."""
+        """Convert weight deltas into trade specifications.
+        Returns
+        -------
+        list[TradeSpec]
+        """
         ...
 
     def new_position_trades(self) -> list[TradeSpec]:
-        """Return trade specs for new candidate positions only."""
+        """Return trade specs for new candidate positions only.
+        Returns
+        -------
+        list[TradeSpec]
+        """
         ...
 
     def binding_constraints(self) -> list[tuple[str, float]]:
-        """Return constraints with near-zero slack as ``(label, slack)`` pairs."""
+        """Return constraints with near-zero slack as ``(label, slack)`` pairs.
+        Returns
+        -------
+        list[tuple[str, float]]
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 def optimize_portfolio_typed(
@@ -2439,22 +3531,38 @@ class SensitivityMatrix:
 
     @property
     def position_ids(self) -> list[str]:
-        """Ordered position identifiers (row axis)."""
+        """Ordered position identifiers (row axis).
+        Returns
+        -------
+        list[str]
+        """
         ...
 
     @property
     def factor_ids(self) -> list[str]:
-        """Ordered factor identifiers (column axis)."""
+        """Ordered factor identifiers (column axis).
+        Returns
+        -------
+        list[str]
+        """
         ...
 
     @property
     def n_positions(self) -> int:
-        """Number of positions (rows)."""
+        """Number of positions (rows).
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def n_factors(self) -> int:
-        """Number of factors (columns)."""
+        """Number of factors (columns).
+        Returns
+        -------
+        int
+        """
         ...
 
     def delta(self, position_idx: int, factor_idx: int) -> float:
@@ -2500,7 +3608,11 @@ class SensitivityMatrix:
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 class FactorPnlProfile:
@@ -2518,17 +3630,29 @@ class FactorPnlProfile:
 
     @property
     def factor_id(self) -> str:
-        """Factor identifier."""
+        """Factor identifier.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def shifts(self) -> list[float]:
-        """Scenario shift coordinates (bump-size multiples)."""
+        """Scenario shift coordinates (bump-size multiples).
+        Returns
+        -------
+        list[float]
+        """
         ...
 
     @property
     def position_pnls(self) -> list[list[float]]:
-        """Per-shift P&L vectors indexed as ``[shift_idx][position_idx]``."""
+        """Per-shift P&L vectors indexed as ``[shift_idx][position_idx]``.
+        Returns
+        -------
+        list[list[float]]
+        """
         ...
 
     def to_dataframe(self, position_ids: list[str]) -> pd.DataFrame:
@@ -2547,7 +3671,11 @@ class FactorPnlProfile:
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 def compute_factor_sensitivities(
@@ -2629,17 +3757,29 @@ class FactorRiskDecomposition:
 
     @property
     def total_risk(self) -> float:
-        """Total portfolio risk under the selected measure."""
+        """Total portfolio risk under the selected measure.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def measure(self) -> str:
-        """Risk measure used (e.g. ``"Variance"``, ``"Volatility"``)."""
+        """Risk measure used (e.g. ``"Variance"``, ``"Volatility"``).
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def residual_risk(self) -> float:
-        """Residual (idiosyncratic) risk not attributed to any factor."""
+        """Residual (idiosyncratic) risk not attributed to any factor.
+        Returns
+        -------
+        float
+        """
         ...
 
     def factor_contributions(self) -> list[dict[str, object]]:
@@ -2686,7 +3826,11 @@ class FactorRiskDecomposition:
         ...
 
     def __repr__(self) -> str:
-        """Return a concise debug representation."""
+        """Return a concise debug representation.
+        Returns
+        -------
+        str
+        """
         ...
 
 def decompose_factor_risk(

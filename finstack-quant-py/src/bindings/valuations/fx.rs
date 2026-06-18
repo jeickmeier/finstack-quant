@@ -9,7 +9,7 @@ use pyo3::types::{PyAny, PyDict, PyList};
 
 macro_rules! fx_class {
     ($py_name:literal, $rust_name:ident, $type_tag:literal) => {
-        #[pyclass(name = $py_name, module = "finstack_quant.valuations.fx", skip_from_py_object)]
+        #[pyclass(name = $py_name, module = "finstack_quant.valuations.instruments.fx", skip_from_py_object)]
         #[derive(Clone)]
         pub(crate) struct $rust_name {
             json: String,
@@ -215,7 +215,7 @@ fx_option_class!("FxBarrierOption", PyFxBarrierOption, "fx_barrier_option");
 fx_class!("FxVarianceSwap", PyFxVarianceSwap, "fx_variance_swap");
 fx_option_class!("QuantoOption", PyQuantoOption, "quanto_option");
 
-/// Register the `finstack_quant.valuations.fx` submodule.
+/// Register the FX instrument wrapper submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "fx")?;
     m.setattr("__doc__", "Direct FX valuation instrument wrappers.")?;

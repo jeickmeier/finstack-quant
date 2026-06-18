@@ -423,7 +423,11 @@ class BaseCorrelationCurve:
 
     @property
     def id(self) -> str:
-        """Curve identifier string."""
+        """Curve identifier string.
+        Returns
+        -------
+        str
+        """
         ...
 
     def correlation(self, detachment_pct: float) -> float:
@@ -447,12 +451,20 @@ class CreditIndexData:
 
     @property
     def num_constituents(self) -> int:
-        """Number of constituents in the index."""
+        """Number of constituents in the index.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def recovery_rate(self) -> float:
-        """Index recovery rate."""
+        """Index recovery rate.
+        Returns
+        -------
+        float
+        """
         ...
 
     def __repr__(self) -> str: ...
@@ -1120,7 +1132,11 @@ class FxMatrix:
     """
 
     def __init__(self) -> None:
-        """Create an empty FX matrix."""
+        """Create an empty FX matrix.
+        Returns
+        -------
+        None
+        """
         ...
 
     def set_quote(
@@ -1197,7 +1213,11 @@ class MarketContext:
     """
 
     def __init__(self) -> None:
-        """Create an empty market context."""
+        """Create an empty market context.
+        Returns
+        -------
+        None
+        """
         ...
 
     def insert(

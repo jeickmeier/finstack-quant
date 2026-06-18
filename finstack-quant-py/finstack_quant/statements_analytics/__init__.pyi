@@ -720,15 +720,57 @@ class ScorecardMetric:
         description: str | None = None,
     ) -> None: ...
     @property
-    def name(self) -> str: ...
+    def name(self) -> str:
+        """Value of ``name``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def formula(self) -> str: ...
+    def formula(self) -> str:
+        """Value of ``formula``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def weight(self) -> float: ...
+    def weight(self) -> float:
+        """Value of ``weight``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def description(self) -> str | None: ...
-    def thresholds_json(self) -> str: ...
-    def to_json(self) -> str: ...
+    def description(self) -> str | None:
+        """Value of ``description``.
+
+        Returns
+        -------
+        str or None
+        """
+        ...
+    def thresholds_json(self) -> str:
+        """Value of ``thresholds_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> ScorecardMetric: ...
 
@@ -748,15 +790,57 @@ class ScorecardConfig:
         period: str | None = None,
     ) -> None: ...
     @property
-    def rating_scale(self) -> str: ...
+    def rating_scale(self) -> str:
+        """Value of ``rating_scale``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def min_rating(self) -> str | None: ...
+    def min_rating(self) -> str | None:
+        """Value of ``min_rating``.
+
+        Returns
+        -------
+        str or None
+        """
+        ...
     @property
-    def period(self) -> str | None: ...
+    def period(self) -> str | None:
+        """Value of ``period``.
+
+        Returns
+        -------
+        str or None
+        """
+        ...
     @property
-    def metrics(self) -> list[ScorecardMetric]: ...
-    def validate(self) -> None: ...
-    def to_json(self) -> str: ...
+    def metrics(self) -> list[ScorecardMetric]:
+        """Value of ``metrics``.
+
+        Returns
+        -------
+        list[ScorecardMetric]
+        """
+        ...
+    def validate(self) -> None:
+        """Value of ``validate``.
+
+        Returns
+        -------
+        None
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> ScorecardConfig: ...
 
@@ -768,26 +852,82 @@ class ScorecardReport:
     """
 
     @property
-    def status(self) -> str: ...
+    def status(self) -> str:
+        """Value of ``status``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def message(self) -> str: ...
+    def message(self) -> str:
+        """Value of ``message``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def warnings(self) -> list[str]: ...
+    def warnings(self) -> list[str]:
+        """Value of ``warnings``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
     @property
-    def errors(self) -> list[str]: ...
-    def data_json(self) -> str: ...
-    def to_json(self) -> str: ...
+    def errors(self) -> list[str]:
+        """Value of ``errors``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
+    def data_json(self) -> str:
+        """Value of ``data_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> ScorecardReport: ...
 
 class CreditScorecardExtension:
     """Credit scorecard extension for rating assignment and stress testing."""
 
-    def __init__(self) -> None: ...
+    def __init__(self) -> None:
+        """Value of ``__init__``.
+
+        Returns
+        -------
+        None
+        """
+        ...
     @staticmethod
     def with_config(config: ScorecardConfig) -> CreditScorecardExtension: ...
     def set_config(self, config: ScorecardConfig) -> None: ...
-    def config(self) -> ScorecardConfig | None: ...
+    def config(self) -> ScorecardConfig | None:
+        """Value of ``config``.
+
+        Returns
+        -------
+        ScorecardConfig or None
+        """
+        ...
     def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> ScorecardReport: ...
 
 def validate_scorecard_config(config: ScorecardConfig) -> None:
@@ -807,7 +947,14 @@ class AccountType:
 
     @staticmethod
     def from_str(value: str) -> AccountType: ...
-    def value(self) -> str: ...
+    def value(self) -> str:
+        """Value of ``value``.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 class CorkscrewAccount:
     """Single corkscrew account: balance node + change nodes + optional beginning override."""
@@ -820,14 +967,49 @@ class CorkscrewAccount:
         beginning_balance_node: str | None = None,
     ) -> None: ...
     @property
-    def node_id(self) -> str: ...
+    def node_id(self) -> str:
+        """Value of ``node_id``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def account_type(self) -> AccountType: ...
+    def account_type(self) -> AccountType:
+        """Value of ``account_type``.
+
+        Returns
+        -------
+        AccountType
+        """
+        ...
     @property
-    def changes(self) -> list[str]: ...
+    def changes(self) -> list[str]:
+        """Value of ``changes``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
     @property
-    def beginning_balance_node(self) -> str | None: ...
-    def to_json(self) -> str: ...
+    def beginning_balance_node(self) -> str | None:
+        """Value of ``beginning_balance_node``.
+
+        Returns
+        -------
+        str or None
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> CorkscrewAccount: ...
 
@@ -841,12 +1023,40 @@ class CorkscrewConfig:
         fail_on_error: bool = False,
     ) -> None: ...
     @property
-    def accounts(self) -> list[CorkscrewAccount]: ...
+    def accounts(self) -> list[CorkscrewAccount]:
+        """Value of ``accounts``.
+
+        Returns
+        -------
+        list[CorkscrewAccount]
+        """
+        ...
     @property
-    def tolerance(self) -> float: ...
+    def tolerance(self) -> float:
+        """Value of ``tolerance``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def fail_on_error(self) -> bool: ...
-    def to_json(self) -> str: ...
+    def fail_on_error(self) -> bool:
+        """Value of ``fail_on_error``.
+
+        Returns
+        -------
+        bool
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> CorkscrewConfig: ...
 
@@ -854,26 +1064,82 @@ class CorkscrewReport:
     """Report produced by ``CorkscrewExtension.execute``."""
 
     @property
-    def status(self) -> str: ...
+    def status(self) -> str:
+        """Value of ``status``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def message(self) -> str: ...
+    def message(self) -> str:
+        """Value of ``message``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def warnings(self) -> list[str]: ...
+    def warnings(self) -> list[str]:
+        """Value of ``warnings``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
     @property
-    def errors(self) -> list[str]: ...
-    def data_json(self) -> str: ...
-    def to_json(self) -> str: ...
+    def errors(self) -> list[str]:
+        """Value of ``errors``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
+    def data_json(self) -> str:
+        """Value of ``data_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> CorkscrewReport: ...
 
 class CorkscrewExtension:
     """Corkscrew extension for balance-sheet roll-forward validation."""
 
-    def __init__(self) -> None: ...
+    def __init__(self) -> None:
+        """Value of ``__init__``.
+
+        Returns
+        -------
+        None
+        """
+        ...
     @staticmethod
     def with_config(config: CorkscrewConfig) -> CorkscrewExtension: ...
     def set_config(self, config: CorkscrewConfig) -> None: ...
-    def config(self) -> CorkscrewConfig | None: ...
+    def config(self) -> CorkscrewConfig | None:
+        """Value of ``config``.
+
+        Returns
+        -------
+        CorkscrewConfig or None
+        """
+        ...
     def execute(self, model: FinancialModelSpec | str, results: StatementResult | str) -> CorkscrewReport: ...
 
 # ---------------------------------------------------------------------------
@@ -944,21 +1210,84 @@ class SimpleLeaseSpec:
         occupancy: float = 1.0,
     ) -> None: ...
     @property
-    def node_id(self) -> str: ...
+    def node_id(self) -> str:
+        """Value of ``node_id``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def start(self) -> str: ...
+    def start(self) -> str:
+        """Value of ``start``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def end(self) -> str | None: ...
+    def end(self) -> str | None:
+        """Value of ``end``.
+
+        Returns
+        -------
+        str or None
+        """
+        ...
     @property
-    def base_rent(self) -> float: ...
+    def base_rent(self) -> float:
+        """Value of ``base_rent``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def growth_rate(self) -> float: ...
+    def growth_rate(self) -> float:
+        """Value of ``growth_rate``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def free_rent_periods(self) -> int: ...
+    def free_rent_periods(self) -> int:
+        """Value of ``free_rent_periods``.
+
+        Returns
+        -------
+        int
+        """
+        ...
     @property
-    def occupancy(self) -> float: ...
-    def validate(self) -> None: ...
-    def to_json(self) -> str: ...
+    def occupancy(self) -> float:
+        """Value of ``occupancy``.
+
+        Returns
+        -------
+        float
+        """
+        ...
+    def validate(self) -> None:
+        """Value of ``validate``.
+
+        Returns
+        -------
+        None
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> SimpleLeaseSpec: ...
 
@@ -967,10 +1296,31 @@ class RentStepSpec:
 
     def __init__(self, start: str, rent: float) -> None: ...
     @property
-    def start(self) -> str: ...
+    def start(self) -> str:
+        """Value of ``start``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def rent(self) -> float: ...
-    def to_json(self) -> str: ...
+    def rent(self) -> float:
+        """Value of ``rent``.
+
+        Returns
+        -------
+        float
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> RentStepSpec: ...
 
@@ -979,10 +1329,31 @@ class FreeRentWindowSpec:
 
     def __init__(self, start: str, periods: int) -> None: ...
     @property
-    def start(self) -> str: ...
+    def start(self) -> str:
+        """Value of ``start``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def periods(self) -> int: ...
-    def to_json(self) -> str: ...
+    def periods(self) -> int:
+        """Value of ``periods``.
+
+        Returns
+        -------
+        int
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> FreeRentWindowSpec: ...
 
@@ -998,17 +1369,66 @@ class RenewalSpec:
         free_rent_periods: int = 0,
     ) -> None: ...
     @property
-    def term_periods(self) -> int: ...
+    def term_periods(self) -> int:
+        """Value of ``term_periods``.
+
+        Returns
+        -------
+        int
+        """
+        ...
     @property
-    def probability(self) -> float: ...
+    def probability(self) -> float:
+        """Value of ``probability``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def downtime_periods(self) -> int: ...
+    def downtime_periods(self) -> int:
+        """Value of ``downtime_periods``.
+
+        Returns
+        -------
+        int
+        """
+        ...
     @property
-    def rent_factor(self) -> float: ...
+    def rent_factor(self) -> float:
+        """Value of ``rent_factor``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def free_rent_periods(self) -> int: ...
-    def validate(self) -> None: ...
-    def to_json(self) -> str: ...
+    def free_rent_periods(self) -> int:
+        """Value of ``free_rent_periods``.
+
+        Returns
+        -------
+        int
+        """
+        ...
+    def validate(self) -> None:
+        """Value of ``validate``.
+
+        Returns
+        -------
+        None
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> RenewalSpec: ...
 
@@ -1020,7 +1440,14 @@ class LeaseGrowthConvention:
 
     @staticmethod
     def from_str(value: str) -> LeaseGrowthConvention: ...
-    def value(self) -> str: ...
+    def value(self) -> str:
+        """Value of ``value``.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 class LeaseSpec:
     """Rich lease specification for rent-roll generation."""
@@ -1040,25 +1467,102 @@ class LeaseSpec:
         renewal: RenewalSpec | None = None,
     ) -> None: ...
     @property
-    def node_id(self) -> str: ...
+    def node_id(self) -> str:
+        """Value of ``node_id``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def start(self) -> str: ...
+    def start(self) -> str:
+        """Value of ``start``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def end(self) -> str | None: ...
+    def end(self) -> str | None:
+        """Value of ``end``.
+
+        Returns
+        -------
+        str or None
+        """
+        ...
     @property
-    def base_rent(self) -> float: ...
+    def base_rent(self) -> float:
+        """Value of ``base_rent``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def growth_rate(self) -> float: ...
+    def growth_rate(self) -> float:
+        """Value of ``growth_rate``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def growth_convention(self) -> LeaseGrowthConvention: ...
+    def growth_convention(self) -> LeaseGrowthConvention:
+        """Value of ``growth_convention``.
+
+        Returns
+        -------
+        LeaseGrowthConvention
+        """
+        ...
     @property
-    def free_rent_periods(self) -> int: ...
+    def free_rent_periods(self) -> int:
+        """Value of ``free_rent_periods``.
+
+        Returns
+        -------
+        int
+        """
+        ...
     @property
-    def occupancy(self) -> float: ...
+    def occupancy(self) -> float:
+        """Value of ``occupancy``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def renewal(self) -> RenewalSpec | None: ...
-    def validate(self) -> None: ...
-    def to_json(self) -> str: ...
+    def renewal(self) -> RenewalSpec | None:
+        """Value of ``renewal``.
+
+        Returns
+        -------
+        RenewalSpec or None
+        """
+        ...
+    def validate(self) -> None:
+        """Value of ``validate``.
+
+        Returns
+        -------
+        None
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> LeaseSpec: ...
 
@@ -1073,14 +1577,49 @@ class RentRollOutputNodes:
         rent_effective_node: str = "rent_effective",
     ) -> None: ...
     @property
-    def rent_pgi_node(self) -> str: ...
+    def rent_pgi_node(self) -> str:
+        """Value of ``rent_pgi_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def free_rent_node(self) -> str: ...
+    def free_rent_node(self) -> str:
+        """Value of ``free_rent_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def vacancy_loss_node(self) -> str: ...
+    def vacancy_loss_node(self) -> str:
+        """Value of ``vacancy_loss_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def rent_effective_node(self) -> str: ...
-    def to_json(self) -> str: ...
+    def rent_effective_node(self) -> str:
+        """Value of ``rent_effective_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> RentRollOutputNodes: ...
 
@@ -1092,17 +1631,45 @@ class ManagementFeeBase:
 
     @staticmethod
     def from_str(value: str) -> ManagementFeeBase: ...
-    def value(self) -> str: ...
+    def value(self) -> str:
+        """Value of ``value``.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 class ManagementFeeSpec:
     """Management fee specification (rate + base)."""
 
     def __init__(self, rate: float, base: ManagementFeeBase = ...) -> None: ...
     @property
-    def rate(self) -> float: ...
+    def rate(self) -> float:
+        """Value of ``rate``.
+
+        Returns
+        -------
+        float
+        """
+        ...
     @property
-    def base(self) -> ManagementFeeBase: ...
-    def to_json(self) -> str: ...
+    def base(self) -> ManagementFeeBase:
+        """Value of ``base``.
+
+        Returns
+        -------
+        ManagementFeeBase
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> ManagementFeeSpec: ...
 
@@ -1121,22 +1688,85 @@ class PropertyTemplateNodes:
         ncf_node: str = "ncf",
     ) -> None: ...
     @property
-    def rent_roll(self) -> RentRollOutputNodes: ...
+    def rent_roll(self) -> RentRollOutputNodes:
+        """Value of ``rent_roll``.
+
+        Returns
+        -------
+        RentRollOutputNodes
+        """
+        ...
     @property
-    def other_income_total_node(self) -> str: ...
+    def other_income_total_node(self) -> str:
+        """Value of ``other_income_total_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def egi_node(self) -> str: ...
+    def egi_node(self) -> str:
+        """Value of ``egi_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def management_fee_node(self) -> str: ...
+    def management_fee_node(self) -> str:
+        """Value of ``management_fee_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def opex_total_node(self) -> str: ...
+    def opex_total_node(self) -> str:
+        """Value of ``opex_total_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def noi_node(self) -> str: ...
+    def noi_node(self) -> str:
+        """Value of ``noi_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def capex_total_node(self) -> str: ...
+    def capex_total_node(self) -> str:
+        """Value of ``capex_total_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @property
-    def ncf_node(self) -> str: ...
-    def to_json(self) -> str: ...
+    def ncf_node(self) -> str:
+        """Value of ``ncf_node``.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def to_json(self) -> str:
+        """Value of ``to_json``.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @staticmethod
     def from_json(json: str) -> PropertyTemplateNodes: ...
 

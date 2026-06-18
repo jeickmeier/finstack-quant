@@ -241,52 +241,92 @@ class HorizonResult:
 
     @property
     def attribution(self) -> PnlAttribution:
-        """Full P&L attribution breakdown."""
+        """Full P&L attribution breakdown.
+        Returns
+        -------
+        PnlAttribution
+        """
         ...
 
     @property
     def initial_value(self) -> float:
-        """Initial instrument value."""
+        """Initial instrument value.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def terminal_value(self) -> float:
-        """Final instrument value after the scenario is applied."""
+        """Final instrument value after the scenario is applied.
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def horizon_days(self) -> int | None:
-        """Horizon in calendar days (``None`` if no time-roll)."""
+        """Horizon in calendar days (``None`` if no time-roll).
+        Returns
+        -------
+        int or None
+        """
         ...
 
     @property
     def total_return_pct(self) -> float:
-        """Total return as decimal fraction (0.05 = 5%)."""
+        """Total return as decimal fraction (0.05 = 5%).
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def annualized_return(self) -> float | None:
-        """Annualized return (``None`` if no time-roll)."""
+        """Annualized return (``None`` if no time-roll).
+        Returns
+        -------
+        float or None
+        """
         ...
 
     @property
     def operations_applied(self) -> int:
-        """Number of scenario operations applied."""
+        """Number of scenario operations applied.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def user_operations(self) -> int:
-        """Number of user-provided scenario operations before hierarchy expansion."""
+        """Number of user-provided scenario operations before hierarchy expansion.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def expanded_operations(self) -> int:
-        """Number of direct operations after hierarchy expansion and deduplication."""
+        """Number of direct operations after hierarchy expansion and deduplication.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def warnings(self) -> list[str]:
-        """Warnings emitted during scenario application (rendered Display form)."""
+        """Warnings emitted during scenario application (rendered Display form).
+        Returns
+        -------
+        list[str]
+        """
         ...
 
     @property
@@ -296,6 +336,10 @@ class HorizonResult:
         Each entry is a `Warning` record with a ``kind`` discriminator plus
         variant-specific fields, mirroring the WASM binding. Parse with
         ``json.loads(...)`` to dispatch on ``kind`` programmatically.
+
+        Returns
+        -------
+        str
         """
         ...
 
@@ -315,11 +359,19 @@ class HorizonResult:
         ...
 
     def to_json(self) -> str:
-        """Serialize the result to JSON."""
+        """Serialize the result to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def explain(self) -> str:
-        """Human-readable summary of horizon return and attribution."""
+        """Human-readable summary of horizon return and attribution.
+        Returns
+        -------
+        str
+        """
         ...
 
 def compute_horizon_return(
@@ -385,12 +437,20 @@ class CurveKind:
 
     @property
     def name(self) -> str:
-        """Variant name, e.g. ``"Discount"``."""
+        """Variant name, e.g. ``"Discount"``.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def value(self) -> str:
-        """Serialized wire value, e.g. ``"discount"`` or ``"par_cds"``."""
+        """Serialized wire value, e.g. ``"discount"`` or ``"par_cds"``.
+        Returns
+        -------
+        str
+        """
         ...
 
 class VolSurfaceKind:
@@ -475,7 +535,11 @@ class RateBindingSpec:
     @property
     def day_count(self) -> str | None: ...
     def to_json(self) -> str:
-        """Serialize to JSON."""
+        """Serialize to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     @classmethod
@@ -667,7 +731,11 @@ class OperationSpec:
         ...
 
     def to_json(self) -> str:
-        """Serialize to the canonical JSON wire format."""
+        """Serialize to the canonical JSON wire format.
+        Returns
+        -------
+        str
+        """
         ...
 
     @classmethod
@@ -677,5 +745,9 @@ class OperationSpec:
 
     @property
     def kind(self) -> str:
-        """Variant discriminator (the serde ``kind`` tag value)."""
+        """Variant discriminator (the serde ``kind`` tag value).
+        Returns
+        -------
+        str
+        """
         ...

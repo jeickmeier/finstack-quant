@@ -36,33 +36,28 @@ __all__ = [
 class MoneyEstimate:
     """Discounted Monte Carlo estimate with money units and confidence bands.
 
-    Args:
-        None
-
-    Returns:
-        N/A (instance type).
-
-    Example:
-        >>> from finstack_quant.monte_carlo import price_european_call
-        >>> r = price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=10_000)
-        >>> r.num_paths
-        10000
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import price_european_call
+    >>> r = price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=10_000)
+    >>> r.num_paths
+    10000
     """
 
     @property
     def mean(self) -> Money:
         """Discounted mean present value.
 
-        Args:
-            None
+        Returns
+        -------
+        Money
+            Mean PV with currency tag.
 
-        Returns:
-            Mean PV as tagged money.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import price_european_call
-            >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=1000).mean.amount > 0
-            True
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import price_european_call
+        >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=1000).mean.amount > 0
+        True
         """
         ...
 
@@ -70,16 +65,16 @@ class MoneyEstimate:
     def stderr(self) -> float:
         """Standard error of the discounted mean.
 
-        Args:
-            None
+        Returns
+        -------
+        float
+            Standard error in the same currency units as :attr:`mean`.
 
-        Returns:
-            Standard error (same currency units as mean amount).
-
-        Example:
-            >>> from finstack_quant.monte_carlo import price_european_call
-            >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=1000).stderr >= 0
-            True
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import price_european_call
+        >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=1000).stderr >= 0
+        True
         """
         ...
 
@@ -87,18 +82,10 @@ class MoneyEstimate:
     def std_dev(self) -> float | None:
         """Sample standard deviation of path discounted values, if available.
 
-        Args:
-            None
-
-        Returns:
-            Sample standard deviation, or None if not provided by the engine.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import price_european_call
-            >>> isinstance(
-            ...     price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=500).std_dev, (float, type(None))
-            ... )
-            True
+        Returns
+        -------
+        float or None
+            Sample standard deviation, or ``None`` if not captured by the engine.
         """
         ...
 
@@ -106,17 +93,17 @@ class MoneyEstimate:
     def ci_lower(self) -> Money:
         """Lower bound of the 95% confidence interval for the mean.
 
-        Args:
-            None
+        Returns
+        -------
+        Money
+            Lower CI bound.
 
-        Returns:
-            Lower CI bound as money.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import price_european_call
-            >>> r = price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000)
-            >>> r.ci_lower.amount <= r.mean.amount
-            True
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import price_european_call
+        >>> r = price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000)
+        >>> r.ci_lower.amount <= r.mean.amount
+        True
         """
         ...
 
@@ -124,17 +111,17 @@ class MoneyEstimate:
     def ci_upper(self) -> Money:
         """Upper bound of the 95% confidence interval for the mean.
 
-        Args:
-            None
+        Returns
+        -------
+        Money
+            Upper CI bound.
 
-        Returns:
-            Upper CI bound as money.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import price_european_call
-            >>> r = price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000)
-            >>> r.ci_upper.amount >= r.mean.amount
-            True
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import price_european_call
+        >>> r = price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000)
+        >>> r.ci_upper.amount >= r.mean.amount
+        True
         """
         ...
 
@@ -145,16 +132,16 @@ class MoneyEstimate:
         Equals the configured ``num_paths`` when antithetic variates are off,
         or half the number of simulated paths when antithetic pairing is on.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        int
             Path-estimator count.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import price_european_call
-            >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=1234).num_paths
-            1234
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import price_european_call
+        >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=1234).num_paths
+        1234
         """
         ...
 
@@ -174,11 +161,11 @@ class MoneyEstimate:
     def median(self) -> float | None:
         """Median of captured discounted path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            Median value, or None when percentile capture is disabled.
+        Returns
+        -------
+        float or None
+            Median discounted path value, or ``None`` when percentile capture is
+            disabled in the engine configuration.
         """
         ...
 
@@ -186,11 +173,11 @@ class MoneyEstimate:
     def percentile_25(self) -> float | None:
         """25th percentile of captured discounted path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            25th percentile value, or None when percentile capture is disabled.
+        Returns
+        -------
+        float or None
+            25th percentile of discounted path values, or ``None`` when
+            percentile capture is disabled.
         """
         ...
 
@@ -198,11 +185,11 @@ class MoneyEstimate:
     def percentile_75(self) -> float | None:
         """75th percentile of captured discounted path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            75th percentile value, or None when percentile capture is disabled.
+        Returns
+        -------
+        float or None
+            75th percentile of discounted path values, or ``None`` when
+            percentile capture is disabled.
         """
         ...
 
@@ -210,11 +197,11 @@ class MoneyEstimate:
     def min(self) -> float | None:
         """Minimum of captured discounted path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            Minimum sampled value, or None when range capture is disabled.
+        Returns
+        -------
+        float or None
+            Minimum sampled discounted value, or ``None`` when range capture is
+            disabled.
         """
         ...
 
@@ -222,59 +209,41 @@ class MoneyEstimate:
     def max(self) -> float | None:
         """Maximum of captured discounted path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            Maximum sampled value, or None when range capture is disabled.
+        Returns
+        -------
+        float or None
+            Maximum sampled discounted value, or ``None`` when range capture is
+            disabled.
         """
         ...
 
     def relative_stderr(self) -> float:
         """Relative standard error (stderr divided by absolute mean amount).
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        float
             Dimensionless relative stderr.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import price_european_call
-            >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=5000).relative_stderr() >= 0
-            True
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import price_european_call
+        >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=5000).relative_stderr() >= 0
+        True
         """
         ...
 
 class Estimate:
-    """Scalar Monte Carlo estimate without currency tagging.
-
-    Args:
-        None
-
-    Returns:
-        N/A (instance type).
-
-    Example:
-        >>> from finstack_quant.monte_carlo import Estimate
-        >>> hasattr(Estimate, "mean")
-        True
-    """
+    """Scalar Monte Carlo estimate without currency tagging."""
 
     @property
     def mean(self) -> float:
         """Point estimate (mean).
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        float
             Mean sample value.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import Estimate
-            >>> Estimate.__dict__.get("mean") is not None
-            True
         """
         ...
 
@@ -282,16 +251,10 @@ class Estimate:
     def stderr(self) -> float:
         """Standard error of the mean.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        float
             Standard error.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import Estimate
-            >>> Estimate.__dict__.get("stderr") is not None
-            True
         """
         ...
 
@@ -299,16 +262,10 @@ class Estimate:
     def std_dev(self) -> float | None:
         """Sample standard deviation, if available.
 
-        Args:
-            None
-
-        Returns:
-            Sample standard deviation or None.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import Estimate
-            >>> Estimate.__dict__.get("std_dev") is not None
-            True
+        Returns
+        -------
+        float or None
+            Sample standard deviation or ``None``.
         """
         ...
 
@@ -316,16 +273,10 @@ class Estimate:
     def ci_lower(self) -> float:
         """Lower 95% confidence bound.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        float
             Lower bound.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import Estimate
-            >>> Estimate.__dict__.get("ci_lower") is not None
-            True
         """
         ...
 
@@ -333,16 +284,10 @@ class Estimate:
     def ci_upper(self) -> float:
         """Upper 95% confidence bound.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        float
             Upper bound.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import Estimate
-            >>> Estimate.__dict__.get("ci_upper") is not None
-            True
         """
         ...
 
@@ -353,16 +298,10 @@ class Estimate:
         Equals the configured ``num_paths`` when antithetic variates are off,
         or half the number of simulated paths when antithetic pairing is on.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        int
             Path-estimator count.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import Estimate
-            >>> Estimate.__dict__.get("num_paths") is not None
-            True
         """
         ...
 
@@ -382,11 +321,10 @@ class Estimate:
     def median(self) -> float | None:
         """Median of captured path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            Median value, or None when percentile capture is disabled.
+        Returns
+        -------
+        float or None
+            Median path value, or ``None`` when percentile capture is disabled.
         """
         ...
 
@@ -394,11 +332,11 @@ class Estimate:
     def percentile_25(self) -> float | None:
         """25th percentile of captured path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            25th percentile value, or None when percentile capture is disabled.
+        Returns
+        -------
+        float or None
+            25th percentile path value, or ``None`` when percentile capture is
+            disabled.
         """
         ...
 
@@ -406,11 +344,11 @@ class Estimate:
     def percentile_75(self) -> float | None:
         """75th percentile of captured path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            75th percentile value, or None when percentile capture is disabled.
+        Returns
+        -------
+        float or None
+            75th percentile path value, or ``None`` when percentile capture is
+            disabled.
         """
         ...
 
@@ -418,11 +356,11 @@ class Estimate:
     def min(self) -> float | None:
         """Minimum of captured path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            Minimum sampled value, or None when range capture is disabled.
+        Returns
+        -------
+        float or None
+            Minimum sampled path value, or ``None`` when range capture is
+            disabled.
         """
         ...
 
@@ -430,11 +368,11 @@ class Estimate:
     def max(self) -> float | None:
         """Maximum of captured path values, if captured.
 
-        Args:
-            None
-
-        Returns:
-            Maximum sampled value, or None when range capture is disabled.
+        Returns
+        -------
+        float or None
+            Maximum sampled path value, or ``None`` when range capture is
+            disabled.
         """
         ...
 
@@ -1355,7 +1293,64 @@ def price_heston_call(
     num_steps: int | None = None,
     currency: str | None = None,
 ) -> MoneyEstimate:
-    """Monte Carlo European call under Heston stochastic volatility."""
+    """Monte Carlo European call under Heston stochastic volatility.
+
+    Simulates spot and variance with the QE Heston discretization. Rates and
+    dividend yield are continuously compounded decimals; Heston parameters follow
+    the standard square-root variance specification.
+
+    Parameters
+    ----------
+    spot : float
+        Initial spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate as a decimal.
+    div_yield : float
+        Dividend yield as a decimal.
+    kappa : float
+        Mean-reversion speed of variance.
+    theta : float
+        Long-run variance level.
+    vol_of_vol : float
+        Volatility of variance (``sigma`` in Heston notation).
+    rho : float
+        Correlation between spot and variance Brownian motions in ``[-1, 1]``.
+    v0 : float
+        Initial variance (not volatility).
+    expiry : float
+        Time to maturity in years.
+    num_paths : int, optional
+        Path count (registry default ``100_000``).
+    seed : int, optional
+        RNG seed (registry default ``42``).
+    num_steps : int, optional
+        Time steps per path (registry default ``252``).
+    currency : str, optional
+        ISO currency code; defaults to USD.
+
+    Returns
+    -------
+    MoneyEstimate
+        Discounted Monte Carlo price with stderr and confidence bands.
+
+    Raises
+    ------
+    ValueError
+        If parameters are non-finite or violate Feller / positivity constraints.
+
+    Sources
+    -------
+    See ``docs/REFERENCES.md#heston-1993``.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import price_heston_call
+    >>> r = price_heston_call(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, num_paths=5000)
+    >>> r.num_paths
+    5000
+    """
     ...
 
 def price_heston_put(
@@ -1374,7 +1369,38 @@ def price_heston_put(
     num_steps: int | None = None,
     currency: str | None = None,
 ) -> MoneyEstimate:
-    """Monte Carlo European put under Heston stochastic volatility."""
+    """Monte Carlo European put under Heston stochastic volatility.
+
+    Same conventions as :func:`price_heston_call` but pays ``max(K - S_T, 0)``.
+
+    Parameters
+    ----------
+    spot, strike, rate, div_yield, kappa, theta, vol_of_vol, rho, v0, expiry
+        See :func:`price_heston_call`.
+    num_paths, seed, num_steps, currency
+        Monte Carlo configuration; see :func:`price_heston_call`.
+
+    Returns
+    -------
+    MoneyEstimate
+        Discounted Monte Carlo put price.
+
+    Raises
+    ------
+    ValueError
+        If parameters are invalid.
+
+    Sources
+    -------
+    See ``docs/REFERENCES.md#heston-1993``.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import price_heston_put
+    >>> r = price_heston_put(100, 100, 0.05, 0.0, 2.0, 0.04, 0.3, -0.7, 0.04, 1.0, num_paths=5000)
+    >>> r.mean.amount > 0
+    True
+    """
     ...
 
 def finite_diff_delta(

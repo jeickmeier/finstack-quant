@@ -120,6 +120,20 @@ risk calculation with a standard reference.
   conventions. Use for hazard-rate, survival-probability, and CDS-style
   accrual/settlement references.
 
+<a id="altman-1968"></a>
+
+### Altman 1968
+
+- Altman, E. I. "Financial Ratios, Discriminant Analysis and the Prediction of
+  Corporate Bankruptcy." Original Altman Z-Score reference.
+
+<a id="diebold-li-2006"></a>
+
+### Diebold Li 2006
+
+- Diebold, F. X., and Li, C. "Forecasting the Term Structure of Government Bond
+  Yields." Nelson-Siegel factor dynamics and yield-curve forecasting.
+
 <a id="mcneil-frey-embrechts-qrm"></a>
 
 ### McNeil Frey Embrechts QRM
@@ -334,6 +348,26 @@ risk calculation with a standard reference.
 - Heston, S. L. "A Closed-Form Solution for Options with Stochastic Volatility."
   Canonical Heston-model reference.
 
+<a id="merton-1974"></a>
+
+### Merton 1974
+
+- Merton, R. C. "On the Pricing of Corporate Debt: The Risk Structure of
+  Interest Rates." Canonical structural credit model reference.
+
+<a id="o-kane-2008"></a>
+
+### O Kane 2008
+
+- O'Kane, D. *Modelling Single-name and Multi-name Credit Derivatives*.
+  Practitioner reference for CreditGrades and CDS valuation conventions.
+
+<a id="dupire-1994"></a>
+
+### Dupire 1994
+
+- Dupire, B. "Pricing with a Smile." Canonical local-volatility density reference.
+
 <a id="clark-fx-options"></a>
 
 ### Clark FX Options
@@ -426,6 +460,20 @@ risk calculation with a standard reference.
 - Grinold, R. C., and Kahn, R. N. *Active Portfolio Management*. Canonical
   practitioner reference for tracking error, information ratio, and
   benchmark-relative performance measurement.
+
+<a id="brinson-fachler-1985"></a>
+
+### Brinson Fachler 1985
+
+- Brinson, G. P., Hood, L. R., and Beebower, G. L. "Determinants of Portfolio
+  Performance." Foundation for Brinson-Fachler attribution.
+
+<a id="carino-1999"></a>
+
+### Carino 1999
+
+- Carino, D. R. "Combining Attribution Effects Over Time." Multi-period
+  linking for Brinson-style attribution.
 
 <a id="fama-french-1993"></a>
 

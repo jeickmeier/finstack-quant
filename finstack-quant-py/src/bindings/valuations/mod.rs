@@ -5,15 +5,19 @@
 
 mod analytic;
 mod calibration;
+mod commodity;
 pub mod correlation;
 mod credit;
 mod credit_derivatives;
 mod direct_wrapper;
+mod equity;
 mod exotic_rates;
 mod exotics;
+mod fixed_income;
 mod fourier;
 mod fx;
 mod pricing;
+mod rates;
 mod sabr;
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
@@ -153,10 +157,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     fourier::register(py, &m)?;
     exotic_rates::register(py, &m)?;
     correlation::register(py, &m)?;
-    credit::register(py, &m)?;
-    credit_derivatives::register(py, &m)?;
-    exotics::register(py, &m)?;
-    fx::register(py, &m)?;
+    register_instruments(py, &m)?;
+    register_models(py, &m)?;
 
     let all = PyList::new(
         py,
@@ -194,14 +196,76 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "SabrSmile",
             "SabrCalibrator",
             "correlation",
-            "credit",
-            "credit_derivatives",
-            "exotics",
-            "fx",
+            "instruments",
+            "models",
         ],
     )?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
 
+    Ok(())
+}
+
+fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    let m = PyModule::new(py, "instruments")?;
+    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
+        parent,
+        &m,
+        "instruments",
+        "finstack_quant.finstack_quant.valuations",
+    )?;
+    m.setattr(
+        "__doc__",
+        "Instrument wrappers and JSON helpers for valuation workflows.",
+    )?;
+
+    m.add_function(wrap_pyfunction!(validate_instrument_json, &m)?)?;
+    pricing::register(py, &m)?;
+    commodity::register(py, &m)?;
+    credit_derivatives::register(py, &m)?;
+    equity::register(py, &m)?;
+    exotics::register(py, &m)?;
+    fixed_income::register(py, &m)?;
+    fx::register(py, &m)?;
+    rates::register(py, &m)?;
+
+    let all = PyList::new(
+        py,
+        [
+            "commodity",
+            "credit_derivatives",
+            "equity",
+            "exotics",
+            "fixed_income",
+            "fx",
+            "instrument_cashflows_json",
+            "list_standard_metrics",
+            "list_standard_metrics_grouped",
+            "price_instrument",
+            "price_instrument_with_metrics",
+            "rates",
+            "validate_instrument_json",
+        ],
+    )?;
+    m.setattr("__all__", all)?;
+    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
+    Ok(())
+}
+
+fn register_models(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
+    let m = PyModule::new(py, "models")?;
+    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
+        parent,
+        &m,
+        "models",
+        "finstack_quant.finstack_quant.valuations",
+    )?;
+    m.setattr("__doc__", "Pricing model wrappers for valuation workflows.")?;
+
+    credit::register(py, &m)?;
+
+    let all = PyList::new(py, ["credit"])?;
+    m.setattr("__all__", all)?;
+    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
     Ok(())
 }

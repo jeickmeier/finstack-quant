@@ -23,8 +23,40 @@ class scoring:
     ) -> tuple[float, str, float]:
         """Original Altman Z-Score (1968) for publicly traded manufacturers.
 
-        Returns ``(score, zone, implied_pd)`` where ``zone`` is one of
-        ``"safe"``, ``"grey"``, ``"distress"``.
+        Parameters
+        ----------
+        working_capital_to_total_assets : float
+            Working capital / total assets (X1).
+        retained_earnings_to_total_assets : float
+            Retained earnings / total assets (X2).
+        ebit_to_total_assets : float
+            EBIT / total assets (X3).
+        market_equity_to_total_liabilities : float
+            Market equity / total liabilities (X4).
+        sales_to_total_assets : float
+            Sales / total assets (X5).
+
+        Returns
+        -------
+        tuple[float, str, float]
+            ``(score, zone, implied_pd)`` where ``zone`` is one of
+            ``"safe"``, ``"grey"``, or ``"distress"``.
+
+        Raises
+        ------
+        ValueError
+            If any ratio is non-finite.
+
+        Sources
+        -------
+        See ``docs/REFERENCES.md#altman-1968``.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.credit import scoring
+        >>> score, zone, pd = scoring.altman_z_score(0.2, 0.3, 0.15, 1.5, 1.0)
+        >>> zone
+        'safe'
         """
         ...
 
@@ -36,7 +68,26 @@ class scoring:
         book_equity_to_total_liabilities: float,
         sales_to_total_assets: float,
     ) -> tuple[float, str, float]:
-        """Altman Z'-Score for private firms. Returns ``(score, zone, implied_pd)``."""
+        """Altman Z'-Score (1983) for private firms.
+
+        Parameters
+        ----------
+        working_capital_to_total_assets, retained_earnings_to_total_assets,
+        ebit_to_total_assets, book_equity_to_total_liabilities,
+        sales_to_total_assets : float
+            Balance-sheet ratios as in Altman (1983); book equity replaces
+            market equity versus the original Z-Score.
+
+        Returns
+        -------
+        tuple[float, str, float]
+            ``(score, zone, implied_pd)`` where ``zone`` is ``"safe"``,
+            ``"grey"``, or ``"distress"``.
+
+        Sources
+        -------
+        - Altman (1968/1983): see docs/REFERENCES.md#altman-1968
+        """
         ...
 
     @staticmethod

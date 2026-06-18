@@ -4,6 +4,18 @@ use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
 /// Validate and canonicalize a covenant spec JSON string.
+///
+/// # Arguments
+///
+/// * `spec_json` - JSON-encoded `CovenantSpec`
+///
+/// # Returns
+///
+/// Canonical JSON string after validation.
+///
+/// # Errors
+///
+/// Raises `ValueError` when the spec fails schema or semantic validation.
 #[pyfunction]
 #[pyo3(text_signature = "(spec_json)")]
 fn validate_covenant_spec(py: Python<'_>, spec_json: &str) -> PyResult<String> {
@@ -34,6 +46,20 @@ fn validate_covenant_engine(py: Python<'_>, engine_json: &str) -> PyResult<Strin
 }
 
 /// Evaluate a covenant engine JSON string against a JSON metric map.
+///
+/// # Arguments
+///
+/// * `engine_json` - Serialized covenant engine configuration
+/// * `metrics_json` - JSON map of metric name to numeric value
+/// * `as_of` - Evaluation date as ISO 8601 `YYYY-MM-DD`
+///
+/// # Returns
+///
+/// JSON-encoded `CovenantReport` with pass/fail and headroom per covenant.
+///
+/// # Errors
+///
+/// Raises `ValueError` when engine/metrics JSON is invalid or required metrics are missing.
 #[pyfunction]
 #[pyo3(text_signature = "(engine_json, metrics_json, as_of)")]
 fn evaluate_engine(

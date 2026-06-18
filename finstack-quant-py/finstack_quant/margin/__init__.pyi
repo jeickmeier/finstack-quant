@@ -805,6 +805,10 @@ class NettingSetId:
         'CSA-001'
         >>> NettingSetId.cleared("LCH").csa_id is None
         True
+
+        Returns
+        -------
+        str or None
         """
         ...
 
@@ -818,6 +822,10 @@ class NettingSetId:
         'LCH'
         >>> NettingSetId.bilateral("X", "CSA").ccp_id is None
         True
+
+        Returns
+        -------
+        str or None
         """
         ...
 
@@ -1450,7 +1458,11 @@ class ImResult:
 
     @property
     def as_of(self) -> str:
-        """Calculation date as an ISO 8601 string."""
+        """Calculation date as an ISO 8601 string.
+        Returns
+        -------
+        str
+        """
         ...
 
     def breakdown_keys(self) -> list[str]:
@@ -1738,7 +1750,11 @@ class SimmSensitivities:
 
     @property
     def base_currency(self) -> str:
-        """Currency context in which sensitivity amounts are expressed."""
+        """Currency context in which sensitivity amounts are expressed.
+        Returns
+        -------
+        str
+        """
         ...
 
 class SimmCalculator:
@@ -1770,12 +1786,20 @@ class SimmCalculator:
 
     @property
     def version(self) -> str:
-        """Stable SIMM version label, either ``"v2_5"`` or ``"v2_6"``."""
+        """Stable SIMM version label, either ``"v2_5"`` or ``"v2_6"``.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def mpor_days(self) -> int:
-        """Margin period of risk in calendar days."""
+        """Margin period of risk in calendar days.
+        Returns
+        -------
+        int
+        """
         ...
 
     def calculate_from_sensitivities(
@@ -2330,6 +2354,10 @@ class XvaConfig:
         Examples
         --------
         >>> XvaConfig().validate()
+
+        Returns
+        -------
+        None
         """
         ...
 
@@ -2536,6 +2564,10 @@ class ExposureProfile:
         Examples
         --------
         >>> ExposureProfile([0.0], [0.0], [0.0], [0.0]).validate()
+
+        Returns
+        -------
+        None
         """
         ...
 
@@ -3552,7 +3584,11 @@ class FrtbSensitivities:
         ...
 
     def to_json(self) -> str:
-        """Serialize to a JSON string."""
+        """Serialize to a JSON string.
+        Returns
+        -------
+        str
+        """
         ...
 
     def add_girr_delta(self, tenor: str, amount: float, currency: str | None = None) -> None:
@@ -3611,7 +3647,11 @@ class FrtbSensitivities:
 
     @property
     def base_currency(self) -> str:
-        """Base / reporting currency code."""
+        """Base / reporting currency code.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str: ...
@@ -3671,7 +3711,11 @@ class SaCcrTrade:
         ...
 
     def to_json(self) -> str:
-        """Serialize to a JSON string."""
+        """Serialize to a JSON string.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
@@ -3715,7 +3759,11 @@ class SaCcrNettingSetConfig:
         ...
 
     def to_json(self) -> str:
-        """Serialize to a JSON string."""
+        """Serialize to a JSON string.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property

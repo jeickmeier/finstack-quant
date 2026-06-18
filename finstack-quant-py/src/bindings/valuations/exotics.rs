@@ -11,7 +11,7 @@ macro_rules! exotic_class {
     ($py_name:literal, $rust_name:ident, $type_tag:literal) => {
         #[pyclass(
             name = $py_name,
-            module = "finstack_quant.valuations.exotics",
+            module = "finstack_quant.valuations.instruments.exotics",
             skip_from_py_object
         )]
         #[derive(Clone)]
@@ -202,7 +202,7 @@ exotic_option_class!("BarrierOption", PyBarrierOption, "barrier_option");
 exotic_option_class!("LookbackOption", PyLookbackOption, "lookback_option");
 exotic_class!("Basket", PyBasket, "basket");
 
-/// Register the `finstack_quant.valuations.exotics` submodule.
+/// Register the exotic instrument wrapper submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "exotics")?;
     m.setattr("__doc__", "Direct exotic valuation instrument wrappers.")?;

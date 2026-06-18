@@ -65,6 +65,11 @@ class PnlAttribution:
         For methods that follow the total-return convention (parallel,
         waterfall, Taylor), ``total_pnl`` includes coupon income received in
         the period. Use :attr:`mark_to_market_pnl` for the raw price change.
+
+        Returns
+        -------
+        float
+            Total P&L in :attr:`currency`.
         """
         ...
 
@@ -77,32 +82,70 @@ class PnlAttribution:
         mark-to-market change so a downstream consumer can reconcile against
         their own computation. ``None`` for attributions deserialized from a
         pre-audit JSON payload that did not carry the field.
+
+        Returns
+        -------
+        float or None
+            Raw MTM P&L in :attr:`currency`, or ``None`` when not stored.
         """
         ...
 
     @property
     def carry(self) -> float:
-        """Carry (theta + accruals) P&L amount."""
+        """Carry (theta + accruals) P&L amount.
+
+        Returns
+        -------
+        float
+            Carry bucket P&L in :attr:`currency`.
+        """
         ...
 
     @property
     def rates_curves_pnl(self) -> float:
-        """Interest rate curves P&L amount."""
+        """Interest rate curves P&L amount.
+
+        Returns
+        -------
+        float
+            Rates-curve bucket P&L in :attr:`currency`. Use
+            :meth:`to_long_dataframe` for per-curve and per-tenor detail.
+        """
         ...
 
     @property
     def credit_curves_pnl(self) -> float:
-        """Credit hazard curves P&L amount."""
+        """Credit hazard curves P&L amount.
+
+        Returns
+        -------
+        float
+            Credit-curve bucket P&L in :attr:`currency`. Use
+            :meth:`to_credit_factor_dataframe` when a credit factor model was
+            supplied.
+        """
         ...
 
     @property
     def inflation_curves_pnl(self) -> float:
-        """Inflation curves P&L amount."""
+        """Inflation curves P&L amount.
+
+        Returns
+        -------
+        float
+            Inflation-curve bucket P&L in :attr:`currency`.
+        """
         ...
 
     @property
     def correlations_pnl(self) -> float:
-        """Base correlation curves P&L amount."""
+        """Base correlation curves P&L amount.
+
+        Returns
+        -------
+        float
+            Correlation-curve bucket P&L in :attr:`currency`.
+        """
         ...
 
     @property
@@ -111,6 +154,11 @@ class PnlAttribution:
 
         Pricing-impact FX P&L for cross-currency instruments. For pure
         single-currency instruments this is zero.
+
+        Returns
+        -------
+        float
+            FX pricing bucket P&L in :attr:`currency`.
         """
         ...
 
@@ -121,32 +169,68 @@ class PnlAttribution:
         Reporting-currency FX P&L when ``AttributionConfig.target_ccy`` was
         supplied and differs from native. Equals
         ``val_t0_native × (T1_fx − T0_fx)``. Zero by default.
+
+        Returns
+        -------
+        float
+            Translation bucket P&L in the reporting currency.
         """
         ...
 
     @property
     def vol_pnl(self) -> float:
-        """Implied volatility changes P&L amount."""
+        """Implied volatility changes P&L amount.
+
+        Returns
+        -------
+        float
+            Volatility bucket P&L in :attr:`currency`.
+        """
         ...
 
     @property
     def cross_factor_pnl(self) -> float:
-        """Cross-factor interaction P&L amount."""
+        """Cross-factor interaction P&L amount.
+
+        Returns
+        -------
+        float
+            Cross-factor bucket P&L in :attr:`currency`.
+        """
         ...
 
     @property
     def model_params_pnl(self) -> float:
-        """Model parameters P&L amount."""
+        """Model parameters P&L amount.
+
+        Returns
+        -------
+        float
+            Model-parameter bucket P&L in :attr:`currency`.
+        """
         ...
 
     @property
     def market_scalars_pnl(self) -> float:
-        """Market scalars P&L amount."""
+        """Market scalars P&L amount.
+
+        Returns
+        -------
+        float
+            Market-scalar bucket P&L in :attr:`currency` (dividends, repo, etc.).
+        """
         ...
 
     @property
     def residual(self) -> float:
-        """Residual (unexplained) P&L amount."""
+        """Residual (unexplained) P&L amount.
+
+        Returns
+        -------
+        float
+            ``total_pnl`` minus the sum of explained factor buckets, in
+            :attr:`currency`.
+        """
         ...
 
     @property

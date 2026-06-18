@@ -442,7 +442,11 @@ class Attributes:
     """
 
     def __init__(self) -> None:
-        """Create an empty attribute set."""
+        """Create an empty attribute set.
+        Returns
+        -------
+        None
+        """
         ...
 
     def get_meta(self, key: str) -> Optional[str]:

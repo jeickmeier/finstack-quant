@@ -21,7 +21,7 @@ fn example_payload<T: Serialize>(type_tag: &str, instrument: &T) -> PyResult<Str
 
 macro_rules! credit_derivative_wrapper {
     ($py_name:literal, $py_struct:ident, $rust_ty:ty, $type_tag:literal, $example:expr) => {
-        #[pyclass(name = $py_name, module = "finstack_quant.valuations.credit_derivatives", skip_from_py_object)]
+        #[pyclass(name = $py_name, module = "finstack_quant.valuations.instruments.credit_derivatives", skip_from_py_object)]
         #[derive(Clone)]
         struct $py_struct {
             json: String,

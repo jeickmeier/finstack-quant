@@ -50,51 +50,99 @@ class PeriodStats:
 
     @property
     def best(self) -> float:
-        """Best period return."""
+        """Best period return.
+        Returns
+        -------
+        float
+        """
 
     @property
     def worst(self) -> float:
-        """Worst period return."""
+        """Worst period return.
+        Returns
+        -------
+        float
+        """
 
     @property
     def consecutive_wins(self) -> int:
-        """Longest consecutive winning streak."""
+        """Longest consecutive winning streak.
+        Returns
+        -------
+        int
+        """
 
     @property
     def consecutive_losses(self) -> int:
-        """Longest consecutive losing streak."""
+        """Longest consecutive losing streak.
+        Returns
+        -------
+        int
+        """
 
     @property
     def win_rate(self) -> float:
-        """Fraction of positive-return periods."""
+        """Fraction of positive-return periods.
+        Returns
+        -------
+        float
+        """
 
     @property
     def avg_return(self) -> float:
-        """Average return across all periods."""
+        """Average return across all periods.
+        Returns
+        -------
+        float
+        """
 
     @property
     def avg_win(self) -> float:
-        """Average return of positive periods."""
+        """Average return of positive periods.
+        Returns
+        -------
+        float
+        """
 
     @property
     def avg_loss(self) -> float:
-        """Average return of negative periods."""
+        """Average return of negative periods.
+        Returns
+        -------
+        float
+        """
 
     @property
     def payoff_ratio(self) -> float:
-        """Payoff ratio (avg win / |avg loss|)."""
+        """Payoff ratio (avg win / |avg loss|).
+        Returns
+        -------
+        float
+        """
 
     @property
     def profit_factor(self) -> float:
-        """Profit factor (gross profits / gross losses)."""
+        """Profit factor (gross profits / gross losses).
+        Returns
+        -------
+        float
+        """
 
     @property
     def cpc_ratio(self) -> float:
-        """CPC index (profit_factor x win_rate x payoff_ratio)."""
+        """CPC index (profit_factor x win_rate x payoff_ratio).
+        Returns
+        -------
+        float
+        """
 
     @property
     def kelly_criterion(self) -> float:
-        """Kelly criterion optimal fraction."""
+        """Kelly criterion optimal fraction.
+        Returns
+        -------
+        float
+        """
 
     def __repr__(self) -> str: ...
 
@@ -107,19 +155,35 @@ class BetaResult:
 
     @property
     def beta(self) -> float:
-        """Beta coefficient."""
+        """Beta coefficient.
+        Returns
+        -------
+        float
+        """
 
     @property
     def std_err(self) -> float:
-        """Standard error of the beta estimate."""
+        """Standard error of the beta estimate.
+        Returns
+        -------
+        float
+        """
 
     @property
     def ci_lower(self) -> float:
-        """Lower 95% confidence bound."""
+        """Lower 95% confidence bound.
+        Returns
+        -------
+        float
+        """
 
     @property
     def ci_upper(self) -> float:
-        """Upper 95% confidence bound."""
+        """Upper 95% confidence bound.
+        Returns
+        -------
+        float
+        """
 
     def __repr__(self) -> str: ...
 
@@ -128,19 +192,35 @@ class GreeksResult:
 
     @property
     def alpha(self) -> float:
-        """Annualized Jensen alpha."""
+        """Annualized Jensen alpha.
+        Returns
+        -------
+        float
+        """
 
     @property
     def beta(self) -> float:
-        """Beta coefficient."""
+        """Beta coefficient.
+        Returns
+        -------
+        float
+        """
 
     @property
     def r_squared(self) -> float:
-        """R-squared."""
+        """R-squared.
+        Returns
+        -------
+        float
+        """
 
     @property
     def adjusted_r_squared(self) -> float:
-        """Adjusted R-squared."""
+        """Adjusted R-squared.
+        Returns
+        -------
+        float
+        """
 
     def __repr__(self) -> str: ...
 
@@ -149,18 +229,34 @@ class RollingGreeks:
 
     @property
     def dates(self) -> list[datetime.date]:
-        """Date labels for each rolling window."""
+        """Date labels for each rolling window.
+        Returns
+        -------
+        list[datetime.date]
+        """
 
     @property
     def alphas(self) -> npt.NDArray[np.float64]:
-        """Rolling alpha values."""
+        """Rolling alpha values.
+        Returns
+        -------
+        npt.NDArray[np.float64]
+        """
 
     @property
     def betas(self) -> npt.NDArray[np.float64]:
-        """Rolling beta values."""
+        """Rolling beta values.
+        Returns
+        -------
+        npt.NDArray[np.float64]
+        """
 
     def to_dataframe(self) -> pd.DataFrame:
-        """Convert to a pandas DataFrame with date index and alpha/beta columns."""
+        """Convert to a pandas DataFrame with date index and alpha/beta columns.
+        Returns
+        -------
+        pd.DataFrame
+        """
         ...
 
     def __repr__(self) -> str: ...
@@ -170,23 +266,43 @@ class MultiFactorResult:
 
     @property
     def alpha(self) -> float:
-        """Raw regression intercept, annualized with the supplied factor frequency."""
+        """Raw regression intercept, annualized with the supplied factor frequency.
+        Returns
+        -------
+        float
+        """
 
     @property
     def betas(self) -> npt.NDArray[np.float64]:
-        """Factor betas."""
+        """Factor betas.
+        Returns
+        -------
+        npt.NDArray[np.float64]
+        """
 
     @property
     def r_squared(self) -> float:
-        """R-squared."""
+        """R-squared.
+        Returns
+        -------
+        float
+        """
 
     @property
     def adjusted_r_squared(self) -> float:
-        """Adjusted R-squared."""
+        """Adjusted R-squared.
+        Returns
+        -------
+        float
+        """
 
     @property
     def residual_vol(self) -> float:
-        """Residual volatility."""
+        """Residual volatility.
+        Returns
+        -------
+        float
+        """
 
     def __repr__(self) -> str: ...
 
@@ -195,31 +311,59 @@ class DrawdownEpisode:
 
     @property
     def start(self) -> datetime.date:
-        """Start date of the drawdown."""
+        """Start date of the drawdown.
+        Returns
+        -------
+        datetime.date
+        """
 
     @property
     def valley(self) -> datetime.date:
-        """Date of the maximum drawdown within this episode."""
+        """Date of the maximum drawdown within this episode.
+        Returns
+        -------
+        datetime.date
+        """
 
     @property
     def end(self) -> datetime.date | None:
-        """Recovery date (``None`` if still in drawdown)."""
+        """Recovery date (``None`` if still in drawdown).
+        Returns
+        -------
+        datetime.date or None
+        """
 
     @property
     def duration_days(self) -> int:
-        """Duration in calendar days."""
+        """Duration in calendar days.
+        Returns
+        -------
+        int
+        """
 
     @property
     def max_drawdown(self) -> float:
-        """Maximum drawdown depth (negative)."""
+        """Maximum drawdown depth (negative).
+        Returns
+        -------
+        float
+        """
 
     @property
     def near_recovery_threshold(self) -> float:
-        """Near-recovery threshold."""
+        """Near-recovery threshold.
+        Returns
+        -------
+        float
+        """
 
     @property
     def truncated_at_start(self) -> bool:
-        """True when the episode began before the first observation (left-censored)."""
+        """True when the episode began before the first observation (left-censored).
+        Returns
+        -------
+        bool
+        """
 
     def __repr__(self) -> str: ...
 
@@ -228,19 +372,35 @@ class LookbackReturns:
 
     @property
     def mtd(self) -> npt.NDArray[np.float64]:
-        """Month-to-date returns per ticker."""
+        """Month-to-date returns per ticker.
+        Returns
+        -------
+        npt.NDArray[np.float64]
+        """
 
     @property
     def qtd(self) -> npt.NDArray[np.float64]:
-        """Quarter-to-date returns per ticker."""
+        """Quarter-to-date returns per ticker.
+        Returns
+        -------
+        npt.NDArray[np.float64]
+        """
 
     @property
     def ytd(self) -> npt.NDArray[np.float64]:
-        """Year-to-date returns per ticker."""
+        """Year-to-date returns per ticker.
+        Returns
+        -------
+        npt.NDArray[np.float64]
+        """
 
     @property
     def fytd(self) -> npt.NDArray[np.float64] | None:
-        """Fiscal-year-to-date returns when a fiscal config is provided."""
+        """Fiscal-year-to-date returns when a fiscal config is provided.
+        Returns
+        -------
+        npt.NDArray[np.float64] or None
+        """
 
     def to_dataframe(self, ticker_names: list[str]) -> pd.DataFrame:
         """Convert to a pandas DataFrame with ticker names as index.
@@ -260,21 +420,37 @@ class DatedSeries:
 
     @property
     def values(self) -> npt.NDArray[np.float64]:
-        """Rolling values, one per window."""
+        """Rolling values, one per window.
+        Returns
+        -------
+        npt.NDArray[np.float64]
+        """
 
     @property
     def dates(self) -> list[datetime.date]:
-        """Window-end dates aligned 1:1 with :attr:`values`."""
+        """Window-end dates aligned 1:1 with :attr:`values`.
+        Returns
+        -------
+        list[datetime.date]
+        """
 
     @property
     def value_column(self) -> str:
-        """Column name used by :meth:`to_dataframe`."""
+        """Column name used by :meth:`to_dataframe`.
+        Returns
+        -------
+        str
+        """
 
     def to_dataframe(self) -> pd.DataFrame:
         """Convert to a pandas DataFrame with date index and a value column.
 
         The column is named after :attr:`value_column` (e.g. ``sharpe``,
         ``sortino``, ``volatility``, or ``return``).
+
+        Returns
+        -------
+        pd.DataFrame
         """
         ...
 
@@ -300,11 +476,32 @@ class Performance:
     ) -> None:
         """Build from a pandas DataFrame of prices.
 
-        Args:
-            prices: Price panel with a date-like index and one column per ticker.
-            benchmark_ticker: Benchmark column name; first column if ``None``.
-            freq: ``daily``, ``weekly``, ``monthly``, ``quarterly``,
-                ``semiannual``, or ``annual``.
+        Parameters
+        ----------
+        prices : pandas.DataFrame
+            Price panel with a date-like index (``datetime.date`` or
+            ``pd.Timestamp``) and one column per ticker.
+        benchmark_ticker : str, optional
+            Benchmark column name. Defaults to the first column when ``None``.
+        freq : str, optional
+            Return aggregation frequency. One of ``"daily"``, ``"weekly"``,
+            ``"monthly"``, ``"quarterly"``, ``"semiannual"``, or ``"annual"``.
+            Default ``"daily"``.
+
+        Raises
+        ------
+        AnalyticsError
+            If ``prices`` is not a DataFrame, dates are invalid, or the panel is
+            empty.
+        TypeError
+            If ``prices`` is not a pandas ``DataFrame`` (use
+            :meth:`from_arrays` for raw lists).
+
+        Examples
+        --------
+        >>> import pandas as pd
+        >>> from finstack_quant.analytics import Performance
+        >>> perf = Performance(prices_df, benchmark_ticker="SPX", freq="daily")  # doctest: +SKIP
         """
 
     @staticmethod
@@ -317,7 +514,37 @@ class Performance:
     ) -> Performance:
         """Construct from raw arrays (dates, prices matrix, ticker names).
 
-        ``prices[i]`` is the series for ticker *i*.
+        Parameters
+        ----------
+        dates : sequence
+            Observation dates as ``datetime.date``, ``pd.Timestamp``, or ISO
+            strings parseable by the binding layer.
+        prices : list[list[float]]
+            Column-major price matrix; ``prices[i]`` is the series for ticker
+            ``ticker_names[i]``.
+        ticker_names : list[str]
+            Column labels, one per price series.
+        benchmark_ticker : str, optional
+            Benchmark ticker name. Defaults to the first column when ``None``.
+        freq : str, optional
+            One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
+            ``"semiannual"``, or ``"annual"``. Default ``"daily"``.
+
+        Returns
+        -------
+        Performance
+            Analytics engine over the supplied panel.
+
+        Raises
+        ------
+        AnalyticsError
+            If dimensions are inconsistent, dates are invalid, or ``freq`` is
+            unrecognized.
+
+        Examples
+        --------
+        >>> from finstack_quant.analytics import Performance
+        >>> perf = Performance.from_arrays(dates, prices, ["A", "B"])  # doctest: +SKIP
         """
 
     @staticmethod
@@ -326,7 +553,32 @@ class Performance:
         benchmark_ticker: str | None = None,
         freq: str = "daily",
     ) -> Performance:
-        """Build from a pandas DataFrame of simple returns."""
+        """Build from a pandas DataFrame of simple returns.
+
+        Parameters
+        ----------
+        returns : pandas.DataFrame
+            Simple-return panel aligned with a date-like index and one column per
+            ticker (decimal returns, e.g. ``0.01`` for +1%).
+        benchmark_ticker : str, optional
+            Benchmark column name. Defaults to the first column when ``None``.
+        freq : str, optional
+            One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
+            ``"semiannual"``, or ``"annual"``. Default ``"daily"``.
+
+        Raises
+        ------
+        AnalyticsError
+            If ``returns`` is invalid or empty.
+        TypeError
+            If ``returns`` is not a pandas ``DataFrame`` (use
+            :meth:`from_returns_arrays` for raw lists).
+
+        Examples
+        --------
+        >>> from finstack_quant.analytics import Performance
+        >>> perf = Performance.from_returns(returns_df, freq="monthly")  # doctest: +SKIP
+        """
 
     @staticmethod
     def from_returns_arrays(
@@ -336,7 +588,33 @@ class Performance:
         benchmark_ticker: str | None = None,
         freq: str = "daily",
     ) -> Performance:
-        """Construct from raw return arrays (dates, returns matrix, ticker names)."""
+        """Construct from raw return arrays (dates, returns matrix, ticker names).
+
+        Parameters
+        ----------
+        dates : sequence
+            Return observation dates.
+        returns : list[list[float]]
+            Column-major simple-return matrix; ``returns[i]`` is the series for
+            ``ticker_names[i]``.
+        ticker_names : list[str]
+            Column labels.
+        benchmark_ticker : str, optional
+            Benchmark ticker name.
+        freq : str, optional
+            One of ``"daily"``, ``"weekly"``, ``"monthly"``, ``"quarterly"``,
+            ``"semiannual"``, or ``"annual"``. Default ``"daily"``.
+
+        Returns
+        -------
+        Performance
+            Analytics engine over the supplied return panel.
+
+        Raises
+        ------
+        AnalyticsError
+            If dimensions are inconsistent or ``freq`` is unrecognized.
+        """
 
     # -- Mutators --
 
@@ -350,21 +628,41 @@ class Performance:
 
     @property
     def ticker_names(self) -> list[str]:
-        """Ticker names in column order."""
+        """Ticker names in column order.
+        Returns
+        -------
+        list[str]
+        """
 
     @property
     def benchmark_idx(self) -> int:
-        """Benchmark column index."""
+        """Benchmark column index.
+        Returns
+        -------
+        int
+        """
 
     @property
     def freq(self) -> str:
-        """Observation frequency as the canonical lowercase token."""
+        """Observation frequency as the canonical lowercase token.
+        Returns
+        -------
+        str
+        """
 
     def dates(self) -> list[datetime.date]:
-        """Full return-aligned date grid (independent of any active window)."""
+        """Full return-aligned date grid (independent of any active window).
+        Returns
+        -------
+        list[datetime.date]
+        """
 
     def active_dates(self) -> list[datetime.date]:
-        """Observation dates of the currently active analysis window."""
+        """Observation dates of the currently active analysis window.
+        Returns
+        -------
+        list[datetime.date]
+        """
 
     def active_dates_for_ticker(self, ticker_idx: int) -> list[datetime.date]:
         """Observation dates for one ticker's active return series."""
@@ -376,6 +674,10 @@ class Performance:
 
         Raises:
             ValueError: If the active date window cannot be annualized.
+
+        Returns
+        -------
+        list[float]
         """
 
     def mean_return(self, annualize: bool = True) -> list[float]:
@@ -385,12 +687,26 @@ class Performance:
         """Volatility for each ticker."""
 
     def sharpe(self, risk_free_rate: float = 0.0) -> list[float]:
-        """Sharpe ratio for each ticker."""
+        """Sharpe ratio for each ticker.
+
+        Args:
+            risk_free_rate: Annualized risk-free rate as a decimal (default 0).
+
+        Returns:
+            Per-ticker Sharpe ratios over the active return window.
+        """
 
     def sortino(self, mar: float = 0.0) -> list[float]:
         """Sortino ratio for each ticker.
 
-        ``mar`` is per-period; Sharpe risk-free inputs are annualized.
+        Args:
+            mar: Minimum acceptable return per period (not annualized).
+
+        Returns:
+            Per-ticker Sortino ratios over the active return window.
+
+        Note:
+            ``mar`` is per-period; Sharpe ``risk_free_rate`` inputs are annualized.
         """
 
     def calmar(self) -> list[float]:
@@ -398,13 +714,25 @@ class Performance:
 
         Raises:
             ValueError: If the active date window cannot be annualized.
+
+        Returns
+        -------
+        list[float]
         """
 
     def max_drawdown(self) -> list[float]:
-        """Max drawdown for each ticker."""
+        """Max drawdown for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def mean_drawdown(self) -> list[float]:
-        """Mean drawdown (path-weighted average) for each ticker."""
+        """Mean drawdown (path-weighted average) for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def value_at_risk(self, confidence: float = 0.95) -> list[float]:
         """Historical VaR for each ticker."""
@@ -413,22 +741,46 @@ class Performance:
         """Expected Shortfall for each ticker."""
 
     def tracking_error(self) -> list[float]:
-        """Tracking error for each ticker vs benchmark."""
+        """Tracking error for each ticker vs benchmark.
+        Returns
+        -------
+        list[float]
+        """
 
     def information_ratio(self) -> list[float]:
-        """Information ratio for each ticker vs benchmark."""
+        """Information ratio for each ticker vs benchmark.
+        Returns
+        -------
+        list[float]
+        """
 
     def skewness(self) -> list[float]:
-        """Skewness for each ticker."""
+        """Skewness for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def kurtosis(self) -> list[float]:
-        """Kurtosis for each ticker."""
+        """Kurtosis for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def geometric_mean(self) -> list[float]:
-        """Geometric mean for each ticker."""
+        """Geometric mean for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def skew_kurt(self) -> tuple[list[float], list[float]]:
-        """Per-ticker ``(skewness, kurtosis)`` from one moments pass."""
+        """Per-ticker ``(skewness, kurtosis)`` from one moments pass.
+        Returns
+        -------
+        tuple[list[float], list[float]]
+        """
 
     def value_at_risk_and_es(
         self,
@@ -443,16 +795,32 @@ class Performance:
         """
 
     def max_drawdown_duration(self) -> list[int]:
-        """Max drawdown duration (calendar days) for each ticker."""
+        """Max drawdown duration (calendar days) for each ticker.
+        Returns
+        -------
+        list[int]
+        """
 
     def up_capture(self) -> list[float]:
-        """Empyrical-style annualized geometric up-capture vs benchmark."""
+        """Empyrical-style annualized geometric up-capture vs benchmark.
+        Returns
+        -------
+        list[float]
+        """
 
     def down_capture(self) -> list[float]:
-        """Empyrical-style annualized geometric down-capture vs benchmark."""
+        """Empyrical-style annualized geometric down-capture vs benchmark.
+        Returns
+        -------
+        list[float]
+        """
 
     def capture_ratio(self) -> list[float]:
-        """Empyrical-style annualized geometric capture ratio vs benchmark."""
+        """Empyrical-style annualized geometric capture ratio vs benchmark.
+        Returns
+        -------
+        list[float]
+        """
 
     def omega_ratio(self, threshold: float = 0.0) -> list[float]:
         """Omega ratio for each ticker."""
@@ -461,23 +829,43 @@ class Performance:
         """Treynor ratio for each ticker."""
 
     def gain_to_pain(self) -> list[float]:
-        """Gain-to-pain ratio for each ticker."""
+        """Gain-to-pain ratio for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def ulcer_index(self) -> list[float]:
-        """Ulcer index for each ticker."""
+        """Ulcer index for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def martin_ratio(self) -> list[float]:
         """Martin ratio for each ticker.
 
         Raises:
             ValueError: If the active date window cannot be annualized.
+
+        Returns
+        -------
+        list[float]
         """
 
     def recovery_factor(self) -> list[float]:
-        """Recovery factor for each ticker."""
+        """Recovery factor for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def pain_index(self) -> list[float]:
-        """Pain index for each ticker."""
+        """Pain index for each ticker.
+        Returns
+        -------
+        list[float]
+        """
 
     def pain_ratio(self, risk_free_rate: float = 0.0) -> list[float]:
         """Pain ratio for each ticker.
@@ -490,10 +878,18 @@ class Performance:
         """Tail ratio for each ticker."""
 
     def r_squared(self) -> list[float]:
-        """R-squared for each ticker vs benchmark."""
+        """R-squared for each ticker vs benchmark.
+        Returns
+        -------
+        list[float]
+        """
 
     def batting_average(self) -> list[float]:
-        """Batting average for each ticker vs benchmark."""
+        """Batting average for each ticker vs benchmark.
+        Returns
+        -------
+        list[float]
+        """
 
     def parametric_var(self, confidence: float = 0.95) -> list[float]:
         """Parametric VaR for each ticker."""
@@ -531,19 +927,39 @@ class Performance:
     # -- Vector-per-ticker methods --
 
     def cumulative_returns(self) -> list[list[float]]:
-        """Cumulative returns for each ticker."""
+        """Cumulative returns for each ticker.
+        Returns
+        -------
+        list[list[float]]
+        """
 
     def drawdown_series(self) -> list[list[float]]:
-        """Drawdown series for each ticker."""
+        """Drawdown series for each ticker.
+        Returns
+        -------
+        list[list[float]]
+        """
 
     def correlation_matrix(self) -> list[list[float]]:
-        """Correlation matrix across all tickers."""
+        """Correlation matrix across all tickers.
+        Returns
+        -------
+        list[list[float]]
+        """
 
     def cumulative_returns_outperformance(self) -> list[list[float]]:
-        """Cumulative returns outperformance vs benchmark."""
+        """Cumulative returns outperformance vs benchmark.
+        Returns
+        -------
+        list[list[float]]
+        """
 
     def drawdown_difference(self) -> list[list[float]]:
-        """Drawdown difference vs benchmark."""
+        """Drawdown difference vs benchmark.
+        Returns
+        -------
+        list[list[float]]
+        """
 
     def excess_returns(
         self,
@@ -555,7 +971,11 @@ class Performance:
     # -- Per-ticker structured methods --
 
     def beta(self) -> list[BetaResult]:
-        """Beta for each ticker vs benchmark."""
+        """Beta for each ticker vs benchmark.
+        Returns
+        -------
+        list[BetaResult]
+        """
 
     def greeks(self, risk_free_rate: float = 0.0) -> list[GreeksResult]:
         """Greeks (annualized Jensen alpha, beta, R²) for each ticker vs benchmark."""
@@ -645,15 +1065,27 @@ class Performance:
         ...
 
     def cumulative_returns_to_dataframe(self) -> pd.DataFrame:
-        """Cumulative returns for all tickers as a pandas DataFrame."""
+        """Cumulative returns for all tickers as a pandas DataFrame.
+        Returns
+        -------
+        pd.DataFrame
+        """
         ...
 
     def drawdown_series_to_dataframe(self) -> pd.DataFrame:
-        """Drawdown series for all tickers as a pandas DataFrame."""
+        """Drawdown series for all tickers as a pandas DataFrame.
+        Returns
+        -------
+        pd.DataFrame
+        """
         ...
 
     def correlation_to_dataframe(self) -> pd.DataFrame:
-        """Correlation matrix as a pandas DataFrame indexed by ticker name."""
+        """Correlation matrix as a pandas DataFrame indexed by ticker name.
+        Returns
+        -------
+        pd.DataFrame
+        """
         ...
 
     def drawdown_details_to_dataframe(

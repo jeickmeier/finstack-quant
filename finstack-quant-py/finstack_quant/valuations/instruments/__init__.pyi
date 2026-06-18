@@ -1,8 +1,31 @@
 from __future__ import annotations
 
 from finstack_quant.core.market_data import MarketContext
+from finstack_quant.valuations.instruments import (
+    commodity as commodity,
+    credit_derivatives as credit_derivatives,
+    equity as equity,
+    exotics as exotics,
+    fixed_income as fixed_income,
+    fx as fx,
+    rates as rates,
+)
 
-__all__: list[str]
+__all__ = [
+    "commodity",
+    "credit_derivatives",
+    "equity",
+    "exotics",
+    "fixed_income",
+    "fx",
+    "instrument_cashflows_json",
+    "list_standard_metrics",
+    "list_standard_metrics_grouped",
+    "price_instrument",
+    "price_instrument_with_metrics",
+    "rates",
+    "validate_instrument_json",
+]
 
 def validate_instrument_json(json: str) -> str:
     """Validate tagged instrument JSON and return canonical JSON.
@@ -75,6 +98,29 @@ def price_instrument_with_metrics(
     Raises:
         ValueError: If a metric is unknown, not applicable, or cannot be
             calculated from the supplied market and history inputs.
+    """
+    ...
+
+def instrument_cashflows_json(
+    instrument_json: str,
+    market: MarketContext | str,
+    as_of: str,
+    model: str = "discounting",
+) -> str:
+    """Per-flow cashflow envelope for a discountable instrument.
+
+    Args:
+        instrument_json: Tagged instrument JSON.
+        market: Typed ``MarketContext`` or serialized market-context JSON.
+        as_of: ISO 8601 valuation date.
+        model: ``"discounting"`` or ``"hazard_rate"``.
+
+    Returns:
+        JSON-serialized ``InstrumentCashflowEnvelope``.
+
+    Raises:
+        ValueError: If the model is unsupported, the instrument is unsupported
+            for cashflow export, or required market data is missing.
     """
     ...
 

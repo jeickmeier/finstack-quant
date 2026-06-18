@@ -441,14 +441,21 @@ class TestValuationsNamespace:
         """Instrument helpers should be available from valuations.instruments."""
         from finstack_quant.valuations import instruments
 
+        assert hasattr(instruments, "commodity")
+        assert hasattr(instruments, "credit_derivatives")
+        assert hasattr(instruments, "equity")
+        assert hasattr(instruments, "exotics")
+        assert hasattr(instruments, "fixed_income")
+        assert hasattr(instruments, "fx")
+        assert hasattr(instruments, "rates")
         assert hasattr(instruments, "validate_instrument_json")
         assert hasattr(instruments, "price_instrument")
         assert hasattr(instruments, "price_instrument_with_metrics")
         assert hasattr(instruments, "list_standard_metrics")
 
     def test_valuations_fx_namespace_exports(self) -> None:
-        """Direct FX instruments should be available from valuations.fx."""
-        from finstack_quant.valuations import fx
+        """Direct FX instruments should be available from valuations.instruments.fx."""
+        from finstack_quant.valuations.instruments import fx
 
         for name in (
             "FxSpot",
@@ -464,12 +471,113 @@ class TestValuationsNamespace:
         ):
             assert hasattr(fx, name)
 
+    def test_valuations_commodity_namespace_exports(self) -> None:
+        """Direct commodity instruments should be available from valuations.instruments.commodity."""
+        from finstack_quant.valuations.instruments import commodity
+
+        for name in (
+            "CommodityOption",
+            "CommodityAsianOption",
+            "CommodityForward",
+            "CommoditySwap",
+            "CommoditySwaption",
+            "CommoditySpreadOption",
+        ):
+            cls = getattr(commodity, name)
+            assert cls.__module__ == "finstack_quant.valuations.instruments.commodity"
+
+    def test_valuations_equity_namespace_exports(self) -> None:
+        """Direct equity instruments should be available from valuations.instruments.equity."""
+        from finstack_quant.valuations.instruments import equity
+
+        for name in (
+            "Equity",
+            "EquityOption",
+            "VarianceSwap",
+            "EquityIndexFuture",
+            "VolatilityIndexFuture",
+            "VolatilityIndexOption",
+            "Autocallable",
+            "CliquetOption",
+            "EquityTotalReturnSwap",
+            "PrivateMarketsFund",
+            "RealEstateAsset",
+            "LeveredRealEstateEquity",
+            "DiscountedCashFlow",
+        ):
+            cls = getattr(equity, name)
+            assert cls.__module__ == "finstack_quant.valuations.instruments.equity"
+
     def test_valuations_exotics_namespace_exports(self) -> None:
-        """Direct exotic instruments should be available from valuations.exotics."""
-        from finstack_quant.valuations import exotics
+        """Direct exotic instruments should be available from valuations.instruments.exotics."""
+        from finstack_quant.valuations.instruments import exotics
 
         for name in ("AsianOption", "BarrierOption", "LookbackOption", "Basket"):
             assert hasattr(exotics, name)
+
+    def test_valuations_fixed_income_namespace_exports(self) -> None:
+        """Direct fixed-income instruments should be available from valuations.instruments.fixed_income."""
+        from finstack_quant.valuations.instruments import fixed_income
+
+        for name in (
+            "Bond",
+            "ConvertibleBond",
+            "InflationLinkedBond",
+            "TermLoan",
+            "RevolvingCredit",
+            "BondFuture",
+            "AgencyMbsPassthrough",
+            "AgencyTba",
+            "AgencyCmo",
+            "DollarRoll",
+            "FIIndexTotalReturnSwap",
+            "StructuredCredit",
+        ):
+            cls = getattr(fixed_income, name)
+            assert cls.__module__ == "finstack_quant.valuations.instruments.fixed_income"
+
+    def test_valuations_rates_namespace_exports(self) -> None:
+        """Direct rates instruments should be available from valuations.instruments.rates."""
+        from finstack_quant.valuations.instruments import rates
+
+        for name in (
+            "InterestRateSwap",
+            "BasisSwap",
+            "XccySwap",
+            "InflationSwap",
+            "YoYInflationSwap",
+            "InflationCapFloor",
+            "ForwardRateAgreement",
+            "Swaption",
+            "BermudanSwaption",
+            "InterestRateFuture",
+            "CapFloor",
+            "CmsSwap",
+            "CmsOption",
+            "IrFutureOption",
+            "Deposit",
+            "Repo",
+            "RangeAccrual",
+            "Tarn",
+            "Snowball",
+            "CmsSpreadOption",
+            "CallableRangeAccrual",
+        ):
+            cls = getattr(rates, name)
+            assert cls.__module__ == "finstack_quant.valuations.instruments.rates"
+
+    def test_valuations_models_credit_namespace_exports(self) -> None:
+        """Structural credit models should mirror valuations.models.credit."""
+        from finstack_quant.valuations.models import credit
+
+        for name in (
+            "CreditState",
+            "DynamicRecoverySpec",
+            "EndogenousHazardSpec",
+            "MertonModel",
+            "ToggleExerciseModel",
+        ):
+            assert hasattr(credit, name)
 
     def test_valuations_extension_submodules_are_registered(self) -> None:
         """PyO3 valuation submodules should have stable extension-qualified names."""
@@ -479,14 +587,28 @@ class TestValuationsNamespace:
 
         root_package = ext_valuations.__package__
         assert root_package == "finstack_quant.finstack_quant.valuations"
-        for name in (
-            "correlation",
-            "credit",
-            "credit_derivatives",
-            "exotics",
-            "fx",
-        ):
+        for name in ("correlation", "instruments", "models"):
             module = getattr(ext_valuations, name)
             qualified = f"{root_package}.{name}"
             assert module.__package__ == qualified
             assert sys.modules[qualified] is module
+
+        instruments_package = f"{root_package}.instruments"
+        for name in (
+            "commodity",
+            "credit_derivatives",
+            "equity",
+            "exotics",
+            "fixed_income",
+            "fx",
+            "rates",
+        ):
+            module = getattr(ext_valuations.instruments, name)
+            qualified = f"{instruments_package}.{name}"
+            assert module.__package__ == qualified
+            assert sys.modules[qualified] is module
+
+        credit = ext_valuations.models.credit
+        qualified = f"{root_package}.models.credit"
+        assert credit.__package__ == qualified
+        assert sys.modules[qualified] is credit

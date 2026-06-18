@@ -10,7 +10,7 @@ use pyo3::types::{PyList, PyModule};
 
 #[pyclass(
     name = "MertonModel",
-    module = "finstack_quant.valuations.credit",
+    module = "finstack_quant.valuations.models.credit",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -20,6 +20,18 @@ struct PyMertonModel {
 
 #[pymethods]
 impl PyMertonModel {
+    /// Construct a Merton structural credit model from firm asset inputs.
+    ///
+    /// # Arguments
+    ///
+    /// * `asset_value` - Firm asset value (positive, finite)
+    /// * `asset_vol` - Annualized asset volatility as a decimal
+    /// * `debt_barrier` - Default barrier, typically total debt face
+    /// * `risk_free_rate` - Continuously compounded risk-free rate as a decimal
+    ///
+    /// # Errors
+    ///
+    /// Raises `ValueError` when inputs are non-finite or out of range.
     #[new]
     fn new(
         asset_value: f64,
@@ -33,6 +45,10 @@ impl PyMertonModel {
         })
     }
 
+    /// Build a CreditGrades-style structural model from equity inputs.
+    ///
+    /// Calibrates asset value and volatility implied by observed equity value
+    /// and equity volatility under the O'Kane CreditGrades barrier specification.
     #[staticmethod]
     fn credit_grades(
         equity_value: f64,
@@ -55,6 +71,7 @@ impl PyMertonModel {
         })
     }
 
+    /// Deserialize a structural credit model from JSON.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         Ok(Self {
@@ -62,18 +79,26 @@ impl PyMertonModel {
         })
     }
 
+    /// Serialize this model to pretty-printed JSON.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string_pretty(&self.inner).map_err(display_to_py)
     }
 
+    /// Risk-neutral distance to default at `horizon` years.
     fn distance_to_default(&self, horizon: f64) -> f64 {
         self.inner.distance_to_default(horizon)
     }
 
+    /// Risk-neutral default probability over `horizon` years.
     fn default_probability(&self, horizon: f64) -> f64 {
         self.inner.default_probability(horizon)
     }
 
+    /// Implied CDS par spread for `horizon` and `recovery` (decimal, not bps).
+    ///
+    /// # Errors
+    ///
+    /// Raises `ValueError` when `horizon` or `recovery` are invalid.
     fn implied_spread(&self, horizon: f64, recovery: f64) -> PyResult<f64> {
         self.inner
             .implied_spread(horizon, recovery)
@@ -83,7 +108,7 @@ impl PyMertonModel {
 
 #[pyclass(
     name = "DynamicRecoverySpec",
-    module = "finstack_quant.valuations.credit",
+    module = "finstack_quant.valuations.models.credit",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -118,7 +143,7 @@ impl PyDynamicRecoverySpec {
 
 #[pyclass(
     name = "EndogenousHazardSpec",
-    module = "finstack_quant.valuations.credit",
+    module = "finstack_quant.valuations.models.credit",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -159,7 +184,7 @@ impl PyEndogenousHazardSpec {
 
 #[pyclass(
     name = "CreditState",
-    module = "finstack_quant.valuations.credit",
+    module = "finstack_quant.valuations.models.credit",
     skip_from_py_object
 )]
 #[derive(Clone)]
@@ -198,7 +223,7 @@ impl PyCreditState {
 
 #[pyclass(
     name = "ToggleExerciseModel",
-    module = "finstack_quant.valuations.credit",
+    module = "finstack_quant.valuations.models.credit",
     skip_from_py_object
 )]
 #[derive(Clone)]

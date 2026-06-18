@@ -567,6 +567,50 @@ def test_valuations_correlation_public_matches_contract() -> None:
         assert hasattr(module, name), f"{block['python_package']} does not expose `{name}`"
 
 
+def test_valuations_instruments_public_matches_contract() -> None:
+    """``finstack_quant.valuations.instruments.__all__`` must match [crates.valuations.instruments]."""
+    block = CONTRACT["crates"]["valuations"]["instruments"]
+    expected = block["public"]
+    module = importlib.import_module(block["python_package"])
+    assert module.__all__ == expected, (
+        f"{block['python_package']}.__all__ diverged from contract.\n"
+        f"  missing: {sorted(set(expected) - set(module.__all__))}\n"
+        f"  unlisted: {sorted(set(module.__all__) - set(expected))}"
+    )
+    for name in expected:
+        assert hasattr(module, name), f"{block['python_package']} does not expose `{name}`"
+
+
+@pytest.mark.parametrize(
+    "contract_path",
+    [
+        ("valuations", "instruments", "commodity"),
+        ("valuations", "instruments", "credit_derivatives"),
+        ("valuations", "instruments", "equity"),
+        ("valuations", "instruments", "exotics"),
+        ("valuations", "instruments", "fixed_income"),
+        ("valuations", "instruments", "fx"),
+        ("valuations", "instruments", "rates"),
+        ("valuations", "models"),
+        ("valuations", "models", "credit"),
+    ],
+)
+def test_valuations_nested_public_matches_contract(contract_path: tuple[str, ...]) -> None:
+    """Rust-shaped nested valuation modules must keep their pinned Python surface."""
+    block: dict[str, Any] = CONTRACT["crates"]
+    for key in contract_path:
+        block = block[key]
+    expected = block["public"]
+    module = importlib.import_module(block["python_package"])
+    assert module.__all__ == expected, (
+        f"{block['python_package']}.__all__ diverged from contract.\n"
+        f"  missing: {sorted(set(expected) - set(module.__all__))}\n"
+        f"  unlisted: {sorted(set(module.__all__) - set(expected))}"
+    )
+    for name in expected:
+        assert hasattr(module, name), f"{block['python_package']} does not expose `{name}`"
+
+
 def test_valuations_correlation_member_pins_resolve_in_both_hosts() -> None:
     """[wasm_valuations_subset.correlation_members] pins shared class members.
 

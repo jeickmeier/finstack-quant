@@ -63,11 +63,8 @@ import pandas as pd
 
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import correlation as correlation
-from finstack_quant.valuations import credit as credit
-from finstack_quant.valuations import credit_derivatives as credit_derivatives
-from finstack_quant.valuations import exotics as exotics
-from finstack_quant.valuations import fx as fx
 from finstack_quant.valuations import instruments as instruments
+from finstack_quant.valuations import models as models
 from finstack_quant.valuations.envelope import (
     BaseCorrelationCurvePrior as BaseCorrelationCurvePrior,
     BaseCorrelationStep as BaseCorrelationStep,
@@ -161,11 +158,8 @@ from finstack_quant.valuations.envelope import (
 
 __all__ = [
     "correlation",
-    "credit",
-    "credit_derivatives",
-    "exotics",
-    "fx",
     "instruments",
+    "models",
     "ValuationResult",
     "BaseCorrelationCurvePrior",
     "BaseCorrelationStep",
@@ -563,11 +557,21 @@ def price_instrument_with_metrics(
     ...
 
 def list_standard_metrics() -> list[str]:
-    """Return all metric IDs in the standard metric registry (sorted)."""
+    """Return all metric IDs in the standard metric registry (sorted).
+
+    Returns:
+        Sorted list of fully qualified metric keys (e.g.
+        ``"bucketed_dv01::USD-OIS::10y"``, ``"cs01::BOND_A"``).
+    """
     ...
 
 def list_standard_metrics_grouped() -> dict[str, list[str]]:
-    """Return standard metrics organized by human-readable group name."""
+    """Return standard metrics organized by human-readable group name.
+
+    Returns:
+        Mapping from group label (e.g. ``"Rates sensitivities"``) to sorted
+        metric ID lists for that group.
+    """
     ...
 
 def instrument_cashflows_json(
@@ -921,7 +925,23 @@ def bs_implied_vol(
     price: float,
     is_call: bool,
 ) -> float:
-    """Solve for Black-Scholes implied volatility given a target price."""
+    """Solve for Black-Scholes implied volatility given a target price.
+
+    Args:
+        spot: Spot price of the underlying.
+        strike: Option strike.
+        r: Continuously compounded risk-free rate (decimal).
+        q: Continuous dividend/borrow yield (decimal).
+        t: Time to expiry in years.
+        price: Observed option price in the same units as spot.
+        is_call: ``True`` for a call, ``False`` for a put.
+
+    Returns:
+        Implied volatility as a decimal.
+
+    Raises:
+        ValueError: If inputs are invalid or no root exists in the search bracket.
+    """
     ...
 
 def black76_implied_vol(
@@ -932,7 +952,22 @@ def black76_implied_vol(
     price: float,
     is_call: bool,
 ) -> float:
-    """Solve for Black-76 (forward-based) implied volatility given a target price."""
+    """Solve for Black-76 (forward-based) implied volatility given a target price.
+
+    Args:
+        forward: Forward price at expiry.
+        strike: Option strike.
+        df: Discount factor from valuation date to expiry.
+        t: Time to expiry in years.
+        price: Observed option price (same units as forward).
+        is_call: ``True`` for a call, ``False`` for a put.
+
+    Returns:
+        Implied volatility as a decimal.
+
+    Raises:
+        ValueError: If inputs are invalid or no root exists in the search bracket.
+    """
     ...
 
 # ---------------------------------------------------------------------------
@@ -1062,19 +1097,45 @@ class SabrParameters:
         ...
 
 class SabrModel:
-    """Hagan-2002 SABR volatility model."""
+    """Hagan-2002 SABR stochastic-volatility smile model.
+
+    Sources
+    -------
+    - Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr
+    """
 
     def __init__(self, params: SabrParameters) -> None:
-        """Create a SABR model from validated parameters."""
+        """Create a SABR model from validated parameters.
+
+        Args:
+            params: SABR parameter set (alpha, beta, nu, rho, optional shift).
+
+        Raises:
+            ValueError: If parameters violate SABR constraints.
+        """
         ...
 
     def implied_vol(self, forward: float, strike: float, t: float) -> float:
-        """Black-style implied volatility under the Hagan-2002 expansion."""
+        """Black-style implied volatility under the Hagan-2002 expansion.
+
+        Args:
+            forward: Forward price at expiry.
+            strike: Strike price.
+            t: Time to expiry in years.
+
+        Returns:
+            Implied volatility as a decimal.
+        """
         ...
 
     @property
     def params(self) -> SabrParameters:
-        """Parameters used by this model."""
+        """Parameters used by this model.
+
+        Returns
+        -------
+        SabrParameters
+        """
         ...
 
     def supports_negative_rates(self) -> bool:
@@ -1122,16 +1183,28 @@ class SabrCalibrator:
     """SABR calibrator (Levenberg-Marquardt with beta fixed)."""
 
     def __init__(self) -> None:
-        """Create a default SABR calibrator."""
+        """Create a default SABR calibrator with standard tolerance and iteration cap."""
         ...
 
     @staticmethod
     def high_precision() -> SabrCalibrator:
-        """Tighter tolerance and higher iteration cap for production fits."""
+        """Return a calibrator with tighter tolerance for production fits.
+
+        Returns
+        -------
+        SabrCalibrator
+        """
         ...
 
     def with_tolerance(self, tolerance: float) -> SabrCalibrator:
-        """Return a copy with an overridden convergence tolerance."""
+        """Return a copy with an overridden convergence tolerance.
+
+        Args:
+            tolerance: Relative RMSE target for the fit.
+
+        Returns:
+            New calibrator instance sharing other settings.
+        """
         ...
 
     def calibrate(
@@ -1142,7 +1215,21 @@ class SabrCalibrator:
         t: float,
         beta: float,
     ) -> SabrParameters:
-        """Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed."""
+        """Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed.
+
+        Args:
+            forward: Forward at expiry.
+            strikes: Strike grid aligned with ``market_vols``.
+            market_vols: Market implied vols as decimals.
+            t: Expiry in years.
+            beta: Fixed SABR beta in ``[0, 1]``.
+
+        Returns:
+            Calibrated :class:`SabrParameters`.
+
+        Raises:
+            ValueError: If lengths mismatch or fit fails to converge.
+        """
         ...
 
     def calibrate_auto_shift(

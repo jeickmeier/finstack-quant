@@ -323,12 +323,9 @@ status = "exists"
 # Top-level public modules. Symbol-level pinning for non-submodule public names
 # lives in [crates.valuations.symbols] below.
 instruments  = { python = "finstack_quant.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack_quant.valuations.instruments" }
-fx           = { python = "finstack_quant.valuations.fx",           status = "exists", note = "Direct FX instrument wrappers for Rust/WASM-supported FX instruments; no JSON-only workflow required" }
-exotics      = { python = "finstack_quant.valuations.exotics",      status = "exists", note = "Python-only direct exotics wrappers; WASM exposes closed-form exotics helpers on the valuations facade instead of class wrappers" }
+models       = { python = "finstack_quant.valuations.models",       status = "exists", note = "Pricing model wrappers; structural credit lives under finstack_quant.valuations.models.credit" }
 calibration  = { python = "finstack_quant.valuations",              status = "flattened", note = "calibrate, dry_run, validate_calibration_json, dependency_graph_json exported from finstack_quant.valuations root" }
 correlation  = { python = "finstack_quant.valuations.correlation",  status = "exists", note = "Former standalone finstack-correlation crate; nested under valuations" }
-credit       = { python = "finstack_quant.valuations.credit",       status = "exists", note = "Structural credit models and PIK toggle helpers" }
-credit_derivatives = { python = "finstack_quant.valuations.credit_derivatives", status = "exists", note = "Typed wrappers for CDS, CDS index, tranche, and option JSON pricing" }
 
 # Symbol-level pinning for the valuations domain. Names listed here MUST
 # resolve when imported from `finstack_quant.valuations`. Adding a public name to
@@ -483,6 +480,154 @@ public = [
     "joint_probabilities",
     "nearest_correlation",
     "validate_correlation_matrix",
+]
+
+[crates.valuations.instruments]
+python_package = "finstack_quant.valuations.instruments"
+public = [
+    "commodity",
+    "credit_derivatives",
+    "equity",
+    "exotics",
+    "fixed_income",
+    "fx",
+    "instrument_cashflows_json",
+    "list_standard_metrics",
+    "list_standard_metrics_grouped",
+    "price_instrument",
+    "price_instrument_with_metrics",
+    "rates",
+    "validate_instrument_json",
+]
+
+[crates.valuations.instruments.modules]
+commodity          = { python = "finstack_quant.valuations.instruments.commodity",          status = "exists", note = "Direct commodity instrument wrappers" }
+credit_derivatives = { python = "finstack_quant.valuations.instruments.credit_derivatives", status = "exists", note = "Typed wrappers for CDS, CDS index, tranche, and option JSON pricing" }
+equity             = { python = "finstack_quant.valuations.instruments.equity",             status = "exists", note = "Direct equity instrument wrappers" }
+exotics            = { python = "finstack_quant.valuations.instruments.exotics",            status = "exists", note = "Direct exotic instrument wrappers" }
+fixed_income       = { python = "finstack_quant.valuations.instruments.fixed_income",       status = "exists", note = "Direct fixed-income instrument wrappers" }
+fx                 = { python = "finstack_quant.valuations.instruments.fx",                 status = "exists", note = "Direct FX instrument wrappers for Rust/WASM-supported FX instruments" }
+rates              = { python = "finstack_quant.valuations.instruments.rates",              status = "exists", note = "Direct rates instrument wrappers" }
+
+[crates.valuations.instruments.commodity]
+python_package = "finstack_quant.valuations.instruments.commodity"
+public = [
+    "CommodityOption",
+    "CommodityAsianOption",
+    "CommodityForward",
+    "CommoditySwap",
+    "CommoditySwaption",
+    "CommoditySpreadOption",
+]
+
+[crates.valuations.instruments.credit_derivatives]
+python_package = "finstack_quant.valuations.instruments.credit_derivatives"
+public = [
+    "CDSIndex",
+    "CDSOption",
+    "CDSTranche",
+    "CreditDefaultSwap",
+]
+
+[crates.valuations.instruments.equity]
+python_package = "finstack_quant.valuations.instruments.equity"
+public = [
+    "Equity",
+    "EquityOption",
+    "VarianceSwap",
+    "EquityIndexFuture",
+    "VolatilityIndexFuture",
+    "VolatilityIndexOption",
+    "Autocallable",
+    "CliquetOption",
+    "EquityTotalReturnSwap",
+    "PrivateMarketsFund",
+    "RealEstateAsset",
+    "LeveredRealEstateEquity",
+    "DiscountedCashFlow",
+]
+
+[crates.valuations.instruments.exotics]
+python_package = "finstack_quant.valuations.instruments.exotics"
+public = [
+    "AsianOption",
+    "BarrierOption",
+    "Basket",
+    "LookbackOption",
+]
+
+[crates.valuations.instruments.fixed_income]
+python_package = "finstack_quant.valuations.instruments.fixed_income"
+public = [
+    "Bond",
+    "ConvertibleBond",
+    "InflationLinkedBond",
+    "TermLoan",
+    "RevolvingCredit",
+    "BondFuture",
+    "AgencyMbsPassthrough",
+    "AgencyTba",
+    "AgencyCmo",
+    "DollarRoll",
+    "FIIndexTotalReturnSwap",
+    "StructuredCredit",
+]
+
+[crates.valuations.instruments.fx]
+python_package = "finstack_quant.valuations.instruments.fx"
+public = [
+    "FxBarrierOption",
+    "FxDigitalOption",
+    "FxForward",
+    "FxOption",
+    "FxSpot",
+    "FxSwap",
+    "FxTouchOption",
+    "FxVarianceSwap",
+    "Ndf",
+    "QuantoOption",
+]
+
+[crates.valuations.instruments.rates]
+python_package = "finstack_quant.valuations.instruments.rates"
+public = [
+    "InterestRateSwap",
+    "BasisSwap",
+    "XccySwap",
+    "InflationSwap",
+    "YoYInflationSwap",
+    "InflationCapFloor",
+    "ForwardRateAgreement",
+    "Swaption",
+    "BermudanSwaption",
+    "InterestRateFuture",
+    "CapFloor",
+    "CmsSwap",
+    "CmsOption",
+    "IrFutureOption",
+    "Deposit",
+    "Repo",
+    "RangeAccrual",
+    "Tarn",
+    "Snowball",
+    "CmsSpreadOption",
+    "CallableRangeAccrual",
+]
+
+[crates.valuations.models]
+python_package = "finstack_quant.valuations.models"
+public = [
+    "credit",
+]
+
+[crates.valuations.models.credit]
+python_package = "finstack_quant.valuations.models.credit"
+public = [
+    "CreditState",
+    "DynamicRecoverySpec",
+    "EndogenousHazardSpec",
+    "MertonModel",
+    "ToggleExerciseModel",
 ]
 
 

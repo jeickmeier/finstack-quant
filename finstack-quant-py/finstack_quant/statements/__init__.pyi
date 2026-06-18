@@ -144,7 +144,11 @@ class ForecastMethod:
         ...
 
     def __repr__(self) -> str:
-        """Return a debug representation of this forecast method."""
+        """Return a debug representation of this forecast method.
+        Returns
+        -------
+        str
+        """
         ...
 
 class ForecastSpec:
@@ -185,11 +189,19 @@ class ForecastSpec:
         ...
 
     def to_json(self) -> str:
-        """Serialize this forecast spec to JSON."""
+        """Serialize this forecast spec to JSON.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a debug representation of this forecast spec."""
+        """Return a debug representation of this forecast spec.
+        Returns
+        -------
+        str
+        """
         ...
 
 class NodeType:
@@ -240,7 +252,11 @@ class NodeType:
         ...
 
     def __repr__(self) -> str:
-        """Return a debug representation of this node type."""
+        """Return a debug representation of this node type.
+        Returns
+        -------
+        str
+        """
         ...
 
 class NodeId:
@@ -284,11 +300,19 @@ class NodeId:
         ...
 
     def __repr__(self) -> str:
-        """Return a Python-literal style representation."""
+        """Return a Python-literal style representation.
+        Returns
+        -------
+        str
+        """
         ...
 
     def __str__(self) -> str:
-        """Return the identifier as a plain string."""
+        """Return the identifier as a plain string.
+        Returns
+        -------
+        str
+        """
         ...
 
 class NumericMode:
@@ -333,7 +357,11 @@ class NumericMode:
         ...
 
     def __repr__(self) -> str:
-        """Return a debug representation of this numeric mode."""
+        """Return a debug representation of this numeric mode.
+        Returns
+        -------
+        str
+        """
         ...
 
 class FinancialModelSpec:
@@ -398,17 +426,29 @@ class FinancialModelSpec:
 
     @property
     def id(self) -> str:
-        """Model identifier string."""
+        """Model identifier string.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def period_count(self) -> int:
-        """Number of periods defined on the model."""
+        """Number of periods defined on the model.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def node_count(self) -> int:
-        """Number of nodes defined on the model."""
+        """Number of nodes defined on the model.
+        Returns
+        -------
+        int
+        """
         ...
 
     def node_ids(self) -> list[str]:
@@ -448,11 +488,19 @@ class FinancialModelSpec:
 
     @property
     def schema_version(self) -> int:
-        """Wire-format schema version of this specification."""
+        """Wire-format schema version of this specification.
+        Returns
+        -------
+        int
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise summary including id, period count, and node count."""
+        """Return a concise summary including id, period count, and node count.
+        Returns
+        -------
+        str
+        """
         ...
 
 class ModelBuilder:
@@ -576,11 +624,19 @@ class ModelBuilder:
         ...
 
     def with_name_normalization(self) -> None:
-        """Enable standard accounting term alias normalization."""
+        """Enable standard accounting term alias normalization.
+        Returns
+        -------
+        None
+        """
         ...
 
     def with_builtin_metrics(self) -> None:
-        """Add all built-in statement metrics to the model."""
+        """Add all built-in statement metrics to the model.
+        Returns
+        -------
+        None
+        """
         ...
 
     def add_metric_from_registry(self, qualified_id: str, registry: MetricRegistry) -> None:
@@ -677,14 +733,22 @@ class MixedNodeBuilder:
         ...
 
     def build(self) -> ModelBuilder:
-        """Attach the mixed node and return a ready model builder."""
+        """Attach the mixed node and return a ready model builder.
+        Returns
+        -------
+        ModelBuilder
+        """
         ...
 
 class MetricRegistry:
     """Reusable statement metric registry."""
 
     def __init__(self) -> None:
-        """Create an empty registry."""
+        """Create an empty registry.
+        Returns
+        -------
+        None
+        """
         ...
 
     @staticmethod
@@ -693,7 +757,11 @@ class MetricRegistry:
         ...
 
     def load_builtins(self) -> None:
-        """Load built-in metrics into this registry."""
+        """Load built-in metrics into this registry.
+        Returns
+        -------
+        None
+        """
         ...
 
     def load_from_json_str(self, json: str) -> None:
@@ -709,7 +777,11 @@ class MetricRegistry:
         ...
 
     def __len__(self) -> int:
-        """Return the number of metrics."""
+        """Return the number of metrics.
+        Returns
+        -------
+        int
+        """
         ...
 
 class StatementResult:
@@ -891,22 +963,38 @@ class StatementResult:
 
     @property
     def node_count(self) -> int:
-        """Number of nodes in the result."""
+        """Number of nodes in the result.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def num_periods(self) -> int:
-        """Number of periods covered by the evaluation metadata."""
+        """Number of periods covered by the evaluation metadata.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def eval_time_ms(self) -> int | None:
-        """Wall-clock evaluation time in milliseconds, if recorded."""
+        """Wall-clock evaluation time in milliseconds, if recorded.
+        Returns
+        -------
+        int or None
+        """
         ...
 
     @property
     def warning_count(self) -> int:
-        """Count of evaluation warnings attached to metadata."""
+        """Count of evaluation warnings attached to metadata.
+        Returns
+        -------
+        int
+        """
         ...
 
     def to_pandas_long(self) -> pd.DataFrame:
@@ -939,7 +1027,11 @@ class StatementResult:
         ...
 
     def __repr__(self) -> str:
-        """Return a concise summary with node and period counts."""
+        """Return a concise summary with node and period counts.
+        Returns
+        -------
+        str
+        """
         ...
 
 class Evaluator:
@@ -960,6 +1052,10 @@ class Evaluator:
         >>> ev = Evaluator()
         >>> ev.evaluate  # doctest: +ELLIPSIS
         <built-in method evaluate ...>
+
+        Returns
+        -------
+        None
         """
         ...
 
@@ -1127,16 +1223,28 @@ class NormalizationConfig:
 
     @property
     def target_node(self) -> str:
-        """Node id being normalized."""
+        """Node id being normalized.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def adjustment_count(self) -> int:
-        """Number of adjustment line items configured."""
+        """Number of adjustment line items configured.
+        Returns
+        -------
+        int
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise summary including target node and adjustment count."""
+        """Return a concise summary including target node and adjustment count.
+        Returns
+        -------
+        str
+        """
         ...
 
 def normalize(results: StatementResult, config: NormalizationConfig) -> str:
@@ -1219,21 +1327,37 @@ class CheckSuiteSpec:
 
     @property
     def name(self) -> str:
-        """Suite name."""
+        """Suite name.
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def builtin_check_count(self) -> int:
-        """Number of built-in checks in the suite spec."""
+        """Number of built-in checks in the suite spec.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def formula_check_count(self) -> int:
-        """Number of formula checks in the suite spec."""
+        """Number of formula checks in the suite spec.
+        Returns
+        -------
+        int
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise summary of the suite spec."""
+        """Return a concise summary of the suite spec.
+        Returns
+        -------
+        str
+        """
         ...
 
 class CheckReport:
@@ -1290,31 +1414,55 @@ class CheckReport:
 
     @property
     def passed(self) -> bool:
-        """Whether all checks passed (no error-severity findings)."""
+        """Whether all checks passed (no error-severity findings).
+        Returns
+        -------
+        bool
+        """
         ...
 
     @property
     def total_checks(self) -> int:
-        """Number of individual check results in the report."""
+        """Number of individual check results in the report.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def total_findings(self) -> int:
-        """Total number of findings across all checks."""
+        """Total number of findings across all checks.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def total_errors(self) -> int:
-        """Number of error-severity findings."""
+        """Number of error-severity findings.
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def total_warnings(self) -> int:
-        """Number of warning-severity findings."""
+        """Number of warning-severity findings.
+        Returns
+        -------
+        int
+        """
         ...
 
     def __repr__(self) -> str:
-        """Return a concise summary of the check report."""
+        """Return a concise summary of the check report.
+        Returns
+        -------
+        str
+        """
         ...
 
 class EcfSweepSpec:

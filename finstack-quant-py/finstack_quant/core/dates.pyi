@@ -1591,11 +1591,19 @@ class ScheduleBuilder:
         ...
 
     def cds_imm(self) -> None:
-        """Enable CDS IMM date mode."""
+        """Enable CDS IMM date mode.
+        Returns
+        -------
+        None
+        """
         ...
 
     def imm(self) -> None:
-        """Enable IMM date mode."""
+        """Enable IMM date mode.
+        Returns
+        -------
+        None
+        """
         ...
 
     def error_policy(self, policy: ScheduleErrorPolicy) -> None:

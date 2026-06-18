@@ -9,11 +9,8 @@ from typing import TYPE_CHECKING as _TYPE_CHECKING, Any as _Any
 from finstack_quant.finstack_quant import valuations as _valuations
 from finstack_quant.valuations import (
     correlation as correlation,
-    credit as credit,
-    credit_derivatives as credit_derivatives,
-    exotics as exotics,
-    fx as fx,
     instruments as instruments,
+    models as models,
 )
 from finstack_quant.valuations.envelope import (
     BaseCorrelationCurvePrior as BaseCorrelationCurvePrior,
@@ -292,12 +289,8 @@ __all__: list[str] = [
     "callable_range_accrual_accrued",
     "cms_spread_option_intrinsic",
     "correlation",
-    "credit",
-    "credit_derivatives",
     "dependency_graph_json",
     "dry_run",
-    "exotics",
-    "fx",
     "instrument_cashflows",
     "instrument_cashflows_json",
     "instruments",
@@ -305,6 +298,7 @@ __all__: list[str] = [
     "list_standard_metrics_grouped",
     "lookback_option_price",
     "merton_jump_cos_price",
+    "models",
     "price_instrument",
     "price_instrument_with_metrics",
     "quanto_option_price",
