@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from finstack_quant.reporting import instrument as ins
 from finstack_quant.valuations import list_standard_metrics
@@ -100,7 +101,8 @@ def test_metric_cell_formats_by_unit() -> None:
     assert ins._metric_cell("ytm", 0.0394) == ("Yield to Maturity", "3.94%", "")
     assert ins._metric_cell("z_spread", 0.0078)[1] == "78 bp"
     assert ins._metric_cell("dv01", 6420.0)[1] in ("6,420", "6,420.00")
-    assert ins._metric_cell("clean_price", 101.96)[1] == "101.96"
+    # clean_price is a full dollar amount (not per-100) — formatted as money (0dp)
+    assert ins._metric_cell("clean_price", 9725674.0)[1] in ("9,725,674", "$9,725,674")
     _lbl, _val, cls = ins._metric_cell("jump_to_default", -5816000.0)
     assert cls == "neg"
 
@@ -239,3 +241,128 @@ def test_cashflow_blocks_from_dataframe() -> None:
     # schedule rows carry the original columns
     assert schedule
     assert "Date" in schedule[0]
+
+
+# ---------------------------------------------------------------------------
+# Task 8: Bond golden test + CDS/option smoke tests
+# ---------------------------------------------------------------------------
+
+DATA = Path(__file__).parent / "data"
+
+
+def _bond_definition() -> dict:
+    return {
+        "type": "bond",
+        "spec": {
+            "id": "ACME-4.25-2034",
+            "notional": {"amount": "10000000", "currency": "USD"},
+            "issue_date": "2024-03-15",
+            "maturity": "2034-03-15",
+            "cashflow_spec": {"Fixed": {"rate": 0.0425, "freq": {"count": 6, "unit": "months"}, "dc": "Thirty360"}},
+            "discount_curve_id": "USD-OIS",
+        },
+    }
+
+
+def _bond_golden_html() -> str:
+    import datetime as dt
+
+    import pandas as pd
+
+    from finstack_quant.reporting import instrument_tearsheet
+    from finstack_quant.valuations import ValuationResult
+
+    result = ValuationResult.from_json((DATA / "instrument_bond_result.json").read_text())
+    records = json.loads((DATA / "instrument_bond_cashflows.json").read_text())
+    cf = pd.DataFrame(records)
+    cf["date"] = pd.to_datetime(cf["date"]).dt.date
+    ts = instrument_tearsheet(result, definition=_bond_definition(), cashflows=cf, generated=dt.date(2026, 6, 19))
+    return ts.to_html()
+
+
+def test_instrument_bond_matches_golden() -> None:
+    golden = DATA / "instrument_bond_tearsheet_golden.html"
+    assert golden.exists(), "golden missing — regenerate (Task 8 Step 4)"
+    assert _bond_golden_html() == golden.read_text(encoding="utf-8")
+
+
+def test_instrument_cds_renders_credit_blocks() -> None:
+    import datetime as dt
+
+    from finstack_quant.reporting import instrument_tearsheet
+
+    cds = _FakeResult({
+        "schema_version": 1,
+        "instrument_id": "ACME-5Y-CDS",
+        "as_of": "2026-06-19",
+        "value": {"amount": "184200.0", "currency": "USD"},
+        "measures": {
+            "par_spread": 0.0137,
+            "cs01": 4930.0,
+            "jump_to_default": -5816000.0,
+            "bucketed_cs01::ACME-SR::5y": 2510.0,
+            "bucketed_cs01::ACME-SR::3y": 940.0,
+            "default01": 9690.0,
+        },
+        "meta": {"numeric_mode": "Decimal"},
+        "details": None,
+        "covenants": None,
+    })
+    defn = {
+        "type": "credit_default_swap",
+        "spec": {
+            "id": "ACME",
+            "notional": {"amount": "10000000", "currency": "USD"},
+            "side": "Buy",
+            "premium": {
+                "start": "2024-06-20",
+                "end": "2029-06-20",
+                "spread_bp": 100,
+                "frequency": {"count": 3, "unit": "months"},
+            },
+            "protection": {"credit_curve_id": "ACME-SR", "recovery_rate": 0.4},
+            "doc_clause": "XR14",
+        },
+    }
+    html = instrument_tearsheet(cds, definition=defn, generated=dt.date(2026, 6, 19)).to_html()
+    assert "Bucketed CS01" in html
+    assert "Par Spread" in html
+
+
+def test_instrument_option_renders_payoff() -> None:
+    import datetime as dt
+
+    from finstack_quant.reporting import instrument_tearsheet
+
+    opt = _FakeResult({
+        "schema_version": 1,
+        "instrument_id": "SPX-5000-C",
+        "as_of": "2026-06-19",
+        "value": {"amount": "218.40", "currency": "USD"},
+        "measures": {
+            "delta": 0.512,
+            "vega": 9.83,
+            "implied_vol": 0.176,
+            "theta": -1.42,
+            "gamma": 0.0021,
+        },
+        "meta": {"numeric_mode": "Decimal"},
+        "details": None,
+        "covenants": None,
+    })
+    defn = {
+        "type": "equity_option",
+        "spec": {
+            "id": "SPX-5000-C",
+            "underlying_ticker": "SPX",
+            "strike": 5000.0,
+            "option_type": "Call",
+            "exercise_style": "European",
+            "expiry": "2026-12-18",
+            "discount_curve_id": "USD-OIS",
+            "vol_surface_id": "SPX-VOL",
+        },
+    }
+    html = instrument_tearsheet(opt, definition=defn, generated=dt.date(2026, 6, 19)).to_html()
+    assert "Payoff at Expiry" in html
+    assert "Delta" in html

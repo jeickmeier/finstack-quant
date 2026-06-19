@@ -131,12 +131,14 @@ def _money_str(m: Any) -> str:
 
 # metric_id -> (display label, unit kind). Unit kinds:
 #   "pct"   decimal -> N.NN%      "bp"   decimal -> NN bp
-#   "price" 2dp as-is             "money" thousands 0dp
-#   "ratio" 2dp                   "ratio4" 4dp
+#   "money" full-value 0dp        "ratio" 2dp
+#   "ratio4" 4dp
+# Spot-check (2026-06-19): dirty/clean/accrued are full dollar values (not per-100),
+# so "money" kind is used (0dp). Yields/vols are decimal (×100 for %). Spreads decimal (×10000 for bp).
 _METRIC_FMT: dict[str, tuple[str, str]] = {
-    "dirty_price": ("Dirty Price", "price"),
-    "clean_price": ("Clean Price", "price"),
-    "accrued": ("Accrued", "price"),
+    "dirty_price": ("Dirty Price", "money"),
+    "clean_price": ("Clean Price", "money"),
+    "accrued": ("Accrued", "money"),
     "ytm": ("Yield to Maturity", "pct"),
     "ytw": ("Yield to Worst", "pct"),
     "z_spread": ("Z-Spread", "bp"),
