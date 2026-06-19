@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 
 import pandas as pd
 
@@ -53,3 +54,25 @@ def test_unknown_section_raises() -> None:
 
     with pytest.raises(ValueError, match=r"unknown section"):
         performance_tearsheet(_perf(), sections=["typo"], generated=dt.date(2026, 6, 19))
+
+
+GOLDEN = Path(__file__).parent / "data" / "performance_tearsheet_golden.html"
+
+
+def _golden_perf() -> Performance:
+    """Fully literal, platform-independent series (no RNG, no system clock)."""
+    import math
+
+    idx = pd.bdate_range("2021-01-04", "2023-12-29")
+    rets = [round(0.0005 + 0.003 * math.sin(i / 7.0) - 0.002 * (i % 23 == 0), 6) for i in range(len(idx))]
+    return Performance.from_returns(pd.DataFrame({"Global Macro Composite": rets}, index=idx))
+
+
+def _golden_html() -> str:
+    ts = performance_tearsheet(_golden_perf(), generated=dt.date(2026, 6, 19))
+    return ts.to_html()
+
+
+def test_performance_tearsheet_matches_golden() -> None:
+    assert GOLDEN.exists(), "golden file missing — regenerate (see plan Task 11 Step 3)"
+    assert _golden_html() == GOLDEN.read_text(encoding="utf-8")
