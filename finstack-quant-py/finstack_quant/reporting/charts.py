@@ -12,6 +12,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from . import format as fmt
 from .theme import Theme
 
 _W = 620
@@ -71,6 +72,11 @@ def color_scale(v: Any, theme: Theme, cap: float = 8.0) -> tuple[str, str]:
 
 def _tick_label(t: float, y_pct: bool) -> str:
     return f"{t:.0f}%" if y_pct else f"{t:.1f}"
+
+
+def _tip_val(v: float, y_pct: bool) -> str:
+    """Tooltip value string (2 dp, % suffix when y_pct)."""
+    return f"{v:.2f}%" if y_pct else f"{v:.2f}"
 
 
 def line_chart(
@@ -146,6 +152,23 @@ def line_chart(
             f'fill="{fill or rgba(color, 0.12)}"/>'
         )
     parts.append(f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="1.6" stroke-linejoin="round"/>')
+    # interactive overlay: transparent hover bands (native <title> + JS hook)
+    band_w = pw / (len(valid) - 1) if len(valid) > 1 else pw
+    for i, v in valid:
+        cx, cy = x(i), y(v)
+        bx = max(ml, cx - band_w / 2)
+        label = fmt.fmt_date(dates[i])
+        val = _tip_val(v, y_pct)
+        parts.append(
+            f'<rect class="fq-hb" x="{bx:.1f}" y="{mt}" width="{band_w:.1f}" height="{ph}" '
+            f'data-cx="{cx:.1f}" data-cy="{cy:.1f}" data-label="{label}" data-val="{val}">'
+            f"<title>{label} · {val}</title></rect>"
+        )
+    parts.append(
+        f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" '
+        f'style="visibility:hidden" pointer-events="none"/>'
+    )
+    parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
     parts.append("</svg>")
     return "".join(parts)
 
@@ -183,9 +206,13 @@ def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool
         v = nums[i]
         y0, y1 = y(0.0), y(v)
         col = theme.pos if v >= 0 else theme.neg
+        label = lab
+        valstr = _tip_val(v, y_pct)
         parts.append(
-            f'<rect x="{cx - bw / 2:.1f}" y="{min(y0, y1):.1f}" width="{bw:.1f}" '
-            f'height="{abs(y1 - y0):.1f}" fill="{col}" fill-opacity="0.82"/>'
+            f'<rect class="fq-hb" x="{cx - bw / 2:.1f}" y="{min(y0, y1):.1f}" width="{bw:.1f}" '
+            f'height="{abs(y1 - y0):.1f}" fill="{col}" fill-opacity="0.82" '
+            f'data-cx="{cx:.1f}" data-cy="{min(y0, y1):.1f}" data-label="{label}" data-val="{valstr}">'
+            f"<title>{label} · {valstr}</title></rect>"
         )
         parts.append(
             f'<text x="{cx:.1f}" y="{height - mb + 15}" text-anchor="middle" font-size="10" '
@@ -196,5 +223,10 @@ def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool
             f'<text x="{cx:.1f}" y="{vy:.1f}" text-anchor="middle" font-size="9.5" '
             f'fill="#23303f" font-family="{_xml_attr(theme.font_num)}">{"+" if v >= 0 else ""}{v:.0f}%</text>'
         )
+    parts.append(
+        f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" '
+        f'style="visibility:hidden" pointer-events="none"/>'
+    )
+    parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
     parts.append("</svg>")
     return "".join(parts)

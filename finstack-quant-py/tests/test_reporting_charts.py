@@ -59,3 +59,28 @@ def test_line_chart_gridlines_within_plot_area() -> None:
         if abs(float(ln.getAttribute("x1")) - 48.0) < 0.5:  # horizontal gridlines start at left margin 48
             y1 = float(ln.getAttribute("y1"))
             assert 11.5 <= y1 <= 166.5
+
+
+def test_line_chart_has_native_tooltips_and_hover_bands() -> None:
+    from xml.dom import minidom
+
+    svg = charts.line_chart(_dates(4), [1.0, 5.0, 3.0, 8.0], theme=INSTITUTIONAL, y_pct=True)
+    doc = minidom.parseString(svg)  # noqa: S318  still well-formed XML
+    bands = [r for r in doc.getElementsByTagName("rect") if r.getAttribute("class") == "fq-hb"]
+    assert len(bands) == 4
+    # each band carries data + a native <title>
+    for b in bands:
+        assert b.getAttribute("data-label")
+        assert b.getAttribute("data-val")
+        assert b.getElementsByTagName("title")
+    # hidden crosshair + marker present for the JS layer
+    assert "fq-cross" in svg
+    assert "fq-mk" in svg
+
+
+def test_bar_chart_bars_have_titles() -> None:
+    svg = charts.bar_chart(["2021", "2022"], [12.0, -8.0], theme=INSTITUTIONAL, y_pct=True)
+    assert svg.count('class="fq-hb"') == 2
+    assert "<title>2021" in svg
+    assert "fq-cross" in svg
+    assert "fq-mk" in svg
