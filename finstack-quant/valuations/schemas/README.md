@@ -109,8 +109,13 @@ Each instrument schema has:
 - **`properties.instrument.properties.spec`** — typed property definitions with:
   - Field types, descriptions, and defaults
   - `required` arrays for mandatory fields
-- Root-level `$defs` for nested types (enums, structs) referenced from the spec
   - Enum variants with descriptions and standards references
+- **Root-level `$defs`** — nested types (enums, structs) referenced from the spec
+
+`instruments/1/instrument.schema.json` validates the common envelope and supported
+`instrument.type` discriminators. Full `instrument.spec` validation uses the
+dedicated per-type schema files; the Rust helper
+`validate_instrument_envelope_json()` runs both checks.
 
 ### Calibration JSON
 

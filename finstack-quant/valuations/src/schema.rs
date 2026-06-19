@@ -204,7 +204,26 @@ pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> 
 ///
 /// let json: serde_json::Value = serde_json::json!({
 ///     "schema": "finstack_quant.instrument/1",
-///     "instrument": { "type": "bond", "spec": {} }
+///     "instrument": {
+///         "type": "bond",
+///         "spec": {
+///             "id": "UST-10Y",
+///             "notional": { "amount": "1000000", "currency": "USD" },
+///             "issue_date": "2024-01-15",
+///             "maturity": "2034-01-15",
+///             "cashflow_spec": {
+///                 "Fixed": {
+///                     "coupon_type": "Cash",
+///                     "freq": { "count": 6, "unit": "months" },
+///                     "dc": "ActActIsma",
+///                     "calendar_id": "sifma",
+///                     "rate": "0.0425"
+///                 }
+///             },
+///             "discount_curve_id": "USD-TREASURY",
+///             "attributes": {}
+///         }
+///     }
 /// });
 /// if let Err(e) = validate_instrument_envelope_json(&json) {
 ///     eprintln!("Validation errors: {e}");
@@ -216,7 +235,18 @@ pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> 
 /// Returns `Error::Validation` if the JSON does not conform to the schema.
 pub fn validate_instrument_envelope_json(instance: &Value) -> finstack_quant_core::Result<()> {
     let schema = instrument_envelope_schema()?;
-    validate_against_schema(instance, schema, "instrument envelope")
+    validate_against_schema(instance, schema, "instrument envelope")?;
+
+    let instrument_type = instance
+        .pointer("/instrument/type")
+        .and_then(Value::as_str)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "instrument envelope validation passed but instrument.type is missing".to_string(),
+            )
+        })?;
+
+    validate_instrument_type_json(instrument_type, instance)
 }
 
 /// Validate a JSON value against a specific instrument type's schema.
@@ -268,6 +298,15 @@ fn validate_against_schema(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn first_schema_example(schema: &Value) -> Value {
+        schema
+            .get("examples")
+            .and_then(Value::as_array)
+            .and_then(|examples| examples.first())
+            .cloned()
+            .expect("schema should have at least one example")
+    }
 
     #[test]
     fn test_schema_stubs() {
@@ -354,16 +393,28 @@ mod tests {
 
     #[test]
     fn test_validate_instrument_json_accepts_valid_envelope() {
-        let valid = serde_json::json!({
+        let valid = first_schema_example(bond_schema().expect("bond schema"));
+        assert!(
+            validate_instrument_envelope_json(&valid).is_ok(),
+            "valid bond example should pass validation"
+        );
+    }
+
+    #[test]
+    fn test_validate_instrument_json_rejects_empty_typed_spec() {
+        let invalid = serde_json::json!({
             "schema": "finstack_quant.instrument/1",
             "instrument": {
                 "type": "bond",
                 "spec": {}
             }
         });
+        let msg = validate_instrument_envelope_json(&invalid)
+            .expect_err("empty bond spec should fail typed validation")
+            .to_string();
         assert!(
-            validate_instrument_envelope_json(&valid).is_ok(),
-            "valid envelope should pass validation"
+            msg.contains("bond validation failed"),
+            "error should mention typed bond validation: {msg}"
         );
     }
 
