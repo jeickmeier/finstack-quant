@@ -1,4 +1,1639 @@
 {
+  "$defs": {
+    "Attributes": {
+      "additionalProperties": false,
+      "description": "User-defined tags and key-value metadata for instrument classification.",
+      "properties": {
+        "meta": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Structured metadata associated with the instrument.",
+          "type": "object"
+        },
+        "tags": {
+          "description": "User-defined tags for categorization.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "type": "object"
+    },
+    "BasketConstituent": {
+      "description": "Individual constituent in a basket",
+      "properties": {
+        "id": {
+          "description": "Unique identifier for the constituent",
+          "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/ConstituentReference",
+          "description": "Reference to the underlying asset"
+        },
+        "ticker": {
+          "description": "Optional ticker symbol for reporting",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "units": {
+          "description": "Number of units for physical replication (optional)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "Weight in the basket (as a fraction, e.g., 0.05 = 5%)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "reference",
+        "weight"
+      ],
+      "type": "object"
+    },
+    "BasketPricingConfig": {
+      "description": "Configuration for basket pricing behaviour.",
+      "properties": {
+        "days_in_year": {
+          "description": "Day basis used for fee accrual (e.g., 365.0 or 365.25). Avoid hardcoding in logic.",
+          "format": "double",
+          "type": "number"
+        },
+        "fx_policy": {
+          "$ref": "#/$defs/FxConversionPolicy",
+          "description": "FX policy hint for conversions when constituent currency != basket currency."
+        }
+      },
+      "required": [
+        "days_in_year",
+        "fx_policy"
+      ],
+      "type": "object"
+    },
+    "BondRiskBasis": {
+      "description": "Basis used for bond duration, convexity, and DV01-style risk metrics.",
+      "oneOf": [
+        {
+          "const": "bullet_discountable",
+          "description": "Use maturity/workout cashflows under the quoted-yield convention.\n\nThis matches Bloomberg YAS \"Workout\" risk fields and is the default for\npublic bond risk metrics.",
+          "type": "string"
+        },
+        {
+          "const": "callable_oas",
+          "description": "Use callable/putable option model repricing under the bond's OAS/tree configuration.",
+          "type": "string"
+        }
+      ]
+    },
+    "BreakevenConfig": {
+      "description": "Configuration for the breakeven calculator.",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/BreakevenMode",
+          "default": "linear",
+          "description": "Solve mode (default: linear)."
+        },
+        "target": {
+          "$ref": "#/$defs/BreakevenTarget",
+          "description": "Which valuation parameter to solve for."
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "type": "object"
+    },
+    "BreakevenMode": {
+      "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "`-(carry_total) / sensitivity`. Fast, ignores convexity.",
+          "type": "string"
+        },
+        {
+          "const": "iterative",
+          "description": "Brent root-find with full reprice at horizon. Accounts for convexity.",
+          "type": "string"
+        }
+      ]
+    },
+    "BreakevenTarget": {
+      "description": "Which valuation parameter to solve the breakeven for.",
+      "oneOf": [
+        {
+          "const": "z_spread",
+          "description": "Z-spread breakeven (sensitivity: CS01).",
+          "type": "string"
+        },
+        {
+          "const": "ytm",
+          "description": "Yield-to-maturity breakeven (sensitivity: DV01).",
+          "type": "string"
+        },
+        {
+          "const": "implied_vol",
+          "description": "Implied volatility breakeven (sensitivity: Vega).",
+          "type": "string"
+        },
+        {
+          "const": "base_correlation",
+          "description": "Base correlation breakeven (sensitivity: Correlation01).",
+          "type": "string"
+        },
+        {
+          "const": "oas",
+          "description": "OAS breakeven (sensitivity: CS01).",
+          "type": "string"
+        }
+      ]
+    },
+    "ConstituentReference": {
+      "type": "object"
+    },
+    "Currency": {
+      "description": "ISO 4217 currency enumeration",
+      "oneOf": [
+        {
+          "const": "AED",
+          "description": "UAE Dirham (784)",
+          "type": "string"
+        },
+        {
+          "const": "AFN",
+          "description": "Afghani (971)",
+          "type": "string"
+        },
+        {
+          "const": "ALL",
+          "description": "Lek (8)",
+          "type": "string"
+        },
+        {
+          "const": "AMD",
+          "description": "Armenian Dram (51)",
+          "type": "string"
+        },
+        {
+          "const": "ANG",
+          "description": "Netherlands Antillean Guilder (532)",
+          "type": "string"
+        },
+        {
+          "const": "AOA",
+          "description": "Kwanza (973)",
+          "type": "string"
+        },
+        {
+          "const": "ARS",
+          "description": "Argentine Peso (32)",
+          "type": "string"
+        },
+        {
+          "const": "AUD",
+          "description": "Australian Dollar (36)",
+          "type": "string"
+        },
+        {
+          "const": "AWG",
+          "description": "Aruban Florin (533)",
+          "type": "string"
+        },
+        {
+          "const": "AZN",
+          "description": "Azerbaijan Manat (944)",
+          "type": "string"
+        },
+        {
+          "const": "BAM",
+          "description": "Convertible Mark (977)",
+          "type": "string"
+        },
+        {
+          "const": "BBD",
+          "description": "Barbados Dollar (52)",
+          "type": "string"
+        },
+        {
+          "const": "BDT",
+          "description": "Taka (50)",
+          "type": "string"
+        },
+        {
+          "const": "BGN",
+          "description": "Bulgarian Lev (975)",
+          "type": "string"
+        },
+        {
+          "const": "BHD",
+          "description": "Bahraini Dinar (48)",
+          "type": "string"
+        },
+        {
+          "const": "BIF",
+          "description": "Burundi Franc (108)",
+          "type": "string"
+        },
+        {
+          "const": "BMD",
+          "description": "Bermudian Dollar (60)",
+          "type": "string"
+        },
+        {
+          "const": "BND",
+          "description": "Brunei Dollar (96)",
+          "type": "string"
+        },
+        {
+          "const": "BOB",
+          "description": "Boliviano (68)",
+          "type": "string"
+        },
+        {
+          "const": "BRL",
+          "description": "Brazilian Real (986)",
+          "type": "string"
+        },
+        {
+          "const": "BSD",
+          "description": "Bahamian Dollar (44)",
+          "type": "string"
+        },
+        {
+          "const": "BTN",
+          "description": "Ngultrum (64)",
+          "type": "string"
+        },
+        {
+          "const": "BWP",
+          "description": "Pula (72)",
+          "type": "string"
+        },
+        {
+          "const": "BYN",
+          "description": "Belarusian Ruble (933)",
+          "type": "string"
+        },
+        {
+          "const": "BZD",
+          "description": "Belize Dollar (84)",
+          "type": "string"
+        },
+        {
+          "const": "CAD",
+          "description": "Canadian Dollar (124)",
+          "type": "string"
+        },
+        {
+          "const": "CDF",
+          "description": "Congolese Franc (976)",
+          "type": "string"
+        },
+        {
+          "const": "CHF",
+          "description": "Swiss Franc (756)",
+          "type": "string"
+        },
+        {
+          "const": "CLF",
+          "description": "Unidad de Fomento (990)",
+          "type": "string"
+        },
+        {
+          "const": "CLP",
+          "description": "Chilean Peso (152)",
+          "type": "string"
+        },
+        {
+          "const": "CNY",
+          "description": "Yuan Renminbi (156)",
+          "type": "string"
+        },
+        {
+          "const": "COP",
+          "description": "Colombian Peso (170)",
+          "type": "string"
+        },
+        {
+          "const": "CRC",
+          "description": "Costa Rican Colon (188)",
+          "type": "string"
+        },
+        {
+          "const": "CUC",
+          "description": "Peso Convertible (931)",
+          "type": "string"
+        },
+        {
+          "const": "CUP",
+          "description": "Cuban Peso (192)",
+          "type": "string"
+        },
+        {
+          "const": "CVE",
+          "description": "Cabo Verde Escudo (132)",
+          "type": "string"
+        },
+        {
+          "const": "CZK",
+          "description": "Czech Koruna (203)",
+          "type": "string"
+        },
+        {
+          "const": "DJF",
+          "description": "Djibouti Franc (262)",
+          "type": "string"
+        },
+        {
+          "const": "DKK",
+          "description": "Danish Krone (208)",
+          "type": "string"
+        },
+        {
+          "const": "DOP",
+          "description": "Dominican Peso (214)",
+          "type": "string"
+        },
+        {
+          "const": "DZD",
+          "description": "Algerian Dinar (12)",
+          "type": "string"
+        },
+        {
+          "const": "EGP",
+          "description": "Egyptian Pound (818)",
+          "type": "string"
+        },
+        {
+          "const": "ERN",
+          "description": "Nakfa (232)",
+          "type": "string"
+        },
+        {
+          "const": "ETB",
+          "description": "Ethiopian Birr (230)",
+          "type": "string"
+        },
+        {
+          "const": "EUR",
+          "description": "Euro (978)",
+          "type": "string"
+        },
+        {
+          "const": "FJD",
+          "description": "Fiji Dollar (242)",
+          "type": "string"
+        },
+        {
+          "const": "FKP",
+          "description": "Falkland Islands Pound (238)",
+          "type": "string"
+        },
+        {
+          "const": "GBP",
+          "description": "Pound Sterling (826)",
+          "type": "string"
+        },
+        {
+          "const": "GEL",
+          "description": "Lari (981)",
+          "type": "string"
+        },
+        {
+          "const": "GHS",
+          "description": "Ghana Cedi (936)",
+          "type": "string"
+        },
+        {
+          "const": "GIP",
+          "description": "Gibraltar Pound (292)",
+          "type": "string"
+        },
+        {
+          "const": "GMD",
+          "description": "Dalasi (270)",
+          "type": "string"
+        },
+        {
+          "const": "GNF",
+          "description": "Guinean Franc (324)",
+          "type": "string"
+        },
+        {
+          "const": "GTQ",
+          "description": "Quetzal (320)",
+          "type": "string"
+        },
+        {
+          "const": "GYD",
+          "description": "Guyana Dollar (328)",
+          "type": "string"
+        },
+        {
+          "const": "HKD",
+          "description": "Hong Kong Dollar (344)",
+          "type": "string"
+        },
+        {
+          "const": "HNL",
+          "description": "Lempira (340)",
+          "type": "string"
+        },
+        {
+          "const": "HRK",
+          "description": "Kuna (191)",
+          "type": "string"
+        },
+        {
+          "const": "HTG",
+          "description": "Gourde (332)",
+          "type": "string"
+        },
+        {
+          "const": "HUF",
+          "description": "Forint (348)",
+          "type": "string"
+        },
+        {
+          "const": "IDR",
+          "description": "Rupiah (360)",
+          "type": "string"
+        },
+        {
+          "const": "ILS",
+          "description": "New Israeli Sheqel (376)",
+          "type": "string"
+        },
+        {
+          "const": "INR",
+          "description": "Indian Rupee (356)",
+          "type": "string"
+        },
+        {
+          "const": "IQD",
+          "description": "Iraqi Dinar (368)",
+          "type": "string"
+        },
+        {
+          "const": "IRR",
+          "description": "Iranian Rial (364)",
+          "type": "string"
+        },
+        {
+          "const": "ISK",
+          "description": "Iceland Krona (352)",
+          "type": "string"
+        },
+        {
+          "const": "JMD",
+          "description": "Jamaican Dollar (388)",
+          "type": "string"
+        },
+        {
+          "const": "JOD",
+          "description": "Jordanian Dinar (400)",
+          "type": "string"
+        },
+        {
+          "const": "JPY",
+          "description": "Yen (392)",
+          "type": "string"
+        },
+        {
+          "const": "KES",
+          "description": "Kenyan Shilling (404)",
+          "type": "string"
+        },
+        {
+          "const": "KGS",
+          "description": "Som (417)",
+          "type": "string"
+        },
+        {
+          "const": "KHR",
+          "description": "Riel (116)",
+          "type": "string"
+        },
+        {
+          "const": "KMF",
+          "description": "Comorian Franc (174)",
+          "type": "string"
+        },
+        {
+          "const": "KPW",
+          "description": "North Korean Won (408)",
+          "type": "string"
+        },
+        {
+          "const": "KRW",
+          "description": "Won (410)",
+          "type": "string"
+        },
+        {
+          "const": "KWD",
+          "description": "Kuwaiti Dinar (414)",
+          "type": "string"
+        },
+        {
+          "const": "KYD",
+          "description": "Cayman Islands Dollar (136)",
+          "type": "string"
+        },
+        {
+          "const": "KZT",
+          "description": "Tenge (398)",
+          "type": "string"
+        },
+        {
+          "const": "LAK",
+          "description": "Lao Kip (418)",
+          "type": "string"
+        },
+        {
+          "const": "LBP",
+          "description": "Lebanese Pound (422)",
+          "type": "string"
+        },
+        {
+          "const": "LKR",
+          "description": "Sri Lanka Rupee (144)",
+          "type": "string"
+        },
+        {
+          "const": "LRD",
+          "description": "Liberian Dollar (430)",
+          "type": "string"
+        },
+        {
+          "const": "LSL",
+          "description": "Loti (426)",
+          "type": "string"
+        },
+        {
+          "const": "LYD",
+          "description": "Libyan Dinar (434)",
+          "type": "string"
+        },
+        {
+          "const": "MAD",
+          "description": "Moroccan Dirham (504)",
+          "type": "string"
+        },
+        {
+          "const": "MDL",
+          "description": "Moldovan Leu (498)",
+          "type": "string"
+        },
+        {
+          "const": "MGA",
+          "description": "Malagasy Ariary (969)",
+          "type": "string"
+        },
+        {
+          "const": "MKD",
+          "description": "Denar (807)",
+          "type": "string"
+        },
+        {
+          "const": "MMK",
+          "description": "Kyat (104)",
+          "type": "string"
+        },
+        {
+          "const": "MNT",
+          "description": "Tugrik (496)",
+          "type": "string"
+        },
+        {
+          "const": "MOP",
+          "description": "Pataca (446)",
+          "type": "string"
+        },
+        {
+          "const": "MRU",
+          "description": "Ouguiya (929)",
+          "type": "string"
+        },
+        {
+          "const": "MUR",
+          "description": "Mauritius Rupee (480)",
+          "type": "string"
+        },
+        {
+          "const": "MVR",
+          "description": "Rufiyaa (462)",
+          "type": "string"
+        },
+        {
+          "const": "MWK",
+          "description": "Malawi Kwacha (454)",
+          "type": "string"
+        },
+        {
+          "const": "MXN",
+          "description": "Mexican Peso (484)",
+          "type": "string"
+        },
+        {
+          "const": "MYR",
+          "description": "Malaysian Ringgit (458)",
+          "type": "string"
+        },
+        {
+          "const": "MZN",
+          "description": "Mozambique Metical (943)",
+          "type": "string"
+        },
+        {
+          "const": "NAD",
+          "description": "Namibia Dollar (516)",
+          "type": "string"
+        },
+        {
+          "const": "NGN",
+          "description": "Naira (566)",
+          "type": "string"
+        },
+        {
+          "const": "NIO",
+          "description": "Cordoba Oro (558)",
+          "type": "string"
+        },
+        {
+          "const": "NOK",
+          "description": "Norwegian Krone (578)",
+          "type": "string"
+        },
+        {
+          "const": "NPR",
+          "description": "Nepalese Rupee (524)",
+          "type": "string"
+        },
+        {
+          "const": "NZD",
+          "description": "New Zealand Dollar (554)",
+          "type": "string"
+        },
+        {
+          "const": "OMR",
+          "description": "Rial Omani (512)",
+          "type": "string"
+        },
+        {
+          "const": "PAB",
+          "description": "Balboa (590)",
+          "type": "string"
+        },
+        {
+          "const": "PEN",
+          "description": "Sol (604)",
+          "type": "string"
+        },
+        {
+          "const": "PGK",
+          "description": "Kina (598)",
+          "type": "string"
+        },
+        {
+          "const": "PHP",
+          "description": "Philippine Peso (608)",
+          "type": "string"
+        },
+        {
+          "const": "PKR",
+          "description": "Pakistan Rupee (586)",
+          "type": "string"
+        },
+        {
+          "const": "PLN",
+          "description": "Zloty (985)",
+          "type": "string"
+        },
+        {
+          "const": "PYG",
+          "description": "Guarani (600)",
+          "type": "string"
+        },
+        {
+          "const": "QAR",
+          "description": "Qatari Rial (634)",
+          "type": "string"
+        },
+        {
+          "const": "RON",
+          "description": "Romanian Leu (946)",
+          "type": "string"
+        },
+        {
+          "const": "RSD",
+          "description": "Serbian Dinar (941)",
+          "type": "string"
+        },
+        {
+          "const": "RUB",
+          "description": "Russian Ruble (643)",
+          "type": "string"
+        },
+        {
+          "const": "RWF",
+          "description": "Rwanda Franc (646)",
+          "type": "string"
+        },
+        {
+          "const": "SAR",
+          "description": "Saudi Riyal (682)",
+          "type": "string"
+        },
+        {
+          "const": "SBD",
+          "description": "Solomon Islands Dollar (90)",
+          "type": "string"
+        },
+        {
+          "const": "SCR",
+          "description": "Seychelles Rupee (690)",
+          "type": "string"
+        },
+        {
+          "const": "SDG",
+          "description": "Sudanese Pound (938)",
+          "type": "string"
+        },
+        {
+          "const": "SEK",
+          "description": "Swedish Krona (752)",
+          "type": "string"
+        },
+        {
+          "const": "SGD",
+          "description": "Singapore Dollar (702)",
+          "type": "string"
+        },
+        {
+          "const": "SHP",
+          "description": "Saint Helena Pound (654)",
+          "type": "string"
+        },
+        {
+          "const": "SLE",
+          "description": "Leone (925)",
+          "type": "string"
+        },
+        {
+          "const": "SLL",
+          "description": "Leone (694)",
+          "type": "string"
+        },
+        {
+          "const": "SOS",
+          "description": "Somali Shilling (706)",
+          "type": "string"
+        },
+        {
+          "const": "SRD",
+          "description": "Surinam Dollar (968)",
+          "type": "string"
+        },
+        {
+          "const": "SSP",
+          "description": "South Sudanese Pound (728)",
+          "type": "string"
+        },
+        {
+          "const": "STN",
+          "description": "Dobra (930)",
+          "type": "string"
+        },
+        {
+          "const": "SYP",
+          "description": "Syrian Pound (760)",
+          "type": "string"
+        },
+        {
+          "const": "SZL",
+          "description": "Lilangeni (748)",
+          "type": "string"
+        },
+        {
+          "const": "THB",
+          "description": "Baht (764)",
+          "type": "string"
+        },
+        {
+          "const": "TJS",
+          "description": "Somoni (972)",
+          "type": "string"
+        },
+        {
+          "const": "TMT",
+          "description": "Turkmenistan New Manat (934)",
+          "type": "string"
+        },
+        {
+          "const": "TND",
+          "description": "Tunisian Dinar (788)",
+          "type": "string"
+        },
+        {
+          "const": "TOP",
+          "description": "Pa'anga (776)",
+          "type": "string"
+        },
+        {
+          "const": "TRY",
+          "description": "Turkish Lira (949)",
+          "type": "string"
+        },
+        {
+          "const": "TTD",
+          "description": "Trinidad and Tobago Dollar (780)",
+          "type": "string"
+        },
+        {
+          "const": "TWD",
+          "description": "New Taiwan Dollar (901)",
+          "type": "string"
+        },
+        {
+          "const": "TZS",
+          "description": "Tanzanian Shilling (834)",
+          "type": "string"
+        },
+        {
+          "const": "UAH",
+          "description": "Hryvnia (980)",
+          "type": "string"
+        },
+        {
+          "const": "UGX",
+          "description": "Uganda Shilling (800)",
+          "type": "string"
+        },
+        {
+          "const": "USD",
+          "description": "US Dollar (840)",
+          "type": "string"
+        },
+        {
+          "const": "UYU",
+          "description": "Peso Uruguayo (858)",
+          "type": "string"
+        },
+        {
+          "const": "UZS",
+          "description": "Uzbekistan Sum (860)",
+          "type": "string"
+        },
+        {
+          "const": "VED",
+          "description": "Bolívar Soberano (926)",
+          "type": "string"
+        },
+        {
+          "const": "VES",
+          "description": "Bolívar Soberano (928)",
+          "type": "string"
+        },
+        {
+          "const": "VND",
+          "description": "Dong (704)",
+          "type": "string"
+        },
+        {
+          "const": "VUV",
+          "description": "Vatu (548)",
+          "type": "string"
+        },
+        {
+          "const": "WST",
+          "description": "Tala (882)",
+          "type": "string"
+        },
+        {
+          "const": "XAF",
+          "description": "CFA Franc BEAC (950)",
+          "type": "string"
+        },
+        {
+          "const": "XCD",
+          "description": "East Caribbean Dollar (951)",
+          "type": "string"
+        },
+        {
+          "const": "XOF",
+          "description": "CFA Franc BCEAO (952)",
+          "type": "string"
+        },
+        {
+          "const": "XPF",
+          "description": "CFP Franc (953)",
+          "type": "string"
+        },
+        {
+          "const": "YER",
+          "description": "Yemeni Rial (886)",
+          "type": "string"
+        },
+        {
+          "const": "ZAR",
+          "description": "Rand (710)",
+          "type": "string"
+        },
+        {
+          "const": "ZMW",
+          "description": "Zambian Kwacha (967)",
+          "type": "string"
+        },
+        {
+          "const": "ZWL",
+          "description": "Zimbabwe Dollar (932)",
+          "type": "string"
+        }
+      ]
+    },
+    "FxConversionPolicy": {
+      "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources.",
+      "oneOf": [
+        {
+          "const": "cashflow_date",
+          "description": "Use spot/forward on the cashflow date.",
+          "type": "string"
+        },
+        {
+          "const": "period_end",
+          "description": "Use period end date.",
+          "type": "string"
+        },
+        {
+          "const": "period_average",
+          "description": "Use an average over the period.",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "Custom strategy defined by the caller/provider.",
+          "type": "string"
+        }
+      ]
+    },
+    "Id": {
+      "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
+      "type": "string"
+    },
+    "Money": {
+      "additionalProperties": false,
+      "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
+      "properties": {
+        "amount": {
+          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "currency": {
+          "$ref": "#/$defs/Currency"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "type": "object"
+    },
+    "OasPriceBasis": {
+      "description": "Price/accrual convention used for OAS inversion targets.",
+      "oneOf": [
+        {
+          "const": "settlement_dirty",
+          "description": "Target the full settlement dirty price.",
+          "type": "string"
+        },
+        {
+          "const": "forward_accrued_clean",
+          "description": "Target clean price plus only the forward accrued amount from valuation to settlement.",
+          "type": "string"
+        }
+      ]
+    },
+    "OasQuoteCompounding": {
+      "description": "Quote convention used when reporting or consuming OAS values.",
+      "oneOf": [
+        {
+          "const": "continuous",
+          "description": "Continuous additive spread, matching the tree's internal short-rate shift.",
+          "type": "string"
+        },
+        {
+          "const": "semi_annual",
+          "description": "Semiannual bond-equivalent OAS quote.",
+          "type": "string"
+        }
+      ]
+    },
+    "PoolGranularity": {
+      "description": "AssetPool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
+      "oneOf": [
+        {
+          "const": "PerName",
+          "description": "Simulate each name's default independently conditional on the\nsystematic factor (finite-pool copula). Captures name-level lumpiness;\nthe correct default for concentrated pools. This is the default.",
+          "type": "string"
+        },
+        {
+          "const": "LargeHomogeneous",
+          "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools.",
+          "type": "string"
+        }
+      ]
+    },
+    "PricingOverrides": {
+      "description": "Optional parameters that override model pricing with market quotes.\n\nFields are organized into focused sub-structs:\n- [`market_quotes`](MarketQuoteOverrides): quoted prices, implied vol, spreads, upfront payments\n- [`metrics`](MetricPricingOverrides): bump sizes, theta period, deterministic MC seeds\n- [`model_config`](ModelConfig): vol model selection, tree pricing, exercise friction\n- [`scenario`](ScenarioPricingOverrides): scenario-only revaluation adjustments\n\n# Serde Compatibility\n\nSub-struct fields are flattened so existing JSON payloads with flat field names\ncontinue to round-trip correctly.",
+      "properties": {
+        "adaptive_bumps": {
+          "default": false,
+          "description": "Enable adaptive bump sizes based on volatility and moneyness\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)",
+          "type": "boolean"
+        },
+        "asw_forward_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
+        },
+        "bond_risk_basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BondRiskBasis"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Basis used for bond duration, convexity, and DV01-style risk metrics."
+        },
+        "breakeven_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BreakevenConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Breakeven configuration: which parameter to solve for and solve mode."
+        },
+        "call_friction_cents": {
+          "default": null,
+          "description": "Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.\n\nThis models the real-world costs of refinancing / reissue (fees, OID, documentation),\nby requiring the issuer/borrower to see sufficient economic benefit before exercising.\n\n## Convention\n- `0.0` (or `None`) means frictionless optimal exercise (pure model)\n- `50.0` means **$0.50 per $100** of outstanding principal (0.50 points)\n- `200.0` means **$2.00 per $100** of outstanding principal (2.00 points)\n\nThe friction affects the **exercise decision threshold**, but redemption still occurs\nat the contractual call price.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "cds_act360_include_last_day": {
+          "default": false,
+          "description": "Add one calendar day to *every* Act/360 premium accrual period.\n\nUsed by the CDS option pricer to model the ISDA pre-Big-Bang\noption underlying convention (and matches QuantLib's\n`Actual360(true)` day-count). The Bloomberg CDSW convention only\ntreats the *final* coupon period as inclusive of the maturity date,\nso this is not the default for production single-name CDS pricing.",
+          "type": "boolean"
+        },
+        "cds_aod_half_day_bias": {
+          "default": false,
+          "description": "Apply ISDA half-day accrual-on-default bias.\n\nAdds half a day of premium accrual in the default-accrual integral.\nUsed by the CDS option pricer to model the Bloomberg CDSO underlying\nconvention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).",
+          "type": "boolean"
+        },
+        "cds_quote_bp": {
+          "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).\n\nRenamed from `quoted_spread_bp`; the legacy JSON field name is still\naccepted as a serde alias for backward compatibility.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "credit_spread_bump_bp": {
+          "default": null,
+          "description": "Custom credit spread bump size override (in basis points, e.g., 1.0 for 1bp).\n\nUsed by CS01 calculations that bump par spreads / hazard calibration quotes.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hw1f_mean_reversion": {
+          "description": "Hull-White 1F mean-reversion speed override (κ), in annualised units.\n\nCompanion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F\noverride to take effect. Typical values: 0.01–0.10.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hw1f_sigma": {
+          "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nMust be set together with [`Self::hw1f_mean_reversion`]; a partial override\n(only σ or only κ) falls through to the calibrated-scalar / default branch.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "implied_volatility": {
+          "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mc_paths": {
+          "description": "Optional Monte Carlo path count for path-dependent GBM pricers (Asians, lookbacks, autocallables, etc.).\n\nWhen set, overrides the default simulation size (typically 100,000 paths). Intended for tests,\nbenchmarks, and controlled revaluation—not a market quote.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mc_seed_scenario": {
+          "default": null,
+          "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mean_reversion": {
+          "default": null,
+          "description": "Mean reversion speed for Hull-White tree model (annualized).\n\nWhen set with Ho-Lee model, transforms the tree into Hull-White 1F:\n`dr = [theta(t) - a*r] dt + sigma dW`\n\nTypical values: 0.01-0.10 (1-10% per year). Higher values produce\ntighter rate dispersion at long maturities.\nWhen `None` or zero, the tree uses pure Ho-Lee dynamics (no mean reversion).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "oas_price_basis": {
+          "$ref": "#/$defs/OasPriceBasis",
+          "default": "settlement_dirty",
+          "description": "Price/accrual target convention for OAS inversion."
+        },
+        "oas_quote_compounding": {
+          "$ref": "#/$defs/OasQuoteCompounding",
+          "default": "continuous",
+          "description": "Quote compounding convention for OAS inputs and outputs."
+        },
+        "quoted_asw_market": {
+          "description": "Quoted asset-swap spread (market convention) in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_clean_price": {
+          "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_dirty_price_ccy": {
+          "description": "Quoted dirty price in the bond's currency units.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_discount_margin": {
+          "description": "Quoted discount margin (for FRNs) in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_i_spread": {
+          "description": "Quoted I-spread in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_oas": {
+          "description": "Quoted OAS (option-adjusted spread) in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_ytm": {
+          "description": "Quoted yield-to-maturity in decimal (e.g., `0.055` = 5.5%).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_ytw": {
+          "description": "Quoted yield-to-worst in decimal.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "quoted_z_spread": {
+          "description": "Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rate_bump_bp": {
+          "default": null,
+          "description": "Custom rate bump size override (in basis points, e.g., 1.0 for 1bp)\n\nWhen set, overrides both standard and adaptive rate bump calculations.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rho_bump_decimal": {
+          "default": null,
+          "description": "Rho bump size in **decimal rate** units (default `0.0001 = 1bp`).\n\nNote: internal curve-bump APIs often take bump sizes in **bp** units (`1.0 = 1bp`).\nPrefer using [`PricingOverrides::rho_bump_bp`] when wiring into `BumpSpec::parallel_bp`\nor `metrics::bump_discount_curve_parallel` to avoid unit mistakes.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "sabr_params": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SABRParameters"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional SABR volatility model parameters."
+        },
+        "scenario_price_shock_pct": {
+          "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "scenario_spread_shock_bp": {
+          "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "spot_bump_pct": {
+          "default": null,
+          "description": "Custom spot bump size override (as percentage, e.g., 0.01 for 1%)\n\nWhen set, overrides both standard and adaptive spot bump calculations.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "structured_credit_pool_granularity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PoolGranularity"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pool-granularity policy for structured-credit copula default models.\n\nWhen set, overrides the default\n[`PoolGranularity::PerName`](crate::instruments::fixed_income::structured_credit::PoolGranularity)\nfinite-pool simulation. Pass\n`PoolGranularity::LargeHomogeneous` to opt into the closed-form LHP\nfast-path for genuinely granular pools. Ignored by non-copula default\nmodels and by non-structured-credit instruments."
+        },
+        "term_loan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TermLoanOverrides"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Term loan specific overrides"
+        },
+        "theta_period": {
+          "default": null,
+          "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tree_discount_curve_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Id"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional discount curve identifier for tree-based option/OAS models.\n\nSome vendor OAS screens use a model curve distinct from the bond's pricing\nor spread curve. When set, tree pricers calibrate to this curve while\nnon-tree spread metrics continue to use the instrument's discount curve."
+        },
+        "tree_steps": {
+          "default": null,
+          "description": "Number of time steps for tree-based pricing (e.g., 100)",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "upfront_payment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Money"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "PV adjustment at valuation date (for CDS, CDSIndex, convertibles).\n\nThis is an **already-discounted** adjustment to the net present value.\nIt is added directly to the NPV without further discounting.\n\n# Sign Convention\n\n- Positive value: increases NPV (e.g., premium received)\n- Negative value: decreases NPV (e.g., premium paid)\n\n# Relationship to CDS Dated Upfront\n\nFor CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:\n- **`upfront_payment`**: PV adjustment at `as_of`, added directly\n- **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date\n\nBoth can be set simultaneously without double-counting."
+        },
+        "use_gobet_miri": {
+          "default": false,
+          "description": "Use Gobet-Miri discrete monitoring correction for barrier options.\n\nWhen true, uses a Monte Carlo correction for discrete monitoring.\nWhen false, uses analytical continuous monitoring pricing.",
+          "type": "boolean"
+        },
+        "var_config": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VarConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Historical VaR / Expected Shortfall configuration override."
+        },
+        "vega_bump_decimal": {
+          "default": null,
+          "description": "Vega bump size in decimal (default 0.01 = 1%)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "vol_bump_pct": {
+          "default": null,
+          "description": "Custom volatility bump size override (as absolute vol, e.g., 0.01 for 1% vol)\n\nWhen set, overrides both standard and adaptive volatility bump calculations.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "vol_model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VolatilityModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
+        },
+        "vol_surface_extrapolation": {
+          "$ref": "#/$defs/VolSurfaceExtrapolation",
+          "default": "error",
+          "description": "Volatility surface extrapolation policy when `implied_volatility` is not set."
+        },
+        "ytm_bump_decimal": {
+          "default": null,
+          "description": "Optional YTM bump size for numerical metrics (e.g., convexity/duration), in decimal (1 bp = 1e-4)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "SABRParameters": {
+      "description": "SABR model parameters",
+      "properties": {
+        "alpha": {
+          "description": "Initial volatility (alpha)",
+          "format": "double",
+          "type": "number"
+        },
+        "beta": {
+          "description": "CEV exponent (beta) - typically 0 to 1",
+          "format": "double",
+          "type": "number"
+        },
+        "nu": {
+          "description": "Volatility of volatility (nu/volvol)",
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "description": "Correlation between asset and volatility (rho)",
+          "format": "double",
+          "type": "number"
+        },
+        "shift": {
+          "description": "Shift parameter for handling negative rates (optional)",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "alpha",
+        "beta",
+        "nu",
+        "rho"
+      ],
+      "type": "object"
+    },
+    "TermLoanOverrides": {
+      "additionalProperties": false,
+      "description": "Term loan specific overrides for covenants and schedule adjustments.",
+      "properties": {
+        "draw_stop_date": {
+          "description": "Draw stop date (earliest date after which draws are blocked)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "extra_cash_sweeps": {
+          "description": "Extra cash sweeps by date",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/Money"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "margin_add_bp_by_date": {
+          "description": "Additional margin step-ups by date (bps)",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "format": "int32",
+                "type": "integer"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "pik_toggle_by_date": {
+          "description": "Force PIK toggles by date",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "margin_add_bp_by_date",
+        "pik_toggle_by_date",
+        "extra_cash_sweeps"
+      ],
+      "type": "object"
+    },
+    "VarConfig": {
+      "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
+      "properties": {
+        "confidence_level": {
+          "default": 0.95,
+          "description": "Confidence level (e.g., 0.95 for 95% VaR, 0.99 for 99% VaR)",
+          "format": "double",
+          "type": "number"
+        },
+        "method": {
+          "$ref": "#/$defs/VarMethod",
+          "default": "full_revaluation",
+          "description": "VaR calculation method"
+        },
+        "reporting_currency": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Currency"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional reporting currency for portfolio aggregation.\n\nWhen omitted, same-currency portfolios use their natural currency.\nMixed-currency portfolios must set this explicitly."
+        }
+      },
+      "type": "object"
+    },
+    "VarMethod": {
+      "description": "VaR calculation method.",
+      "oneOf": [
+        {
+          "const": "full_revaluation",
+          "description": "Full revaluation of instrument under each historical scenario.\n\nMost accurate method - reprices the instrument under each historical\nmarket scenario. Captures all non-linearities and path dependencies.",
+          "type": "string"
+        },
+        {
+          "const": "taylor_approximation",
+          "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).",
+          "type": "string"
+        }
+      ]
+    },
+    "VolSurfaceExtrapolation": {
+      "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping.\n- **LinearInVariance**: Market-standard for equity/FX; preserves no-arbitrage conditions\n  better than linear-in-vol by extrapolating in total variance space (σ²T).",
+      "oneOf": [
+        {
+          "const": "error",
+          "description": "Fail fast if `(expiry, strike)` is out of bounds.",
+          "type": "string"
+        },
+        {
+          "const": "clamp",
+          "description": "Flat extrapolation to the nearest edge (clamp to grid).",
+          "type": "string"
+        },
+        {
+          "const": "linear_in_variance",
+          "description": "Linear extrapolation in total variance space (σ²T).\n\nThis is the market-standard approach for equity and FX volatility surfaces\nbecause it preserves the no-arbitrage condition that total variance must\nincrease with time. The extrapolated volatility is computed as:\n\n```text\nσ(T_extrap) = sqrt(σ²(T_edge) * T_edge / T_extrap + slope * (T_extrap - T_edge) / T_extrap)\n```\n\nwhere `slope` is derived from the variance gradient at the edge.\n\n# When to Use\n\n- Long-dated option pricing where expiries exceed the calibrated grid\n- Scenario analysis requiring extrapolation to extreme tenors\n- Bootstrapping procedures that need consistent variance behavior\n\n# References\n\n- Gatheral, J. (2006). *The Volatility Surface*. Chapter 3.\n- Fengler, M. R. (2009). \"Arbitrage-free smoothing of the implied volatility surface.\"",
+          "type": "string"
+        }
+      ]
+    },
+    "VolatilityModel": {
+      "description": "Volatility model for option pricing.",
+      "oneOf": [
+        {
+          "const": "black",
+          "description": "Black (lognormal).",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "Bachelier / normal model.",
+          "type": "string"
+        }
+      ]
+    }
+  },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
@@ -71,1644 +1706,10 @@
   ],
   "properties": {
     "instrument": {
+      "additionalProperties": false,
       "description": "The Basket instrument definition",
       "properties": {
         "spec": {
-          "$defs": {
-            "Attributes": {
-              "additionalProperties": false,
-              "description": "User-defined tags and key-value metadata for instrument classification.",
-              "properties": {
-                "meta": {
-                  "additionalProperties": {
-                    "type": "string"
-                  },
-                  "description": "Structured metadata associated with the instrument.",
-                  "type": "object"
-                },
-                "tags": {
-                  "description": "User-defined tags for categorization.",
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array",
-                  "uniqueItems": true
-                }
-              },
-              "type": "object"
-            },
-            "BasketConstituent": {
-              "description": "Individual constituent in a basket",
-              "properties": {
-                "id": {
-                  "description": "Unique identifier for the constituent",
-                  "type": "string"
-                },
-                "reference": {
-                  "$ref": "#/$defs/ConstituentReference",
-                  "description": "Reference to the underlying asset"
-                },
-                "ticker": {
-                  "description": "Optional ticker symbol for reporting",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "units": {
-                  "description": "Number of units for physical replication (optional)",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "weight": {
-                  "description": "Weight in the basket (as a fraction, e.g., 0.05 = 5%)",
-                  "format": "double",
-                  "type": "number"
-                }
-              },
-              "required": [
-                "id",
-                "reference",
-                "weight"
-              ],
-              "type": "object"
-            },
-            "BasketPricingConfig": {
-              "description": "Configuration for basket pricing behaviour.",
-              "properties": {
-                "days_in_year": {
-                  "description": "Day basis used for fee accrual (e.g., 365.0 or 365.25). Avoid hardcoding in logic.",
-                  "format": "double",
-                  "type": "number"
-                },
-                "fx_policy": {
-                  "$ref": "#/$defs/FxConversionPolicy",
-                  "description": "FX policy hint for conversions when constituent currency != basket currency."
-                }
-              },
-              "required": [
-                "days_in_year",
-                "fx_policy"
-              ],
-              "type": "object"
-            },
-            "BondRiskBasis": {
-              "description": "Basis used for bond duration, convexity, and DV01-style risk metrics.",
-              "oneOf": [
-                {
-                  "const": "bullet_discountable",
-                  "description": "Use maturity/workout cashflows under the quoted-yield convention.\n\nThis matches Bloomberg YAS \"Workout\" risk fields and is the default for\npublic bond risk metrics.",
-                  "type": "string"
-                },
-                {
-                  "const": "callable_oas",
-                  "description": "Use callable/putable option model repricing under the bond's OAS/tree configuration.",
-                  "type": "string"
-                }
-              ]
-            },
-            "BreakevenConfig": {
-              "description": "Configuration for the breakeven calculator.",
-              "properties": {
-                "mode": {
-                  "$ref": "#/$defs/BreakevenMode",
-                  "default": "linear",
-                  "description": "Solve mode (default: linear)."
-                },
-                "target": {
-                  "$ref": "#/$defs/BreakevenTarget",
-                  "description": "Which valuation parameter to solve for."
-                }
-              },
-              "required": [
-                "target"
-              ],
-              "type": "object"
-            },
-            "BreakevenMode": {
-              "description": "Linear (first-order) or iterative (full-reprice root-find) solve mode.",
-              "oneOf": [
-                {
-                  "const": "linear",
-                  "description": "`-(carry_total) / sensitivity`. Fast, ignores convexity.",
-                  "type": "string"
-                },
-                {
-                  "const": "iterative",
-                  "description": "Brent root-find with full reprice at horizon. Accounts for convexity.",
-                  "type": "string"
-                }
-              ]
-            },
-            "BreakevenTarget": {
-              "description": "Which valuation parameter to solve the breakeven for.",
-              "oneOf": [
-                {
-                  "const": "z_spread",
-                  "description": "Z-spread breakeven (sensitivity: CS01).",
-                  "type": "string"
-                },
-                {
-                  "const": "ytm",
-                  "description": "Yield-to-maturity breakeven (sensitivity: DV01).",
-                  "type": "string"
-                },
-                {
-                  "const": "implied_vol",
-                  "description": "Implied volatility breakeven (sensitivity: Vega).",
-                  "type": "string"
-                },
-                {
-                  "const": "base_correlation",
-                  "description": "Base correlation breakeven (sensitivity: Correlation01).",
-                  "type": "string"
-                },
-                {
-                  "const": "oas",
-                  "description": "OAS breakeven (sensitivity: CS01).",
-                  "type": "string"
-                }
-              ]
-            },
-            "ConstituentReference": {
-              "type": "object"
-            },
-            "Currency": {
-              "description": "ISO 4217 currency enumeration",
-              "oneOf": [
-                {
-                  "const": "AED",
-                  "description": "UAE Dirham (784)",
-                  "type": "string"
-                },
-                {
-                  "const": "AFN",
-                  "description": "Afghani (971)",
-                  "type": "string"
-                },
-                {
-                  "const": "ALL",
-                  "description": "Lek (8)",
-                  "type": "string"
-                },
-                {
-                  "const": "AMD",
-                  "description": "Armenian Dram (51)",
-                  "type": "string"
-                },
-                {
-                  "const": "ANG",
-                  "description": "Netherlands Antillean Guilder (532)",
-                  "type": "string"
-                },
-                {
-                  "const": "AOA",
-                  "description": "Kwanza (973)",
-                  "type": "string"
-                },
-                {
-                  "const": "ARS",
-                  "description": "Argentine Peso (32)",
-                  "type": "string"
-                },
-                {
-                  "const": "AUD",
-                  "description": "Australian Dollar (36)",
-                  "type": "string"
-                },
-                {
-                  "const": "AWG",
-                  "description": "Aruban Florin (533)",
-                  "type": "string"
-                },
-                {
-                  "const": "AZN",
-                  "description": "Azerbaijan Manat (944)",
-                  "type": "string"
-                },
-                {
-                  "const": "BAM",
-                  "description": "Convertible Mark (977)",
-                  "type": "string"
-                },
-                {
-                  "const": "BBD",
-                  "description": "Barbados Dollar (52)",
-                  "type": "string"
-                },
-                {
-                  "const": "BDT",
-                  "description": "Taka (50)",
-                  "type": "string"
-                },
-                {
-                  "const": "BGN",
-                  "description": "Bulgarian Lev (975)",
-                  "type": "string"
-                },
-                {
-                  "const": "BHD",
-                  "description": "Bahraini Dinar (48)",
-                  "type": "string"
-                },
-                {
-                  "const": "BIF",
-                  "description": "Burundi Franc (108)",
-                  "type": "string"
-                },
-                {
-                  "const": "BMD",
-                  "description": "Bermudian Dollar (60)",
-                  "type": "string"
-                },
-                {
-                  "const": "BND",
-                  "description": "Brunei Dollar (96)",
-                  "type": "string"
-                },
-                {
-                  "const": "BOB",
-                  "description": "Boliviano (68)",
-                  "type": "string"
-                },
-                {
-                  "const": "BRL",
-                  "description": "Brazilian Real (986)",
-                  "type": "string"
-                },
-                {
-                  "const": "BSD",
-                  "description": "Bahamian Dollar (44)",
-                  "type": "string"
-                },
-                {
-                  "const": "BTN",
-                  "description": "Ngultrum (64)",
-                  "type": "string"
-                },
-                {
-                  "const": "BWP",
-                  "description": "Pula (72)",
-                  "type": "string"
-                },
-                {
-                  "const": "BYN",
-                  "description": "Belarusian Ruble (933)",
-                  "type": "string"
-                },
-                {
-                  "const": "BZD",
-                  "description": "Belize Dollar (84)",
-                  "type": "string"
-                },
-                {
-                  "const": "CAD",
-                  "description": "Canadian Dollar (124)",
-                  "type": "string"
-                },
-                {
-                  "const": "CDF",
-                  "description": "Congolese Franc (976)",
-                  "type": "string"
-                },
-                {
-                  "const": "CHF",
-                  "description": "Swiss Franc (756)",
-                  "type": "string"
-                },
-                {
-                  "const": "CLF",
-                  "description": "Unidad de Fomento (990)",
-                  "type": "string"
-                },
-                {
-                  "const": "CLP",
-                  "description": "Chilean Peso (152)",
-                  "type": "string"
-                },
-                {
-                  "const": "CNY",
-                  "description": "Yuan Renminbi (156)",
-                  "type": "string"
-                },
-                {
-                  "const": "COP",
-                  "description": "Colombian Peso (170)",
-                  "type": "string"
-                },
-                {
-                  "const": "CRC",
-                  "description": "Costa Rican Colon (188)",
-                  "type": "string"
-                },
-                {
-                  "const": "CUC",
-                  "description": "Peso Convertible (931)",
-                  "type": "string"
-                },
-                {
-                  "const": "CUP",
-                  "description": "Cuban Peso (192)",
-                  "type": "string"
-                },
-                {
-                  "const": "CVE",
-                  "description": "Cabo Verde Escudo (132)",
-                  "type": "string"
-                },
-                {
-                  "const": "CZK",
-                  "description": "Czech Koruna (203)",
-                  "type": "string"
-                },
-                {
-                  "const": "DJF",
-                  "description": "Djibouti Franc (262)",
-                  "type": "string"
-                },
-                {
-                  "const": "DKK",
-                  "description": "Danish Krone (208)",
-                  "type": "string"
-                },
-                {
-                  "const": "DOP",
-                  "description": "Dominican Peso (214)",
-                  "type": "string"
-                },
-                {
-                  "const": "DZD",
-                  "description": "Algerian Dinar (12)",
-                  "type": "string"
-                },
-                {
-                  "const": "EGP",
-                  "description": "Egyptian Pound (818)",
-                  "type": "string"
-                },
-                {
-                  "const": "ERN",
-                  "description": "Nakfa (232)",
-                  "type": "string"
-                },
-                {
-                  "const": "ETB",
-                  "description": "Ethiopian Birr (230)",
-                  "type": "string"
-                },
-                {
-                  "const": "EUR",
-                  "description": "Euro (978)",
-                  "type": "string"
-                },
-                {
-                  "const": "FJD",
-                  "description": "Fiji Dollar (242)",
-                  "type": "string"
-                },
-                {
-                  "const": "FKP",
-                  "description": "Falkland Islands Pound (238)",
-                  "type": "string"
-                },
-                {
-                  "const": "GBP",
-                  "description": "Pound Sterling (826)",
-                  "type": "string"
-                },
-                {
-                  "const": "GEL",
-                  "description": "Lari (981)",
-                  "type": "string"
-                },
-                {
-                  "const": "GHS",
-                  "description": "Ghana Cedi (936)",
-                  "type": "string"
-                },
-                {
-                  "const": "GIP",
-                  "description": "Gibraltar Pound (292)",
-                  "type": "string"
-                },
-                {
-                  "const": "GMD",
-                  "description": "Dalasi (270)",
-                  "type": "string"
-                },
-                {
-                  "const": "GNF",
-                  "description": "Guinean Franc (324)",
-                  "type": "string"
-                },
-                {
-                  "const": "GTQ",
-                  "description": "Quetzal (320)",
-                  "type": "string"
-                },
-                {
-                  "const": "GYD",
-                  "description": "Guyana Dollar (328)",
-                  "type": "string"
-                },
-                {
-                  "const": "HKD",
-                  "description": "Hong Kong Dollar (344)",
-                  "type": "string"
-                },
-                {
-                  "const": "HNL",
-                  "description": "Lempira (340)",
-                  "type": "string"
-                },
-                {
-                  "const": "HRK",
-                  "description": "Kuna (191)",
-                  "type": "string"
-                },
-                {
-                  "const": "HTG",
-                  "description": "Gourde (332)",
-                  "type": "string"
-                },
-                {
-                  "const": "HUF",
-                  "description": "Forint (348)",
-                  "type": "string"
-                },
-                {
-                  "const": "IDR",
-                  "description": "Rupiah (360)",
-                  "type": "string"
-                },
-                {
-                  "const": "ILS",
-                  "description": "New Israeli Sheqel (376)",
-                  "type": "string"
-                },
-                {
-                  "const": "INR",
-                  "description": "Indian Rupee (356)",
-                  "type": "string"
-                },
-                {
-                  "const": "IQD",
-                  "description": "Iraqi Dinar (368)",
-                  "type": "string"
-                },
-                {
-                  "const": "IRR",
-                  "description": "Iranian Rial (364)",
-                  "type": "string"
-                },
-                {
-                  "const": "ISK",
-                  "description": "Iceland Krona (352)",
-                  "type": "string"
-                },
-                {
-                  "const": "JMD",
-                  "description": "Jamaican Dollar (388)",
-                  "type": "string"
-                },
-                {
-                  "const": "JOD",
-                  "description": "Jordanian Dinar (400)",
-                  "type": "string"
-                },
-                {
-                  "const": "JPY",
-                  "description": "Yen (392)",
-                  "type": "string"
-                },
-                {
-                  "const": "KES",
-                  "description": "Kenyan Shilling (404)",
-                  "type": "string"
-                },
-                {
-                  "const": "KGS",
-                  "description": "Som (417)",
-                  "type": "string"
-                },
-                {
-                  "const": "KHR",
-                  "description": "Riel (116)",
-                  "type": "string"
-                },
-                {
-                  "const": "KMF",
-                  "description": "Comorian Franc (174)",
-                  "type": "string"
-                },
-                {
-                  "const": "KPW",
-                  "description": "North Korean Won (408)",
-                  "type": "string"
-                },
-                {
-                  "const": "KRW",
-                  "description": "Won (410)",
-                  "type": "string"
-                },
-                {
-                  "const": "KWD",
-                  "description": "Kuwaiti Dinar (414)",
-                  "type": "string"
-                },
-                {
-                  "const": "KYD",
-                  "description": "Cayman Islands Dollar (136)",
-                  "type": "string"
-                },
-                {
-                  "const": "KZT",
-                  "description": "Tenge (398)",
-                  "type": "string"
-                },
-                {
-                  "const": "LAK",
-                  "description": "Lao Kip (418)",
-                  "type": "string"
-                },
-                {
-                  "const": "LBP",
-                  "description": "Lebanese Pound (422)",
-                  "type": "string"
-                },
-                {
-                  "const": "LKR",
-                  "description": "Sri Lanka Rupee (144)",
-                  "type": "string"
-                },
-                {
-                  "const": "LRD",
-                  "description": "Liberian Dollar (430)",
-                  "type": "string"
-                },
-                {
-                  "const": "LSL",
-                  "description": "Loti (426)",
-                  "type": "string"
-                },
-                {
-                  "const": "LYD",
-                  "description": "Libyan Dinar (434)",
-                  "type": "string"
-                },
-                {
-                  "const": "MAD",
-                  "description": "Moroccan Dirham (504)",
-                  "type": "string"
-                },
-                {
-                  "const": "MDL",
-                  "description": "Moldovan Leu (498)",
-                  "type": "string"
-                },
-                {
-                  "const": "MGA",
-                  "description": "Malagasy Ariary (969)",
-                  "type": "string"
-                },
-                {
-                  "const": "MKD",
-                  "description": "Denar (807)",
-                  "type": "string"
-                },
-                {
-                  "const": "MMK",
-                  "description": "Kyat (104)",
-                  "type": "string"
-                },
-                {
-                  "const": "MNT",
-                  "description": "Tugrik (496)",
-                  "type": "string"
-                },
-                {
-                  "const": "MOP",
-                  "description": "Pataca (446)",
-                  "type": "string"
-                },
-                {
-                  "const": "MRU",
-                  "description": "Ouguiya (929)",
-                  "type": "string"
-                },
-                {
-                  "const": "MUR",
-                  "description": "Mauritius Rupee (480)",
-                  "type": "string"
-                },
-                {
-                  "const": "MVR",
-                  "description": "Rufiyaa (462)",
-                  "type": "string"
-                },
-                {
-                  "const": "MWK",
-                  "description": "Malawi Kwacha (454)",
-                  "type": "string"
-                },
-                {
-                  "const": "MXN",
-                  "description": "Mexican Peso (484)",
-                  "type": "string"
-                },
-                {
-                  "const": "MYR",
-                  "description": "Malaysian Ringgit (458)",
-                  "type": "string"
-                },
-                {
-                  "const": "MZN",
-                  "description": "Mozambique Metical (943)",
-                  "type": "string"
-                },
-                {
-                  "const": "NAD",
-                  "description": "Namibia Dollar (516)",
-                  "type": "string"
-                },
-                {
-                  "const": "NGN",
-                  "description": "Naira (566)",
-                  "type": "string"
-                },
-                {
-                  "const": "NIO",
-                  "description": "Cordoba Oro (558)",
-                  "type": "string"
-                },
-                {
-                  "const": "NOK",
-                  "description": "Norwegian Krone (578)",
-                  "type": "string"
-                },
-                {
-                  "const": "NPR",
-                  "description": "Nepalese Rupee (524)",
-                  "type": "string"
-                },
-                {
-                  "const": "NZD",
-                  "description": "New Zealand Dollar (554)",
-                  "type": "string"
-                },
-                {
-                  "const": "OMR",
-                  "description": "Rial Omani (512)",
-                  "type": "string"
-                },
-                {
-                  "const": "PAB",
-                  "description": "Balboa (590)",
-                  "type": "string"
-                },
-                {
-                  "const": "PEN",
-                  "description": "Sol (604)",
-                  "type": "string"
-                },
-                {
-                  "const": "PGK",
-                  "description": "Kina (598)",
-                  "type": "string"
-                },
-                {
-                  "const": "PHP",
-                  "description": "Philippine Peso (608)",
-                  "type": "string"
-                },
-                {
-                  "const": "PKR",
-                  "description": "Pakistan Rupee (586)",
-                  "type": "string"
-                },
-                {
-                  "const": "PLN",
-                  "description": "Zloty (985)",
-                  "type": "string"
-                },
-                {
-                  "const": "PYG",
-                  "description": "Guarani (600)",
-                  "type": "string"
-                },
-                {
-                  "const": "QAR",
-                  "description": "Qatari Rial (634)",
-                  "type": "string"
-                },
-                {
-                  "const": "RON",
-                  "description": "Romanian Leu (946)",
-                  "type": "string"
-                },
-                {
-                  "const": "RSD",
-                  "description": "Serbian Dinar (941)",
-                  "type": "string"
-                },
-                {
-                  "const": "RUB",
-                  "description": "Russian Ruble (643)",
-                  "type": "string"
-                },
-                {
-                  "const": "RWF",
-                  "description": "Rwanda Franc (646)",
-                  "type": "string"
-                },
-                {
-                  "const": "SAR",
-                  "description": "Saudi Riyal (682)",
-                  "type": "string"
-                },
-                {
-                  "const": "SBD",
-                  "description": "Solomon Islands Dollar (90)",
-                  "type": "string"
-                },
-                {
-                  "const": "SCR",
-                  "description": "Seychelles Rupee (690)",
-                  "type": "string"
-                },
-                {
-                  "const": "SDG",
-                  "description": "Sudanese Pound (938)",
-                  "type": "string"
-                },
-                {
-                  "const": "SEK",
-                  "description": "Swedish Krona (752)",
-                  "type": "string"
-                },
-                {
-                  "const": "SGD",
-                  "description": "Singapore Dollar (702)",
-                  "type": "string"
-                },
-                {
-                  "const": "SHP",
-                  "description": "Saint Helena Pound (654)",
-                  "type": "string"
-                },
-                {
-                  "const": "SLE",
-                  "description": "Leone (925)",
-                  "type": "string"
-                },
-                {
-                  "const": "SLL",
-                  "description": "Leone (694)",
-                  "type": "string"
-                },
-                {
-                  "const": "SOS",
-                  "description": "Somali Shilling (706)",
-                  "type": "string"
-                },
-                {
-                  "const": "SRD",
-                  "description": "Surinam Dollar (968)",
-                  "type": "string"
-                },
-                {
-                  "const": "SSP",
-                  "description": "South Sudanese Pound (728)",
-                  "type": "string"
-                },
-                {
-                  "const": "STN",
-                  "description": "Dobra (930)",
-                  "type": "string"
-                },
-                {
-                  "const": "SYP",
-                  "description": "Syrian Pound (760)",
-                  "type": "string"
-                },
-                {
-                  "const": "SZL",
-                  "description": "Lilangeni (748)",
-                  "type": "string"
-                },
-                {
-                  "const": "THB",
-                  "description": "Baht (764)",
-                  "type": "string"
-                },
-                {
-                  "const": "TJS",
-                  "description": "Somoni (972)",
-                  "type": "string"
-                },
-                {
-                  "const": "TMT",
-                  "description": "Turkmenistan New Manat (934)",
-                  "type": "string"
-                },
-                {
-                  "const": "TND",
-                  "description": "Tunisian Dinar (788)",
-                  "type": "string"
-                },
-                {
-                  "const": "TOP",
-                  "description": "Pa'anga (776)",
-                  "type": "string"
-                },
-                {
-                  "const": "TRY",
-                  "description": "Turkish Lira (949)",
-                  "type": "string"
-                },
-                {
-                  "const": "TTD",
-                  "description": "Trinidad and Tobago Dollar (780)",
-                  "type": "string"
-                },
-                {
-                  "const": "TWD",
-                  "description": "New Taiwan Dollar (901)",
-                  "type": "string"
-                },
-                {
-                  "const": "TZS",
-                  "description": "Tanzanian Shilling (834)",
-                  "type": "string"
-                },
-                {
-                  "const": "UAH",
-                  "description": "Hryvnia (980)",
-                  "type": "string"
-                },
-                {
-                  "const": "UGX",
-                  "description": "Uganda Shilling (800)",
-                  "type": "string"
-                },
-                {
-                  "const": "USD",
-                  "description": "US Dollar (840)",
-                  "type": "string"
-                },
-                {
-                  "const": "UYU",
-                  "description": "Peso Uruguayo (858)",
-                  "type": "string"
-                },
-                {
-                  "const": "UZS",
-                  "description": "Uzbekistan Sum (860)",
-                  "type": "string"
-                },
-                {
-                  "const": "VED",
-                  "description": "Bolívar Soberano (926)",
-                  "type": "string"
-                },
-                {
-                  "const": "VES",
-                  "description": "Bolívar Soberano (928)",
-                  "type": "string"
-                },
-                {
-                  "const": "VND",
-                  "description": "Dong (704)",
-                  "type": "string"
-                },
-                {
-                  "const": "VUV",
-                  "description": "Vatu (548)",
-                  "type": "string"
-                },
-                {
-                  "const": "WST",
-                  "description": "Tala (882)",
-                  "type": "string"
-                },
-                {
-                  "const": "XAF",
-                  "description": "CFA Franc BEAC (950)",
-                  "type": "string"
-                },
-                {
-                  "const": "XCD",
-                  "description": "East Caribbean Dollar (951)",
-                  "type": "string"
-                },
-                {
-                  "const": "XOF",
-                  "description": "CFA Franc BCEAO (952)",
-                  "type": "string"
-                },
-                {
-                  "const": "XPF",
-                  "description": "CFP Franc (953)",
-                  "type": "string"
-                },
-                {
-                  "const": "YER",
-                  "description": "Yemeni Rial (886)",
-                  "type": "string"
-                },
-                {
-                  "const": "ZAR",
-                  "description": "Rand (710)",
-                  "type": "string"
-                },
-                {
-                  "const": "ZMW",
-                  "description": "Zambian Kwacha (967)",
-                  "type": "string"
-                },
-                {
-                  "const": "ZWL",
-                  "description": "Zimbabwe Dollar (932)",
-                  "type": "string"
-                }
-              ]
-            },
-            "FxConversionPolicy": {
-              "description": "Standard FX conversion strategies used to hint FX providers.\n\nThe policy tells a provider *how* the rate will be applied so it can decide\nbetween spot, forward, or averaged sources.",
-              "oneOf": [
-                {
-                  "const": "cashflow_date",
-                  "description": "Use spot/forward on the cashflow date.",
-                  "type": "string"
-                },
-                {
-                  "const": "period_end",
-                  "description": "Use period end date.",
-                  "type": "string"
-                },
-                {
-                  "const": "period_average",
-                  "description": "Use an average over the period.",
-                  "type": "string"
-                },
-                {
-                  "const": "custom",
-                  "description": "Custom strategy defined by the caller/provider.",
-                  "type": "string"
-                }
-              ]
-            },
-            "Id": {
-              "description": "A phantom-typed identifier that prevents mixing different kinds of IDs.\n\nThis type wraps a string identifier with a phantom type parameter to ensure\ntype safety at compile time. Different `Id<T>` types with different `T`\ncannot be compared or mixed accidentally, preventing entire classes of bugs.\n\n# Type Parameters\n\n* `T` - Phantom type tag that distinguishes this ID from IDs with different tags\n\n# Invariants\n\n- Storage uses `Arc<str>` for efficient cloning\n- The phantom marker has zero size and runtime cost\n- Two `Id<T>` values are equal if their string values are equal\n- IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared\n\n# Examples\n\n```rust\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\n// Create IDs with different type tags\nlet curve = CurveId::from(\"USD-SOFR\");\nlet bond = InstrumentId::from(\"ISIN:US912828XG60\");\n\n// Can compare IDs of the same type\nassert_eq!(curve, CurveId::from(\"USD-SOFR\"));\nassert_ne!(curve, CurveId::from(\"EUR-ESTR\"));\n\n// Cannot compare IDs of different types (compile error):\n// let _ = curve == bond;  // Error: mismatched types\n```\n\n# Thread Safety\n\n`Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can\nsafely share and clone IDs with minimal synchronization overhead.",
-              "type": "string"
-            },
-            "Money": {
-              "additionalProperties": false,
-              "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
-              "properties": {
-                "amount": {
-                  "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
-                  "type": [
-                    "string",
-                    "number"
-                  ]
-                },
-                "currency": {
-                  "$ref": "#/$defs/Currency"
-                }
-              },
-              "required": [
-                "amount",
-                "currency"
-              ],
-              "type": "object"
-            },
-            "OasPriceBasis": {
-              "description": "Price/accrual convention used for OAS inversion targets.",
-              "oneOf": [
-                {
-                  "const": "settlement_dirty",
-                  "description": "Target the full settlement dirty price.",
-                  "type": "string"
-                },
-                {
-                  "const": "forward_accrued_clean",
-                  "description": "Target clean price plus only the forward accrued amount from valuation to settlement.",
-                  "type": "string"
-                }
-              ]
-            },
-            "OasQuoteCompounding": {
-              "description": "Quote convention used when reporting or consuming OAS values.",
-              "oneOf": [
-                {
-                  "const": "continuous",
-                  "description": "Continuous additive spread, matching the tree's internal short-rate shift.",
-                  "type": "string"
-                },
-                {
-                  "const": "semi_annual",
-                  "description": "Semiannual bond-equivalent OAS quote.",
-                  "type": "string"
-                }
-              ]
-            },
-            "PoolGranularity": {
-              "description": "AssetPool-granularity policy for the structured-credit default engine.\n\nSelects whether each scenario realizes defaults name-by-name (finite-pool\ncopula simulation) or applies the closed-form LHP conditional default\nprobability uniformly to the pool.",
-              "oneOf": [
-                {
-                  "const": "PerName",
-                  "description": "Simulate each name's default independently conditional on the\nsystematic factor (finite-pool copula). Captures name-level lumpiness;\nthe correct default for concentrated pools. This is the default.",
-                  "type": "string"
-                },
-                {
-                  "const": "LargeHomogeneous",
-                  "description": "Apply the closed-form LHP conditional default probability uniformly to\nevery name. This is the `N → ∞` limit of [`Self::PerName`] — an\nacceptable, faster approximation only for genuinely granular pools.",
-                  "type": "string"
-                }
-              ]
-            },
-            "PricingOverrides": {
-              "description": "Optional parameters that override model pricing with market quotes.\n\nFields are organized into focused sub-structs:\n- [`market_quotes`](MarketQuoteOverrides): quoted prices, implied vol, spreads, upfront payments\n- [`metrics`](MetricPricingOverrides): bump sizes, theta period, deterministic MC seeds\n- [`model_config`](ModelConfig): vol model selection, tree pricing, exercise friction\n- [`scenario`](ScenarioPricingOverrides): scenario-only revaluation adjustments\n\n# Serde Compatibility\n\nSub-struct fields are flattened so existing JSON payloads with flat field names\ncontinue to round-trip correctly.",
-              "properties": {
-                "adaptive_bumps": {
-                  "default": false,
-                  "description": "Enable adaptive bump sizes based on volatility and moneyness\n\nWhen true, bump sizes are scaled based on:\n- Volatility level (higher vol → larger bumps)\n- Time to expiry (longer dated → larger bumps)\n- Moneyness (deep ITM/OTM → smaller bumps)\n\nDefault: false (use fixed bump sizes)",
-                  "type": "boolean"
-                },
-                "asw_forward_curve_id": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/Id"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Optional forward curve identifier for asset-swap spread metrics.\n\nWhen set, ASW par/market metrics project the floating receiver leg from\nthis forward curve instead of using a discount-curve par-rate proxy."
-                },
-                "bond_risk_basis": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/BondRiskBasis"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Basis used for bond duration, convexity, and DV01-style risk metrics."
-                },
-                "breakeven_config": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/BreakevenConfig"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Breakeven configuration: which parameter to solve for and solve mode."
-                },
-                "call_friction_cents": {
-                  "default": null,
-                  "description": "Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.\n\nThis models the real-world costs of refinancing / reissue (fees, OID, documentation),\nby requiring the issuer/borrower to see sufficient economic benefit before exercising.\n\n## Convention\n- `0.0` (or `None`) means frictionless optimal exercise (pure model)\n- `50.0` means **$0.50 per $100** of outstanding principal (0.50 points)\n- `200.0` means **$2.00 per $100** of outstanding principal (2.00 points)\n\nThe friction affects the **exercise decision threshold**, but redemption still occurs\nat the contractual call price.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "cds_act360_include_last_day": {
-                  "default": false,
-                  "description": "Add one calendar day to *every* Act/360 premium accrual period.\n\nUsed by the CDS option pricer to model the ISDA pre-Big-Bang\noption underlying convention (and matches QuantLib's\n`Actual360(true)` day-count). The Bloomberg CDSW convention only\ntreats the *final* coupon period as inclusive of the maturity date,\nso this is not the default for production single-name CDS pricing.",
-                  "type": "boolean"
-                },
-                "cds_aod_half_day_bias": {
-                  "default": false,
-                  "description": "Apply ISDA half-day accrual-on-default bias.\n\nAdds half a day of premium accrual in the default-accrual integral.\nUsed by the CDS option pricer to model the Bloomberg CDSO underlying\nconvention (and matches QuantLib's `IsdaCdsEngine::HalfDayBias`).",
-                  "type": "boolean"
-                },
-                "cds_quote_bp": {
-                  "description": "CDS par-spread quote in basis points (for CDS and CDS index pricers).\n\nRenamed from `quoted_spread_bp`; the legacy JSON field name is still\naccepted as a serde alias for backward compatibility.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "credit_spread_bump_bp": {
-                  "default": null,
-                  "description": "Custom credit spread bump size override (in basis points, e.g., 1.0 for 1bp).\n\nUsed by CS01 calculations that bump par spreads / hazard calibration quotes.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "hw1f_mean_reversion": {
-                  "description": "Hull-White 1F mean-reversion speed override (κ), in annualised units.\n\nCompanion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F\noverride to take effect. Typical values: 0.01–0.10.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "hw1f_sigma": {
-                  "description": "Hull-White 1F short-rate absolute volatility override (σ), in annual decimal units.\n\nThis is the **short-rate** σ used directly in the HW1F stochastic differential\nequation `dr = [θ(t) − κr] dt + σ dW`. It is **not** an option implied\nvolatility (Black/Normal) and must not be confused with `implied_volatility`.\n\nTypical values: 0.005–0.015 (50–150 bp/year annualised short-rate vol).\nA value of 0.20 (a typical lognormal swaption vol) would be approximately\n13–40× too large and would produce a wildly mis-priced HW tree.\n\nMust be set together with [`Self::hw1f_mean_reversion`]; a partial override\n(only σ or only κ) falls through to the calibrated-scalar / default branch.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "implied_volatility": {
-                  "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "mc_paths": {
-                  "description": "Optional Monte Carlo path count for path-dependent GBM pricers (Asians, lookbacks, autocallables, etc.).\n\nWhen set, overrides the default simulation size (typically 100,000 paths). Intended for tests,\nbenchmarks, and controlled revaluation—not a market quote.",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": [
-                    "integer",
-                    "null"
-                  ]
-                },
-                "mc_seed_scenario": {
-                  "default": null,
-                  "description": "MC seed scenario override for deterministic greek calculations.\n\nWhen computing greeks via finite differences, this allows specifying\na scenario name (e.g., \"delta_up\", \"vega_down\") to derive deterministic\nseeds. If `None`, the pricer derives a stable default seed.",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "mean_reversion": {
-                  "default": null,
-                  "description": "Mean reversion speed for Hull-White tree model (annualized).\n\nWhen set with Ho-Lee model, transforms the tree into Hull-White 1F:\n`dr = [theta(t) - a*r] dt + sigma dW`\n\nTypical values: 0.01-0.10 (1-10% per year). Higher values produce\ntighter rate dispersion at long maturities.\nWhen `None` or zero, the tree uses pure Ho-Lee dynamics (no mean reversion).",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "oas_price_basis": {
-                  "$ref": "#/$defs/OasPriceBasis",
-                  "default": "settlement_dirty",
-                  "description": "Price/accrual target convention for OAS inversion."
-                },
-                "oas_quote_compounding": {
-                  "$ref": "#/$defs/OasQuoteCompounding",
-                  "default": "continuous",
-                  "description": "Quote compounding convention for OAS inputs and outputs."
-                },
-                "quoted_asw_market": {
-                  "description": "Quoted asset-swap spread (market convention) in decimal.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_clean_price": {
-                  "description": "Quoted clean price as a percentage of par (e.g., `99.5` = 99.5% of par).",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_dirty_price_ccy": {
-                  "description": "Quoted dirty price in the bond's currency units.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_discount_margin": {
-                  "description": "Quoted discount margin (for FRNs) in decimal.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_i_spread": {
-                  "description": "Quoted I-spread in decimal.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_oas": {
-                  "description": "Quoted OAS (option-adjusted spread) in decimal.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_ytm": {
-                  "description": "Quoted yield-to-maturity in decimal (e.g., `0.055` = 5.5%).",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_ytw": {
-                  "description": "Quoted yield-to-worst in decimal.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "quoted_z_spread": {
-                  "description": "Quoted Z-spread in decimal (e.g., `0.0125` = 125bp).",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "rate_bump_bp": {
-                  "default": null,
-                  "description": "Custom rate bump size override (in basis points, e.g., 1.0 for 1bp)\n\nWhen set, overrides both standard and adaptive rate bump calculations.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "rho_bump_decimal": {
-                  "default": null,
-                  "description": "Rho bump size in **decimal rate** units (default `0.0001 = 1bp`).\n\nNote: internal curve-bump APIs often take bump sizes in **bp** units (`1.0 = 1bp`).\nPrefer using [`PricingOverrides::rho_bump_bp`] when wiring into `BumpSpec::parallel_bp`\nor `metrics::bump_discount_curve_parallel` to avoid unit mistakes.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "sabr_params": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/SABRParameters"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Optional SABR volatility model parameters."
-                },
-                "scenario_price_shock_pct": {
-                  "description": "Scenario price shock as decimal percentage (e.g., -0.05 for -5% price shock).\n\nWhen set, valuation helpers apply it as a multiplier: `price * (1 + shock_pct)`.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "scenario_spread_shock_bp": {
-                  "description": "Scenario spread shock in basis points (e.g., `150.0` for +150 bp widening).\n\nApplied as an additional flat Z-spread during valuation by pricers that\nsupport spread-based revaluation. Currently consumed by `Bond::base_value`\nfor bonds without embedded options, without an assigned credit curve, and\nwithout a price-pinning quote override other than `quoted_z_spread`\n(where the shock is additive on the quoted spread). See\n[`Instrument::scenario_spread_shock_supported`](crate::instruments::common_impl::traits::Instrument::scenario_spread_shock_supported).\n\nSetting this on an unsupported configuration produces a validation error\nat pricing time rather than a silent no-op. For hazard-priced (credit\ncurve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "spot_bump_pct": {
-                  "default": null,
-                  "description": "Custom spot bump size override (as percentage, e.g., 0.01 for 1%)\n\nWhen set, overrides both standard and adaptive spot bump calculations.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "structured_credit_pool_granularity": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/PoolGranularity"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Pool-granularity policy for structured-credit copula default models.\n\nWhen set, overrides the default\n[`PoolGranularity::PerName`](crate::instruments::fixed_income::structured_credit::PoolGranularity)\nfinite-pool simulation. Pass\n`PoolGranularity::LargeHomogeneous` to opt into the closed-form LHP\nfast-path for genuinely granular pools. Ignored by non-copula default\nmodels and by non-structured-credit instruments."
-                },
-                "term_loan": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/TermLoanOverrides"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Term loan specific overrides"
-                },
-                "theta_period": {
-                  "default": null,
-                  "description": "Theta period for time decay calculations (e.g., \"1D\", \"1W\", \"1M\", \"3M\").",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "tree_discount_curve_id": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/Id"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Optional discount curve identifier for tree-based option/OAS models.\n\nSome vendor OAS screens use a model curve distinct from the bond's pricing\nor spread curve. When set, tree pricers calibrate to this curve while\nnon-tree spread metrics continue to use the instrument's discount curve."
-                },
-                "tree_steps": {
-                  "default": null,
-                  "description": "Number of time steps for tree-based pricing (e.g., 100)",
-                  "format": "uint",
-                  "minimum": 0,
-                  "type": [
-                    "integer",
-                    "null"
-                  ]
-                },
-                "upfront_payment": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/Money"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "PV adjustment at valuation date (for CDS, CDSIndex, convertibles).\n\nThis is an **already-discounted** adjustment to the net present value.\nIt is added directly to the NPV without further discounting.\n\n# Sign Convention\n\n- Positive value: increases NPV (e.g., premium received)\n- Negative value: decreases NPV (e.g., premium paid)\n\n# Relationship to CDS Dated Upfront\n\nFor CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:\n- **`upfront_payment`**: PV adjustment at `as_of`, added directly\n- **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date\n\nBoth can be set simultaneously without double-counting."
-                },
-                "use_gobet_miri": {
-                  "default": false,
-                  "description": "Use Gobet-Miri discrete monitoring correction for barrier options.\n\nWhen true, uses a Monte Carlo correction for discrete monitoring.\nWhen false, uses analytical continuous monitoring pricing.",
-                  "type": "boolean"
-                },
-                "var_config": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/VarConfig"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Historical VaR / Expected Shortfall configuration override."
-                },
-                "vega_bump_decimal": {
-                  "default": null,
-                  "description": "Vega bump size in decimal (default 0.01 = 1%)",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "vol_bump_pct": {
-                  "default": null,
-                  "description": "Custom volatility bump size override (as absolute vol, e.g., 0.01 for 1% vol)\n\nWhen set, overrides both standard and adaptive volatility bump calculations.",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                },
-                "vol_model": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/VolatilityModel"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "description": "Volatility model choice for option pricing.\n\nWhen set, overrides the default Black (lognormal) model."
-                },
-                "vol_surface_extrapolation": {
-                  "$ref": "#/$defs/VolSurfaceExtrapolation",
-                  "default": "error",
-                  "description": "Volatility surface extrapolation policy when `implied_volatility` is not set."
-                },
-                "ytm_bump_decimal": {
-                  "default": null,
-                  "description": "Optional YTM bump size for numerical metrics (e.g., convexity/duration), in decimal (1 bp = 1e-4)",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                }
-              },
-              "type": "object"
-            },
-            "SABRParameters": {
-              "description": "SABR model parameters",
-              "properties": {
-                "alpha": {
-                  "description": "Initial volatility (alpha)",
-                  "format": "double",
-                  "type": "number"
-                },
-                "beta": {
-                  "description": "CEV exponent (beta) - typically 0 to 1",
-                  "format": "double",
-                  "type": "number"
-                },
-                "nu": {
-                  "description": "Volatility of volatility (nu/volvol)",
-                  "format": "double",
-                  "type": "number"
-                },
-                "rho": {
-                  "description": "Correlation between asset and volatility (rho)",
-                  "format": "double",
-                  "type": "number"
-                },
-                "shift": {
-                  "description": "Shift parameter for handling negative rates (optional)",
-                  "format": "double",
-                  "type": [
-                    "number",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "alpha",
-                "beta",
-                "nu",
-                "rho"
-              ],
-              "type": "object"
-            },
-            "TermLoanOverrides": {
-              "additionalProperties": false,
-              "description": "Term loan specific overrides for covenants and schedule adjustments.",
-              "properties": {
-                "draw_stop_date": {
-                  "description": "Draw stop date (earliest date after which draws are blocked)",
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "extra_cash_sweeps": {
-                  "description": "Extra cash sweeps by date",
-                  "items": {
-                    "maxItems": 2,
-                    "minItems": 2,
-                    "prefixItems": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "$ref": "#/$defs/Money"
-                      }
-                    ],
-                    "type": "array"
-                  },
-                  "type": "array"
-                },
-                "margin_add_bp_by_date": {
-                  "description": "Additional margin step-ups by date (bps)",
-                  "items": {
-                    "maxItems": 2,
-                    "minItems": 2,
-                    "prefixItems": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "format": "int32",
-                        "type": "integer"
-                      }
-                    ],
-                    "type": "array"
-                  },
-                  "type": "array"
-                },
-                "pik_toggle_by_date": {
-                  "description": "Force PIK toggles by date",
-                  "items": {
-                    "maxItems": 2,
-                    "minItems": 2,
-                    "prefixItems": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "boolean"
-                      }
-                    ],
-                    "type": "array"
-                  },
-                  "type": "array"
-                }
-              },
-              "required": [
-                "margin_add_bp_by_date",
-                "pik_toggle_by_date",
-                "extra_cash_sweeps"
-              ],
-              "type": "object"
-            },
-            "VarConfig": {
-              "description": "Configuration for VaR calculation.\n\nControls statistical properties such as confidence level and pricing method.\nThe historical window/observation count is derived from [`MarketHistory`].",
-              "properties": {
-                "confidence_level": {
-                  "default": 0.95,
-                  "description": "Confidence level (e.g., 0.95 for 95% VaR, 0.99 for 99% VaR)",
-                  "format": "double",
-                  "type": "number"
-                },
-                "method": {
-                  "$ref": "#/$defs/VarMethod",
-                  "default": "full_revaluation",
-                  "description": "VaR calculation method"
-                },
-                "reporting_currency": {
-                  "anyOf": [
-                    {
-                      "$ref": "#/$defs/Currency"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ],
-                  "default": null,
-                  "description": "Optional reporting currency for portfolio aggregation.\n\nWhen omitted, same-currency portfolios use their natural currency.\nMixed-currency portfolios must set this explicitly."
-                }
-              },
-              "type": "object"
-            },
-            "VarMethod": {
-              "description": "VaR calculation method.",
-              "oneOf": [
-                {
-                  "const": "full_revaluation",
-                  "description": "Full revaluation of instrument under each historical scenario.\n\nMost accurate method - reprices the instrument under each historical\nmarket scenario. Captures all non-linearities and path dependencies.",
-                  "type": "string"
-                },
-                {
-                  "const": "taylor_approximation",
-                  "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).",
-                  "type": "string"
-                }
-              ]
-            },
-            "VolSurfaceExtrapolation": {
-              "description": "Policy for evaluating volatility surfaces outside their calibrated grid.\n\nMarket-standard production systems typically make this choice explicit because\nextrapolation can materially affect PV and greeks.\n\n# Market Standards\n\n- **Error**: Conservative approach for production systems; forces explicit handling.\n- **Clamp**: Simple flat extrapolation; common for quick prototyping.\n- **LinearInVariance**: Market-standard for equity/FX; preserves no-arbitrage conditions\n  better than linear-in-vol by extrapolating in total variance space (σ²T).",
-              "oneOf": [
-                {
-                  "const": "error",
-                  "description": "Fail fast if `(expiry, strike)` is out of bounds.",
-                  "type": "string"
-                },
-                {
-                  "const": "clamp",
-                  "description": "Flat extrapolation to the nearest edge (clamp to grid).",
-                  "type": "string"
-                },
-                {
-                  "const": "linear_in_variance",
-                  "description": "Linear extrapolation in total variance space (σ²T).\n\nThis is the market-standard approach for equity and FX volatility surfaces\nbecause it preserves the no-arbitrage condition that total variance must\nincrease with time. The extrapolated volatility is computed as:\n\n```text\nσ(T_extrap) = sqrt(σ²(T_edge) * T_edge / T_extrap + slope * (T_extrap - T_edge) / T_extrap)\n```\n\nwhere `slope` is derived from the variance gradient at the edge.\n\n# When to Use\n\n- Long-dated option pricing where expiries exceed the calibrated grid\n- Scenario analysis requiring extrapolation to extreme tenors\n- Bootstrapping procedures that need consistent variance behavior\n\n# References\n\n- Gatheral, J. (2006). *The Volatility Surface*. Chapter 3.\n- Fengler, M. R. (2009). \"Arbitrage-free smoothing of the implied volatility surface.\"",
-                  "type": "string"
-                }
-              ]
-            },
-            "VolatilityModel": {
-              "description": "Volatility model for option pricing.",
-              "oneOf": [
-                {
-                  "const": "black",
-                  "description": "Black (lognormal).",
-                  "type": "string"
-                },
-                {
-                  "const": "normal",
-                  "description": "Bachelier / normal model.",
-                  "type": "string"
-                }
-              ]
-            }
-          },
           "additionalProperties": false,
           "properties": {
             "attributes": {

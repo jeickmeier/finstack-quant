@@ -59,7 +59,8 @@ fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
         .expect("existing schema must be an object");
 
     // Extract the generated schema's properties and required fields for embedding
-    // into the spec sub-schema. Also collect any $defs for inlining.
+    // into the spec sub-schema. Generated refs are document-root pointers
+    // (`#/$defs/...`), so `$defs` must stay at the top level of the schema.
     let mut spec_schema = Map::new();
 
     if let Some(props) = generated_schema.get("properties") {
@@ -74,17 +75,13 @@ fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
     if let Some(additional) = generated_schema.get("additionalProperties") {
         spec_schema.insert("additionalProperties".to_string(), additional.clone());
     }
-    // Carry forward $defs if present
-    if let Some(defs) = generated_schema.get("$defs") {
-        spec_schema.insert("$defs".to_string(), defs.clone());
-    }
-
     let title = to_title(name);
 
     // Build the new properties.instrument value
     let instrument_value = json!({
         "description": format!("The {title} instrument definition"),
         "type": "object",
+        "additionalProperties": false,
         "properties": {
             "type": {
                 "const": name,
@@ -114,6 +111,14 @@ fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
             output.insert((*key).to_string(), val.clone());
         }
     }
+    output
+        .entry("additionalProperties".to_string())
+        .or_insert(Value::Bool(false));
+
+    // Carry forward generated `$defs` at document root to match schemars refs.
+    if let Some(defs) = generated_schema.get("$defs") {
+        output.insert("$defs".to_string(), defs.clone());
+    }
 
     // Build properties: keep existing non-instrument properties, replace instrument
     let mut properties = Map::new();
@@ -124,13 +129,18 @@ fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
             }
         }
     }
+    properties.insert(
+        "schema".to_string(),
+        json!({
+            "const": "finstack_quant.instrument/1",
+            "description": "Schema version identifier",
+            "type": "string"
+        }),
+    );
     properties.insert("instrument".to_string(), instrument_value);
     output.insert("properties".to_string(), Value::Object(properties));
 
-    // Preserve required
-    if let Some(req) = existing_obj.get("required") {
-        output.insert("required".to_string(), req.clone());
-    }
+    output.insert("required".to_string(), json!(["schema", "instrument"]));
 
     let json_str = serde_json::to_string_pretty(&Value::Object(output)).expect("serialize output");
 
@@ -275,12 +285,15 @@ fn main() {
     gen_schema!("interest_rate_future", InterestRateFuture, "rates");
     gen_schema!("cap_floor", CapFloor, "rates");
     gen_schema!("cms_option", CmsOption, "rates");
+    gen_schema!("cms_spread_option", CmsSpreadOption, "rates");
     gen_schema!("cms_swap", CmsSwap, "rates");
     gen_schema!("ir_future_option", IrFutureOption, "rates");
     gen_schema!("deposit", Deposit, "rates");
     gen_schema!("repo", Repo, "rates");
     gen_schema!("range_accrual", RangeAccrual, "rates");
     gen_schema!("callable_range_accrual", CallableRangeAccrual, "rates");
+    gen_schema!("snowball", Snowball, "rates");
+    gen_schema!("tarn", Tarn, "rates");
 
     // --- Credit Derivatives ---
     gen_schema!(
@@ -341,7 +354,7 @@ fn main() {
     gen_schema!("lookback_option", LookbackOption, "exotics");
     gen_schema!("basket", Basket, "exotics");
 
-    println!("\nDone! Updated 67 instrument schema files.");
+    println!("\nDone! Updated 70 instrument schema files.");
 
     // =========================================================================
     // Non-instrument schemas (calibration, attribution, cashflow, margin, results)

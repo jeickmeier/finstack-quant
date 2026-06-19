@@ -70,12 +70,15 @@ mod schema_roundtrip {
     test_roundtrip!(plain: interest_rate_future, InterestRateFuture, InterestRateFuture::example().expect("irf"));
     test_roundtrip!(plain: cap_floor, CapFloor, CapFloor::example().expect("cap floor"));
     test_roundtrip!(plain: cms_option, CmsOption, CmsOption::example());
+    test_roundtrip!(plain: cms_spread_option, CmsSpreadOption, CmsSpreadOption::example());
     test_roundtrip!(plain: cms_swap, CmsSwap, CmsSwap::example());
     test_roundtrip!(plain: ir_future_option, IrFutureOption, IrFutureOption::example().expect("irfo"));
     test_roundtrip!(plain: deposit, Deposit, Deposit::example().expect("dep"));
     test_roundtrip!(plain: repo, Repo, Repo::example());
     test_roundtrip!(plain: range_accrual, RangeAccrual, RangeAccrual::example());
     test_roundtrip!(boxed: callable_range_accrual, CallableRangeAccrual, CallableRangeAccrual::example());
+    test_roundtrip!(plain: snowball, Snowball, Snowball::example_snowball());
+    test_roundtrip!(plain: tarn, Tarn, Tarn::example());
 
     // Credit
     test_roundtrip!(plain: credit_default_swap, CreditDefaultSwap, CreditDefaultSwap::example());
@@ -159,6 +162,113 @@ mod schema_roundtrip {
     test_roundtrip!(plain: basket, Basket, Basket::example().expect("bsk"));
 }
 
+mod generated_schema_contract {
+    #![allow(clippy::expect_used)]
+
+    use serde_json::Value;
+    use std::path::{Path, PathBuf};
+
+    fn instrument_schema_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("schemas")
+            .join("instruments")
+            .join("1")
+    }
+
+    fn read_schema(path: &Path) -> Value {
+        let content = std::fs::read_to_string(path)
+            .unwrap_or_else(|err| panic!("read {}: {err}", path.display()));
+        serde_json::from_str(&content)
+            .unwrap_or_else(|err| panic!("parse {}: {err}", path.display()))
+    }
+
+    fn collect_schema_files(dir: &Path, out: &mut Vec<PathBuf>) {
+        let mut entries: Vec<_> = std::fs::read_dir(dir)
+            .unwrap_or_else(|err| panic!("read_dir {}: {err}", dir.display()))
+            .map(|entry| {
+                entry
+                    .unwrap_or_else(|err| panic!("read_dir entry {}: {err}", dir.display()))
+                    .path()
+            })
+            .collect();
+        entries.sort();
+
+        for path in entries {
+            if path.is_dir() {
+                collect_schema_files(&path, out);
+            } else if path.file_name().and_then(|name| name.to_str())
+                != Some("instrument.schema.json")
+                && path.extension().and_then(|ext| ext.to_str()) == Some("json")
+            {
+                out.push(path);
+            }
+        }
+    }
+
+    #[test]
+    fn generated_instrument_schemas_are_typed() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&instrument_schema_root(), &mut schema_files);
+
+        for path in schema_files {
+            if path.file_name().and_then(|name| name.to_str())
+                == Some("basket_with_instruments.schema.json")
+            {
+                continue;
+            }
+
+            let schema = read_schema(&path);
+            assert!(
+                schema.pointer("/properties/schema/const").is_some(),
+                "{} is missing the standard schema const",
+                path.display()
+            );
+            assert!(
+                schema
+                    .pointer("/properties/instrument/properties/type/const")
+                    .is_some(),
+                "{} is missing the instrument type discriminator",
+                path.display()
+            );
+            assert!(
+                schema
+                    .pointer("/properties/instrument/properties/spec/properties")
+                    .is_some(),
+                "{} is missing typed spec properties",
+                path.display()
+            );
+            assert!(
+                schema
+                    .pointer("/properties/instrument/properties/spec/required")
+                    .is_some(),
+                "{} is missing typed spec required fields",
+                path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn generated_instrument_schema_examples_validate() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&instrument_schema_root(), &mut schema_files);
+
+        for path in schema_files {
+            let schema = read_schema(&path);
+            let validator = jsonschema::validator_for(&schema)
+                .unwrap_or_else(|err| panic!("compile {}: {err}", path.display()));
+            let Some(examples) = schema.get("examples").and_then(Value::as_array) else {
+                continue;
+            };
+
+            for example in examples {
+                if let Err(error) = validator.validate(example) {
+                    panic!("example in {} failed validation: {error}", path.display());
+                }
+            }
+        }
+    }
+}
+
 mod fx_schema_drift {
     use finstack_quant_valuations::instruments::*;
     use schemars::JsonSchema;
@@ -186,13 +296,7 @@ mod fx_schema_drift {
         let schema = schemars::schema_for!(T);
         let generated = serde_json::to_value(schema).expect("serialize generated schema");
         let mut spec = Map::new();
-        for key in [
-            "properties",
-            "required",
-            "type",
-            "additionalProperties",
-            "$defs",
-        ] {
+        for key in ["properties", "required", "type", "additionalProperties"] {
             if let Some(value) = generated.get(key) {
                 spec.insert(key.to_string(), value.clone());
             }

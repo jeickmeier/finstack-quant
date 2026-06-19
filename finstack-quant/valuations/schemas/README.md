@@ -25,10 +25,12 @@ schemas/
     fx/                    # FX spots, forwards, options, barriers
     commodity/             # Commodity forwards, options, swaps
     exotics/               # Asian, barrier, lookback, basket options
-  calibration/2/           # Calibration plan & result schemas (v2)
+  calibration/2/           # Frozen calibration schema (v2)
+  calibration/3/           # Current calibration schema (v3)
   cashflow/1/              # Cashflow component specs (v1)
+  factor_model/1/          # Credit factor-model schemas (v1)
+  market/1/                # Market quote schemas (v1)
   results/1/               # Valuation result schema (v1)
-  attribution/1/           # P&L attribution specs & results (v1)
 ```
 
 ## Using Schemas
@@ -46,7 +48,7 @@ Add to your `.vscode/settings.json`:
     },
     {
       "fileMatch": ["**/calibration/**/*.json"],
-      "url": "./finstack-quant/valuations/schemas/calibration/2/calibration.schema.json"
+      "url": "./finstack-quant/valuations/schemas/calibration/3/calibration.schema.json"
     }
   ]
 }
@@ -69,8 +71,9 @@ Every instrument uses the envelope format:
       "cashflow_spec": {
         "Fixed": {
           "coupon_type": "Cash",
-          "frequency": { "count": 6, "unit": "months" },
-          "day_count": "ActActIsma",
+          "freq": { "count": 6, "unit": "months" },
+          "dc": "ActActIsma",
+          "calendar_id": "sifma",
           "rate": "0.0425",
           "bdc": "following",
           "stub": "None"
@@ -92,7 +95,7 @@ Key conventions:
 
 ### Instrument Types
 
-The `instrument.type` field must be one of the 65 supported discriminators. See `instrument.schema.json` for the full list, or use:
+The `instrument.type` field must be one of the supported discriminators. See `instrument.schema.json` for the full list, or use:
 
 ```rust
 use finstack_quant_valuations::schema::instrument_types;
@@ -106,7 +109,7 @@ Each instrument schema has:
 - **`properties.instrument.properties.spec`** — typed property definitions with:
   - Field types, descriptions, and defaults
   - `required` arrays for mandatory fields
-  - `$defs` for nested types (enums, structs)
+- Root-level `$defs` for nested types (enums, structs) referenced from the spec
   - Enum variants with descriptions and standards references
 
 ### Calibration JSON
@@ -115,7 +118,7 @@ Calibration uses a plan-based approach:
 
 ```json
 {
-  "schema": "finstack_quant.calibration",
+  "schema": "finstack_quant.calibration/3",
   "plan": {
     "id": "my-calibration",
     "quote_sets": {
@@ -140,7 +143,7 @@ Calibration uses a plan-based approach:
 
 ## Versioning
 
-Schema versions are encoded in directory paths (`/1/`, `/2/`). The `schema` field in envelopes (`"finstack_quant.instrument/1"`, `"finstack_quant.calibration"`) enforces version compatibility at parse time.
+Schema versions are encoded in directory paths (`/1/`, `/2/`, `/3/`). The `schema` field in envelopes (for example, `"finstack_quant.instrument/1"` and `"finstack_quant.calibration/3"`) enforces version compatibility at parse time.
 
 ## Validation
 
