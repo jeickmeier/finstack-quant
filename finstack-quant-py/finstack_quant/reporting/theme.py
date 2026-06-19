@@ -92,6 +92,8 @@ class Theme:
 {s} svg rect.fq-hb:not([fill]) {{ fill:transparent; }}
 {s} svg .fq-cross {{ stroke:{self.muted}; stroke-width:1; stroke-dasharray:3 3; pointer-events:none; }}
 {s} svg .fq-mk {{ fill:{self.accent}; stroke:#fff; stroke-width:1; pointer-events:none; }}
+{s} .fq-scroll {{ max-height:240px; overflow:auto; border:1px solid {self.faint}; border-radius:4px; }}
+{s} .fq-scroll table.dd th {{ position:sticky; top:0; background:#f3f1ea; }}
 </style>"""
 
 

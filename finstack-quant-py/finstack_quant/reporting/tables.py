@@ -17,6 +17,11 @@ def _esc(x: Any) -> str:
     return html.escape(str(x))
 
 
+def scroll(inner_html: str) -> str:
+    """Wrap a (tall) table in a fixed-height vertical scroll container."""
+    return f'<div class="fq-scroll">{inner_html}</div>'
+
+
 def kv_table(rows: list[tuple[str, str, str]], *, theme: Theme) -> str:  # noqa: ARG001
     """Render key/value rows. Each row is ``(label, value_str, value_css_class)``."""
     body = "".join(f'<tr><td class="k">{_esc(k)}</td><td class="v {cls}">{_esc(v)}</td></tr>' for k, v, cls in rows)

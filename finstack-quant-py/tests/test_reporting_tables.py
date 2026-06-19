@@ -36,3 +36,11 @@ def test_data_table_applies_formats() -> None:
     )
     minidom.parseString(html)  # noqa: S318
     assert "-14.6%" in html
+
+
+def test_scroll_wraps_inner_html() -> None:
+    inner = '<table class="dd"><tbody><tr><td>x</td></tr></tbody></table>'
+    out = tables.scroll(inner)
+    assert out.startswith('<div class="fq-scroll">')
+    assert inner in out
+    assert out.endswith("</div>")

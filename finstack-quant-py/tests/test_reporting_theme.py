@@ -24,3 +24,8 @@ def test_theme_is_overridable() -> None:
     dark = dataclasses.replace(INSTITUTIONAL, name="dark", canvas="#0b0f17")
     assert dark.canvas == "#0b0f17"
     assert INSTITUTIONAL.canvas != "#0b0f17"  # frozen original unchanged
+
+
+def test_to_css_has_scrollbox_rule() -> None:
+    css = INSTITUTIONAL.to_css("fq-ts")
+    assert "fq-scroll" in css
