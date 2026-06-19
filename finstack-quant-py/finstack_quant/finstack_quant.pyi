@@ -19,6 +19,7 @@ features: Any
 margin: Any
 monte_carlo: Any
 portfolio: Any
+reporting: Any
 scenarios: Any
 statements: Any
 statements_analytics: Any

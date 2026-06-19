@@ -1026,6 +1026,24 @@ public = [
 ]
 
 # ---------------------------------------------------------------------------
+# reporting  →  finstack_quant.reporting  (pure-Python, no Rust counterpart)
+# ---------------------------------------------------------------------------
+[crates.reporting]
+rust_crate = ""
+rust_lib   = ""
+python_package = "finstack_quant.reporting"
+visibility = "pub"
+status = "exists"
+note = "Pure-Python presentation layer (tear sheets, tables, charts). No Rust counterpart; exempt from crate-mirroring. Python-only (no WASM parity)."
+
+[crates.reporting.symbols]
+public = [
+    "INSTITUTIONAL",
+    "Theme",
+    "performance_tearsheet",
+]
+
+# ---------------------------------------------------------------------------
 # finstack-quant-scenarios  →  finstack_quant.scenarios
 # ---------------------------------------------------------------------------
 [crates.scenarios]
@@ -1085,6 +1103,7 @@ names = [
     "margin",
     "monte_carlo",
     "portfolio",
+    "reporting",
     "scenarios",
     "statements",
     "statements_analytics",
