@@ -930,9 +930,10 @@ impl PyPerformance {
 
     /// Calendar-bucketed compounded returns as a pandas ``DataFrame``.
     ///
-    /// ``freq`` is ``"monthly"`` or ``"annual"``. Returns a DataFrame indexed
-    /// by period-end date with one column per ticker; buckets reconcile with
-    /// :meth:`cumulative_returns_to_dataframe`.
+    /// ``freq`` is one of ``"daily"``, ``"weekly"``, ``"monthly"``,
+    /// ``"quarterly"``, ``"semiannual"``, or ``"annual"``. Returns a DataFrame
+    /// indexed by period-end date with one column per ticker; buckets reconcile
+    /// with :meth:`cumulative_returns_to_dataframe`.
     #[pyo3(signature = (freq = "monthly"))]
     fn periodic_returns_to_dataframe<'py>(
         &self,
