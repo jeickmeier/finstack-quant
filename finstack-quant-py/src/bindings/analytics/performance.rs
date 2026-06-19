@@ -11,6 +11,7 @@ use pyo3::buffer::PyBuffer;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
+use std::collections::BTreeSet;
 
 /// Wrap a `Vec<f64>` as a NumPy `float64` array, taking ownership of the
 /// buffer so no per-element `PyFloat` boxing occurs.
@@ -209,6 +210,35 @@ fn panel_to_dataframe<'py>(
         data.set_item(name, vec_to_pyarray(py, padded))?;
     }
     let idx = dates_to_datetime_index(py, dates)?;
+    dict_to_dataframe(py, &data, Some(idx))
+}
+
+/// Rectangularize ragged per-ticker periodic series onto the sorted union of
+/// period-end dates, producing a pandas ``DataFrame`` with one column per ticker.
+fn periodic_panel_to_dataframe<'py>(
+    py: Python<'py>,
+    perf: &fa::Performance,
+    panel: Vec<Vec<(time::Date, f64)>>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let mut all_dates: BTreeSet<time::Date> = BTreeSet::new();
+    for series in &panel {
+        for (d, _) in series {
+            all_dates.insert(*d);
+        }
+    }
+    let dates: Vec<time::Date> = all_dates.into_iter().collect();
+
+    let data = PyDict::new(py);
+    for (name, series) in perf.ticker_names().iter().zip(panel.into_iter()) {
+        let mut padded = vec![f64::NAN; dates.len()];
+        for (d, v) in series {
+            if let Ok(pos) = dates.binary_search(&d) {
+                padded[pos] = v;
+            }
+        }
+        data.set_item(name, vec_to_pyarray(py, padded))?;
+    }
+    let idx = dates_to_datetime_index(py, &dates)?;
     dict_to_dataframe(py, &data, Some(idx))
 }
 
@@ -896,6 +926,21 @@ impl PyPerformance {
     /// Returns a DataFrame with a date index and one column per ticker.
     fn cumulative_returns_to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         panel_to_dataframe(py, &self.inner, self.inner.cumulative_returns())
+    }
+
+    /// Calendar-bucketed compounded returns as a pandas ``DataFrame``.
+    ///
+    /// ``freq`` is ``"monthly"`` or ``"annual"``. Returns a DataFrame indexed
+    /// by period-end date with one column per ticker; buckets reconcile with
+    /// :meth:`cumulative_returns_to_dataframe`.
+    #[pyo3(signature = (freq = "monthly"))]
+    fn periodic_returns_to_dataframe<'py>(
+        &self,
+        py: Python<'py>,
+        freq: &str,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let kind = parse_freq(freq)?;
+        periodic_panel_to_dataframe(py, &self.inner, self.inner.periodic_returns(kind))
     }
 
     /// Drawdown series for all tickers as a pandas ``DataFrame``.

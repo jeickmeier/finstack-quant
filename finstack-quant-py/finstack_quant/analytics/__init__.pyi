@@ -1728,6 +1728,29 @@ class Performance:
         """
         ...
 
+    def periodic_returns_to_dataframe(self, freq: str = "monthly") -> pd.DataFrame:
+        """Calendar-bucketed compounded returns for all tickers.
+
+        Parameters
+        ----------
+        freq : str, default "monthly"
+            Bucketing frequency: one of ``"daily"``, ``"weekly"``,
+            ``"monthly"``, ``"quarterly"``, ``"semiannual"``, ``"annual"``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Compounded period returns indexed by period-end date, one column
+            per ticker. Buckets reconcile with
+            :meth:`cumulative_returns_to_dataframe`.
+
+        Raises
+        ------
+        ValueError
+            If ``freq`` is not a recognized frequency.
+        """
+        ...
+
     def drawdown_series_to_dataframe(self) -> pd.DataFrame:
         """Drawdown series for all tickers as a pandas DataFrame.
 
