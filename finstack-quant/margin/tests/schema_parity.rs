@@ -2,6 +2,13 @@
 
 use serde_json::Value;
 
+const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
+
+fn margin_schema() -> Value {
+    let schema_json = include_str!("../schemas/margin/1/margin.schema.json");
+    serde_json::from_str(schema_json).expect("Schema JSON should be valid")
+}
+
 /// Extract enum variant names from a schemars-generated enum schema.
 fn extract_enum_values(schema: &Value) -> Vec<&str> {
     if let Some(arr) = schema.get("enum").and_then(|v| v.as_array()) {
@@ -42,9 +49,18 @@ const CANONICAL_IM_METHODOLOGIES: &[&str] = &[
 const CANONICAL_MARGIN_TENORS: &[&str] = &["Daily", "Monthly", "OnDemand", "Weekly"];
 
 #[test]
+fn margin_schema_declares_2020_12_dialect() {
+    let schema = margin_schema();
+    assert_eq!(
+        schema.get("$schema").and_then(Value::as_str),
+        Some(JSON_SCHEMA_2020_12),
+        "margin schema declares the wrong JSON Schema dialect"
+    );
+}
+
+#[test]
 fn margin_im_methodology_schema_parity() {
-    let schema_json = include_str!("../schemas/margin/1/margin.schema.json");
-    let schema: Value = serde_json::from_str(schema_json).expect("Schema JSON should be valid");
+    let schema = margin_schema();
 
     let im = schema
         .pointer("/$defs/ImMethodology")
@@ -57,8 +73,7 @@ fn margin_im_methodology_schema_parity() {
 
 #[test]
 fn margin_tenor_schema_parity() {
-    let schema_json = include_str!("../schemas/margin/1/margin.schema.json");
-    let schema: Value = serde_json::from_str(schema_json).expect("Schema JSON should be valid");
+    let schema = margin_schema();
 
     let mt = schema
         .pointer("/$defs/MarginTenor")
