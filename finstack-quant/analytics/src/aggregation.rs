@@ -167,6 +167,39 @@ pub(crate) fn group_by_period(
     result
 }
 
+/// Calendar-bucket compounded returns, tagging each bucket with its **last
+/// observation date** (the period-end). Reuses [`comp_total`] so buckets
+/// reconcile exactly with `cumulative_returns`. Calendar bucketing only
+/// (no fiscal config); `Annual` uses the calendar year.
+pub(crate) fn group_by_period_dated(
+    dates: &[Date],
+    returns: &[f64],
+    freq: PeriodKind,
+) -> Vec<(Date, f64)> {
+    let mut it = dates.iter().copied().zip(returns.iter().copied());
+    let Some((first_date, first_ret)) = it.next() else {
+        return Vec::new();
+    };
+
+    let mut out: Vec<(Date, f64)> = Vec::new();
+    let mut current_pid = date_to_period_id(first_date, freq, None);
+    let mut bucket = vec![first_ret];
+    let mut last_date = first_date;
+
+    for (date, ret) in it {
+        let pid = date_to_period_id(date, freq, None);
+        if pid != current_pid {
+            out.push((last_date, comp_total(&bucket)));
+            bucket.clear();
+            current_pid = pid;
+        }
+        bucket.push(ret);
+        last_date = date;
+    }
+    out.push((last_date, comp_total(&bucket)));
+    out
+}
+
 /// Compute period-level statistics from grouped returns.
 ///
 /// Derives period-level trading statistics from a sequence of
@@ -322,6 +355,43 @@ fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
         profit_factor,
         cpc_ratio,
         kelly_criterion,
+    }
+}
+
+#[cfg(test)]
+mod periodic_dated_tests {
+    use super::*;
+    use crate::dates::{Month, PeriodKind};
+
+    fn d(y: i32, m: u8, day: u8) -> Date {
+        crate::dates::create_date(y, Month::try_from(m).unwrap(), day).unwrap()
+    }
+
+    #[test]
+    fn group_by_period_dated_monthly_buckets_and_reconciles() {
+        let dates = vec![
+            d(2021, 1, 5),
+            d(2021, 1, 20),
+            d(2021, 2, 10),
+            d(2021, 2, 25),
+        ];
+        let rets = vec![0.01, 0.02, -0.01, 0.03];
+        let out = group_by_period_dated(&dates, &rets, PeriodKind::Monthly);
+
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].0, d(2021, 1, 20));
+        assert_eq!(out[1].0, d(2021, 2, 25));
+        assert!((out[0].1 - (1.01 * 1.02 - 1.0)).abs() < 1e-12);
+        assert!((out[1].1 - (0.99 * 1.03 - 1.0)).abs() < 1e-12);
+        let total = (1.0 + out[0].1) * (1.0 + out[1].1) - 1.0;
+        let expected = 1.01 * 1.02 * 0.99 * 1.03 - 1.0;
+        assert!((total - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn group_by_period_dated_empty_is_empty() {
+        let out = group_by_period_dated(&[], &[], PeriodKind::Monthly);
+        assert!(out.is_empty());
     }
 }
 
