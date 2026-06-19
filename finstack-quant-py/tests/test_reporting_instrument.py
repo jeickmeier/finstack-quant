@@ -94,3 +94,39 @@ def test_bucketed_series_orders_by_tenor() -> None:
     # ordered by the standard tenor grid: 2y, 5y, 10y (3m/6m/1y absent)
     assert [t for t, _ in series] == ["2y", "5y", "10y"]
     assert dict(series)["10y"] == 2620.0
+
+
+def test_metric_cell_formats_by_unit() -> None:
+    assert ins._metric_cell("ytm", 0.0394) == ("Yield to Maturity", "3.94%", "")
+    assert ins._metric_cell("z_spread", 0.0078)[1] == "78 bp"
+    assert ins._metric_cell("dv01", 6420.0)[1] in ("6,420", "6,420.00")
+    assert ins._metric_cell("clean_price", 101.96)[1] == "101.96"
+    _lbl, _val, cls = ins._metric_cell("jump_to_default", -5816000.0)
+    assert cls == "neg"
+
+
+def test_definition_terms_bond() -> None:
+    defn = {
+        "type": "bond",
+        "spec": {
+            "id": "ACME-34",
+            "notional": {"amount": "10000000", "currency": "USD"},
+            "issue_date": "2024-03-15",
+            "maturity": "2034-03-15",
+            "cashflow_spec": {"Fixed": {"rate": 0.0425, "freq": {"count": 6, "unit": "months"}, "dc": "Thirty360"}},
+            "discount_curve_id": "USD-OIS",
+        },
+    }
+    cols = ins._definition_terms(defn)
+    flat = [kv for col in cols for kv in col]
+    keys = {k for k, _ in flat}
+    assert "Notional" in keys
+    assert "Maturity" in keys
+    assert "Coupon" in keys
+
+
+def test_definition_terms_generic_fallback() -> None:
+    defn = {"type": "mystery", "spec": {"id": "X", "notional": {"amount": "5", "currency": "USD"}, "rate": 0.01}}
+    cols = ins._definition_terms(defn)
+    flat = [kv for col in cols for kv in col]
+    assert flat  # produced something from spec scalars
