@@ -154,7 +154,12 @@ def line_chart(
     parts.append(f'<polyline points="{pts}" fill="none" stroke="{color}" stroke-width="1.6" stroke-linejoin="round"/>')
     # interactive overlay: transparent hover bands (native <title> + JS hook)
     band_w = pw / (len(valid) - 1) if len(valid) > 1 else pw
-    for i, v in valid:
+    max_bands = 500
+    valid_for_bands = valid
+    if len(valid) > max_bands:
+        stride = max(1, math.ceil(len(valid) / max_bands))
+        valid_for_bands = valid[::stride]
+    for i, v in valid_for_bands:
         cx, cy = x(i), y(v)
         bx = max(ml, cx - band_w / 2)
         label = fmt.fmt_date(dates[i])

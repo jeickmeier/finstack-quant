@@ -84,3 +84,12 @@ def test_bar_chart_bars_have_titles() -> None:
     assert "<title>2021" in svg
     assert "fq-cross" in svg
     assert "fq-mk" in svg
+
+
+def test_line_chart_caps_hover_bands() -> None:
+    n = 1500
+    svg = charts.line_chart(_dates(n), [float(i % 7) for i in range(n)], theme=INSTITUTIONAL)
+    band_count = svg.count('class="fq-hb"')
+    assert 0 < band_count <= 500
+    # polyline keeps full resolution: it references all points, so the svg is large
+    assert "<polyline" in svg
