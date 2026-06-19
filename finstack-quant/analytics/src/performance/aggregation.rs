@@ -229,5 +229,15 @@ mod periodic_returns_tests {
         assert_eq!(periodic.len(), perf.ticker_names().len());
         // Single-ticker fixture spanning Jan+Feb -> 2 buckets.
         assert_eq!(periodic[0].len(), 2);
+
+        // Period-end dates fall in the expected calendar months.
+        assert_eq!(periodic[0][0].0.month(), Month::January);
+        assert_eq!(periodic[0][1].0.month(), Month::February);
+
+        // Buckets chain to the full-period cumulative return (exact reconciliation).
+        let cum = perf.cumulative_returns();
+        let total = *cum[0].last().unwrap();
+        let chained = (1.0 + periodic[0][0].1) * (1.0 + periodic[0][1].1) - 1.0;
+        assert!((chained - total).abs() < 1e-12);
     }
 }
