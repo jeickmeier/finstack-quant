@@ -152,7 +152,9 @@ class MoneyEstimate:
         Equals :attr:`num_paths` without variance reduction, or
         ``2 * num_paths`` when antithetic variates are enabled.
 
-        Returns:
+        Returns
+        -------
+        int
             Count of simulated sample paths.
         """
         ...
@@ -234,7 +236,13 @@ class MoneyEstimate:
         ...
 
 class Estimate:
-    """Scalar Monte Carlo estimate without currency tagging."""
+    """Scalar Monte Carlo estimate without currency tagging.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import Estimate
+    >>> # Estimate objects are returned by scalar MC functions.
+    """
 
     @property
     def mean(self) -> float:
@@ -312,7 +320,9 @@ class Estimate:
         Equals :attr:`num_paths` without variance reduction, or
         ``2 * num_paths`` when antithetic variates are enabled.
 
-        Returns:
+        Returns
+        -------
+        int
             Count of simulated sample paths.
         """
         ...
@@ -379,33 +389,33 @@ class Estimate:
 class TimeGrid:
     """Discretised time axis for Monte Carlo stepping.
 
-    Args:
-        t_max: Terminal time in years.
-        num_steps: Number of steps between 0 and ``t_max``.
-
-    Returns:
-        N/A (instance type).
-
-    Example:
-        >>> from finstack_quant.monte_carlo import TimeGrid
-        >>> TimeGrid(1.0, 4).num_steps
-        4
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import TimeGrid
+    >>> TimeGrid(1.0, 4).num_steps
+    4
     """
 
     def __init__(self, t_max: float, num_steps: int) -> None:
         """Build a uniform grid from ``0`` to ``t_max`` with ``num_steps`` steps.
 
-        Args:
-            t_max: Terminal time.
-            num_steps: Step count.
+        Parameters
+        ----------
+        t_max : float
+            Terminal time in years.
+        num_steps : int
+            Number of steps between 0 and ``t_max``.
 
-        Returns:
-            None
+        Raises
+        ------
+        ValueError
+            If ``t_max`` is non-positive or ``num_steps`` is less than 1.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid(0.5, 10).t_max
-            0.5
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid(0.5, 10).t_max
+        0.5
         """
         ...
 
@@ -413,16 +423,28 @@ class TimeGrid:
     def from_times(times: Sequence[float]) -> TimeGrid:
         """Construct a grid from explicit increasing time points.
 
-        Args:
-            times: Strictly usable time knot sequence (copied as ``list[float]`` internally).
+        Parameters
+        ----------
+        times : Sequence[float]
+            Strictly increasing time knot sequence (copied as ``list[float]``
+            internally).
 
-        Returns:
+        Returns
+        -------
+        TimeGrid
             A ``TimeGrid`` instance.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid.from_times([0.0, 0.25, 0.5, 1.0]).num_steps
-            3
+        Raises
+        ------
+        ValueError
+            If ``times`` is empty, not strictly increasing, or contains
+            non-finite values.
+
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid.from_times([0.0, 0.25, 0.5, 1.0]).num_steps
+        3
         """
         ...
 
@@ -430,16 +452,16 @@ class TimeGrid:
     def num_steps(self) -> int:
         """Number of time steps on the grid.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        int
             Step count.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid(1.0, 100).num_steps
-            100
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid(1.0, 100).num_steps
+        100
         """
         ...
 
@@ -447,16 +469,16 @@ class TimeGrid:
     def t_max(self) -> float:
         """Terminal time of the grid.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        float
             Maximum time coordinate.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid(2.0, 8).t_max
-            2.0
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid(2.0, 8).t_max
+        2.0
         """
         ...
 
@@ -464,16 +486,16 @@ class TimeGrid:
     def is_uniform(self) -> bool:
         """Whether step sizes are uniform.
 
-        Args:
-            None
+        Returns
+        -------
+        bool
+            ``True`` if all inner steps share one ``dt``.
 
-        Returns:
-            True if all inner steps share one ``dt``.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid(1.0, 5).is_uniform
-            True
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid(1.0, 5).is_uniform
+        True
         """
         ...
 
@@ -481,16 +503,16 @@ class TimeGrid:
     def times(self) -> list[float]:
         """All time coordinates including the origin.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        list[float]
             Copy of knot times.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid(1.0, 2).times[0]
-            0.0
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid(1.0, 2).times[0]
+        0.0
         """
         ...
 
@@ -498,15 +520,15 @@ class TimeGrid:
     def dts(self) -> list[float]:
         """Step sizes between consecutive times.
 
-        Args:
-            None
-
-        Returns:
+        Returns
+        -------
+        list[float]
             Per-step ``dt`` values.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> len(TimeGrid(1.0, 4).dts)
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> len(TimeGrid(1.0, 4).dts)
             4
         """
         ...
@@ -514,15 +536,25 @@ class TimeGrid:
     def time(self, step: int) -> float:
         """Time at a given step index.
 
-        Args:
-            step: Step index in ``[0, num_steps]``.
+        Parameters
+        ----------
+        step : int
+            Step index in ``[0, num_steps]``.
 
-        Returns:
+        Returns
+        -------
+        float
             Time coordinate.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid(1.0, 4).time(0)
+        Raises
+        ------
+        IndexError
+            If ``step`` is out of bounds.
+
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid(1.0, 4).time(0)
             0.0
         """
         ...
@@ -530,15 +562,25 @@ class TimeGrid:
     def dt(self, step: int) -> float:
         """Step size following the given step index.
 
-        Args:
-            step: Step index in ``[0, num_steps - 1]``.
+        Parameters
+        ----------
+        step : int
+            Step index in ``[0, num_steps - 1]``.
 
-        Returns:
+        Returns
+        -------
+        float
             Increment to the next time.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import TimeGrid
-            >>> TimeGrid(1.0, 4).dt(0)
+        Raises
+        ------
+        IndexError
+            If ``step`` is out of bounds.
+
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import TimeGrid
+        >>> TimeGrid(1.0, 4).dt(0)
             0.25
         """
         ...
@@ -546,19 +588,11 @@ class TimeGrid:
 class McEngine:
     """Full Monte Carlo engine bound to a :class:`TimeGrid`.
 
-    Args:
-        num_paths: Number of paths.
-        time_grid: Discretisation grid.
-        seed: RNG seed (default ``42``).
-        use_parallel: Enable parallel path generation (default ``False``).
-
-    Returns:
-        N/A (instance type).
-
-    Example:
-        >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
-        >>> McEngine(100, TimeGrid(1.0, 50), seed=7).price_european_call(100, 100, 0.05, 0.0, 0.2).num_paths
-        100
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
+    >>> McEngine(100, TimeGrid(1.0, 50), seed=7).price_european_call(100, 100, 0.05, 0.0, 0.2).num_paths
+    100
     """
 
     def __init__(
@@ -568,21 +602,24 @@ class McEngine:
         seed: int | None = None,
         use_parallel: bool | None = None,
     ) -> None:
-        """See class docstring for parameters.
+        """Create a Monte Carlo engine.
 
-        Args:
-            num_paths: Path count.
-            time_grid: Simulation grid.
-            seed: Seed.
-            use_parallel: Parallel flag.
+        Parameters
+        ----------
+        num_paths : int
+            Number of paths to simulate.
+        time_grid : TimeGrid
+            Discretisation grid for path generation.
+        seed : int, optional
+            RNG seed. Defaults to the registry default (``42``).
+        use_parallel : bool, optional
+            Enable parallel path generation. Defaults to ``False``.
 
-        Returns:
-            None
-
-        Example:
-            >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
-            >>> McEngine(10, TimeGrid(1.0, 5), seed=1, use_parallel=True)  # doctest: +ELLIPSIS
-            McEngine(...)
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
+        >>> McEngine(10, TimeGrid(1.0, 5), seed=1, use_parallel=True)  # doctest: +ELLIPSIS
+        McEngine(...)
         """
         ...
 
@@ -597,21 +634,31 @@ class McEngine:
     ) -> MoneyEstimate:
         """Price a European call on the engine's grid under GBM.
 
-        Args:
-            spot: Initial spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            currency: Currency string or None for USD default.
+        Parameters
+        ----------
+        spot : float
+            Initial spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Priced result.
+        Returns
+        -------
+        MoneyEstimate
+            Priced result with mean, stderr, and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
-            >>> McEngine(500, TimeGrid(1.0, 52)).price_european_call(100, 100, 0.05, 0.0, 0.25).num_paths
-            500
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
+        >>> McEngine(500, TimeGrid(1.0, 52)).price_european_call(100, 100, 0.05, 0.0, 0.25).num_paths
+        500
         """
         ...
 
@@ -626,39 +673,42 @@ class McEngine:
     ) -> MoneyEstimate:
         """Price a European put on the engine's grid under GBM.
 
-        Args:
-            spot: Initial spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            currency: Currency string or None for USD default.
+        Parameters
+        ----------
+        spot : float
+            Initial spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Priced result.
+        Returns
+        -------
+        MoneyEstimate
+            Priced result with mean, stderr, and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
-            >>> McEngine(500, TimeGrid(1.0, 52)).price_european_put(100, 100, 0.05, 0.0, 0.25).num_paths
-            500
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import McEngine, TimeGrid
+        >>> McEngine(500, TimeGrid(1.0, 52)).price_european_put(100, 100, 0.05, 0.0, 0.25).num_paths
+        500
         """
         ...
 
 class EuropeanPricer:
     """European-option Monte Carlo pricer under GBM (exact time-stepping).
 
-    Args:
-        num_paths: Paths, or None for the registry default.
-        seed: RNG seed, or None for the registry default.
-        use_parallel: Parallel accumulation flag, or None for the registry default.
-
-    Returns:
-        N/A (instance type).
-
-    Example:
-        >>> from finstack_quant.monte_carlo import EuropeanPricer
-        >>> EuropeanPricer(num_paths=1000, seed=1).price_call(100, 100, 0.05, 0.0, 0.2, 1.0).num_paths
-        1000
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import EuropeanPricer
+    >>> EuropeanPricer(num_paths=1000, seed=1).price_call(100, 100, 0.05, 0.0, 0.2, 1.0).num_paths
+    1000
     """
 
     def __init__(
@@ -667,20 +717,22 @@ class EuropeanPricer:
         seed: int | None = None,
         use_parallel: bool | None = None,
     ) -> None:
-        """See class docstring for parameters.
+        """Create a European-option pricer.
 
-        Args:
-            num_paths: Path count.
-            seed: Seed.
-            use_parallel: Parallel flag.
+        Parameters
+        ----------
+        num_paths : int, optional
+            Path count. Defaults to the registry default (``100_000``).
+        seed : int, optional
+            RNG seed. Defaults to the registry default (``42``).
+        use_parallel : bool, optional
+            Parallel accumulation flag. Defaults to the registry default.
 
-        Returns:
-            None
-
-        Example:
-            >>> from finstack_quant.monte_carlo import EuropeanPricer
-            >>> EuropeanPricer(500, 9).seed
-            9
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import EuropeanPricer
+        >>> EuropeanPricer(500, 9).seed
+        9
         """
         ...
 
@@ -688,16 +740,16 @@ class EuropeanPricer:
     def num_paths(self) -> int:
         """Configured path count.
 
-        Args:
-            None
+        Returns
+        -------
+        int
+            Number of Monte Carlo paths.
 
-        Returns:
-            Paths.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import EuropeanPricer
-            >>> EuropeanPricer(1234).num_paths
-            1234
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import EuropeanPricer
+        >>> EuropeanPricer(1234).num_paths
+        1234
         """
         ...
 
@@ -705,16 +757,16 @@ class EuropeanPricer:
     def seed(self) -> int:
         """RNG seed.
 
-        Args:
-            None
+        Returns
+        -------
+        int
+            Seed value used for path generation.
 
-        Returns:
-            Seed.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import EuropeanPricer
-            >>> EuropeanPricer(seed=55).seed
-            55
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import EuropeanPricer
+        >>> EuropeanPricer(seed=55).seed
+        55
         """
         ...
 
@@ -722,7 +774,9 @@ class EuropeanPricer:
     def use_parallel(self) -> bool:
         """Whether path accumulation runs on the rayon pool.
 
-        Returns:
+        Returns
+        -------
+        bool
             Parallel flag as passed to ``__init__``.
         """
         ...
@@ -740,23 +794,35 @@ class EuropeanPricer:
     ) -> MoneyEstimate:
         """Price a European call.
 
-        Args:
-            spot: Spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            expiry: Time to maturity in years.
-            num_steps: Time steps, or None for the registry default.
-            currency: ISO string or None for USD.
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Time to maturity in years.
+        num_steps : int, optional
+            Time steps. Defaults to the registry default (``252``).
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Result object.
+        Returns
+        -------
+        MoneyEstimate
+            Monte Carlo price with stderr and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import EuropeanPricer
-            >>> EuropeanPricer(800, 0).price_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
-            800
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import EuropeanPricer
+        >>> EuropeanPricer(800, 0).price_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
+        800
         """
         ...
 
@@ -773,41 +839,46 @@ class EuropeanPricer:
     ) -> MoneyEstimate:
         """Price a European put.
 
-        Args:
-            spot: Spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            expiry: Time to maturity in years.
-            num_steps: Time steps, or None for the registry default.
-            currency: ISO string or None for USD.
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Time to maturity in years.
+        num_steps : int, optional
+            Time steps. Defaults to the registry default (``252``).
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Result object.
+        Returns
+        -------
+        MoneyEstimate
+            Monte Carlo price with stderr and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import EuropeanPricer
-            >>> EuropeanPricer(800, 0).price_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
-            800
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import EuropeanPricer
+        >>> EuropeanPricer(800, 0).price_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=52).num_paths
+        800
         """
         ...
 
 class PathDependentPricer:
     """Path-dependent Monte Carlo pricer (Asian-style exotics on GBM).
 
-    Args:
-        num_paths: Paths, or None for the registry default.
-        seed: RNG seed, or None for the registry default.
-        use_parallel: Parallel accumulation flag, or None for the registry default.
-
-    Returns:
-        N/A (instance type).
-
-    Example:
-        >>> from finstack_quant.monte_carlo import PathDependentPricer
-        >>> PathDependentPricer(600, 2).price_asian_call(100, 100, 0.05, 0.0, 0.2, 1.0).num_paths
-        600
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import PathDependentPricer
+    >>> PathDependentPricer(600, 2).price_asian_call(100, 100, 0.05, 0.0, 0.2, 1.0).num_paths
+    600
     """
 
     def __init__(
@@ -816,20 +887,22 @@ class PathDependentPricer:
         seed: int | None = None,
         use_parallel: bool | None = None,
     ) -> None:
-        """See class docstring for parameters.
+        """Create a path-dependent pricer.
 
-        Args:
-            num_paths: Path count.
-            seed: Seed.
-            use_parallel: Parallel flag.
+        Parameters
+        ----------
+        num_paths : int, optional
+            Path count. Defaults to the registry default.
+        seed : int, optional
+            RNG seed. Defaults to the registry default.
+        use_parallel : bool, optional
+            Parallel accumulation flag. Defaults to the registry default.
 
-        Returns:
-            None
-
-        Example:
-            >>> from finstack_quant.monte_carlo import PathDependentPricer
-            >>> PathDependentPricer(100, 1, use_parallel=True).num_paths
-            100
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import PathDependentPricer
+        >>> PathDependentPricer(100, 1, use_parallel=True).num_paths
+        100
         """
         ...
 
@@ -846,25 +919,37 @@ class PathDependentPricer:
     ) -> MoneyEstimate:
         """Price an arithmetic Asian call (post-initial fixings at every step).
 
-        Args:
-            spot: Spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            expiry: Maturity in years.
-            num_steps: Steps, or None for the registry default. The default
-                fixing schedule is steps ``1..=num_steps`` and excludes the
-                initial spot at step ``0``.
-            currency: ISO string or None for USD.
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Maturity in years.
+        num_steps : int, optional
+            Steps. Defaults to the registry default. The default fixing
+            schedule is steps ``1..=num_steps`` and excludes the initial spot
+            at step ``0``.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Result object.
+        Returns
+        -------
+        MoneyEstimate
+            Monte Carlo price with stderr and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import PathDependentPricer
-            >>> PathDependentPricer(400, 0).price_asian_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
-            400
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import PathDependentPricer
+        >>> PathDependentPricer(400, 0).price_asian_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
+        400
         """
         ...
 
@@ -881,25 +966,37 @@ class PathDependentPricer:
     ) -> MoneyEstimate:
         """Price an arithmetic Asian put (post-initial fixings at every step).
 
-        Args:
-            spot: Spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            expiry: Maturity in years.
-            num_steps: Steps, or None for the registry default. The default
-                fixing schedule is steps ``1..=num_steps`` and excludes the
-                initial spot at step ``0``.
-            currency: ISO string or None for USD.
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Maturity in years.
+        num_steps : int, optional
+            Steps. Defaults to the registry default. The default fixing
+            schedule is steps ``1..=num_steps`` and excludes the initial spot
+            at step ``0``.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Result object.
+        Returns
+        -------
+        MoneyEstimate
+            Monte Carlo price with stderr and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import PathDependentPricer
-            >>> PathDependentPricer(400, 0).price_asian_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
-            400
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import PathDependentPricer
+        >>> PathDependentPricer(400, 0).price_asian_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_steps=12).num_paths
+        400
         """
         ...
 
@@ -907,16 +1004,16 @@ class PathDependentPricer:
     def num_paths(self) -> int:
         """Configured path count.
 
-        Args:
-            None
+        Returns
+        -------
+        int
+            Number of Monte Carlo paths.
 
-        Returns:
-            Paths.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import PathDependentPricer
-            >>> PathDependentPricer(777).num_paths
-            777
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import PathDependentPricer
+        >>> PathDependentPricer(777).num_paths
+        777
         """
         ...
 
@@ -924,40 +1021,27 @@ class PathDependentPricer:
     def seed(self) -> int:
         """RNG seed.
 
-        Args:
-            None
+        Returns
+        -------
+        int
+            Seed value used for path generation.
 
-        Returns:
-            Seed.
-
-        Example:
-            >>> from finstack_quant.monte_carlo import PathDependentPricer
-            >>> PathDependentPricer(seed=44).seed
-            44
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import PathDependentPricer
+        >>> PathDependentPricer(seed=44).seed
+        44
         """
         ...
 
 class LsmcPricer:
     """Longstaff–Schwartz Monte Carlo pricer for American options under GBM.
 
-    Args:
-        num_paths: Paths, or None for the registry default.
-        seed: RNG seed, or None for the registry default.
-        use_parallel: Parallel path generation flag, or None for the registry default.
-        basis: Regression basis family. One of ``"laguerre"``,
-            ``"polynomial"``, or ``"normalized_polynomial"``. ``None`` is
-            resolved from the registry default.
-        basis_degree: Polynomial/Laguerre degree, or None for the registry
-            default. Must be
-            positive; for ``"laguerre"`` it must additionally be in ``[1, 4]``.
-
-    Returns:
-        N/A (instance type).
-
-    Example:
-        >>> from finstack_quant.monte_carlo import LsmcPricer
-        >>> LsmcPricer(300, 0).price_american_put(100, 100, 0.05, 0.0, 0.3, 1.0, num_steps=10).num_paths
-        300
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import LsmcPricer
+    >>> LsmcPricer(300, 0).price_american_put(100, 100, 0.05, 0.0, 0.3, 1.0, num_steps=10).num_paths
+    300
     """
 
     def __init__(
@@ -968,40 +1052,68 @@ class LsmcPricer:
         basis: str | None = None,
         basis_degree: int | None = None,
     ) -> None:
-        """See class docstring for parameters.
+        """Create an LSMC pricer.
 
-        Args:
-            num_paths: Path count.
-            seed: Seed.
-            use_parallel: Parallel flag.
-            basis: Basis family name.
-            basis_degree: Polynomial/Laguerre degree.
+        Parameters
+        ----------
+        num_paths : int, optional
+            Path count. Defaults to the registry default.
+        seed : int, optional
+            RNG seed. Defaults to the registry default.
+        use_parallel : bool, optional
+            Parallel path generation flag. Defaults to the registry default.
+        basis : str, optional
+            Regression basis family. One of ``"laguerre"``,
+            ``"polynomial"``, or ``"normalized_polynomial"``. Defaults to
+            the registry default.
+        basis_degree : int, optional
+            Polynomial/Laguerre degree. Defaults to the registry default.
+            Must be positive; for ``"laguerre"`` it must additionally be
+            in ``[1, 4]``.
 
-        Returns:
-            None
+        Raises
+        ------
+        ValueError
+            If ``basis`` is not a recognized family or ``basis_degree`` is
+            out of range.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import LsmcPricer
-            >>> LsmcPricer(50, 3).num_paths
-            50
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import LsmcPricer
+        >>> LsmcPricer(50, 3).num_paths
+        50
         """
         ...
 
     @property
     def num_paths(self) -> int:
-        """Configured path count."""
+        """Configured path count.
+
+        Returns
+        -------
+        int
+            Number of Monte Carlo paths.
+        """
         ...
 
     @property
     def seed(self) -> int:
-        """RNG seed."""
+        """RNG seed.
+
+        Returns
+        -------
+        int
+            Seed value used for path generation.
+        """
         ...
 
     @property
     def use_parallel(self) -> bool:
         """Whether path generation runs on the rayon pool.
 
-        Returns:
+        Returns
+        -------
+        bool
             Parallel flag as passed to ``__init__``.
         """
         ...
@@ -1010,14 +1122,23 @@ class LsmcPricer:
     def basis(self) -> str:
         """Regression basis family name.
 
-        Returns:
-            One of ``"laguerre"``, ``"polynomial"``, ``"normalized_polynomial"``.
+        Returns
+        -------
+        str
+            One of ``"laguerre"``, ``"polynomial"``,
+            ``"normalized_polynomial"``.
         """
         ...
 
     @property
     def basis_degree(self) -> int:
-        """Configured polynomial/Laguerre degree."""
+        """Configured polynomial/Laguerre degree.
+
+        Returns
+        -------
+        int
+            Degree value used in the regression basis.
+        """
         ...
 
     def price_american_put(
@@ -1033,23 +1154,35 @@ class LsmcPricer:
     ) -> MoneyEstimate:
         """Price an American put via LSMC.
 
-        Args:
-            spot: Spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            expiry: Maturity in years.
-            num_steps: Exercise grid steps, or None for the registry default.
-            currency: ISO string or None for USD.
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Maturity in years.
+        num_steps : int, optional
+            Exercise grid steps. Defaults to the registry default.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Result object.
+        Returns
+        -------
+        MoneyEstimate
+            LSMC price with stderr and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import LsmcPricer
-            >>> LsmcPricer(200, 0).price_american_put(100, 100, 0.05, 0.0, 0.25, 1.0, num_steps=8).num_paths
-            200
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import LsmcPricer
+        >>> LsmcPricer(200, 0).price_american_put(100, 100, 0.05, 0.0, 0.25, 1.0, num_steps=8).num_paths
+        200
         """
         ...
 
@@ -1066,23 +1199,35 @@ class LsmcPricer:
     ) -> MoneyEstimate:
         """Price an American call via LSMC.
 
-        Args:
-            spot: Spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            expiry: Maturity in years.
-            num_steps: Exercise grid steps, or None for the registry default.
-            currency: ISO string or None for USD.
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Maturity in years.
+        num_steps : int, optional
+            Exercise grid steps. Defaults to the registry default.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Result object.
+        Returns
+        -------
+        MoneyEstimate
+            LSMC price with stderr and confidence bands.
 
-        Example:
-            >>> from finstack_quant.monte_carlo import LsmcPricer
-            >>> LsmcPricer(200, 0).price_american_call(100, 100, 0.05, 0.0, 0.25, 1.0, num_steps=8).num_paths
-            200
+        Examples
+        --------
+        >>> from finstack_quant.monte_carlo import LsmcPricer
+        >>> LsmcPricer(200, 0).price_american_call(100, 100, 0.05, 0.0, 0.25, 1.0, num_steps=8).num_paths
+        200
         """
         ...
 
@@ -1104,21 +1249,38 @@ class LsmcPricer:
         the regression on a training path set seeded by the pricer's ``seed``
         and pricing on an independent path set seeded by ``pricing_seed``.
 
-        Args:
-            spot: Spot.
-            strike: Strike.
-            rate: Risk-free rate.
-            div_yield: Dividend yield.
-            vol: Volatility.
-            expiry: Maturity in years.
-            pricing_seed: Seed for the pricing pass; must differ from the
-                pricer's training seed (passing the same value reintroduces
-                the in-sample bias and is rejected).
-            num_steps: Exercise grid steps, or None for the registry default.
-            currency: ISO string or None for USD.
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Maturity in years.
+        pricing_seed : int
+            Seed for the pricing pass; must differ from the pricer's training
+            seed (passing the same value reintroduces the in-sample bias and
+            is rejected).
+        num_steps : int, optional
+            Exercise grid steps. Defaults to the registry default.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
 
-        Returns:
-            Out-of-sample MoneyEstimate.
+        Returns
+        -------
+        MoneyEstimate
+            Out-of-sample price with stderr and confidence bands.
+
+        Raises
+        ------
+        ValueError
+            If ``pricing_seed`` equals the pricer's training seed.
         """
         ...
 
@@ -1138,6 +1300,38 @@ class LsmcPricer:
 
         See :meth:`price_american_put_unbiased` for the bias-mitigation
         rationale and the meaning of ``pricing_seed``.
+
+        Parameters
+        ----------
+        spot : float
+            Spot price.
+        strike : float
+            Strike price.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Volatility (decimal).
+        expiry : float
+            Maturity in years.
+        pricing_seed : int
+            Seed for the pricing pass; must differ from the pricer's training
+            seed.
+        num_steps : int, optional
+            Exercise grid steps. Defaults to the registry default.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
+
+        Returns
+        -------
+        MoneyEstimate
+            Out-of-sample price with stderr and confidence bands.
+
+        Raises
+        ------
+        ValueError
+            If ``pricing_seed`` equals the pricer's training seed.
         """
         ...
 
@@ -1155,21 +1349,36 @@ def black_scholes_call(
     quoted in decimal form. This is a closed-form option price, not a raw
     terminal payoff.
 
-    Args:
-        spot: Spot.
-        strike: Strike.
-        rate: Risk-free rate.
-        div_yield: Dividend yield.
-        vol: Volatility.
-        expiry: Time to maturity.
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Time to maturity in years.
 
-    Returns:
+    Returns
+    -------
+    float
         Present value of the European call.
 
-    Example:
-        >>> from finstack_quant.monte_carlo import black_scholes_call
-        >>> black_scholes_call(100, 100, 0.05, 0.0, 0.2, 1.0) > 0
-        True
+    Raises
+    ------
+    ValueError
+        If any parameter is non-finite or ``expiry`` is negative.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import black_scholes_call
+    >>> black_scholes_call(100, 100, 0.05, 0.0, 0.2, 1.0) > 0
+    True
     """
     ...
 
@@ -1187,21 +1396,36 @@ def black_scholes_put(
     quoted in decimal form. This is a closed-form option price, not a raw
     terminal payoff.
 
-    Args:
-        spot: Spot.
-        strike: Strike.
-        rate: Risk-free rate.
-        div_yield: Dividend yield.
-        vol: Volatility.
-        expiry: Time to maturity.
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Time to maturity in years.
 
-    Returns:
+    Returns
+    -------
+    float
         Present value of the European put.
 
-    Example:
-        >>> from finstack_quant.monte_carlo import black_scholes_put
-        >>> black_scholes_put(100, 100, 0.05, 0.0, 0.2, 1.0) > 0
-        True
+    Raises
+    ------
+    ValueError
+        If any parameter is non-finite or ``expiry`` is negative.
+
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import black_scholes_put
+    >>> black_scholes_put(100, 100, 0.05, 0.0, 0.2, 1.0) > 0
+    True
     """
     ...
 
@@ -1219,25 +1443,39 @@ def price_european_call(
 ) -> MoneyEstimate:
     """Monte Carlo European call under GBM (standalone convenience).
 
-    Args:
-        spot: Spot.
-        strike: Strike.
-        rate: Risk-free rate.
-        div_yield: Dividend yield.
-        vol: Volatility.
-        expiry: Maturity in years.
-        num_paths: Paths (default ``100_000``).
-        seed: Seed (default ``42``).
-        num_steps: Steps (default ``252``).
-        currency: ISO string or None for USD.
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Maturity in years.
+    num_paths : int, optional
+        Paths (default ``100_000``).
+    seed : int, optional
+        RNG seed (default ``42``).
+    num_steps : int, optional
+        Time steps (default ``252``).
+    currency : str, optional
+        ISO currency code. Defaults to USD.
 
-    Returns:
-        Monte Carlo result.
+    Returns
+    -------
+    MoneyEstimate
+        Monte Carlo price with stderr and confidence bands.
 
-    Example:
-        >>> from finstack_quant.monte_carlo import price_european_call
-        >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000).num_paths
-        2000
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import price_european_call
+    >>> price_european_call(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000).num_paths
+    2000
     """
     ...
 
@@ -1255,25 +1493,39 @@ def price_european_put(
 ) -> MoneyEstimate:
     """Monte Carlo European put under GBM (standalone convenience).
 
-    Args:
-        spot: Spot.
-        strike: Strike.
-        rate: Risk-free rate.
-        div_yield: Dividend yield.
-        vol: Volatility.
-        expiry: Maturity in years.
-        num_paths: Paths (default ``100_000``).
-        seed: Seed (default ``42``).
-        num_steps: Steps (default ``252``).
-        currency: ISO string or None for USD.
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Maturity in years.
+    num_paths : int, optional
+        Paths (default ``100_000``).
+    seed : int, optional
+        RNG seed (default ``42``).
+    num_steps : int, optional
+        Time steps (default ``252``).
+    currency : str, optional
+        ISO currency code. Defaults to USD.
 
-    Returns:
-        Monte Carlo result.
+    Returns
+    -------
+    MoneyEstimate
+        Monte Carlo price with stderr and confidence bands.
 
-    Example:
-        >>> from finstack_quant.monte_carlo import price_european_put
-        >>> price_european_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000).num_paths
-        2000
+    Examples
+    --------
+    >>> from finstack_quant.monte_carlo import price_european_put
+    >>> price_european_put(100, 100, 0.05, 0.0, 0.2, 1.0, num_paths=2000).num_paths
+    2000
     """
     ...
 
@@ -1424,21 +1676,36 @@ def finite_diff_delta(
     For hedge-ratio sizing prefer :func:`finite_diff_delta_crn`, which returns the
     tighter paired CRN stderr.
 
-    Args:
-        spot: Spot price.
-        strike: Strike.
-        rate: Risk-free rate.
-        div_yield: Dividend yield.
-        vol: Volatility.
-        expiry: Maturity in years.
-        num_paths: Paths per evaluation (default ``10_000``).
-        seed: RNG seed (default ``42``).
-        num_steps: Time-grid steps (default ``50``).
-        bump_size: Relative bump fraction of spot (default ``0.01``).
-        option_type: ``"call"`` or ``"put"``.
-        currency: ISO currency code or None for USD.
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Maturity in years.
+    num_paths : int, optional
+        Paths per evaluation (default ``10_000``).
+    seed : int, optional
+        RNG seed (default ``42``).
+    num_steps : int, optional
+        Time-grid steps (default ``50``).
+    bump_size : float, optional
+        Relative bump fraction of spot (default ``0.01``).
+    option_type : str, optional
+        ``"call"`` or ``"put"``.
+    currency : str, optional
+        ISO currency code. Defaults to USD.
 
-    Returns:
+    Returns
+    -------
+    tuple[float, float]
         ``(delta, stderr)``.
     """
     ...
@@ -1464,21 +1731,36 @@ def finite_diff_delta_crn(
     magnitude tighter than the independence bound returned by
     :func:`finite_diff_delta`. Always runs serially.
 
-    Args:
-        spot: Spot price.
-        strike: Strike.
-        rate: Risk-free rate.
-        div_yield: Dividend yield.
-        vol: Volatility.
-        expiry: Maturity in years.
-        num_paths: Paths per evaluation (default ``10_000``).
-        seed: RNG seed (default ``42``).
-        num_steps: Time-grid steps (default ``50``).
-        bump_size: Relative bump fraction of spot (default ``0.01``).
-        option_type: ``"call"`` or ``"put"``.
-        currency: ISO currency code or None for USD.
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Maturity in years.
+    num_paths : int, optional
+        Paths per evaluation (default ``10_000``).
+    seed : int, optional
+        RNG seed (default ``42``).
+    num_steps : int, optional
+        Time-grid steps (default ``50``).
+    bump_size : float, optional
+        Relative bump fraction of spot (default ``0.01``).
+    option_type : str, optional
+        ``"call"`` or ``"put"``.
+    currency : str, optional
+        ISO currency code. Defaults to USD.
 
-    Returns:
+    Returns
+    -------
+    tuple[float, float]
         ``(delta, paired_stderr)``.
     """
     ...
@@ -1499,8 +1781,39 @@ def finite_diff_gamma(
 ) -> tuple[float, float]:
     """Finite-difference gamma (independence-bound stderr).
 
-    See :func:`finite_diff_gamma_crn` for the tighter paired CRN variant. Returns
-    ``(gamma, stderr)``.
+    See :func:`finite_diff_gamma_crn` for the tighter paired CRN variant.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Maturity in years.
+    num_paths : int, optional
+        Paths per evaluation (default ``10_000``).
+    seed : int, optional
+        RNG seed (default ``42``).
+    num_steps : int, optional
+        Time-grid steps (default ``50``).
+    bump_size : float, optional
+        Relative bump fraction of spot (default ``0.01``).
+    option_type : str, optional
+        ``"call"`` or ``"put"``.
+    currency : str, optional
+        ISO currency code. Defaults to USD.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(gamma, stderr)``.
     """
     ...
 
@@ -1523,5 +1836,37 @@ def finite_diff_gamma_crn(
     Returns ``(gamma, paired_stderr)`` where the standard error is the
     per-path paired error of ``(V_up_i − 2 V_base_i + V_down_i) / h²``.
     Always runs serially.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price.
+    strike : float
+        Strike price.
+    rate : float
+        Risk-free rate (continuously compounded decimal).
+    div_yield : float
+        Dividend yield (continuously compounded decimal).
+    vol : float
+        Volatility (decimal).
+    expiry : float
+        Maturity in years.
+    num_paths : int, optional
+        Paths per evaluation (default ``10_000``).
+    seed : int, optional
+        RNG seed (default ``42``).
+    num_steps : int, optional
+        Time-grid steps (default ``50``).
+    bump_size : float, optional
+        Relative bump fraction of spot (default ``0.01``).
+    option_type : str, optional
+        ``"call"`` or ``"put"``.
+    currency : str, optional
+        ISO currency code. Defaults to USD.
+
+    Returns
+    -------
+    tuple[float, float]
+        ``(gamma, paired_stderr)``.
     """
     ...

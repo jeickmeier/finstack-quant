@@ -461,16 +461,22 @@ def allocate_weights(spec_json: str) -> str:
     scheme. The Rust allocator computes normalized weights and money amounts;
     Python only passes the JSON through.
 
-    Args:
-        spec_json: JSON-serialized allocation specification.
+    Parameters
+    ----------
+    spec_json : str
+        JSON-serialized allocation specification.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON allocation result with the selected scheme and per-strategy
         ``id``, ``weight``, and allocated capital fields.
 
-    Raises:
-        ValueError: If the JSON is malformed, required fields are missing, the
-            scheme is unsupported, or the selected scheme cannot be evaluated.
+    Raises
+    ------
+    ValueError
+        If the JSON is malformed, required fields are missing, the
+        scheme is unsupported, or the selected scheme cannot be evaluated.
     """
     ...
 
@@ -480,11 +486,15 @@ def validate_allocation_json(spec_json: str) -> None:
     Performs the same Rust-side parse and semantic validation used by
     :func:`allocate_weights` without computing allocations.
 
-    Args:
-        spec_json: JSON-serialized allocation specification.
+    Parameters
+    ----------
+    spec_json : str
+        JSON-serialized allocation specification.
 
-    Raises:
-        ValueError: If the specification is malformed or invalid.
+    Raises
+    ------
+    ValueError
+        If the specification is malformed or invalid.
     """
     ...
 
@@ -530,18 +540,26 @@ def replay_portfolio(
 ) -> str:
     """Replay a portfolio through dated market snapshots.
 
-    Args:
-        portfolio: Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
-        snapshots_json: JSON array or envelope of market snapshots.
-        config_json: JSON replay configuration controlling dates, valuation
-            options, and output detail.
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Typed :class:`Portfolio` or JSON ``PortfolioSpec``.
+    snapshots_json : str
+        JSON array or envelope of market snapshots.
+    config_json : str
+        JSON replay configuration controlling dates, valuation
+        options, and output detail.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON replay result containing dated valuations and diagnostics.
 
-    Raises:
-        PortfolioError: If the portfolio, snapshots, or replay config are
-            invalid, or if a snapshot valuation fails.
+    Raises
+    ------
+    PortfolioError
+        If the portfolio, snapshots, or replay config are
+        invalid, or if a snapshot valuation fails.
     """
     ...
 
@@ -553,19 +571,28 @@ def parametric_var_decomposition(
 ) -> dict[str, object]:
     """Decompose portfolio parametric VaR across positions.
 
-    Args:
-        position_ids: Position identifiers aligned with ``weights``.
-        weights: Portfolio weights or exposures.
-        covariance: Square covariance matrix aligned with ``position_ids``.
-        confidence: VaR confidence level in ``(0, 1)``.
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers aligned with ``weights``.
+    weights : list[float]
+        Portfolio weights or exposures.
+    covariance : list[list[float]]
+        Square covariance matrix aligned with ``position_ids``.
+    confidence : float, default 0.95
+        VaR confidence level in ``(0, 1)``.
 
-    Returns:
+    Returns
+    -------
+    dict[str, object]
         Dict containing portfolio VaR and per-position component, marginal, and
         relative VaR contributions.
 
-    Raises:
-        ValueError: If dimensions do not match, covariance is malformed, or the
-            confidence level is invalid.
+    Raises
+    ------
+    ValueError
+        If dimensions do not match, covariance is malformed, or the
+        confidence level is invalid.
     """
     ...
 
@@ -577,19 +604,28 @@ def parametric_es_decomposition(
 ) -> dict[str, object]:
     """Decompose portfolio parametric expected shortfall across positions.
 
-    Args:
-        position_ids: Position identifiers aligned with ``weights``.
-        weights: Portfolio weights or exposures.
-        covariance: Square covariance matrix aligned with ``position_ids``.
-        confidence: ES confidence level in ``(0, 1)``.
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers aligned with ``weights``.
+    weights : list[float]
+        Portfolio weights or exposures.
+    covariance : list[list[float]]
+        Square covariance matrix aligned with ``position_ids``.
+    confidence : float, default 0.95
+        ES confidence level in ``(0, 1)``.
 
-    Returns:
+    Returns
+    -------
+    dict[str, object]
         Dict containing portfolio ES and per-position component, marginal, and
         relative ES contributions.
 
-    Raises:
-        ValueError: If dimensions do not match, covariance is malformed, or the
-            confidence level is invalid.
+    Raises
+    ------
+    ValueError
+        If dimensions do not match, covariance is malformed, or the
+        confidence level is invalid.
     """
     ...
 
@@ -600,19 +636,27 @@ def historical_var_decomposition(
 ) -> dict[str, object]:
     """Decompose historical VaR from scenario or realized position P&Ls.
 
-    Args:
-        position_ids: Position identifiers.
-        position_pnls: Matrix of position P&Ls, one scenario row per list and
-            one column per ``position_ids`` entry.
-        confidence: Historical VaR confidence level in ``(0, 1)``.
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers.
+    position_pnls : list[list[float]]
+        Matrix of position P&Ls, one scenario row per list and
+        one column per ``position_ids`` entry.
+    confidence : float, default 0.95
+        Historical VaR confidence level in ``(0, 1)``.
 
-    Returns:
+    Returns
+    -------
+    dict[str, object]
         Dict containing portfolio historical VaR and per-position contribution
         estimates.
 
-    Raises:
-        ValueError: If the P&L matrix is empty, ragged, dimensionally
-            inconsistent, or the confidence level is invalid.
+    Raises
+    ------
+    ValueError
+        If the P&L matrix is empty, ragged, dimensionally
+        inconsistent, or the confidence level is invalid.
     """
     ...
 
@@ -625,22 +669,31 @@ def evaluate_risk_budget(
 ) -> dict[str, object]:
     """Compare actual position VaR against target risk-budget shares.
 
-    Args:
-        position_ids: Position identifiers aligned with ``actual_var`` and
-            ``target_var_pct``.
-        actual_var: Position component VaR amounts.
-        target_var_pct: Target share of total portfolio VaR per position.
-        portfolio_var: Total portfolio VaR used to convert target percentages
-            into target VaR amounts.
-        utilization_threshold: Breach threshold for actual / target
-            utilization.
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers aligned with ``actual_var`` and
+        ``target_var_pct``.
+    actual_var : list[float]
+        Position component VaR amounts.
+    target_var_pct : list[float]
+        Target share of total portfolio VaR per position.
+    portfolio_var : float
+        Total portfolio VaR used to convert target percentages
+        into target VaR amounts.
+    utilization_threshold : float, default 1.20
+        Breach threshold for actual / target utilization.
 
-    Returns:
+    Returns
+    -------
+    dict[str, object]
         Dict with per-position utilization, excess VaR, total over-budget risk,
         and breach flag.
 
-    Raises:
-        ValueError: If input lengths differ or risk-budget inputs are invalid.
+    Raises
+    ------
+    ValueError
+        If input lengths differ or risk-budget inputs are invalid.
     """
     ...
 
@@ -655,11 +708,16 @@ def roll_effective_spread(returns: list[float]) -> float | None:
 def amihud_illiquidity(returns: list[float], volumes: list[float]) -> float | None:
     """Compute Amihud illiquidity from absolute returns and traded volumes.
 
-    Args:
-        returns: Period returns.
-        volumes: Traded volumes aligned with ``returns``.
+    Parameters
+    ----------
+    returns : list[float]
+        Period returns.
+    volumes : list[float]
+        Traded volumes aligned with ``returns``.
 
-    Returns:
+    Returns
+    -------
+    float or None
         Average ``abs(return) / volume`` over positive-volume observations, or
         ``None`` when no valid observations are available.
     """
@@ -672,18 +730,24 @@ def days_to_liquidate(
 ) -> float:
     """Estimate liquidation horizon in trading days.
 
-    Args:
-        position_value: Position market value to liquidate.
-        avg_daily_volume: Average daily market volume in the same notional
-            units.
-        participation_rate: Maximum fraction of daily volume the liquidation
-            may consume.
+    Parameters
+    ----------
+    position_value : float
+        Position market value to liquidate.
+    avg_daily_volume : float
+        Average daily market volume in the same notional units.
+    participation_rate : float
+        Maximum fraction of daily volume the liquidation may consume.
 
-    Returns:
+    Returns
+    -------
+    float
         ``position_value / (avg_daily_volume * participation_rate)``.
 
-    Raises:
-        ValueError: If volume or participation inputs are non-positive.
+    Raises
+    ------
+    ValueError
+        If volume or participation inputs are non-positive.
     """
     ...
 
@@ -700,14 +764,22 @@ def lvar_bangia(
 ) -> dict[str, float]:
     """Compute Bangia-style liquidity-adjusted VaR.
 
-    Args:
-        var: Base market VaR.
-        spread_mean: Mean bid-ask spread.
-        spread_vol: Spread volatility.
-        confidence: Confidence level for the liquidity adjustment.
-        position_value: Position value used to scale spread cost.
+    Parameters
+    ----------
+    var : float
+        Base market VaR.
+    spread_mean : float
+        Mean bid-ask spread.
+    spread_vol : float
+        Spread volatility.
+    confidence : float
+        Confidence level for the liquidity adjustment.
+    position_value : float
+        Position value used to scale spread cost.
 
-    Returns:
+    Returns
+    -------
+    dict[str, float]
         Dict containing the base VaR, liquidity add-on, and adjusted LVaR.
     """
     ...
@@ -723,17 +795,26 @@ def almgren_chriss_impact(
 ) -> dict[str, float]:
     """Estimate Almgren-Chriss execution impact components.
 
-    Args:
-        position_size: Trade size in shares or notional units.
-        avg_daily_volume: Average daily volume in matching units.
-        volatility: Asset volatility used for risk scaling.
-        execution_horizon_days: Execution horizon in trading days.
-        permanent_impact_coef: Permanent impact coefficient.
-        temporary_impact_coef: Temporary impact coefficient.
-        reference_price: Optional price used to convert share impact to
-            notional impact.
+    Parameters
+    ----------
+    position_size : float
+        Trade size in shares or notional units.
+    avg_daily_volume : float
+        Average daily volume in matching units.
+    volatility : float
+        Asset volatility used for risk scaling.
+    execution_horizon_days : float
+        Execution horizon in trading days.
+    permanent_impact_coef : float
+        Permanent impact coefficient.
+    temporary_impact_coef : float
+        Temporary impact coefficient.
+    reference_price : float, optional
+        Optional price used to convert share impact to notional impact.
 
-    Returns:
+    Returns
+    -------
+    dict[str, float]
         Dict of permanent, temporary, and total impact estimates.
     """
     ...
@@ -2294,27 +2375,37 @@ def factor_stress(
     the base portfolio, computes sensitivities, applies the requested factor
     shifts, and returns the stressed result.
 
-    Args:
-        portfolio: Portfolio instance or JSON portfolio specification accepted
-            by the compiled portfolio extractor.
-        market: MarketContext instance or JSON market context accepted by the
-            compiled market extractor.
-        factor_model_config_json: JSON-encoded
-            ``finstack_quant_factor_model::FactorModelConfig``.
-        as_of: ISO calculation date, ``YYYY-MM-DD``.
-        stresses: ``(factor_id, shift)`` pairs. Factor IDs must match the
-            configured model; shifts use the Rust factor model's units for that
-            factor.
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Portfolio instance or JSON portfolio specification accepted
+        by the compiled portfolio extractor.
+    market : MarketContext or str
+        MarketContext instance or JSON market context accepted by the
+        compiled market extractor.
+    factor_model_config_json : str
+        JSON-encoded ``finstack_quant_factor_model::FactorModelConfig``.
+    as_of : str
+        ISO calculation date, ``YYYY-MM-DD``.
+    stresses : list[tuple[str, float]]
+        ``(factor_id, shift)`` pairs. Factor IDs must match the
+        configured model; shifts use the Rust factor model's units for that
+        factor.
 
-    Returns:
+    Returns
+    -------
+    StressResult
         StressResult containing base/stressed portfolio risk and per-factor
         deltas.
 
-    Raises:
-        ValueError: If JSON parsing, date parsing, model construction, market
-            lookup, or portfolio valuation fails.
-        TypeError: If ``portfolio`` or ``market`` cannot be converted to the
-            expected Rust types.
+    Raises
+    ------
+    ValueError
+        If JSON parsing, date parsing, model construction, market
+        lookup, or portfolio valuation fails.
+    TypeError
+        If ``portfolio`` or ``market`` cannot be converted to the
+        expected Rust types.
     """
     ...
 
@@ -2331,29 +2422,39 @@ def position_what_if(
     changes, then delegates the sensitivity reallocation and result generation
     to Rust.
 
-    Args:
-        portfolio: Portfolio instance or JSON portfolio specification accepted
-            by the compiled portfolio extractor.
-        market: MarketContext instance or JSON market context accepted by the
-            compiled market extractor.
-        factor_model_config_json: JSON-encoded
-            ``finstack_quant_factor_model::FactorModelConfig``.
-        as_of: ISO calculation date, ``YYYY-MM-DD``.
-        changes: List of dictionaries. Remove changes use
-            ``{"kind": "remove", "position_id": "..."}``; resize changes use
-            ``{"kind": "resize", "position_id": "...", "new_quantity": 123.0}``.
-            Add changes are not supported by this JSON-shaped Python helper
-            because adding requires a typed Rust position object.
+    Parameters
+    ----------
+    portfolio : Portfolio or str
+        Portfolio instance or JSON portfolio specification accepted
+        by the compiled portfolio extractor.
+    market : MarketContext or str
+        MarketContext instance or JSON market context accepted by the
+        compiled market extractor.
+    factor_model_config_json : str
+        JSON-encoded ``finstack_quant_factor_model::FactorModelConfig``.
+    as_of : str
+        ISO calculation date, ``YYYY-MM-DD``.
+    changes : list[dict[str, Any]]
+        List of dictionaries. Remove changes use
+        ``{"kind": "remove", "position_id": "..."}``; resize changes use
+        ``{"kind": "resize", "position_id": "...", "new_quantity": 123.0}``.
+        Add changes are not supported by this JSON-shaped Python helper
+        because adding requires a typed Rust position object.
 
-    Returns:
+    Returns
+    -------
+    WhatIfResult
         WhatIfResult with base and scenario risk decomposition deltas.
 
-    Raises:
-        ValueError: If a change kind is unknown, resize omits
-            ``new_quantity``, add is requested, JSON/config parsing fails, or
-            Rust factor-model evaluation fails.
-        TypeError: If ``portfolio`` or ``market`` cannot be converted to the
-            expected Rust types.
+    Raises
+    ------
+    ValueError
+        If a change kind is unknown, resize omits
+        ``new_quantity``, add is requested, JSON/config parsing fails, or
+        Rust factor-model evaluation fails.
+    TypeError
+        If ``portfolio`` or ``market`` cannot be converted to the
+        expected Rust types.
     """
     ...
 
@@ -2368,21 +2469,29 @@ def build_stress_attribution(
     that position's P&L across all scenarios. The binding transposes this into
     Rust's scenario-major buffer before selecting tail scenarios.
 
-    Args:
-        position_ids: Position identifiers, one per row in ``position_pnls``.
-        position_pnls: Matrix shaped ``len(position_ids) x n_scenarios``.
-            Every row must have the same number of finite scenario P&Ls.
-        confidence: Tail confidence level in ``(0.5, 1)``. The Rust engine
-            selects ``floor((1 - confidence) * n_scenarios)`` tail scenarios.
+    Parameters
+    ----------
+    position_ids : list[str]
+        Position identifiers, one per row in ``position_pnls``.
+    position_pnls : list[list[float]]
+        Matrix shaped ``len(position_ids) x n_scenarios``.
+        Every row must have the same number of finite scenario P&Ls.
+    confidence : float, default 0.95
+        Tail confidence level in ``(0.5, 1)``. The Rust engine
+        selects ``floor((1 - confidence) * n_scenarios)`` tail scenarios.
 
-    Returns:
+    Returns
+    -------
+    StressAttribution
         StressAttribution containing VaR threshold, tail scenario count,
         per-position tail contributions, and scenario-level P&L breakdowns.
 
-    Raises:
-        ValueError: If dimensions are inconsistent, confidence is outside
-            ``(0.5, 1)``, the requested tail has zero scenarios, or any P&L is
-            non-finite.
+    Raises
+    ------
+    ValueError
+        If dimensions are inconsistent, confidence is outside
+        ``(0.5, 1)``, the requested tail has zero scenarios, or any P&L is
+        non-finite.
     """
     ...
 
@@ -2397,13 +2506,19 @@ def build_credit_vol_report(
     model hierarchy into generic, level, idiosyncratic, and optional
     per-position volatility contributions.
 
-    Args:
-        decomposition: Factor risk decomposition to summarize.
-        model: Credit factor model whose hierarchy and factor taxonomy label
-            the report levels and buckets.
-        by_position: Include per-position contribution rows when ``True``.
+    Parameters
+    ----------
+    decomposition : RiskDecomposition
+        Factor risk decomposition to summarize.
+    model : CreditFactorModel
+        Credit factor model whose hierarchy and factor taxonomy label
+        the report levels and buckets.
+    by_position : bool, default False
+        Include per-position contribution rows when ``True``.
 
-    Returns:
+    Returns
+    -------
+    CreditVolReport
         CreditVolReport with total, generic, level, idiosyncratic, and optional
         position-level volatility contribution fields.
     """
@@ -3524,9 +3639,10 @@ class SensitivityMatrix:
 
     Construct via :func:`compute_factor_sensitivities`.
 
-    Example:
-        >>> from finstack_quant.portfolio import compute_factor_sensitivities
-        >>> matrix = compute_factor_sensitivities(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import compute_factor_sensitivities
+    >>> matrix = compute_factor_sensitivities(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
     """
 
     @property
@@ -3568,11 +3684,16 @@ class SensitivityMatrix:
     def delta(self, position_idx: int, factor_idx: int) -> float:
         """Read a single sensitivity element.
 
-        Args:
-            position_idx: Row index.
-            factor_idx: Column index.
+        Parameters
+        ----------
+        position_idx : int
+            Row index.
+        factor_idx : int
+            Column index.
 
-        Returns:
+        Returns
+        -------
+        float
             Sensitivity value.
         """
         ...
@@ -3580,10 +3701,14 @@ class SensitivityMatrix:
     def position_deltas(self, position_idx: int) -> list[float]:
         """Sensitivity row for a single position across all factors.
 
-        Args:
-            position_idx: Row index.
+        Parameters
+        ----------
+        position_idx : int
+            Row index.
 
-        Returns:
+        Returns
+        -------
+        list[float]
             List of delta values, one per factor.
         """
         ...
@@ -3591,10 +3716,14 @@ class SensitivityMatrix:
     def factor_deltas(self, factor_idx: int) -> list[float]:
         """Sensitivity column for a single factor across all positions.
 
-        Args:
-            factor_idx: Column index.
+        Parameters
+        ----------
+        factor_idx : int
+            Column index.
 
-        Returns:
+        Returns
+        -------
+        list[float]
             List of delta values, one per position.
         """
         ...
@@ -3602,7 +3731,9 @@ class SensitivityMatrix:
     def to_dataframe(self) -> pd.DataFrame:
         """Export as a pandas DataFrame with positions as rows and factors as columns.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             DataFrame indexed by position IDs with factor IDs as column names.
         """
         ...
@@ -3623,9 +3754,10 @@ class FactorPnlProfile:
 
     Construct via :func:`compute_pnl_profiles`.
 
-    Example:
-        >>> from finstack_quant.portfolio import compute_pnl_profiles
-        >>> profiles = compute_pnl_profiles(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import compute_pnl_profiles
+    >>> profiles = compute_pnl_profiles(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
     """
 
     @property
@@ -3658,15 +3790,21 @@ class FactorPnlProfile:
     def to_dataframe(self, position_ids: list[str]) -> pd.DataFrame:
         """Export as a pandas DataFrame with shifts as rows and positions as columns.
 
-        Args:
-            position_ids: Position identifiers to use as column names.  Must
-                match the number of positions in the profile.
+        Parameters
+        ----------
+        position_ids : list[str]
+            Position identifiers to use as column names.  Must
+            match the number of positions in the profile.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             DataFrame indexed by shift values with position IDs as column names.
 
-        Raises:
-            ValueError: If ``len(position_ids)`` does not match the profile width.
+        Raises
+        ------
+        ValueError
+            If ``len(position_ids)`` does not match the profile width.
         """
         ...
 
@@ -3687,22 +3825,31 @@ def compute_factor_sensitivities(
 ) -> SensitivityMatrix:
     """Compute first-order factor sensitivities using central finite differences.
 
-    Args:
-        positions_json: JSON array of position objects, each with ``id`` (str),
-            ``instrument`` (tagged instrument JSON), and ``weight`` (float).
-        factors_json: JSON array of ``FactorDefinition`` objects.
-        market: ``MarketContext`` instance or JSON string.
-        as_of: Valuation date in ISO 8601 format.
-        bump_config_json: Optional JSON-serialized ``BumpSizeConfig``.
-            Defaults to 1 bp / 1 % per factor type.
+    Parameters
+    ----------
+    positions_json : str
+        JSON array of position objects, each with ``id`` (str),
+        ``instrument`` (tagged instrument JSON), and ``weight`` (float).
+    factors_json : str
+        JSON array of ``FactorDefinition`` objects.
+    market : MarketContext or str
+        ``MarketContext`` instance or JSON string.
+    as_of : str
+        Valuation date in ISO 8601 format.
+    bump_config_json : str, optional
+        Optional JSON-serialized ``BumpSizeConfig``.
+        Defaults to 1 bp / 1 % per factor type.
 
-    Returns:
+    Returns
+    -------
+    SensitivityMatrix
         Positions-by-factors delta matrix.
 
-    Example:
-        >>> from finstack_quant.portfolio import compute_factor_sensitivities
-        >>> matrix = compute_factor_sensitivities(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
-        >>> matrix.to_dataframe()  # doctest: +SKIP
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import compute_factor_sensitivities
+    >>> matrix = compute_factor_sensitivities(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
+    >>> matrix.to_dataframe()  # doctest: +SKIP
     """
     ...
 
@@ -3716,23 +3863,33 @@ def compute_pnl_profiles(
 ) -> list[FactorPnlProfile]:
     """Compute scenario P&L profiles via full repricing across a factor grid.
 
-    Args:
-        positions_json: JSON array of position objects (same schema as
-            :func:`compute_factor_sensitivities`).
-        factors_json: JSON array of ``FactorDefinition`` objects.
-        market: ``MarketContext`` instance or JSON string.
-        as_of: Valuation date in ISO 8601 format.
-        bump_config_json: Optional JSON-serialized ``BumpSizeConfig``.
-        n_scenario_points: Number of scenario grid points
-            (default 5 produces shifts ``[-2, -1, 0, 1, 2]``).
+    Parameters
+    ----------
+    positions_json : str
+        JSON array of position objects (same schema as
+        :func:`compute_factor_sensitivities`).
+    factors_json : str
+        JSON array of ``FactorDefinition`` objects.
+    market : MarketContext or str
+        ``MarketContext`` instance or JSON string.
+    as_of : str
+        Valuation date in ISO 8601 format.
+    bump_config_json : str, optional
+        Optional JSON-serialized ``BumpSizeConfig``.
+    n_scenario_points : int, default 5
+        Number of scenario grid points
+        (default 5 produces shifts ``[-2, -1, 0, 1, 2]``).
 
-    Returns:
+    Returns
+    -------
+    list[FactorPnlProfile]
         One profile per factor, each containing scenario P&L for every position.
 
-    Example:
-        >>> from finstack_quant.portfolio import compute_pnl_profiles
-        >>> profiles = compute_pnl_profiles(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
-        >>> profiles[0].to_dataframe(["bond_1", "equity_1"])  # doctest: +SKIP
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import compute_pnl_profiles
+    >>> profiles = compute_pnl_profiles(pos_json, fac_json, mkt_json, "2025-01-15")  # doctest: +SKIP
+    >>> profiles[0].to_dataframe(["bond_1", "equity_1"])  # doctest: +SKIP
     """
     ...
 
@@ -3748,11 +3905,12 @@ class FactorRiskDecomposition:
     Euler-allocated factor-level contributions, each drillable to per-position
     detail.
 
-    Example:
-        >>> from finstack_quant.portfolio import decompose_factor_risk  # doctest: +SKIP
-        >>> result = decompose_factor_risk(sens, cov_json)  # doctest: +SKIP
-        >>> result.total_risk  # doctest: +SKIP
-        0.042
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import decompose_factor_risk  # doctest: +SKIP
+    >>> result = decompose_factor_risk(sens, cov_json)  # doctest: +SKIP
+    >>> result.total_risk  # doctest: +SKIP
+    0.042
     """
 
     @property
@@ -3788,7 +3946,9 @@ class FactorRiskDecomposition:
         Each dict contains ``factor_id``, ``absolute_risk``, ``relative_risk``,
         and ``marginal_risk``.
 
-        Returns:
+        Returns
+        -------
+        list[dict[str, object]]
             List of per-factor contribution dicts.
         """
         ...
@@ -3799,7 +3959,9 @@ class FactorRiskDecomposition:
         Each dict contains ``position_id``, ``factor_id``, and
         ``risk_contribution``.
 
-        Returns:
+        Returns
+        -------
+        list[dict[str, object]]
             List of per-position, per-factor contribution dicts.
         """
         ...
@@ -3810,7 +3972,9 @@ class FactorRiskDecomposition:
         Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
         ``marginal_risk``.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             DataFrame with one row per factor.
         """
         ...
@@ -3820,7 +3984,9 @@ class FactorRiskDecomposition:
 
         Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             DataFrame with one row per position-factor pair.
         """
         ...
@@ -3843,27 +4009,36 @@ def decompose_factor_risk(
     Uses the parametric (covariance-based) Euler decomposition to attribute
     forecasted portfolio risk across factors and individual positions.
 
-    Args:
-        sensitivities: Weighted position x factor sensitivity matrix, as
-            returned by :func:`compute_factor_sensitivities`.
-        covariance_json: JSON-serialized ``FactorCovarianceMatrix``.  Must use
-            the same factor IDs and ordering as the sensitivity matrix.
-        risk_measure: Risk measure.  Defaults to ``"variance"``.
-            Accepts Python strings (``"variance"``, ``"volatility"``) or dicts
-            (``{"var": {"confidence": 0.99}}``,
-            ``{"expected_shortfall": {"confidence": 0.975}}``).
+    Parameters
+    ----------
+    sensitivities : SensitivityMatrix
+        Weighted position x factor sensitivity matrix, as
+        returned by :func:`compute_factor_sensitivities`.
+    covariance_json : str
+        JSON-serialized ``FactorCovarianceMatrix``.  Must use
+        the same factor IDs and ordering as the sensitivity matrix.
+    risk_measure : str or dict[str, Any] or None, optional
+        Risk measure.  Defaults to ``"variance"``.
+        Accepts Python strings (``"variance"``, ``"volatility"``) or dicts
+        (``{"var": {"confidence": 0.99}}``,
+        ``{"expected_shortfall": {"confidence": 0.975}}``).
 
-    Returns:
+    Returns
+    -------
+    FactorRiskDecomposition
         Portfolio-level risk decomposition with factor and position detail.
 
-    Raises:
-        ValueError: If factor axes do not match or the covariance matrix is
-            invalid.
+    Raises
+    ------
+    ValueError
+        If factor axes do not match or the covariance matrix is
+        invalid.
 
-    Example:
-        >>> from finstack_quant.portfolio import compute_factor_sensitivities, decompose_factor_risk
-        >>> sens = compute_factor_sensitivities(pos, fac, mkt, "2025-01-15")  # doctest: +SKIP
-        >>> result = decompose_factor_risk(sens, cov_json, "volatility")  # doctest: +SKIP
-        >>> result.to_factor_dataframe()  # doctest: +SKIP
+    Examples
+    --------
+    >>> from finstack_quant.portfolio import compute_factor_sensitivities, decompose_factor_risk
+    >>> sens = compute_factor_sensitivities(pos, fac, mkt, "2025-01-15")  # doctest: +SKIP
+    >>> result = decompose_factor_risk(sens, cov_json, "volatility")  # doctest: +SKIP
+    >>> result.to_factor_dataframe()  # doctest: +SKIP
     """
     ...

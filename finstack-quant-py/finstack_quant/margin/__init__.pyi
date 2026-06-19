@@ -799,16 +799,17 @@ class NettingSetId:
     def csa_id(self) -> str | None:
         """CSA identifier when bilateral; ``None`` for cleared sets.
 
+        Returns
+        -------
+        str or None
+            CSA id string, or ``None`` for cleared netting sets.
+
         Examples
         --------
         >>> NettingSetId.bilateral("X", "CSA-001").csa_id
         'CSA-001'
         >>> NettingSetId.cleared("LCH").csa_id is None
         True
-
-        Returns
-        -------
-        str or None
         """
         ...
 
@@ -816,16 +817,17 @@ class NettingSetId:
     def ccp_id(self) -> str | None:
         """CCP identifier when cleared; ``None`` for bilateral sets.
 
+        Returns
+        -------
+        str or None
+            CCP id string, or ``None`` for bilateral netting sets.
+
         Examples
         --------
         >>> NettingSetId.cleared("LCH").ccp_id
         'LCH'
         >>> NettingSetId.bilateral("X", "CSA").ccp_id is None
         True
-
-        Returns
-        -------
-        str or None
         """
         ...
 
@@ -1459,9 +1461,11 @@ class ImResult:
     @property
     def as_of(self) -> str:
         """Calculation date as an ISO 8601 string.
+
         Returns
         -------
         str
+            ISO 8601 date string.
         """
         ...
 
@@ -1751,9 +1755,11 @@ class SimmSensitivities:
     @property
     def base_currency(self) -> str:
         """Currency context in which sensitivity amounts are expressed.
+
         Returns
         -------
         str
+            ISO currency code for sensitivity amounts.
         """
         ...
 
@@ -1787,18 +1793,22 @@ class SimmCalculator:
     @property
     def version(self) -> str:
         """Stable SIMM version label, either ``"v2_5"`` or ``"v2_6"``.
+
         Returns
         -------
         str
+            Normalized SIMM version label.
         """
         ...
 
     @property
     def mpor_days(self) -> int:
         """Margin period of risk in calendar days.
+
         Returns
         -------
         int
+            MPOR in calendar days.
         """
         ...
 
@@ -2346,6 +2356,10 @@ class XvaConfig:
     def validate(self) -> None:
         """Validate configuration parameters.
 
+        Returns
+        -------
+        None
+
         Raises
         ------
         Exception
@@ -2354,10 +2368,6 @@ class XvaConfig:
         Examples
         --------
         >>> XvaConfig().validate()
-
-        Returns
-        -------
-        None
         """
         ...
 
@@ -2556,6 +2566,10 @@ class ExposureProfile:
     def validate(self) -> None:
         """Validate internal consistency.
 
+        Returns
+        -------
+        None
+
         Raises
         ------
         Exception
@@ -2564,10 +2578,6 @@ class ExposureProfile:
         Examples
         --------
         >>> ExposureProfile([0.0], [0.0], [0.0], [0.0]).validate()
-
-        Returns
-        -------
-        None
         """
         ...
 
@@ -3580,35 +3590,102 @@ class FrtbSensitivities:
     def __init__(self, base_currency: str = "USD") -> None: ...
     @staticmethod
     def from_json(json: str) -> FrtbSensitivities:
-        """Construct from a JSON serialization."""
+        """Construct from a JSON serialization.
+
+        Parameters
+        ----------
+        json : str
+            JSON string produced by ``to_json``.
+
+        Returns
+        -------
+        FrtbSensitivities
+            Sensitivity set populated from the JSON payload.
+        """
         ...
 
     def to_json(self) -> str:
         """Serialize to a JSON string.
+
         Returns
         -------
         str
+            JSON serialization of the sensitivity portfolio.
         """
         ...
 
     def add_girr_delta(self, tenor: str, amount: float, currency: str | None = None) -> None:
-        """Add a GIRR delta sensitivity (currency per 1bp)."""
+        """Add a GIRR delta sensitivity (currency per 1bp).
+
+        Parameters
+        ----------
+        tenor : str
+            GIRR tenor bucket, such as ``"5Y"``.
+        amount : float
+            Signed sensitivity amount per 1bp move.
+        currency : str, optional
+            Currency code; defaults to the base currency.
+        """
         ...
 
     def add_csr_delta(self, issuer: str, bucket: int, tenor: str, amount: float) -> None:
-        """Add a CSR (non-securitization) delta sensitivity."""
+        """Add a CSR (non-securitization) delta sensitivity.
+
+        Parameters
+        ----------
+        issuer : str
+            Issuer or reference-entity identifier.
+        bucket : int
+            CSR bucket number.
+        tenor : str
+            Credit tenor bucket.
+        amount : float
+            Signed sensitivity amount per 1bp move.
+        """
         ...
 
     def add_equity_delta(self, underlier: str, bucket: int, amount: float) -> None:
-        """Add an equity delta sensitivity."""
+        """Add an equity delta sensitivity.
+
+        Parameters
+        ----------
+        underlier : str
+            Equity underlier or index identifier.
+        bucket : int
+            Equity bucket number.
+        amount : float
+            Signed sensitivity amount per 1bp move.
+        """
         ...
 
     def add_fx_delta(self, ccy1: str, ccy2: str, amount: float) -> None:
-        """Add an FX delta sensitivity for the pair (ccy1, ccy2)."""
+        """Add an FX delta sensitivity for the pair (ccy1, ccy2).
+
+        Parameters
+        ----------
+        ccy1 : str
+            First currency in the FX pair.
+        ccy2 : str
+            Second currency in the FX pair.
+        amount : float
+            Signed sensitivity amount per 1bp move.
+        """
         ...
 
     def add_commodity_delta(self, name: str, bucket: int, tenor: str, amount: float) -> None:
-        """Add a commodity delta sensitivity."""
+        """Add a commodity delta sensitivity.
+
+        Parameters
+        ----------
+        name : str
+            Commodity identifier.
+        bucket : int
+            Commodity bucket number.
+        tenor : str
+            Commodity tenor bucket.
+        amount : float
+            Signed sensitivity amount per 1bp move.
+        """
         ...
 
     def add_girr_vega(
@@ -3618,50 +3695,156 @@ class FrtbSensitivities:
         amount: float,
         currency: str | None = None,
     ) -> None:
-        """Add a GIRR vega sensitivity."""
+        """Add a GIRR vega sensitivity.
+
+        Parameters
+        ----------
+        option_maturity : str
+            Option maturity bucket.
+        underlying_tenor : str
+            Underlying tenor bucket.
+        amount : float
+            Signed vega amount.
+        currency : str, optional
+            Currency code; defaults to the base currency.
+        """
         ...
 
     def add_equity_vega(self, underlier: str, bucket: int, maturity: str, amount: float) -> None:
-        """Add an equity vega sensitivity."""
+        """Add an equity vega sensitivity.
+
+        Parameters
+        ----------
+        underlier : str
+            Equity underlier or index identifier.
+        bucket : int
+            Equity bucket number.
+        maturity : str
+            Option maturity bucket.
+        amount : float
+            Signed vega amount.
+        """
         ...
 
     def add_fx_vega(self, ccy1: str, ccy2: str, maturity: str, amount: float) -> None:
-        """Add an FX vega sensitivity."""
+        """Add an FX vega sensitivity.
+
+        Parameters
+        ----------
+        ccy1 : str
+            First currency in the FX pair.
+        ccy2 : str
+            Second currency in the FX pair.
+        maturity : str
+            Option maturity bucket.
+        amount : float
+            Signed vega amount.
+        """
         ...
 
     def add_girr_curvature(self, cvr_up: float, cvr_down: float, currency: str | None = None) -> None:
-        """Add a GIRR curvature sensitivity."""
+        """Add a GIRR curvature sensitivity.
+
+        Parameters
+        ----------
+        cvr_up : float
+            Curvature sensitivity for upward shock.
+        cvr_down : float
+            Curvature sensitivity for downward shock.
+        currency : str, optional
+            Currency code; defaults to the base currency.
+        """
         ...
 
     def add_equity_curvature(self, underlier: str, bucket: int, cvr_up: float, cvr_down: float) -> None:
-        """Add an equity curvature sensitivity."""
+        """Add an equity curvature sensitivity.
+
+        Parameters
+        ----------
+        underlier : str
+            Equity underlier or index identifier.
+        bucket : int
+            Equity bucket number.
+        cvr_up : float
+            Curvature sensitivity for upward shock.
+        cvr_down : float
+            Curvature sensitivity for downward shock.
+        """
         ...
 
     def add_fx_curvature(self, ccy1: str, ccy2: str, cvr_up: float, cvr_down: float) -> None:
-        """Add an FX curvature sensitivity."""
+        """Add an FX curvature sensitivity.
+
+        Parameters
+        ----------
+        ccy1 : str
+            First currency in the FX pair.
+        ccy2 : str
+            Second currency in the FX pair.
+        cvr_up : float
+            Curvature sensitivity for upward shock.
+        cvr_down : float
+            Curvature sensitivity for downward shock.
+        """
         ...
 
     def add_rrao_position(self, instrument_id: str, notional: float, is_exotic: bool = False) -> None:
-        """Add a Residual Risk Add-On position."""
+        """Add a Residual Risk Add-On position.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Instrument identifier.
+        notional : float
+            Notional amount for the RRAO position.
+        is_exotic : bool, default False
+            Whether the instrument is exotic (higher RRAO weight).
+        """
         ...
 
     @property
     def base_currency(self) -> str:
         """Base / reporting currency code.
+
         Returns
         -------
         str
+            ISO currency code for FRTB reporting.
         """
         ...
 
     def __repr__(self) -> str: ...
 
 class FrtbSbaEngine:
-    """FRTB SBA engine matching the canonical Rust API."""
+    """FRTB SBA engine matching the canonical Rust API.
+
+    Calculates the Sensitivity-Based Approach capital charge under one or more
+    correlation scenarios per BCBS d457.
+
+    Parameters
+    ----------
+    correlation_scenario : str or None, optional
+        If provided (``"low"``, ``"medium"``, or ``"high"``), only that
+        scenario is evaluated. Otherwise all three are run.
+    """
 
     def __init__(self, correlation_scenario: str | None = None) -> None: ...
     def calculate(self, sensitivities: FrtbSensitivities) -> tuple[float, dict[str, Any]]:
-        """Calculate the FRTB SBA charge for a sensitivity portfolio."""
+        """Calculate the FRTB SBA charge for a sensitivity portfolio.
+
+        Parameters
+        ----------
+        sensitivities : FrtbSensitivities
+            Portfolio of FRTB sensitivities (delta, vega, curvature, DRC, RRAO).
+
+        Returns
+        -------
+        tuple[float, dict[str, Any]]
+            ``(total_charge, breakdown)`` where ``breakdown`` has keys
+            ``delta``, ``vega``, ``curvature`` (each dict of risk class -> charge),
+            plus ``drc``, ``rrao``, ``binding_scenario``, and
+            ``scenario_charges``.
+        """
         ...
 
 class SaCcrTrade:
@@ -3707,29 +3890,82 @@ class SaCcrTrade:
     ) -> None: ...
     @staticmethod
     def from_json(json: str) -> SaCcrTrade:
-        """Construct from a JSON serialization."""
+        """Construct from a JSON serialization.
+
+        Parameters
+        ----------
+        json : str
+            JSON string produced by ``to_json``.
+
+        Returns
+        -------
+        SaCcrTrade
+            Parsed trade.
+        """
         ...
 
     def to_json(self) -> str:
         """Serialize to a JSON string.
+
         Returns
         -------
         str
+            JSON serialization of the trade.
         """
         ...
 
     @property
-    def trade_id(self) -> str: ...
+    def trade_id(self) -> str:
+        """Unique trade identifier.
+
+        Returns
+        -------
+        str
+            Trade id string.
+        """
+        ...
+
     @property
-    def asset_class(self) -> str: ...
+    def asset_class(self) -> str:
+        """Asset class label.
+
+        Returns
+        -------
+        str
+            One of ``"ir"``, ``"fx"``, ``"credit"``, ``"equity"``, ``"commodity"``.
+        """
+        ...
+
     @property
-    def notional(self) -> float: ...
+    def notional(self) -> float:
+        """Adjusted notional in reporting currency.
+
+        Returns
+        -------
+        float
+            Notional amount.
+        """
+        ...
+
     @property
-    def mtm(self) -> float: ...
+    def mtm(self) -> float:
+        """Current mark-to-market value.
+
+        Returns
+        -------
+        float
+            MtM value.
+        """
+        ...
     def __repr__(self) -> str: ...
 
 class SaCcrNettingSetConfig:
-    """SA-CCR netting-set configuration with explicit valuation date."""
+    """SA-CCR netting-set configuration with explicit valuation date.
+
+    Parameters
+    ----------
+    (Use ``un margined`` or ``margined`` factories.)
+    """
 
     @staticmethod
     def unmargined(
@@ -3739,7 +3975,31 @@ class SaCcrNettingSetConfig:
         as_of_year: int,
         as_of_month: int,
         as_of_day: int,
-    ) -> SaCcrNettingSetConfig: ...
+    ) -> SaCcrNettingSetConfig:
+        """Create an unmargined netting-set configuration.
+
+        Parameters
+        ----------
+        counterparty_id : str
+            Counterparty identifier.
+        csa_id : str
+            CSA agreement identifier.
+        collateral : float
+            Net collateral currently held.
+        as_of_year : int
+            Valuation year.
+        as_of_month : int
+            Valuation month (1–12).
+        as_of_day : int
+            Valuation day.
+
+        Returns
+        -------
+        SaCcrNettingSetConfig
+            Unmargined netting-set config.
+        """
+        ...
+
     @staticmethod
     def margined(
         counterparty_id: str,
@@ -3752,31 +4012,114 @@ class SaCcrNettingSetConfig:
         as_of_year: int,
         as_of_month: int,
         as_of_day: int,
-    ) -> SaCcrNettingSetConfig: ...
+    ) -> SaCcrNettingSetConfig:
+        """Create a margined netting-set configuration.
+
+        Parameters
+        ----------
+        counterparty_id : str
+            Counterparty identifier.
+        csa_id : str
+            CSA agreement identifier.
+        collateral : float
+            Net collateral currently held.
+        threshold : float
+            Threshold below which no collateral is required.
+        mta : float
+            Minimum transfer amount.
+        nica : float
+            Net independent collateral amount.
+        mpor_days : int
+            Margin period of risk in calendar days.
+        as_of_year : int
+            Valuation year.
+        as_of_month : int
+            Valuation month (1–12).
+        as_of_day : int
+            Valuation day.
+
+        Returns
+        -------
+        SaCcrNettingSetConfig
+            Margined netting-set config.
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> SaCcrNettingSetConfig:
-        """Construct from a JSON serialization."""
+        """Construct from a JSON serialization.
+
+        Parameters
+        ----------
+        json : str
+            JSON string produced by ``to_json``.
+
+        Returns
+        -------
+        SaCcrNettingSetConfig
+            Parsed netting-set config.
+        """
         ...
 
     def to_json(self) -> str:
         """Serialize to a JSON string.
+
         Returns
         -------
         str
+            JSON serialization of the netting-set config.
         """
         ...
 
     @property
-    def is_margined(self) -> bool: ...
+    def is_margined(self) -> bool:
+        """Whether the netting set is margined.
+
+        Returns
+        -------
+        bool
+            True if subject to daily margin agreement.
+        """
+        ...
+
     @property
-    def collateral(self) -> float: ...
+    def collateral(self) -> float:
+        """Net collateral currently held.
+
+        Returns
+        -------
+        float
+            Collateral amount.
+        """
+        ...
 
 class SaCcrEngine:
-    """SA-CCR EAD engine matching the canonical Rust API."""
+    """SA-CCR EAD engine matching the canonical Rust API.
+
+    Parameters
+    ----------
+    alpha : float or None, optional
+        Supervisory alpha factor; defaults to 1.4 when ``None``.
+    reporting_currency : str, default "USD"
+        ISO currency code for EAD reporting.
+    """
 
     def __init__(self, alpha: float | None = None, reporting_currency: str = "USD") -> None: ...
     def calculate_ead(self, config: SaCcrNettingSetConfig, trades: list[SaCcrTrade]) -> dict[str, Any]:
-        """Calculate SA-CCR EAD for a netting set and trade list."""
+        """Calculate SA-CCR EAD for a netting set and trade list.
+
+        Parameters
+        ----------
+        config : SaCcrNettingSetConfig
+            Netting-set configuration with valuation date and collateral.
+        trades : list[SaCcrTrade]
+            Derivative trades in the netting set.
+
+        Returns
+        -------
+        dict[str, Any]
+            EAD breakdown including replacement cost, PFE, and total EAD.
+        """
         ...
 
 def frtb_sba_charge(

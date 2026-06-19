@@ -288,46 +288,46 @@ class ValuationResult:
 
     Instantiate via :meth:`from_json` or the ``price_*`` helpers that emit JSON.
 
-    Args:
-        None (use ``from_json``).
-
-    Returns:
-        A ``ValuationResult`` instance (type description only).
-
-    Example:
-        >>> from finstack_quant.valuations import ValuationResult
-        >>> ValuationResult.from_json(result_json)  # doctest: +SKIP
+    Examples
+    --------
+    >>> from finstack_quant.valuations import ValuationResult
+    >>> ValuationResult.from_json(result_json)  # doctest: +SKIP
     """
 
     @staticmethod
     def from_json(json: str) -> ValuationResult:
         """Deserialize a ``ValuationResult`` from JSON.
 
-        Args:
-            json: JSON string produced by the pricing pipeline or ``to_json``.
+        Parameters
+        ----------
+        json : str
+            JSON string produced by the pricing pipeline or ``to_json``.
 
-        Returns:
+        Returns
+        -------
+        ValuationResult
             Parsed ``ValuationResult`` instance.
 
-        Example:
-            >>> from finstack_quant.valuations import ValuationResult
-            >>> ValuationResult.from_json('{"instrument_id":"x","value":{}}')  # doctest: +SKIP
+        Examples
+        --------
+        >>> from finstack_quant.valuations import ValuationResult
+        >>> ValuationResult.from_json('{"instrument_id":"x","value":{}}')  # doctest: +SKIP
         """
         ...
 
     def to_json(self) -> str:
         """Serialize this result to pretty-printed JSON.
 
-        Args:
-            (none)
-
-        Returns:
+        Returns
+        -------
+        str
             Pretty-printed JSON string.
 
-        Example:
-            >>> ValuationResult.from_json(
-            ...     '{"instrument_id":"i","value":{"amount":1.0,"currency":"USD"},"measures":{}}'
-            ... ).to_json()  # doctest: +SKIP
+        Examples
+        --------
+        >>> ValuationResult.from_json(
+        ...     '{"instrument_id":"i","value":{"amount":1.0,"currency":"USD"},"measures":{}}'
+        ... ).to_json()  # doctest: +SKIP
             ''
         """
         ...
@@ -336,16 +336,16 @@ class ValuationResult:
     def instrument_id(self) -> str:
         """Instrument identifier assigned by the pricer.
 
-        Args:
-            None (read-only property).
-
-        Returns:
+        Returns
+        -------
+        str
             Instrument ID string.
 
-        Example:
-            >>> vr = ValuationResult.from_json("{}")  # doctest: +SKIP
-            >>> vr.instrument_id  # doctest: +SKIP
-            ''
+        Examples
+        --------
+        >>> vr = ValuationResult.from_json("{}")  # doctest: +SKIP
+        >>> vr.instrument_id  # doctest: +SKIP
+        ''
         """
         ...
 
@@ -353,16 +353,16 @@ class ValuationResult:
     def price(self) -> float:
         """Present value amount (NPV).
 
-        Args:
-            None (read-only property).
-
-        Returns:
+        Returns
+        -------
+        float
             PV amount as a float.
 
-        Example:
-            >>> vr = ValuationResult.from_json("{}")  # doctest: +SKIP
-            >>> vr.price  # doctest: +SKIP
-            0.0
+        Examples
+        --------
+        >>> vr = ValuationResult.from_json("{}")  # doctest: +SKIP
+        >>> vr.price  # doctest: +SKIP
+        0.0
         """
         ...
 
@@ -370,101 +370,106 @@ class ValuationResult:
     def currency(self) -> str:
         """Currency code for the present value.
 
-        Args:
-            None (read-only property).
-
-        Returns:
+        Returns
+        -------
+        str
             Currency code string.
 
-        Example:
-            >>> vr = ValuationResult.from_json("{}")  # doctest: +SKIP
-            >>> vr.currency  # doctest: +SKIP
-            'USD'
+        Examples
+        --------
+        >>> vr = ValuationResult.from_json("{}")  # doctest: +SKIP
+        >>> vr.currency  # doctest: +SKIP
+        'USD'
         """
         ...
 
     def get_metric(self, key: str) -> float | None:
         """Return a scalar risk measure by string key.
 
-        Args:
-            key: Metric identifier (e.g. ``"ytm"``, ``"dv01"``).
+        Parameters
+        ----------
+        key : str
+            Metric identifier (e.g. ``"ytm"``, ``"dv01"``).
 
-        Returns:
+        Returns
+        -------
+        float or None
             Metric value, or ``None`` if missing.
 
-        Example:
-            >>> vr = ValuationResult.from_json(
-            ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
-            ... )  # doctest: +SKIP
-            >>> vr.get_metric("ytm")  # doctest: +SKIP
+        Examples
+        --------
+        >>> vr = ValuationResult.from_json(
+        ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
+        ... )  # doctest: +SKIP
+        >>> vr.get_metric("ytm")  # doctest: +SKIP
         """
         ...
 
     def metric_keys(self) -> list[str]:
         """List metric keys present on this result.
 
-        Args:
-            (none)
-
-        Returns:
+        Returns
+        -------
+        list[str]
             All measure keys as strings.
 
-        Example:
-            >>> ValuationResult.from_json(
-            ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
-            ... ).metric_keys()  # doctest: +SKIP
-            []
+        Examples
+        --------
+        >>> ValuationResult.from_json(
+        ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
+        ... ).metric_keys()  # doctest: +SKIP
+        []
         """
         ...
 
     def metric_count(self) -> int:
         """Count of measures stored on this result.
 
-        Args:
-            (none)
-
-        Returns:
+        Returns
+        -------
+        int
             Number of entries in the measures map.
 
-        Example:
-            >>> ValuationResult.from_json(
-            ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
-            ... ).metric_count()  # doctest: +SKIP
-            0
+        Examples
+        --------
+        >>> ValuationResult.from_json(
+        ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
+        ... ).metric_count()  # doctest: +SKIP
+        0
         """
         ...
 
     def all_covenants_passed(self) -> bool:
         """Whether every covenant passed (or none were evaluated).
 
-        Args:
-            (none)
-
-        Returns:
+        Returns
+        -------
+        bool
             ``True`` if no covenant failures are recorded.
 
-        Example:
-            >>> ValuationResult.from_json(
-            ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
-            ... ).all_covenants_passed()  # doctest: +SKIP
-            True
+        Examples
+        --------
+        >>> ValuationResult.from_json(
+        ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
+        ... ).all_covenants_passed()  # doctest: +SKIP
+        True
         """
         ...
 
     def failed_covenants(self) -> list[str]:
         """Covenant IDs that failed, if any.
 
-        Args:
-            (none)
-
-        Returns:
+        Returns
+        -------
+        list[str]
             List of failed covenant identifiers.
 
-        Example:
-            >>> ValuationResult.from_json(
-            ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
-            ... ).failed_covenants()  # doctest: +SKIP
-            []
+        Examples
+        --------
+        >>> ValuationResult.from_json(
+        ...     '{"instrument_id":"i","value":{"amount":1,"currency":"USD"},"measures":{}}'
+        ... ).failed_covenants()  # doctest: +SKIP
+        []
         """
         ...
 
@@ -475,37 +480,45 @@ class ValuationResult:
         column per metric key.  Useful for stacking multiple results with
         ``pd.concat``.
 
-        Returns:
-            Single-row DataFrame.
+        Returns
+        -------
+        pd.DataFrame
+            Single-row DataFrame with one column per metric.
         """
         ...
 
     def __repr__(self) -> str:
         """Return a concise debug string for this result.
 
-        Args:
-            None (uses ``self``).
-
-        Returns:
+        Returns
+        -------
+        str
             ``ValuationResult(id=..., price=..., currency=..., metrics=...)`` text.
 
-        Example:
-            >>> repr(ValuationResult.from_json("{}"))  # doctest: +SKIP
-            ''
+        Examples
+        --------
+        >>> repr(ValuationResult.from_json("{}"))  # doctest: +SKIP
+        ''
         """
         ...
 
 def validate_instrument_json(json: str) -> str:
     """Validate tagged instrument JSON and return canonical pretty-printed JSON.
 
-    Args:
-        json: Raw tagged instrument JSON string.
+    Parameters
+    ----------
+    json : str
+        Raw tagged instrument JSON string.
 
-    Returns:
+    Returns
+    -------
+    str
         Canonical, pretty-printed JSON suitable for :func:`price_instrument`.
 
-    Raises:
-        ValueError: If the instrument JSON is invalid.
+    Raises
+    ------
+    ValueError
+        If the instrument JSON is invalid.
     """
     ...
 
@@ -517,14 +530,21 @@ def price_instrument(
 ) -> str:
     """Price an instrument from tagged JSON, returning a ``ValuationResult`` JSON.
 
-    Args:
-        instrument_json: Tagged instrument JSON.
-        market: ``MarketContext`` instance or JSON string.
-        as_of: ISO 8601 valuation date.
-        model: Model key (e.g. ``"default"``, ``"discounting"``,
-            ``"hazard_rate"``, ``"black76"``).
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged instrument JSON.
+    market : MarketContext or str
+        ``MarketContext`` instance or JSON string.
+    as_of : str
+        ISO 8601 valuation date.
+    model : str, default "default"
+        Model key (e.g. ``"default"``, ``"discounting"``,
+        ``"hazard_rate"``, ``"black76"``).
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``ValuationResult``.
     """
     ...
@@ -540,18 +560,28 @@ def price_instrument_with_metrics(
 ) -> str:
     """Price an instrument with explicit metric requests.
 
-    Args:
-        instrument_json: Tagged instrument JSON.
-        market: ``MarketContext`` instance or JSON string.
-        as_of: ISO 8601 valuation date.
-        model: Model key string.
-        metrics: Metric identifiers to compute (e.g.
-            ``["ytm", "dv01", "modified_duration"]``).
-        pricing_options: Optional JSON string of ``MetricPricingOverrides``.
-        market_history: Optional JSON string of ``MarketHistory`` scenarios
-            required by ``hvar`` and ``expected_shortfall`` metrics.
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged instrument JSON.
+    market : MarketContext or str
+        ``MarketContext`` instance or JSON string.
+    as_of : str
+        ISO 8601 valuation date.
+    model : str, default "default"
+        Model key string.
+    metrics : list[str], default []
+        Metric identifiers to compute (e.g.
+        ``["ytm", "dv01", "modified_duration"]``).
+    pricing_options : str, optional
+        Optional JSON string of ``MetricPricingOverrides``.
+    market_history : str, optional
+        Optional JSON string of ``MarketHistory`` scenarios
+        required by ``hvar`` and ``expected_shortfall`` metrics.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``ValuationResult`` including requested metrics.
     """
     ...
@@ -559,7 +589,9 @@ def price_instrument_with_metrics(
 def list_standard_metrics() -> list[str]:
     """Return all metric IDs in the standard metric registry (sorted).
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Sorted list of fully qualified metric keys (e.g.
         ``"bucketed_dv01::USD-OIS::10y"``, ``"cs01::BOND_A"``).
     """
@@ -568,7 +600,9 @@ def list_standard_metrics() -> list[str]:
 def list_standard_metrics_grouped() -> dict[str, list[str]]:
     """Return standard metrics organized by human-readable group name.
 
-    Returns:
+    Returns
+    -------
+    dict[str, list[str]]
         Mapping from group label (e.g. ``"Rates sensitivities"``) to sorted
         metric ID lists for that group.
     """
@@ -586,20 +620,29 @@ def instrument_cashflows_json(
     ``total_pv`` reconciles with the instrument's ``base_value`` for the
     supported model-instrument pairs.
 
-    Args:
-        instrument_json: Tagged instrument JSON.
-        market: ``MarketContext`` instance or JSON string.
-        as_of: ISO 8601 valuation date.
-        model: ``"discounting"`` (DF only) or ``"hazard_rate"`` (adds
-            survival probability, conditional default probability, and
-            recovery-adjusted principal PV).
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged instrument JSON.
+    market : MarketContext or str
+        ``MarketContext`` instance or JSON string.
+    as_of : str
+        ISO 8601 valuation date.
+    model : str, default "discounting"
+        ``"discounting"`` (DF only) or ``"hazard_rate"`` (adds
+        survival probability, conditional default probability, and
+        recovery-adjusted principal PV).
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``InstrumentCashflowEnvelope``.
 
-    Raises:
-        ValueError: If ``model`` is unsupported or the instrument type isn't
-            priced under that model.
+    Raises
+    ------
+    ValueError
+        If ``model`` is unsupported or the instrument type isn't
+        priced under that model.
     """
     ...
 
@@ -617,7 +660,9 @@ def instrument_cashflows(
     ``datetime64``. See :func:`instrument_cashflows_json` for argument and
     error semantics.
 
-    Returns:
+    Returns
+    -------
+    tuple[dict[str, Any], pd.DataFrame]
         ``(envelope, df)`` where ``envelope`` is the parsed dict and ``df``
         carries one row per flow with columns ``date``, ``amount``,
         ``currency``, ``kind``, ``accrual_factor``, ``year_fraction``,
@@ -639,22 +684,27 @@ class CalibrationResult:
     and overall success status.  Construct via :func:`calibrate` or
     :meth:`from_json`.
 
-    Example:
-        >>> import json
-        >>> from finstack_quant.valuations import calibrate
-        >>> result = calibrate(json.dumps(plan))  # doctest: +SKIP
-        >>> result.success  # doctest: +SKIP
-        True
+    Examples
+    --------
+    >>> import json
+    >>> from finstack_quant.valuations import calibrate
+    >>> result = calibrate(json.dumps(plan))  # doctest: +SKIP
+    >>> result.success  # doctest: +SKIP
+    True
     """
 
     @staticmethod
     def from_json(json: str) -> CalibrationResult:
         """Deserialize a ``CalibrationResult`` from JSON.
 
-        Args:
-            json: JSON string (a ``CalibrationResultEnvelope``).
+        Parameters
+        ----------
+        json : str
+            JSON string (a ``CalibrationResultEnvelope``).
 
-        Returns:
+        Returns
+        -------
+        CalibrationResult
             Parsed ``CalibrationResult`` instance.
         """
         ...
@@ -662,62 +712,118 @@ class CalibrationResult:
     def to_json(self) -> str:
         """Serialize to pretty-printed JSON.
 
-        Returns:
+        Returns
+        -------
+        str
             Pretty-printed JSON string.
         """
         ...
 
     @property
     def success(self) -> bool:
-        """Whether the overall calibration succeeded (all steps passed)."""
+        """Whether the overall calibration succeeded (all steps passed).
+
+        Returns
+        -------
+        bool
+            ``True`` if all steps passed.
+        """
         ...
 
     @property
     def market(self) -> MarketContext:
-        """The calibrated ``MarketContext`` containing all produced curves."""
+        """The calibrated ``MarketContext`` containing all produced curves.
+
+        Returns
+        -------
+        MarketContext
+            Live market context ready for pricing and attribution.
+        """
         ...
 
     @property
     def market_json(self) -> str:
-        """The calibrated market serialized as a JSON string."""
+        """The calibrated market serialized as a JSON string.
+
+        Returns
+        -------
+        str
+            JSON snapshot of the calibrated market.
+        """
         ...
 
     @property
     def report_json(self) -> str:
-        """The aggregated calibration report as a JSON string."""
+        """The aggregated calibration report as a JSON string.
+
+        Returns
+        -------
+        str
+            JSON-serialized calibration report.
+        """
         ...
 
     @property
     def step_ids(self) -> list[str]:
-        """List of step identifiers that were executed."""
+        """List of step identifiers that were executed.
+
+        Returns
+        -------
+        list[str]
+            Step IDs in declared order.
+        """
         ...
 
     @property
     def iterations(self) -> int:
-        """Total solver iterations across all steps."""
+        """Total solver iterations across all steps.
+
+        Returns
+        -------
+        int
+            Sum of solver iterations.
+        """
         ...
 
     @property
     def max_residual(self) -> float:
-        """Maximum absolute residual across all steps."""
+        """Maximum absolute residual across all steps.
+
+        Returns
+        -------
+        float
+            Largest absolute residual.
+        """
         ...
 
     @property
     def rmse(self) -> float:
-        """Root mean square error across all steps."""
+        """Root mean square error across all steps.
+
+        Returns
+        -------
+        float
+            RMSE of all step residuals.
+        """
         ...
 
     def step_report_json(self, step_id: str) -> str:
         """Per-step calibration report as a JSON string.
 
-        Args:
-            step_id: Identifier of the calibration step.
+        Parameters
+        ----------
+        step_id : str
+            Identifier of the calibration step.
 
-        Returns:
+        Returns
+        -------
+        str
             JSON-serialized calibration report for the step.
 
-        Raises:
-            ValueError: If no step with the given *step_id* exists.
+        Raises
+        ------
+        ValueError
+            If no step with the given *step_id* exists.
         """
         ...
 
@@ -727,7 +833,9 @@ class CalibrationResult:
         Columns: ``step_id``, ``success``, ``iterations``, ``max_residual``,
         ``rmse``, ``convergence_reason``.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             DataFrame with one row per calibration step.
         """
         ...
@@ -740,15 +848,19 @@ class CalibrationEnvelopeError(RuntimeError):
     Inherits from :class:`RuntimeError`, so existing ``except RuntimeError``
     callers continue to catch it (backward-compatible with pre-Phase-4 code).
 
-    Attributes:
-        kind: Snake-case discriminator for the failure category. One of
-            ``"json_parse"``, ``"unknown_step_kind"``, ``"missing_dependency"``,
-            ``"undefined_quote_set"``, ``"quote_class_mismatch"``,
-            ``"solver_not_converged"``, ``"quote_data_invalid"``.
-        step_id: Identifier of the offending step, when applicable. ``None``
-            for ``"json_parse"``.
-        details: JSON-serialized structured payload (see ``EnvelopeError``
-            in the Rust crate for the schema).
+    Attributes
+    ----------
+    kind : str
+        Snake-case discriminator for the failure category. One of
+        ``"json_parse"``, ``"unknown_step_kind"``, ``"missing_dependency"``,
+        ``"undefined_quote_set"``, ``"quote_class_mismatch"``,
+        ``"solver_not_converged"``, ``"quote_data_invalid"``.
+    step_id : str or None
+        Identifier of the offending step, when applicable. ``None``
+        for ``"json_parse"``.
+    details : str
+        JSON-serialized structured payload (see ``EnvelopeError``
+        in the Rust crate for the schema).
     """
 
     kind: str
@@ -758,20 +870,27 @@ class CalibrationEnvelopeError(RuntimeError):
 def validate_calibration_json(json: str) -> str:
     """Validate a calibration plan JSON and return canonical pretty-printed form.
 
-    Args:
-        json: JSON-serialized ``CalibrationEnvelope``.
+    Parameters
+    ----------
+    json : str
+        JSON-serialized ``CalibrationEnvelope``.
 
-    Returns:
+    Returns
+    -------
+    str
         Canonical pretty-printed JSON.
 
-    Raises:
-        CalibrationEnvelopeError: If the JSON is not a valid calibration
-            envelope. Inherits from :class:`RuntimeError`.
+    Raises
+    ------
+    CalibrationEnvelopeError
+        If the JSON is not a valid calibration envelope. Inherits from
+        :class:`RuntimeError`.
 
-    Example:
-        >>> from finstack_quant.valuations import validate_calibration_json
-        >>> validate_calibration_json(plan_json)  # doctest: +SKIP
-        ''
+    Examples
+    --------
+    >>> from finstack_quant.valuations import validate_calibration_json
+    >>> validate_calibration_json(plan_json)  # doctest: +SKIP
+    ''
     """
     ...
 
@@ -784,39 +903,52 @@ def dry_run(json: str) -> str:
     Microseconds — suitable as a fast pre-flight check before invoking
     :func:`calibrate`.
 
-    Args:
-        json: JSON-serialized ``CalibrationEnvelope``.
+    Parameters
+    ----------
+    json : str
+        JSON-serialized ``CalibrationEnvelope``.
 
-    Returns:
+    Returns
+    -------
+    str
         Pretty-printed JSON ``ValidationReport``. Inspect ``report["errors"]``
         for any structural problems and ``report["dependency_graph"]`` for the
         step DAG.
 
-    Raises:
-        CalibrationEnvelopeError: If the envelope JSON is malformed.
+    Raises
+    ------
+    CalibrationEnvelopeError
+        If the envelope JSON is malformed.
 
-    Example:
-        >>> import json as _json
-        >>> from finstack_quant.valuations import dry_run
-        >>> report = _json.loads(dry_run(_json.dumps(envelope)))  # doctest: +SKIP
-        >>> for err in report["errors"]:  # doctest: +SKIP
-        ...     print(err["kind"], err.get("step_id"))
+    Examples
+    --------
+    >>> import json as _json
+    >>> from finstack_quant.valuations import dry_run
+    >>> report = _json.loads(dry_run(_json.dumps(envelope)))  # doctest: +SKIP
+    >>> for err in report["errors"]:  # doctest: +SKIP
+    ...     print(err["kind"], err.get("step_id"))
     """
     ...
 
 def dependency_graph_json(json: str) -> str:
     """Dump the static dependency graph of a calibration plan as JSON.
 
-    Args:
-        json: JSON-serialized ``CalibrationEnvelope``.
+    Parameters
+    ----------
+    json : str
+        JSON-serialized ``CalibrationEnvelope``.
 
-    Returns:
+    Returns
+    -------
+    str
         Pretty-printed JSON ``DependencyGraph`` with ``initial_ids`` (curve
         IDs available at execution start, sourced from ``prior_market``)
         and ``nodes`` (per-step ``reads``/``writes`` in declared order).
 
-    Raises:
-        CalibrationEnvelopeError: If the envelope JSON is malformed.
+    Raises
+    ------
+    CalibrationEnvelopeError
+        If the envelope JSON is malformed.
     """
     ...
 
@@ -839,42 +971,49 @@ def calibrate(json: str) -> CalibrationResult:
     - ``prior_market`` — pre-built curves and surfaces from a prior
       calibration, layered in before steps execute.
 
-    Args:
-        json: JSON-serialized ``CalibrationEnvelope`` (schema string is
-            ``"finstack_quant.calibration"``).
+    Parameters
+    ----------
+    json : str
+        JSON-serialized ``CalibrationEnvelope`` (schema string is
+        ``"finstack_quant.calibration"``).
 
-    Returns:
+    Returns
+    -------
+    CalibrationResult
         :class:`CalibrationResult` with:
-            - ``.market`` — the live :class:`MarketContext` (use this for
-              pricing, attribution, scenarios, portfolio).
-            - ``.market_json`` — same context as a JSON snapshot for
-              persistence or comparison.
-            - ``.report_json`` / ``.step_report_json(id)`` /
-              ``.report_to_dataframe()`` — diagnostics. Always check
-              ``.success`` and ``.rmse`` before relying on the produced market.
-            - ``.iterations``, ``.max_residual``, ``.step_ids`` — summary stats.
+        - ``.market`` — the live :class:`MarketContext` (use this for
+          pricing, attribution, scenarios, portfolio).
+        - ``.market_json`` — same context as a JSON snapshot for
+          persistence or comparison.
+        - ``.report_json`` / ``.step_report_json(id)`` /
+          ``.report_to_dataframe()`` — diagnostics. Always check
+          ``.success`` and ``.rmse`` before relying on the produced market.
+        - ``.iterations``, ``.max_residual``, ``.step_ids`` — summary stats.
 
-    Raises:
-        CalibrationEnvelopeError: If the JSON is malformed or calibration
-            fails (e.g., missing dependency, solver non-convergence). The
-            exception carries ``kind``, ``step_id``, and ``details``
-            attributes for programmatic handling. Inherits from
-            :class:`RuntimeError` so legacy ``except RuntimeError`` handlers
-            continue to catch it.
+    Raises
+    ------
+    CalibrationEnvelopeError
+        If the JSON is malformed or calibration fails (e.g., missing
+        dependency, solver non-convergence). The exception carries ``kind``,
+        ``step_id``, and ``details`` attributes for programmatic handling.
+        Inherits from :class:`RuntimeError` so legacy ``except RuntimeError``
+        handlers continue to catch it.
 
-    Example:
-        >>> import json as _json
-        >>> from finstack_quant.valuations import calibrate
-        >>> result = calibrate(_json.dumps(envelope))  # doctest: +SKIP
-        >>> assert result.success and result.rmse < 1e-6  # doctest: +SKIP
-        >>> curve = result.market.get_discount("USD-OIS")  # doctest: +SKIP
-        >>> from finstack_quant.valuations.instruments import price_instrument
-        >>> price_json = price_instrument(inst_json, result.market_json, "2026-05-08")  # doctest: +SKIP
+    Examples
+    --------
+    >>> import json as _json
+    >>> from finstack_quant.valuations import calibrate
+    >>> result = calibrate(_json.dumps(envelope))  # doctest: +SKIP
+    >>> assert result.success and result.rmse < 1e-6  # doctest: +SKIP
+    >>> curve = result.market.get_discount("USD-OIS")  # doctest: +SKIP
+    >>> from finstack_quant.valuations.instruments import price_instrument
+    >>> price_json = price_instrument(inst_json, result.market_json, "2026-05-08")  # doctest: +SKIP
 
-    See Also:
-        - ``finstack-quant/valuations/examples/market_bootstrap/`` — reference
-          envelope JSON files (discount curve, single-name hazard, FX matrix).
-        - :func:`validate_calibration_json` — pre-flight envelope check.
+    See Also
+    --------
+    - ``finstack-quant/valuations/examples/market_bootstrap/`` — reference
+      envelope JSON files (discount curve, single-name hazard, FX matrix).
+    - :func:`validate_calibration_json` — pre-flight envelope check.
     """
     ...
 
@@ -895,6 +1034,28 @@ def bs_price(
 
     All rates are continuously compounded decimals; ``sigma`` is annualized
     vol; ``t`` is years to expiry. Pass ``is_call=False`` for puts.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    r : float
+        Continuously compounded risk-free rate (decimal).
+    q : float
+        Continuous dividend/borrow yield (decimal).
+    sigma : float
+        Annualized volatility (decimal).
+    t : float
+        Time to expiry in years.
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
+
+    Returns
+    -------
+    float
+        Per-unit option price.
     """
     ...
 
@@ -913,6 +1074,31 @@ def bs_greeks(
     Returns ``{"delta", "gamma", "vega", "theta", "rho", "rho_q"}``. ``vega``
     and both rho values are per 1% move; ``theta`` is per-day using the
     ``theta_days`` day-count denominator (ACT/365 by default).
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    r : float
+        Continuously compounded risk-free rate (decimal).
+    q : float
+        Continuous dividend/borrow yield (decimal).
+    sigma : float
+        Annualized volatility (decimal).
+    t : float
+        Time to expiry in years.
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
+    theta_days : float, default 365.0
+        Day-count denominator for theta scaling.
+
+    Returns
+    -------
+    dict[str, float]
+        Greeks dict with keys ``delta``, ``gamma``, ``vega``, ``theta``,
+        ``rho``, ``rho_q``.
     """
     ...
 
@@ -927,20 +1113,32 @@ def bs_implied_vol(
 ) -> float:
     """Solve for Black-Scholes implied volatility given a target price.
 
-    Args:
-        spot: Spot price of the underlying.
-        strike: Option strike.
-        r: Continuously compounded risk-free rate (decimal).
-        q: Continuous dividend/borrow yield (decimal).
-        t: Time to expiry in years.
-        price: Observed option price in the same units as spot.
-        is_call: ``True`` for a call, ``False`` for a put.
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    r : float
+        Continuously compounded risk-free rate (decimal).
+    q : float
+        Continuous dividend/borrow yield (decimal).
+    t : float
+        Time to expiry in years.
+    price : float
+        Observed option price in the same units as spot.
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
 
-    Returns:
+    Returns
+    -------
+    float
         Implied volatility as a decimal.
 
-    Raises:
-        ValueError: If inputs are invalid or no root exists in the search bracket.
+    Raises
+    ------
+    ValueError
+        If inputs are invalid or no root exists in the search bracket.
     """
     ...
 
@@ -954,19 +1152,30 @@ def black76_implied_vol(
 ) -> float:
     """Solve for Black-76 (forward-based) implied volatility given a target price.
 
-    Args:
-        forward: Forward price at expiry.
-        strike: Option strike.
-        df: Discount factor from valuation date to expiry.
-        t: Time to expiry in years.
-        price: Observed option price (same units as forward).
-        is_call: ``True`` for a call, ``False`` for a put.
+    Parameters
+    ----------
+    forward : float
+        Forward price at expiry.
+    strike : float
+        Option strike.
+    df : float
+        Discount factor from valuation date to expiry.
+    t : float
+        Time to expiry in years.
+    price : float
+        Observed option price (same units as forward).
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
 
-    Returns:
+    Returns
+    -------
+    float
         Implied volatility as a decimal.
 
-    Raises:
-        ValueError: If inputs are invalid or no root exists in the search bracket.
+    Raises
+    ------
+    ValueError
+        If inputs are invalid or no root exists in the search bracket.
     """
     ...
 
@@ -988,6 +1197,32 @@ def barrier_call(
     """Reiner-Rubinstein continuous-monitoring barrier call price.
 
     ``direction`` is ``"up"`` or ``"down"``; ``knock`` is ``"in"`` or ``"out"``.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    barrier : float
+        Barrier level.
+    r : float
+        Continuously compounded risk-free rate (decimal).
+    q : float
+        Continuous dividend/borrow yield (decimal).
+    sigma : float
+        Annualized volatility (decimal).
+    t : float
+        Time to expiry in years.
+    direction : str
+        ``"up"`` or ``"down"``.
+    knock : str
+        ``"in"`` or ``"out"``.
+
+    Returns
+    -------
+    float
+        Per-unit barrier call price.
     """
     ...
 
@@ -1002,7 +1237,34 @@ def asian_option_price(
     averaging: str = "arithmetic",
     is_call: bool = True,
 ) -> float:
-    """Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option price."""
+    """Arithmetic (Turnbull-Wakeman) or geometric (Kemna-Vorst) Asian option price.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    r : float
+        Continuously compounded risk-free rate (decimal).
+    q : float
+        Continuous dividend/borrow yield (decimal).
+    sigma : float
+        Annualized volatility (decimal).
+    t : float
+        Time to expiry in years.
+    num_fixings : int
+        Number of averaging fixings.
+    averaging : str, default "arithmetic"
+        ``"arithmetic"`` (Turnbull-Wakeman) or ``"geometric"`` (Kemna-Vorst).
+    is_call : bool, default True
+        ``True`` for a call, ``False`` for a put.
+
+    Returns
+    -------
+    float
+        Per-unit Asian option price.
+    """
     ...
 
 def lookback_option_price(
@@ -1020,6 +1282,32 @@ def lookback_option_price(
 
     For ``strike_type="floating"``, ``strike`` is ignored and ``extremum``
     is the observed min (call) / max (put) to date.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike (ignored for floating strike).
+    r : float
+        Continuously compounded risk-free rate (decimal).
+    q : float
+        Continuous dividend/borrow yield (decimal).
+    sigma : float
+        Annualized volatility (decimal).
+    t : float
+        Time to expiry in years.
+    extremum : float
+        Observed extremum (min for call, max for put) to date.
+    strike_type : str, default "fixed"
+        ``"fixed"`` or ``"floating"``.
+    is_call : bool, default True
+        ``True`` for a call, ``False`` for a put.
+
+    Returns
+    -------
+    float
+        Per-unit lookback option price.
     """
     ...
 
@@ -1035,7 +1323,36 @@ def quanto_option_price(
     correlation: float,
     is_call: bool = True,
 ) -> float:
-    """Quanto option (FX-adjusted cross-currency) price in domestic currency."""
+    """Quanto option (FX-adjusted cross-currency) price in domestic currency.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying in foreign currency.
+    strike : float
+        Option strike in foreign currency.
+    t : float
+        Time to expiry in years.
+    rate_domestic : float
+        Domestic risk-free rate (decimal, continuously compounded).
+    rate_foreign : float
+        Foreign risk-free rate (decimal, continuously compounded).
+    div_yield : float
+        Dividend yield on the underlying (decimal).
+    vol_asset : float
+        Volatility of the underlying asset (decimal).
+    vol_fx : float
+        Volatility of the FX rate (decimal).
+    correlation : float
+        Correlation between asset and FX returns.
+    is_call : bool, default True
+        ``True`` for a call, ``False`` for a put.
+
+    Returns
+    -------
+    float
+        Per-unit quanto option price in domestic currency.
+    """
     ...
 
 # ---------------------------------------------------------------------------
@@ -1059,41 +1376,89 @@ class SabrParameters:
     ) -> None: ...
     @staticmethod
     def equity_default() -> SabrParameters:
-        """Equity-standard defaults ``(alpha=0.20, beta=1.0, nu=0.30, rho=-0.20)``."""
+        """Equity-standard defaults ``(alpha=0.20, beta=1.0, nu=0.30, rho=-0.20)``.
+
+        Returns
+        -------
+        SabrParameters
+            Default equity SABR parameters.
+        """
         ...
 
     @staticmethod
     def rates_default() -> SabrParameters:
-        """Rates-standard defaults ``(alpha=0.02, beta=0.5, nu=0.30, rho=0.0)``."""
+        """Rates-standard defaults ``(alpha=0.02, beta=0.5, nu=0.30, rho=0.0)``.
+
+        Returns
+        -------
+        SabrParameters
+            Default rates SABR parameters.
+        """
         ...
 
     @property
     def alpha(self) -> float:
-        """SABR alpha level parameter."""
+        """SABR alpha level parameter.
+
+        Returns
+        -------
+        float
+            Alpha parameter value.
+        """
         ...
 
     @property
     def beta(self) -> float:
-        """SABR beta elasticity parameter in ``[0, 1]``."""
+        """SABR beta elasticity parameter in ``[0, 1]``.
+
+        Returns
+        -------
+        float
+            Beta parameter value.
+        """
         ...
 
     @property
     def nu(self) -> float:
-        """Volatility-of-volatility parameter."""
+        """Volatility-of-volatility parameter.
+
+        Returns
+        -------
+        float
+            Nu parameter value.
+        """
         ...
 
     @property
     def rho(self) -> float:
-        """Forward/volatility correlation parameter in ``[-1, 1]``."""
+        """Forward/volatility correlation parameter in ``[-1, 1]``.
+
+        Returns
+        -------
+        float
+            Rho parameter value.
+        """
         ...
 
     @property
     def shift(self) -> float | None:
-        """Optional positive shift used for negative-rate smiles."""
+        """Optional positive shift used for negative-rate smiles.
+
+        Returns
+        -------
+        float or None
+            Shift value, or ``None`` if not set.
+        """
         ...
 
     def is_shifted(self) -> bool:
-        """``True`` when parameters include a non-zero shift (negative-rate support)."""
+        """``True`` when parameters include a non-zero shift (negative-rate support).
+
+        Returns
+        -------
+        bool
+            ``True`` if a non-zero shift is present.
+        """
         ...
 
 class SabrModel:
@@ -1102,28 +1467,45 @@ class SabrModel:
     Sources
     -------
     - Hagan SABR (2002): see docs/REFERENCES.md#hagan-2002-sabr
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import SabrModel, SabrParameters
+    >>> model = SabrModel(SabrParameters.rates_default())  # doctest: +SKIP
+    >>> model.implied_vol(0.02, 0.02, 1.0)  # doctest: +SKIP
+    0.20
     """
 
     def __init__(self, params: SabrParameters) -> None:
         """Create a SABR model from validated parameters.
 
-        Args:
-            params: SABR parameter set (alpha, beta, nu, rho, optional shift).
+        Parameters
+        ----------
+        params : SabrParameters
+            SABR parameter set (alpha, beta, nu, rho, optional shift).
 
-        Raises:
-            ValueError: If parameters violate SABR constraints.
+        Raises
+        ------
+        ValueError
+            If parameters violate SABR constraints.
         """
         ...
 
     def implied_vol(self, forward: float, strike: float, t: float) -> float:
         """Black-style implied volatility under the Hagan-2002 expansion.
 
-        Args:
-            forward: Forward price at expiry.
-            strike: Strike price.
-            t: Time to expiry in years.
+        Parameters
+        ----------
+        forward : float
+            Forward price at expiry.
+        strike : float
+            Strike price.
+        t : float
+            Time to expiry in years.
 
-        Returns:
+        Returns
+        -------
+        float
             Implied volatility as a decimal.
         """
         ...
@@ -1135,15 +1517,30 @@ class SabrModel:
         Returns
         -------
         SabrParameters
+            The SABR parameter set.
         """
         ...
 
     def supports_negative_rates(self) -> bool:
-        """Return ``True`` when the model has a positive shift."""
+        """Return ``True`` when the model has a positive shift.
+
+        Returns
+        -------
+        bool
+            ``True`` if the shift is non-zero, enabling negative-rate smiles.
+        """
         ...
 
 class SabrSmile:
-    """Volatility smile generator for a fixed ``(forward, t)`` pair."""
+    """Volatility smile generator for a fixed ``(forward, t)`` pair.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import SabrSmile, SabrParameters
+    >>> smile = SabrSmile(SabrParameters.equity_default(), 100.0, 1.0)  # doctest: +SKIP
+    >>> smile.atm_vol()  # doctest: +SKIP
+    0.20
+    """
 
     def __init__(
         self,
@@ -1151,19 +1548,57 @@ class SabrSmile:
         forward: float,
         t: float,
     ) -> None:
-        """Create a smile helper for one forward and expiry."""
+        """Create a smile helper for one forward and expiry.
+
+        Parameters
+        ----------
+        params : SabrParameters
+            SABR parameter set.
+        forward : float
+            Forward price at expiry.
+        t : float
+            Time to expiry in years.
+        """
         ...
 
     def atm_vol(self) -> float:
-        """Return the ATM implied volatility."""
+        """Return the ATM implied volatility.
+
+        Returns
+        -------
+        float
+            ATM implied vol as a decimal.
+        """
         ...
 
     def implied_vol(self, strike: float) -> float:
-        """Return implied volatility at ``strike``."""
+        """Return implied volatility at ``strike``.
+
+        Parameters
+        ----------
+        strike : float
+            Strike price.
+
+        Returns
+        -------
+        float
+            Implied vol as a decimal.
+        """
         ...
 
     def generate_smile(self, strikes: list[float]) -> list[float]:
-        """Return implied volatilities for all supplied strikes."""
+        """Return implied volatilities for all supplied strikes.
+
+        Parameters
+        ----------
+        strikes : list[float]
+            Strike grid.
+
+        Returns
+        -------
+        list[float]
+            Implied vols aligned with ``strikes``.
+        """
         ...
 
     def arbitrage_diagnostics(
@@ -1176,11 +1611,33 @@ class SabrSmile:
 
         Returns a dict with ``arbitrage_free``, ``butterfly_violations``,
         and ``monotonicity_violations``.
+
+        Parameters
+        ----------
+        strikes : list[float]
+            Strike grid to test.
+        r : float, default 0.0
+            Risk-free rate (decimal).
+        q : float, default 0.0
+            Dividend yield (decimal).
+
+        Returns
+        -------
+        dict[str, Any]
+            Diagnostics dict with ``arbitrage_free``, ``butterfly_violations``,
+            and ``monotonicity_violations``.
         """
         ...
 
 class SabrCalibrator:
-    """SABR calibrator (Levenberg-Marquardt with beta fixed)."""
+    """SABR calibrator (Levenberg-Marquardt with beta fixed).
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations import SabrCalibrator
+    >>> cal = SabrCalibrator()  # doctest: +SKIP
+    >>> params = cal.calibrate(0.02, strikes, vols, 1.0, 0.5)  # doctest: +SKIP
+    """
 
     def __init__(self) -> None:
         """Create a default SABR calibrator with standard tolerance and iteration cap."""
@@ -1193,16 +1650,21 @@ class SabrCalibrator:
         Returns
         -------
         SabrCalibrator
+            Calibrator with high-precision tolerance.
         """
         ...
 
     def with_tolerance(self, tolerance: float) -> SabrCalibrator:
         """Return a copy with an overridden convergence tolerance.
 
-        Args:
-            tolerance: Relative RMSE target for the fit.
+        Parameters
+        ----------
+        tolerance : float
+            Relative RMSE target for the fit.
 
-        Returns:
+        Returns
+        -------
+        SabrCalibrator
             New calibrator instance sharing other settings.
         """
         ...
@@ -1217,18 +1679,28 @@ class SabrCalibrator:
     ) -> SabrParameters:
         """Fit ``(alpha, nu, rho)`` to market vols with ``beta`` fixed.
 
-        Args:
-            forward: Forward at expiry.
-            strikes: Strike grid aligned with ``market_vols``.
-            market_vols: Market implied vols as decimals.
-            t: Expiry in years.
-            beta: Fixed SABR beta in ``[0, 1]``.
+        Parameters
+        ----------
+        forward : float
+            Forward at expiry.
+        strikes : list[float]
+            Strike grid aligned with ``market_vols``.
+        market_vols : list[float]
+            Market implied vols as decimals.
+        t : float
+            Expiry in years.
+        beta : float
+            Fixed SABR beta in ``[0, 1]``.
 
-        Returns:
+        Returns
+        -------
+        SabrParameters
             Calibrated :class:`SabrParameters`.
 
-        Raises:
-            ValueError: If lengths mismatch or fit fails to converge.
+        Raises
+        ------
+        ValueError
+            If lengths mismatch or fit fails to converge.
         """
         ...
 
@@ -1240,7 +1712,31 @@ class SabrCalibrator:
         t: float,
         beta: float,
     ) -> SabrParameters:
-        """Calibrate with automatic shift selection for negative-rate smiles."""
+        """Calibrate with automatic shift selection for negative-rate smiles.
+
+        Parameters
+        ----------
+        forward : float
+            Forward at expiry.
+        strikes : list[float]
+            Strike grid aligned with ``market_vols``.
+        market_vols : list[float]
+            Market implied vols as decimals.
+        t : float
+            Expiry in years.
+        beta : float
+            Fixed SABR beta in ``[0, 1]``.
+
+        Returns
+        -------
+        SabrParameters
+            Calibrated :class:`SabrParameters` with auto-selected shift.
+
+        Raises
+        ------
+        ValueError
+            If lengths mismatch or fit fails to converge.
+        """
         ...
 
 # ---------------------------------------------------------------------------
@@ -1257,7 +1753,32 @@ def bs_cos_price(
     is_call: bool,
     n_terms: int | None = None,
 ) -> float:
-    """Price a European option under Black-Scholes with the COS method."""
+    """Price a European option under Black-Scholes with the COS method.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    rate : float
+        Continuously compounded risk-free rate (decimal).
+    dividend : float
+        Continuous dividend yield (decimal).
+    vol : float
+        Annualized volatility (decimal).
+    maturity : float
+        Time to expiry in years.
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
+    n_terms : int, optional
+        Number of COS terms. Uses a default when ``None``.
+
+    Returns
+    -------
+    float
+        Per-unit option price.
+    """
     ...
 
 def vg_cos_price(
@@ -1272,7 +1793,36 @@ def vg_cos_price(
     is_call: bool,
     n_terms: int | None = None,
 ) -> float:
-    """Price a European option under Variance Gamma with the COS method."""
+    """Price a European option under Variance Gamma with the COS method.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    rate : float
+        Continuously compounded risk-free rate (decimal).
+    dividend : float
+        Continuous dividend yield (decimal).
+    sigma : float
+        VG diffusion parameter (volatility).
+    theta : float
+        VG drift parameter.
+    nu : float
+        VG variance rate parameter.
+    maturity : float
+        Time to expiry in years.
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
+    n_terms : int, optional
+        Number of COS terms. Uses a default when ``None``.
+
+    Returns
+    -------
+    float
+        Per-unit option price.
+    """
     ...
 
 def merton_jump_cos_price(
@@ -1288,7 +1838,38 @@ def merton_jump_cos_price(
     is_call: bool,
     n_terms: int | None = None,
 ) -> float:
-    """Price a European option under Merton jump-diffusion with the COS method."""
+    """Price a European option under Merton jump-diffusion with the COS method.
+
+    Parameters
+    ----------
+    spot : float
+        Spot price of the underlying.
+    strike : float
+        Option strike.
+    rate : float
+        Continuously compounded risk-free rate (decimal).
+    dividend : float
+        Continuous dividend yield (decimal).
+    sigma : float
+        Diffusion volatility (decimal).
+    mu_jump : float
+        Mean of the jump size distribution.
+    sigma_jump : float
+        Standard deviation of the jump size.
+    lambda_ : float
+        Jump intensity (expected jumps per year).
+    maturity : float
+        Time to expiry in years.
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
+    n_terms : int, optional
+        Number of COS terms. Uses a default when ``None``.
+
+    Returns
+    -------
+    float
+        Per-unit option price.
+    """
     ...
 
 # ---------------------------------------------------------------------------
@@ -1309,14 +1890,22 @@ def tarn_coupon_profile(
     which point the final coupon is capped so the cumulative hits the
     target exactly and the note redeems early.
 
-    Args:
-        fixed_rate: Fixed strike rate.
-        coupon_floor: Per-period floor on ``fixed_rate - L_i``.
-        floating_fixings: Floating rate fixings (one per period).
-        target_coupon: Cumulative target that triggers knockout (> 0).
-        day_count_fraction: Year fraction applied to each period coupon.
+    Parameters
+    ----------
+    fixed_rate : float
+        Fixed strike rate.
+    coupon_floor : float
+        Per-period floor on ``fixed_rate - L_i``.
+    floating_fixings : list[float]
+        Floating rate fixings (one per period).
+    target_coupon : float
+        Cumulative target that triggers knockout (> 0).
+    day_count_fraction : float
+        Year fraction applied to each period coupon.
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dict with keys ``coupons_paid`` (list[float]), ``cumulative``
         (list[float]), ``redemption_index`` (int | None) and
         ``redeemed_early`` (bool).
@@ -1341,6 +1930,28 @@ def snowball_coupon_profile(
     (``initial_coupon`` ignored).
 
     Pass ``float('inf')`` as ``cap`` for an uncapped coupon.
+
+    Parameters
+    ----------
+    initial_coupon : float
+        First-period coupon for snowball mode.
+    fixed_rate : float
+        Fixed strike rate.
+    floating_fixings : list[float]
+        Floating rate fixings (one per period).
+    floor : float
+        Per-period coupon floor.
+    cap : float
+        Per-period coupon cap (use ``float('inf')`` for uncapped).
+    is_inverse_floater : bool
+        ``True`` for inverse floater mode, ``False`` for snowball.
+    leverage : float, default 1.0
+        Leverage multiplier for inverse floater mode.
+
+    Returns
+    -------
+    list[float]
+        Coupon schedule, one per period.
     """
     ...
 
@@ -1359,6 +1970,24 @@ def cms_spread_option_intrinsic(
     Ignores CMS convexity, vol smile, and correlation adjustments — the
     full product pricer applies those on top of a copula model with
     SABR marginals.
+
+    Parameters
+    ----------
+    long_cms : float
+        Long CMS rate.
+    short_cms : float
+        Short CMS rate.
+    strike : float
+        Spread strike.
+    is_call : bool
+        ``True`` for a call, ``False`` for a put.
+    notional : float
+        Notional amount.
+
+    Returns
+    -------
+    float
+        Undiscounted intrinsic payoff.
     """
     ...
 
@@ -1377,5 +2006,23 @@ def callable_range_accrual_accrued(
 
     The call provision is not applied here — this is the coupon that
     would accrue assuming the note is not called before period end.
+
+    Parameters
+    ----------
+    lower : float
+        Lower bound of the accrual range.
+    upper : float
+        Upper bound of the accrual range.
+    observations : list[float]
+        Observed values (one per day in the period).
+    coupon_rate : float
+        Coupon rate (decimal).
+    day_count_fraction : float
+        Year fraction for the period.
+
+    Returns
+    -------
+    float
+        Accrued coupon amount.
     """
     ...

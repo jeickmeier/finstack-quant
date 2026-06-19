@@ -30,15 +30,21 @@ __all__ = [
 def validate_instrument_json(json: str) -> str:
     """Validate tagged instrument JSON and return canonical JSON.
 
-    Args:
-        json: JSON string for a tagged valuation instrument.
+    Parameters
+    ----------
+    json : str
+        JSON string for a tagged valuation instrument.
 
-    Returns:
+    Returns
+    -------
+    str
         Canonical pretty-printed instrument JSON after Rust serde validation.
 
-    Raises:
-        ValueError: If the JSON is malformed, has an unknown instrument tag, or
-            fails instrument-specific validation.
+    Raises
+    ------
+    ValueError
+        If the JSON is malformed, has an unknown instrument tag, or
+        fails instrument-specific validation.
     """
     ...
 
@@ -50,22 +56,31 @@ def price_instrument(
 ) -> str:
     """Price one instrument and return a ``ValuationResult`` JSON string.
 
-    Args:
-        instrument_json: Tagged instrument JSON accepted by
-            :func:`validate_instrument_json`.
-        market: Typed ``MarketContext`` or serialized market-context JSON.
-        as_of: ISO 8601 valuation date.
-        model: Pricing model selector. Common values include ``"default"``,
-            ``"discounting"``, ``"hazard_rate"``, and option-model keys such
-            as ``"black76"`` where supported by the instrument.
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged instrument JSON accepted by
+        :func:`validate_instrument_json`.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON.
+    as_of : str
+        ISO 8601 valuation date.
+    model : str, default "default"
+        Pricing model selector. Common values include ``"default"``,
+        ``"discounting"``, ``"hazard_rate"``, and option-model keys such
+        as ``"black76"`` where supported by the instrument.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized valuation result containing value, currency, metrics,
         and covenant flags when applicable.
 
-    Raises:
-        ValueError: If any input JSON is malformed, required market data is
-            missing, or the selected model is unsupported for the instrument.
+    Raises
+    ------
+    ValueError
+        If any input JSON is malformed, required market data is
+        missing, or the selected model is unsupported for the instrument.
     """
     ...
 
@@ -80,24 +95,36 @@ def price_instrument_with_metrics(
 ) -> str:
     """Price one instrument and compute explicit risk metric requests.
 
-    Args:
-        instrument_json: Tagged instrument JSON.
-        market: Typed ``MarketContext`` or serialized market-context JSON.
-        as_of: ISO 8601 valuation date.
-        model: Pricing model selector.
-        metrics: Metric IDs to compute, such as ``"ytm"``, ``"dv01"``,
-            ``"modified_duration"``, ``"hvar"``, or ``"expected_shortfall"``
-            when supported by the instrument.
-        pricing_options: Optional JSON string for metric pricing overrides.
-        market_history: Optional JSON market-history payload required by
-            historical risk metrics.
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged instrument JSON.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON.
+    as_of : str
+        ISO 8601 valuation date.
+    model : str, default "default"
+        Pricing model selector.
+    metrics : list[str], default []
+        Metric IDs to compute, such as ``"ytm"``, ``"dv01"``,
+        ``"modified_duration"``, ``"hvar"``, or ``"expected_shortfall"``
+        when supported by the instrument.
+    pricing_options : str, optional
+        Optional JSON string for metric pricing overrides.
+    market_history : str, optional
+        Optional JSON market-history payload required by
+        historical risk metrics.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized valuation result including requested metric values.
 
-    Raises:
-        ValueError: If a metric is unknown, not applicable, or cannot be
-            calculated from the supplied market and history inputs.
+    Raises
+    ------
+    ValueError
+        If a metric is unknown, not applicable, or cannot be
+        calculated from the supplied market and history inputs.
     """
     ...
 
@@ -109,25 +136,46 @@ def instrument_cashflows_json(
 ) -> str:
     """Per-flow cashflow envelope for a discountable instrument.
 
-    Args:
-        instrument_json: Tagged instrument JSON.
-        market: Typed ``MarketContext`` or serialized market-context JSON.
-        as_of: ISO 8601 valuation date.
-        model: ``"discounting"`` or ``"hazard_rate"``.
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged instrument JSON.
+    market : MarketContext or str
+        Typed ``MarketContext`` or serialized market-context JSON.
+    as_of : str
+        ISO 8601 valuation date.
+    model : str, default "discounting"
+        ``"discounting"`` or ``"hazard_rate"``.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``InstrumentCashflowEnvelope``.
 
-    Raises:
-        ValueError: If the model is unsupported, the instrument is unsupported
-            for cashflow export, or required market data is missing.
+    Raises
+    ------
+    ValueError
+        If the model is unsupported, the instrument is unsupported
+        for cashflow export, or required market data is missing.
     """
     ...
 
 def list_standard_metrics() -> list[str]:
-    """Return all standard metric IDs registered by the Rust valuation engine."""
+    """Return all standard metric IDs registered by the Rust valuation engine.
+
+    Returns
+    -------
+    list[str]
+        Sorted list of fully qualified metric keys.
+    """
     ...
 
 def list_standard_metrics_grouped() -> dict[str, list[str]]:
-    """Return standard metric IDs grouped by human-readable category."""
+    """Return standard metric IDs grouped by human-readable category.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping from group label to sorted metric ID lists.
+    """
     ...
