@@ -115,6 +115,7 @@
               ]
             },
             "AfcSpec": {
+              "additionalProperties": false,
               "description": "Available-funds cap (net-WAC cap) specification.",
               "properties": {
                 "capped_tranches": {
@@ -6161,6 +6162,7 @@
               "type": "object"
             },
             "ControlledAccumulationSpec": {
+              "additionalProperties": false,
               "description": "Controlled-accumulation specification for revolving (master-trust) deals.\n\nBetween `start_date` and `bullet_date` the deal is in its controlled-\naccumulation period: collected pool principal is held in a principal funding\naccount (investor balances stay flat, no pass-through paydown) rather than\nrecycled or distributed. At the first payment date on or after `bullet_date`\nthe entire account is released into the waterfall as a single bullet\nprincipal payment. Accumulation is suspended while a revolving/reinvestment\nperiod is still active (which recycles principal) and on early amortization\n(which pays principal down immediately).\n\n`start_date` is typically the revolving-period end and `bullet_date` the\nnote's expected maturity (and at/before the legal final maturity, so the\nrelease occurs before the deal winds down). If the deal terminates before\nthe bullet date (cleanup call, pool exhaustion, or a bullet date beyond the\nlast payment), any residual funding-account balance is swept to the\noutstanding tranches senior-first at deal end, so accumulated principal is\nnever stranded.",
               "properties": {
                 "bullet_date": {
@@ -9003,6 +9005,7 @@
               ]
             },
             "EarlyAmortizationSpec": {
+              "additionalProperties": false,
               "description": "Early-amortization specification for revolving (master-trust) deals.\n\nWhile a deal's reinvestment/revolving period is active, principal is recycled\nand the investor (tranche) balances are held flat. If cumulative losses reach\n`max_cumulative_loss_pct`, an early-amortization event is triggered: the\nrevolving period ends immediately and the deal begins paying principal down\n(amortizing) even before its scheduled revolving-period end.",
               "properties": {
                 "max_cumulative_loss_pct": {
@@ -9678,6 +9681,7 @@
               "type": "object"
             },
             "ExcessSpreadSpec": {
+              "additionalProperties": false,
               "description": "Excess-spread / spread-account specification.\n\nEach period the account captures residual interest (that would otherwise be\ndistributed to equity) up to `target_balance`, and draws down to cover debt\ntranche interest shortfalls — providing credit enhancement from excess\nspread. Any balance unused at deal end is released back to equity, unless a\ncumulative-loss trap trigger is breached.",
               "properties": {
                 "target_balance": {
@@ -17618,6 +17622,7 @@
               ]
             },
             "ShiftingInterestSpec": {
+              "additionalProperties": false,
               "description": "Shifting-interest principal allocation (non-agency senior/sub RMBS).\n\nThe senior tranche receives `senior_pct` of principal (the rest split across\nthe remaining debt tranches), where `senior_pct` follows a declining\nschedule by deal age. A `1.0` lockout early routes all principal to the\nsenior; later steps release principal to the subordinates. Modelled as a\nper-period weighted pro-rata of *all* principal (a first-order treatment;\nagency-style scheduled-vs-prepayment splitting is a refinement).",
               "properties": {
                 "schedule": {
@@ -17639,6 +17644,7 @@
               "type": "object"
             },
             "ShiftingInterestStep": {
+              "additionalProperties": false,
               "description": "One step of a shifting-interest schedule: the senior's share of principal\nfrom `months_from_closing` onward (until the next step).",
               "properties": {
                 "months_from_closing": {
@@ -17864,6 +17870,7 @@
               "type": "object"
             },
             "StepDownSpec": {
+              "additionalProperties": false,
               "description": "Step-down specification for senior/subordinate principal allocation.\n\nPrincipal is paid sequentially (senior first) until the deal seasons past\n`step_down_date`; from then on, *if* every configured [`StepDownTrigger`]\npasses, principal switches to pro-rata across the debt tranches, releasing\nsubordination to the juniors. While any trigger is breached the deal reverts\nto sequential, so the switch is re-evaluated every period (non-sticky). An\nempty `triggers` list steps down purely on the date.",
               "properties": {
                 "step_down_date": {
@@ -20419,6 +20426,7 @@
               ]
             },
             "WaterfallRules": {
+              "additionalProperties": false,
               "description": "Declarative, additively-applied waterfall rules layered onto a deal's base\nwaterfall.\n\nEach sub-spec is optional; when none are present the resolved waterfall is\nidentical to the base waterfall. Applied by\n[`crate::instruments::fixed_income::structured_credit::resolve_waterfall`].",
               "properties": {
                 "afc": {
