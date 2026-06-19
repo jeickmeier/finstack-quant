@@ -130,3 +130,27 @@ def test_definition_terms_generic_fallback() -> None:
     cols = ins._definition_terms(defn)
     flat = [kv for col in cols for kv in col]
     assert flat  # produced something from spec scalars
+
+
+def test_cashflow_blocks_from_dataframe() -> None:
+    import datetime as dt
+
+    import pandas as pd
+
+    df = pd.DataFrame({
+        "date": [dt.date(2027, 3, 15), dt.date(2027, 9, 15), dt.date(2034, 3, 15)],
+        "kind": ["coupon", "coupon", "principal"],
+        "amount": [212500.0, 212500.0, 10000000.0],
+        "rate": [0.0425, 0.0425, None],
+        "discount_factor": [0.98, 0.97, 0.71],
+        "pv": [208000.0, 206000.0, 7100000.0],
+    })
+    ladder, schedule = ins._cashflow_blocks(df)
+    # ladder grouped by year: 2027 has coupons; 2034 has the principal
+    years = [p for p, _, _, _ in ladder]
+    assert "2034" in years
+    by_year = {p: (c, pr) for p, c, pr, _ in ladder}
+    assert by_year["2034"][1] > 0  # principal present in 2034
+    # schedule rows carry the original columns
+    assert schedule
+    assert "Date" in schedule[0]

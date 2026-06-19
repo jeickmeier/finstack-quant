@@ -10,6 +10,7 @@ read-only for meta/details, and renders the optional ``cashflows`` DataFrame and
 from __future__ import annotations
 
 import json
+import math
 import re
 from typing import Any
 
@@ -293,3 +294,46 @@ def _definition_terms(definition: dict[str, Any]) -> list[list[tuple[str, str]]]
     for i, kv in enumerate(rows[:18]):
         cols[i % 3].append(kv)
     return cols
+
+
+_PRINCIPAL_KINDS = {"principal", "notional"}
+
+
+def _is_nan(x: Any) -> bool:
+    return isinstance(x, float) and math.isnan(x)
+
+
+def _cashflow_blocks(
+    cashflows: Any,
+) -> tuple[list[tuple[str, float, float, float]], list[dict[str, Any]]]:
+    """Shape a cashflow DataFrame (or ``(envelope, df)``) into ladder rows and schedule rows.
+
+    Ladder rows: ``(period_label, coupon_sum, principal_sum, pv_sum)`` grouped by calendar
+    year (values scaled to millions). Schedule rows: per-flow dicts for the scroll table.
+    """
+    df = cashflows[1] if isinstance(cashflows, tuple) else cashflows
+    by_year: dict[int, list[float]] = {}
+    schedule: list[dict[str, Any]] = []
+    for _, r in df.iterrows():
+        d = r["date"]
+        year = d.year if hasattr(d, "year") else int(str(d)[:4])
+        kind = str(r.get("kind", ""))
+        amt = float(r.get("amount") or 0.0)
+        pv = float(r.get("pv") or 0.0)
+        slot = by_year.setdefault(year, [0.0, 0.0, 0.0])  # coupon, principal, pv
+        if kind in _PRINCIPAL_KINDS:
+            slot[1] += amt
+        else:
+            slot[0] += amt
+        slot[2] += pv
+        rate = r.get("rate")
+        schedule.append({
+            "Date": fmt.fmt_date(d),
+            "Kind": kind,
+            "Amount": fmt.money(amt, dp=0),
+            "Rate": fmt.pct(float(rate) * 100, dp=3) if rate is not None and not _is_nan(rate) else "—",
+            "DF": fmt.ratio(float(r["discount_factor"]), dp=4) if "discount_factor" in r else "—",
+            "PV": fmt.money(pv, dp=0),
+        })
+    ladder = [(str(y), by_year[y][0] / 1e6, by_year[y][1] / 1e6, by_year[y][2] / 1e6) for y in sorted(by_year)]
+    return ladder, schedule
