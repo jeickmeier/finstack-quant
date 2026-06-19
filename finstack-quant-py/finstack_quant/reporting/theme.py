@@ -85,6 +85,13 @@ class Theme:
 {s} svg {{ display:block; width:100%; height:auto; }}
 {s} .foot {{ margin-top:30px; border-top:1px solid {self.ink}; padding-top:10px;
   font-size:10.5px; color:{self.muted}; display:flex; justify-content:space-between; }}
+{s} .fq-tip {{ position:fixed; pointer-events:none; z-index:9999; opacity:0; transition:opacity .08s;
+  background:{self.ink}; color:#fff; font:11px/1.4 {self.font_sans}; padding:4px 8px;
+  border-radius:4px; white-space:nowrap; }}
+{s} svg .fq-hb {{ cursor:crosshair; }}
+{s} svg rect.fq-hb:not([fill]) {{ fill:transparent; }}
+{s} svg .fq-cross {{ stroke:{self.muted}; stroke-width:1; stroke-dasharray:3 3; pointer-events:none; }}
+{s} svg .fq-mk {{ fill:{self.accent}; stroke:#fff; stroke-width:1; pointer-events:none; }}
 </style>"""
 
 

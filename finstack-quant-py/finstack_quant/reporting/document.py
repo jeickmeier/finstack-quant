@@ -20,6 +20,33 @@ from .theme import Theme
 
 _SCOPE = "fq-ts"
 
+_TOOLTIP_JS = """<script>
+(function(){
+  function init(){
+    document.querySelectorAll('.fq-ts svg .fq-hb').forEach(function(band){
+      if(band.__fqWired){return;} band.__fqWired=true;
+      var root=band.closest('.fq-ts'); if(!root){return;}
+      var tip=root.querySelector('.fq-tip');
+      var svg=band.ownerSVGElement;
+      var cross=svg&&svg.querySelector('.fq-cross');
+      var mk=svg&&svg.querySelector('.fq-mk');
+      function show(e){
+        if(tip){tip.textContent=band.getAttribute('data-label')+' · '+band.getAttribute('data-val');
+          tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px'; tip.style.opacity='1';}
+        var cx=band.getAttribute('data-cx'), cy=band.getAttribute('data-cy');
+        if(cross){cross.setAttribute('x1',cx); cross.setAttribute('x2',cx); cross.style.visibility='visible';}
+        if(mk){mk.setAttribute('cx',cx); mk.setAttribute('cy',cy); mk.style.visibility='visible';}
+      }
+      function hide(){ if(tip){tip.style.opacity='0';} if(cross){cross.style.visibility='hidden';} if(mk){mk.style.visibility='hidden';} }
+      band.addEventListener('mousemove',show);
+      band.addEventListener('mouseenter',show);
+      band.addEventListener('mouseleave',hide);
+    });
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+})();
+</script>"""
+
 
 @dataclass
 class KPI:
@@ -99,12 +126,13 @@ class TearSheet:
         return (
             f'<div class="{_SCOPE}">'
             f"{self._header_html()}{self._kpis_html()}{self._sections_html()}{self._footer_html()}"
+            '<div class="fq-tip" aria-hidden="true"></div>'
             "</div>"
         )
 
     def _repr_html_(self) -> str:
         """Scoped fragment for inline Jupyter display."""
-        return self.theme.to_css(_SCOPE) + self._body_fragment()
+        return self.theme.to_css(_SCOPE) + self._body_fragment() + _TOOLTIP_JS
 
     def to_html(self) -> str:
         """Full standalone HTML document."""
@@ -114,7 +142,7 @@ class TearSheet:
             '<meta name="viewport" content="width=device-width, initial-scale=1">'
             f"<title>{self._esc(self.title)}</title>{self.theme.to_css(_SCOPE)}</head>"
             '<body style="margin:0;padding:24px;background:#e8e9ec;">'
-            f"{self._body_fragment()}</body></html>\n"
+            f"{self._body_fragment()}{_TOOLTIP_JS}</body></html>\n"
         )
 
     def save(self, path: str | os.PathLike[str]) -> None:

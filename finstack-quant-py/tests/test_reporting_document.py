@@ -44,3 +44,16 @@ def test_save_writes_file(tmp_path: Path) -> None:
 
 def test_output_is_deterministic() -> None:
     assert _sheet().to_html() == _sheet().to_html()
+
+
+def test_tooltip_assets_present() -> None:
+    html = _sheet()._repr_html_()
+    assert 'class="fq-tip"' in html
+    assert "<script>" in html
+    assert "__fqWired" in html  # the wiring guard
+
+
+def test_to_html_includes_tooltip_script() -> None:
+    html = _sheet().to_html()
+    assert 'class="fq-tip"' in html
+    assert "addEventListener" in html
