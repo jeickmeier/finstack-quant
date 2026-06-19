@@ -1532,6 +1532,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1806,6 +1807,7 @@
             },
             "effective_date": {
               "description": "Optional effective date for schedule anchoring (if None, uses as_of date)",
+              "format": "date",
               "type": [
                 "string",
                 "null"
@@ -1825,6 +1827,7 @@
             },
             "maturity": {
               "description": "Maturity date of the tranche",
+              "format": "date",
               "type": "string"
             },
             "notional": {

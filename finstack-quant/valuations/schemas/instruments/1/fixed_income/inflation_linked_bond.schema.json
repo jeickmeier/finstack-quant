@@ -1654,6 +1654,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1875,6 +1876,7 @@
             },
             "base_date": {
               "description": "Base date for index (may differ from issue date)",
+              "format": "date",
               "type": "string"
             },
             "base_index": {
@@ -1928,6 +1930,7 @@
             },
             "issue_date": {
               "description": "Issue date",
+              "format": "date",
               "type": "string"
             },
             "lag": {
@@ -1936,6 +1939,7 @@
             },
             "maturity": {
               "description": "Maturity date",
+              "format": "date",
               "type": "string"
             },
             "notional": {

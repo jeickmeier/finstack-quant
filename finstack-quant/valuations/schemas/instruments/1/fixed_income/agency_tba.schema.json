@@ -1478,6 +1478,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1775,6 +1776,7 @@
             },
             "trade_date": {
               "description": "Trade date.",
+              "format": "date",
               "type": [
                 "string",
                 "null"

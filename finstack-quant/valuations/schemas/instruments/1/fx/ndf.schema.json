@@ -1473,6 +1473,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1709,6 +1710,7 @@
             },
             "fixing_date": {
               "description": "Fixing date (rate observation date, typically T-2 before maturity).",
+              "format": "date",
               "type": "string"
             },
             "fixing_rate": {
@@ -1759,6 +1761,7 @@
             },
             "maturity": {
               "description": "Maturity/settlement date.",
+              "format": "date",
               "type": "string"
             },
             "notional": {

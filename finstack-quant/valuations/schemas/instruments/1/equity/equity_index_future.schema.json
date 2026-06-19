@@ -1449,6 +1449,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1715,6 +1716,7 @@
             },
             "expiry": {
               "description": "Future expiry/settlement date.",
+              "format": "date",
               "type": "string"
             },
             "id": {
@@ -1723,6 +1725,7 @@
             },
             "last_trading_date": {
               "description": "Last trading date (typically one day before expiry).",
+              "format": "date",
               "type": "string"
             },
             "notional": {

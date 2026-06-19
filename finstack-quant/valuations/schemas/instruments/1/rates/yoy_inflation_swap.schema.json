@@ -1589,6 +1589,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1860,6 +1861,7 @@
             },
             "maturity": {
               "description": "Maturity date",
+              "format": "date",
               "type": "string"
             },
             "notional": {
@@ -1897,6 +1899,7 @@
             },
             "start_date": {
               "description": "Start date of the first accrual period",
+              "format": "date",
               "type": "string"
             }
           },

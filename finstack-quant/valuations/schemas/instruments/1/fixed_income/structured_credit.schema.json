@@ -930,10 +930,12 @@
       "properties": {
         "bullet_date": {
           "description": "Date the accumulated funding account is released as a bullet payment.",
+          "format": "date",
           "type": "string"
         },
         "start_date": {
           "description": "First date principal is accumulated into the funding account.",
+          "format": "date",
           "type": "string"
         }
       },
@@ -1122,6 +1124,7 @@
       "properties": {
         "breach_date": {
           "description": "Date when breach occurred (if any)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3626,6 +3629,7 @@
       "properties": {
         "acquisition_date": {
           "description": "Acquisition date",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3678,6 +3682,7 @@
         },
         "maturity": {
           "description": "Maturity date",
+          "format": "date",
           "type": "string"
         },
         "mdr_override": {
@@ -4302,6 +4307,7 @@
         },
         "end_date": {
           "description": "End date of reinvestment period",
+          "format": "date",
           "type": "string"
         },
         "is_active": {
@@ -4356,6 +4362,7 @@
         },
         "maturity": {
           "description": "Weighted average maturity date",
+          "format": "date",
           "type": "string"
         },
         "rate": {
@@ -4486,6 +4493,7 @@
       "properties": {
         "step_down_date": {
           "description": "Earliest date principal may switch to pro-rata.",
+          "format": "date",
           "type": "string"
         },
         "triggers": {
@@ -4904,6 +4912,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -5018,6 +5027,7 @@
         },
         "expected_maturity": {
           "description": "Expected maturity date (may be earlier than legal maturity for CLOs)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -5048,6 +5058,7 @@
         },
         "maturity": {
           "description": "Legal final maturity date",
+          "format": "date",
           "type": "string"
         },
         "oc_trigger": {
@@ -5695,6 +5706,7 @@
             },
             "closing_date": {
               "description": "Key dates.\nDeal closing date (issuance).",
+              "format": "date",
               "type": "string"
             },
             "correlation_structure": {
@@ -5793,6 +5805,7 @@
             },
             "first_payment_date": {
               "description": "First payment date to tranches.",
+              "format": "date",
               "type": "string"
             },
             "frequency": {
@@ -5817,6 +5830,7 @@
             },
             "maturity": {
               "description": "Legal final maturity date.",
+              "format": "date",
               "type": "string"
             },
             "payment_bdc": {
@@ -5884,6 +5898,7 @@
             },
             "reinvestment_end_date": {
               "description": "End of reinvestment period (if applicable).",
+              "format": "date",
               "type": [
                 "string",
                 "null"

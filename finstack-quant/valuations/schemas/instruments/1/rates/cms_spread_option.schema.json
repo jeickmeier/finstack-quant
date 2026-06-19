@@ -1547,6 +1547,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1718,6 +1719,7 @@
             },
             "expiry_date": {
               "description": "Option expiry date.",
+              "format": "date",
               "type": "string"
             },
             "forward_curve_id": {
@@ -1746,6 +1748,7 @@
             },
             "payment_date": {
               "description": "Payment date (may differ from expiry).",
+              "format": "date",
               "type": "string"
             },
             "pricing_overrides": {

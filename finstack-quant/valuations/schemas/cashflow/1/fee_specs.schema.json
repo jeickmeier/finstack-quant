@@ -1046,6 +1046,7 @@
             },
             "date": {
               "description": "Payment date of the fixed fee.",
+              "format": "date",
               "type": "string"
             }
           },

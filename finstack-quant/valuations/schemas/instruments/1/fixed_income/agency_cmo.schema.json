@@ -42,10 +42,12 @@
         },
         "issue_date": {
           "description": "Issue date of the pool.",
+          "format": "date",
           "type": "string"
         },
         "maturity": {
           "description": "Legal maturity date.",
+          "format": "date",
           "type": "string"
         },
         "original_face": {
@@ -1849,6 +1851,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -2152,6 +2155,7 @@
             },
             "issue_date": {
               "description": "Issue date",
+              "format": "date",
               "type": "string"
             },
             "pricing_overrides": {

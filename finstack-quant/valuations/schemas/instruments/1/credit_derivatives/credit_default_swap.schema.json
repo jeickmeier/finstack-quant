@@ -2126,6 +2126,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -2521,6 +2522,7 @@
             },
             "protection_effective_date": {
               "description": "Optional protection effective date for forward-starting CDS.\n\nWhen `Some(date)`, protection begins on the specified date rather than\nthe premium leg start date. This allows a CDS where premium accrues\nfrom the original start date but credit protection only kicks in later.\n\nMust satisfy: `premium.start <= protection_effective_date <= premium.end`.\n\nWhen `None`, protection starts on the premium leg start date (standard CDS).",
+              "format": "date",
               "type": [
                 "string",
                 "null"

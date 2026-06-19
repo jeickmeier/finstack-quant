@@ -155,6 +155,7 @@
       "properties": {
         "end_date": {
           "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start_date` for one-day/discrete exercise.",
+          "format": "date",
           "type": "string"
         },
         "make_whole": {
@@ -175,6 +176,7 @@
         },
         "start_date": {
           "description": "First date when the option can be exercised.",
+          "format": "date",
           "type": "string"
         }
       },
@@ -323,6 +325,7 @@
               "properties": {
                 "conversion_date": {
                   "description": "Date of mandatory conversion.",
+                  "format": "date",
                   "type": "string"
                 },
                 "lower_conversion_price": {
@@ -1309,6 +1312,7 @@
       "properties": {
         "date": {
           "description": "Date of the dilutive event.",
+          "format": "date",
           "type": "string"
         },
         "new_issue_price": {
@@ -2367,6 +2371,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -2743,10 +2748,12 @@
             },
             "issue_date": {
               "description": "Issue date.",
+              "format": "date",
               "type": "string"
             },
             "maturity": {
               "description": "Maturity date.",
+              "format": "date",
               "type": "string"
             },
             "notional": {

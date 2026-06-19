@@ -1478,6 +1478,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1706,6 +1707,7 @@
             },
             "back_settlement_date": {
               "description": "Explicit back-month settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for the back leg.",
+              "format": "date",
               "type": [
                 "string",
                 "null"
@@ -1739,6 +1741,7 @@
             },
             "front_settlement_date": {
               "description": "Explicit front-month settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for the front leg.",
+              "format": "date",
               "type": [
                 "string",
                 "null"
@@ -1817,6 +1820,7 @@
             },
             "trade_date": {
               "description": "Trade date.",
+              "format": "date",
               "type": [
                 "string",
                 "null"

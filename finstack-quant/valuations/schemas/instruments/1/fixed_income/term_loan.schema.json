@@ -252,6 +252,7 @@
         },
         "date": {
           "description": "Date of cash sweep prepayment",
+          "format": "date",
           "type": "string"
         }
       },
@@ -282,6 +283,7 @@
       "properties": {
         "date": {
           "description": "Effective date of the step-down",
+          "format": "date",
           "type": "string"
         },
         "new_limit": {
@@ -1279,6 +1281,7 @@
         },
         "date": {
           "description": "Date of the draw",
+          "format": "date",
           "type": "string"
         }
       },
@@ -1498,6 +1501,7 @@
         },
         "date": {
           "description": "Call date (earliest prepayment date for this call provision)",
+          "format": "date",
           "type": "string"
         },
         "price_pct_of_par": {
@@ -1574,6 +1578,7 @@
       "properties": {
         "date": {
           "description": "Effective date of margin increase",
+          "format": "date",
           "type": "string"
         },
         "delta_bp": {
@@ -1821,6 +1826,7 @@
       "properties": {
         "date": {
           "description": "Date PIK feature is toggled",
+          "format": "date",
           "type": "string"
         },
         "enable_pik": {
@@ -2438,6 +2444,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3051,10 +3058,12 @@
             },
             "issue_date": {
               "description": "Issue (effective) date",
+              "format": "date",
               "type": "string"
             },
             "maturity": {
               "description": "Maturity date",
+              "format": "date",
               "type": "string"
             },
             "notional_limit": {

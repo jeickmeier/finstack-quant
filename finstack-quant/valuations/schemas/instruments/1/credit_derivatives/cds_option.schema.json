@@ -1493,6 +1493,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1710,6 +1711,7 @@
             },
             "cash_settlement_date": {
               "description": "Cash premium settlement date for Black time-to-expiry, when the screen\nquotes option time from premium settlement rather than valuation date.",
+              "format": "date",
               "type": [
                 "string",
                 "null"
@@ -1717,6 +1719,7 @@
             },
             "cds_maturity": {
               "description": "Underlying CDS maturity date",
+              "format": "date",
               "type": "string"
             },
             "credit_curve_id": {
@@ -1729,6 +1732,7 @@
             },
             "exercise_settlement_date": {
               "description": "Exercise settlement date for Black time-to-expiry, when distinct from\nthe legal option expiration date.",
+              "format": "date",
               "type": [
                 "string",
                 "null"
@@ -1740,6 +1744,7 @@
             },
             "expiry": {
               "description": "Option expiry date",
+              "format": "date",
               "type": "string"
             },
             "id": {
@@ -1839,6 +1844,7 @@
             },
             "underlying_effective_date": {
               "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry.",
+              "format": "date",
               "type": [
                 "string",
                 "null"

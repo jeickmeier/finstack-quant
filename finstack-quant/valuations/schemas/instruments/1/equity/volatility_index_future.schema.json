@@ -1418,6 +1418,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1675,6 +1676,7 @@
             },
             "expiry": {
               "description": "Future expiry date. For VIX futures this is the final settlement day\nitself (the Wednesday ~30 days before the expiry of the SPX options\nused in the settlement calculation), not a date 30 days before\nsettlement.",
+              "format": "date",
               "type": "string"
             },
             "id": {
@@ -1721,6 +1723,7 @@
             },
             "settlement_date": {
               "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX).",
+              "format": "date",
               "type": "string"
             },
             "vol_index_curve_id": {

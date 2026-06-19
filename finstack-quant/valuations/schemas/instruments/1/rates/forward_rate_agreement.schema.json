@@ -1503,6 +1503,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1750,6 +1751,7 @@
             },
             "fixing_date": {
               "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days.",
+              "format": "date",
               "type": [
                 "string",
                 "null"
@@ -1765,6 +1767,7 @@
             },
             "maturity": {
               "description": "Interest period end date",
+              "format": "date",
               "type": "string"
             },
             "notional": {
@@ -1815,6 +1818,7 @@
             },
             "start_date": {
               "description": "Interest period start date",
+              "format": "date",
               "type": "string"
             }
           },

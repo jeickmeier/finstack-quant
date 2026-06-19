@@ -1802,6 +1802,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -2070,6 +2071,7 @@
             },
             "maturity": {
               "description": "Maturity date of the repo",
+              "format": "date",
               "type": "string"
             },
             "pricing_overrides": {
@@ -2111,6 +2113,7 @@
             },
             "start_date": {
               "description": "Start date of the repo",
+              "format": "date",
               "type": "string"
             },
             "triparty": {

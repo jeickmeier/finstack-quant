@@ -1493,6 +1493,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1740,6 +1741,7 @@
               "default": "european"
             },
             "expiry": {
+              "format": "date",
               "type": "string"
             },
             "id": {
@@ -1777,6 +1779,7 @@
             },
             "settlement_date": {
               "default": null,
+              "format": "date",
               "type": [
                 "string",
                 "null"

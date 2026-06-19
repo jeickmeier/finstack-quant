@@ -1515,6 +1515,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1741,10 +1742,12 @@
             },
             "expiry": {
               "description": "Future expiry/delivery date",
+              "format": "date",
               "type": "string"
             },
             "fixing_date": {
               "description": "Underlying rate fixing date.\n\nDefaults to `expiry` when omitted.",
+              "format": "date",
               "type": [
                 "string",
                 "null"

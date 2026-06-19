@@ -1551,6 +1551,7 @@
         },
         "payment_date": {
           "description": "Optional payment date (defaults to last observation date)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1681,6 +1682,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"

@@ -1138,6 +1138,7 @@
         },
         "date": {
           "description": "Date of the draw or repayment.",
+          "format": "date",
           "type": "string"
         },
         "is_draw": {
@@ -2284,6 +2285,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -2606,6 +2608,7 @@
             },
             "commitment_date": {
               "description": "Date when the facility becomes available.",
+              "format": "date",
               "type": "string"
             },
             "credit_curve_id": {
@@ -2650,6 +2653,7 @@
             },
             "maturity": {
               "description": "Date when the facility expires.",
+              "format": "date",
               "type": "string"
             },
             "pricing_overrides": {

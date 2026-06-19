@@ -1629,6 +1629,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1898,6 +1899,7 @@
             },
             "maturity": {
               "description": "End date of the final inflation period.",
+              "format": "date",
               "type": "string"
             },
             "nominal_rate_volatility": {
@@ -1943,6 +1945,7 @@
             },
             "start_date": {
               "description": "Start date of the first inflation period.",
+              "format": "date",
               "type": "string"
             },
             "strike": {

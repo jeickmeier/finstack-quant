@@ -1488,6 +1488,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1724,6 +1725,7 @@
             },
             "maturity": {
               "description": "Maturity date of the deposit period.",
+              "format": "date",
               "type": "string"
             },
             "notional": {
@@ -1774,6 +1776,7 @@
             },
             "start_date": {
               "description": "Start date of the deposit period.",
+              "format": "date",
               "type": "string"
             }
           },

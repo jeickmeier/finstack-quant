@@ -67,26 +67,26 @@
             "df_hard_min": 1e-12,
             "extrapolation_policy": "flat_zero",
             "interp_style": "linear",
-            "jacobian_step_size": 1e-6,
+            "jacobian_step_size": 1e-06,
             "min_scan_grid_points": 20,
-            "min_t_spot": 1e-6,
+            "min_t_spot": 1e-06,
             "scan_grid_points": 48,
             "scan_grid_step": 0.0001,
-            "validation_tolerance": 1e-8,
+            "validation_tolerance": 1e-08,
             "weighting_scheme": "SqrtTime"
           },
           "description": "Discount-curve specific solver configuration."
         },
         "fail_on_bad_fit": {
           "default": true,
-          "description": "When `true`, a calibration step whose solver reports\n`report.success == false` is propagated as a\n`finstack_quant_core::Error::Calibration` and its output is **not**\ninstalled into the market context.\n\nDefaults to `true` — this is the safe production choice because\na non-converged solver would otherwise silently poison downstream\npricing. Legacy or exploratory workflows that want to inspect the\nreport without aborting can set this to `false`.",
+          "description": "When `true`, a calibration step whose solver reports\n`report.success == false` is propagated as a\n`finstack_quant_core::Error::Calibration` and its output is **not**\ninstalled into the market context.\n\nDefaults to `true` \u2014 this is the safe production choice because\na non-converged solver would otherwise silently poison downstream\npricing. Legacy or exploratory workflows that want to inspect the\nreport without aborting can set this to `false`.",
           "type": "boolean"
         },
         "hazard_curve": {
           "default": {
             "hazard_hard_max": 10.0,
             "hazard_hard_min": 0.0,
-            "validation_tolerance": 1e-8,
+            "validation_tolerance": 1e-08,
             "weighting_scheme": "SqrtTime"
           },
           "description": "Hazard-curve specific solver configuration."
@@ -95,7 +95,7 @@
           "default": {
             "cpi_hard_max": 10000.0,
             "cpi_hard_min": 1.0,
-            "validation_tolerance": 1e-8,
+            "validation_tolerance": 1e-08,
             "weighting_scheme": "SqrtTime"
           },
           "description": "Inflation-curve specific solver configuration."
@@ -227,25 +227,25 @@
               "df_hard_min": 1e-12,
               "extrapolation_policy": "flat_zero",
               "interp_style": "linear",
-              "jacobian_step_size": 1e-6,
+              "jacobian_step_size": 1e-06,
               "min_scan_grid_points": 20,
-              "min_t_spot": 1e-6,
+              "min_t_spot": 1e-06,
               "scan_grid_points": 48,
               "scan_grid_step": 0.0001,
-              "validation_tolerance": 1e-8,
+              "validation_tolerance": 1e-08,
               "weighting_scheme": "SqrtTime"
             },
             "fail_on_bad_fit": true,
             "hazard_curve": {
               "hazard_hard_max": 10.0,
               "hazard_hard_min": 0.0,
-              "validation_tolerance": 1e-8,
+              "validation_tolerance": 1e-08,
               "weighting_scheme": "SqrtTime"
             },
             "inflation_curve": {
               "cpi_hard_max": 10000.0,
               "cpi_hard_min": 1.0,
-              "validation_tolerance": 1e-8,
+              "validation_tolerance": 1e-08,
               "weighting_scheme": "SqrtTime"
             },
             "rate_bounds": {
@@ -309,7 +309,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "conventions": {
               "$ref": "#/$defs/RatesStepConventions",
@@ -384,7 +385,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "conventions": {
               "$ref": "#/$defs/RatesStepConventions",
@@ -441,7 +443,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "cds_valuation_convention": {
               "anyOf": [
@@ -534,7 +537,8 @@
             },
             "base_date": {
               "description": "Base date for the curve.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "currency": {
               "$ref": "#/$defs/Currency",
@@ -605,7 +609,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the surface.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "beta": {
               "default": 0.5,
@@ -707,7 +712,8 @@
             },
             "base_date": {
               "description": "Base date for the calibration.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "calendar_id": {
               "default": null,
@@ -758,7 +764,7 @@
             "sabr_extrapolation": {
               "$ref": "#/$defs/SurfaceExtrapolationPolicy",
               "default": "error",
-              "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry–tenor grid for target points that do not have a directly calibrated bucket."
+              "description": "Extrapolation policy used when interpolating SABR parameters across the\nexpiry\u2013tenor grid for target points that do not have a directly calibrated bucket."
             },
             "sabr_interpolation": {
               "$ref": "#/$defs/SabrInterpolationMethod",
@@ -815,7 +821,7 @@
             },
             "vol_tolerance": {
               "default": null,
-              "description": "Reporting tolerance used to determine calibration success.\n\nThis is distinct from `plan.settings.tolerance` (solver tolerance). For swaption-vol\ncalibration, success should reflect whether the fitted smile residuals are within a\nmarket-appropriate tolerance (e.g., 10–20 vol bps), not machine epsilon.",
+              "description": "Reporting tolerance used to determine calibration success.\n\nThis is distinct from `plan.settings.tolerance` (solver tolerance). For swaption-vol\ncalibration, success should reflect whether the fitted smile residuals are within a\nmarket-appropriate tolerance (e.g., 10\u201320 vol bps), not machine epsilon.",
               "format": "double",
               "type": [
                 "number",
@@ -837,7 +843,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the calibration.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "bdc": {
               "anyOf": [
@@ -1015,7 +1022,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the calibration.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "currency": {
               "$ref": "#/$defs/Currency",
@@ -1027,7 +1035,7 @@
             },
             "initial_kappa": {
               "default": null,
-              "description": "Optional initial guess for mean reversion κ.",
+              "description": "Optional initial guess for mean reversion \u03ba.",
               "format": "double",
               "type": [
                 "number",
@@ -1036,7 +1044,7 @@
             },
             "initial_sigma": {
               "default": null,
-              "description": "Optional initial guess for short rate vol σ.",
+              "description": "Optional initial guess for short rate vol \u03c3.",
               "format": "double",
               "type": [
                 "number",
@@ -1061,7 +1069,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the calibration.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "currency": {
               "$ref": "#/$defs/Currency",
@@ -1073,7 +1082,7 @@
             },
             "fixed_kappa": {
               "default": null,
-              "description": "Optional source mean reversion κ. Required for one-quote calibration.",
+              "description": "Optional source mean reversion \u03ba. Required for one-quote calibration.",
               "format": "double",
               "type": [
                 "number",
@@ -1086,7 +1095,7 @@
             },
             "initial_kappa": {
               "default": null,
-              "description": "Optional initial guess for mean reversion κ when solving both κ and σ.",
+              "description": "Optional initial guess for mean reversion \u03ba when solving both \u03ba and \u03c3.",
               "format": "double",
               "type": [
                 "number",
@@ -1095,7 +1104,7 @@
             },
             "initial_sigma": {
               "default": null,
-              "description": "Optional initial guess for short-rate volatility σ when solving both κ and σ.",
+              "description": "Optional initial guess for short-rate volatility \u03c3 when solving both \u03ba and \u03c3.",
               "format": "double",
               "type": [
                 "number",
@@ -1126,7 +1135,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the surface.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "discount_curve_id": {
               "anyOf": [
@@ -1193,7 +1203,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "basis_spread_curve_id": {
               "anyOf": [
@@ -1267,7 +1278,8 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
-              "type": "string"
+              "type": "string",
+              "format": "date"
             },
             "curve_id": {
               "$ref": "#/$defs/Id",
@@ -1332,7 +1344,7 @@
       "type": "object"
     },
     "CdsValuationConvention": {
-      "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nclean/dirty NPV, par-spread denominator). Mixing those choices via separate\nboolean overrides is intentionally not supported — the variants here are the\nonly conventions traded in practice.",
+      "description": "Valuation presentation and pricing policy for CDS marks.\n\nEach variant bundles a coherent set of choices (premium-leg accrual schedule,\nclean/dirty NPV, par-spread denominator). Mixing those choices via separate\nboolean overrides is intentionally not supported \u2014 the variants here are the\nonly conventions traded in practice.",
       "oneOf": [
         {
           "const": "isda_dirty",
@@ -2081,12 +2093,12 @@
         },
         {
           "const": "VED",
-          "description": "Bolívar Soberano (926)",
+          "description": "Bol\u00edvar Soberano (926)",
           "type": "string"
         },
         {
           "const": "VES",
-          "description": "Bolívar Soberano (928)",
+          "description": "Bol\u00edvar Soberano (928)",
           "type": "string"
         },
         {
@@ -2151,7 +2163,7 @@
       "oneOf": [
         {
           "const": "Act360",
-          "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
+          "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, \u20acSTR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```",
           "type": "string"
         },
         {
@@ -2161,17 +2173,17 @@
         },
         {
           "const": "Act365L",
-          "description": "Actual/365 Leap day count convention (Actual/365L or AFB).\n\nYear fraction = (actual days) / (366 if Feb 29 in period else 365)\n\n# Standards Reference\n\n- **AFB**: Association Française des Banques (French Bankers Association)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, AFB, ISMA-Year\n\n# Usage\n\nUsed in:\n- French government bonds (OATs)\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```",
+          "description": "Actual/365 Leap day count convention (Actual/365L or AFB).\n\nYear fraction = (actual days) / (366 if Feb 29 in period else 365)\n\n# Standards Reference\n\n- **AFB**: Association Fran\u00e7aise des Banques (French Bankers Association)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, AFB, ISMA-Year\n\n# Usage\n\nUsed in:\n- French government bonds (OATs)\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```",
           "type": "string"
         },
         {
           "const": "Thirty360",
-          "description": "30/360 US (Bond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with US market adjustments.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)\n  — primary reference for this implementation, including the February\n  end-of-month rule\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA\n\n# SIA/PSA vs ISDA\n\nThis implementation follows the SIA/PSA convention, which includes a\nFebruary end-of-month rule: when both the start date and the end date\nfall on the last day of February, D₂ is changed to 30. ISDA 2006\n§4.16(f) specifies a slightly different set of adjustment rules that\nomit this February-EOM logic. Both are commonly referred to as\n\"30/360 US\", but they can produce different day counts for periods\nthat start or end on the last day of February.\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere (SIA/PSA rules):\n  D₁' = 30                       if D₁ is 31 or last day of February\n  D₂' = 30                       if D₂ is 31 and D₁' = 30\n  D₂' = 30                       if D₂ is last day of Feb and D₁ is last day of Feb\n  otherwise D₁' = D₁, D₂' = D₂\n```\n\n# Usage\n\nStandard for:\n- US corporate bonds\n- US municipal bonds\n- US agency debt\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::February, 28).expect(\"Valid date\");\n\nlet yf = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats Jan 31 as day 30, Feb 28 as day 28: 28 days / 360\nassert_eq!(yf, 28.0 / 360.0);\n```",
+          "description": "30/360 US (Bond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with US market adjustments.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)\n  \u2014 primary reference for this implementation, including the February\n  end-of-month rule\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA\n\n# SIA/PSA vs ISDA\n\nThis implementation follows the SIA/PSA convention, which includes a\nFebruary end-of-month rule: when both the start date and the end date\nfall on the last day of February, D\u2082 is changed to 30. ISDA 2006\n\u00a74.16(f) specifies a slightly different set of adjustment rules that\nomit this February-EOM logic. Both are commonly referred to as\n\"30/360 US\", but they can produce different day counts for periods\nthat start or end on the last day of February.\n\n# Formula\n\n```text\nDays = 360(Y\u2082 - Y\u2081) + 30(M\u2082 - M\u2081) + (D\u2082' - D\u2081')\n\nwhere (SIA/PSA rules):\n  D\u2081' = 30                       if D\u2081 is 31 or last day of February\n  D\u2082' = 30                       if D\u2082 is 31 and D\u2081' = 30\n  D\u2082' = 30                       if D\u2082 is last day of Feb and D\u2081 is last day of Feb\n  otherwise D\u2081' = D\u2081, D\u2082' = D\u2082\n```\n\n# Usage\n\nStandard for:\n- US corporate bonds\n- US municipal bonds\n- US agency debt\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::February, 28).expect(\"Valid date\");\n\nlet yf = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats Jan 31 as day 30, Feb 28 as day 28: 28 days / 360\nassert_eq!(yf, 28.0 / 360.0);\n```",
           "type": "string"
         },
         {
           "const": "ThirtyE360",
-          "description": "30E/360 (Eurobond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with European adjustments.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = min(D₁, 30)\n  D₂' = min(D₂, 30)\n```\n\n# Usage\n\nStandard for:\n- Eurobonds\n- International bonds\n- Some interest rate swaps\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::March, 31).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats both 31st as day 30: 60 days / 360\nassert_eq!(yf, 60.0 / 360.0);\n```",
+          "description": "30E/360 (Eurobond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with European adjustments.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis\n\n# Formula\n\n```text\nDays = 360(Y\u2082 - Y\u2081) + 30(M\u2082 - M\u2081) + (D\u2082' - D\u2081')\n\nwhere:\n  D\u2081' = min(D\u2081, 30)\n  D\u2082' = min(D\u2082, 30)\n```\n\n# Usage\n\nStandard for:\n- Eurobonds\n- International bonds\n- Some interest rate swaps\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::March, 31).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats both 31st as day 30: 60 days / 360\nassert_eq!(yf, 60.0 / 360.0);\n```",
           "type": "string"
         },
         {
@@ -2212,26 +2224,26 @@
       ]
     },
     "FloatingLegCompounding": {
-      "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple (LIBOR-style)\n- **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`\n- **Use for**: USD LIBOR, EUR EURIBOR, GBP LIBOR (historical)\n- **Standard**: ISDA 2006 Definitions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Lookback**: Typically 2-5 business days before period end\n- **Observation shift**: Optional shift for operational convenience\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR swap with 2-day lookback\nlet sofr = FloatingLegCompounding::CompoundedInArrears {\n    lookback_days: 2,\n    observation_shift: None,\n};\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA swap with 5-day lookback\nlet sonia = FloatingLegCompounding::sonia();\nif let FloatingLegCompounding::CompoundedInArrears { lookback_days, .. } = sonia {\n    assert_eq!(lookback_days, 5);\n}\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions\n- **BoE** (Bank of England): SONIA conventions\n- **ECB**: €STR conventions\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details.",
+      "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, \u20acSTR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple (LIBOR-style)\n- **Formula**: `Coupon = Notional \u00d7 (Forward_Rate + Spread) \u00d7 DCF`\n- **Use for**: USD LIBOR, EUR EURIBOR, GBP LIBOR (historical)\n- **Standard**: ISDA 2006 Definitions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional \u00d7 [\u220f(1 + r_i \u00d7 dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR \u20acSTR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Lookback**: Typically 2-5 business days before period end\n- **Observation shift**: Optional shift for operational convenience\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR swap with 2-day lookback\nlet sofr = FloatingLegCompounding::CompoundedInArrears {\n    lookback_days: 2,\n    observation_shift: None,\n};\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA swap with 5-day lookback\nlet sonia = FloatingLegCompounding::sonia();\nif let FloatingLegCompounding::CompoundedInArrears { lookback_days, .. } = sonia {\n    assert_eq!(lookback_days, 5);\n}\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions\n- **BoE** (Bank of England): SONIA conventions\n- **ECB**: \u20acSTR conventions\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details.",
       "oneOf": [
         {
           "const": "Simple",
-          "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional × (Forward_Rate + Spread) × Day_Count_Fraction\n\nUse for:\n- Term SOFR / EURIBOR-style swaps with fixed-tenor indices\n- Legacy USD/EUR/GBP LIBOR swaps (for back-testing only)\n\nThis is the current default behavior for vanilla IRS and matches\nISDA 2006 term-rate conventions.",
+          "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional \u00d7 (Forward_Rate + Spread) \u00d7 Day_Count_Fraction\n\nUse for:\n- Term SOFR / EURIBOR-style swaps with fixed-tenor indices\n- Legacy USD/EUR/GBP LIBOR swaps (for back-testing only)\n\nThis is the current default behavior for vanilla IRS and matches\nISDA 2006 term-rate conventions.",
           "type": "string"
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional × [∏(1 + r_i × dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR €STR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Days to shift observation end date before period end (typically 2-5)\n- `observation_shift`: Optional additional shift for operational convenience\n\n# Market Conventions\n\n- **SOFR**: 2-day lookback (ARRC recommended)\n- **SONIA**: 5-day lookback (BoE recommended)\n- **€STR**: 2-day shift (ECB convention)\n- **TONA**: 2-day lag (JSCC convention)",
+          "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional \u00d7 [\u220f(1 + r_i \u00d7 dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR \u20acSTR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Days to shift observation end date before period end (typically 2-5)\n- `observation_shift`: Optional additional shift for operational convenience\n\n# Market Conventions\n\n- **SOFR**: 2-day lookback (ARRC recommended)\n- **SONIA**: 5-day lookback (BoE recommended)\n- **\u20acSTR**: 2-day shift (ECB convention)\n- **TONA**: 2-day lag (JSCC convention)",
           "properties": {
             "CompoundedInArrears": {
               "properties": {
                 "lookback_days": {
-                  "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
+                  "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2\u20135 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
                   "format": "int32",
                   "type": "integer"
                 },
                 "observation_shift": {
-                  "description": "Optional additional date shift applied on top of the lookback\n(in business days).\n\n**Implementation note – lookback semantics, not true observation shift:**\nThis parameter shifts observation dates only; DCF weights are always\ncomputed from the original (unshifted) accrual period dates.  Under the\nISDA 2021 \"observation shift\" convention, both observation dates *and*\nDCF weights should be shifted.  All current market presets (SOFR, SONIA,\nESTR, TONA) use lookback semantics so this distinction does not affect\nstandard swaps.  If true observation-shift behavior is required, a\ndedicated variant should be added.",
+                  "description": "Optional additional date shift applied on top of the lookback\n(in business days).\n\n**Implementation note \u2013 lookback semantics, not true observation shift:**\nThis parameter shifts observation dates only; DCF weights are always\ncomputed from the original (unshifted) accrual period dates.  Under the\nISDA 2021 \"observation shift\" convention, both observation dates *and*\nDCF weights should be shifted.  All current market presets (SOFR, SONIA,\nESTR, TONA) use lookback semantics so this distinction does not affect\nstandard swaps.  If true observation-shift behavior is required, a\ndedicated variant should be added.",
                   "format": "int32",
                   "type": [
                     "integer",
@@ -2252,7 +2264,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           × rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) × rate(d - shift, d+1 - shift)\n```",
+          "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           \u00d7 rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) \u00d7 rate(d - shift, d+1 - shift)\n```",
           "properties": {
             "CompoundedWithObservationShift": {
               "properties": {
@@ -2312,12 +2324,12 @@
         },
         {
           "const": "log_linear",
-          "description": "Log‐linear interpolation of positive values.",
+          "description": "Log\u2010linear interpolation of positive values.",
           "type": "string"
         },
         {
           "const": "monotone_convex",
-          "description": "Monotone‐convex interpolation of positive, non-increasing values.",
+          "description": "Monotone\u2010convex interpolation of positive, non-increasing values.",
           "type": "string"
         },
         {
@@ -2327,7 +2339,7 @@
         },
         {
           "const": "piecewise_quadratic_forward",
-          "description": "Piecewise quadratic forwards (smooth forward curve, C²).",
+          "description": "Piecewise quadratic forwards (smooth forward curve, C\u00b2).",
           "type": "string"
         }
       ]
@@ -2401,7 +2413,7 @@
               "type": "number"
             },
             "tau2": {
-              "description": "Second decay factor (must be > 0, ≠ τ₁).",
+              "description": "Second decay factor (must be > 0, \u2260 \u03c4\u2081).",
               "format": "double",
               "type": "number"
             },
@@ -2479,13 +2491,13 @@
             }
           ],
           "default": null,
-          "description": "Optional override for the OIS floating-leg compounding mode used by\nthe calibration's bootstrap-internal swaps.\n\nWhen unset, the bootstrap uses the registered per-index default\n(e.g. SOFR → `CompoundedInArrears { lookback_days: 2 }` per ARRC).\nSet this to match a vendor convention that differs from the registry\ndefault — e.g. Bloomberg SWPM SOFR uses\n`CompoundedWithRateCutoff { cutoff_days: 1 }` for the daily-compounded\nfloat leg, and a curve calibrated against SWPM screen rates needs to\nprice its bootstrap swaps with the same compounding to bit-match\nBloomberg's resulting DFs."
+          "description": "Optional override for the OIS floating-leg compounding mode used by\nthe calibration's bootstrap-internal swaps.\n\nWhen unset, the bootstrap uses the registered per-index default\n(e.g. SOFR \u2192 `CompoundedInArrears { lookback_days: 2 }` per ARRC).\nSet this to match a vendor convention that differs from the registry\ndefault \u2014 e.g. Bloomberg SWPM SOFR uses\n`CompoundedWithRateCutoff { cutoff_days: 1 }` for the daily-compounded\nfloat leg, and a curve calibrated against SWPM screen rates needs to\nprice its bootstrap swaps with the same compounding to bit-match\nBloomberg's resulting DFs."
         }
       },
       "type": "object"
     },
     "SabrInterpolationMethod": {
-      "description": "Interpolation method for SABR parameters across the expiry–tenor grid.",
+      "description": "Interpolation method for SABR parameters across the expiry\u2013tenor grid.",
       "oneOf": [
         {
           "const": "bilinear",
@@ -2515,7 +2527,7 @@
       "type": "object"
     },
     "Seniority": {
-      "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n[`crate::credit::lgd::seniority`].\n\nOrder is **not** total — `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
+      "description": "Seniority level for credit exposures.\n\nUsed to tag a hazard curve with the seniority of the issuer's debt\nobserved by the curve. Drives the recovery-rate prior in default\nmodelling and selects the right LGD prior in\n[`crate::credit::lgd::seniority`].\n\nOrder is **not** total \u2014 `SeniorSecured` is strictly senior to `Senior`,\n`Subordinated`, and `Junior`, but the relative ordering of `Subordinated`\nvs. `Junior` is jurisdiction-dependent. Do not rely on `Ord` semantics.",
       "oneOf": [
         {
           "const": "senior_secured",

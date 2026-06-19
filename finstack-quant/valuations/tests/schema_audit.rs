@@ -166,9 +166,11 @@ mod generated_schema_contract {
     #![allow(clippy::expect_used)]
 
     use serde_json::Value;
+    use std::collections::BTreeSet;
     use std::path::{Path, PathBuf};
 
     const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
+    const SCHEMA_ID_HOST: &str = "https://finstack_quant.dev/";
 
     fn schema_root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("schemas")
@@ -176,6 +178,28 @@ mod generated_schema_contract {
 
     fn instrument_schema_root() -> PathBuf {
         schema_root().join("instruments").join("1")
+    }
+
+    fn generated_standalone_schema_paths() -> Vec<PathBuf> {
+        [
+            ("calibration/3", "calibration"),
+            ("results/1", "valuation_result"),
+            ("cashflow/1", "coupon_specs"),
+            ("cashflow/1", "amortization_spec"),
+            ("cashflow/1", "schedule_params"),
+            ("cashflow/1", "fee_specs"),
+            ("cashflow/1", "default_model_spec"),
+            ("cashflow/1", "prepayment_model_spec"),
+            ("cashflow/1", "recovery_model_spec"),
+            ("market/1", "market_quote"),
+        ]
+        .into_iter()
+        .map(|(subdir, filename)| {
+            schema_root()
+                .join(subdir)
+                .join(format!("{filename}.schema.json"))
+        })
+        .collect()
     }
 
     fn read_schema(path: &Path) -> Value {
@@ -215,6 +239,179 @@ mod generated_schema_contract {
             }
             Value::Array(items) => items.iter().any(|child| contains_key(child, key)),
             _ => false,
+        }
+    }
+
+    fn is_date_like_property(name: &str) -> bool {
+        name == "date"
+            || name.ends_with("_date")
+            || name == "maturity"
+            || name.ends_with("_maturity")
+            || name == "expiry"
+            || name.ends_with("_expiry")
+    }
+
+    fn schema_accepts_string(value: &Value) -> bool {
+        match value.get("type") {
+            Some(Value::String(schema_type)) => schema_type == "string",
+            Some(Value::Array(schema_types)) => schema_types.iter().any(|schema_type| {
+                schema_type
+                    .as_str()
+                    .is_some_and(|schema_type| schema_type == "string")
+            }),
+            _ => false,
+        }
+    }
+
+    fn collect_missing_date_formats(value: &Value, path: &str, out: &mut Vec<String>) {
+        match value {
+            Value::Object(map) => {
+                if let Some(properties) = map.get("properties").and_then(Value::as_object) {
+                    for (property, schema) in properties {
+                        let property_path = format!("{path}/properties/{property}");
+                        if is_date_like_property(property)
+                            && schema_accepts_string(schema)
+                            && schema.get("format").and_then(Value::as_str) != Some("date")
+                        {
+                            out.push(property_path.clone());
+                        }
+                        collect_missing_date_formats(schema, &property_path, out);
+                    }
+                }
+
+                for (key, child) in map {
+                    if key != "properties" {
+                        collect_missing_date_formats(child, &format!("{path}/{key}"), out);
+                    }
+                }
+            }
+            Value::Array(items) => {
+                for (idx, child) in items.iter().enumerate() {
+                    collect_missing_date_formats(child, &format!("{path}/{idx}"), out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn date_like_string_properties_declare_date_format() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&schema_root(), &mut schema_files);
+
+        for path in schema_files {
+            let schema = read_schema(&path);
+            let mut missing = Vec::new();
+            collect_missing_date_formats(&schema, "", &mut missing);
+
+            assert!(
+                missing.is_empty(),
+                "{} has date-like string properties without format=date: {}",
+                path.display(),
+                missing.join(", ")
+            );
+        }
+    }
+
+    #[test]
+    fn schemas_use_canonical_id_host() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&schema_root(), &mut schema_files);
+
+        for path in schema_files {
+            let schema = read_schema(&path);
+            let Some(id) = schema.get("$id").and_then(Value::as_str) else {
+                continue;
+            };
+            assert!(
+                id.starts_with(SCHEMA_ID_HOST),
+                "{} has non-canonical $id host: {id}",
+                path.display()
+            );
+        }
+    }
+
+    fn json_pointer_unescape(segment: &str) -> String {
+        segment.replace("~1", "/").replace("~0", "~")
+    }
+
+    fn collect_local_def_refs(value: &Value, out: &mut BTreeSet<String>) {
+        match value {
+            Value::Object(map) => {
+                if let Some(reference) = map.get("$ref").and_then(Value::as_str) {
+                    if let Some(rest) = reference.strip_prefix("#/$defs/") {
+                        if let Some(segment) = rest.split('/').next() {
+                            out.insert(json_pointer_unescape(segment));
+                        }
+                    }
+                }
+                for child in map.values() {
+                    collect_local_def_refs(child, out);
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    collect_local_def_refs(child, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn reachable_local_defs(schema: &Value) -> BTreeSet<String> {
+        let Some(defs) = schema.get("$defs").and_then(Value::as_object) else {
+            return BTreeSet::new();
+        };
+
+        let mut root = schema.clone();
+        if let Some(root_obj) = root.as_object_mut() {
+            root_obj.remove("$defs");
+        }
+
+        let mut discovered = BTreeSet::new();
+        collect_local_def_refs(&root, &mut discovered);
+
+        let mut reachable = BTreeSet::new();
+        while let Some(next) = discovered.iter().next().cloned() {
+            discovered.remove(&next);
+            if !reachable.insert(next.clone()) {
+                continue;
+            }
+            if let Some(definition) = defs.get(&next) {
+                collect_local_def_refs(definition, &mut discovered);
+            }
+        }
+
+        reachable
+    }
+
+    #[test]
+    fn generated_schemas_do_not_emit_unreachable_defs() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&instrument_schema_root(), &mut schema_files);
+        schema_files.extend(generated_standalone_schema_paths());
+
+        for path in schema_files {
+            if path.file_name().and_then(|name| name.to_str())
+                == Some("basket_with_instruments.schema.json")
+            {
+                continue;
+            }
+
+            let schema = read_schema(&path);
+            let Some(defs) = schema.get("$defs").and_then(Value::as_object) else {
+                continue;
+            };
+            let reachable = reachable_local_defs(&schema);
+            let all_defs: BTreeSet<_> = defs.keys().cloned().collect();
+            let unreachable: Vec<_> = all_defs.difference(&reachable).cloned().collect();
+
+            assert!(
+                unreachable.is_empty(),
+                "{} has unreachable $defs: {}",
+                path.display(),
+                unreachable.join(", ")
+            );
         }
     }
 
@@ -306,6 +503,58 @@ mod fx_schema_drift {
     use serde_json::{Map, Value};
     use std::path::Path;
 
+    fn is_date_like_property(name: &str) -> bool {
+        name == "date"
+            || name.ends_with("_date")
+            || name == "maturity"
+            || name.ends_with("_maturity")
+            || name == "expiry"
+            || name.ends_with("_expiry")
+    }
+
+    fn schema_accepts_string(value: &Value) -> bool {
+        match value.get("type") {
+            Some(Value::String(schema_type)) => schema_type == "string",
+            Some(Value::Array(schema_types)) => schema_types.iter().any(|schema_type| {
+                schema_type
+                    .as_str()
+                    .is_some_and(|schema_type| schema_type == "string")
+            }),
+            _ => false,
+        }
+    }
+
+    fn annotate_date_formats(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                if let Some(properties) = map.get_mut("properties").and_then(Value::as_object_mut) {
+                    for (property, schema) in properties {
+                        if is_date_like_property(property) && schema_accepts_string(schema) {
+                            if let Some(schema_obj) = schema.as_object_mut() {
+                                schema_obj
+                                    .entry("format".to_string())
+                                    .or_insert_with(|| Value::String("date".to_string()));
+                            }
+                        }
+                        annotate_date_formats(schema);
+                    }
+                }
+
+                for (key, child) in map {
+                    if key != "properties" {
+                        annotate_date_formats(child);
+                    }
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    annotate_date_formats(child);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn checked_in_spec(name: &str) -> Value {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("schemas")
@@ -325,7 +574,8 @@ mod fx_schema_drift {
 
     fn generated_spec<T: JsonSchema>() -> Value {
         let schema = schemars::schema_for!(T);
-        let generated = serde_json::to_value(schema).expect("serialize generated schema");
+        let mut generated = serde_json::to_value(schema).expect("serialize generated schema");
+        annotate_date_formats(&mut generated);
         let mut spec = Map::new();
         for key in ["properties", "required", "type", "additionalProperties"] {
             if let Some(value) = generated.get(key) {

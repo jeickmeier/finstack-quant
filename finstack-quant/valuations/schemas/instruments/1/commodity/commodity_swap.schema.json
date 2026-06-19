@@ -1492,6 +1492,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1767,6 +1768,7 @@
             },
             "maturity": {
               "description": "End date of the swap.",
+              "format": "date",
               "type": "string"
             },
             "pricing_overrides": {
@@ -1824,6 +1826,7 @@
             },
             "start_date": {
               "description": "Start date of the swap.",
+              "format": "date",
               "type": "string"
             },
             "ticker": {

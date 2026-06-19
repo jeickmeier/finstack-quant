@@ -333,6 +333,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
+              "format": "date",
               "type": "string"
             },
             "conventions": {
@@ -408,6 +409,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
+              "format": "date",
               "type": "string"
             },
             "conventions": {
@@ -465,6 +467,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
+              "format": "date",
               "type": "string"
             },
             "cds_valuation_convention": {
@@ -558,6 +561,7 @@
             },
             "base_date": {
               "description": "Base date for the curve.",
+              "format": "date",
               "type": "string"
             },
             "currency": {
@@ -629,6 +633,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the surface.",
+              "format": "date",
               "type": "string"
             },
             "beta": {
@@ -731,6 +736,7 @@
             },
             "base_date": {
               "description": "Base date for the calibration.",
+              "format": "date",
               "type": "string"
             },
             "calendar_id": {
@@ -861,6 +867,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the calibration.",
+              "format": "date",
               "type": "string"
             },
             "bdc": {
@@ -1039,6 +1046,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the calibration.",
+              "format": "date",
               "type": "string"
             },
             "currency": {
@@ -1085,6 +1093,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the calibration.",
+              "format": "date",
               "type": "string"
             },
             "currency": {
@@ -1150,6 +1159,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the surface.",
+              "format": "date",
               "type": "string"
             },
             "discount_curve_id": {
@@ -1217,6 +1227,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
+              "format": "date",
               "type": "string"
             },
             "basis_spread_curve_id": {
@@ -1291,6 +1302,7 @@
           "properties": {
             "base_date": {
               "description": "Base date for the curve.",
+              "format": "date",
               "type": "string"
             },
             "curve_id": {
@@ -2623,6 +2635,7 @@
                 },
                 "expiry": {
                   "description": "Expiry date of the future.",
+                  "format": "date",
                   "type": "string"
                 },
                 "id": {
@@ -2856,6 +2869,7 @@
                 },
                 "maturity": {
                   "description": "Maturity date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "running_spread_bp": {
@@ -2984,6 +2998,7 @@
                 },
                 "expiry": {
                   "description": "Option expiry date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "id": {
@@ -3054,6 +3069,7 @@
                     },
                     "maturity": {
                       "description": "Swap maturity",
+                      "format": "date",
                       "type": "string"
                     },
                     "rate": {
@@ -3101,6 +3117,7 @@
                     },
                     "maturity": {
                       "description": "Swap maturity",
+                      "format": "date",
                       "type": "string"
                     },
                     "rate": {
@@ -3152,6 +3169,7 @@
                     },
                     "expiry": {
                       "description": "Option expiry",
+                      "format": "date",
                       "type": "string"
                     },
                     "id": {
@@ -3206,6 +3224,7 @@
                     },
                     "expiry": {
                       "description": "Option expiry",
+                      "format": "date",
                       "type": "string"
                     },
                     "id": {
@@ -3214,6 +3233,7 @@
                     },
                     "maturity": {
                       "description": "Underlying swap maturity date",
+                      "format": "date",
                       "type": "string"
                     },
                     "quote_type": {
@@ -3260,6 +3280,7 @@
                     },
                     "expiry": {
                       "description": "Cap/floor maturity or caplet expiry.",
+                      "format": "date",
                       "type": "string"
                     },
                     "id": {
@@ -3401,10 +3422,12 @@
                 },
                 "issue_date": {
                   "description": "Bond issue date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "maturity": {
                   "description": "Bond maturity date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "type": {
@@ -3446,10 +3469,12 @@
                 },
                 "issue_date": {
                   "description": "Bond issue date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "maturity": {
                   "description": "Bond maturity date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "type": {
@@ -3496,10 +3521,12 @@
                 },
                 "issue_date": {
                   "description": "Bond issue date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "maturity": {
                   "description": "Bond maturity date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "oas": {
@@ -3546,10 +3573,12 @@
                 },
                 "issue_date": {
                   "description": "Bond issue date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "maturity": {
                   "description": "Bond maturity date.",
+                  "format": "date",
                   "type": "string"
                 },
                 "type": {
@@ -3967,6 +3996,7 @@
           "description": "An absolute date.\n\nThe maturity is fixed to a specific date, regardless of the valuation date. This is\ntypically used for futures contracts or bespoke instruments with fixed maturities.",
           "properties": {
             "date": {
+              "format": "date",
               "type": "string"
             }
           },

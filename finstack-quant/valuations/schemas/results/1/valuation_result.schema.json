@@ -1234,6 +1234,7 @@
             },
             "date": {
               "description": "Cashflow payment date (ISO8601)",
+              "format": "date",
               "type": "string"
             },
             "discount_factor": {

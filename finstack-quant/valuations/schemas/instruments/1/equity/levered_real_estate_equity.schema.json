@@ -95,6 +95,7 @@
         },
         "issue_date": {
           "description": "Issue date",
+          "format": "date",
           "type": "string"
         },
         "pricing_overrides": {
@@ -184,10 +185,12 @@
         },
         "issue_date": {
           "description": "Issue date of the pool.",
+          "format": "date",
           "type": "string"
         },
         "maturity": {
           "description": "Legal maturity date.",
+          "format": "date",
           "type": "string"
         },
         "original_face": {
@@ -404,6 +407,7 @@
         },
         "trade_date": {
           "description": "Trade date.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -722,6 +726,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "fixing_dates": {
@@ -1569,6 +1574,7 @@
           "default": null
         },
         "expiry": {
+          "format": "date",
           "type": "string"
         },
         "final_barrier": {
@@ -1745,6 +1751,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -2502,10 +2509,12 @@
         },
         "issue_date": {
           "description": "Issue date of the bond.",
+          "format": "date",
           "type": "string"
         },
         "maturity": {
           "description": "Maturity date of the bond.",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -2611,6 +2620,7 @@
         },
         "expiry": {
           "description": "Future expiry date (last trading day)",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -3051,6 +3061,7 @@
         },
         "cash_settlement_date": {
           "description": "Cash premium settlement date for Black time-to-expiry, when the screen\nquotes option time from premium settlement rather than valuation date.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3058,6 +3069,7 @@
         },
         "cds_maturity": {
           "description": "Underlying CDS maturity date",
+          "format": "date",
           "type": "string"
         },
         "credit_curve_id": {
@@ -3070,6 +3082,7 @@
         },
         "exercise_settlement_date": {
           "description": "Exercise settlement date for Black time-to-expiry, when distinct from\nthe legal option expiration date.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3081,6 +3094,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -3180,6 +3194,7 @@
         },
         "underlying_effective_date": {
           "description": "Underlying CDS accrual-effective date used for forward spread and risky\nannuity. Bloomberg CDSO can quote a standard CDS effective date before\noption expiry; in that case premium accrues from this date while\nprotection starts at expiry.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3260,6 +3275,7 @@
         },
         "effective_date": {
           "description": "Optional effective date for schedule anchoring (if None, uses as_of date)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3279,6 +3295,7 @@
         },
         "maturity": {
           "description": "Maturity date of the tranche",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -3499,6 +3516,7 @@
       "properties": {
         "end_date": {
           "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start_date` for one-day/discrete exercise.",
+          "format": "date",
           "type": "string"
         },
         "make_whole": {
@@ -3519,6 +3537,7 @@
         },
         "start_date": {
           "description": "First date when the option can be exercised.",
+          "format": "date",
           "type": "string"
         }
       },
@@ -3658,6 +3677,7 @@
         },
         "maturity": {
           "description": "End date of underlying period",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -3700,6 +3720,7 @@
         },
         "start_date": {
           "description": "Start date of underlying period",
+          "format": "date",
           "type": "string"
         },
         "strike": {
@@ -3787,6 +3808,7 @@
         },
         "date": {
           "description": "Payment date (or payment date for principal/fee, or reset date for `CFKind::FloatReset`).",
+          "format": "date",
           "type": "string"
         },
         "kind": {
@@ -3803,6 +3825,7 @@
         },
         "reset_date": {
           "description": "Optional index reset date (for floating coupons).",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3841,6 +3864,7 @@
         },
         "issue_date": {
           "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3919,6 +3943,7 @@
         },
         "date": {
           "description": "Date of cash sweep prepayment",
+          "format": "date",
           "type": "string"
         }
       },
@@ -4218,6 +4243,7 @@
           "default": null
         },
         "expiry": {
+          "format": "date",
           "type": "string"
         },
         "global_cap": {
@@ -4635,6 +4661,7 @@
         },
         "expiry_date": {
           "description": "Option expiry date.",
+          "format": "date",
           "type": "string"
         },
         "forward_curve_id": {
@@ -4663,6 +4690,7 @@
         },
         "payment_date": {
           "description": "Payment date (may differ from expiry).",
+          "format": "date",
           "type": "string"
         },
         "pricing_overrides": {
@@ -5130,6 +5158,7 @@
       "properties": {
         "date": {
           "description": "Effective date of the step-down",
+          "format": "date",
           "type": "string"
         },
         "new_limit": {
@@ -5174,6 +5203,7 @@
         },
         "expiry": {
           "description": "Option expiry/settlement date for the payoff.",
+          "format": "date",
           "type": "string"
         },
         "fixing_dates": {
@@ -5388,6 +5418,7 @@
         },
         "maturity": {
           "description": "Settlement/delivery date.",
+          "format": "date",
           "type": "string"
         },
         "multiplier": {
@@ -5553,6 +5584,7 @@
         },
         "expiry": {
           "description": "Option expiry date.",
+          "format": "date",
           "type": "string"
         },
         "forward_curve_id": {
@@ -5694,6 +5726,7 @@
         },
         "expiry": {
           "description": "Option expiry date.",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -5838,6 +5871,7 @@
         },
         "maturity": {
           "description": "End date of the swap.",
+          "format": "date",
           "type": "string"
         },
         "pricing_overrides": {
@@ -5895,6 +5929,7 @@
         },
         "start_date": {
           "description": "Start date of the swap.",
+          "format": "date",
           "type": "string"
         },
         "ticker": {
@@ -5966,6 +6001,7 @@
         },
         "expiry": {
           "description": "Option expiry date.",
+          "format": "date",
           "type": "string"
         },
         "fixed_price": {
@@ -6068,10 +6104,12 @@
       "properties": {
         "bullet_date": {
           "description": "Date the accumulated funding account is released as a bullet payment.",
+          "format": "date",
           "type": "string"
         },
         "start_date": {
           "description": "First date principal is accumulated into the funding account.",
+          "format": "date",
           "type": "string"
         }
       },
@@ -6195,6 +6233,7 @@
               "properties": {
                 "conversion_date": {
                   "description": "Date of mandatory conversion.",
+                  "format": "date",
                   "type": "string"
                 },
                 "lower_conversion_price": {
@@ -6336,10 +6375,12 @@
         },
         "issue_date": {
           "description": "Issue date.",
+          "format": "date",
           "type": "string"
         },
         "maturity": {
           "description": "Maturity date.",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -6648,6 +6689,7 @@
       "properties": {
         "breach_date": {
           "description": "Date when breach occurred (if any)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -6755,6 +6797,7 @@
         },
         "protection_effective_date": {
           "description": "Optional protection effective date for forward-starting CDS.\n\nWhen `Some(date)`, protection begins on the specified date rather than\nthe premium leg start date. This allows a CDS where premium accrues\nfrom the original start date but credit protection only kicks in later.\n\nMust satisfy: `premium.start <= protection_effective_date <= premium.end`.\n\nWhen `None`, protection starts on the premium leg start date (standard CDS).",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -8387,6 +8430,7 @@
         },
         "maturity": {
           "description": "Maturity date of the deposit period.",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -8437,6 +8481,7 @@
         },
         "start_date": {
           "description": "Start date of the deposit period.",
+          "format": "date",
           "type": "string"
         }
       },
@@ -8471,6 +8516,7 @@
       "properties": {
         "date": {
           "description": "Date of the dilutive event.",
+          "format": "date",
           "type": "string"
         },
         "new_issue_price": {
@@ -8625,6 +8671,7 @@
           "$ref": "#/$defs/TerminalValueSpec"
         },
         "valuation_date": {
+          "format": "date",
           "type": "string"
         },
         "valuation_discounts": {
@@ -8696,6 +8743,7 @@
         },
         "back_settlement_date": {
           "description": "Explicit back-month settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for the back leg.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -8729,6 +8777,7 @@
         },
         "front_settlement_date": {
           "description": "Explicit front-month settlement date override.\n\nWhen set, bypasses the SIFMA calendar lookup for the front leg.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -8807,6 +8856,7 @@
         },
         "trade_date": {
           "description": "Trade date.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -8839,6 +8889,7 @@
         },
         "date": {
           "description": "Date of the draw",
+          "format": "date",
           "type": "string"
         }
       },
@@ -8857,6 +8908,7 @@
         },
         "date": {
           "description": "Date of the draw or repayment.",
+          "format": "date",
           "type": "string"
         },
         "is_draw": {
@@ -9209,6 +9261,7 @@
         },
         "expiry": {
           "description": "Future expiry/settlement date.",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -9217,6 +9270,7 @@
         },
         "last_trading_date": {
           "description": "Last trading date (typically one day before expiry).",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -9345,6 +9399,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -10462,6 +10517,7 @@
         },
         "fixing_date": {
           "description": "Rate fixing date. If `None`, inferred from `start_date - reset_lag` business days.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -10477,6 +10533,7 @@
         },
         "maturity": {
           "description": "Interest period end date",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -10527,6 +10584,7 @@
         },
         "start_date": {
           "description": "Interest period start date",
+          "format": "date",
           "type": "string"
         }
       },
@@ -10555,6 +10613,7 @@
         },
         "date": {
           "description": "Date of the event",
+          "format": "date",
           "type": "string"
         },
         "deal_id": {
@@ -10762,6 +10821,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "foreign_discount_curve_id": {
@@ -10919,6 +10979,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "foreign_discount_curve_id": {
@@ -11045,6 +11106,7 @@
         },
         "maturity": {
           "description": "Maturity/settlement date.",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -11138,6 +11200,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "foreign_discount_curve_id": {
@@ -11345,6 +11408,7 @@
         },
         "far_date": {
           "description": "Far leg settlement date (forward leg).",
+          "format": "date",
           "type": "string"
         },
         "far_rate": {
@@ -11366,6 +11430,7 @@
         },
         "near_date": {
           "description": "Near leg settlement date (spot leg).",
+          "format": "date",
           "type": "string"
         },
         "near_rate": {
@@ -11459,6 +11524,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "foreign_discount_curve_id": {
@@ -11594,6 +11660,7 @@
         },
         "maturity": {
           "description": "Maturity/settlement date",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -11659,6 +11726,7 @@
         },
         "start_date": {
           "description": "Start date of observation period",
+          "format": "date",
           "type": "string"
         },
         "strike_variance": {
@@ -11968,6 +12036,7 @@
         },
         "maturity": {
           "description": "End date of the final inflation period.",
+          "format": "date",
           "type": "string"
         },
         "nominal_rate_volatility": {
@@ -12013,6 +12082,7 @@
         },
         "start_date": {
           "description": "Start date of the first inflation period.",
+          "format": "date",
           "type": "string"
         },
         "strike": {
@@ -12126,6 +12196,7 @@
         },
         "base_date": {
           "description": "Base date for index (may differ from issue date)",
+          "format": "date",
           "type": "string"
         },
         "base_index": {
@@ -12179,6 +12250,7 @@
         },
         "issue_date": {
           "description": "Issue date",
+          "format": "date",
           "type": "string"
         },
         "lag": {
@@ -12187,6 +12259,7 @@
         },
         "maturity": {
           "description": "Maturity date",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -12328,6 +12401,7 @@
         },
         "maturity": {
           "description": "Maturity date",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -12365,6 +12439,7 @@
         },
         "start_date": {
           "description": "Start date of indexation",
+          "format": "date",
           "type": "string"
         }
       },
@@ -13669,10 +13744,12 @@
         },
         "expiry": {
           "description": "Future expiry/delivery date",
+          "format": "date",
           "type": "string"
         },
         "fixing_date": {
           "description": "Underlying rate fixing date.\n\nDefaults to `expiry` when omitted.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -13900,6 +13977,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "futures_price": {
@@ -14005,6 +14083,7 @@
         },
         "date": {
           "description": "Call date (earliest prepayment date for this call provision)",
+          "format": "date",
           "type": "string"
         },
         "price_pct_of_par": {
@@ -14104,6 +14183,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -14291,6 +14371,7 @@
       "properties": {
         "date": {
           "description": "Effective date of margin increase",
+          "format": "date",
           "type": "string"
         },
         "delta_bp": {
@@ -14558,6 +14639,7 @@
         },
         "fixing_date": {
           "description": "Fixing date (rate observation date, typically T-2 before maturity).",
+          "format": "date",
           "type": "string"
         },
         "fixing_rate": {
@@ -14608,6 +14690,7 @@
         },
         "maturity": {
           "description": "Maturity/settlement date.",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -15209,6 +15292,7 @@
       "properties": {
         "date": {
           "description": "Date PIK feature is toggled",
+          "format": "date",
           "type": "string"
         },
         "enable_pik": {
@@ -15227,6 +15311,7 @@
       "properties": {
         "acquisition_date": {
           "description": "Acquisition date",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -15279,6 +15364,7 @@
         },
         "maturity": {
           "description": "Maturity date",
+          "format": "date",
           "type": "string"
         },
         "mdr_override": {
@@ -16111,6 +16197,7 @@
         },
         "expiry": {
           "description": "Option expiry date.",
+          "format": "date",
           "type": "string"
         },
         "foreign_discount_curve_id": {
@@ -16322,6 +16409,7 @@
         },
         "payment_date": {
           "description": "Optional payment date (defaults to last observation date)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -16635,6 +16723,7 @@
         },
         "sale_date": {
           "default": null,
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -16676,6 +16765,7 @@
           ]
         },
         "valuation_date": {
+          "format": "date",
           "type": "string"
         },
         "valuation_method": {
@@ -16858,6 +16948,7 @@
         },
         "end_date": {
           "description": "End date of reinvestment period",
+          "format": "date",
           "type": "string"
         },
         "is_active": {
@@ -16912,6 +17003,7 @@
         },
         "maturity": {
           "description": "Weighted average maturity date",
+          "format": "date",
           "type": "string"
         },
         "rate": {
@@ -17014,6 +17106,7 @@
         },
         "maturity": {
           "description": "Maturity date of the repo",
+          "format": "date",
           "type": "string"
         },
         "pricing_overrides": {
@@ -17055,6 +17148,7 @@
         },
         "start_date": {
           "description": "Start date of the repo",
+          "format": "date",
           "type": "string"
         },
         "triparty": {
@@ -17238,6 +17332,7 @@
         },
         "commitment_date": {
           "description": "Date when the facility becomes available.",
+          "format": "date",
           "type": "string"
         },
         "credit_curve_id": {
@@ -17282,6 +17377,7 @@
         },
         "maturity": {
           "description": "Date when the facility expires.",
+          "format": "date",
           "type": "string"
         },
         "pricing_overrides": {
@@ -17776,6 +17872,7 @@
       "properties": {
         "step_down_date": {
           "description": "Earliest date principal may switch to pro-rata.",
+          "format": "date",
           "type": "string"
         },
         "triggers": {
@@ -18277,6 +18374,7 @@
         },
         "closing_date": {
           "description": "Key dates.\nDeal closing date (issuance).",
+          "format": "date",
           "type": "string"
         },
         "correlation_structure": {
@@ -18375,6 +18473,7 @@
         },
         "first_payment_date": {
           "description": "First payment date to tranches.",
+          "format": "date",
           "type": "string"
         },
         "frequency": {
@@ -18399,6 +18498,7 @@
         },
         "maturity": {
           "description": "Legal final maturity date.",
+          "format": "date",
           "type": "string"
         },
         "payment_bdc": {
@@ -18466,6 +18566,7 @@
         },
         "reinvestment_end_date": {
           "description": "End of reinvestment period (if applicable).",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -18596,6 +18697,7 @@
         },
         "expiry": {
           "description": "Option expiry date",
+          "format": "date",
           "type": "string"
         },
         "fixed_freq": {
@@ -19028,10 +19130,12 @@
         },
         "issue_date": {
           "description": "Issue (effective) date",
+          "format": "date",
           "type": "string"
         },
         "maturity": {
           "description": "Maturity date",
+          "format": "date",
           "type": "string"
         },
         "notional_limit": {
@@ -19164,6 +19268,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -19373,6 +19478,7 @@
         },
         "expected_maturity": {
           "description": "Expected maturity date (may be earlier than legal maturity for CLOs)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -19403,6 +19509,7 @@
         },
         "maturity": {
           "description": "Legal final maturity date",
+          "format": "date",
           "type": "string"
         },
         "oc_trigger": {
@@ -19922,6 +20029,7 @@
         },
         "maturity": {
           "description": "Maturity/settlement date",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -19976,6 +20084,7 @@
         },
         "start_date": {
           "description": "Start date of observation period",
+          "format": "date",
           "type": "string"
         },
         "strike_variance": {
@@ -20138,6 +20247,7 @@
         },
         "expiry": {
           "description": "Future expiry date. For VIX futures this is the final settlement day\nitself (the Wednesday ~30 days before the expiry of the SPX options\nused in the settlement calculation), not a date 30 days before\nsettlement.",
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -20184,6 +20294,7 @@
         },
         "settlement_date": {
           "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX).",
+          "format": "date",
           "type": "string"
         },
         "vol_index_curve_id": {
@@ -20230,6 +20341,7 @@
           "default": "european"
         },
         "expiry": {
+          "format": "date",
           "type": "string"
         },
         "id": {
@@ -20267,6 +20379,7 @@
         },
         "settlement_date": {
           "default": null,
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -20661,6 +20774,7 @@
         },
         "maturity": {
           "description": "Maturity date",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -20698,6 +20812,7 @@
         },
         "start_date": {
           "description": "Start date of the first accrual period",
+          "format": "date",
           "type": "string"
         }
       },
@@ -20837,6 +20952,7 @@
             },
             "exit_date": {
               "description": "Optional explicit exit/sale date. Defaults to the last NOI date on/after `as_of`.",
+              "format": "date",
               "type": [
                 "string",
                 "null"

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://finstack_quant.io/schemas/factor_model/1/credit_factor_model.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
   "title": "CreditFactorModel",
   "description": "Fully self-contained credit factor hierarchy model artifact. Canonical Rust type: finstack_quant_factor_model::credit::hierarchy::CreditFactorModel. Schema version constant: finstack_quant.credit_factor_model/1.",
   "type": "object",

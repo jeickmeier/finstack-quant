@@ -1488,6 +1488,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -1727,6 +1728,7 @@
             },
             "expiry": {
               "description": "Option expiry/settlement date for the payoff.",
+              "format": "date",
               "type": "string"
             },
             "fixing_dates": {

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://finstack_quant.io/schemas/factor_model/1/credit_calibration_config.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_calibration_config.schema.json",
   "title": "CreditCalibrationConfig",
   "description": "Configuration for the credit factor calibrator. Canonical Rust type: finstack_quant_valuations::factor_model::CreditCalibrationConfig. Note: this type is not serialized into the output artifact; it is the calibration-time input configuration.",
   "type": "object",

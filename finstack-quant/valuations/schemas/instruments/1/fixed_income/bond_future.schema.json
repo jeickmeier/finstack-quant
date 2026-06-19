@@ -261,10 +261,12 @@
         },
         "issue_date": {
           "description": "Issue date of the bond.",
+          "format": "date",
           "type": "string"
         },
         "maturity": {
           "description": "Maturity date of the bond.",
+          "format": "date",
           "type": "string"
         },
         "notional": {
@@ -608,6 +610,7 @@
       "properties": {
         "end_date": {
           "description": "Last date when the option can be exercised, inclusive.\n\nUse the same value as `start_date` for one-day/discrete exercise.",
+          "format": "date",
           "type": "string"
         },
         "make_whole": {
@@ -628,6 +631,7 @@
         },
         "start_date": {
           "description": "First date when the option can be exercised.",
+          "format": "date",
           "type": "string"
         }
       },
@@ -677,6 +681,7 @@
         },
         "date": {
           "description": "Payment date (or payment date for principal/fee, or reset date for `CFKind::FloatReset`).",
+          "format": "date",
           "type": "string"
         },
         "kind": {
@@ -693,6 +698,7 @@
         },
         "reset_date": {
           "description": "Optional index reset date (for floating coupons).",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -731,6 +737,7 @@
         },
         "issue_date": {
           "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days.",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -2914,6 +2921,7 @@
       "properties": {
         "draw_stop_date": {
           "description": "Draw stop date (earliest date after which draws are blocked)",
+          "format": "date",
           "type": [
             "string",
             "null"
@@ -3186,6 +3194,7 @@
             },
             "expiry": {
               "description": "Future expiry date (last trading day)",
+              "format": "date",
               "type": "string"
             },
             "id": {

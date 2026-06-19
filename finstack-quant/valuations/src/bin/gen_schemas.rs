@@ -39,8 +39,62 @@ fn to_title(name: &str) -> String {
         .join(" ")
 }
 
+/// Return true for field names that conventionally carry ISO calendar dates.
+fn is_date_like_property(name: &str) -> bool {
+    name == "date"
+        || name.ends_with("_date")
+        || name == "maturity"
+        || name.ends_with("_maturity")
+        || name == "expiry"
+        || name.ends_with("_expiry")
+}
+
+fn schema_accepts_string(value: &Value) -> bool {
+    match value.get("type") {
+        Some(Value::String(schema_type)) => schema_type == "string",
+        Some(Value::Array(schema_types)) => schema_types.iter().any(|schema_type| {
+            schema_type
+                .as_str()
+                .is_some_and(|schema_type| schema_type == "string")
+        }),
+        _ => false,
+    }
+}
+
+/// Add `format: "date"` to generated date-like string properties.
+fn annotate_date_formats(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            if let Some(properties) = map.get_mut("properties").and_then(Value::as_object_mut) {
+                for (property, schema) in properties {
+                    if is_date_like_property(property) && schema_accepts_string(schema) {
+                        if let Some(schema_obj) = schema.as_object_mut() {
+                            schema_obj
+                                .entry("format".to_string())
+                                .or_insert_with(|| Value::String("date".to_string()));
+                        }
+                    }
+                    annotate_date_formats(schema);
+                }
+            }
+
+            for (key, child) in map {
+                if key != "properties" {
+                    annotate_date_formats(child);
+                }
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                annotate_date_formats(child);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Read an existing schema file, merge the generated instrument schema, and write back.
-fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
+fn update_schema_file(name: &str, category: &str, mut generated_schema: Value) {
     let base = schemas_dir();
     let path = base.join(category).join(format!("{name}.schema.json"));
 
@@ -59,6 +113,7 @@ fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
     let existing_obj = existing
         .as_object()
         .expect("existing schema must be an object");
+    annotate_date_formats(&mut generated_schema);
 
     // Extract the generated schema's properties and required fields for embedding
     // into the spec sub-schema. Generated refs are document-root pointers
@@ -167,6 +222,8 @@ fn all_schemas_dir() -> PathBuf {
 fn update_standalone_schema_file(name: &str, subdir: &str, filename: &str, generated: Value) {
     let base = all_schemas_dir();
     let path = base.join(subdir).join(format!("{filename}.schema.json"));
+    let mut generated = generated;
+    annotate_date_formats(&mut generated);
 
     let existing: Value = if path.exists() {
         let content = std::fs::read_to_string(&path)
