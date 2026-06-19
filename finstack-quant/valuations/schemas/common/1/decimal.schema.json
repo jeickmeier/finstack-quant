@@ -1,0 +1,8 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/decimal.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Decimal number encoded as a JSON string.",
+  "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+  "title": "Decimal",
+  "type": "string"
+}

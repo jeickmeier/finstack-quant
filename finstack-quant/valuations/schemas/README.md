@@ -16,8 +16,9 @@ cargo run -p finstack-quant-valuations --bin gen_schemas
 
 ```
 schemas/
+  common/1/                # Shared schemas referenced by generated artifacts
   instruments/1/           # Financial instrument definitions (v1)
-    instrument.schema.json # Envelope schema (tagged union of all types)
+    instrument.schema.json # Full envelope union of all instrument schemas
     fixed_income/          # Bonds, loans, structured credit, MBS
     rates/                 # Swaps, swaptions, caps/floors, futures
     credit_derivatives/    # CDS, CDS indices, tranches, options
@@ -112,10 +113,29 @@ Each instrument schema has:
   - Enum variants with descriptions and standards references
 - **Root-level `$defs`** — nested types (enums, structs) referenced from the spec
 
-`instruments/1/instrument.schema.json` validates the common envelope and supported
-`instrument.type` discriminators. Full `instrument.spec` validation uses the
-dedicated per-type schema files; the Rust helper
-`validate_instrument_envelope_json()` runs both checks.
+`instruments/1/instrument.schema.json` is a full `oneOf` union over the
+dedicated per-type schema files. It validates both the common envelope and the
+typed `instrument.spec` payload. The Rust helper
+`validate_instrument_envelope_json()` still runs a second per-type validation
+step so callers get discriminator-specific error messages.
+
+### Shared References
+
+Generated schemas use canonical external refs for repeated shapes:
+- `common/1/*.schema.json` covers shared core types such as money, currency,
+  IDs, attributes, pricing overrides, tenors, dates, decimals, day-count
+  conventions, and business-day conventions.
+- `cashflow/1/*.schema.json` covers standalone cashflow component specs. The
+  generator only externalizes unambiguous cashflow definitions; overloaded names
+  such as instrument-specific `AmortizationSpec` remain local.
+
+Validators must resolve these `$id` URIs. Offline validators should register the
+checked-in files as in-memory resources keyed by their `$id` values. The Rust
+runtime validation helpers do this automatically for embedded schemas.
+
+`exotics/basket.schema.json` is the canonical basket schema. The former
+supplementary `basket_with_instruments.schema.json` artifact was removed to keep
+the basket surface single-sourced.
 
 ### Calibration JSON
 
@@ -150,6 +170,10 @@ Calibration uses a plan-based approach:
 
 Schema versions are encoded in directory paths (`/1/`, `/2/`, `/3/`). The `schema` field in envelopes (for example, `"finstack_quant.instrument/1"` and `"finstack_quant.calibration/3"`) enforces version compatibility at parse time.
 
+`schema_version` is reserved for internal model/data payloads whose Rust type
+owns that field. Current exceptions are valuation results and credit factor
+model artifacts; public envelopes should use `schema`.
+
 ## Validation
 
 Schemas can be used with any JSON Schema Draft 2020-12 validator:
@@ -161,5 +185,10 @@ schema = json.load(open("schemas/instruments/1/fixed_income/bond.schema.json"))
 instance = json.load(open("my_bond.json"))
 jsonschema.validate(instance, schema)
 ```
+
+For schemas containing external `$ref`s, configure your validator with the
+referenced files from `common/1`, `cashflow/1`, and the relevant instrument
+schema directories. Validating `instrument.schema.json` requires registering all
+per-instrument schema files as resources.
 
 In Rust, use the `finstack_quant_valuations::schema::validate_instrument_envelope_json()` function for runtime validation against the embedded schemas.

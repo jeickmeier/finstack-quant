@@ -1,0 +1,25 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "User-defined tags and key-value metadata for classification.",
+  "properties": {
+    "meta": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Structured metadata associated with the instrument.",
+      "type": "object"
+    },
+    "tags": {
+      "description": "User-defined tags for categorization.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "title": "Attributes",
+  "type": "object"
+}

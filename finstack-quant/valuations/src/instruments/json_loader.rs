@@ -1435,23 +1435,30 @@ mod tests {
         }
     }
 
-    /// Verifies that the instrument.schema.json enum matches the canonical list.
+    /// Verifies that the instrument.schema.json union matches the canonical list.
     ///
     /// This test ensures that the JSON schema stays in sync with the Rust code.
     /// If this test fails, update the JSON schema file to match the canonical list.
     #[test]
-    fn test_instrument_schema_enum_parity() {
+    fn test_instrument_schema_union_parity() {
         let schema_json = include_str!("../../schemas/instruments/1/instrument.schema.json");
         let schema: serde_json::Value =
             serde_json::from_str(schema_json).expect("Schema JSON should be valid");
 
-        // Extract the enum array from the schema
-        let schema_types: Vec<&str> = schema["properties"]["instrument"]["properties"]["type"]
-            ["enum"]
+        // Extract instrument type names from the oneOf refs in the union schema.
+        let schema_types: Vec<&str> = schema["oneOf"]
             .as_array()
-            .expect("Schema should have instrument.properties.type.enum array")
+            .expect("Schema should have oneOf instrument refs")
             .iter()
-            .map(|v| v.as_str().expect("Enum values should be strings"))
+            .map(|v| {
+                let reference = v["$ref"].as_str().expect("oneOf entries should be refs");
+                reference
+                    .rsplit('/')
+                    .next()
+                    .expect("ref should contain filename")
+                    .strip_suffix(".schema.json")
+                    .expect("ref should point to a schema file")
+            })
             .collect();
 
         // Sort both lists for comparison

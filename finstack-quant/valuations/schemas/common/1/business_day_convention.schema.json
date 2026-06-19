@@ -1,0 +1,33 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Business day adjustment convention.",
+  "oneOf": [
+    {
+      "const": "unadjusted",
+      "description": "No adjustment - date remains as specified.\n\n**ISDA**: Section 4.12(a) - \"Unadjusted\"\n**FpML**: \"NONE\"",
+      "type": "string"
+    },
+    {
+      "const": "following",
+      "description": "Adjust to next business day (may cross month boundary).\n\n**ISDA**: Section 4.12(b) - \"Following Business Day Convention\"\n**FpML**: \"FOLLOWING\"\n**ISO 20022**: \"FWNG\"",
+      "type": "string"
+    },
+    {
+      "const": "modified_following",
+      "description": "Following, unless that crosses into next month, then preceding.\n\nEnsures month-end dates don't shift to next month, important for\nconsistent period calculations in swaps and bonds.\n\n**ISDA**: Section 4.12(c) - \"Modified Following Business Day Convention\"\n**FpML**: \"MODFOLLOWING\"\n**ISO 20022**: \"MODF\"",
+      "type": "string"
+    },
+    {
+      "const": "preceding",
+      "description": "Adjust to previous business day (may cross month boundary).\n\n**ISDA**: Section 4.12(d) - \"Preceding Business Day Convention\"\n**FpML**: \"PRECEDING\"\n**ISO 20022**: \"PREC\"",
+      "type": "string"
+    },
+    {
+      "const": "modified_preceding",
+      "description": "Preceding, unless that crosses into previous month, then following.\n\n**ISDA**: Section 4.12(e) - \"Modified Preceding Business Day Convention\"\n**FpML**: \"MODPRECEDING\"",
+      "type": "string"
+    }
+  ],
+  "title": "Business Day Convention"
+}

@@ -7,12 +7,18 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import validators
+from referencing import Registry, Resource
 
 from finstack_quant.valuations.instruments import list_standard_metrics, validate_instrument_json
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[3]
 INSTRUMENT_ENVELOPE_SCHEMA_PATH = (
     WORKSPACE_ROOT / "finstack-quant/valuations/schemas/instruments/1/instrument.schema.json"
+)
+SCHEMA_RESOURCE_DIRS = (
+    WORKSPACE_ROOT / "finstack-quant/valuations/schemas/common/1",
+    WORKSPACE_ROOT / "finstack-quant/valuations/schemas/cashflow/1",
+    WORKSPACE_ROOT / "finstack-quant/valuations/schemas/instruments/1",
 )
 
 
@@ -50,12 +56,23 @@ def _validate_instrument_envelope_schema(instrument_json: dict[str, Any]) -> Non
     schema = json.loads(INSTRUMENT_ENVELOPE_SCHEMA_PATH.read_text(encoding="utf-8"))
     validator_cls = validators.validator_for(schema)
     validator_cls.check_schema(schema)
-    validator = validator_cls(schema)
+    validator = validator_cls(schema, registry=_schema_registry())
     errors = sorted(validator.iter_errors(instrument_json), key=lambda error: list(error.path))
     if errors:
         details = "\n  ".join(error.message for error in errors)
         msg = f"instrument_json failed {INSTRUMENT_ENVELOPE_SCHEMA_PATH.name} validation:\n  {details}"
         raise ValueError(msg)
+
+
+def _schema_registry() -> Registry:
+    resources: list[tuple[str, Resource]] = []
+    for schema_dir in SCHEMA_RESOURCE_DIRS:
+        for path in sorted(schema_dir.rglob("*.schema.json")):
+            schema = json.loads(path.read_text(encoding="utf-8"))
+            schema_id = schema.get("$id")
+            if isinstance(schema_id, str):
+                resources.append((schema_id, Resource.from_contents(schema)))
+    return Registry().with_resources(resources)
 
 
 def _metric_base(metric: str) -> str:

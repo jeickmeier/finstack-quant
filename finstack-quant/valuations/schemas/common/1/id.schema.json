@@ -1,0 +1,7 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Opaque string identifier.",
+  "title": "Id",
+  "type": "string"
+}

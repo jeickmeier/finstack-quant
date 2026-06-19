@@ -13,6 +13,8 @@ use serde_json::Value;
 use std::sync::OnceLock;
 
 const JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
+const COMMON_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/common/1/";
+const CASHFLOW_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
 
 /// Parse embedded JSON schema at compile time, returning a Result.
 /// The JSON is embedded via `include_str!` so the content is always present,
@@ -123,6 +125,156 @@ fn fallback_instrument_schema(instrument_type: &str) -> Value {
     })
 }
 
+fn common_schema_resource(
+    filename: &'static str,
+    raw: &'static str,
+) -> finstack_quant_core::Result<(String, jsonschema::Resource)> {
+    let schema = serde_json::from_str::<Value>(raw).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "invalid common schema JSON at {filename}: {e}"
+        ))
+    })?;
+    let resource = jsonschema::Resource::from_contents(schema).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "invalid common schema resource at {filename}: {e}"
+        ))
+    })?;
+    Ok((format!("{COMMON_SCHEMA_BASE}{filename}"), resource))
+}
+
+fn common_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
+    [
+        (
+            "attributes.schema.json",
+            include_str!("../schemas/common/1/attributes.schema.json"),
+        ),
+        (
+            "business_day_convention.schema.json",
+            include_str!("../schemas/common/1/business_day_convention.schema.json"),
+        ),
+        (
+            "currency.schema.json",
+            include_str!("../schemas/common/1/currency.schema.json"),
+        ),
+        (
+            "date.schema.json",
+            include_str!("../schemas/common/1/date.schema.json"),
+        ),
+        (
+            "day_count.schema.json",
+            include_str!("../schemas/common/1/day_count.schema.json"),
+        ),
+        (
+            "decimal.schema.json",
+            include_str!("../schemas/common/1/decimal.schema.json"),
+        ),
+        (
+            "id.schema.json",
+            include_str!("../schemas/common/1/id.schema.json"),
+        ),
+        (
+            "money.schema.json",
+            include_str!("../schemas/common/1/money.schema.json"),
+        ),
+        (
+            "pricing_overrides.schema.json",
+            include_str!("../schemas/common/1/pricing_overrides.schema.json"),
+        ),
+        (
+            "tenor.schema.json",
+            include_str!("../schemas/common/1/tenor.schema.json"),
+        ),
+    ]
+    .into_iter()
+    .map(|(filename, raw)| common_schema_resource(filename, raw))
+    .collect()
+}
+
+fn cashflow_schema_resource(
+    filename: &'static str,
+    raw: &'static str,
+) -> finstack_quant_core::Result<(String, jsonschema::Resource)> {
+    let schema = serde_json::from_str::<Value>(raw).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "invalid cashflow schema JSON at {filename}: {e}"
+        ))
+    })?;
+    let resource = jsonschema::Resource::from_contents(schema).map_err(|e| {
+        finstack_quant_core::Error::Validation(format!(
+            "invalid cashflow schema resource at {filename}: {e}"
+        ))
+    })?;
+    Ok((format!("{CASHFLOW_SCHEMA_BASE}{filename}"), resource))
+}
+
+fn cashflow_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
+    [
+        (
+            "amortization_spec.schema.json",
+            include_str!("../schemas/cashflow/1/amortization_spec.schema.json"),
+        ),
+        (
+            "coupon_specs.schema.json",
+            include_str!("../schemas/cashflow/1/coupon_specs.schema.json"),
+        ),
+        (
+            "default_model_spec.schema.json",
+            include_str!("../schemas/cashflow/1/default_model_spec.schema.json"),
+        ),
+        (
+            "fee_specs.schema.json",
+            include_str!("../schemas/cashflow/1/fee_specs.schema.json"),
+        ),
+        (
+            "prepayment_model_spec.schema.json",
+            include_str!("../schemas/cashflow/1/prepayment_model_spec.schema.json"),
+        ),
+        (
+            "recovery_model_spec.schema.json",
+            include_str!("../schemas/cashflow/1/recovery_model_spec.schema.json"),
+        ),
+        (
+            "schedule_params.schema.json",
+            include_str!("../schemas/cashflow/1/schedule_params.schema.json"),
+        ),
+    ]
+    .into_iter()
+    .map(|(filename, raw)| cashflow_schema_resource(filename, raw))
+    .collect()
+}
+
+fn embedded_instrument_schema_resources(
+) -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
+    let mut resources = std::collections::BTreeMap::new();
+    for (tag, schema_result) in instrument_schema_cache() {
+        let schema = schema_result.as_ref().map_err(|e| {
+            finstack_quant_core::Error::Validation(format!(
+                "invalid instrument schema JSON for {tag}: {e}"
+            ))
+        })?;
+        let id = schema.get("$id").and_then(Value::as_str).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "instrument schema for {tag} is missing $id"
+            ))
+        })?;
+        let resource = jsonschema::Resource::from_contents(schema.clone()).map_err(|e| {
+            finstack_quant_core::Error::Validation(format!(
+                "invalid instrument schema resource for {tag}: {e}"
+            ))
+        })?;
+        resources.insert(id.to_string(), resource);
+    }
+
+    Ok(resources.into_iter().collect())
+}
+
+fn external_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
+    let mut resources = common_schema_resources()?;
+    resources.extend(cashflow_schema_resources()?);
+    resources.extend(embedded_instrument_schema_resources()?);
+    Ok(resources)
+}
+
 /// Return the canonical instrument discriminators advertised by the envelope schema.
 ///
 /// # Errors
@@ -130,23 +282,49 @@ fn fallback_instrument_schema(instrument_type: &str) -> Value {
 /// Returns `Error::Validation` if the embedded schema JSON is malformed.
 pub fn instrument_types() -> finstack_quant_core::Result<Vec<String>> {
     let schema = instrument_envelope_schema()?;
-    let Some(values) = schema
+    if let Some(values) = schema
         .pointer("/properties/instrument/properties/type/enum")
         .and_then(serde_json::Value::as_array)
-    else {
+    {
+        return values
+            .iter()
+            .map(|value| {
+                value.as_str().map(str::to_owned).ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "instrument schema enum contains a non-string value".to_string(),
+                    )
+                })
+            })
+            .collect();
+    }
+
+    let Some(variants) = schema.get("oneOf").and_then(Value::as_array) else {
         return Err(finstack_quant_core::Error::Validation(
-            "instrument schema enum is missing".to_string(),
+            "instrument schema oneOf union is missing".to_string(),
         ));
     };
 
-    values
+    variants
         .iter()
-        .map(|value| {
-            value.as_str().map(str::to_owned).ok_or_else(|| {
+        .map(|variant| {
+            let reference = variant.get("$ref").and_then(Value::as_str).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(
-                    "instrument schema enum contains a non-string value".to_string(),
+                    "instrument schema oneOf entry is missing $ref".to_string(),
                 )
-            })
+            })?;
+            let filename = reference.rsplit('/').next().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "instrument schema $ref has no filename: {reference}"
+                ))
+            })?;
+            filename
+                .strip_suffix(".schema.json")
+                .map(str::to_owned)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "instrument schema $ref is not a schema file: {reference}"
+                    ))
+                })
         })
         .collect()
 }
@@ -237,7 +415,7 @@ pub fn valuation_result_schema() -> finstack_quant_core::Result<&'static Value> 
 /// Returns `Error::Validation` if the JSON does not conform to the schema.
 pub fn validate_instrument_envelope_json(instance: &Value) -> finstack_quant_core::Result<()> {
     let schema = instrument_envelope_schema()?;
-    validate_against_schema(instance, schema, "instrument envelope")?;
+    let envelope_result = validate_against_schema(instance, schema, "instrument envelope");
 
     let instrument_type = instance
         .pointer("/instrument/type")
@@ -247,6 +425,13 @@ pub fn validate_instrument_envelope_json(instance: &Value) -> finstack_quant_cor
                 "instrument envelope validation passed but instrument.type is missing".to_string(),
             )
         })?;
+
+    if let Err(envelope_error) = envelope_result {
+        if instrument_types()?.iter().any(|ty| ty == instrument_type) {
+            validate_instrument_type_json(instrument_type, instance)?;
+        }
+        return Err(envelope_error);
+    }
 
     validate_instrument_type_json(instrument_type, instance)
 }
@@ -270,9 +455,12 @@ fn validate_against_schema(
     schema: &Value,
     context: &str,
 ) -> finstack_quant_core::Result<()> {
-    let validator = jsonschema::validator_for(schema).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("Invalid {context} schema: {e}"))
-    })?;
+    let validator = jsonschema::options()
+        .with_resources(external_schema_resources()?.into_iter())
+        .build(schema)
+        .map_err(|e| {
+            finstack_quant_core::Error::Validation(format!("Invalid {context} schema: {e}"))
+        })?;
 
     let errors: Vec<String> = validator
         .iter_errors(instance)

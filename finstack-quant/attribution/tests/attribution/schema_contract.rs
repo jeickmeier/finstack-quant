@@ -62,3 +62,24 @@ fn attribution_schemas_declare_2020_12_dialect() {
         );
     }
 }
+
+#[test]
+fn attribution_unannotated_enums_remain_simple_enums() {
+    let schema = read_schema(&schema_root().join("attribution.schema.json"));
+    for pointer in [
+        "/properties/attribution/properties/method/oneOf/2/properties/Waterfall/items",
+        "/properties/attribution/properties/config/properties/execution_policy",
+    ] {
+        let enum_schema = schema
+            .pointer(pointer)
+            .unwrap_or_else(|| panic!("missing enum schema at {pointer}"));
+        assert!(
+            enum_schema.get("enum").and_then(Value::as_array).is_some(),
+            "{pointer} should use simple enum while it has no per-variant metadata"
+        );
+        assert!(
+            enum_schema.get("oneOf").is_none(),
+            "{pointer} should not use oneOf without per-variant metadata"
+        );
+    }
+}

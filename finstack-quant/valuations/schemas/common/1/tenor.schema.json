@@ -1,0 +1,49 @@
+{
+  "$defs": {
+    "TenorUnit": {
+      "description": "Unit of a tenor period.",
+      "oneOf": [
+        {
+          "const": "days",
+          "description": "Days (D)",
+          "type": "string"
+        },
+        {
+          "const": "weeks",
+          "description": "Weeks (W)",
+          "type": "string"
+        },
+        {
+          "const": "months",
+          "description": "Months (M)",
+          "type": "string"
+        },
+        {
+          "const": "years",
+          "description": "Years (Y)",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A parsed financial tenor.",
+  "properties": {
+    "count": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "unit": {
+      "$ref": "#/$defs/TenorUnit"
+    }
+  },
+  "required": [
+    "count",
+    "unit"
+  ],
+  "title": "Tenor",
+  "type": "object"
+}

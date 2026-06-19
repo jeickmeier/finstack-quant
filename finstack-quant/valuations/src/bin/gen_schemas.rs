@@ -9,11 +9,19 @@
 
 use finstack_quant_valuations::instruments::*;
 use serde_json::{json, Map, Value};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 const JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 const DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
 const SCHEMARS_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE]\d+)?$";
+const COMMON_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/common/1/";
+
+#[derive(Clone, Copy)]
+struct InstrumentSchemaEntry {
+    name: &'static str,
+    category: &'static str,
+}
 
 /// Locate the schemas directory relative to the crate root.
 fn schemas_dir() -> PathBuf {
@@ -22,6 +30,17 @@ fn schemas_dir() -> PathBuf {
         .join("schemas")
         .join("instruments")
         .join("1")
+}
+
+/// Locate the top-level schemas directory.
+fn all_schemas_dir() -> PathBuf {
+    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
+    Path::new(&manifest_dir).join("schemas")
+}
+
+/// Locate the shared common-schema directory.
+fn common_schemas_dir() -> PathBuf {
+    all_schemas_dir().join("common").join("1")
 }
 
 /// Convert a snake_case name to a Title Case display name.
@@ -61,6 +80,156 @@ fn schema_accepts_string(value: &Value) -> bool {
         }),
         _ => false,
     }
+}
+
+fn common_schema_filename(def_name: &str) -> Option<&'static str> {
+    match def_name {
+        "Attributes" => Some("attributes.schema.json"),
+        "BusinessDayConvention" => Some("business_day_convention.schema.json"),
+        "Currency" => Some("currency.schema.json"),
+        "DayCount" => Some("day_count.schema.json"),
+        "Id" => Some("id.schema.json"),
+        "Money" => Some("money.schema.json"),
+        "PricingOverrides" => Some("pricing_overrides.schema.json"),
+        "Tenor" => Some("tenor.schema.json"),
+        _ => None,
+    }
+}
+
+fn common_schema_ref(def_name: &str) -> Option<String> {
+    common_schema_filename(def_name).map(|filename| format!("{COMMON_SCHEMA_BASE}{filename}"))
+}
+
+fn cashflow_schema_filename(def_name: &str) -> Option<&'static str> {
+    match def_name {
+        "DefaultModelSpec" => Some("default_model_spec.schema.json"),
+        "FeeSpec" => Some("fee_specs.schema.json"),
+        "FixedCouponSpec" => Some("coupon_specs.schema.json"),
+        "PrepaymentModelSpec" => Some("prepayment_model_spec.schema.json"),
+        "RecoveryModelSpec" => Some("recovery_model_spec.schema.json"),
+        "ScheduleParams" => Some("schedule_params.schema.json"),
+        _ => None,
+    }
+}
+
+fn cashflow_schema_ref(def_name: &str) -> Option<String> {
+    cashflow_schema_filename(def_name)
+        .map(|filename| format!("https://finstack_quant.dev/schemas/cashflow/1/{filename}"))
+}
+
+fn external_schema_ref(def_name: &str) -> Option<String> {
+    common_schema_ref(def_name).or_else(|| cashflow_schema_ref(def_name))
+}
+
+fn is_externalized_def(def_name: &str) -> bool {
+    common_schema_filename(def_name).is_some() || cashflow_schema_filename(def_name).is_some()
+}
+
+fn rewrite_common_refs(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            let replacement = map
+                .get("$ref")
+                .and_then(Value::as_str)
+                .and_then(|reference| reference.strip_prefix("#/$defs/"))
+                .and_then(external_schema_ref);
+            if let Some(external_ref) = replacement {
+                if let Some(reference) = map.get_mut("$ref") {
+                    *reference = Value::String(external_ref);
+                }
+            }
+
+            for child in map.values_mut() {
+                rewrite_common_refs(child);
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                rewrite_common_refs(child);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn json_pointer_unescape(segment: &str) -> String {
+    segment.replace("~1", "/").replace("~0", "~")
+}
+
+fn collect_local_def_refs(value: &Value, out: &mut BTreeSet<String>) {
+    match value {
+        Value::Object(map) => {
+            if let Some(reference) = map.get("$ref").and_then(Value::as_str) {
+                if let Some(rest) = reference.strip_prefix("#/$defs/") {
+                    if let Some(segment) = rest.split('/').next() {
+                        out.insert(json_pointer_unescape(segment));
+                    }
+                }
+            }
+            for child in map.values() {
+                collect_local_def_refs(child, out);
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                collect_local_def_refs(child, out);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn prune_unreachable_defs(value: &mut Value) {
+    let Some(defs) = value.get("$defs").and_then(Value::as_object) else {
+        return;
+    };
+
+    let mut root = value.clone();
+    if let Some(root_obj) = root.as_object_mut() {
+        root_obj.remove("$defs");
+    }
+
+    let mut discovered = BTreeSet::new();
+    collect_local_def_refs(&root, &mut discovered);
+
+    let mut reachable = BTreeSet::new();
+    while let Some(next) = discovered.iter().next().cloned() {
+        discovered.remove(&next);
+        if !reachable.insert(next.clone()) {
+            continue;
+        }
+        if let Some(definition) = defs.get(&next) {
+            collect_local_def_refs(definition, &mut discovered);
+        }
+    }
+
+    if let Some(defs) = value.get_mut("$defs").and_then(Value::as_object_mut) {
+        defs.retain(|def_name, _| reachable.contains(def_name));
+        if defs.is_empty() {
+            if let Some(obj) = value.as_object_mut() {
+                obj.remove("$defs");
+            }
+        }
+    }
+}
+
+fn prune_common_defs(value: &mut Value) {
+    if let Some(defs) = value.get_mut("$defs").and_then(Value::as_object_mut) {
+        defs.retain(|def_name, _| !is_externalized_def(def_name));
+        if defs.is_empty() {
+            if let Some(obj) = value.as_object_mut() {
+                obj.remove("$defs");
+            }
+        }
+    }
+}
+
+fn postprocess_schema(value: &mut Value) {
+    normalize_decimal_patterns(value);
+    annotate_date_formats(value);
+    rewrite_common_refs(value);
+    prune_common_defs(value);
+    prune_unreachable_defs(value);
 }
 
 /// Normalize `rust_decimal::Decimal` schemas emitted by schemars.
@@ -153,8 +322,7 @@ fn update_schema_file(name: &str, category: &str, mut generated_schema: Value) {
     let existing_obj = existing
         .as_object()
         .expect("existing schema must be an object");
-    normalize_decimal_patterns(&mut generated_schema);
-    annotate_date_formats(&mut generated_schema);
+    postprocess_schema(&mut generated_schema);
 
     // Extract the generated schema's properties and required fields for embedding
     // into the spec sub-schema. Generated refs are document-root pointers
@@ -252,10 +420,56 @@ fn update_schema_file(name: &str, category: &str, mut generated_schema: Value) {
     println!("  updated {}", path.display());
 }
 
-/// Locate the top-level schemas directory (parent of instruments/).
-fn all_schemas_dir() -> PathBuf {
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
-    Path::new(&manifest_dir).join("schemas")
+fn update_instrument_union_schema_file(entries: &[InstrumentSchemaEntry]) {
+    let path = schemas_dir().join("instrument.schema.json");
+    let existing: Value = if path.exists() {
+        let content = std::fs::read_to_string(&path)
+            .unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+        serde_json::from_str(&content).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
+    } else {
+        json!({
+            "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
+            "title": "Finstack Quant Instrument",
+            "description": "Tagged union of all supported financial instruments"
+        })
+    };
+    let existing_obj = existing
+        .as_object()
+        .expect("instrument union schema must be an object");
+
+    let mut output = Map::new();
+    for key in ["$id", "description", "title"] {
+        if let Some(value) = existing_obj.get(key) {
+            output.insert(key.to_string(), value.clone());
+        }
+    }
+    output.insert(
+        "$schema".to_string(),
+        Value::String(JSON_SCHEMA_DIALECT.to_string()),
+    );
+    let mut entries = entries.to_vec();
+    entries.sort_by_key(|entry| entry.name);
+    output.insert(
+        "oneOf".to_string(),
+        Value::Array(
+            entries
+                .iter()
+                .map(|entry| {
+                    json!({
+                        "$ref": format!(
+                            "https://finstack_quant.dev/schemas/instrument/1/{}/{}.schema.json",
+                            entry.category, entry.name
+                        )
+                    })
+                })
+                .collect(),
+        ),
+    );
+
+    let json_str = serde_json::to_string_pretty(&Value::Object(output)).expect("serialize output");
+    std::fs::write(&path, json_str + "\n")
+        .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+    println!("  updated {}", path.display());
 }
 
 /// Update a standalone (non-instrument) schema file, replacing the top-level
@@ -264,8 +478,7 @@ fn update_standalone_schema_file(name: &str, subdir: &str, filename: &str, gener
     let base = all_schemas_dir();
     let path = base.join(subdir).join(format!("{filename}.schema.json"));
     let mut generated = generated;
-    normalize_decimal_patterns(&mut generated);
-    annotate_date_formats(&mut generated);
+    postprocess_schema(&mut generated);
 
     let existing: Value = if path.exists() {
         let content = std::fs::read_to_string(&path)
@@ -335,6 +548,67 @@ fn update_standalone_schema_file(name: &str, subdir: &str, filename: &str, gener
     println!("  updated {}", path.display());
 }
 
+/// Update a shared common schema file from a schemars-generated type schema.
+fn update_common_schema_file(title: &str, description: &str, filename: &str, generated: Value) {
+    let dir = common_schemas_dir();
+    std::fs::create_dir_all(&dir).unwrap_or_else(|e| panic!("create {}: {e}", dir.display()));
+    let path = dir.join(filename);
+    let mut schema = generated;
+    normalize_decimal_patterns(&mut schema);
+    annotate_date_formats(&mut schema);
+    rewrite_common_refs(&mut schema);
+    prune_common_defs(&mut schema);
+
+    let mut output = Map::new();
+    output.insert(
+        "$id".to_string(),
+        Value::String(format!("{COMMON_SCHEMA_BASE}{filename}")),
+    );
+    output.insert(
+        "$schema".to_string(),
+        Value::String(JSON_SCHEMA_DIALECT.to_string()),
+    );
+    output.insert("title".to_string(), Value::String(title.to_string()));
+    output.insert(
+        "description".to_string(),
+        Value::String(description.to_string()),
+    );
+
+    if let Some(obj) = schema.as_object() {
+        for key in [
+            "type",
+            "format",
+            "pattern",
+            "additionalProperties",
+            "properties",
+            "required",
+            "oneOf",
+            "anyOf",
+            "enum",
+            "$defs",
+        ] {
+            if let Some(value) = obj.get(key) {
+                output.insert(key.to_string(), value.clone());
+            }
+        }
+    }
+
+    let json_str = serde_json::to_string_pretty(&Value::Object(output)).expect("serialize output");
+    std::fs::write(&path, json_str + "\n")
+        .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+    println!("  updated {}", path.display());
+}
+
+fn update_manual_common_schema_file(filename: &str, schema: Value) {
+    let dir = common_schemas_dir();
+    std::fs::create_dir_all(&dir).unwrap_or_else(|e| panic!("create {}: {e}", dir.display()));
+    let path = dir.join(filename);
+    let json_str = serde_json::to_string_pretty(&schema).expect("serialize output");
+    std::fs::write(&path, json_str + "\n")
+        .unwrap_or_else(|e| panic!("write {}: {e}", path.display()));
+    println!("  updated {}", path.display());
+}
+
 /// Generate a standalone schema for a type and update the corresponding file.
 macro_rules! gen_standalone_schema {
     ($name:literal, $ty:ty, $subdir:literal, $filename:literal) => {{
@@ -345,122 +619,392 @@ macro_rules! gen_standalone_schema {
     }};
 }
 
+/// Generate a common schema for a canonical shared type.
+macro_rules! gen_common_schema {
+    ($title:literal, $description:literal, $ty:ty, $filename:literal) => {{
+        let schema = schemars::schema_for!($ty);
+        let schema_value =
+            serde_json::to_value(&schema).expect(concat!("serialize schema for ", $title));
+        update_common_schema_file($title, $description, $filename, schema_value);
+    }};
+}
+
 /// Generate schema for a type and update the corresponding schema file.
 macro_rules! gen_schema {
-    ($name:literal, $ty:ty, $category:literal) => {{
+    ($entries:ident, $name:literal, $ty:ty, $category:literal) => {{
         let schema = schemars::schema_for!($ty);
         let schema_value =
             serde_json::to_value(&schema).expect(concat!("serialize schema for ", $name));
         update_schema_file($name, $category, schema_value);
+        $entries.push(InstrumentSchemaEntry {
+            name: $name,
+            category: $category,
+        });
     }};
 }
 
 fn main() {
+    println!("Generating common schemas...\n");
+    gen_common_schema!(
+        "Attributes",
+        "User-defined tags and key-value metadata for classification.",
+        finstack_quant_core::types::Attributes,
+        "attributes.schema.json"
+    );
+    gen_common_schema!(
+        "Business Day Convention",
+        "Business day adjustment convention.",
+        finstack_quant_core::dates::BusinessDayConvention,
+        "business_day_convention.schema.json"
+    );
+    gen_common_schema!(
+        "Currency",
+        "ISO 4217 currency code.",
+        finstack_quant_core::currency::Currency,
+        "currency.schema.json"
+    );
+    gen_common_schema!(
+        "Day Count",
+        "Day-count convention.",
+        finstack_quant_core::dates::DayCount,
+        "day_count.schema.json"
+    );
+    gen_common_schema!(
+        "Money",
+        "Currency-tagged monetary amount.",
+        finstack_quant_core::money::Money,
+        "money.schema.json"
+    );
+    gen_common_schema!(
+        "Pricing Overrides",
+        "Per-instrument pricing and sensitivity override knobs.",
+        finstack_quant_valuations::instruments::PricingOverrides,
+        "pricing_overrides.schema.json"
+    );
+    gen_common_schema!(
+        "Tenor",
+        "A parsed financial tenor.",
+        finstack_quant_core::dates::Tenor,
+        "tenor.schema.json"
+    );
+    update_common_schema_file(
+        "Id",
+        "Opaque string identifier.",
+        "id.schema.json",
+        json!({ "type": "string" }),
+    );
+    update_manual_common_schema_file(
+        "date.schema.json",
+        json!({
+            "$id": format!("{COMMON_SCHEMA_BASE}date.schema.json"),
+            "$schema": JSON_SCHEMA_DIALECT,
+            "title": "Date",
+            "description": "ISO 8601 calendar date string.",
+            "type": "string",
+            "format": "date"
+        }),
+    );
+    update_manual_common_schema_file(
+        "decimal.schema.json",
+        json!({
+            "$id": format!("{COMMON_SCHEMA_BASE}decimal.schema.json"),
+            "$schema": JSON_SCHEMA_DIALECT,
+            "title": "Decimal",
+            "description": "Decimal number encoded as a JSON string.",
+            "type": "string",
+            "pattern": DECIMAL_PATTERN
+        }),
+    );
+    println!("\nDone! Updated common schema files.");
+
     println!("Generating instrument schemas...\n");
+    let mut instrument_entries = Vec::new();
 
     // --- Fixed Income ---
-    gen_schema!("bond", Bond, "fixed_income");
-    gen_schema!("convertible_bond", ConvertibleBond, "fixed_income");
-    gen_schema!("inflation_linked_bond", InflationLinkedBond, "fixed_income");
-    gen_schema!("term_loan", TermLoan, "fixed_income");
-    gen_schema!("revolving_credit", RevolvingCredit, "fixed_income");
-    gen_schema!("bond_future", BondFuture, "fixed_income");
+    gen_schema!(instrument_entries, "bond", Bond, "fixed_income");
     gen_schema!(
+        instrument_entries,
+        "convertible_bond",
+        ConvertibleBond,
+        "fixed_income"
+    );
+    gen_schema!(
+        instrument_entries,
+        "inflation_linked_bond",
+        InflationLinkedBond,
+        "fixed_income"
+    );
+    gen_schema!(instrument_entries, "term_loan", TermLoan, "fixed_income");
+    gen_schema!(
+        instrument_entries,
+        "revolving_credit",
+        RevolvingCredit,
+        "fixed_income"
+    );
+    gen_schema!(
+        instrument_entries,
+        "bond_future",
+        BondFuture,
+        "fixed_income"
+    );
+    gen_schema!(
+        instrument_entries,
         "agency_mbs_passthrough",
         AgencyMbsPassthrough,
         "fixed_income"
     );
-    gen_schema!("agency_tba", AgencyTba, "fixed_income");
-    gen_schema!("agency_cmo", AgencyCmo, "fixed_income");
-    gen_schema!("dollar_roll", DollarRoll, "fixed_income");
+    gen_schema!(instrument_entries, "agency_tba", AgencyTba, "fixed_income");
+    gen_schema!(instrument_entries, "agency_cmo", AgencyCmo, "fixed_income");
     gen_schema!(
+        instrument_entries,
+        "dollar_roll",
+        DollarRoll,
+        "fixed_income"
+    );
+    gen_schema!(
+        instrument_entries,
         "trs_fixed_income_index",
         FIIndexTotalReturnSwap,
         "fixed_income"
     );
-    gen_schema!("structured_credit", StructuredCredit, "fixed_income");
+    gen_schema!(
+        instrument_entries,
+        "structured_credit",
+        StructuredCredit,
+        "fixed_income"
+    );
 
     // --- Rates ---
-    gen_schema!("interest_rate_swap", InterestRateSwap, "rates");
-    gen_schema!("basis_swap", BasisSwap, "rates");
-    gen_schema!("xccy_swap", XccySwap, "rates");
-    gen_schema!("inflation_swap", InflationSwap, "rates");
-    gen_schema!("yoy_inflation_swap", YoYInflationSwap, "rates");
-    gen_schema!("inflation_cap_floor", InflationCapFloor, "rates");
-    gen_schema!("forward_rate_agreement", ForwardRateAgreement, "rates");
-    gen_schema!("swaption", Swaption, "rates");
-    gen_schema!("bermudan_swaption", BermudanSwaption, "rates");
-    gen_schema!("interest_rate_future", InterestRateFuture, "rates");
-    gen_schema!("cap_floor", CapFloor, "rates");
-    gen_schema!("cms_option", CmsOption, "rates");
-    gen_schema!("cms_spread_option", CmsSpreadOption, "rates");
-    gen_schema!("cms_swap", CmsSwap, "rates");
-    gen_schema!("ir_future_option", IrFutureOption, "rates");
-    gen_schema!("deposit", Deposit, "rates");
-    gen_schema!("repo", Repo, "rates");
-    gen_schema!("range_accrual", RangeAccrual, "rates");
-    gen_schema!("callable_range_accrual", CallableRangeAccrual, "rates");
-    gen_schema!("snowball", Snowball, "rates");
-    gen_schema!("tarn", Tarn, "rates");
+    gen_schema!(
+        instrument_entries,
+        "interest_rate_swap",
+        InterestRateSwap,
+        "rates"
+    );
+    gen_schema!(instrument_entries, "basis_swap", BasisSwap, "rates");
+    gen_schema!(instrument_entries, "xccy_swap", XccySwap, "rates");
+    gen_schema!(instrument_entries, "inflation_swap", InflationSwap, "rates");
+    gen_schema!(
+        instrument_entries,
+        "yoy_inflation_swap",
+        YoYInflationSwap,
+        "rates"
+    );
+    gen_schema!(
+        instrument_entries,
+        "inflation_cap_floor",
+        InflationCapFloor,
+        "rates"
+    );
+    gen_schema!(
+        instrument_entries,
+        "forward_rate_agreement",
+        ForwardRateAgreement,
+        "rates"
+    );
+    gen_schema!(instrument_entries, "swaption", Swaption, "rates");
+    gen_schema!(
+        instrument_entries,
+        "bermudan_swaption",
+        BermudanSwaption,
+        "rates"
+    );
+    gen_schema!(
+        instrument_entries,
+        "interest_rate_future",
+        InterestRateFuture,
+        "rates"
+    );
+    gen_schema!(instrument_entries, "cap_floor", CapFloor, "rates");
+    gen_schema!(instrument_entries, "cms_option", CmsOption, "rates");
+    gen_schema!(
+        instrument_entries,
+        "cms_spread_option",
+        CmsSpreadOption,
+        "rates"
+    );
+    gen_schema!(instrument_entries, "cms_swap", CmsSwap, "rates");
+    gen_schema!(
+        instrument_entries,
+        "ir_future_option",
+        IrFutureOption,
+        "rates"
+    );
+    gen_schema!(instrument_entries, "deposit", Deposit, "rates");
+    gen_schema!(instrument_entries, "repo", Repo, "rates");
+    gen_schema!(instrument_entries, "range_accrual", RangeAccrual, "rates");
+    gen_schema!(
+        instrument_entries,
+        "callable_range_accrual",
+        CallableRangeAccrual,
+        "rates"
+    );
+    gen_schema!(instrument_entries, "snowball", Snowball, "rates");
+    gen_schema!(instrument_entries, "tarn", Tarn, "rates");
 
     // --- Credit Derivatives ---
     gen_schema!(
+        instrument_entries,
         "credit_default_swap",
         CreditDefaultSwap,
         "credit_derivatives"
     );
-    gen_schema!("cds_index", CDSIndex, "credit_derivatives");
-    gen_schema!("cds_tranche", CDSTranche, "credit_derivatives");
-    gen_schema!("cds_option", CDSOption, "credit_derivatives");
+    gen_schema!(
+        instrument_entries,
+        "cds_index",
+        CDSIndex,
+        "credit_derivatives"
+    );
+    gen_schema!(
+        instrument_entries,
+        "cds_tranche",
+        CDSTranche,
+        "credit_derivatives"
+    );
+    gen_schema!(
+        instrument_entries,
+        "cds_option",
+        CDSOption,
+        "credit_derivatives"
+    );
 
     // --- Equity ---
-    gen_schema!("equity", Equity, "equity");
-    gen_schema!("equity_option", EquityOption, "equity");
-    gen_schema!("autocallable", Autocallable, "equity");
-    gen_schema!("cliquet_option", CliquetOption, "equity");
-    gen_schema!("variance_swap", VarianceSwap, "equity");
-    gen_schema!("equity_index_future", EquityIndexFuture, "equity");
-    gen_schema!("volatility_index_future", VolatilityIndexFuture, "equity");
-    gen_schema!("volatility_index_option", VolatilityIndexOption, "equity");
-    gen_schema!("trs_equity", EquityTotalReturnSwap, "equity");
-    gen_schema!("private_markets_fund", PrivateMarketsFund, "equity");
-    gen_schema!("real_estate_asset", RealEstateAsset, "equity");
-    gen_schema!("discounted_cash_flow", DiscountedCashFlow, "equity");
+    gen_schema!(instrument_entries, "equity", Equity, "equity");
+    gen_schema!(instrument_entries, "equity_option", EquityOption, "equity");
+    gen_schema!(instrument_entries, "autocallable", Autocallable, "equity");
     gen_schema!(
+        instrument_entries,
+        "cliquet_option",
+        CliquetOption,
+        "equity"
+    );
+    gen_schema!(instrument_entries, "variance_swap", VarianceSwap, "equity");
+    gen_schema!(
+        instrument_entries,
+        "equity_index_future",
+        EquityIndexFuture,
+        "equity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "volatility_index_future",
+        VolatilityIndexFuture,
+        "equity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "volatility_index_option",
+        VolatilityIndexOption,
+        "equity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "trs_equity",
+        EquityTotalReturnSwap,
+        "equity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "private_markets_fund",
+        PrivateMarketsFund,
+        "equity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "real_estate_asset",
+        RealEstateAsset,
+        "equity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "discounted_cash_flow",
+        DiscountedCashFlow,
+        "equity"
+    );
+    gen_schema!(
+        instrument_entries,
         "levered_real_estate_equity",
         LeveredRealEstateEquity,
         "equity"
     );
 
     // --- FX ---
-    gen_schema!("fx_spot", FxSpot, "fx");
-    gen_schema!("fx_swap", FxSwap, "fx");
-    gen_schema!("fx_forward", FxForward, "fx");
-    gen_schema!("ndf", Ndf, "fx");
-    gen_schema!("fx_option", FxOption, "fx");
-    gen_schema!("fx_digital_option", FxDigitalOption, "fx");
-    gen_schema!("fx_touch_option", FxTouchOption, "fx");
-    gen_schema!("fx_barrier_option", FxBarrierOption, "fx");
-    gen_schema!("fx_variance_swap", FxVarianceSwap, "fx");
-    gen_schema!("quanto_option", QuantoOption, "fx");
+    gen_schema!(instrument_entries, "fx_spot", FxSpot, "fx");
+    gen_schema!(instrument_entries, "fx_swap", FxSwap, "fx");
+    gen_schema!(instrument_entries, "fx_forward", FxForward, "fx");
+    gen_schema!(instrument_entries, "ndf", Ndf, "fx");
+    gen_schema!(instrument_entries, "fx_option", FxOption, "fx");
+    gen_schema!(
+        instrument_entries,
+        "fx_digital_option",
+        FxDigitalOption,
+        "fx"
+    );
+    gen_schema!(instrument_entries, "fx_touch_option", FxTouchOption, "fx");
+    gen_schema!(
+        instrument_entries,
+        "fx_barrier_option",
+        FxBarrierOption,
+        "fx"
+    );
+    gen_schema!(instrument_entries, "fx_variance_swap", FxVarianceSwap, "fx");
+    gen_schema!(instrument_entries, "quanto_option", QuantoOption, "fx");
 
     // --- Commodity ---
-    gen_schema!("commodity_option", CommodityOption, "commodity");
-    gen_schema!("commodity_asian_option", CommodityAsianOption, "commodity");
-    gen_schema!("commodity_forward", CommodityForward, "commodity");
-    gen_schema!("commodity_swap", CommoditySwap, "commodity");
-    gen_schema!("commodity_swaption", CommoditySwaption, "commodity");
     gen_schema!(
+        instrument_entries,
+        "commodity_option",
+        CommodityOption,
+        "commodity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "commodity_asian_option",
+        CommodityAsianOption,
+        "commodity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "commodity_forward",
+        CommodityForward,
+        "commodity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "commodity_swap",
+        CommoditySwap,
+        "commodity"
+    );
+    gen_schema!(
+        instrument_entries,
+        "commodity_swaption",
+        CommoditySwaption,
+        "commodity"
+    );
+    gen_schema!(
+        instrument_entries,
         "commodity_spread_option",
         CommoditySpreadOption,
         "commodity"
     );
 
     // --- Exotics ---
-    gen_schema!("asian_option", AsianOption, "exotics");
-    gen_schema!("barrier_option", BarrierOption, "exotics");
-    gen_schema!("lookback_option", LookbackOption, "exotics");
-    gen_schema!("basket", Basket, "exotics");
+    gen_schema!(instrument_entries, "asian_option", AsianOption, "exotics");
+    gen_schema!(
+        instrument_entries,
+        "barrier_option",
+        BarrierOption,
+        "exotics"
+    );
+    gen_schema!(
+        instrument_entries,
+        "lookback_option",
+        LookbackOption,
+        "exotics"
+    );
+    gen_schema!(instrument_entries, "basket", Basket, "exotics");
+
+    update_instrument_union_schema_file(&instrument_entries);
 
     println!("\nDone! Updated 70 instrument schema files.");
 

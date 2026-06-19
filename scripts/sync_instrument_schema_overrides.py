@@ -17,8 +17,8 @@ IR_FUTURE_SCHEMA = ROOT / "finstack-quant/valuations/schemas/instruments/1/rates
 
 BOND_DESCRIPTION = (
     "Fixed income bond instrument with fixed, floating, or amortizing cashflows. "
-    "`issue`/`issue_date` is typically provided; when omitted, deserialization "
-    "requires `pricing_overrides.quoted_clean_price`."
+    "Use `issue_date` as the canonical issue field; `pricing_overrides.quoted_clean_price` "
+    "may be supplied for market-price-driven validation examples."
 )
 IR_FUTURE_DESCRIPTION = (
     "Exchange-traded interest rate future. `fixing_date`, `period_start`, and "
@@ -43,7 +43,7 @@ def _sync_bond_schema() -> None:
 
     top_spec = schema["examples"][0]["instrument"]["spec"]
     top_spec.pop("issue", None)
-    top_spec.pop("issue_date", None)
+    top_spec.setdefault("issue_date", "2024-01-15")
     top_spec["pricing_overrides"]["quoted_clean_price"] = 98.75
 
     _write_json(BOND_SCHEMA, schema)

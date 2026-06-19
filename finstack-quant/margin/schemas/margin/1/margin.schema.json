@@ -26,14 +26,59 @@
       "description": "ISO 8601 date (YYYY-MM-DD)"
     },
     "MarginTenor": {
-      "type": "string",
-      "enum": ["Daily", "Weekly", "Monthly", "OnDemand"],
-      "description": "Margin call frequency. Daily is standard for OTC derivatives post-2016 under BCBS-IOSCO rules."
+      "description": "Margin call frequency. Daily is standard for OTC derivatives post-2016 under BCBS-IOSCO rules.",
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "Daily",
+          "description": "Daily margin calls."
+        },
+        {
+          "type": "string",
+          "const": "Weekly",
+          "description": "Weekly margin calls."
+        },
+        {
+          "type": "string",
+          "const": "Monthly",
+          "description": "Monthly margin calls."
+        },
+        {
+          "type": "string",
+          "const": "OnDemand",
+          "description": "Margin calls issued on demand."
+        }
+      ]
     },
     "ImMethodology": {
-      "type": "string",
-      "enum": ["Haircut", "Simm", "Schedule", "InternalModel", "ClearingHouse"],
-      "description": "Initial margin calculation methodology. SIMM is the industry standard for large dealers."
+      "description": "Initial margin calculation methodology. SIMM is the industry standard for large dealers.",
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "Haircut",
+          "description": "Rules-based haircut methodology."
+        },
+        {
+          "type": "string",
+          "const": "Simm",
+          "description": "ISDA SIMM initial margin methodology."
+        },
+        {
+          "type": "string",
+          "const": "Schedule",
+          "description": "BCBS-IOSCO schedule-based methodology."
+        },
+        {
+          "type": "string",
+          "const": "InternalModel",
+          "description": "Approved internal model methodology."
+        },
+        {
+          "type": "string",
+          "const": "ClearingHouse",
+          "description": "Central-counterparty margin methodology."
+        }
+      ]
     },
     "ClearingStatus": {
       "description": "Clearing status for OTC derivatives",
@@ -65,9 +110,34 @@
       ]
     },
     "MarginCallType": {
-      "type": "string",
-      "enum": ["InitialMargin", "VariationMarginDelivery", "VariationMarginReturn", "TopUp", "Substitution"],
-      "description": "Type of margin call for proper processing and accounting treatment"
+      "description": "Type of margin call for proper processing and accounting treatment",
+      "oneOf": [
+        {
+          "type": "string",
+          "const": "InitialMargin",
+          "description": "Initial margin call."
+        },
+        {
+          "type": "string",
+          "const": "VariationMarginDelivery",
+          "description": "Variation margin delivery call."
+        },
+        {
+          "type": "string",
+          "const": "VariationMarginReturn",
+          "description": "Variation margin return call."
+        },
+        {
+          "type": "string",
+          "const": "TopUp",
+          "description": "Additional collateral top-up call."
+        },
+        {
+          "type": "string",
+          "const": "Substitution",
+          "description": "Collateral substitution call."
+        }
+      ]
     },
     "CollateralAssetClass": {
       "type": "string",

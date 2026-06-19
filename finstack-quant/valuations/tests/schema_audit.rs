@@ -172,6 +172,31 @@ mod generated_schema_contract {
     const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
     const SCHEMA_ID_HOST: &str = "https://finstack_quant.dev/";
     const DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
+    const COMMON_SCHEMA_HOST: &str = "https://finstack_quant.dev/schemas/common/1/";
+    const CASHFLOW_SCHEMA_HOST: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
+    const COMMON_SCHEMA_FILES: &[(&str, &str)] = &[
+        ("Attributes", "attributes.schema.json"),
+        (
+            "BusinessDayConvention",
+            "business_day_convention.schema.json",
+        ),
+        ("Currency", "currency.schema.json"),
+        ("Date", "date.schema.json"),
+        ("DayCount", "day_count.schema.json"),
+        ("Decimal", "decimal.schema.json"),
+        ("Id", "id.schema.json"),
+        ("Money", "money.schema.json"),
+        ("PricingOverrides", "pricing_overrides.schema.json"),
+        ("Tenor", "tenor.schema.json"),
+    ];
+    const CASHFLOW_SCHEMA_FILES: &[(&str, &str)] = &[
+        ("DefaultModelSpec", "default_model_spec.schema.json"),
+        ("FeeSpec", "fee_specs.schema.json"),
+        ("FixedCouponSpec", "coupon_specs.schema.json"),
+        ("PrepaymentModelSpec", "prepayment_model_spec.schema.json"),
+        ("RecoveryModelSpec", "recovery_model_spec.schema.json"),
+        ("ScheduleParams", "schedule_params.schema.json"),
+    ];
 
     fn schema_root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("schemas")
@@ -179,6 +204,70 @@ mod generated_schema_contract {
 
     fn instrument_schema_root() -> PathBuf {
         schema_root().join("instruments").join("1")
+    }
+
+    fn common_schema_root() -> PathBuf {
+        schema_root().join("common").join("1")
+    }
+
+    fn cashflow_schema_root() -> PathBuf {
+        schema_root().join("cashflow").join("1")
+    }
+
+    fn common_schema_uri(filename: &str) -> String {
+        format!("{COMMON_SCHEMA_HOST}{filename}")
+    }
+
+    fn cashflow_schema_uri(filename: &str) -> String {
+        format!("{CASHFLOW_SCHEMA_HOST}{filename}")
+    }
+
+    fn common_schema_resources() -> Vec<(String, jsonschema::Resource)> {
+        COMMON_SCHEMA_FILES
+            .iter()
+            .map(|(_, filename)| {
+                let schema = read_schema(&common_schema_root().join(filename));
+                let resource = jsonschema::Resource::from_contents(schema)
+                    .unwrap_or_else(|err| panic!("build common schema resource {filename}: {err}"));
+                (common_schema_uri(filename), resource)
+            })
+            .collect()
+    }
+
+    fn cashflow_schema_resources() -> Vec<(String, jsonschema::Resource)> {
+        CASHFLOW_SCHEMA_FILES
+            .iter()
+            .map(|(_, filename)| {
+                let schema = read_schema(&cashflow_schema_root().join(filename));
+                let resource = jsonschema::Resource::from_contents(schema).unwrap_or_else(|err| {
+                    panic!("build cashflow schema resource {filename}: {err}")
+                });
+                (cashflow_schema_uri(filename), resource)
+            })
+            .collect()
+    }
+
+    fn schema_resource(schema: Value, context: &str) -> (String, jsonschema::Resource) {
+        let id = schema
+            .get("$id")
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{context} is missing $id"))
+            .to_string();
+        let resource = jsonschema::Resource::from_contents(schema)
+            .unwrap_or_else(|err| panic!("build schema resource {context}: {err}"));
+        (id, resource)
+    }
+
+    fn external_schema_resources() -> Vec<(String, jsonschema::Resource)> {
+        let mut resources = common_schema_resources();
+        resources.extend(cashflow_schema_resources());
+        let mut schema_files = Vec::new();
+        collect_schema_files(&instrument_schema_root(), &mut schema_files);
+        for path in schema_files {
+            let context = path.display().to_string();
+            resources.push(schema_resource(read_schema(&path), &context));
+        }
+        resources
     }
 
     fn generated_standalone_schema_paths() -> Vec<PathBuf> {
@@ -241,6 +330,115 @@ mod generated_schema_contract {
             Value::Array(items) => items.iter().any(|child| contains_key(child, key)),
             _ => false,
         }
+    }
+
+    fn collect_refs(value: &Value, out: &mut BTreeSet<String>) {
+        match value {
+            Value::Object(map) => {
+                if let Some(reference) = map.get("$ref").and_then(Value::as_str) {
+                    out.insert(reference.to_string());
+                }
+                for child in map.values() {
+                    collect_refs(child, out);
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    collect_refs(child, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn common_schema_files_exist_and_use_canonical_ids() {
+        for (_, filename) in COMMON_SCHEMA_FILES {
+            let path = common_schema_root().join(filename);
+            let schema = read_schema(&path);
+            assert_eq!(
+                schema.get("$id").and_then(Value::as_str),
+                Some(common_schema_uri(filename).as_str()),
+                "{} has the wrong $id",
+                path.display()
+            );
+            assert_eq!(
+                schema.get("$schema").and_then(Value::as_str),
+                Some(JSON_SCHEMA_2020_12),
+                "{} has the wrong $schema dialect",
+                path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn generated_schemas_use_common_refs_for_moved_defs() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&instrument_schema_root(), &mut schema_files);
+        schema_files.extend(generated_standalone_schema_paths());
+        let mut schemas_with_common_refs = 0usize;
+
+        for path in schema_files {
+            let schema = read_schema(&path);
+            let mut refs = BTreeSet::new();
+            collect_refs(&schema, &mut refs);
+            let common_refs: Vec<_> = refs
+                .iter()
+                .filter(|reference| reference.starts_with(COMMON_SCHEMA_HOST))
+                .collect();
+            if !common_refs.is_empty() {
+                schemas_with_common_refs += 1;
+            }
+
+            if let Some(defs) = schema.get("$defs").and_then(Value::as_object) {
+                for (def_name, _) in COMMON_SCHEMA_FILES {
+                    assert!(
+                        !defs.contains_key(*def_name),
+                        "{} retains moved common $defs entry {def_name}",
+                        path.display()
+                    );
+                }
+            }
+        }
+
+        assert!(
+            schemas_with_common_refs > 0,
+            "no generated schema references the common schema library"
+        );
+    }
+
+    #[test]
+    fn generated_instrument_schemas_use_cashflow_refs_for_moved_defs() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&instrument_schema_root(), &mut schema_files);
+        let mut schemas_with_cashflow_refs = 0usize;
+
+        for path in schema_files {
+            let schema = read_schema(&path);
+            let mut refs = BTreeSet::new();
+            collect_refs(&schema, &mut refs);
+            if refs
+                .iter()
+                .any(|reference| reference.starts_with(CASHFLOW_SCHEMA_HOST))
+            {
+                schemas_with_cashflow_refs += 1;
+            }
+
+            if let Some(defs) = schema.get("$defs").and_then(Value::as_object) {
+                for (def_name, _) in CASHFLOW_SCHEMA_FILES {
+                    assert!(
+                        !defs.contains_key(*def_name),
+                        "{} retains moved cashflow $defs entry {def_name}",
+                        path.display()
+                    );
+                }
+            }
+        }
+
+        assert!(
+            schemas_with_cashflow_refs > 0,
+            "no generated instrument schema references standalone cashflow schemas"
+        );
     }
 
     fn is_date_like_property(name: &str) -> bool {
@@ -434,12 +632,6 @@ mod generated_schema_contract {
         schema_files.extend(generated_standalone_schema_paths());
 
         for path in schema_files {
-            if path.file_name().and_then(|name| name.to_str())
-                == Some("basket_with_instruments.schema.json")
-            {
-                continue;
-            }
-
             let schema = read_schema(&path);
             let Some(defs) = schema.get("$defs").and_then(Value::as_object) else {
                 continue;
@@ -481,16 +673,15 @@ mod generated_schema_contract {
         collect_schema_files(&instrument_schema_root(), &mut schema_files);
 
         for path in schema_files {
-            if path.file_name().and_then(|name| name.to_str())
-                == Some("basket_with_instruments.schema.json")
-            {
-                continue;
-            }
-
             let schema = read_schema(&path);
             assert!(
                 schema.pointer("/properties/schema/const").is_some(),
                 "{} is missing the standard schema const",
+                path.display()
+            );
+            assert!(
+                schema.pointer("/properties/schema_version").is_none(),
+                "{} uses schema_version on a public instrument envelope",
                 path.display()
             );
             assert!(
@@ -518,13 +709,109 @@ mod generated_schema_contract {
     }
 
     #[test]
+    fn generated_schedule_params_use_short_field_names() {
+        let path = schema_root()
+            .join("cashflow")
+            .join("1")
+            .join("schedule_params.schema.json");
+        let schema = read_schema(&path);
+        assert!(
+            schema.pointer("/properties/freq").is_some(),
+            "schedule params should expose freq"
+        );
+        assert!(
+            schema.pointer("/properties/dc").is_some(),
+            "schedule params should expose dc"
+        );
+        assert!(
+            schema.pointer("/properties/frequency").is_none(),
+            "schedule params should not expose stale frequency"
+        );
+        assert!(
+            schema.pointer("/properties/day_count").is_none(),
+            "schedule params should not expose stale day_count"
+        );
+    }
+
+    #[test]
+    fn schema_version_is_only_used_for_internal_payload_schemas() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&schema_root(), &mut schema_files);
+
+        let mut public_schema_version_paths = Vec::new();
+        for path in schema_files {
+            let schema = read_schema(&path);
+            if schema.pointer("/properties/schema_version").is_some()
+                && !path.ends_with("results/1/valuation_result.schema.json")
+                && !path.ends_with("factor_model/1/credit_factor_model.schema.json")
+            {
+                public_schema_version_paths.push(path.display().to_string());
+            }
+        }
+
+        assert!(
+            public_schema_version_paths.is_empty(),
+            "unexpected public schema_version fields: {}",
+            public_schema_version_paths.join(", ")
+        );
+    }
+
+    #[test]
+    fn generated_instrument_union_refs_all_typed_schemas() {
+        let schema = read_schema(&instrument_schema_root().join("instrument.schema.json"));
+        assert!(
+            schema
+                .pointer("/properties/instrument/properties/type/enum")
+                .is_none(),
+            "instrument union should not keep the legacy shallow type enum"
+        );
+        let variants = schema
+            .get("oneOf")
+            .and_then(Value::as_array)
+            .expect("instrument union should declare oneOf variants");
+
+        let mut schema_files = Vec::new();
+        collect_schema_files(&instrument_schema_root(), &mut schema_files);
+        let typed_schema_count = schema_files.len();
+
+        assert_eq!(
+            variants.len(),
+            typed_schema_count,
+            "instrument union should reference every typed instrument schema"
+        );
+    }
+
+    #[test]
+    fn instrument_union_rejects_invalid_typed_spec_directly() {
+        let schema = read_schema(&instrument_schema_root().join("instrument.schema.json"));
+        let validator = jsonschema::options()
+            .with_resources(external_schema_resources().into_iter())
+            .build(&schema)
+            .expect("compile instrument union schema");
+        let invalid = serde_json::json!({
+            "schema": "finstack_quant.instrument/1",
+            "instrument": {
+                "type": "bond",
+                "spec": {}
+            }
+        });
+
+        assert!(
+            validator.validate(&invalid).is_err(),
+            "instrument union should reject invalid specs for a known discriminator"
+        );
+    }
+
+    #[test]
     fn generated_instrument_schema_examples_validate() {
         let mut schema_files = Vec::new();
         collect_schema_files(&instrument_schema_root(), &mut schema_files);
 
         for path in schema_files {
             let schema = read_schema(&path);
-            let validator = jsonschema::validator_for(&schema)
+            let validator = jsonschema::options()
+                .with_resources(external_schema_resources().into_iter())
+                .build(&schema)
                 .unwrap_or_else(|err| panic!("compile {}: {err}", path.display()));
             let Some(examples) = schema.get("examples").and_then(Value::as_array) else {
                 continue;
@@ -543,7 +830,30 @@ mod fx_schema_drift {
     use finstack_quant_valuations::instruments::*;
     use schemars::JsonSchema;
     use serde_json::{Map, Value};
+    use std::collections::BTreeSet;
     use std::path::Path;
+
+    const DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
+    const SCHEMARS_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE]\d+)?$";
+    const COMMON_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/common/1/";
+
+    fn common_schema_filename(def_name: &str) -> Option<&'static str> {
+        match def_name {
+            "Attributes" => Some("attributes.schema.json"),
+            "BusinessDayConvention" => Some("business_day_convention.schema.json"),
+            "Currency" => Some("currency.schema.json"),
+            "DayCount" => Some("day_count.schema.json"),
+            "Id" => Some("id.schema.json"),
+            "Money" => Some("money.schema.json"),
+            "PricingOverrides" => Some("pricing_overrides.schema.json"),
+            "Tenor" => Some("tenor.schema.json"),
+            _ => None,
+        }
+    }
+
+    fn common_schema_ref(def_name: &str) -> Option<String> {
+        common_schema_filename(def_name).map(|filename| format!("{COMMON_SCHEMA_BASE}{filename}"))
+    }
 
     fn is_date_like_property(name: &str) -> bool {
         name == "date"
@@ -563,6 +873,43 @@ mod fx_schema_drift {
                     .is_some_and(|schema_type| schema_type == "string")
             }),
             _ => false,
+        }
+    }
+
+    fn normalize_decimal_patterns(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                let accepts_string = match map.get("type") {
+                    Some(Value::String(schema_type)) => schema_type == "string",
+                    Some(Value::Array(schema_types)) => schema_types.iter().any(|schema_type| {
+                        schema_type
+                            .as_str()
+                            .is_some_and(|schema_type| schema_type == "string")
+                    }),
+                    _ => false,
+                };
+                if accepts_string
+                    && map
+                        .get("pattern")
+                        .and_then(Value::as_str)
+                        .is_some_and(|pattern| pattern == SCHEMARS_DECIMAL_PATTERN)
+                {
+                    map.insert(
+                        "pattern".to_string(),
+                        Value::String(DECIMAL_PATTERN.to_string()),
+                    );
+                }
+
+                for child in map.values_mut() {
+                    normalize_decimal_patterns(child);
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    normalize_decimal_patterns(child);
+                }
+            }
+            _ => {}
         }
     }
 
@@ -597,6 +944,113 @@ mod fx_schema_drift {
         }
     }
 
+    fn rewrite_common_refs(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                let replacement = map
+                    .get("$ref")
+                    .and_then(Value::as_str)
+                    .and_then(|reference| reference.strip_prefix("#/$defs/"))
+                    .and_then(common_schema_ref);
+                if let Some(common_ref) = replacement {
+                    if let Some(reference) = map.get_mut("$ref") {
+                        *reference = Value::String(common_ref);
+                    }
+                }
+
+                for child in map.values_mut() {
+                    rewrite_common_refs(child);
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    rewrite_common_refs(child);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn json_pointer_unescape(segment: &str) -> String {
+        segment.replace("~1", "/").replace("~0", "~")
+    }
+
+    fn collect_local_def_refs(value: &Value, out: &mut BTreeSet<String>) {
+        match value {
+            Value::Object(map) => {
+                if let Some(reference) = map.get("$ref").and_then(Value::as_str) {
+                    if let Some(rest) = reference.strip_prefix("#/$defs/") {
+                        if let Some(segment) = rest.split('/').next() {
+                            out.insert(json_pointer_unescape(segment));
+                        }
+                    }
+                }
+                for child in map.values() {
+                    collect_local_def_refs(child, out);
+                }
+            }
+            Value::Array(items) => {
+                for child in items {
+                    collect_local_def_refs(child, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn prune_common_defs(value: &mut Value) {
+        if let Some(defs) = value.get_mut("$defs").and_then(Value::as_object_mut) {
+            defs.retain(|def_name, _| common_schema_filename(def_name).is_none());
+            if defs.is_empty() {
+                if let Some(obj) = value.as_object_mut() {
+                    obj.remove("$defs");
+                }
+            }
+        }
+    }
+
+    fn prune_unreachable_defs(value: &mut Value) {
+        let Some(defs) = value.get("$defs").and_then(Value::as_object) else {
+            return;
+        };
+
+        let mut root = value.clone();
+        if let Some(root_obj) = root.as_object_mut() {
+            root_obj.remove("$defs");
+        }
+
+        let mut discovered = BTreeSet::new();
+        collect_local_def_refs(&root, &mut discovered);
+
+        let mut reachable = BTreeSet::new();
+        while let Some(next) = discovered.iter().next().cloned() {
+            discovered.remove(&next);
+            if !reachable.insert(next.clone()) {
+                continue;
+            }
+            if let Some(definition) = defs.get(&next) {
+                collect_local_def_refs(definition, &mut discovered);
+            }
+        }
+
+        if let Some(defs) = value.get_mut("$defs").and_then(Value::as_object_mut) {
+            defs.retain(|def_name, _| reachable.contains(def_name));
+            if defs.is_empty() {
+                if let Some(obj) = value.as_object_mut() {
+                    obj.remove("$defs");
+                }
+            }
+        }
+    }
+
+    fn postprocess_schema(value: &mut Value) {
+        normalize_decimal_patterns(value);
+        annotate_date_formats(value);
+        rewrite_common_refs(value);
+        prune_common_defs(value);
+        prune_unreachable_defs(value);
+    }
+
     fn checked_in_spec(name: &str) -> Value {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("schemas")
@@ -617,7 +1071,7 @@ mod fx_schema_drift {
     fn generated_spec<T: JsonSchema>() -> Value {
         let schema = schemars::schema_for!(T);
         let mut generated = serde_json::to_value(schema).expect("serialize generated schema");
-        annotate_date_formats(&mut generated);
+        postprocess_schema(&mut generated);
         let mut spec = Map::new();
         for key in ["properties", "required", "type", "additionalProperties"] {
             if let Some(value) = generated.get(key) {

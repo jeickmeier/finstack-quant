@@ -37,6 +37,24 @@ fn assert_enum_parity(schema_name: &str, mut actual: Vec<&str>, expected: &[&str
     }
 }
 
+fn assert_described_one_of_enum(schema_name: &str, schema: &Value) {
+    assert!(
+        schema.get("enum").is_none(),
+        "{schema_name} should use oneOf/const variants instead of enum"
+    );
+    let variants = schema
+        .get("oneOf")
+        .and_then(Value::as_array)
+        .unwrap_or_else(|| panic!("{schema_name} should declare oneOf variants"));
+    assert!(
+        variants.iter().all(|variant| {
+            variant.get("const").and_then(Value::as_str).is_some()
+                && variant.get("description").and_then(Value::as_str).is_some()
+        }),
+        "{schema_name} oneOf variants should have const and description"
+    );
+}
+
 /// Canonical IM methodologies (schemars uses the serde variant names).
 const CANONICAL_IM_METHODOLOGIES: &[&str] = &[
     "ClearingHouse",
@@ -82,4 +100,15 @@ fn margin_tenor_schema_parity() {
 
     let values = extract_enum_values(mt);
     assert_enum_parity("MarginTenor", values, CANONICAL_MARGIN_TENORS);
+}
+
+#[test]
+fn described_margin_enums_use_one_of_const_style() {
+    let schema = margin_schema();
+    for schema_name in ["ImMethodology", "MarginTenor", "MarginCallType"] {
+        let enum_schema = schema
+            .pointer(&format!("/definitions/{schema_name}"))
+            .unwrap_or_else(|| panic!("{schema_name} should exist in schema"));
+        assert_described_one_of_enum(schema_name, enum_schema);
+    }
 }
