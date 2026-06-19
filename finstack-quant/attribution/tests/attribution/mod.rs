@@ -33,6 +33,7 @@ mod quantlib_parity;
 mod return_contribution;
 mod rounding_policy;
 mod scalars_attribution;
+mod schema_contract;
 mod serialization_roundtrip;
 mod spec_tests;
 mod taylor_wing_buckets;

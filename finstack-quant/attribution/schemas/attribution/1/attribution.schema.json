@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://finstack_quant.io/schemas/attribution/1/attribution.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
   "title": "Finstack Quant Attribution Specification",
   "description": "Complete specification for P&L attribution runs with instrument and market snapshots",
   "type": "object",

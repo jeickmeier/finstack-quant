@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://finstack_quant.io/schemas/attribution/1/attribution_result.schema.json",
+  "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_result.schema.json",
   "title": "Finstack Quant Attribution Result",
   "description": "Complete result of a P&L attribution run including factor decomposition and metadata",
   "type": "object",
