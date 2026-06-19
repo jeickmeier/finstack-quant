@@ -9,12 +9,15 @@ read-only for meta/details, and renders the optional ``cashflows`` DataFrame and
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import math
 import re
 from typing import Any
 
-from . import format as fmt
+from . import charts, format as fmt, tables
+from .document import KPI, Section, TearSheet
+from .theme import INSTITUTIONAL, Theme
 
 _TENOR_ORDER = ["3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "15y", "20y", "30y"]
 
@@ -337,3 +340,277 @@ def _cashflow_blocks(
         })
     ladder = [(str(y), by_year[y][0] / 1e6, by_year[y][1] / 1e6, by_year[y][2] / 1e6) for y in sorted(by_year)]
     return ladder, schedule
+
+
+# ---------------------------------------------------------------------------
+# Task 6: Assembly — instrument_tearsheet public API
+# ---------------------------------------------------------------------------
+
+ALL_SECTIONS = ["definition", "valuation", "keyrate", "cashflows", "schedule", "payoff", "survival", "covenants"]
+
+# Headline KPI metric ids per type (label comes from _metric_cell).
+# Reconciliation: "default_probability" replaced with "default01" for CDS.
+_KPI_METRICS: dict[str, list[str]] = {
+    "bond": ["dirty_price", "ytm", "duration_mod", "dv01"],
+    "credit_default_swap": ["par_spread", "cs01", "jump_to_default", "default01"],
+    "equity_option": ["delta", "vega", "implied_vol", "theta"],
+}
+
+# Analytics column groupings per type: list of groups of metric_ids.
+# Reconciliation: "default_probability" replaced with "default01" for CDS;
+#                 "g_spread" removed from bond (not a real metric).
+_ANALYTICS_GROUPS: dict[str, list[list[str]]] = {
+    "bond": [
+        ["clean_price", "dirty_price", "accrued"],
+        ["ytm", "ytw", "z_spread", "oas", "i_spread", "asw_par"],
+        ["dv01", "duration_mod", "duration_mac", "convexity", "spread_duration"],
+    ],
+    "credit_default_swap": [
+        ["protection_leg_pv", "premium_leg_pv", "risky_annuity"],
+        ["par_spread", "risky_pv01", "default01"],
+        ["cs01", "expected_loss", "jump_to_default", "recovery_01"],
+    ],
+    "equity_option": [
+        ["implied_vol"],
+        ["delta", "gamma", "vega", "theta"],
+        ["rho", "vanna", "volga", "charm"],
+    ],
+}
+
+
+def _instrument_type(definition: Any) -> str:
+    if definition is None:
+        return ""
+    if isinstance(definition, str):
+        try:
+            definition = json.loads(definition)
+        except json.JSONDecodeError:
+            return ""
+    return definition.get("type", "") if isinstance(definition, dict) else ""
+
+
+def _kpis(result: Any, itype: str) -> list[KPI]:
+    ids = _KPI_METRICS.get(itype)
+    if not ids:
+        # generic: PV + first three present non-composite metrics
+        cells: list[tuple[str, str, str]] = [("PV", fmt.money(result.price, result.currency, dp=0), "")]
+        count = 0
+        for mid in result.metric_keys():
+            if "::" in mid:
+                continue
+            cells.append(_metric_cell(mid, result.get_metric(mid)))
+            count += 1
+            if count == 3:
+                break
+        return [KPI(lbl, val, cls) for lbl, val, cls in cells]
+    out = []
+    for mid in ids:
+        lbl, val, cls = _metric_cell(mid, result.get_metric(mid))
+        out.append(KPI(lbl, val, cls))
+    return out
+
+
+def _analytics_section(result: Any, itype: str) -> Section:
+    groups = _ANALYTICS_GROUPS.get(itype)
+    if not groups:
+        # generic: one column of every present non-composite metric
+        present = [(m, result.get_metric(m)) for m in result.metric_keys() if "::" not in m]
+        rows = [_metric_cell(m, v) for m, v in present]
+        cols_html = "".join(
+            tables.kv_table([(lbl, val, cls) for lbl, val, cls in rows[i::3]], theme=INSTITUTIONAL) for i in range(3)
+        )
+        return Section("Valuation & Analytics", f'<div class="statgrid">{cols_html}</div>')
+    cols_html = ""
+    for group in groups:
+        rows = [_metric_cell(m, result.get_metric(m)) for m in group if result.get_metric(m) is not None]
+        cols_html += tables.kv_table([(lbl, val, cls) for lbl, val, cls in rows], theme=INSTITUTIONAL)
+    return Section("Valuation & Analytics", f'<div class="statgrid">{cols_html}</div>')
+
+
+def _definition_section(definition: Any, theme: Theme) -> Section | None:
+    if definition is None:
+        return None
+    if isinstance(definition, str):
+        definition = json.loads(definition)
+    cols = _definition_terms(definition)
+    cols_html = "".join(tables.kv_table([(k, v, "") for k, v in col], theme=theme) for col in cols if col)
+    return Section("Definition", f'<div class="statgrid">{cols_html}</div>')
+
+
+def _keyrate_section(result: Any, itype: str, theme: Theme) -> Section | None:
+    if itype == "credit_default_swap":
+        prefix = "bucketed_cs01"
+    elif itype == "equity_option":
+        prefix = "bucketed_vega"
+    else:
+        prefix = "bucketed_dv01"
+    series = _bucketed_series(result, prefix)
+    if not series:
+        return None
+    labels = [t for t, _ in series]
+    vals = [v for _, v in series]
+    title_map = {"bucketed_cs01": "Bucketed CS01", "bucketed_vega": "Bucketed Vega"}
+    title = title_map.get(prefix, "Key-Rate (Bucketed) DV01")
+    return Section(title, charts.bar_chart(labels, vals, theme=theme, y_pct=False, height=175))
+
+
+def _cashflow_sections(cashflows: Any, theme: Theme) -> list[Section]:
+    if cashflows is None:
+        return []
+    ladder, schedule = _cashflow_blocks(cashflows)
+    out: list[Section] = []
+    if ladder:
+        periods = [p for p, _, _, _ in ladder]
+        coupon = [c for _, c, _, _ in ladder]
+        principal = [pr for _, _, pr, _ in ladder]
+        pv = [p for _, _, _, p in ladder]
+        out.append(Section("Cashflow Ladder", charts.cashflow_ladder(periods, coupon, principal, theme=theme, pv=pv)))
+    if schedule:
+        cols = ["Date", "Kind", "Amount", "Rate", "DF", "PV"]
+        out.append(Section("Cashflow Schedule", tables.scroll(tables.data_table(schedule, columns=cols, theme=theme))))
+    return out
+
+
+def _payoff_section(definition: Any, _result: Any, theme: Theme) -> Section | None:
+    if definition is None:
+        return None
+    if isinstance(definition, str):
+        definition = json.loads(definition)
+    if definition.get("type") != "equity_option":
+        return None
+    spec = definition.get("spec", {})
+    strike = float(spec.get("strike", 0) or 0)
+    if strike <= 0:
+        return None
+    is_call = str(spec.get("option_type", "Call")).lower().startswith("c")
+    spots = [strike * (0.6 + 0.04 * i) for i in range(21)]  # 0.6K .. 1.4K
+    payoff = [max(s - strike, 0.0) if is_call else max(strike - s, 0.0) for s in spots]
+    return Section(
+        "Payoff at Expiry",
+        charts.line_chart(
+            spots,
+            payoff,
+            theme=theme,
+            x_numeric=True,
+            zero=True,
+            color=theme.ink,
+            fill=charts.rgba(theme.accent, 0.12),
+            area=True,
+        ),
+    )
+
+
+def _survival_section(_result: Any, cashflows: Any, theme: Theme) -> Section | None:
+    if cashflows is None:
+        return None
+    df = cashflows[1] if isinstance(cashflows, tuple) else cashflows
+    if "survival_probability" not in getattr(df, "columns", []):
+        return None
+    sp = [float(v) for v in df["survival_probability"].tolist() if v is not None and not _is_nan(v)]
+    if not sp:
+        return None
+    dates = list(df["date"])[: len(sp)]
+    return Section(
+        "Survival Probability",
+        charts.line_chart(
+            dates,
+            [v * 100 for v in sp],
+            theme=theme,
+            y_pct=True,
+            ymin=min(sp) * 100 - 2,
+            ymax=100,
+            color=theme.ink,
+            area=True,
+        ),
+    )
+
+
+def _covenants_section(parsed: dict[str, Any], theme: Theme) -> Section | None:
+    cov = parsed.get("covenants")
+    if not cov:
+        return None
+    rows = []
+    for cid, c in cov.items():
+        rows.append({
+            "Covenant": cid,
+            "Type": c.get("covenant_type", ""),
+            "Actual": fmt.ratio(c.get("actual_value"), dp=2) if c.get("actual_value") is not None else "·",
+            "Threshold": fmt.ratio(c.get("threshold"), dp=2) if c.get("threshold") is not None else "·",
+            "Headroom": fmt.ratio(c.get("headroom"), dp=2) if c.get("headroom") is not None else "·",
+            "Status": "PASS" if c.get("passed") else "BREACH",
+        })
+    cols = ["Covenant", "Type", "Actual", "Threshold", "Headroom", "Status"]
+    return Section("Covenants", tables.data_table(rows, columns=cols, theme=theme))
+
+
+def _build_sections(
+    result: Any,
+    cashflows: Any,
+    definition: Any,
+    parsed: dict[str, Any],
+    itype: str,
+    wanted: list[str],
+    theme: Theme,
+) -> list[Section]:
+    """Dispatch section builders and collect the ordered list of Section objects."""
+    secs: list[Section] = []
+    if "definition" in wanted and (s := _definition_section(definition, theme)):
+        secs.append(s)
+    if "valuation" in wanted:
+        secs.append(_analytics_section(result, itype))
+    if "survival" in wanted and (s := _survival_section(result, cashflows, theme)):
+        secs.append(s)
+    if "keyrate" in wanted and (s := _keyrate_section(result, itype, theme)):
+        secs.append(s)
+    if "payoff" in wanted and (s := _payoff_section(definition, result, theme)):
+        secs.append(s)
+    if "cashflows" in wanted or "schedule" in wanted:
+        secs.extend(
+            s
+            for s in _cashflow_sections(cashflows, theme)
+            if (s.title == "Cashflow Ladder" and "cashflows" in wanted)
+            or (s.title == "Cashflow Schedule" and "schedule" in wanted)
+        )
+    if "covenants" in wanted and (s := _covenants_section(parsed, theme)):
+        secs.append(s)
+    return secs
+
+
+def instrument_tearsheet(
+    result: Any,
+    *,
+    cashflows: Any = None,
+    definition: Any = None,
+    title: str | None = None,
+    subtitle: str | None = None,
+    sections: list[str] | None = None,
+    theme: Theme = INSTITUTIONAL,
+    generated: dt.date | None = None,
+) -> TearSheet:
+    """Render a priced ``valuations.ValuationResult`` as an HTML instrument tear sheet."""
+    wanted = sections if sections is not None else ALL_SECTIONS
+    unknown = set(wanted) - set(ALL_SECTIONS)
+    if unknown:
+        raise ValueError(f"unknown section(s): {sorted(unknown)}; valid: {ALL_SECTIONS}")
+
+    parsed = _parse_result(result)
+    itype = _instrument_type(definition)
+
+    secs = _build_sections(result, cashflows, definition, parsed, itype, wanted, theme)
+
+    as_of = parsed.get("as_of") or ""
+    type_label = itype.replace("_", " ").title() if itype else "Instrument"
+    meta_lines = [f"Numeric: {parsed.get('numeric_mode') or '—'}"]
+    if parsed.get("fx_policy"):
+        meta_lines.append(f"FX: {parsed['fx_policy']}")
+    return TearSheet(
+        theme=theme,
+        eyebrow="Instrument Valuation",
+        title=title or result.instrument_id,
+        subtitle=subtitle if subtitle is not None else f"{type_label} · {result.currency} · As of {as_of}",
+        meta_lines=meta_lines,
+        kpis=_kpis(result, itype),
+        sections=secs,
+        generated=generated,
+        footer_left=result.instrument_id,
+    )

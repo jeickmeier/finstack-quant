@@ -132,6 +132,91 @@ def test_definition_terms_generic_fallback() -> None:
     assert flat  # produced something from spec scalars
 
 
+def test_instrument_tearsheet_generic_from_fake_result() -> None:
+    import datetime as dt
+
+    from finstack_quant.reporting import instrument_tearsheet
+    from finstack_quant.reporting.document import TearSheet
+
+    ts = instrument_tearsheet(_fake_bond_result(), generated=dt.date(2026, 6, 19))
+    assert isinstance(ts, TearSheet)
+    html = ts.to_html()
+    assert "TEST-BOND" in html
+    assert "DV01" in html
+    assert "Yield to Maturity" in html
+    # key-rate bar present (bucketed_dv01 keys exist on the fake result)
+    assert "Key-Rate" in html
+
+
+def test_instrument_tearsheet_bond_with_definition_and_cashflows() -> None:
+    import datetime as dt
+
+    import pandas as pd
+
+    from finstack_quant.reporting import instrument_tearsheet
+
+    defn = {
+        "type": "bond",
+        "spec": {
+            "id": "TEST-BOND",
+            "notional": {"amount": "10000000", "currency": "USD"},
+            "issue_date": "2024-03-15",
+            "maturity": "2034-03-15",
+            "cashflow_spec": {"Fixed": {"rate": 0.0425, "freq": {"count": 6, "unit": "months"}, "dc": "Thirty360"}},
+            "discount_curve_id": "USD-OIS",
+        },
+    }
+    cf = pd.DataFrame({
+        "date": [dt.date(2027, 3, 15), dt.date(2034, 3, 15)],
+        "kind": ["coupon", "principal"],
+        "amount": [212500.0, 10000000.0],
+        "rate": [0.0425, None],
+        "discount_factor": [0.98, 0.71],
+        "pv": [208000.0, 7100000.0],
+    })
+    html = instrument_tearsheet(
+        _fake_bond_result(), definition=defn, cashflows=cf, generated=dt.date(2026, 6, 19)
+    ).to_html()
+    assert "Cashflow Ladder" in html
+    assert "Cashflow Schedule" in html
+    assert "Maturity" in html  # definition table
+
+
+def test_instrument_tearsheet_unknown_section_raises() -> None:
+    import datetime as dt
+
+    import pytest
+
+    from finstack_quant.reporting import instrument_tearsheet
+
+    with pytest.raises(ValueError, match=r"unknown section"):
+        instrument_tearsheet(_fake_bond_result(), sections=["typo"], generated=dt.date(2026, 6, 19))
+
+
+def test_generic_kpis_skip_composite_keys() -> None:
+    r = _FakeResult({
+        "schema_version": 1,
+        "instrument_id": "X",
+        "as_of": "2026-06-19",
+        "value": {"amount": "100.0", "currency": "USD"},
+        "measures": {
+            "bucketed_dv01::C::5y": 1.0,
+            "bucketed_dv01::C::10y": 2.0,  # composites FIRST
+            "ytm": 0.04,
+            "dv01": 500.0,
+            "duration_mod": 6.0,
+        },
+        "meta": {"numeric_mode": "Decimal"},
+        "details": None,
+        "covenants": None,
+    })
+    kpis = ins._kpis(r, "")
+    labels = [k.label for k in kpis]
+    assert "PV" in labels
+    # the 3 non-composite metrics are included despite composites appearing first
+    assert len([k for k in kpis if k.label != "PV"]) == 3
+
+
 def test_cashflow_blocks_from_dataframe() -> None:
     import datetime as dt
 
