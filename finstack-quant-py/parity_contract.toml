@@ -1040,7 +1040,9 @@ note = "Pure-Python presentation layer (tear sheets, tables, charts). No Rust co
 public = [
     "INSTITUTIONAL",
     "Theme",
+    "instrument_tearsheet",
     "performance_tearsheet",
+    "recommended_metrics",
 ]
 
 # ---------------------------------------------------------------------------
