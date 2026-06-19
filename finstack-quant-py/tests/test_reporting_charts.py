@@ -93,3 +93,41 @@ def test_line_chart_caps_hover_bands() -> None:
     assert 0 < band_count <= 500
     # polyline keeps full resolution: it references all points, so the svg is large
     assert "<polyline" in svg
+
+
+def test_bar_chart_value_label_respects_y_pct() -> None:
+    # dollar bars must NOT be labelled with "%"
+    svg = charts.bar_chart(["5y", "10y"], [1350.0, 2620.0], theme=INSTITUTIONAL, y_pct=False)
+    assert "1350%" not in svg
+    assert "2620%" not in svg
+    assert ">1350<" in svg or ">1,350<" in svg or "1350" in svg
+    # percent bars still get "%"
+    svg2 = charts.bar_chart(["2021"], [12.0], theme=INSTITUTIONAL, y_pct=True)
+    assert "12%" in svg2
+
+
+def test_line_chart_numeric_x_axis() -> None:
+    from xml.dom import minidom
+
+    spots = [4000.0, 4500.0, 5000.0, 5500.0, 6000.0]
+    payoff = [0.0, 0.0, 0.0, 500.0, 1000.0]
+    svg = charts.line_chart(spots, payoff, theme=INSTITUTIONAL, x_numeric=True, zero=True)
+    minidom.parseString(svg)  # noqa: S318
+    # numeric x tick labels appear (e.g. 5000), and no year label like "2026"
+    assert "5000" in svg
+    # hover band labels use the numeric x value, not a date
+    assert 'data-label="5000"' in svg or 'data-label="5000.0"' in svg
+
+
+def test_cashflow_ladder_wellformed() -> None:
+    from xml.dom import minidom
+
+    periods = ["'27", "'28", "'29"]
+    coupon = [0.85, 0.85, 0.85]
+    principal = [0.0, 0.0, 10.0]
+    pv = [0.80, 0.77, 8.9]
+    svg = charts.cashflow_ladder(periods, coupon, principal, theme=INSTITUTIONAL, pv=pv)
+    minidom.parseString(svg)  # noqa: S318
+    assert svg.count('class="fq-hb"') == 3  # one hover band per period
+    assert "<polyline" in svg  # the PV overlay line
+    assert "<title>" in svg

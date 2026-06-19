@@ -79,6 +79,51 @@ def _tip_val(v: float, y_pct: bool) -> str:
     return f"{v:.2f}%" if y_pct else f"{v:.2f}"
 
 
+def _x_label_numeric(v: float) -> str:
+    return f"{v:.0f}" if abs(v - round(v)) < 1e-9 else f"{v:.1f}"
+
+
+def _x_ticks_numeric(dates: list[Any], n: int, height: int, mb: int, theme: Theme, x: Any) -> list[str]:
+    """Return SVG tick + label elements for a numeric x-axis (5 evenly-spaced ticks)."""
+    parts: list[str] = []
+    n_ticks = 5
+    seen: set[int] = set()
+    for k in range(n_ticks):
+        i = round(k * (n - 1) / (n_ticks - 1)) if n > 1 else 0
+        if i in seen:
+            continue
+        seen.add(i)
+        xx = x(i)
+        lab = _x_label_numeric(float(dates[i]))
+        parts.append(
+            f'<line x1="{xx:.1f}" y1="{height - mb}" x2="{xx:.1f}" y2="{height - mb + 4}" stroke="{theme.muted}"/>'
+        )
+        parts.append(
+            f'<text x="{xx:.1f}" y="{height - mb + 15}" text-anchor="middle" font-size="10" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{lab}</text>'
+        )
+    return parts
+
+
+def _x_ticks_date(dates: list[Any], height: int, mb: int, theme: Theme, x: Any) -> list[str]:
+    """Return SVG tick + label elements for a date x-axis (one tick per year change)."""
+    parts: list[str] = []
+    prev_year = None
+    for i, d in enumerate(dates):
+        yr = _year(d)
+        if yr != prev_year:
+            xx = x(i)
+            parts.append(
+                f'<line x1="{xx:.1f}" y1="{height - mb}" x2="{xx:.1f}" y2="{height - mb + 4}" stroke="{theme.muted}"/>'
+            )
+            parts.append(
+                f'<text x="{xx:.1f}" y="{height - mb + 15}" text-anchor="middle" font-size="10" '
+                f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{yr}</text>'
+            )
+            prev_year = yr
+    return parts
+
+
 def line_chart(
     dates: list[Any],
     values: list[Any],
@@ -92,6 +137,7 @@ def line_chart(
     color: str | None = None,
     fill: str | None = None,
     height: int = 190,
+    x_numeric: bool = False,
 ) -> str:
     """Render a line (optionally area-filled) chart with date x-axis and value y-axis."""
     color = color or theme.ink
@@ -130,20 +176,11 @@ def line_chart(
             f'<text x="{ml - 6}" y="{yy + 3:.1f}" text-anchor="end" font-size="10" '
             f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{_tick_label(t, y_pct)}</text>'
         )
-    # x ticks at year changes
-    prev_year = None
-    for i, d in enumerate(dates):
-        yr = _year(d)
-        if yr != prev_year:
-            xx = x(i)
-            parts.append(
-                f'<line x1="{xx:.1f}" y1="{height - mb}" x2="{xx:.1f}" y2="{height - mb + 4}" stroke="{theme.muted}"/>'
-            )
-            parts.append(
-                f'<text x="{xx:.1f}" y="{height - mb + 15}" text-anchor="middle" font-size="10" '
-                f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{yr}</text>'
-            )
-            prev_year = yr
+    # x ticks
+    if x_numeric:
+        parts.extend(_x_ticks_numeric(dates, n, height, mb, theme, x))
+    else:
+        parts.extend(_x_ticks_date(dates, height, mb, theme, x))
     pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in valid)
     if area:
         base = y(0.0 if zero else lo)
@@ -162,7 +199,7 @@ def line_chart(
     for i, v in valid_for_bands:
         cx, cy = x(i), y(v)
         bx = max(ml, cx - band_w / 2)
-        label = fmt.fmt_date(dates[i])
+        label = _x_label_numeric(float(dates[i])) if x_numeric else fmt.fmt_date(dates[i])
         val = _tip_val(v, y_pct)
         parts.append(
             f'<rect class="fq-hb" x="{bx:.1f}" y="{mt}" width="{band_w:.1f}" height="{ph}" '
@@ -172,6 +209,78 @@ def line_chart(
     parts.append(
         f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" '
         f'style="visibility:hidden" pointer-events="none"/>'
+    )
+    parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def cashflow_ladder(
+    periods: list[str],
+    coupon: list[float],
+    principal: list[float],
+    *,
+    theme: Theme,
+    pv: list[float] | None = None,
+    height: int = 210,
+) -> str:
+    """Stacked coupon+principal bars per period, with an optional dashed PV-overlay line.
+
+    Values are in display units (e.g. $ millions). Each period gets a transparent
+    full-height hover band with a native ``<title>`` summarising the flow.
+    """
+    ml, mr, mt, mb = 52, 14, 12, 24
+    pw, ph = _W - ml - mr, height - mt - mb
+    totals = [coupon[i] + principal[i] for i in range(len(periods))]
+    hi = max([*totals, *(pv or [0.0]), 0.0])
+    ticks = nice_ticks(0.0, hi, 4)
+    hi = ticks[-1] if ticks[-1] > 0 else 1.0
+
+    def y(v: float) -> float:
+        return mt + (1 - v / hi) * ph
+
+    gap = pw / max(len(periods), 1)
+    bw = gap * 0.55
+    parts: list[str] = [f'<svg viewBox="0 0 {_W} {height}" xmlns="http://www.w3.org/2000/svg">']
+    for t in ticks:
+        yy = y(t)
+        stroke = theme.grid if abs(t) < 1e-9 else theme.faint
+        parts.append(f'<line x1="{ml}" y1="{yy:.1f}" x2="{_W - mr}" y2="{yy:.1f}" stroke="{stroke}"/>')
+        parts.append(
+            f'<text x="{ml - 6}" y="{yy + 3:.1f}" text-anchor="end" font-size="9.5" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{t:,.0f}</text>'
+        )
+    for i, lab in enumerate(periods):
+        cx = ml + i * gap + gap / 2
+        yc0, yc1 = y(0.0), y(coupon[i])
+        parts.append(
+            f'<rect x="{cx - bw / 2:.1f}" y="{yc1:.1f}" width="{bw:.1f}" height="{yc0 - yc1:.1f}" '
+            f'fill="{theme.ink}" fill-opacity="0.85"/>'
+        )
+        if principal[i] > 0:
+            yp1 = y(coupon[i] + principal[i])
+            parts.append(
+                f'<rect x="{cx - bw / 2:.1f}" y="{yp1:.1f}" width="{bw:.1f}" height="{yc1 - yp1:.1f}" '
+                f'fill="{theme.accent}" fill-opacity="0.85"/>'
+            )
+        parts.append(
+            f'<text x="{cx:.1f}" y="{height - mb + 15}" text-anchor="middle" font-size="9.5" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{_xml_attr(lab)}</text>'
+        )
+        pvtxt = f" · pv {pv[i]:,.2f}" if pv is not None else ""
+        title = f"{lab} · coupon {coupon[i]:,.2f} · principal {principal[i]:,.2f}{pvtxt}"
+        parts.append(
+            f'<rect class="fq-hb" x="{cx - gap / 2:.1f}" y="{mt}" width="{gap:.1f}" height="{ph}" '
+            f'data-cx="{cx:.1f}" data-cy="{y(totals[i]):.1f}" data-label="{_xml_attr(lab)}" '
+            f'data-val="{coupon[i] + principal[i]:,.2f}"><title>{_xml_attr(title)}</title></rect>'
+        )
+    if pv is not None:
+        pts = " ".join(f"{ml + i * gap + gap / 2:.1f},{y(pv[i]):.1f}" for i in range(len(periods)))
+        parts.append(
+            f'<polyline points="{pts}" fill="none" stroke="{theme.pos}" stroke-width="1.6" stroke-dasharray="4 3"/>'
+        )
+    parts.append(
+        f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" style="visibility:hidden" pointer-events="none"/>'
     )
     parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
     parts.append("</svg>")
@@ -224,9 +333,10 @@ def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool
             f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{lab}</text>'
         )
         vy = y1 - 4 if v >= 0 else y1 + 12
+        vlabel = f"{'+' if v >= 0 else ''}{v:.0f}%" if y_pct else f"{v:,.0f}"
         parts.append(
             f'<text x="{cx:.1f}" y="{vy:.1f}" text-anchor="middle" font-size="9.5" '
-            f'fill="#23303f" font-family="{_xml_attr(theme.font_num)}">{"+" if v >= 0 else ""}{v:.0f}%</text>'
+            f'fill="#23303f" font-family="{_xml_attr(theme.font_num)}">{vlabel}</text>'
         )
     parts.append(
         f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" '
