@@ -4,7 +4,9 @@
 //! Pure layout split from `performance.rs`; no behavior changes.
 
 use super::{LookbackReturns, Performance};
-use crate::aggregation::{group_by_period, period_stats_from_grouped, PeriodStats};
+use crate::aggregation::{
+    group_by_period, group_by_period_dated, period_stats_from_grouped, PeriodStats,
+};
 use crate::dates::{Date, FiscalConfig, HolidayCalendar, PeriodKind};
 use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
 use crate::lookback;
@@ -165,5 +167,67 @@ impl Performance {
             fiscal_config,
         );
         Ok(period_stats_from_grouped(&grouped))
+    }
+
+    /// Calendar-bucketed compounded returns per ticker.
+    ///
+    /// Returns one `Vec<(Date, f64)>` per ticker — each entry is
+    /// `(period_end_date, compounded_return)` for one calendar bucket of `freq`.
+    /// Buckets compound via the shared kernel, so they reconcile exactly with
+    /// [`Performance::cumulative_returns`]. Calendar bucketing only.
+    pub fn periodic_returns(&self, freq: PeriodKind) -> Vec<Vec<(Date, f64)>> {
+        self.map_tickers(|i| {
+            group_by_period_dated(
+                self.active_dates_for_ticker_unchecked(i),
+                self.active_returns(i),
+                freq,
+            )
+        })
+    }
+}
+
+#[cfg(test)]
+mod periodic_returns_tests {
+    use super::*;
+    use crate::dates::{Month, PeriodKind};
+    use crate::Performance;
+
+    /// Build a single-ticker `Performance` with daily returns spanning
+    /// January and February 2021 (2021-01-04 through 2021-02-26).
+    fn sample_two_month_daily_performance() -> Performance {
+        // Build dates: weekdays in January (4..=29) and February (1..=26) 2021.
+        // We use calendar days for simplicity — just enough to guarantee
+        // observations in two distinct calendar months.
+        let jan_dates: Vec<Date> = (4u8..=29)
+            .filter_map(|d| Date::from_calendar_date(2021, Month::January, d).ok())
+            .collect();
+        let feb_dates: Vec<Date> = (1u8..=26)
+            .filter_map(|d| Date::from_calendar_date(2021, Month::February, d).ok())
+            .collect();
+
+        let mut dates = jan_dates;
+        dates.extend(feb_dates);
+
+        let n = dates.len();
+        // Simple positive daily returns — no NaN spans.
+        let returns = vec![vec![0.001_f64; n]];
+
+        Performance::from_returns(
+            dates,
+            returns,
+            vec!["TEST".to_string()],
+            None,
+            PeriodKind::Daily,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn periodic_returns_monthly_has_one_bucket_per_month() {
+        let perf = sample_two_month_daily_performance();
+        let periodic = perf.periodic_returns(PeriodKind::Monthly);
+        assert_eq!(periodic.len(), perf.ticker_names().len());
+        // Single-ticker fixture spanning Jan+Feb -> 2 buckets.
+        assert_eq!(periodic[0].len(), 2);
     }
 }
