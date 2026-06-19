@@ -28,7 +28,7 @@
 ///     }
 /// }
 /// ```
-pub trait EquityDependencies {
+pub trait EquityDependencies: Send + Sync {
     /// Return equity market data dependencies for this instrument.
     fn equity_dependencies(&self) -> finstack_quant_core::Result<EquityInstrumentDeps>;
 }

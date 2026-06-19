@@ -107,7 +107,7 @@ pub enum StepperError {
 ///
 /// Implementors define how each time step is executed, potentially with
 /// different theta parameters at different stages (e.g., Rannacher smoothing).
-pub trait TimeStepper {
+pub trait TimeStepper: Send + Sync {
     /// Advance the solution one step backward in time from `t_from` to `t_to`.
     ///
     /// * `problem` — PDE coefficients and boundary conditions

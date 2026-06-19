@@ -17,7 +17,7 @@ use finstack_quant_core::{Error, Result};
 /// for discount, forward, hazard, and inflation curves. These checks
 /// ensure that calibrated curves are economically meaningful and
 /// arbitrage-free.
-pub trait CurveValidator {
+pub trait CurveValidator: Send + Sync {
     /// Validate that the curve satisfies no-arbitrage constraints.
     ///
     /// For discount curves, this verifies forward rate positivity.

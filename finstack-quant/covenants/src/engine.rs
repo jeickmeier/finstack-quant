@@ -1406,7 +1406,7 @@ pub struct ConsequenceApplication {
 }
 
 /// Trait for instruments that can be mutated by covenant consequences.
-pub trait InstrumentMutator {
+pub trait InstrumentMutator: Send + Sync {
     /// Set default status.
     fn set_default_status(
         &mut self,

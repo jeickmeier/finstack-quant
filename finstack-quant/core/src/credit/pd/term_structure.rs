@@ -56,6 +56,15 @@ pub struct PdTermStructure {
 }
 
 impl PdTermStructure {
+    /// Start building a PD term structure from cumulative PDs, transition
+    /// matrices, or other sources.
+    ///
+    /// This is the preferred entry point, consistent with other curve builders.
+    #[must_use]
+    pub fn builder() -> PdTermStructureBuilder {
+        PdTermStructureBuilder::new()
+    }
+
     /// Cumulative default probability at an arbitrary horizon via
     /// log-linear interpolation on survival probability.
     ///

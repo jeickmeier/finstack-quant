@@ -6,7 +6,7 @@ use super::node_state::NodeState;
 use super::state_keys;
 
 /// Trait for instrument-specific valuation logic on a tree
-pub trait TreeValuator {
+pub trait TreeValuator: Send + Sync {
     /// Calculate the instrument's value at a terminal node (maturity)
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64>;
 
@@ -24,7 +24,7 @@ pub trait TreeValuator {
 }
 
 /// Trait for generic tree models (binomial, trinomial, etc.)
-pub trait TreeModel {
+pub trait TreeModel: Send + Sync {
     /// Price an instrument using this tree model
     ///
     /// # Arguments

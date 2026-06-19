@@ -6,23 +6,13 @@
 
 #![forbid(unsafe_code)]
 
-use std::fmt;
-
 pub mod golden;
 
 /// Error type for shared test utility failures.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// Input data, fixture shape, or assertion validation failed.
+    #[error("{0}")]
     Validation(String),
 }
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Error::Validation(message) => f.write_str(message),
-        }
-    }
-}
-
-impl std::error::Error for Error {}

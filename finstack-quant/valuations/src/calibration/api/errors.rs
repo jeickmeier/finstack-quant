@@ -6,14 +6,43 @@
 //! `From<EnvelopeError> for finstack_quant_core::Error` for backwards-compatible
 //! propagation through existing call sites that take `finstack_quant_core::Result`.
 
-use serde::Serialize;
-use std::fmt;
+fn json_parse_loc(line: &Option<u32>, col: &Option<u32>) -> String {
+    match (line, col) {
+        (Some(l), Some(c)) => format!(" at line {l}, column {c}"),
+        (Some(l), None) => format!(" at line {l}"),
+        _ => String::new(),
+    }
+}
+
+fn suggestion_hint(suggestion: &Option<String>) -> String {
+    match suggestion {
+        Some(s) => format!(" Did you mean '{s}'?"),
+        None => String::new(),
+    }
+}
+
+fn format_breakdown(breakdown: &[(String, usize)]) -> String {
+    breakdown
+        .iter()
+        .map(|(c, n)| format!("{n} '{c}'"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn format_worst_quote(id: &Option<String>, residual: &Option<f64>) -> String {
+    match (id, residual) {
+        (Some(id), Some(r)) => format!(" Worst quote: '{id}' (residual {r:.3e})."),
+        _ => String::new(),
+    }
+}
 
 /// Errors surfaced when an envelope is invalid or calibration fails.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EnvelopeError {
     /// JSON parse failure (malformed envelope).
+    #[error("JSON parse error{}: {message}", json_parse_loc(line, col))]
     JsonParse {
         /// Parser-provided error description.
         message: String,
@@ -23,6 +52,7 @@ pub enum EnvelopeError {
         col: Option<u32>,
     },
     /// A step's `kind` discriminator is not a recognized variant.
+    #[error("step[{step_index}] '{step_id}': unknown kind '{found}'; expected one of: {}", expected_one_of.join(", "))]
     UnknownStepKind {
         /// Zero-based index of the offending step in `plan.steps`.
         step_index: usize,
@@ -35,6 +65,7 @@ pub enum EnvelopeError {
     },
     /// A step references a curve / surface ID that's not produced by an
     /// earlier step or carried in `market_data` / `prior_market`.
+    #[error("step[{step_index}] '{step_id}' (kind='{step_kind}'): missing {missing_kind} dependency '{missing_id}'. Available: [{}]", available.join(", "))]
     MissingDependency {
         /// Zero-based index of the offending step in `plan.steps`.
         step_index: usize,
@@ -50,6 +81,7 @@ pub enum EnvelopeError {
         available: Vec<String>,
     },
     /// A step's `quote_set` field references a name not in `plan.quote_sets`.
+    #[error("step[{step_index}] '{step_id}': quote_set '{ref_name}' is not defined in plan.quote_sets. Available: [{}].{}", available.join(", "), suggestion_hint(suggestion))]
     UndefinedQuoteSet {
         /// Zero-based index of the offending step.
         step_index: usize,
@@ -63,6 +95,7 @@ pub enum EnvelopeError {
         suggestion: Option<String>,
     },
     /// A step's `quote_set` contains quotes of a class incompatible with the step.
+    #[error("step[{step_index}] '{step_id}' (kind='{step_kind}'): expected quotes of class '{expected_class}', but found: {}", format_breakdown(breakdown))]
     QuoteClassMismatch {
         /// Zero-based index of the offending step.
         step_index: usize,
@@ -76,6 +109,7 @@ pub enum EnvelopeError {
         breakdown: Vec<(String, usize)>,
     },
     /// A solver step did not converge to within tolerance.
+    #[error("step '{step_id}' did not converge: max residual {max_residual:.3e} > tolerance {tolerance:.3e} after {iterations} iterations.{}", format_worst_quote(worst_quote_id, worst_quote_residual))]
     SolverNotConverged {
         /// Step identifier.
         step_id: String,
@@ -91,6 +125,7 @@ pub enum EnvelopeError {
         worst_quote_residual: Option<f64>,
     },
     /// Quote data fails domain validation (NaN, out-of-range, etc.).
+    #[error("step '{step_id}': quote '{quote_id}' is invalid: {reason}")]
     QuoteDataInvalid {
         /// Step identifier consuming the quote.
         step_id: String,
@@ -101,6 +136,7 @@ pub enum EnvelopeError {
     },
     /// Two entries in `market_data` share the same `(kind, id)` (or same id
     /// within the quote namespace shared by the eight `*_quote` kinds).
+    #[error("market_data contains duplicate id '{id}' within kind '{datum_kind}'")]
     DuplicateMarketDatumId {
         /// `"quote"` (shared namespace for the eight `*_quote` variants) or
         /// the specific datum kind name for non-quote variants.
@@ -113,6 +149,7 @@ pub enum EnvelopeError {
     },
     /// A quote ID listed in `plan.quote_sets[name]` doesn't resolve to any
     /// quote-kind entry in `market_data`.
+    #[error("quote_set '{quote_set}' references id '{id}', which is not present in market_data as a quote")]
     QuoteIdNotInMarketData {
         /// The named quote set in `plan.quote_sets`.
         quote_set: String,
@@ -120,6 +157,7 @@ pub enum EnvelopeError {
         id: String,
     },
     /// A JSON response payload could not be serialized.
+    #[error("failed to serialize {target} as JSON: {message}")]
     JsonSerialize {
         /// Payload being serialized, e.g. `"ValidationReport"`.
         target: String,
@@ -127,121 +165,6 @@ pub enum EnvelopeError {
         message: String,
     },
 }
-
-impl fmt::Display for EnvelopeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            EnvelopeError::JsonParse { message, line, col } => {
-                let loc = match (line, col) {
-                    (Some(l), Some(c)) => format!(" at line {l}, column {c}"),
-                    (Some(l), None) => format!(" at line {l}"),
-                    _ => String::new(),
-                };
-                write!(f, "JSON parse error{loc}: {message}")
-            }
-            EnvelopeError::UnknownStepKind {
-                step_index,
-                step_id,
-                found,
-                expected_one_of,
-            } => write!(
-                f,
-                "step[{step_index}] '{step_id}': unknown kind '{found}'; expected one of: {}",
-                expected_one_of.join(", ")
-            ),
-            EnvelopeError::MissingDependency {
-                step_index,
-                step_id,
-                step_kind,
-                missing_id,
-                missing_kind,
-                available,
-            } => {
-                let avail = if available.is_empty() {
-                    "none".to_string()
-                } else {
-                    available.join(", ")
-                };
-                write!(
-                    f,
-                    "step[{step_index}] '{step_id}' (kind='{step_kind}'): missing {missing_kind} dependency '{missing_id}'. Available: [{avail}]"
-                )
-            }
-            EnvelopeError::UndefinedQuoteSet {
-                step_index,
-                step_id,
-                ref_name,
-                available,
-                suggestion,
-            } => {
-                let hint = match suggestion {
-                    Some(s) => format!(" Did you mean '{s}'?"),
-                    None => String::new(),
-                };
-                write!(
-                    f,
-                    "step[{step_index}] '{step_id}': quote_set '{ref_name}' is not defined in plan.quote_sets. Available: [{}].{hint}",
-                    available.join(", ")
-                )
-            }
-            EnvelopeError::QuoteClassMismatch {
-                step_index,
-                step_id,
-                step_kind,
-                expected_class,
-                breakdown,
-            } => {
-                let counts: Vec<String> = breakdown
-                    .iter()
-                    .map(|(c, n)| format!("{n} '{c}'"))
-                    .collect();
-                write!(
-                    f,
-                    "step[{step_index}] '{step_id}' (kind='{step_kind}'): expected quotes of class '{expected_class}', but found: {}",
-                    counts.join(", ")
-                )
-            }
-            EnvelopeError::SolverNotConverged {
-                step_id,
-                max_residual,
-                tolerance,
-                iterations,
-                worst_quote_id,
-                worst_quote_residual,
-            } => {
-                let worst = match (worst_quote_id, worst_quote_residual) {
-                    (Some(id), Some(r)) => format!(" Worst quote: '{id}' (residual {r:.3e})."),
-                    _ => String::new(),
-                };
-                write!(
-                    f,
-                    "step '{step_id}' did not converge: max residual {max_residual:.3e} > tolerance {tolerance:.3e} after {iterations} iterations.{worst}"
-                )
-            }
-            EnvelopeError::QuoteDataInvalid {
-                step_id,
-                quote_id,
-                reason,
-            } => write!(
-                f,
-                "step '{step_id}': quote '{quote_id}' is invalid: {reason}"
-            ),
-            EnvelopeError::DuplicateMarketDatumId { datum_kind, id } => write!(
-                f,
-                "market_data contains duplicate id '{id}' within kind '{datum_kind}'"
-            ),
-            EnvelopeError::QuoteIdNotInMarketData { quote_set, id } => write!(
-                f,
-                "quote_set '{quote_set}' references id '{id}', which is not present in market_data as a quote"
-            ),
-            EnvelopeError::JsonSerialize { target, message } => {
-                write!(f, "failed to serialize {target} as JSON: {message}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for EnvelopeError {}
 
 impl EnvelopeError {
     /// Snake-case discriminator matching the `kind` tag of the serialized form.

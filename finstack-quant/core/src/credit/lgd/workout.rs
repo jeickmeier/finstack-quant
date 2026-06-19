@@ -220,6 +220,7 @@ pub struct WorkoutLgd {
 
 impl WorkoutLgd {
     /// Start building a WorkoutLgd.
+    #[must_use]
     pub fn builder() -> WorkoutLgdBuilder {
         WorkoutLgdBuilder::default()
     }

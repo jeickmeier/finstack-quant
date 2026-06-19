@@ -172,7 +172,7 @@ pub struct FutureBreach {
 }
 
 /// Minimal read-only adapter to query model time-series values and map periods to dates.
-pub trait ModelTimeSeries {
+pub trait ModelTimeSeries: Send + Sync {
     /// Get scalar value for a metric node and period
     fn get_scalar(&self, node_id: &str, period: &PeriodId) -> Option<f64>;
     /// Get end date for a given period

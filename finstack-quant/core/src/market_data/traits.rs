@@ -84,7 +84,7 @@ use crate::dates::{Date, DayCount, DayCountContext};
 ///
 /// - [`Forward`] - Trait for forward rate curves
 /// - [`Survival`] - Trait for hazard/survival curves
-pub trait Discounting: TermStructure {
+pub trait Discounting: TermStructure + Send + Sync {
     /// Base (valuation) date of the curve.
     fn base_date(&self) -> Date;
     /// Discount factor at time `t` (year fraction from the base date).
@@ -256,7 +256,7 @@ pub trait Discounting: TermStructure {
 /// assert_eq!(curve.rate(1.0), 0.05);
 /// assert!((curve.rate_period(0.5, 1.0) - 0.05).abs() < 1e-14); // Flat curve: period average ≈ rate
 /// ```
-pub trait Forward: TermStructure {
+pub trait Forward: TermStructure + Send + Sync {
     /// Simple forward rate starting at time `t`.
     ///
     /// # Arguments
@@ -366,7 +366,7 @@ pub trait Forward: TermStructure {
 /// let sp_1y = curve.sp(1.0);
 /// assert!(sp_1y < 1.0 && sp_1y > 0.0); // Survival prob decreases over time
 /// ```
-pub trait Survival: TermStructure {
+pub trait Survival: TermStructure + Send + Sync {
     /// Survival probability up to time `t`.
     ///
     /// # Arguments
@@ -396,7 +396,7 @@ pub trait Survival: TermStructure {
 /// let curve = DummyCurve { id: CurveId::from("DUMMY") };
 /// assert_eq!(curve.id().as_str(), "DUMMY");
 /// ```
-pub trait TermStructure {
+pub trait TermStructure: Send + Sync {
     /// Unique identifier of the term structure.
     fn id(&self) -> &crate::types::CurveId;
 }

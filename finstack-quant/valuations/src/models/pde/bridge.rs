@@ -108,7 +108,7 @@ pub struct LocalVolPde<F: Fn(f64, f64) -> f64> {
     pub is_call: bool,
 }
 
-impl<F: Fn(f64, f64) -> f64> PdeProblem1D for LocalVolPde<F> {
+impl<F: Fn(f64, f64) -> f64 + Send + Sync> PdeProblem1D for LocalVolPde<F> {
     fn diffusion(&self, x: f64, t: f64) -> f64 {
         let s = x.exp();
         let sigma = (self.local_vol)(s, t);

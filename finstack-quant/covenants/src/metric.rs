@@ -67,7 +67,7 @@ impl AsRef<str> for CovenantMetricId {
 }
 
 /// Source of covenant operating metric values.
-pub trait CovenantMetricSource {
+pub trait CovenantMetricSource: Send + Sync {
     /// Return the metric value for the requested covenant operating metric.
     ///
     /// # Errors

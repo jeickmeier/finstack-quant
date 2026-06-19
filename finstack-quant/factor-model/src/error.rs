@@ -4,7 +4,7 @@ use std::fmt;
 use std::str::FromStr;
 
 /// Errors produced by factor-model workflows.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 pub enum FactorModelError {
     /// No factor matched a dependency for a position.
@@ -28,15 +28,14 @@ pub enum FactorModelError {
         reason: String,
     },
     /// Repricing under a factor move failed.
-    #[error("Repricing failed for position '{position_id}' under factor '{factor_id}': {source}")]
+    #[error("Repricing failed for position '{position_id}' under factor '{factor_id}': {reason}")]
     RepricingFailed {
         /// Position identifier.
         position_id: String,
         /// Factor that triggered repricing.
         factor_id: FactorId,
-        /// Underlying source error.
-        #[source]
-        source: Box<dyn std::error::Error + Send + Sync>,
+        /// Underlying source error message.
+        reason: String,
     },
     /// Multiple factors matched where only one was allowed.
     #[error("Ambiguous factor match for position '{position_id}': {candidates:?}")]

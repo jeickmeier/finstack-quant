@@ -68,7 +68,7 @@ pub use sobol_pca::{effective_dimension, pca_ordering, transform_pca_to_assets};
 ///
 /// This trait provides the basic interface needed for Monte Carlo simulations
 /// and stochastic sampling algorithms.
-pub trait RandomNumberGenerator {
+pub trait RandomNumberGenerator: Send + Sync {
     /// Generate uniform random number in [0, 1)
     fn uniform(&mut self) -> f64;
 

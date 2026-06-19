@@ -477,7 +477,7 @@ pub(crate) fn id_bump_pct(id: &str, pct: f64) -> CurveId {
 /// - The mode/units combination is invalid
 /// - The curve reconstruction fails after applying the bump
 /// - Input validation fails (e.g., invalid recovery rate for hazard curves)
-pub trait Bumpable: Sized {
+pub trait Bumpable: Sized + Send + Sync {
     /// Apply a bump specification to create a new bumped instance.
     ///
     /// # Errors

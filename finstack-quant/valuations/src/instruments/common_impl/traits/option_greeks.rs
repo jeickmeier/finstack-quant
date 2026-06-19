@@ -77,7 +77,7 @@ pub struct OptionGreeks {
 /// Implementations return a sparse [`OptionGreeks`] payload keyed by the
 /// requested [`OptionGreekKind`]. Callers should interpret `None` as "not
 /// supported for this instrument" rather than as a zero-valued greek.
-pub trait OptionGreeksProvider {
+pub trait OptionGreeksProvider: Send + Sync {
     /// Return cash delta per instrument conventions.
     fn option_delta(
         &self,

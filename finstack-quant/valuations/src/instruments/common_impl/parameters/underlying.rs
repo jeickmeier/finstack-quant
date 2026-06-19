@@ -30,7 +30,7 @@ pub fn default_ois_curve_id(currency: Currency) -> finstack_quant_core::Result<&
 }
 
 /// Base trait for underlying parameters to enable polymorphic behavior
-pub trait UnderlyingParams {
+pub trait UnderlyingParams: Send + Sync {
     /// Get the base currency for pricing
     fn base_currency(&self) -> Currency;
 

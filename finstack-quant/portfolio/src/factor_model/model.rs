@@ -211,6 +211,15 @@ pub struct FactorModel {
 }
 
 impl FactorModel {
+    /// Start building a factor model configuration.
+    ///
+    /// This is the preferred entry point, consistent with other builders
+    /// in the workspace.
+    #[must_use]
+    pub fn builder() -> FactorModelBuilder {
+        FactorModelBuilder::new()
+    }
+
     /// Borrow the factor definitions configured on the model.
     ///
     /// # Returns

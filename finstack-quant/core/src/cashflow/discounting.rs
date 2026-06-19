@@ -130,7 +130,7 @@ use crate::money::Money;
 /// let pv = flows.npv(&curve, base, None)?;
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-pub trait Discountable {
+pub trait Discountable: Send + Sync {
     /// Output type for the NPV calculation.
     type PVOutput;
 
@@ -629,7 +629,7 @@ mod hardening_tests {
 /// All flows must be in the same currency for the calculation to succeed.
 impl<T> Discountable for T
 where
-    T: AsRef<[(Date, Money)]>,
+    T: AsRef<[(Date, Money)]> + Send + Sync,
 {
     type PVOutput = crate::Result<Money>;
 

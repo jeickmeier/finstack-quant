@@ -29,7 +29,7 @@ use smallvec::SmallVec;
 ///     }
 /// }
 /// ```
-pub trait CurveDependencies {
+pub trait CurveDependencies: Send + Sync {
     /// Return all curves used by this instrument, categorized by type.
     fn curve_dependencies(&self) -> finstack_quant_core::Result<InstrumentCurves>;
 }

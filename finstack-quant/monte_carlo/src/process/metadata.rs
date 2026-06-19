@@ -18,7 +18,7 @@ use crate::paths::ProcessParams;
 /// - `factor_names` should describe the order of entries in captured state vectors.
 /// - `correlation`, when present, should be a row-major square matrix aligned with
 ///   `factor_names`.
-pub trait ProcessMetadata {
+pub trait ProcessMetadata: Send + Sync {
     /// Return metadata describing the process configuration and state layout.
     fn metadata(&self) -> ProcessParams;
 }

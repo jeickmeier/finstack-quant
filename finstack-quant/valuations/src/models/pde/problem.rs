@@ -24,7 +24,7 @@ use super::boundary::BoundaryCondition;
 /// - Convection `b = r - q - 0.5 σ²`
 /// - Grid spacing maps to relative price moves
 /// - Payoff kinks at strike `K` map to `ln K`
-pub trait PdeProblem1D {
+pub trait PdeProblem1D: Send + Sync {
     /// Diffusion coefficient `a(x, t)` — multiplies `d²u/dx²`.
     ///
     /// For Black-Scholes in log-spot: `0.5 * σ²`.

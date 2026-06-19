@@ -172,7 +172,7 @@ pub struct TotalReturnLegParams<'a> {
 ///     }
 /// }
 /// ```
-pub trait TrsReturnModel {
+pub trait TrsReturnModel: Send + Sync {
     /// Computes total return over a period.
     ///
     /// # Arguments
@@ -577,7 +577,6 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use rust_decimal::Decimal;
-    use std::cell::Cell;
     use time::Month;
 
     fn date(y: i32, m: u8, d: u8) -> Date {
@@ -590,7 +589,7 @@ mod tests {
 
     struct SequencedReturnModel {
         returns: [f64; 3],
-        next_idx: Cell<usize>,
+        next_idx: std::sync::atomic::AtomicUsize,
     }
 
     impl TrsReturnModel for FlatReturnModel {
@@ -609,8 +608,9 @@ mod tests {
             _inputs: &super::PeriodReturnInputs,
             _context: &MarketContext,
         ) -> finstack_quant_core::Result<f64> {
-            let idx = self.next_idx.get();
-            self.next_idx.set(idx + 1);
+            let idx = self.next_idx.load(std::sync::atomic::Ordering::SeqCst);
+            self.next_idx
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Ok(self.returns[idx])
         }
     }
@@ -667,7 +667,7 @@ mod tests {
         };
         let model = SequencedReturnModel {
             returns: [1e16, 1.0, -1e16],
-            next_idx: Cell::new(0),
+            next_idx: std::sync::atomic::AtomicUsize::new(0),
         };
 
         let pv =

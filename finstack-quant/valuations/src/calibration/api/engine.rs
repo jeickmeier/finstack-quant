@@ -34,17 +34,19 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 /// backwards compatibility. Bindings that want full structured detail (e.g.,
 /// `worst_quote_id` on solver non-convergence) call
 /// [`execute_with_diagnostics`] directly.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ExecuteError {
     /// Structured envelope-shaped failure (currently only solver
     /// non-convergence). Static envelope validation is a separate,
     /// opt-in pass exposed via [`super::validate::validate`] and the
     /// `dry_run` / `dependency_graph_json` bindings; `execute` does not
     /// run it automatically.
+    #[error(transparent)]
     Envelope(EnvelopeError),
     /// Other (legacy, stringly-typed) errors from the engine pipeline:
     /// quote-set lookup, preflight validation, market-context construction,
     /// and step-runtime failures.
+    #[error(transparent)]
     Other(finstack_quant_core::Error),
 }
 

@@ -107,7 +107,7 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 /// assert!(cal.is_holiday(new_year));
 /// assert!(!cal.is_business_day(new_year)); // Holiday = not business day
 /// ```
-pub trait HolidayCalendar {
+pub trait HolidayCalendar: Send + Sync {
     /// Returns `true` if `date` is a holiday according to this calendar.
     ///
     /// Notes:

@@ -25,7 +25,7 @@ use super::boundary::BoundaryCondition;
 ///
 /// - x-axis: typically log-spot (`x = ln S`)
 /// - y-axis: typically variance (`v`) or log-variance
-pub trait PdeProblem2D {
+pub trait PdeProblem2D: Send + Sync {
     /// Diffusion in the x-direction: coefficient of `d²u/dx²`.
     fn diffusion_xx(&self, x: f64, y: f64, t: f64) -> f64;
 
