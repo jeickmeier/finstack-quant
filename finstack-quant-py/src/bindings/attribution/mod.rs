@@ -46,9 +46,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    parent.add_submodule(&m)?;
-    py.import("sys")?
-        .getattr("modules")?
-        .set_item("finstack_quant.attribution", &m)?;
+    crate::bindings::module_utils::register_submodule(
+        py,
+        parent,
+        &m,
+        "attribution",
+        crate::bindings::module_utils::ROOT_PACKAGE,
+        crate::bindings::module_utils::ParentNameSource::Name,
+    )?;
     Ok(())
 }

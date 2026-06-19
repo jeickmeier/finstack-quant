@@ -13,7 +13,7 @@
 //!   `theta` is per day under ACT/365 (use 252 day-count via `theta_days` if you
 //!   want a business-day convention).
 
-use crate::errors::display_to_py;
+use crate::errors::{display_to_py, value_error};
 use finstack_quant_valuations::models::closed_form::implied_vol::{
     black76_implied_vol, bs_implied_vol,
 };
@@ -111,7 +111,7 @@ fn bs_greeks_wrapper<'py>(
     theta_days: f64,
 ) -> PyResult<Bound<'py, PyDict>> {
     if !theta_days.is_finite() || theta_days <= 0.0 {
-        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+        return Err(value_error(format!(
             "theta_days must be positive, got {theta_days}"
         )));
     }

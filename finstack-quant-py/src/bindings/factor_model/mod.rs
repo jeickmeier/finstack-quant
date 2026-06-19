@@ -11,12 +11,22 @@ pub(crate) mod credit;
 /// Register the `factor_model` Python domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "factor_model")?;
+    let qual = crate::bindings::module_utils::set_submodule_package(
+        parent,
+        &m,
+        "factor_model",
+        crate::bindings::module_utils::ROOT_PACKAGE,
+        crate::bindings::module_utils::ParentNameSource::Name,
+    )?;
     m.setattr(
         "__doc__",
         "Factor-model primitives, credit calibration, and decomposition.",
     )?;
 
     let credit = PyModule::new(py, "credit")?;
+    let credit_qual = crate::bindings::module_utils::set_submodule_package_by_package(
+        &m, &credit, "credit", &qual,
+    )?;
     credit.setattr(
         "__doc__",
         "Credit factor hierarchy artifacts, calibration, and decomposition.",
@@ -36,26 +46,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     credit.setattr("__all__", credit_all)?;
-    m.add_submodule(&credit)?;
-    m.setattr("credit", &credit)?;
+    crate::bindings::module_utils::register_submodule_at(py, &m, &credit, &credit_qual)?;
 
     let all = PyList::new(py, ["credit"])?;
     m.setattr("__all__", all)?;
-    parent.add_submodule(&m)?;
-
-    let parent_name = crate::bindings::module_utils::parent_qualified_name(
-        parent,
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
-    );
-    let qual = format!("{parent_name}.factor_model");
-    let credit_qual = format!("{qual}.credit");
-    m.setattr("__package__", &qual)?;
-    credit.setattr("__package__", &credit_qual)?;
-    let sys = PyModule::import(py, "sys")?;
-    let modules = sys.getattr("modules")?;
-    modules.set_item(&qual, &m)?;
-    modules.set_item(&credit_qual, &credit)?;
+    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
 
     Ok(())
 }

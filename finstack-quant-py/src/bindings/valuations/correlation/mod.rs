@@ -4,7 +4,7 @@
 //! probability utilities to Python under `finstack_quant.valuations.correlation`,
 //! mirroring the Rust module [`finstack_quant_valuations::correlation`].
 
-use crate::errors::display_to_py;
+use crate::errors::{display_to_py, value_error};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
@@ -193,7 +193,7 @@ impl PyCopula {
                 Ok(corr::RandomFactorLoadingCopula::new(*loading_volatility)
                     .stress_correlation_proxy(correlation))
             }
-            _ => Err(pyo3::exceptions::PyValueError::new_err(format!(
+            _ => Err(value_error(format!(
                 "stress_correlation_proxy is only defined for the Random Factor Loading \
                  copula, got '{}'",
                 self.inner.model_name()
@@ -701,7 +701,7 @@ impl PyLatentMultiFactor {
     fn generate_correlated_factors(&self, independent_z: Vec<f64>) -> PyResult<Vec<f64>> {
         let expected = self.inner.num_factors();
         if independent_z.len() != expected {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            return Err(value_error(format!(
                 "independent_z must contain exactly {expected} draws (one per factor), \
                  got {}",
                 independent_z.len()
