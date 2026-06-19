@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://finstack_quant.io/schemas/factor_model/1/credit_calibration_inputs.schema.json",
   "title": "CreditCalibrationInputs",
   "description": "All inputs the credit factor calibrator needs for a single calibration run. Canonical Rust type: finstack_quant_valuations::factor_model::CreditCalibrationInputs (in credit_calibration.rs).",

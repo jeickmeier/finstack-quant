@@ -1030,7 +1030,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/cashflow/1/fee_specs.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Fee specifications for fixed and periodic fees. Rust types: FeeSpec, FeeBase, FeeTier from finstack_quant_valuations::cashflow::builder::specs::fees",
   "oneOf": [
     {

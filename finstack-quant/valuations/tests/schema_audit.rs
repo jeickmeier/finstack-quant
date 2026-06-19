@@ -168,11 +168,14 @@ mod generated_schema_contract {
     use serde_json::Value;
     use std::path::{Path, PathBuf};
 
+    const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
+
+    fn schema_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("schemas")
+    }
+
     fn instrument_schema_root() -> PathBuf {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("schemas")
-            .join("instruments")
-            .join("1")
+        schema_root().join("instruments").join("1")
     }
 
     fn read_schema(path: &Path) -> Value {
@@ -201,6 +204,34 @@ mod generated_schema_contract {
                 && path.extension().and_then(|ext| ext.to_str()) == Some("json")
             {
                 out.push(path);
+            }
+        }
+    }
+
+    fn contains_key(value: &Value, key: &str) -> bool {
+        match value {
+            Value::Object(map) => {
+                map.contains_key(key) || map.values().any(|child| contains_key(child, key))
+            }
+            Value::Array(items) => items.iter().any(|child| contains_key(child, key)),
+            _ => false,
+        }
+    }
+
+    #[test]
+    fn generated_schemas_declare_2020_12_when_using_modern_keywords() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&schema_root(), &mut schema_files);
+
+        for path in schema_files {
+            let schema = read_schema(&path);
+            if contains_key(&schema, "$defs") || contains_key(&schema, "prefixItems") {
+                assert_eq!(
+                    schema.get("$schema").and_then(Value::as_str),
+                    Some(JSON_SCHEMA_2020_12),
+                    "{} uses modern JSON Schema keywords but declares the wrong dialect",
+                    path.display()
+                );
             }
         }
     }

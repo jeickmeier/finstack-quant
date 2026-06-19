@@ -1661,7 +1661,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_future.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Exchange-traded interest rate future. `fixing_date`, `period_start`, and `period_end` are optional and may be derived from `expiry_date` and contract conventions.",
   "examples": [

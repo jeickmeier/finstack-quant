@@ -12,6 +12,8 @@
 use serde_json::Value;
 use std::sync::OnceLock;
 
+const JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
+
 /// Parse embedded JSON schema at compile time, returning a Result.
 /// The JSON is embedded via `include_str!` so the content is always present,
 /// but parsing can still fail if the JSON is malformed.
@@ -89,7 +91,7 @@ fn instrument_schema_cache(
 
 fn fallback_instrument_schema(instrument_type: &str) -> Value {
     serde_json::json!({
-        "$schema": "http://json-schema.org/draft-07/schema#",
+        "$schema": JSON_SCHEMA_DIALECT,
         "title": format!("{instrument_type} (generic)"),
         "description": format!(
             "Fallback schema for instrument type '{instrument_type}'. Dedicated schema is not yet available; 'spec' remains untyped."
@@ -312,7 +314,7 @@ mod tests {
     fn test_schema_stubs() {
         // Verify stub schemas are valid JSON and have expected structure
         let bond = bond_schema().expect("bond schema should parse");
-        assert_eq!(bond["$schema"], "http://json-schema.org/draft-07/schema#");
+        assert_eq!(bond["$schema"], JSON_SCHEMA_DIALECT);
         assert_eq!(bond["title"], "Bond");
 
         let envelope =

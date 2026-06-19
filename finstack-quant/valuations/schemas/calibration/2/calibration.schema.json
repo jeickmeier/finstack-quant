@@ -2659,7 +2659,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/calibration/2/calibration.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Top-level envelope for plan-driven calibration requests. Contains the calibration plan with quote sets and steps, plus optional initial market state.",
   "examples": [

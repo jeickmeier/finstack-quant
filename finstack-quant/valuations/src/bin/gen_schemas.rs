@@ -11,6 +11,8 @@ use finstack_quant_valuations::instruments::*;
 use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 
+const JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
+
 /// Locate the schemas directory relative to the crate root.
 fn schemas_dir() -> PathBuf {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR must be set");
@@ -98,7 +100,6 @@ fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
     // Preserve known top-level keys from the existing file
     let preserve_keys = [
         "$id",
-        "$schema",
         "additionalProperties",
         "description",
         "examples",
@@ -111,6 +112,10 @@ fn update_schema_file(name: &str, category: &str, generated_schema: Value) {
             output.insert((*key).to_string(), val.clone());
         }
     }
+    output.insert(
+        "$schema".to_string(),
+        Value::String(JSON_SCHEMA_DIALECT.to_string()),
+    );
     output
         .entry("additionalProperties".to_string())
         .or_insert(Value::Bool(false));
@@ -171,7 +176,7 @@ fn update_standalone_schema_file(name: &str, subdir: &str, filename: &str, gener
         // Create minimal placeholder if file doesn't exist
         json!({
             "$id": format!("https://finstack_quant.dev/schemas/{subdir}/{filename}.schema.json"),
-            "$schema": "http://json-schema.org/draft-07/schema#",
+            "$schema": JSON_SCHEMA_DIALECT,
             "title": to_title(name),
             "description": format!("{} specification", to_title(name)),
             "type": "object"
@@ -185,11 +190,15 @@ fn update_standalone_schema_file(name: &str, subdir: &str, filename: &str, gener
     let mut output = Map::new();
 
     // Preserve metadata from existing file
-    for key in ["$id", "$schema", "title", "description"] {
+    for key in ["$id", "title", "description"] {
         if let Some(val) = existing_obj.get(key) {
             output.insert(key.to_string(), val.clone());
         }
     }
+    output.insert(
+        "$schema".to_string(),
+        Value::String(JSON_SCHEMA_DIALECT.to_string()),
+    );
 
     // Preserve examples if present
     if let Some(examples) = existing_obj.get("examples") {

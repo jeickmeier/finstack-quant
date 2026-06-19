@@ -1775,7 +1775,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/inflation_cap_floor.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "YoY inflation cap/floor option priced with Black-76 or Bachelier model",
   "examples": [

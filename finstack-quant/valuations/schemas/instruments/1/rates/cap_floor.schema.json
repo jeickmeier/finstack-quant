@@ -1793,7 +1793,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/cap_floor.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Cap/floor instrument priced with Black model",
   "examples": [

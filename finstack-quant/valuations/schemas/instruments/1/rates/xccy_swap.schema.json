@@ -1179,7 +1179,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/rates/xccy_swap.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Cross-currency floating-for-floating swap with principal exchange",
   "examples": [

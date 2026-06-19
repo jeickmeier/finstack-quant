@@ -1595,7 +1595,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/volatility_index_future.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Volatility index futures contract (VIX, VXN, VSTOXX)",
   "examples": [

@@ -1732,7 +1732,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/agency_mbs_passthrough.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Agency MBS passthrough security (FNMA, FHLMC, GNMA)",
   "examples": [

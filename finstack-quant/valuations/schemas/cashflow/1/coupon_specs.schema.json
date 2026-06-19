@@ -212,7 +212,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/cashflow/1/coupon_specs.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Fixed and floating coupon specifications for cashflow generation. Rust types: CouponType, FixedCouponSpec, FloatingRateSpec, FloatingCouponSpec from finstack_quant_valuations::cashflow::builder::specs::coupon",
   "properties": {

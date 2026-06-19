@@ -20718,7 +20718,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Levered real estate equity combining a property asset with financing instruments",
   "examples": [

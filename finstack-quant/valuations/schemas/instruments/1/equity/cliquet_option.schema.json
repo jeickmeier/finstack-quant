@@ -1619,7 +1619,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/cliquet_option.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Option with periodic reset caps and global cap",
   "examples": [

@@ -1,6 +1,6 @@
 # Finstack JSON Schemas
 
-JSON Schema (Draft 7) definitions for all Finstack data types. These schemas are **auto-generated from Rust types** via [schemars](https://github.com/GREsau/schemars) and should not be edited by hand.
+JSON Schema Draft 2020-12 definitions for all Finstack data types. These schemas are **auto-generated from Rust types** via [schemars](https://github.com/GREsau/schemars) and should not be edited by hand.
 
 ## Regenerating Schemas
 
@@ -152,7 +152,7 @@ Schema versions are encoded in directory paths (`/1/`, `/2/`, `/3/`). The `schem
 
 ## Validation
 
-Schemas can be used with any JSON Schema Draft 7 validator:
+Schemas can be used with any JSON Schema Draft 2020-12 validator:
 
 ```python
 import jsonschema, json

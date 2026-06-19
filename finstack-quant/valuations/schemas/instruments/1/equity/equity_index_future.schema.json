@@ -1595,7 +1595,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/equity/equity_index_future.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "Equity index futures contract (E-mini S&P 500, Nasdaq-100, etc.)",
   "examples": [

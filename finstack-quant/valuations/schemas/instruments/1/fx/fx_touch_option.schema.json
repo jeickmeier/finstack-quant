@@ -1649,7 +1649,7 @@
     }
   },
   "$id": "https://finstack_quant.dev/schemas/instrument/1/fx/fx_touch_option.schema.json",
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "description": "FX touch/no-touch barrier option with configurable barrier direction and payout timing",
   "examples": [
