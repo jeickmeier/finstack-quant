@@ -52,7 +52,7 @@
               "properties": {
                 "cash_pct": {
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
-                  "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+                  "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
                   "type": [
                     "string",
                     "number"
@@ -60,7 +60,7 @@
                 },
                 "pik_pct": {
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`.",
-                  "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+                  "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
                   "type": [
                     "string",
                     "number"
@@ -251,7 +251,7 @@
     },
     "rate": {
       "description": "Coupon rate as a decimal (e.g., 0.05 for 5%). Uses Decimal for exact representation.",
-      "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+      "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
       "type": [
         "string",
         "number"

@@ -2598,7 +2598,7 @@
         },
         "rate": {
           "description": "Fixed rate (e.g., 0.05 for 5%)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -2691,7 +2691,7 @@
         },
         "spread_bp": {
           "description": "Spread in basis points added to the forward rate",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -2824,7 +2824,7 @@
           "description": "Use a fixed rate as the index component. Emits `info!`.\n\nThe value is a **decimal annual rate**, not basis points: `0.045`\nmeans 4.5%. This differs from the bp-denominated spread/floor/cap\nfields on [`FloatingRateSpec`] because it substitutes directly for\nthe projected index rate.",
           "properties": {
             "FixedRate": {
-              "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+              "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
               "type": [
                 "string",
                 "number"
@@ -2845,7 +2845,7 @@
         "all_in_cap_bp": {
           "default": null,
           "description": "Cap on all-in rate in basis points (applied after spread and gearing).\n\nExample: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -2855,7 +2855,7 @@
         "all_in_floor_bp": {
           "default": null,
           "description": "Floor on all-in rate in basis points (Min Coupon).\n\nApplied to the final calculated rate after gearing and spread.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -2895,7 +2895,7 @@
         "gearing": {
           "default": "1",
           "description": "Gearing/leverage multiplier applied to the all-in rate (default: 1.0).\n\nExample: gearing = 2.0 means the rate is doubled.\n\n**Restriction:** gearing must be strictly positive (`gearing > 0`);\nprojection rejects zero or negative gearing, so inverse floaters\n(negative gearing) are not currently expressible with this field.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -2909,7 +2909,7 @@
         "index_cap_bp": {
           "default": null,
           "description": "Cap on index rate in basis points (applied to index component).",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -2919,7 +2919,7 @@
         "index_floor_bp": {
           "default": null,
           "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -2985,7 +2985,7 @@
         },
         "spread_bp": {
           "description": "Spread/margin over index in basis points. Uses Decimal for exact representation.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -3336,7 +3336,7 @@
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
       "properties": {
         "amount": {
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"

@@ -171,6 +171,7 @@ mod generated_schema_contract {
 
     const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
     const SCHEMA_ID_HOST: &str = "https://finstack_quant.dev/";
+    const DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
 
     fn schema_root() -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("schemas")
@@ -260,6 +261,47 @@ mod generated_schema_contract {
                     .is_some_and(|schema_type| schema_type == "string")
             }),
             _ => false,
+        }
+    }
+
+    fn collect_noncanonical_decimal_patterns(value: &Value, path: &str, out: &mut Vec<String>) {
+        match value {
+            Value::Object(map) => {
+                if let Some(pattern) = map.get("pattern").and_then(Value::as_str) {
+                    if pattern != DECIMAL_PATTERN || !schema_accepts_string(value) {
+                        out.push(format!("{path} pattern={pattern:?}"));
+                    }
+                }
+
+                for (key, child) in map {
+                    collect_noncanonical_decimal_patterns(child, &format!("{path}/{key}"), out);
+                }
+            }
+            Value::Array(items) => {
+                for (idx, child) in items.iter().enumerate() {
+                    collect_noncanonical_decimal_patterns(child, &format!("{path}/{idx}"), out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn decimal_string_properties_use_canonical_pattern() {
+        let mut schema_files = Vec::new();
+        collect_schema_files(&schema_root(), &mut schema_files);
+
+        for path in schema_files {
+            let schema = read_schema(&path);
+            let mut noncanonical = Vec::new();
+            collect_noncanonical_decimal_patterns(&schema, "", &mut noncanonical);
+
+            assert!(
+                noncanonical.is_empty(),
+                "{} has non-canonical decimal string patterns: {}",
+                path.display(),
+                noncanonical.join(", ")
+            );
         }
     }
 

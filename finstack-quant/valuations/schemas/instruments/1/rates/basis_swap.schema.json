@@ -71,7 +71,7 @@
         },
         "spread_bp": {
           "description": "Spread added to the floating rate, in **basis points**.\n\n# Units\n\n- `Decimal::from(5)` represents 5 basis points (5bp)\n- `Decimal::from(100)` represents 100 basis points (1%)\n- `Decimal::from(-10)` represents -10 basis points\n\nThis is consistent with `FloatLegSpec::spread_bp` and `PremiumLegSpec::spread_bp`.\n\n# Typical Market Range\n\nBasis spreads in liquid markets typically range from -50bp to +50bp.\nValues outside ±5000bp are considered extreme and\nwill trigger a validation warning during pricing.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -1070,7 +1070,7 @@
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
       "properties": {
         "amount": {
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"

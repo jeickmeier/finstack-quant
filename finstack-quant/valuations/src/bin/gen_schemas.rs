@@ -12,6 +12,8 @@ use serde_json::{json, Map, Value};
 use std::path::{Path, PathBuf};
 
 const JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
+const DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE][+-]?\d+)?$";
+const SCHEMARS_DECIMAL_PATTERN: &str = r"^-?\d+(\.\d+)?([eE]\d+)?$";
 
 /// Locate the schemas directory relative to the crate root.
 fn schemas_dir() -> PathBuf {
@@ -58,6 +60,44 @@ fn schema_accepts_string(value: &Value) -> bool {
                 .is_some_and(|schema_type| schema_type == "string")
         }),
         _ => false,
+    }
+}
+
+/// Normalize `rust_decimal::Decimal` schemas emitted by schemars.
+fn normalize_decimal_patterns(value: &mut Value) {
+    match value {
+        Value::Object(map) => {
+            let accepts_string = match map.get("type") {
+                Some(Value::String(schema_type)) => schema_type == "string",
+                Some(Value::Array(schema_types)) => schema_types.iter().any(|schema_type| {
+                    schema_type
+                        .as_str()
+                        .is_some_and(|schema_type| schema_type == "string")
+                }),
+                _ => false,
+            };
+            if accepts_string
+                && map
+                    .get("pattern")
+                    .and_then(Value::as_str)
+                    .is_some_and(|pattern| pattern == SCHEMARS_DECIMAL_PATTERN)
+            {
+                map.insert(
+                    "pattern".to_string(),
+                    Value::String(DECIMAL_PATTERN.to_string()),
+                );
+            }
+
+            for child in map.values_mut() {
+                normalize_decimal_patterns(child);
+            }
+        }
+        Value::Array(items) => {
+            for child in items {
+                normalize_decimal_patterns(child);
+            }
+        }
+        _ => {}
     }
 }
 
@@ -113,6 +153,7 @@ fn update_schema_file(name: &str, category: &str, mut generated_schema: Value) {
     let existing_obj = existing
         .as_object()
         .expect("existing schema must be an object");
+    normalize_decimal_patterns(&mut generated_schema);
     annotate_date_formats(&mut generated_schema);
 
     // Extract the generated schema's properties and required fields for embedding
@@ -223,6 +264,7 @@ fn update_standalone_schema_file(name: &str, subdir: &str, filename: &str, gener
     let base = all_schemas_dir();
     let path = base.join(subdir).join(format!("{filename}.schema.json"));
     let mut generated = generated;
+    normalize_decimal_patterns(&mut generated);
     annotate_date_formats(&mut generated);
 
     let existing: Value = if path.exists() {

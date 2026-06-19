@@ -2046,7 +2046,7 @@
         },
         "spread_bp": {
           "description": "Spread added to the floating rate, in **basis points**.\n\n# Units\n\n- `Decimal::from(5)` represents 5 basis points (5bp)\n- `Decimal::from(100)` represents 100 basis points (1%)\n- `Decimal::from(-10)` represents -10 basis points\n\nThis is consistent with `FloatLegSpec::spread_bp` and `PremiumLegSpec::spread_bp`.\n\n# Typical Market Range\n\nBasis spreads in liquid markets typically range from -50bp to +50bp.\nValues outside ±5000bp are considered extreme and\nwill trigger a validation warning during pricing.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -2361,7 +2361,7 @@
         },
         "strike": {
           "description": "Strike (fixed rate on underlying swap)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -3171,7 +3171,7 @@
         },
         "strike": {
           "description": "Strike spread as a decimal rate (e.g., 0.01 = 100bp)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -3180,7 +3180,7 @@
         "underlying_cds_coupon": {
           "default": null,
           "description": "Contractual coupon `c` of the underlying CDS, expressed as a decimal\nrate (e.g., 0.01 for the 100 bp standard CDX coupon, 0.05 for the\n500 bp standard CDX.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -3725,7 +3725,7 @@
         },
         "strike": {
           "description": "Strike (as decimal, e.g., 0.05 for 5%)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -4561,7 +4561,7 @@
         },
         "strike": {
           "description": "Strike (fixed rate for CMS option)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -5843,7 +5843,7 @@
         },
         "fixed_price": {
           "description": "Fixed price per unit.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -6655,7 +6655,7 @@
               "properties": {
                 "cash_pct": {
                   "description": "Fraction of the coupon paid in cash, expressed as a decimal share in\n`[0, 1]`.",
-                  "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+                  "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
                   "type": [
                     "string",
                     "number"
@@ -6663,7 +6663,7 @@
                 },
                 "pik_pct": {
                   "description": "Fraction of the coupon capitalized as PIK, expressed as a decimal\nshare in `[0, 1]`.",
-                  "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+                  "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
                   "type": [
                     "string",
                     "number"
@@ -8464,7 +8464,7 @@
         },
         "quote_rate": {
           "description": "Optional quoted simple rate r (annualised) for the deposit.\n\nNote: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders).",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -9772,7 +9772,7 @@
       "properties": {
         "bps": {
           "description": "Fee rate in basis points for this tier.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -9780,7 +9780,7 @@
         },
         "threshold": {
           "description": "Utilization threshold (0.0 to 1.0). Fee applies when utilization >= this threshold.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -9889,7 +9889,7 @@
         },
         "spread_bp": {
           "description": "Spread in basis points over the floating rate (e.g., 50 = 50bp = 0.5%)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -9958,7 +9958,7 @@
         },
         "rate": {
           "description": "Coupon rate as a decimal (e.g., 0.05 for 5%). Uses Decimal for exact representation.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -10037,7 +10037,7 @@
         },
         "rate": {
           "description": "Fixed rate (e.g., 0.05 for 5%)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -10130,7 +10130,7 @@
         },
         "spread_bp": {
           "description": "Spread in basis points added to the forward rate",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -10292,7 +10292,7 @@
           "description": "Use a fixed rate as the index component. Emits `info!`.\n\nThe value is a **decimal annual rate**, not basis points: `0.045`\nmeans 4.5%. This differs from the bp-denominated spread/floor/cap\nfields on [`FloatingRateSpec`] because it substitutes directly for\nthe projected index rate.",
           "properties": {
             "FixedRate": {
-              "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+              "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
               "type": [
                 "string",
                 "number"
@@ -10313,7 +10313,7 @@
         "all_in_cap_bp": {
           "default": null,
           "description": "Cap on all-in rate in basis points (applied after spread and gearing).\n\nExample: all_in_cap_bp = Some(1000.0) ensures all-in rate <= 10%.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -10323,7 +10323,7 @@
         "all_in_floor_bp": {
           "default": null,
           "description": "Floor on all-in rate in basis points (Min Coupon).\n\nApplied to the final calculated rate after gearing and spread.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -10363,7 +10363,7 @@
         "gearing": {
           "default": "1",
           "description": "Gearing/leverage multiplier applied to the all-in rate (default: 1.0).\n\nExample: gearing = 2.0 means the rate is doubled.\n\n**Restriction:** gearing must be strictly positive (`gearing > 0`);\nprojection rejects zero or negative gearing, so inverse floaters\n(negative gearing) are not currently expressible with this field.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -10377,7 +10377,7 @@
         "index_cap_bp": {
           "default": null,
           "description": "Cap on index rate in basis points (applied to index component).",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -10387,7 +10387,7 @@
         "index_floor_bp": {
           "default": null,
           "description": "Floor on index rate in basis points (applied to index component).\n\nExample: index_floor_bp = Some(0.0) ensures index rate >= 0%.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number",
@@ -10453,7 +10453,7 @@
         },
         "spread_bp": {
           "description": "Spread/margin over index in basis points. Uses Decimal for exact representation.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -10487,7 +10487,7 @@
         },
         "fixed_rate": {
           "description": "Fixed rate (decimal, e.g., 0.05 for 5%)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -12087,7 +12087,7 @@
         },
         "strike": {
           "description": "Strike (annualized, decimal).",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -12301,7 +12301,7 @@
         },
         "real_coupon": {
           "description": "Real coupon rate (as decimal)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -12374,7 +12374,7 @@
         },
         "fixed_rate": {
           "description": "Fixed real rate (as decimal)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -14592,7 +14592,7 @@
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
       "properties": {
         "amount": {
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -15532,7 +15532,7 @@
         },
         "spread_bp": {
           "description": "Fixed spread in basis points (e.g., 100 = 100bp = 1%)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -17136,7 +17136,7 @@
         },
         "repo_rate": {
           "description": "Repo rate (annual, as decimal)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -17969,7 +17969,7 @@
         },
         "initial_rate": {
           "description": "Initial coupon rate (annual, decimal). Used until the first step date.",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -17991,7 +17991,7 @@
                 "type": "string"
               },
               {
-                "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+                "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
                 "type": [
                   "string",
                   "number"
@@ -18766,7 +18766,7 @@
         },
         "strike": {
           "description": "Strike (fixed rate on underlying swap)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -20680,7 +20680,7 @@
         "spread_bp": {
           "default": "0",
           "description": "Spread in basis points (e.g. `Decimal::from(5)` = 5bp).",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -20743,7 +20743,7 @@
         },
         "fixed_rate": {
           "description": "Fixed rate (decimal)",
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"

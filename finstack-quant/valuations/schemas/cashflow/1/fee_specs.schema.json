@@ -938,7 +938,7 @@
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
       "properties": {
         "amount": {
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -1083,7 +1083,7 @@
             },
             "bps": {
               "description": "Fee quote in basis points per annum, stored as `Decimal` to preserve\nthe quoted value exactly.",
-              "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+              "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
               "type": [
                 "string",
                 "number"

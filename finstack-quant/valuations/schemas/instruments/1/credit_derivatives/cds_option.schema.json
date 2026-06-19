@@ -954,7 +954,7 @@
       "description": "Currency-tagged monetary amount with safe arithmetic.\n\nValues are stored using a fixed-point representation derived from ISO 4217\ndecimal places.\n\nWhen you need configurable rounding during ingestion, use\n[`Money::new_with_config`].\n\n# Examples\n```rust\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::currency::Currency;\n\nlet notional = Money::new(1_000_000.0, Currency::EUR);\nassert_eq!(notional.currency(), Currency::EUR);\nassert_eq!(notional.amount(), 1_000_000.0);\n```",
       "properties": {
         "amount": {
-          "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+          "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
           "type": [
             "string",
             "number"
@@ -1821,7 +1821,7 @@
             },
             "strike": {
               "description": "Strike spread as a decimal rate (e.g., 0.01 = 100bp)",
-              "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+              "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
               "type": [
                 "string",
                 "number"
@@ -1830,7 +1830,7 @@
             "underlying_cds_coupon": {
               "default": null,
               "description": "Contractual coupon `c` of the underlying CDS, expressed as a decimal\nrate (e.g., 0.01 for the 100 bp standard CDX coupon, 0.05 for the\n500 bp standard CDX.HY coupon). When `None`, the synthetic underlying\nCDS uses `strike` as its running coupon — the appropriate single-name\nSNAC default where the trade is struck at the par spread. For CDS\nindex options where the index has a fixed standard coupon different\nfrom the option strike, set this explicitly so the strike-adjustment\nterm `H(K) = ξN(c − K)A(K)` (DOCS 2055833 Eq. 2.4) is populated.",
-              "pattern": "^-?\\d+(\\.\\d+)?([eE]\\d+)?$",
+              "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
               "type": [
                 "string",
                 "number",
