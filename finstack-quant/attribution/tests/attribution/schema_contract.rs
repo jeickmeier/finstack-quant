@@ -5,6 +5,7 @@
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
+const JSON_SCHEMA_2020_12: &str = "https://json-schema.org/draft/2020-12/schema";
 const SCHEMA_ID_HOST: &str = "https://finstack_quant.dev/";
 
 fn schema_root() -> PathBuf {
@@ -44,6 +45,19 @@ fn attribution_schemas_use_canonical_id_host() {
         assert!(
             id.starts_with(SCHEMA_ID_HOST),
             "{} has non-canonical $id host: {id}",
+            path.display()
+        );
+    }
+}
+
+#[test]
+fn attribution_schemas_declare_2020_12_dialect() {
+    for path in schema_files() {
+        let schema = read_schema(&path);
+        assert_eq!(
+            schema.get("$schema").and_then(Value::as_str),
+            Some(JSON_SCHEMA_2020_12),
+            "{} declares the wrong JSON Schema dialect",
             path.display()
         );
     }
