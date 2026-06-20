@@ -598,8 +598,15 @@ def _price_path(
     to this one entry point.
 
     When ``market_price`` is given, OAS/YTW are computed in a separate call with
-    ``quoted_clean_price`` injected, then merged into the main result.  This avoids
-    a known limitation where the quote-override path zeroes bucketed DV01 values.
+    ``quoted_clean_price`` injected, then merged into the main result.
+
+    INTERIM WORKAROUND: this two-call merge papers over a valuations-engine gap —
+    setting ``quoted_clean_price`` pins the price and zeroes the curve-bump
+    sensitivities (bucketed DV01, key-rate). The merged measures therefore mix a
+    no-spread base run (sensitivities) with a price-pinned solve (OAS/YTW), which
+    are not from one calibrated model. The correct fix lives in the engine:
+    spread-calibrate to the quote, then compute all metrics on the spread-pinned
+    model; once that lands, delete this merge and use a single priced call.
     """
     if market is None or as_of is None:
         raise ValueError("instrument_tearsheet: pricing an instrument JSON requires market= and as_of=")
