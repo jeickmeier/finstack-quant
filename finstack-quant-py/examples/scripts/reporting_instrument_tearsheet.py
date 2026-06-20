@@ -11,7 +11,6 @@ import json
 from datetime import date
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
-from finstack_quant.valuations import ValuationResult, instrument_cashflows, price_instrument_with_metrics
 from finstack_quant import reporting
 
 
@@ -24,23 +23,18 @@ def main() -> None:
             "calendar_id": "weekends_only", "stub": "None", "end_of_month": False, "payment_lag_days": 0}},
         "discount_curve_id": "USD-OIS", "call_put": None, "attributes": {"tags": [], "meta": {}}, "pricing_overrides": {}}})
 
-    mc = MarketContext()
-    mc.insert(DiscountCurve("USD-OIS", date(2026, 6, 19),
-        [(0.0, 1.0), (0.5, 0.98), (1.0, 0.96), (2.0, 0.92), (3.0, 0.88), (5.0, 0.80), (10.0, 0.65)],
+    # Standard-tenor curve so key-rate (bucketed) DV01 buckets are populated.
+    mc = MarketContext().insert(DiscountCurve("USD-OIS", date(2026, 6, 19),
+        [(0.0, 1.0), (0.25, 0.989), (0.5, 0.978), (1.0, 0.956), (2.0, 0.912),
+         (3.0, 0.868), (5.0, 0.79), (7.0, 0.715), (10.0, 0.64),
+         (15.0, 0.52), (20.0, 0.43), (30.0, 0.30)],
         day_count="act_365f"))
     as_of = "2026-06-19"
 
-    # Price with the recommended metric set for a full bond sheet.
-    # Some metrics (ytw, oas, asw_par) require a market-quoted clean price to be present in
-    # pricing_overrides; we drop those here so the script runs without additional market data.
-    _NEEDS_QUOTE = {"ytw", "oas", "asw_par"}
-    metrics = [m for m in reporting.recommended_metrics("bond") if m not in _NEEDS_QUOTE]
-    result = ValuationResult.from_json(price_instrument_with_metrics(
-        bond, mc.to_json(), as_of, model="discounting", metrics=metrics))
-    _, cashflows = instrument_cashflows(bond, mc.to_json(), as_of, model="discounting")
-
-    ts = reporting.instrument_tearsheet(result, definition=json.loads(bond), cashflows=cashflows,
-                                        title="ACME 4.25% 2034 Senior Notes", generated=dt.date.today())
+    # Build the market once, then render in a single call (prices internally):
+    ts = reporting.instrument_tearsheet(
+        json.loads(bond), market=mc, as_of=as_of, market_price=99.5,
+        title="ACME 4.25% 2034 Senior Notes", generated=dt.date.today())
     ts.save("instrument_tearsheet.html")
     print("Wrote instrument_tearsheet.html")
 

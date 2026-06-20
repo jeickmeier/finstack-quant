@@ -254,7 +254,7 @@ def _bond_definition() -> dict:
     return {
         "type": "bond",
         "spec": {
-            "id": "ACME-4.25-2034",
+            "id": "ACME 4.25% 2034",
             "notional": {"amount": "10000000", "currency": "USD"},
             "issue_date": "2024-03-15",
             "maturity": "2034-03-15",
@@ -449,6 +449,7 @@ def test_instrument_tearsheet_prices_from_json() -> None:
 
 def test_instrument_tearsheet_market_price_adds_oas() -> None:
     import datetime as dt
+    import re
 
     from finstack_quant.reporting import instrument_tearsheet
 
@@ -456,6 +457,10 @@ def test_instrument_tearsheet_market_price_adds_oas() -> None:
         _demo_bond_dict(), market=_disc_market(), as_of="2026-06-19", market_price=99.5, generated=dt.date(2026, 6, 19)
     ).to_html()
     assert "OAS" in html
+    # market_price must NOT zero the key-rate bars (the two-call merge regression guard)
+    bar_labels = re.findall(r'font-size="9.5"[^>]*>([^<]+)</text>', html)
+    nonzero = [b for b in bar_labels if b not in ("0", "")]
+    assert len(nonzero) >= 5
 
 
 def test_instrument_tearsheet_price_path_requires_market() -> None:

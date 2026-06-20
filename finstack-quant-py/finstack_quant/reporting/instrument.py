@@ -592,17 +592,17 @@ def _price_path(
 
     Deliberate, documented relaxation of the "reporting never prices" rule, confined
     to this one entry point.
+
+    When ``market_price`` is given, OAS/YTW are computed in a separate call with
+    ``quoted_clean_price`` injected, then merged into the main result.  This avoids
+    a known limitation where the quote-override path zeroes bucketed DV01 values.
     """
     if market is None or as_of is None:
         raise ValueError("instrument_tearsheet: pricing an instrument JSON requires market= and as_of=")
     spec_obj = json.loads(instrument) if isinstance(instrument, str) else json.loads(json.dumps(instrument))
     itype = spec_obj.get("type", "")
-    metrics = recommended_metrics(itype)
-    if market_price is None:
-        metrics = [m for m in metrics if m not in _NEEDS_QUOTE]
-    else:
-        po = spec_obj.setdefault("spec", {}).setdefault("pricing_overrides", {})
-        po["quoted_clean_price"] = market_price
+    all_metrics = recommended_metrics(itype)
+    base_metrics = [m for m in all_metrics if m not in _NEEDS_QUOTE]
     instrument_json = json.dumps(spec_obj)
     market_arg = market.to_json() if hasattr(market, "to_json") else market
     # Lazy import keeps `import finstack_quant.reporting` light and makes the dependency explicit.
@@ -612,9 +612,28 @@ def _price_path(
         price_instrument_with_metrics,
     )
 
-    result = ValuationResult.from_json(
-        price_instrument_with_metrics(instrument_json, market_arg, as_of, model=model, metrics=metrics)
-    )
+    # Main pricing call — excludes quote-gated metrics to preserve bucketed DV01.
+    result_json = price_instrument_with_metrics(instrument_json, market_arg, as_of, model=model, metrics=base_metrics)
+
+    if market_price is not None:
+        # Second call with the market quote injected: solves OAS/YTW.
+        # Injecting quoted_clean_price into pricing_overrides zeros bucketed DV01,
+        # so we only request the quote-gated metrics and merge them in.
+        import copy
+
+        spec_with_quote = copy.deepcopy(spec_obj)
+        spec_with_quote.setdefault("spec", {}).setdefault("pricing_overrides", {})["quoted_clean_price"] = market_price
+        quote_metrics = [m for m in all_metrics if m in _NEEDS_QUOTE]
+        if quote_metrics:
+            quote_json = price_instrument_with_metrics(
+                json.dumps(spec_with_quote), market_arg, as_of, model=model, metrics=quote_metrics
+            )
+            d_base = json.loads(result_json)
+            d_quote = json.loads(quote_json)
+            d_base["measures"].update({k: v for k, v in d_quote["measures"].items() if k in _NEEDS_QUOTE})
+            result_json = json.dumps(d_base)
+
+    result = ValuationResult.from_json(result_json)
     if cashflows is None:
         cf_model = "hazard_rate" if model == "hazard_rate" else "discounting"
         cashflows = instrument_cashflows(instrument_json, market_arg, as_of, model=cf_model)
