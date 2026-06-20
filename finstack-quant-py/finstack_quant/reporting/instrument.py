@@ -595,25 +595,20 @@ def _price_path(
     """Price an instrument JSON and return ``(result, cashflows, definition_dict)``.
 
     Deliberate, documented relaxation of the "reporting never prices" rule, confined
-    to this one entry point.
-
-    When ``market_price`` is given, OAS/YTW are computed in a separate call with
-    ``quoted_clean_price`` injected, then merged into the main result.
-
-    INTERIM WORKAROUND: this two-call merge papers over a valuations-engine gap —
-    setting ``quoted_clean_price`` pins the price and zeroes the curve-bump
-    sensitivities (bucketed DV01, key-rate). The merged measures therefore mix a
-    no-spread base run (sensitivities) with a price-pinned solve (OAS/YTW), which
-    are not from one calibrated model. The correct fix lives in the engine:
-    spread-calibrate to the quote, then compute all metrics on the spread-pinned
-    model; once that lands, delete this merge and use a single priced call.
+    to this one entry point. When ``market_price`` is given it is injected as the
+    instrument's ``quoted_clean_price`` and OAS/YTW are requested in the SAME call —
+    the engine spread-calibrates to the quote, so bucketed DV01 / key-rate stay
+    correct alongside OAS.
     """
     if market is None or as_of is None:
         raise ValueError("instrument_tearsheet: pricing an instrument JSON requires market= and as_of=")
     spec_obj = json.loads(instrument) if isinstance(instrument, str) else json.loads(json.dumps(instrument))
     itype = spec_obj.get("type", "")
-    all_metrics = recommended_metrics(itype)
-    base_metrics = [m for m in all_metrics if m not in _NEEDS_QUOTE]
+    metrics = recommended_metrics(itype)
+    if market_price is None:
+        metrics = [m for m in metrics if m not in _NEEDS_QUOTE]
+    else:
+        spec_obj.setdefault("spec", {}).setdefault("pricing_overrides", {})["quoted_clean_price"] = market_price
     instrument_json = json.dumps(spec_obj)
     market_arg = market.to_json() if hasattr(market, "to_json") else market
     # Lazy import keeps `import finstack_quant.reporting` light and makes the dependency explicit.
@@ -623,35 +618,15 @@ def _price_path(
         price_instrument_with_metrics,
     )
 
-    # Main pricing call — excludes quote-gated metrics to preserve bucketed DV01.
-    result_json = price_instrument_with_metrics(instrument_json, market_arg, as_of, model=model, metrics=base_metrics)
-
-    if market_price is not None:
-        # Second call with the market quote injected: solves OAS/YTW.
-        # Injecting quoted_clean_price into pricing_overrides zeros bucketed DV01,
-        # so we only request the quote-gated metrics and merge them in.
-        import copy
-
-        spec_with_quote = copy.deepcopy(spec_obj)
-        spec_with_quote.setdefault("spec", {}).setdefault("pricing_overrides", {})["quoted_clean_price"] = market_price
-        quote_metrics = [m for m in all_metrics if m in _NEEDS_QUOTE]
-        if quote_metrics:
-            quote_json = price_instrument_with_metrics(
-                json.dumps(spec_with_quote), market_arg, as_of, model=model, metrics=quote_metrics
-            )
-            d_base = json.loads(result_json)
-            d_quote = json.loads(quote_json)
-            d_base["measures"].update({k: v for k, v in d_quote["measures"].items() if k in _NEEDS_QUOTE})
-            result_json = json.dumps(d_base)
-
-    result = ValuationResult.from_json(result_json)
+    result = ValuationResult.from_json(
+        price_instrument_with_metrics(instrument_json, market_arg, as_of, model=model, metrics=metrics)
+    )
     if cashflows is None:
         cf_model = "hazard_rate" if model == "hazard_rate" else "discounting"
         try:
             cashflows = instrument_cashflows(instrument_json, market_arg, as_of, model=cf_model)
         except (ValueError, RuntimeError):
-            # Some instrument types (e.g. equity options) have no deterministic
-            # cashflow schedule; proceed without cashflows.
+            # Some instruments (e.g. options) have no deterministic cashflow schedule.
             cashflows = None
     return result, cashflows, spec_obj
 
