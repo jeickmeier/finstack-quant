@@ -32,7 +32,6 @@ _RECOMMENDED: dict[str, list[str]] = {
         "z_spread",
         "oas",
         "i_spread",
-        "asw_par",
         "duration_mod",
         "duration_mac",
         "convexity",
@@ -75,6 +74,9 @@ _RECOMMENDED: dict[str, list[str]] = {
         "bucketed_vega",
     ],
 }
+
+
+_NEEDS_QUOTE: frozenset[str] = frozenset({"oas", "ytw"})  # metrics that require a quoted market price to solve
 
 
 def recommended_metrics(instrument_type: str) -> list[str]:
@@ -578,9 +580,54 @@ def _build_sections(
     return secs
 
 
+def _price_path(
+    instrument: str | dict,
+    market: Any,
+    as_of: str | None,
+    model: str,
+    market_price: float | None,
+    cashflows: Any,
+) -> tuple[Any, Any, dict]:
+    """Price an instrument JSON and return ``(result, cashflows, definition_dict)``.
+
+    Deliberate, documented relaxation of the "reporting never prices" rule, confined
+    to this one entry point.
+    """
+    if market is None or as_of is None:
+        raise ValueError("instrument_tearsheet: pricing an instrument JSON requires market= and as_of=")
+    spec_obj = json.loads(instrument) if isinstance(instrument, str) else json.loads(json.dumps(instrument))
+    itype = spec_obj.get("type", "")
+    metrics = recommended_metrics(itype)
+    if market_price is None:
+        metrics = [m for m in metrics if m not in _NEEDS_QUOTE]
+    else:
+        po = spec_obj.setdefault("spec", {}).setdefault("pricing_overrides", {})
+        po["quoted_clean_price"] = market_price
+    instrument_json = json.dumps(spec_obj)
+    market_arg = market.to_json() if hasattr(market, "to_json") else market
+    # Lazy import keeps `import finstack_quant.reporting` light and makes the dependency explicit.
+    from finstack_quant.valuations import (
+        ValuationResult,
+        instrument_cashflows,
+        price_instrument_with_metrics,
+    )
+
+    result = ValuationResult.from_json(
+        price_instrument_with_metrics(instrument_json, market_arg, as_of, model=model, metrics=metrics)
+    )
+    if cashflows is None:
+        cf_model = "hazard_rate" if model == "hazard_rate" else "discounting"
+        cashflows = instrument_cashflows(instrument_json, market_arg, as_of, model=cf_model)
+    return result, cashflows, spec_obj
+
+
 def instrument_tearsheet(
     result: Any,
     *,
+    market: Any = None,
+    as_of: str | None = None,
+    model: str = "discounting",
+    market_price: float | None = None,
     cashflows: Any = None,
     definition: Any = None,
     title: str | None = None,
@@ -589,7 +636,16 @@ def instrument_tearsheet(
     theme: Theme = INSTITUTIONAL,
     generated: dt.date | None = None,
 ) -> TearSheet:
-    """Render a priced ``valuations.ValuationResult`` as an HTML instrument tear sheet."""
+    """Render an instrument tear sheet.
+
+    ``result`` is either an already-priced ``valuations.ValuationResult`` (pure
+    formatter path) **or** an instrument JSON (``str``/``dict``). For the latter,
+    pass ``market=`` and ``as_of=``; the instrument is priced with
+    :func:`recommended_metrics` (plus ``oas``/``ytw`` when ``market_price`` is
+    given) and its cashflows fetched, then rendered.
+    """
+    if isinstance(result, (str, dict)):
+        result, cashflows, definition = _price_path(result, market, as_of, model, market_price, cashflows)
     wanted = sections if sections is not None else ALL_SECTIONS
     unknown = set(wanted) - set(ALL_SECTIONS)
     if unknown:

@@ -366,3 +366,112 @@ def test_instrument_option_renders_payoff() -> None:
     html = instrument_tearsheet(opt, definition=defn, generated=dt.date(2026, 6, 19)).to_html()
     assert "Payoff at Expiry" in html
     assert "Delta" in html
+
+
+# ---------------------------------------------------------------------------
+# Task 1 (Phase 2.1): Polymorphic instrument_tearsheet + price path
+# ---------------------------------------------------------------------------
+
+
+def _disc_market(as_of_str: str = "2026-06-19") -> object:
+    from datetime import date
+
+    from finstack_quant.core.market_data import DiscountCurve, MarketContext
+
+    base = date.fromisoformat(as_of_str)
+    knots = [
+        (0.0, 1.0),
+        (0.25, 0.989),
+        (0.5, 0.978),
+        (1.0, 0.956),
+        (2.0, 0.912),
+        (3.0, 0.868),
+        (5.0, 0.79),
+        (7.0, 0.715),
+        (10.0, 0.64),
+        (15.0, 0.52),
+        (20.0, 0.43),
+        (30.0, 0.30),
+    ]
+    return MarketContext().insert(DiscountCurve("USD-OIS", base, knots, day_count="act_365f"))
+
+
+def _demo_bond_dict() -> dict:
+    return {
+        "type": "bond",
+        "spec": {
+            "id": "ACME 4.25% 2034",
+            "notional": {"amount": "10000000", "currency": "USD"},
+            "issue_date": "2024-03-15",
+            "maturity": "2034-03-15",
+            "cashflow_spec": {
+                "Fixed": {
+                    "coupon_type": "Cash",
+                    "rate": 0.0425,
+                    "freq": {"count": 6, "unit": "months"},
+                    "dc": "Thirty360",
+                    "bdc": "following",
+                    "calendar_id": "weekends_only",
+                    "stub": "None",
+                    "end_of_month": False,
+                    "payment_lag_days": 0,
+                }
+            },
+            "discount_curve_id": "USD-OIS",
+            "call_put": None,
+            "attributes": {"tags": [], "meta": {}},
+            "pricing_overrides": {},
+        },
+    }
+
+
+def test_instrument_tearsheet_prices_from_json() -> None:
+    import datetime as dt
+
+    from finstack_quant.reporting import instrument_tearsheet
+    from finstack_quant.reporting.document import TearSheet
+
+    ts = instrument_tearsheet(
+        _demo_bond_dict(), market=_disc_market(), as_of="2026-06-19", generated=dt.date(2026, 6, 19)
+    )
+    assert isinstance(ts, TearSheet)
+    html = ts.to_html()
+    assert "ACME 4.25% 2034" in html
+    assert "Key-Rate" in html
+    assert "Cashflow Ladder" in html
+    # richer curve -> multiple non-zero key-rate buckets render (not all "0")
+    import re
+
+    bar_labels = re.findall(r'font-size="9.5"[^>]*>([^<]+)</text>', html)
+    nonzero = [b for b in bar_labels if b not in ("0", "")]
+    assert len(nonzero) >= 3
+
+
+def test_instrument_tearsheet_market_price_adds_oas() -> None:
+    import datetime as dt
+
+    from finstack_quant.reporting import instrument_tearsheet
+
+    html = instrument_tearsheet(
+        _demo_bond_dict(), market=_disc_market(), as_of="2026-06-19", market_price=99.5, generated=dt.date(2026, 6, 19)
+    ).to_html()
+    assert "OAS" in html
+
+
+def test_instrument_tearsheet_price_path_requires_market() -> None:
+    import pytest
+
+    from finstack_quant.reporting import instrument_tearsheet
+
+    with pytest.raises(ValueError, match=r"market=.*as_of=|requires"):
+        instrument_tearsheet(_demo_bond_dict())  # instrument JSON but no market/as_of
+
+
+def test_result_path_still_pure() -> None:
+    # passing a ValuationResult-like object must NOT go through pricing
+    import datetime as dt
+
+    from finstack_quant.reporting import instrument_tearsheet
+
+    ts = instrument_tearsheet(_fake_bond_result(), generated=dt.date(2026, 6, 19))
+    assert "TEST-BOND" in ts.to_html()
