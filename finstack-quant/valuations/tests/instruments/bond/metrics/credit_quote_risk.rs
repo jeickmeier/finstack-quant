@@ -107,3 +107,40 @@ fn test_quoted_credit_bond_cs01_nonzero_and_matches_unquoted() {
         "quoted CS01 ({cs01:.4}) should reconcile with unquoted ({base_cs01:.4})"
     );
 }
+
+#[test]
+fn test_quoted_credit_bond_offmodel_recalibrates_hazard() {
+    let as_of = date!(2025 - 01 - 01);
+    let market = build_market(as_of);
+
+    let unquoted = build_credit_bond(as_of);
+    let base = unquoted
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::CleanPrice],
+            PricingOptions::default(),
+        )
+        .unwrap();
+    let model_clean_pct = *base.measures.get("clean_price").unwrap() / 1_000_000.0 * 100.0;
+
+    let cs01_at = |clean_pct: f64| -> f64 {
+        let mut q = build_credit_bond(as_of);
+        q.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(clean_pct);
+        let r = q
+            .price_with_metrics(&market, as_of, &[MetricId::Cs01], PricingOptions::default())
+            .unwrap();
+        *r.measures.get("cs01").unwrap()
+    };
+
+    // Quoting 8pts below model recalibrates the hazard wider, so CS01 must differ
+    // from the at-model quote. If the calibrated shift were silently discarded
+    // (curve-id bug), both would equal the unquoted CS01 and this would fail.
+    let cs01_model = cs01_at(model_clean_pct);
+    let cs01_distressed = cs01_at(model_clean_pct - 8.0);
+    assert!(
+        (cs01_distressed - cs01_model).abs() > 1e-2,
+        "off-model quote should recalibrate the hazard and change CS01: \
+         model={cs01_model:.4}, distressed={cs01_distressed:.4}"
+    );
+}

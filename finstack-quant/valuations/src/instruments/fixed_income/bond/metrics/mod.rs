@@ -62,6 +62,8 @@ pub(crate) mod dv01;
 pub(crate) mod effective;
 /// Price, yield, and spread metrics
 pub(crate) mod price_yield_spread;
+/// Quote-reproducing risk view for bond bump-based sensitivities
+mod risk_view;
 /// Weighted Average Life calculator
 pub(crate) mod wal;
 /// Yield-basis DV01 calculator

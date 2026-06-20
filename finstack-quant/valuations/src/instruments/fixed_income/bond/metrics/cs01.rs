@@ -43,6 +43,7 @@
 //! [`price_from_z_spread`]: crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread
 //! [`ZSpreadCalculator`]: crate::instruments::fixed_income::bond::ZSpreadCalculator
 
+use super::risk_view::with_bond_risk_view;
 use crate::constants::ONE_BASIS_POINT;
 use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
@@ -58,13 +59,18 @@ pub(crate) struct BondCs01Calculator;
 
 impl MetricCalculator for BondCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bond: &Bond = context.instrument_as()?;
-        let curves = bond.curve_dependencies()?;
+        let has_credit = {
+            let bond: &Bond = context.instrument_as()?;
+            !bond.curve_dependencies()?.credit_curves.is_empty()
+        };
 
-        if !curves.credit_curves.is_empty() {
-            return crate::metrics::GenericParallelCs01::<Bond>::default().calculate(context);
+        if has_credit {
+            return with_bond_risk_view(context, |ctx| {
+                crate::metrics::GenericParallelCs01::<Bond>::default().calculate(ctx)
+            });
         }
 
+        let bond: &Bond = context.instrument_as()?;
         let inst_id = bond.id();
 
         let base_spread = context
@@ -79,11 +85,6 @@ impl MetricCalculator for BondCs01Calculator {
 
         let bumped_spread = base_spread + ONE_BASIS_POINT;
 
-        // Reprice on the settlement-anchored, compounding-aware basis the
-        // z-spread was calibrated on. `price_from_z_spread` derives the same
-        // `quote_date` origin and uses the same `z_spread_discount_factor` shift
-        // as `ZSpreadCalculator`, so `base_npv` is the dirty price the z-spread
-        // was solved to and the finite difference is taken on the right curve.
         let base_npv = price_from_z_spread(bond, &context.curves, context.as_of, base_spread)?;
         let bumped_npv = price_from_z_spread(bond, &context.curves, context.as_of, bumped_spread)?;
 
@@ -109,11 +110,15 @@ pub(crate) struct BondBucketedCs01Calculator;
 
 impl MetricCalculator for BondBucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
-        let bond: &Bond = context.instrument_as()?;
-        let curves = bond.curve_dependencies()?;
+        let has_credit = {
+            let bond: &Bond = context.instrument_as()?;
+            !bond.curve_dependencies()?.credit_curves.is_empty()
+        };
 
-        if !curves.credit_curves.is_empty() {
-            return crate::metrics::GenericBucketedCs01::<Bond>::default().calculate(context);
+        if has_credit {
+            return with_bond_risk_view(context, |ctx| {
+                crate::metrics::GenericBucketedCs01::<Bond>::default().calculate(ctx)
+            });
         }
 
         let cs01 = context
