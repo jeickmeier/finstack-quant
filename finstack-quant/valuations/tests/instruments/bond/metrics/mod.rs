@@ -20,6 +20,7 @@
 
 mod accrued;
 mod asw;
+mod bucketed_dv01;
 mod convexity;
 mod cs01;
 mod dm;
