@@ -366,6 +366,7 @@ def test_instrument_option_renders_payoff() -> None:
     html = instrument_tearsheet(opt, definition=defn, generated=dt.date(2026, 6, 19)).to_html()
     assert "Payoff at Expiry" in html
     assert "Delta" in html
+    assert "Gamma" in html  # gamma KPI replaces the quote-gated implied_vol slot
 
 
 # ---------------------------------------------------------------------------

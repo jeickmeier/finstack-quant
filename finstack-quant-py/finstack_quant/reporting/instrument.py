@@ -67,16 +67,20 @@ _RECOMMENDED: dict[str, list[str]] = {
         "vega",
         "theta",
         "rho",
-        "implied_vol",
-        "vanna",
-        "volga",
+        # implied_vol requires a quoted market price → gated by _NEEDS_QUOTE.
+        # vanna, volga, bucketed_vega require a full vol surface and cannot be
+        # computed from a flat implied_volatility override; omit so the
+        # recommended set works with minimal markets (spot + discount + override).
         "charm",
-        "bucketed_vega",
     ],
 }
 
 
-_NEEDS_QUOTE: frozenset[str] = frozenset({"oas", "ytw"})  # metrics that require a quoted market price to solve
+_NEEDS_QUOTE: frozenset[str] = frozenset({
+    "oas",
+    "ytw",
+    "implied_vol",
+})  # metrics that require a quoted market price to solve
 
 
 def recommended_metrics(instrument_type: str) -> list[str]:
@@ -357,7 +361,7 @@ ALL_SECTIONS = ["definition", "valuation", "keyrate", "cashflows", "schedule", "
 _KPI_METRICS: dict[str, list[str]] = {
     "bond": ["dirty_price", "ytm", "duration_mod", "dv01"],
     "credit_default_swap": ["par_spread", "cs01", "jump_to_default", "default01"],
-    "equity_option": ["delta", "vega", "implied_vol", "theta"],
+    "equity_option": ["delta", "vega", "gamma", "theta"],
 }
 
 # Analytics column groupings per type: list of groups of metric_ids.
@@ -636,7 +640,12 @@ def _price_path(
     result = ValuationResult.from_json(result_json)
     if cashflows is None:
         cf_model = "hazard_rate" if model == "hazard_rate" else "discounting"
-        cashflows = instrument_cashflows(instrument_json, market_arg, as_of, model=cf_model)
+        try:
+            cashflows = instrument_cashflows(instrument_json, market_arg, as_of, model=cf_model)
+        except (ValueError, RuntimeError):
+            # Some instrument types (e.g. equity options) have no deterministic
+            # cashflow schedule; proceed without cashflows.
+            cashflows = None
     return result, cashflows, spec_obj
 
 
