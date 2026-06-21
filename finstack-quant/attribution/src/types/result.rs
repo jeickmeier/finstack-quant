@@ -508,7 +508,6 @@ impl PnlAttribution {
             d.total *= factor;
             scale_source_line_opt(&mut d.coupon_income, factor);
             scale_money_opt(&mut d.pull_to_par, factor);
-            scale_money_opt(&mut d.theta, factor);
             scale_source_line_opt(&mut d.roll_down, factor);
             scale_money_opt(&mut d.funding_cost, factor);
         }
@@ -892,9 +891,6 @@ impl PnlAttribution {
                 if let Some(ref pull_to_par) = detail.pull_to_par {
                     lines.push(format!("  │   ├─ Pull-to-Par: {}", pull_to_par));
                 }
-                if let Some(ref theta) = detail.theta {
-                    lines.push(format!("  │   ├─ Theta: {}", theta));
-                }
                 if let Some(ref roll_down) = detail.roll_down {
                     lines.push(format!("  │   ├─ Roll-Down: {}", roll_down.total));
                 }
@@ -1111,7 +1107,6 @@ mod tests {
             pull_to_par: Some(Money::new(4.0, Currency::USD)),
             roll_down: Some(SourceLine::scalar(Money::new(5.0, Currency::USD))),
             funding_cost: Some(Money::new(2.0, Currency::USD)),
-            theta: Some(Money::new(12.0, Currency::USD)),
         });
 
         attribution.scale(0.5);
@@ -1139,7 +1134,6 @@ mod tests {
             detail.funding_cost.as_ref().expect("funding cost").amount(),
             1.0
         );
-        assert_eq!(detail.theta.as_ref().expect("theta").amount(), 6.0);
 
         attribution.carry_detail = Some(detail);
         let explanation = attribution.explain_verbose();
@@ -1147,7 +1141,7 @@ mod tests {
         assert!(explanation.contains("Pull-to-Par"));
         assert!(explanation.contains("Roll-Down"));
         assert!(explanation.contains("Funding Cost"));
-        assert!(explanation.contains("Theta"));
+        assert!(!explanation.contains("Theta"));
     }
 
     #[test]

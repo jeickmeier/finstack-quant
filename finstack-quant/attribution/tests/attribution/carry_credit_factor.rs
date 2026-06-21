@@ -526,7 +526,6 @@ fn legacy_carry_detail_json_deserializes_into_scalar_source_line() {
         pull_to_par: None,
         roll_down: Some(SourceLine::scalar(Money::new(5.0, Currency::USD))),
         funding_cost: None,
-        theta: None,
     });
 
     // Serialize then mutate to legacy shape.

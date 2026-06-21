@@ -239,15 +239,18 @@ fn test_metrics_based_bond_attribution_populates_carry_decomposition() {
     assert!(detail.roll_down.is_some());
     assert!(detail.funding_cost.is_some());
 
-    let coupon_income = detail.coupon_income.unwrap().total.amount();
+    let coupon_income = detail.coupon_income.as_ref().unwrap().total.amount();
     let pull_to_par = detail.pull_to_par.unwrap().amount();
-    let roll_down = detail.roll_down.unwrap().total.amount();
+    let roll_down = detail.roll_down.as_ref().unwrap().total.amount();
     let funding_cost = detail.funding_cost.unwrap().amount();
     let total = detail.total.amount();
     assert!((total - (coupon_income + pull_to_par + roll_down - funding_cost)).abs() < 1e-6);
-    assert_eq!(
-        detail.theta.expect("legacy theta").currency(),
-        Currency::USD
+
+    // Partition check: populated sub-lines sum to total (no theta field any more).
+    let comp = coupon_income + pull_to_par + roll_down;
+    assert!(
+        (comp - total + funding_cost).abs() < 1e-6,
+        "carry lines should partition total: coupon_income({coupon_income}) + pull_to_par({pull_to_par}) + roll_down({roll_down}) - funding_cost({funding_cost}) should = total({total})"
     );
 }
 
@@ -301,9 +304,17 @@ fn test_metrics_based_bond_attribution_without_carry_metrics_keeps_legacy_shape(
     let detail = attribution.carry_detail.clone().expect("carry detail");
     assert!(detail.coupon_income.is_none());
     assert!(detail.pull_to_par.is_none());
-    assert!(detail.roll_down.is_none());
+    // Degenerate (Theta-only) branch now routes carry to roll_down so partition holds.
+    assert!(detail.roll_down.is_some());
     assert!(detail.funding_cost.is_none());
-    assert!(detail.theta.is_some());
+
+    // Partition: roll_down alone should equal total (coupon_income = None, pull_to_par = None).
+    let roll_down = detail.roll_down.as_ref().unwrap().total.amount();
+    let total = detail.total.amount();
+    assert!(
+        (roll_down - total).abs() < 1e-6,
+        "in the degenerate branch, roll_down ({roll_down}) should equal total ({total})"
+    );
 
     let mut scaled = attribution;
     scaled.scale(0.5);

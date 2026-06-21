@@ -850,16 +850,6 @@ pub fn attribute_pnl_metrics_based(
         }
     }
 
-    let legacy_theta = val_t0.measures.get(MetricId::Theta.as_str()).map(|theta| {
-        factor_money_or_invalid(
-            theta * carry_scale,
-            ccy,
-            "carry/theta",
-            &mut attribution.meta.notes,
-            &mut non_finite_detected,
-        )
-    });
-
     if let Some(carry_total) = val_t0.measures.get(MetricId::CarryTotal.as_str()) {
         attribution.carry = factor_money_or_invalid(
             carry_total * carry_scale,
@@ -900,7 +890,6 @@ pub fn attribute_pnl_metrics_based(
                 &mut attribution.meta.notes,
                 &mut non_finite_detected,
             ),
-            theta: legacy_theta,
         });
     } else if let Some(theta) = val_t0.measures.get(MetricId::Theta.as_str()) {
         let carry_amount = theta * carry_scale;
@@ -915,9 +904,8 @@ pub fn attribute_pnl_metrics_based(
             total: attribution.carry,
             coupon_income: None,
             pull_to_par: None,
-            roll_down: None,
+            roll_down: Some(SourceLine::scalar(attribution.carry)),
             funding_cost: None,
-            theta: Some(attribution.carry),
         });
     } else {
         note_warning(
@@ -2121,13 +2109,39 @@ mod tests {
             .expect("carry_detail should be populated");
         assert_eq!(attribution.carry.amount(), -4.5);
         assert_eq!(
-            detail.coupon_income.expect("coupon income").total.amount(),
+            detail
+                .coupon_income
+                .as_ref()
+                .expect("coupon income")
+                .total
+                .amount(),
             13.7
         );
         assert_eq!(detail.pull_to_par.expect("pull to par").amount(), -8.2);
-        assert_eq!(detail.roll_down.expect("roll down").total.amount(), -10.0);
+        assert_eq!(
+            detail.roll_down.as_ref().expect("roll down").total.amount(),
+            -10.0
+        );
         assert_eq!(detail.funding_cost.expect("funding cost").amount(), 0.0);
-        assert_eq!(detail.theta.expect("theta").amount(), -5.0);
+
+        // Partition check: populated sub-lines should sum to total.
+        let comp = detail
+            .coupon_income
+            .as_ref()
+            .map(|l| l.total.amount())
+            .unwrap_or(0.0)
+            + detail.pull_to_par.map(|m| m.amount()).unwrap_or(0.0)
+            + detail
+                .roll_down
+                .as_ref()
+                .map(|l| l.total.amount())
+                .unwrap_or(0.0)
+            - detail.funding_cost.map(|m| m.amount()).unwrap_or(0.0);
+        assert!(
+            (comp - detail.total.amount()).abs() < 1e-6,
+            "carry lines should partition total: {comp} vs {}",
+            detail.total.amount()
+        );
     }
 
     #[test]

@@ -348,7 +348,7 @@ class PnlAttribution:
                 ``"vol.by_surface"``, ``"cross_factor.by_pair"``,
                 ``"scalars.dividends"``, ``"credit_factor.generic"``,
                 ``"credit_factor.level"``, ``"credit_factor.adder"``,
-                ``"credit_factor.curve_shape"``, ``"carry.theta"``,
+                ``"credit_factor.curve_shape"``,
                 ``"carry.coupon_income"``, ...).
             factor: parent factor family (``"rates"``, ``"credit"``, ``"fx"``,
                 ``"vol"``, ``"cross_factor"``, ``"scalars"``,
@@ -377,8 +377,8 @@ class PnlAttribution:
 
         Columns are the same as :meth:`to_long_dataframe` but the kind values
         are limited to the ``"carry.*"`` family — useful when you only want the
-        carry split (coupon income, pull-to-par, roll-down, funding cost,
-        theta), including the optional rates/credit splits when a credit
+        carry split (coupon income, pull-to-par, roll-down, funding cost),
+        including the optional rates/credit splits when a credit
         factor model was supplied.
 
         Returns an empty DataFrame when ``carry_detail`` is not populated.

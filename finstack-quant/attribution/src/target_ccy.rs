@@ -176,9 +176,6 @@ fn translate_carry_detail(
     if let Some(m) = detail.funding_cost.as_mut() {
         *m = convert(*m)?;
     }
-    if let Some(m) = detail.theta.as_mut() {
-        *m = convert(*m)?;
-    }
     Ok(())
 }
 

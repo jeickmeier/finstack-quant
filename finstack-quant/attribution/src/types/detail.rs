@@ -444,7 +444,9 @@ impl<'de> Deserialize<'de> for SourceLine {
 /// - **pull_to_par**: PV convergence toward par (time effect at flat yield)
 /// - **roll_down**: Curve shape benefit from aging along a sloped curve
 /// - **funding_cost**: Cost of financing the position
-/// - **theta**: Total pre-funding carry (before decomposition into sub-components)
+///
+/// The populated detail lines partition `total`:
+/// `coupon_income + pull_to_par + roll_down − funding_cost = total`.
 ///
 /// In metrics-based attribution, these fields are populated from pre-computed
 /// carry decomposition metrics when available. In repricing-based attribution
@@ -460,13 +462,9 @@ impl<'de> Deserialize<'de> for SourceLine {
 /// and Shift as distinct P&L components.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CarryDetail {
-    /// Total carry P&L. Equals `theta + coupon_income` on the repricing-based
-    /// paths, or the `CarryTotal` metric on the metrics-based path.
-    ///
-    /// NOTE: this is **not** the sum of every field below. `theta` is the
-    /// pre-decomposition aggregate that already contains `pull_to_par` and
-    /// `roll_down`, so summing `theta` together with those sub-lines would
-    /// double-count. See each field's own doc for its role in the breakdown.
+    /// Total carry P&L. Equals the `CarryTotal` metric on the metrics-based
+    /// path, or the repricing-based time drift plus coupons paid on the
+    /// reprice paths. The populated sub-lines always partition this total.
     pub total: Money,
 
     /// Coupon/interest income received during the period (with optional
@@ -482,17 +480,14 @@ pub struct CarryDetail {
     /// rates / credit split.
     ///
     /// This field includes slide/rolldown effects separate from pure pull-to-par.
+    /// On repricing paths where the full split is unavailable, the price-carry
+    /// residual is folded here so the partition invariant always holds.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roll_down: Option<SourceLine>,
 
     /// Cost of financing the position. Pure rates, never split.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub funding_cost: Option<Money>,
-
-    /// Total pre-funding carry (before decomposition into sub-components).
-    /// Residual catch-all, unsplit.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub theta: Option<Money>,
 }
 
 /// Factor-cut decomposition of carry under a calibrated `CreditFactorModel`

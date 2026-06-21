@@ -247,9 +247,6 @@ pub(super) fn build_carry_detail_rows(
     };
 
     push("carry.total", "total", &detail.total);
-    if let Some(theta) = &detail.theta {
-        push("carry.theta", "theta", theta);
-    }
     if let Some(ci) = &detail.coupon_income {
         push("carry.coupon_income", "total", &ci.total);
         if let Some(r) = &ci.rates_part {

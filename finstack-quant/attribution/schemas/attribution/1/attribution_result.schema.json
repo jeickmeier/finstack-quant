@@ -152,8 +152,7 @@
                 "coupon_income": { "$ref": "#/$defs/SourceLineOrMoney" },
                 "pull_to_par": { "$ref": "#/$defs/Money" },
                 "roll_down": { "$ref": "#/$defs/SourceLineOrMoney" },
-                "funding_cost": { "$ref": "#/$defs/Money" },
-                "theta": { "$ref": "#/$defs/Money" }
+                "funding_cost": { "$ref": "#/$defs/Money" }
               }
             },
             "meta": {
