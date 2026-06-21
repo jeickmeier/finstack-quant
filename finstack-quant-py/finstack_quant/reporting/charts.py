@@ -16,6 +16,7 @@ from . import format as fmt
 from .theme import Theme
 
 _W = 620
+_MINUS = chr(0x2212)  # U+2212 MINUS SIGN (used in value labels)
 
 
 def _xml_attr(s: str) -> str:
@@ -281,6 +282,105 @@ def cashflow_ladder(
         )
     parts.append(
         f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" style="visibility:hidden" pointer-events="none"/>'
+    )
+    parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def waterfall_chart(
+    labels: list[str],
+    deltas: list[Any],
+    *,
+    theme: Theme,
+    total_label: str = "Total",
+    height: int = 210,
+) -> str:
+    """Render a contribution waterfall (bridge).
+
+    Each ``deltas[i]`` is a signed contribution; bar ``i`` floats from the running
+    cumulative ``cum_i`` to ``cum_i + deltas[i]``, and a final anchored bar spans
+    ``[0, Σ deltas]`` labelled ``total_label``. Positive steps use ``theme.pos``,
+    negative ``theme.neg``, and the total bar ``theme.ink``. Reuses the axis,
+    gridline, value-label, and hover-band (``fq-hb``/``fq-cross``/``fq-mk``)
+    conventions of :func:`bar_chart`. Deterministic.
+    """
+    ml, mr, mt, mb = 56, 14, 12, 40
+    pw, ph = _W - ml - mr, height - mt - mb
+    ds = [0.0 if _missing(v) else float(v) for v in deltas]
+    n = len(ds)
+
+    cum = [0.0]
+    for d in ds:
+        cum.append(cum[-1] + d)
+    total = cum[-1]
+
+    levels = [*cum, 0.0, total]
+    lo, hi = min(0.0, *levels), max(0.0, *levels)
+    if lo == hi:
+        hi = lo + 1.0
+    ticks = nice_ticks(lo, hi, 4)
+    lo, hi = ticks[0], ticks[-1]
+    if lo == hi:
+        hi = lo + 1.0
+
+    def y(v: float) -> float:
+        return mt + (1 - (v - lo) / (hi - lo)) * ph
+
+    parts: list[str] = [f'<svg viewBox="0 0 {_W} {height}" xmlns="http://www.w3.org/2000/svg">']
+
+    for t in ticks:
+        yy = y(t)
+        stroke = theme.grid if abs(t) < 1e-9 else theme.faint
+        parts.append(f'<line x1="{ml}" y1="{yy:.1f}" x2="{_W - mr}" y2="{yy:.1f}" stroke="{stroke}"/>')
+        parts.append(
+            f'<text x="{ml - 6}" y="{yy + 3:.1f}" text-anchor="end" font-size="10" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{t:,.0f}</text>'
+        )
+
+    nbars = n + 1
+    gap = pw / max(nbars, 1)
+    bw = gap * 0.62
+
+    def _bar(i: int, level_top: float, level_bot: float, value: float, lab: str, col: str, anchored: bool) -> None:
+        cx = ml + i * gap + gap / 2
+        y_top, y_bot = y(level_top), y(level_bot)
+        sign = "+" if value >= 0 else _MINUS
+        valstr = f"{sign}{abs(value):,.0f}"
+        parts.append(
+            f'<rect class="fq-hb" x="{cx - bw / 2:.1f}" y="{min(y_top, y_bot):.1f}" width="{bw:.1f}" '
+            f'height="{max(abs(y_bot - y_top), 1.0):.1f}" fill="{col}" '
+            f'fill-opacity="{0.9 if anchored else 0.82}" '
+            f'data-cx="{cx:.1f}" data-cy="{min(y_top, y_bot):.1f}" data-label="{_xml_attr(lab)}" data-val="{valstr}">'
+            f"<title>{lab} · {valstr}</title></rect>"
+        )
+        parts.append(
+            f'<text x="{cx:.1f}" y="{height - mb + 14}" text-anchor="middle" font-size="9.5" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_sans)}">{lab}</text>'
+        )
+        vy = min(y_top, y_bot) - 4 if value >= 0 else max(y_top, y_bot) + 12
+        parts.append(
+            f'<text x="{cx:.1f}" y="{vy:.1f}" text-anchor="middle" font-size="9.5" '
+            f'fill="#23303f" font-family="{_xml_attr(theme.font_num)}">{valstr}</text>'
+        )
+
+    for i, d in enumerate(ds):
+        col = theme.pos if d >= 0 else theme.neg
+        _bar(i, cum[i + 1], cum[i], d, labels[i], col, anchored=False)
+        cx = ml + i * gap + gap / 2
+        x_from = cx + bw / 2
+        x_to = ml + (i + 1) * gap + gap / 2 - bw / 2
+        yy = y(cum[i + 1])
+        parts.append(
+            f'<line x1="{x_from:.1f}" y1="{yy:.1f}" x2="{x_to:.1f}" y2="{yy:.1f}" '
+            f'stroke="{theme.faint}" stroke-dasharray="2 2"/>'
+        )
+
+    _bar(n, total, 0.0, total, total_label, theme.ink, anchored=True)
+
+    parts.append(
+        f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" '
+        f'style="visibility:hidden" pointer-events="none"/>'
     )
     parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
     parts.append("</svg>")
