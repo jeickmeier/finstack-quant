@@ -10,6 +10,9 @@
 //!
 //! Routing:
 //! - **Callable** → OAS-pinned clone (the existing tree calibration), base market.
+//!   The clone keeps `credit_curve_id`, so for a risky callable it reprices on the
+//!   two-factor `RatesCreditTree`: CS01 bumps the hazard curve and DV01 bumps the
+//!   discount curve, both holding the calibrated OAS constant (call + credit aware).
 //! - **Credit** (hazard curve, non-callable) → quote-cleared clone + hazard-shifted
 //!   market (a flat λ-shift solved to reproduce the quote). Mirrors the library's
 //!   bond convention: IR DV01 bumps discount holding hazard; CS01 bumps hazard via
