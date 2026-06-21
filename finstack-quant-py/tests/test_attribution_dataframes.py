@@ -132,21 +132,21 @@ def test_to_long_dataframe_carries_cross_factor_by_pair() -> None:
 
 
 def test_to_carry_detail_dataframe_breakdown() -> None:
-    """Carry detail with theta + coupon_income + funding_cost.
+    """Carry detail with coupon_income + pull_to_par + roll_down + funding_cost.
 
     The typed accessor must return only ``carry.*`` rows.
+    ``carry.theta`` is no longer emitted; the component lines partition ``total``.
     """
     carry_detail = {
         "total": {"amount": "15", "currency": "USD"},
         "coupon_income": {
             "total": {"amount": "12", "currency": "USD"},
         },
-        "pull_to_par": {"amount": "-2", "currency": "USD"},
+        "pull_to_par": {"amount": "2", "currency": "USD"},
         "roll_down": {
             "total": {"amount": "1", "currency": "USD"},
         },
-        "funding_cost": {"amount": "-1", "currency": "USD"},
-        "theta": {"amount": "5", "currency": "USD"},
+        "funding_cost": {"amount": "0", "currency": "USD"},
     }
     attr = _patch_attribution(
         carry={"amount": "15", "currency": "USD"},
@@ -159,16 +159,19 @@ def test_to_carry_detail_dataframe_breakdown() -> None:
 
     kinds = set(df["kind"])
     assert "carry.total" in kinds
-    assert "carry.theta" in kinds
+    assert "carry.theta" not in kinds
     assert "carry.coupon_income" in kinds
     assert "carry.pull_to_par" in kinds
     assert "carry.roll_down" in kinds
     assert "carry.funding_cost" in kinds
 
-    theta_row = df[df["kind"] == "carry.theta"].iloc[0]
-    assert theta_row["amount"] == 5.0
     coupon_row = df[df["kind"] == "carry.coupon_income"].iloc[0]
     assert coupon_row["amount"] == 12.0
+
+    # Component rows (coupon_income + pull_to_par + roll_down) partition carry.total.
+    comps = df[df["kind"].isin({"carry.coupon_income", "carry.pull_to_par", "carry.roll_down"})]["amount"].sum()
+    total = df[df["kind"] == "carry.total"]["amount"].iloc[0]
+    assert abs(comps - total) < 1e-6
 
 
 def test_to_credit_factor_dataframe_includes_generic_levels_adder_curve_shape() -> None:
@@ -235,11 +238,14 @@ def test_to_long_dataframe_folds_in_carry_and_credit_factor_rows() -> None:
     """``to_long_dataframe()`` is a union of every detail breakdown.
 
     Must include the carry and credit-factor rows alongside the by-curve
-    breakdowns.
+    breakdowns. ``carry.theta`` is no longer emitted; roll_down absorbs any
+    residual so the component rows still partition total.
     """
     carry_detail = {
         "total": {"amount": "10", "currency": "USD"},
-        "theta": {"amount": "10", "currency": "USD"},
+        "roll_down": {
+            "total": {"amount": "10", "currency": "USD"},
+        },
     }
     credit_factor_detail = {
         "model_id": "test-model/aaaaaaaaaaaaaaaa",
@@ -259,3 +265,10 @@ def test_to_long_dataframe_folds_in_carry_and_credit_factor_rows() -> None:
     factors = set(df["factor"])
     assert "carry" in factors
     assert "credit_factor" in factors
+
+    # theta must not appear; roll_down should partition total.
+    carry_kinds = set(df[df["factor"] == "carry"]["kind"])
+    assert "carry.theta" not in carry_kinds
+    comps = df[df["kind"].isin({"carry.coupon_income", "carry.pull_to_par", "carry.roll_down"})]["amount"].sum()
+    total = df[df["kind"] == "carry.total"]["amount"].iloc[0]
+    assert abs(comps - total) < 1e-6
