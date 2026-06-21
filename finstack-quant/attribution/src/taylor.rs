@@ -568,7 +568,15 @@ pub fn attribute_pnl_taylor(
                 &mut non_finite_detected,
             );
             let theta_only = Money::new(factor_money.amount() - ci.amount(), ccy);
-            apply_total_return_carry(&mut attribution, theta_only, ci, None)?;
+            // Taylor path: delta_accrued and flat_window_diff are unavailable (no repricing).
+            let carry_inputs = TotalReturnCarryInputs {
+                cash_paid: ci,
+                delta_accrued: None,
+                flat_window_diff: None,
+                warnings: Vec::new(),
+                invalid: false,
+            };
+            apply_total_return_carry(&mut attribution, theta_only, carry_inputs)?;
         }
     }
 

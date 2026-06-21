@@ -50,7 +50,12 @@ fn inter_coupon_window_coupon_income_is_accrued_and_roll_down_small() {
     // Expected coupon earned = Δaccrued (accrued is curve-independent).
     let accrued = |as_of: time::Date| -> f64 {
         instrument
-            .price_with_metrics(&market, as_of, &[MetricId::Accrued], PricingOptions::default())
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Accrued],
+                PricingOptions::default(),
+            )
             .unwrap()
             .measures
             .get(MetricId::Accrued.as_str())
@@ -74,9 +79,20 @@ fn inter_coupon_window_coupon_income_is_accrued_and_roll_down_small() {
     )
     .expect("parallel attribution should succeed");
 
-    let cd = attribution.carry_detail.as_ref().expect("carry detail present");
-    let coupon = cd.coupon_income.as_ref().map(|l| l.total.amount()).unwrap_or(0.0);
-    let roll = cd.roll_down.as_ref().map(|l| l.total.amount()).unwrap_or(0.0);
+    let cd = attribution
+        .carry_detail
+        .as_ref()
+        .expect("carry detail present");
+    let coupon = cd
+        .coupon_income
+        .as_ref()
+        .map(|l| l.total.amount())
+        .unwrap_or(0.0);
+    let roll = cd
+        .roll_down
+        .as_ref()
+        .map(|l| l.total.amount())
+        .unwrap_or(0.0);
     let ptp = cd.pull_to_par.map(|m| m.amount()).unwrap_or(0.0);
     let carry_total = cd.total.amount();
 

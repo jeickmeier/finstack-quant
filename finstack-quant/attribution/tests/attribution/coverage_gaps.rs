@@ -78,27 +78,40 @@ fn coupon_payment_inside_window_keeps_total_return_identity() {
     )
     .expect("attribution over a coupon date should succeed");
 
-    let coupon = attribution
+    let cd = attribution
         .carry_detail
         .as_ref()
-        .and_then(|d| d.coupon_income.as_ref())
+        .expect("carry_detail must be present");
+    let coupon_income = cd
+        .coupon_income
+        .as_ref()
         .map(|line| line.total.amount())
         .unwrap_or(0.0);
+    // `coupon_income = Δaccrued + cash_paid` = coupon EARNED in the window.
+    // Over a 10-day window that straddles a coupon date (Jan 15 → Jan 25,
+    // coupon on Jan 20), only ~5 post-coupon days of accrual is earned:
+    // 5% × $1M × 5/184 ≈ $1 360. The full $25k payment flows through
+    // `carry = theta + cash_paid`; the partition is checked below.
     assert!(
-        (20_000.0..30_000.0).contains(&coupon),
-        "the semiannual coupon (~25k) must be captured in coupon_income, got {coupon}"
+        (1_000.0..2_000.0).contains(&coupon_income),
+        "coupon_income must be ~days-earned (~$1 360 for 5 post-coupon days), got {coupon_income}"
     );
 
-    let mtm = attribution
-        .mark_to_market_pnl
-        .expect("mark_to_market_pnl must be populated")
-        .amount();
+    // Partition: coupon_income + pull_to_par + roll_down ≈ carry_total.
+    let ptp = cd.pull_to_par.map(|m| m.amount()).unwrap_or(0.0);
+    let roll = cd
+        .roll_down
+        .as_ref()
+        .map(|l| l.total.amount())
+        .unwrap_or(0.0);
+    let carry_total = cd.total.amount();
+    let sum = coupon_income + ptp + roll;
+    assert!(
+        (sum - carry_total).abs() < 1.0,
+        "partition coupon_income + ptp + roll ({sum:.4}) must ≈ carry_total ({carry_total:.4})"
+    );
+
     let total = attribution.total_pnl.amount();
-    assert!(
-        (total - (mtm + coupon)).abs() < 1e-6,
-        "total-return identity: total ({total}) must equal MTM ({mtm}) + coupon ({coupon})"
-    );
-
     // With identical markets, carry is the only factor: total ≈ carry.
     assert!(
         (total - attribution.carry.amount()).abs() < 1e-6,
