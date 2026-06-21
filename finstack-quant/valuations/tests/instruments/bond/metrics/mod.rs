@@ -21,6 +21,7 @@
 mod accrued;
 mod asw;
 mod bucketed_dv01;
+mod callable_credit_risk;
 mod convexity;
 mod credit_quote_risk;
 mod cs01;
