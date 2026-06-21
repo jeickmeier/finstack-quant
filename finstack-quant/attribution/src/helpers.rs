@@ -9,6 +9,8 @@ use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::fx::{FxConversionPolicy, FxPolicyMeta};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
@@ -156,37 +158,14 @@ pub(crate) fn init_attribution(
     }
 }
 
-/// Populate carry and `carry_detail` for the Taylor (total-return) path.
-///
-/// `roll_down` is intentionally `None` for the Taylor path: Taylor's
-/// first-order approximation does not separately track time-decay vs
-/// spread-shift contributions, so roll-down is rolled into the bond's total
-/// return. PR-8b's carry credit decomposition handles `coupon_income.split`
-/// but skips `roll_down.split` when this field is `None`.
-pub(crate) fn apply_total_return_carry(
-    attribution: &mut PnlAttribution,
-    theta: Money,
-    coupon_income: Money,
-    roll_down: Option<Money>,
-) -> Result<()> {
-    attribution.carry = theta.checked_add(coupon_income)?;
-    if coupon_income.amount().abs() > 0.0 {
-        attribution.total_pnl = attribution.total_pnl.checked_add(coupon_income)?;
-    }
-    attribution.carry_detail = Some(CarryDetail {
-        total: attribution.carry,
-        coupon_income: Some(SourceLine::scalar(coupon_income)),
-        pull_to_par: None,
-        roll_down: roll_down.map(SourceLine::scalar),
-        funding_cost: None,
-        theta: Some(theta),
-    });
-    Ok(())
-}
-
+/// Raw, repricing-derived inputs for the full-window carry decomposition.
 pub(crate) struct TotalReturnCarryInputs {
-    pub coupon_income: Money,
-    pub roll_down: Option<Money>,
+    /// Coupons whose PAYMENT date falls in `[t0, t1)` (drives carry total + total_pnl).
+    pub cash_paid: Money,
+    /// `accrued(t1) - accrued(t0)` (curve-independent); `None` when the instrument has no `Accrued`.
+    pub delta_accrued: Option<Money>,
+    /// `F_t1 - F_t0` on a flat-YTM(t0) curve (basis cancels); `None` when `Ytm`/flat pricing is unavailable.
+    pub flat_window_diff: Option<Money>,
     /// Diagnostics for the caller to merge into `meta.notes`.
     pub warnings: Vec<String>,
     /// True when a non-finite cashflow/metric value was zeroed; the caller
@@ -194,10 +173,14 @@ pub(crate) struct TotalReturnCarryInputs {
     pub invalid: bool,
 }
 
+/// Gather the repricing-based pieces of the carry decomposition over `[as_of_t0, as_of_t1]`,
+/// pricing on `market` (the market on which `theta` was computed: `market_t0` for the parallel
+/// path, the accumulated market for the waterfall path). Accrued and YTM are read via the
+/// instrument's metrics; the flat-YTM window values isolate the constant-yield aging and
+/// curve-shape effects with the flat-vs-market level basis cancelled.
 pub(crate) fn total_return_carry_inputs(
     instrument: &dyn Instrument,
-    cashflow_market: &MarketContext,
-    roll_down_market: &MarketContext,
+    market: &MarketContext,
     as_of_t0: Date,
     as_of_t1: Date,
     currency: Currency,
@@ -205,65 +188,145 @@ pub(crate) fn total_return_carry_inputs(
     let mut warnings = Vec::new();
     let mut invalid = false;
 
-    // A failed cashflow collection must be VISIBLE: coupon income feeds
-    // `total_pnl` via `apply_total_return_carry`, so silently defaulting to
-    // zero would flip the attribution from total-return to MTM-only with no
-    // observability .
-    let coupon_income = match collect_cashflows_in_period(
-        instrument,
-        cashflow_market,
-        as_of_t0,
-        as_of_t1,
-        currency,
-    ) {
-        Ok(value) => factor_money_or_invalid(
-            value,
-            currency,
-            "carry coupon income",
-            &mut warnings,
-            &mut invalid,
-        ),
-        Err(e) => {
-            tracing::warn!(
-                instrument_id = instrument.id(),
-                error = %e,
-                "cashflow collection failed; coupon income omitted from total-return carry"
-            );
-            warnings.push(format!(
-                "Carry coupon income unavailable (cashflow collection failed: {e}); \
-                     total-return adjustment skipped — total_pnl is MTM-only for this period"
-            ));
-            Money::new(0.0, currency)
-        }
+    let cash_paid =
+        match collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency) {
+            Ok(value) => factor_money_or_invalid(
+                value,
+                currency,
+                "carry cash income",
+                &mut warnings,
+                &mut invalid,
+            ),
+            Err(e) => {
+                warnings.push(format!("carry cash income unavailable: {e}"));
+                Money::new(0.0, currency)
+            }
+        };
+
+    let accrued_at = |as_of: Date| -> Option<f64> {
+        instrument
+            .price_with_metrics(
+                market,
+                as_of,
+                &[MetricId::Accrued],
+                PricingOptions::default(),
+            )
+            .ok()
+            .and_then(|r| r.measures.get(MetricId::Accrued.as_str()).copied())
+            .filter(|v| v.is_finite())
+    };
+    let delta_accrued = match (accrued_at(as_of_t0), accrued_at(as_of_t1)) {
+        (Some(a0), Some(a1)) => Some(Money::new(a1 - a0, currency)),
+        _ => None,
     };
 
-    let roll_down_opt = if let Ok(val_res) = instrument.price_with_metrics(
-        roll_down_market,
-        as_of_t0,
-        &[MetricId::RollDown],
-        PricingOptions::default(),
-    ) {
-        val_res.measures.get(MetricId::RollDown.as_str()).copied()
-    } else {
-        None
-    };
-    let time_period_days = (as_of_t1 - as_of_t0).whole_days() as f64;
-    let roll_down = roll_down_opt.map(|rd| {
-        factor_money_or_invalid(
-            rd * time_period_days,
-            currency,
-            "carry roll-down",
-            &mut warnings,
-            &mut invalid,
-        )
-    });
+    let flat_window_diff = flat_window_diff(instrument, market, as_of_t0, as_of_t1, currency);
 
     TotalReturnCarryInputs {
-        coupon_income,
-        roll_down,
+        cash_paid,
+        delta_accrued,
+        flat_window_diff,
         warnings,
         invalid,
     }
+}
+
+/// `F_t1 - F_t0` on a flat-YTM(t0) curve, or `None` if YTM / flat pricing is unavailable.
+fn flat_window_diff(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    as_of_t0: Date,
+    as_of_t1: Date,
+    currency: Currency,
+) -> Option<Money> {
+    let ytm = instrument
+        .price_with_metrics(
+            market,
+            as_of_t0,
+            &[MetricId::Ytm],
+            PricingOptions::default(),
+        )
+        .ok()
+        .and_then(|r| r.measures.get(MetricId::Ytm.as_str()).copied())
+        .filter(|y| y.is_finite())?;
+    let flat = build_flat_ytm_market(instrument, market, ytm).ok()?;
+    let f_t0 = instrument.value(&flat, as_of_t0).ok()?.amount();
+    let f_t1 = instrument.value(&flat, as_of_t1).ok()?.amount();
+    if f_t0.is_finite() && f_t1.is_finite() {
+        Some(Money::new(f_t1 - f_t0, currency))
+    } else {
+        None
+    }
+}
+
+/// Build a market whose discount curve is replaced by a flat-YTM curve `DF(t) = exp(-ytm·t)`.
+/// Ported from `valuations`'s private `build_flat_curve_market` (not reachable cross-crate).
+fn build_flat_ytm_market(
+    instrument: &dyn Instrument,
+    market: &MarketContext,
+    ytm: f64,
+) -> Result<MarketContext> {
+    let curve_id = instrument
+        .market_dependencies()?
+        .curve_dependencies()
+        .discount_curves
+        .first()
+        .cloned()
+        .ok_or_else(|| finstack_quant_core::InputError::NotFound {
+            id: format!("discount_curve_for:{}", instrument.id()),
+        })?;
+    let original = market.get_discount(curve_id.as_str())?;
+    let knots: Vec<(f64, f64)> = (0..=120)
+        .map(|i| {
+            let t = i as f64 * 0.5;
+            (t, (-ytm * t).exp())
+        })
+        .collect();
+    let flat_curve = DiscountCurve::builder(curve_id.as_str())
+        .base_date(original.base_date())
+        .day_count(original.day_count())
+        .knots(knots)
+        .interp(InterpStyle::LogLinear)
+        .build()?;
+    Ok(market.clone().insert(flat_curve))
+}
+
+/// Assemble the carry total + the fully-labeled detail partition.
+///
+/// `carry_total = theta + cash_paid` (unchanged); `total_pnl += cash_paid`. The detail:
+/// `coupon_income = Δaccrued + cash`, `pull_to_par = (F_t1−F_t0) − Δaccrued`,
+/// `roll_down = theta − (F_t1−F_t0)`, which sum to `carry_total`. When accrual / flat pricing is
+/// unavailable (non-bonds), falls back to `coupon_income = cash`, `pull_to_par = roll_down = None`.
+pub(crate) fn apply_total_return_carry(
+    attribution: &mut PnlAttribution,
+    theta: Money,
+    inputs: TotalReturnCarryInputs,
+) -> Result<()> {
+    attribution.carry = theta.checked_add(inputs.cash_paid)?;
+    if inputs.cash_paid.amount().abs() > 0.0 {
+        attribution.total_pnl = attribution.total_pnl.checked_add(inputs.cash_paid)?;
+    }
+
+    let coupon_income = match inputs.delta_accrued {
+        Some(da) => da.checked_add(inputs.cash_paid)?,
+        None => inputs.cash_paid,
+    };
+    let (pull_to_par, roll_down) = match (inputs.delta_accrued, inputs.flat_window_diff) {
+        (Some(da), Some(fd)) => (Some(fd.checked_sub(da)?), Some(theta.checked_sub(fd)?)),
+        _ => (None, None),
+    };
+    // Legacy `theta` field = the price-carry residual (= pull_to_par + roll_down), not the whole carry.
+    let price_carry = attribution.carry.checked_sub(coupon_income)?;
+
+    attribution.carry_detail = Some(CarryDetail {
+        total: attribution.carry,
+        coupon_income: Some(SourceLine::scalar(coupon_income)),
+        pull_to_par,
+        roll_down: roll_down.map(SourceLine::scalar),
+        funding_cost: None,
+        theta: Some(price_carry),
+    });
+    Ok(())
 }
 
 pub(crate) fn stamp_fx_policy(

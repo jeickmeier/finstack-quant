@@ -541,25 +541,22 @@ pub fn attribute_pnl_parallel_with_credit_model(
     let carry_inputs = total_return_carry_inputs(
         instrument_t0.as_ref(),
         market_t0,
-        market_t0,
         as_of_t0,
         as_of_t1,
         val_t1.currency(),
     );
-    attribution.meta.notes.extend(carry_inputs.warnings);
+    // Merge diagnostics BEFORE moving carry_inputs into apply_total_return_carry.
+    for w in &carry_inputs.warnings {
+        attribution.meta.notes.push(w.clone());
+    }
     if carry_inputs.invalid {
         attribution.result_invalid = true;
     }
-    // `total_return_carry_inputs` performed one full `price_with_metrics`
-    // (RollDown) pricing — count it.
+    // `total_return_carry_inputs` performed extra `price_with_metrics`
+    // repricings (Accrued×2, YTM, flat-curve value×2) — count one.
     num_repricings += 1;
 
-    apply_total_return_carry(
-        &mut attribution,
-        theta,
-        carry_inputs.coupon_income,
-        carry_inputs.roll_down,
-    )?;
+    apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
 
     if full_cross_attribution {
         let discount_snap = MarketSnapshot::extract(market_t0, MarketRestoreFlags::DISCOUNT);

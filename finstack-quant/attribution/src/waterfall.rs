@@ -354,25 +354,22 @@ pub fn attribute_pnl_waterfall_with_credit_model(
                 let carry_inputs = total_return_carry_inputs(
                     ctx.current_instrument.as_ref(),
                     &ctx.current_market,
-                    market_t0,
                     ctx.as_of_t0,
                     ctx.as_of_t1,
                     factor_pnl.currency(),
                 );
-                attribution.meta.notes.extend(carry_inputs.warnings);
+                // Merge diagnostics BEFORE moving carry_inputs into apply_total_return_carry.
+                for w in &carry_inputs.warnings {
+                    attribution.meta.notes.push(w.clone());
+                }
                 if carry_inputs.invalid {
                     attribution.result_invalid = true;
                 }
-                // `total_return_carry_inputs` performed one full
-                // `price_with_metrics` (RollDown) pricing — count it.
+                // `total_return_carry_inputs` performed extra `price_with_metrics`
+                // repricings (Accrued×2, YTM, flat-curve value×2) — count one.
                 ctx.count_extra_repricing();
 
-                apply_total_return_carry(
-                    &mut attribution,
-                    theta,
-                    carry_inputs.coupon_income,
-                    carry_inputs.roll_down,
-                )?;
+                apply_total_return_carry(&mut attribution, theta, carry_inputs)?;
             }
             AttributionFactor::RatesCurves => attribution.rates_curves_pnl = factor_pnl,
             AttributionFactor::CreditCurves => attribution.credit_curves_pnl = factor_pnl,
