@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>P&amp;L Attribution</title><style>
+.fq-ts { background:#fbfaf6; color:#1c1c1e; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  border-radius:12px; padding:30px 38px 40px; }
+.fq-ts .head { display:flex; justify-content:space-between; align-items:flex-end;
+  border-bottom:1px solid #10243f; padding-bottom:13px; margin-bottom:18px; }
+.fq-ts .head .eyebrow { font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+  color:#7a8190; margin-bottom:4px; }
+.fq-ts .head .title { font-family:Georgia,"Times New Roman",serif; font-size:25px; font-weight:600;
+  color:#10243f; letter-spacing:-.01em; }
+.fq-ts .head .subtitle { font-size:12.5px; color:#7a8190; margin-top:4px; }
+.fq-ts .head .meta { text-align:right; font-size:11px; color:#7a8190; line-height:1.6; }
+.fq-ts .kpis { display:grid; grid-template-columns:repeat(4,1fr);
+  border-top:1px solid #e4e1d8; border-bottom:1px solid #e4e1d8;
+  padding:15px 0; margin-bottom:22px; }
+.fq-ts .kpi { padding:0 16px; border-right:1px solid #e4e1d8; }
+.fq-ts .kpi:last-child { border-right:none; }
+.fq-ts .kpi .lbl { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase;
+  color:#7a8190; margin-bottom:6px; }
+.fq-ts .kpi .val { font-family:"Iowan Old Style",Georgia,serif; font-size:25px; font-weight:600;
+  color:#10243f; line-height:1; }
+.fq-ts .kpi .val.pos { color:#1b6b4f; } .fq-ts .kpi .val.neg { color:#9b2335; }
+.fq-ts .secttl { font-family:Georgia,"Times New Roman",serif; font-size:14px; font-weight:600;
+  color:#10243f; margin:26px 0 4px; border-bottom:1px solid #e4e1d8; padding-bottom:6px; }
+.fq-ts .sub { font-size:11px; color:#7a8190; margin:0 0 10px; }
+.fq-ts .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+.fq-ts .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:0 30px; margin-top:6px; }
+.fq-ts table.kv { width:100%; border-collapse:collapse; font-size:12.5px; }
+.fq-ts table.kv td { padding:6px 0; border-bottom:1px solid #e4e1d8; }
+.fq-ts table.kv td.k { color:#7a8190; }
+.fq-ts table.kv td.v { text-align:right; font-family:"Iowan Old Style",Georgia,serif; font-weight:600; color:#10243f; }
+.fq-ts table.kv td.v.pos { color:#1b6b4f; } .fq-ts table.kv td.v.neg { color:#9b2335; }
+.fq-ts table.hm { width:100%; border-collapse:collapse; font-family:"Iowan Old Style",Georgia,serif; font-size:11.5px; }
+.fq-ts table.hm th { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:10px; letter-spacing:.04em;
+  text-transform:uppercase; color:#7a8190; font-weight:600; padding:5px 0; text-align:center; }
+.fq-ts table.hm th.yr, .fq-ts table.hm td.yr { text-align:left; color:#7a8190;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; font-size:11px; width:46px; }
+.fq-ts table.hm td { text-align:center; padding:7px 2px; color:#23303f;
+  border:2px solid #fbfaf6; }
+.fq-ts table.hm td.ytd { font-weight:700; border-left:2px solid #cfc8b8; }
+.fq-ts table.dd { width:100%; border-collapse:collapse; font-size:12px; }
+.fq-ts table.dd th { font-size:10px; letter-spacing:.05em; text-transform:uppercase;
+  color:#7a8190; font-weight:600; text-align:right; padding:6px 4px; border-bottom:1px solid #10243f; }
+.fq-ts table.dd th:first-child { text-align:left; }
+.fq-ts table.dd td { padding:6px 4px; border-bottom:1px solid #e4e1d8; text-align:right;
+  font-family:"Iowan Old Style",Georgia,serif; }
+.fq-ts table.dd td:first-child { text-align:left; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:#7a8190; }
+.fq-ts table.dd td.neg { color:#9b2335; }
+.fq-ts svg { display:block; width:100%; height:auto; }
+.fq-ts .foot { margin-top:30px; border-top:1px solid #10243f; padding-top:10px;
+  font-size:10.5px; color:#7a8190; display:flex; justify-content:space-between; }
+.fq-ts .fq-tip { position:fixed; pointer-events:none; z-index:9999; opacity:0; transition:opacity .08s;
+  background:#10243f; color:#fff; font:11px/1.4 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding:4px 8px;
+  border-radius:4px; white-space:nowrap; }
+.fq-ts svg .fq-hb { cursor:crosshair; }
+.fq-ts svg rect.fq-hb:not([fill]) { fill:transparent; }
+.fq-ts svg .fq-cross { stroke:#7a8190; stroke-width:1; stroke-dasharray:3 3; pointer-events:none; }
+.fq-ts svg .fq-mk { fill:#7c2230; stroke:#fff; stroke-width:1; pointer-events:none; }
+.fq-ts .fq-scroll { max-height:240px; overflow:auto; border:1px solid #e4e1d8; border-radius:4px; }
+.fq-ts .fq-scroll table.dd th { position:sticky; top:0; background:#f3f1ea; }
+</style></head><body style="margin:0;padding:24px;background:#e8e9ec;"><div class="fq-ts"><div class="head"><div><div class="eyebrow">Instrument Attribution</div><div class="title">P&amp;L Attribution</div><div class="subtitle">ATTR-BOND-001 · 2025-01-15 → 2025-01-16</div></div><div class="meta">Instrument ATTR-BOND-001<br>Method Parallel<br>2025-01-15 → 2025-01-16<br>Currency USD<br>Generated 21 Jun 2026</div></div><div class="kpis"><div class="kpi"><div class="lbl">Total P&amp;L</div><div class="val pos">22,734 USD</div></div><div class="kpi"><div class="lbl">Mark-to-Market</div><div class="val neg">-2,266 USD</div></div><div class="kpi"><div class="lbl">Carry</div><div class="val pos">25,112 USD</div></div><div class="kpi"><div class="lbl">Residual</div><div class="val ">0.00%</div></div><div class="kpi"><div class="lbl">Repricings</div><div class="val ">6</div></div></div><div class="secttl">P&amp;L Attribution</div><svg viewBox="0 0 620 210" xmlns="http://www.w3.org/2000/svg"><line x1="56" y1="170.0" x2="606" y2="170.0" stroke="#cfc8b8"/><text x="50" y="173.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">0</text><line x1="56" y1="143.7" x2="606" y2="143.7" stroke="#e4e1d8"/><text x="50" y="146.7" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">5,000</text><line x1="56" y1="117.3" x2="606" y2="117.3" stroke="#e4e1d8"/><text x="50" y="120.3" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">10,000</text><line x1="56" y1="91.0" x2="606" y2="91.0" stroke="#e4e1d8"/><text x="50" y="94.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">15,000</text><line x1="56" y1="64.7" x2="606" y2="64.7" stroke="#e4e1d8"/><text x="50" y="67.7" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">20,000</text><line x1="56" y1="38.3" x2="606" y2="38.3" stroke="#e4e1d8"/><text x="50" y="41.3" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">25,000</text><line x1="56" y1="12.0" x2="606" y2="12.0" stroke="#e4e1d8"/><text x="50" y="15.0" text-anchor="end" font-size="10" fill="#7a8190" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">30,000</text><rect class="fq-hb" x="90.8" y="37.7" width="113.7" height="132.3" fill="#1b6b4f" fill-opacity="0.82" data-cx="147.7" data-cy="37.7" data-label="Carry" data-val="+25,112"><title>Carry · +25,112</title></rect><text x="147.7" y="184" text-anchor="middle" font-size="9.5" fill="#7a8190" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">Carry</text><text x="147.7" y="33.7" text-anchor="middle" font-size="9.5" fill="#23303f" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">+25,112</text><line x1="204.5" y1="37.7" x2="274.2" y2="37.7" stroke="#e4e1d8" stroke-dasharray="2 2"/><rect class="fq-hb" x="274.2" y="37.7" width="113.7" height="12.5" fill="#9b2335" fill-opacity="0.82" data-cx="331.0" data-cy="37.7" data-label="Rates" data-val="−2,378"><title>Rates · −2,378</title></rect><text x="331.0" y="184" text-anchor="middle" font-size="9.5" fill="#7a8190" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">Rates</text><text x="331.0" y="62.3" text-anchor="middle" font-size="9.5" fill="#23303f" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">−2,378</text><line x1="387.8" y1="50.3" x2="457.5" y2="50.3" stroke="#e4e1d8" stroke-dasharray="2 2"/><rect class="fq-hb" x="457.5" y="50.3" width="113.7" height="119.7" fill="#10243f" fill-opacity="0.9" data-cx="514.3" data-cy="50.3" data-label="Total P&amp;L" data-val="+22,734"><title>Total P&L · +22,734</title></rect><text x="514.3" y="184" text-anchor="middle" font-size="9.5" fill="#7a8190" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">Total P&L</text><text x="514.3" y="46.3" text-anchor="middle" font-size="9.5" fill="#23303f" font-family="&quot;Iowan Old Style&quot;,Georgia,serif">+22,734</text><line class="fq-cross" x1="0" x2="0" y1="12" y2="170" style="visibility:hidden" pointer-events="none"/><circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/></svg><div class="secttl">Factor Contributions</div><table class="dd"><thead><tr><th>Factor</th><th>Amount</th><th>% of Total</th></tr></thead><tbody><tr><td class="">Carry</td><td class="">25,112 USD</td><td class="">+110.5%</td></tr><tr><td class="">Rates</td><td class="neg">-2,378 USD</td><td class="neg">-10.5%</td></tr><tr><td class="">Total P&L</td><td class="">22,734 USD</td><td class="">+100.0%</td></tr></tbody></table><div class="secttl">Carry &amp; Roll-Down</div><table class="dd"><thead><tr><th>Component</th><th>Amount</th></tr></thead><tbody><tr><td class="">Theta</td><td class="">112 USD</td></tr><tr><td class="">Coupon Income</td><td class="">25,000 USD</td></tr><tr><td class="">Roll Down</td><td class="">1,886 USD</td></tr></tbody></table><div class="foot"><span></span><span>finstack-quant</span></div><div class="fq-tip" aria-hidden="true"></div></div><script>
+(function(){
+  function init(){
+    document.querySelectorAll('.fq-ts svg .fq-hb').forEach(function(band){
+      if(band.__fqWired){return;} band.__fqWired=true;
+      var root=band.closest('.fq-ts'); if(!root){return;}
+      var tip=root.querySelector('.fq-tip');
+      var svg=band.ownerSVGElement;
+      var cross=svg&&svg.querySelector('.fq-cross');
+      var mk=svg&&svg.querySelector('.fq-mk');
+      function show(e){
+        if(tip){tip.textContent=band.getAttribute('data-label')+' · '+band.getAttribute('data-val');
+          tip.style.left=(e.clientX+12)+'px'; tip.style.top=(e.clientY+12)+'px'; tip.style.opacity='1';}
+        var cx=band.getAttribute('data-cx'), cy=band.getAttribute('data-cy');
+        if(cross){cross.setAttribute('x1',cx); cross.setAttribute('x2',cx); cross.style.visibility='visible';}
+        if(mk){mk.setAttribute('cx',cx); mk.setAttribute('cy',cy); mk.style.visibility='visible';}
+      }
+      function hide(){ if(tip){tip.style.opacity='0';} if(cross){cross.style.visibility='hidden';} if(mk){mk.style.visibility='hidden';} }
+      band.addEventListener('mousemove',show);
+      band.addEventListener('mouseenter',show);
+      band.addEventListener('mouseleave',hide);
+    });
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',init);}else{init();}
+})();
+</script></body></html>

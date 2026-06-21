@@ -108,3 +108,15 @@ def test_attribution_tearsheet_rejects_unknown_section() -> None:
 
     with pytest.raises(ValueError, match=r"section"):
         attribution_tearsheet(_load_attr(), sections=["nope"])
+
+
+def _attribution_golden_html() -> str:
+    from finstack_quant.reporting import attribution_tearsheet
+
+    return attribution_tearsheet(_load_attr(), generated=dt.date(2026, 6, 21)).to_html()
+
+
+def test_attribution_tearsheet_matches_golden() -> None:
+    golden = DATA / "attribution_tearsheet_golden.html"
+    assert golden.exists(), "golden missing — regenerate (Task 3 Step 2)"
+    assert _attribution_golden_html() == golden.read_text(encoding="utf-8")
