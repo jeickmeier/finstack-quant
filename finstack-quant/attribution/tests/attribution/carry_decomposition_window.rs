@@ -112,4 +112,11 @@ fn inter_coupon_window_coupon_income_is_accrued_and_roll_down_small() {
         (sum - carry_total).abs() < 1.0,
         "partition coupon+ptp+roll ({sum:.4}) should ≈ carry_total ({carry_total:.4})"
     );
+    // `theta` must be absent when the full split is present, so the detail lines never double-count
+    // (theta == pull_to_par + roll_down would overshoot the total if summed alongside them).
+    assert!(
+        cd.theta.is_none(),
+        "theta should be None when pull_to_par/roll_down are present, got {:?}",
+        cd.theta
+    );
 }

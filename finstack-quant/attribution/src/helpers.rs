@@ -296,7 +296,8 @@ fn build_flat_ytm_market(
 /// `carry_total = theta + cash_paid` (unchanged); `total_pnl += cash_paid`. The detail:
 /// `coupon_income = Δaccrued + cash`, `pull_to_par = (F_t1−F_t0) − Δaccrued`,
 /// `roll_down = theta − (F_t1−F_t0)`, which sum to `carry_total`. When accrual / flat pricing is
-/// unavailable (non-bonds), falls back to `coupon_income = cash`, `pull_to_par = roll_down = None`.
+/// unavailable (non-bonds), falls back to `coupon_income = cash`, `pull_to_par = roll_down = None`,
+/// and the unsplit residual goes to `theta`. The populated detail lines always partition `total`.
 pub(crate) fn apply_total_return_carry(
     attribution: &mut PnlAttribution,
     theta: Money,
@@ -315,8 +316,15 @@ pub(crate) fn apply_total_return_carry(
         (Some(da), Some(fd)) => (Some(fd.checked_sub(da)?), Some(theta.checked_sub(fd)?)),
         _ => (None, None),
     };
-    // Legacy `theta` field = the price-carry residual (= pull_to_par + roll_down), not the whole carry.
-    let price_carry = attribution.carry.checked_sub(coupon_income)?;
+    // The detail always partitions the total: `coupon_income + pull_to_par + roll_down` (full split)
+    // or `coupon_income + theta` (fallback). `theta` is the UNSPLIT price-carry residual used ONLY
+    // when the split is unavailable; when `pull_to_par`/`roll_down` are present it would duplicate
+    // them (`theta == pull_to_par + roll_down`), so it is `None` to avoid double-counting.
+    let theta_detail = if pull_to_par.is_some() {
+        None
+    } else {
+        Some(attribution.carry.checked_sub(coupon_income)?)
+    };
 
     attribution.carry_detail = Some(CarryDetail {
         total: attribution.carry,
@@ -324,7 +332,7 @@ pub(crate) fn apply_total_return_carry(
         pull_to_par,
         roll_down: roll_down.map(SourceLine::scalar),
         funding_cost: None,
-        theta: Some(price_carry),
+        theta: theta_detail,
     });
     Ok(())
 }
