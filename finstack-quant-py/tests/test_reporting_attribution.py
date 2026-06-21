@@ -99,3 +99,12 @@ def test_reporting_import_is_engine_light() -> None:
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)  # noqa: S603
     assert out.returncode == 0, out.stderr
+
+
+def test_attribution_tearsheet_rejects_unknown_section() -> None:
+    import pytest
+
+    from finstack_quant.reporting import attribution_tearsheet
+
+    with pytest.raises(ValueError, match=r"section"):
+        attribution_tearsheet(_load_attr(), sections=["nope"])

@@ -204,6 +204,9 @@ def attribution_tearsheet(
         attribution = PnlAttribution.from_json(payload)
 
     wanted = sections if sections is not None else ALL_SECTIONS
+    unknown = set(wanted) - set(ALL_SECTIONS)
+    if unknown:
+        raise ValueError(f"unknown section(s): {sorted(unknown)}; valid: {ALL_SECTIONS}")
     cur = attribution.currency
     kpis = [
         KPI("Total P&L", fmt.money(attribution.total_pnl, cur, dp=0), fmt.sign_class(attribution.total_pnl)),
