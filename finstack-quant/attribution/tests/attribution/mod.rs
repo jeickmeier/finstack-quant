@@ -18,6 +18,7 @@
 mod analytical_self_consistency;
 mod bond_attribution;
 mod carry_credit_factor;
+mod carry_decomposition_window;
 mod convertible_attribution;
 mod coverage_gaps;
 mod credit_factor_linear;
