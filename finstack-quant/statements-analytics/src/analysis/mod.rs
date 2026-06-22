@@ -65,7 +65,10 @@ pub use introspection::{
     render_tree_ascii, render_tree_detailed, DependencyTracer, DependencyTree, Explanation,
     ExplanationStep, FormulaExplainer,
 };
-pub use reports::{Alignment, CreditAssessmentReport, PLSummaryReport, Report, TableBuilder};
+pub use reports::{
+    Alignment, CreditAssessment, CreditAssessmentPoint, CreditAssessmentReport, PLSummaryReport,
+    Report, TableBuilder,
+};
 pub use scenarios::{
     generate_tornado_entries, BridgeChart, BridgeStep, MonteCarloConfig, MonteCarloResults,
     ParameterSpec, PercentileSeries, ScenarioDefinition, ScenarioDiff, ScenarioResults,

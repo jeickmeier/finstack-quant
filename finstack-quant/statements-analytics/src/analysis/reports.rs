@@ -25,6 +25,7 @@
 
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
+use serde::Serialize;
 use std::fmt::Write as FmtWrite;
 
 // ============================================================================
@@ -389,6 +390,135 @@ impl Report for PLSummaryReport<'_> {
 }
 
 // ============================================================================
+// Shared credit metric helpers
+// ============================================================================
+
+/// Trailing-twelve-month sum of `node_id` ending at (and including) `at`.
+///
+/// Returns `None` unless a full window (periods-per-year, e.g. 4 quarters) of
+/// finite values is available at or before `at`.
+fn trailing_sum_at(results: &StatementResult, node_id: &str, at: &PeriodId) -> Option<f64> {
+    let window = at.kind().periods_per_year() as usize;
+    let mut values: Vec<(PeriodId, f64)> = results
+        .get_node(node_id)?
+        .iter()
+        .filter(|(period, _)| **period <= *at)
+        .map(|(period, value)| (*period, *value))
+        .collect();
+
+    values.sort_by_key(|(period, _)| *period);
+    let trailing: Vec<f64> = values
+        .into_iter()
+        .rev()
+        .take(window)
+        .map(|(_, value)| value)
+        .collect();
+    if trailing.len() == window && trailing.iter().all(|value| value.is_finite()) {
+        Some(trailing.iter().sum())
+    } else {
+        None
+    }
+}
+
+/// Leverage ratio (total debt / TTM EBITDA) at `at`. `None` if inputs missing
+/// or TTM EBITDA is zero.
+fn leverage_at(results: &StatementResult, at: &PeriodId) -> Option<f64> {
+    let debt = results.get("total_debt", at)?;
+    let ebitda = trailing_sum_at(results, "ebitda", at)?;
+    (ebitda != 0.0).then_some(debt / ebitda)
+}
+
+/// Interest coverage (TTM EBITDA / TTM interest expense) at `at`. `None` if
+/// inputs missing or TTM interest is zero.
+fn interest_coverage_at(results: &StatementResult, at: &PeriodId) -> Option<f64> {
+    let ebitda = trailing_sum_at(results, "ebitda", at)?;
+    let interest = trailing_sum_at(results, "interest_expense", at)?;
+    (interest != 0.0).then_some(ebitda / interest)
+}
+
+/// One period's structured credit metrics. Each metric is `None` when it
+/// cannot be computed for that period (e.g. an incomplete TTM window).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CreditAssessmentPoint {
+    /// Period identifier rendered as a string (e.g. `"2025Q4"`).
+    pub period: String,
+    /// Total debt / TTM EBITDA.
+    pub leverage_ratio: Option<f64>,
+    /// TTM EBITDA / TTM interest expense.
+    pub interest_coverage: Option<f64>,
+    /// Free cash flow at this period.
+    pub free_cash_flow: Option<f64>,
+}
+
+/// Structured credit assessment: leverage, interest coverage, and free cash
+/// flow at an `as_of` period plus a per-period series for trend display.
+///
+/// This is the structured counterpart of [`CreditAssessmentReport`]; both share
+/// the same TTM computation so the numbers always agree.
+///
+/// # Examples
+///
+/// ```rust
+/// # use finstack_quant_statements::evaluator::StatementResult;
+/// # use finstack_quant_core::dates::PeriodId;
+/// # use finstack_quant_statements_analytics::analysis::CreditAssessment;
+/// # let results = StatementResult::new();
+/// let assessment = CreditAssessment::compute(&results, PeriodId::quarter(2025, 4));
+/// assert_eq!(assessment.as_of, "2025Q4");
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct CreditAssessment {
+    /// As-of period rendered as a string (e.g. `"2025Q4"`).
+    pub as_of: String,
+    /// Leverage ratio at `as_of`.
+    pub leverage_ratio: Option<f64>,
+    /// Interest coverage at `as_of`.
+    pub interest_coverage: Option<f64>,
+    /// Free cash flow at `as_of`.
+    pub free_cash_flow: Option<f64>,
+    /// Per-period series (ascending) for trend display.
+    pub series: Vec<CreditAssessmentPoint>,
+}
+
+impl CreditAssessment {
+    /// Compute a structured credit assessment from statement results.
+    ///
+    /// The series spans every period (≤ `as_of`) present on any of the driver
+    /// nodes (`ebitda`, `total_debt`, `interest_expense`, `free_cash_flow`),
+    /// in ascending order.
+    pub fn compute(results: &StatementResult, as_of: PeriodId) -> Self {
+        let mut periods: std::collections::BTreeSet<PeriodId> = std::collections::BTreeSet::new();
+        for node in ["ebitda", "total_debt", "interest_expense", "free_cash_flow"] {
+            if let Some(series) = results.get_node(node) {
+                for (period, _) in series.iter() {
+                    if *period <= as_of {
+                        periods.insert(*period);
+                    }
+                }
+            }
+        }
+
+        let series: Vec<CreditAssessmentPoint> = periods
+            .iter()
+            .map(|period| CreditAssessmentPoint {
+                period: period.to_string(),
+                leverage_ratio: leverage_at(results, period),
+                interest_coverage: interest_coverage_at(results, period),
+                free_cash_flow: results.get("free_cash_flow", period),
+            })
+            .collect();
+
+        Self {
+            as_of: as_of.to_string(),
+            leverage_ratio: leverage_at(results, &as_of),
+            interest_coverage: interest_coverage_at(results, &as_of),
+            free_cash_flow: results.get("free_cash_flow", &as_of),
+            series,
+        }
+    }
+}
+
+// ============================================================================
 // Credit Assessment Report
 // ============================================================================
 
@@ -425,48 +555,12 @@ impl<'a> CreditAssessmentReport<'a> {
         Self { results, as_of }
     }
 
-    fn trailing_sum(&self, node_id: &str) -> Option<f64> {
-        let window = self.as_of.kind().periods_per_year() as usize;
-        let mut values: Vec<(PeriodId, f64)> = self
-            .results
-            .get_node(node_id)?
-            .iter()
-            .filter(|(period, _)| **period <= self.as_of)
-            .map(|(period, value)| (*period, *value))
-            .collect();
-
-        values.sort_by_key(|(period, _)| *period);
-        let trailing: Vec<f64> = values
-            .into_iter()
-            .rev()
-            .take(window)
-            .map(|(_, value)| value)
-            .collect();
-        if trailing.len() == window && trailing.iter().all(|value| value.is_finite()) {
-            Some(trailing.iter().sum())
-        } else {
-            None
-        }
-    }
-
     fn calculate_leverage_ratio(&self) -> Option<f64> {
-        let debt = self.results.get("total_debt", &self.as_of)?;
-        let ebitda = self.trailing_sum("ebitda")?;
-        if ebitda != 0.0 {
-            Some(debt / ebitda)
-        } else {
-            None
-        }
+        leverage_at(self.results, &self.as_of)
     }
 
     fn calculate_interest_coverage(&self) -> Option<f64> {
-        let ebitda = self.trailing_sum("ebitda")?;
-        let interest = self.trailing_sum("interest_expense")?;
-        if interest != 0.0 {
-            Some(ebitda / interest)
-        } else {
-            None
-        }
+        interest_coverage_at(self.results, &self.as_of)
     }
 }
 
@@ -590,6 +684,71 @@ mod tests {
             !output.contains("0.00"),
             "missing value must not render as 0.00: {output}"
         );
+    }
+
+    #[test]
+    fn credit_assessment_compute_matches_report_scalars() {
+        let mut results = StatementResult::new();
+        for (quarter, ebitda) in [(1, 10.0), (2, 20.0), (3, 30.0), (4, 40.0)] {
+            results
+                .nodes
+                .entry("ebitda".to_string())
+                .or_default()
+                .insert(PeriodId::quarter(2025, quarter), ebitda);
+        }
+        for (quarter, interest) in [(1, 1.0), (2, 2.0), (3, 3.0), (4, 4.0)] {
+            results
+                .nodes
+                .entry("interest_expense".to_string())
+                .or_default()
+                .insert(PeriodId::quarter(2025, quarter), interest);
+        }
+        results
+            .nodes
+            .entry("total_debt".to_string())
+            .or_default()
+            .insert(PeriodId::quarter(2025, 4), 300.0);
+
+        let as_of = PeriodId::quarter(2025, 4);
+        let assessment = CreditAssessment::compute(&results, as_of);
+
+        assert_eq!(assessment.as_of, as_of.to_string());
+        assert_eq!(assessment.leverage_ratio, Some(3.0));
+        assert_eq!(assessment.interest_coverage, Some(10.0));
+        assert_eq!(assessment.free_cash_flow, None);
+    }
+
+    #[test]
+    fn credit_assessment_series_covers_periods_with_ttm() {
+        let mut results = StatementResult::new();
+        for (quarter, ebitda) in [(1, 10.0), (2, 20.0), (3, 30.0), (4, 40.0)] {
+            results
+                .nodes
+                .entry("ebitda".to_string())
+                .or_default()
+                .insert(PeriodId::quarter(2025, quarter), ebitda);
+        }
+        results
+            .nodes
+            .entry("total_debt".to_string())
+            .or_default()
+            .insert(PeriodId::quarter(2025, 4), 300.0);
+
+        let assessment = CreditAssessment::compute(&results, PeriodId::quarter(2025, 4));
+
+        let q4 = assessment
+            .series
+            .iter()
+            .find(|p| p.period == PeriodId::quarter(2025, 4).to_string())
+            .expect("Q4 point present");
+        assert_eq!(q4.leverage_ratio, Some(3.0));
+
+        let q1 = assessment
+            .series
+            .iter()
+            .find(|p| p.period == PeriodId::quarter(2025, 1).to_string())
+            .expect("Q1 point present");
+        assert_eq!(q1.leverage_ratio, None);
     }
 
     #[test]
