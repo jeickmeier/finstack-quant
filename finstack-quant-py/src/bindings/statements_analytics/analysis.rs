@@ -577,6 +577,55 @@ fn credit_assessment_report(results: &Bound<'_, PyAny>, as_of: &str) -> PyResult
     Ok(report.to_string())
 }
 
+/// Compute a structured credit assessment (leverage, interest coverage, FCF).
+///
+/// Parameters
+/// ----------
+/// results : StatementResult | str
+///     A ``StatementResult`` object or a JSON string.
+/// as_of : str
+///     Period string for the assessment date (e.g. ``"2025Q4"``).
+///
+/// Returns
+/// -------
+/// dict
+///     Dict with ``as_of`` (str), ``leverage_ratio``, ``interest_coverage``,
+///     ``free_cash_flow`` (float | None), and ``series`` (list of dicts with
+///     ``period``, ``leverage_ratio``, ``interest_coverage``, ``free_cash_flow``).
+#[pyfunction]
+fn credit_assessment<'py>(
+    py: Python<'py>,
+    results: &Bound<'py, PyAny>,
+    as_of: &str,
+) -> PyResult<Bound<'py, PyDict>> {
+    let results = extract_results_ref(results)?;
+    let period: finstack_quant_core::dates::PeriodId = as_of.parse().map_err(display_to_py)?;
+    let assessment =
+        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&*results, period);
+
+    let dict = PyDict::new(py);
+    dict.set_item("as_of", &assessment.as_of)?;
+    dict.set_item("leverage_ratio", assessment.leverage_ratio)?;
+    dict.set_item("interest_coverage", assessment.interest_coverage)?;
+    dict.set_item("free_cash_flow", assessment.free_cash_flow)?;
+
+    let points: Vec<Bound<'py, PyDict>> = assessment
+        .series
+        .iter()
+        .map(|pt| {
+            let d = PyDict::new(py);
+            d.set_item("period", &pt.period)?;
+            d.set_item("leverage_ratio", pt.leverage_ratio)?;
+            d.set_item("interest_coverage", pt.interest_coverage)?;
+            d.set_item("free_cash_flow", pt.free_cash_flow)?;
+            Ok(d)
+        })
+        .collect::<PyResult<Vec<_>>>()?;
+    dict.set_item("series", PyList::new(py, points)?)?;
+
+    Ok(dict)
+}
+
 // ---------------------------------------------------------------------------
 // Introspection — DependencyTracer (class)
 // ---------------------------------------------------------------------------
@@ -1041,6 +1090,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(run_corporate_analysis, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pl_summary_report, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(credit_assessment_report, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(credit_assessment, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(direct_dependencies, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(all_dependencies, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(dependents, m)?)?;

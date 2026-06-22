@@ -19,6 +19,7 @@ evaluate_dcf = _sa.evaluate_dcf
 run_corporate_analysis = _sa.run_corporate_analysis
 pl_summary_report = _sa.pl_summary_report
 credit_assessment_report = _sa.credit_assessment_report
+credit_assessment = _sa.credit_assessment
 DependencyTracer = _sa.DependencyTracer
 direct_dependencies = _sa.direct_dependencies
 all_dependencies = _sa.all_dependencies
@@ -119,6 +120,7 @@ __all__: list[str] = [
     "compute_ecl",
     "compute_ecl_weighted",
     "compute_multiple",
+    "credit_assessment",
     "credit_assessment_report",
     "dependents",
     "direct_dependencies",

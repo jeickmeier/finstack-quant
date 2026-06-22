@@ -19,6 +19,7 @@ __all__ = [
     "run_corporate_analysis",
     "pl_summary_report",
     "credit_assessment_report",
+    "credit_assessment",
     "DependencyTracer",
     "direct_dependencies",
     "all_dependencies",
@@ -316,6 +317,25 @@ def credit_assessment_report(results: StatementResult | str, as_of: str) -> str:
     Example:
         >>> from finstack_quant.statements_analytics import credit_assessment_report
         >>> report = credit_assessment_report(res_json, "2025Q1")
+    """
+    ...
+
+def credit_assessment(results: StatementResult | str, as_of: str) -> dict[str, Any]:
+    """Compute a structured credit assessment (leverage, coverage, FCF).
+
+    Args:
+        results: ``StatementResult`` object or JSON string.
+        as_of: Period string for the as-of date (e.g. ``"2025Q4"``).
+
+    Returns:
+        Dict with ``as_of`` (str), ``leverage_ratio``, ``interest_coverage``,
+        ``free_cash_flow`` (float | None), and ``series`` (list of per-period
+        dicts with the same metric keys plus ``period``).
+
+    Example:
+        >>> from finstack_quant.statements_analytics import credit_assessment
+        >>> out = credit_assessment(res_json, "2025Q4")
+        >>> out["leverage_ratio"]
     """
     ...
 
