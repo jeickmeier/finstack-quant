@@ -131,3 +131,24 @@ def test_cashflow_ladder_wellformed() -> None:
     assert svg.count('class="fq-hb"') == 3  # one hover band per period
     assert "<polyline" in svg  # the PV overlay line
     assert "<title>" in svg
+
+
+def test_tornado_chart_is_wellformed_svg() -> None:
+    svg = charts.tornado_chart(
+        [("Revenue", -25.0, 35.0), ("WACC", -18.0, 12.0)],
+        theme=INSTITUTIONAL,
+    )
+    assert svg.startswith("<svg")
+    minidom.parseString(svg)  # noqa: S318
+    # 2 entries x (downside + upside) = 4 value bars
+    assert svg.count('class="fq-hb"') == 4
+    assert INSTITUTIONAL.neg in svg
+    assert INSTITUTIONAL.pos in svg
+    assert "Revenue" in svg
+    assert "WACC" in svg
+
+
+def test_tornado_chart_empty_is_wellformed() -> None:
+    svg = charts.tornado_chart([], theme=INSTITUTIONAL)
+    assert svg.startswith("<svg")
+    minidom.parseString(svg)  # noqa: S318

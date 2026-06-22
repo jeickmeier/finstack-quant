@@ -445,3 +445,77 @@ def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool
     parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
     parts.append("</svg>")
     return "".join(parts)
+
+
+def tornado_chart(
+    entries: list[tuple[str, Any, Any]],
+    *,
+    theme: Theme,
+    height: int | None = None,
+) -> str:
+    """Render a horizontal tornado (diverging bars) for sensitivity entries.
+
+    ``entries`` is ``[(label, downside, upside)]`` (caller sorts by magnitude).
+    Each row draws a downside bar (left of the zero baseline, ``theme.neg``) and
+    an upside bar (right, ``theme.pos``). Reuses the value-axis, gridline, and
+    hover-band (``fq-hb``/``fq-cross``/``fq-mk``) conventions of the other
+    charts. Deterministic.
+    """
+    n = len(entries)
+    row_h = 26
+    ml, mr, mt, mb = 132, 16, 14, 26  # wide left margin for category labels
+    height = height if height is not None else mt + mb + max(n, 1) * row_h
+    pw, ph = _W - ml - mr, height - mt - mb
+
+    downs = [0.0 if _missing(d) else float(d) for _, d, _ in entries]
+    ups = [0.0 if _missing(u) else float(u) for _, _, u in entries]
+    lo = min(0.0, *downs, *ups) if entries else 0.0
+    hi = max(0.0, *downs, *ups) if entries else 1.0
+    if lo == hi:
+        hi = lo + 1.0
+    ticks = nice_ticks(lo, hi, 4)
+    lo, hi = ticks[0], ticks[-1]
+    if lo == hi:
+        hi = lo + 1.0
+
+    def x(v: float) -> float:
+        return ml + (v - lo) / (hi - lo) * pw
+
+    x0 = x(0.0)
+    parts: list[str] = [f'<svg viewBox="0 0 {_W} {height}" xmlns="http://www.w3.org/2000/svg">']
+    for t in ticks:
+        xx = x(t)
+        stroke = theme.grid if abs(t) < 1e-9 else theme.faint
+        parts.append(f'<line x1="{xx:.1f}" y1="{mt}" x2="{xx:.1f}" y2="{mt + ph}" stroke="{stroke}"/>')
+        parts.append(
+            f'<text x="{xx:.1f}" y="{mt + ph + 16}" text-anchor="middle" font-size="10" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{t:,.0f}</text>'
+        )
+
+    bh = row_h * 0.6
+    for i, (label, _, _) in enumerate(entries):
+        cy = mt + i * row_h + row_h / 2
+        parts.append(
+            f'<text x="{ml - 8}" y="{cy + 3:.1f}" text-anchor="end" font-size="10.5" '
+            f'fill="{theme.ink}" font-family="{_xml_attr(theme.font_sans)}">{_xml_attr(str(label))}</text>'
+        )
+        for value, col in ((downs[i], theme.neg), (ups[i], theme.pos)):
+            xv = x(value)
+            xa, xb = min(x0, xv), max(x0, xv)
+            sign = "+" if value >= 0 else _MINUS
+            valstr = f"{sign}{abs(value):,.0f}"
+            parts.append(
+                f'<rect class="fq-hb" x="{xa:.1f}" y="{cy - bh / 2:.1f}" width="{max(xb - xa, 0.5):.1f}" '
+                f'height="{bh:.1f}" fill="{col}" fill-opacity="0.82" '
+                f'data-cx="{xv:.1f}" data-cy="{cy:.1f}" data-label="{_xml_attr(str(label))}" data-val="{valstr}">'
+                f"<title>{_xml_attr(str(label))} · {valstr}</title></rect>"
+            )
+
+    parts.append(f'<line x1="{x0:.1f}" y1="{mt}" x2="{x0:.1f}" y2="{mt + ph}" stroke="{theme.ink}"/>')
+    parts.append(
+        f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" '
+        f'style="visibility:hidden" pointer-events="none"/>'
+    )
+    parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
+    parts.append("</svg>")
+    return "".join(parts)
