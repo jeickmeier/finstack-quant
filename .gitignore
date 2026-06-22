@@ -115,3 +115,5 @@ docs/superpowers/*
 
 .worktrees/
 .worktree/
+
+.superpowers/*
