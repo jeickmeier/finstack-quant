@@ -789,6 +789,7 @@ root_exports = [
     "explainFormulaText",
     "plSummaryReport",
     "creditAssessmentReport",
+    "creditAssessment",
     "runChecks",
     "runThreeStatementChecks",
     "runCreditUnderwritingChecks",
@@ -814,6 +815,7 @@ explain_formula = "explainFormula"
 explain_formula_text = "explainFormulaText"
 pl_summary_report = "plSummaryReport"
 credit_assessment_report = "creditAssessmentReport"
+credit_assessment = "creditAssessment"
 run_checks = "runChecks"
 run_three_statement_checks = "runThreeStatementChecks"
 run_credit_underwriting_checks = "runCreditUnderwritingChecks"
