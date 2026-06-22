@@ -13,6 +13,7 @@ export const statements_analytics = {
   explainFormulaText: wasm.explainFormulaText,
   plSummaryReport: wasm.plSummaryReport,
   creditAssessmentReport: wasm.creditAssessmentReport,
+  creditAssessment: wasm.creditAssessment,
   runChecks: wasm.runChecks,
   runThreeStatementChecks: wasm.runThreeStatementChecks,
   runCreditUnderwritingChecks: wasm.runCreditUnderwritingChecks,

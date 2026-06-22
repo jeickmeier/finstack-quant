@@ -285,6 +285,17 @@ pub fn credit_assessment_report(results_json: &str, as_of: &str) -> Result<Strin
     Ok(report.to_string())
 }
 
+/// Compute a structured credit assessment (leverage, coverage, FCF) as JSON.
+#[wasm_bindgen(js_name = creditAssessment)]
+pub fn credit_assessment(results_json: &str, as_of: &str) -> Result<String, JsValue> {
+    let results: finstack_quant_statements::evaluator::StatementResult =
+        serde_json::from_str(results_json).map_err(to_js_err)?;
+    let period: finstack_quant_core::dates::PeriodId = as_of.parse().map_err(to_js_err)?;
+    let assessment =
+        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&results, period);
+    serde_json::to_string(&assessment).map_err(to_js_err)
+}
+
 /// Run checks from a suite spec against a model (JSON in/out).
 ///
 /// Evaluates the model, resolves the suite spec into runnable checks
@@ -450,6 +461,15 @@ mod tests {
         let (_, results_json) = evaluated_results();
         let text = credit_assessment_report(&results_json, "2024Q1").expect("report");
         assert!(text.contains("Credit Assessment"));
+    }
+
+    #[test]
+    fn credit_assessment_returns_structured_json() {
+        let (_, results_json) = evaluated_results();
+        let json = credit_assessment(&results_json, "2024Q1").expect("assessment");
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse");
+        assert!(parsed.get("as_of").is_some());
+        assert!(parsed.get("series").map(|s| s.is_array()).unwrap_or(false));
     }
 
     #[test]
