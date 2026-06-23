@@ -73,6 +73,8 @@ Deep dives: `instruments/` (15 notebooks, including credit events, Fourier prici
 | Reporting: Credit Tear Sheet | Leverage/coverage trend, per-instrument coverage, covenant compliance (`credit_tearsheet`) |
 | Reporting: DCF Tear Sheet | EV→equity bridge, UFCF projection, WACC/terminal-growth sensitivity (`dcf_tearsheet`) |
 | Reporting: Scenario Tear Sheet | Driver tornado, scenario comparison, Monte-Carlo fan, variance (`scenario_tearsheet`) |
+| Reporting: Portfolio Tear Sheet | Holdings, exposure by entity, aggregated sensitivities, cashflow ladder (`portfolio_tearsheet`) |
+| Reporting: Portfolio Risk Tear Sheet | Euler VaR/ES contributions and risk budget (`portfolio_risk_tearsheet`) |
 
 ### Level 4 -- Financial Statement Modeling (`04_statement_modeling/`)
 
