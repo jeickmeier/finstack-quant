@@ -15,8 +15,9 @@ def test_waterfall_chart_totals_signs_and_colors() -> None:
     svg = charts.waterfall_chart(["Carry", "Rates"], [25000.0, -2400.0], theme=INSTITUTIONAL, total_label="Total P&L")
     assert svg.startswith("<svg")
     # all three bar labels present
-    for lab in ("Carry", "Rates", "Total P&L"):
-        assert lab in svg
+    assert "Carry" in svg
+    assert "Rates" in svg
+    assert "Total P&amp;L" in svg  # & is XML-escaped in SVG titles/labels
     # positive step uses pos color, negative uses neg, total uses ink
     assert INSTITUTIONAL.pos in svg
     assert INSTITUTIONAL.neg in svg
