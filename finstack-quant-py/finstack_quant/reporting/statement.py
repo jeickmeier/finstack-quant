@@ -12,9 +12,9 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
-from . import charts, format as fmt, tables
+from . import charts, format as fmt
 from .document import KPI, Section, TearSheet
-from .statements_common import parse_statement, pl_matrix_table
+from .statements_common import parse_statement, pl_matrix_table, variance_table
 from .theme import INSTITUTIONAL, Theme
 
 ALL_SECTIONS = ["summary", "trend", "margins", "variance"]
@@ -64,39 +64,8 @@ def _section_margins(view: Any, periods: list[str], theme: Theme) -> Section | N
 
 
 def _section_variance(variance: Any, theme: Theme) -> Section | None:
-    rows = variance.get("rows") if isinstance(variance, dict) else None
-    if not rows:
-        return None
-
-    def _pct_disp(v: Any) -> Any:
-        return v * 100.0 if isinstance(v, (int, float)) else None
-
-    table_rows = [
-        {
-            "Period": r.get("period"),
-            "Metric": r.get("metric"),
-            "Baseline": r.get("baseline"),
-            "Comparison": r.get("comparison"),
-            "Abs Δ": r.get("abs_var"),
-            "% Δ": _pct_disp(r.get("pct_var")),
-        }
-        for r in rows
-    ]
-    return Section(
-        "Variance vs Baseline",
-        tables.data_table(
-            table_rows,
-            columns=["Period", "Metric", "Baseline", "Comparison", "Abs Δ", "% Δ"],
-            formats={
-                "Baseline": fmt.money,
-                "Comparison": fmt.money,
-                "Abs Δ": fmt.money,
-                "% Δ": lambda v: fmt.pct(v, signed=True),
-            },
-            neg_columns={"Abs Δ", "% Δ"},
-            theme=theme,
-        ),
-    )
+    body = variance_table(variance, theme=theme)
+    return Section("Variance vs Baseline", body) if body is not None else None
 
 
 def statement_tearsheet(

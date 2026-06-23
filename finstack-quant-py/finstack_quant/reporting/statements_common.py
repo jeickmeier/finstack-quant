@@ -13,6 +13,7 @@ import html
 import json
 from typing import Any
 
+from . import format as fmt, tables
 from .theme import Theme
 
 
@@ -115,3 +116,41 @@ def pl_matrix_table(
         cells.extend(f"<td>{formatter(view.get(node_id, p))}</td>" for p in periods)
         body_rows.append(f"<tr>{''.join(cells)}</tr>")
     return f'<table class="dd"><thead><tr>{head}</tr></thead><tbody>{"".join(body_rows)}</tbody></table>'
+
+
+def variance_table(variance: Any, *, theme: Theme) -> str | None:
+    """Render a ``run_variance`` result (``{"rows": [...]}``) as an HTML table.
+
+    Returns ``None`` when there are no rows. Pure presentation; ``pct_var`` is
+    scaled to percent for display.
+    """
+    rows = variance.get("rows") if isinstance(variance, dict) else None
+    if not rows:
+        return None
+
+    def _pct_disp(v: Any) -> Any:
+        return v * 100.0 if isinstance(v, (int, float)) else None
+
+    table_rows = [
+        {
+            "Period": r.get("period"),
+            "Metric": r.get("metric"),
+            "Baseline": r.get("baseline"),
+            "Comparison": r.get("comparison"),
+            "Abs Δ": r.get("abs_var"),
+            "% Δ": _pct_disp(r.get("pct_var")),
+        }
+        for r in rows
+    ]
+    return tables.data_table(
+        table_rows,
+        columns=["Period", "Metric", "Baseline", "Comparison", "Abs Δ", "% Δ"],
+        formats={
+            "Baseline": fmt.money,
+            "Comparison": fmt.money,
+            "Abs Δ": fmt.money,
+            "% Δ": lambda v: fmt.pct(v, signed=True),
+        },
+        neg_columns={"Abs Δ", "% Δ"},
+        theme=theme,
+    )
