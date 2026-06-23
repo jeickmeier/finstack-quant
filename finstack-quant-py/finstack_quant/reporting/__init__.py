@@ -2,6 +2,7 @@
 
 from .attribution import attribution_tearsheet
 from .credit import credit_tearsheet
+from .dcf import dcf_tearsheet
 from .instrument import instrument_tearsheet, recommended_metrics
 from .performance import performance_tearsheet
 from .statement import statement_tearsheet
@@ -12,6 +13,7 @@ __all__ = [
     "Theme",
     "attribution_tearsheet",
     "credit_tearsheet",
+    "dcf_tearsheet",
     "instrument_tearsheet",
     "performance_tearsheet",
     "recommended_metrics",
