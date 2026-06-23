@@ -1,6 +1,7 @@
 """Publication-quality tear sheets, tables, and charts (pure-Python presentation layer)."""
 
 from .attribution import attribution_tearsheet
+from .benchmark import benchmark_tearsheet
 from .credit import credit_tearsheet
 from .dcf import dcf_tearsheet
 from .instrument import instrument_tearsheet, recommended_metrics
@@ -15,6 +16,7 @@ __all__ = [
     "INSTITUTIONAL",
     "Theme",
     "attribution_tearsheet",
+    "benchmark_tearsheet",
     "credit_tearsheet",
     "dcf_tearsheet",
     "instrument_tearsheet",

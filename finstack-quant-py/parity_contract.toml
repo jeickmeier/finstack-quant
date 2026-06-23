@@ -1043,6 +1043,7 @@ public = [
     "INSTITUTIONAL",
     "Theme",
     "attribution_tearsheet",
+    "benchmark_tearsheet",
     "credit_tearsheet",
     "dcf_tearsheet",
     "instrument_tearsheet",
