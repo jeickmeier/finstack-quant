@@ -69,6 +69,10 @@ Deep dives: `instruments/` (15 notebooks, including credit events, Fourier prici
 | Breakeven Analysis | Spread / carry breakevens from cs01, dv01, and carry metrics |
 | Return-Contribution Attribution | Single-period return contribution, group/factor decomposition, Brinson-Fachler, weighting modes |
 | Portfolio Returns and Attribution | Time- and money-weighted returns (TWRR/MWRR), multi-period Brinson-Fachler, Carino linking |
+| Reporting: Statement Tear Sheet | P&L summary, margins, variance-vs-plan (`statement_tearsheet`) |
+| Reporting: Credit Tear Sheet | Leverage/coverage trend, per-instrument coverage, covenant compliance (`credit_tearsheet`) |
+| Reporting: DCF Tear Sheet | EV→equity bridge, UFCF projection, WACC/terminal-growth sensitivity (`dcf_tearsheet`) |
+| Reporting: Scenario Tear Sheet | Driver tornado, scenario comparison, Monte-Carlo fan, variance (`scenario_tearsheet`) |
 
 ### Level 4 -- Financial Statement Modeling (`04_statement_modeling/`)
 
