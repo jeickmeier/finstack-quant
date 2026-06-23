@@ -5,6 +5,7 @@ from .credit import credit_tearsheet
 from .dcf import dcf_tearsheet
 from .instrument import instrument_tearsheet, recommended_metrics
 from .performance import performance_tearsheet
+from .portfolio import portfolio_tearsheet
 from .scenario import scenario_tearsheet
 from .statement import statement_tearsheet
 from .theme import INSTITUTIONAL, Theme
@@ -17,6 +18,7 @@ __all__ = [
     "dcf_tearsheet",
     "instrument_tearsheet",
     "performance_tearsheet",
+    "portfolio_tearsheet",
     "recommended_metrics",
     "scenario_tearsheet",
     "statement_tearsheet",
