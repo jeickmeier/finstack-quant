@@ -12,12 +12,11 @@ No financial calculation.
 from __future__ import annotations
 
 import datetime as dt
-import json
 from typing import Any
 
 from . import charts, format as fmt, tables
 from .document import KPI, Section, TearSheet
-from .statements_common import parse_statement, pl_matrix_table
+from .statements_common import json_or_dict, parse_statement, pl_matrix_table
 from .theme import INSTITUTIONAL, Theme
 
 ALL_SECTIONS = ["ratios", "coverage", "covenants", "pl"]
@@ -31,14 +30,6 @@ _EBITDA_BUILD: list[tuple[str, str, Any]] = [
     ("EBITDA", "ebitda", fmt.money),
     ("Interest Expense", "interest_expense", fmt.money),
 ]
-
-
-def _as_dict(obj: Any) -> dict[str, Any]:
-    if isinstance(obj, str):
-        return json.loads(obj)
-    if isinstance(obj, dict):
-        return obj
-    raise TypeError(f"assessment must be a dict or JSON string; got {type(obj).__name__}")
 
 
 def _section_ratios(assessment: dict[str, Any], theme: Theme) -> Section | None:
@@ -163,7 +154,7 @@ def credit_tearsheet(
     if unknown:
         raise ValueError(f"unknown section(s): {sorted(unknown)}; valid sections: {ALL_SECTIONS}")
 
-    asmt = _as_dict(assessment)
+    asmt = json_or_dict(assessment, noun="assessment")
 
     secs: list[Section] = []
     if "ratios" in wanted and (s := _section_ratios(asmt, theme)) is not None:

@@ -49,6 +49,23 @@ class StatementView:
         return sorted(seen)
 
 
+def json_or_dict(obj: Any, *, noun: str = "value") -> dict[str, Any]:
+    """Normalise a dict or JSON-object string into a dict.
+
+    Raises:
+        TypeError: if ``obj`` is not a dict/str, or its JSON does not decode to
+            an object.
+    """
+    if isinstance(obj, dict):
+        return obj
+    if isinstance(obj, str):
+        data = json.loads(obj)
+        if not isinstance(data, dict):
+            raise TypeError(f"{noun} JSON must decode to an object; got {type(data).__name__}")
+        return data
+    raise TypeError(f"{noun} must be a dict or JSON string; got {type(obj).__name__}")
+
+
 def parse_statement(results: Any) -> StatementView:
     """Build a :class:`StatementView` from a ``StatementResult``, JSON, or dict.
 
@@ -72,6 +89,8 @@ def parse_statement(results: Any) -> StatementView:
         raise TypeError(
             f"results must be a StatementResult, JSON string, dict, or StatementView; got {type(results).__name__}"
         )
+    if not isinstance(data, dict):
+        raise TypeError(f"results JSON must decode to an object; got {type(data).__name__}")
     return StatementView(data.get("nodes", {}))
 
 

@@ -46,6 +46,11 @@ def test_parse_statement_rejects_bad_type() -> None:
         sc.parse_statement(123)
 
 
+def test_parse_statement_rejects_non_dict_json() -> None:
+    with pytest.raises(TypeError):
+        sc.parse_statement("[1, 2, 3]")
+
+
 def test_pl_matrix_table_lays_out_items_and_periods() -> None:
     v = sc.parse_statement(_results())
     out = sc.pl_matrix_table(

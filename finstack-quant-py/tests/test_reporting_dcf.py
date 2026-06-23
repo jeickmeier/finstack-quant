@@ -74,3 +74,29 @@ def test_dcf_tearsheet_optional_sections_omitted() -> None:
 def test_dcf_tearsheet_rejects_unknown_section() -> None:
     with pytest.raises(ValueError, match="unknown section"):
         dcf_tearsheet(_VAL, sections=["bridge", "nope"])
+
+
+def test_dcf_tearsheet_rejects_bad_valuation() -> None:
+    with pytest.raises(TypeError):
+        dcf_tearsheet(12345)
+    with pytest.raises(TypeError):
+        dcf_tearsheet("[1, 2, 3]")  # valid JSON, not an object
+
+
+def test_dcf_tearsheet_zero_net_debt_renders_bridge() -> None:
+    val = dict(_VAL)
+    val["net_debt"] = 0.0
+    html = dcf_tearsheet(val, generated=dt.date(2026, 6, 22)).to_html()
+    assert "Equity Bridge" in html
+
+
+def test_dcf_tearsheet_custom_ufcf_node() -> None:
+    b = statements.ModelBuilder("acme2")
+    b.periods("2025Q1..Q2", None)
+    b.value("revenue", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    b.compute("fcff", "revenue * 0.15")
+    res = statements.Evaluator().evaluate(b.build())
+    html = dcf_tearsheet(
+        _VAL, results=res, ufcf_node="fcff", sections=["ufcf"], generated=dt.date(2026, 6, 22)
+    ).to_html()
+    assert "Unlevered Free Cash Flow" in html
