@@ -20,8 +20,12 @@ _MINUS = chr(0x2212)  # U+2212 MINUS SIGN (used in value labels)
 
 
 def _xml_attr(s: str) -> str:
-    """Escape a string for use as an XML attribute value (double-quoted)."""
-    return s.replace("&", "&amp;").replace('"', "&quot;")
+    """Escape a string for use as an XML attribute value or element text.
+
+    Escapes ``&`` first, then ``<``/``>``/``"`` so the result is safe both as a
+    double-quoted attribute value and as ``<title>`` text content.
+    """
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
 def _missing(v: Any) -> bool:
@@ -352,11 +356,11 @@ def waterfall_chart(
             f'height="{max(abs(y_bot - y_top), 1.0):.1f}" fill="{col}" '
             f'fill-opacity="{0.9 if anchored else 0.82}" '
             f'data-cx="{cx:.1f}" data-cy="{min(y_top, y_bot):.1f}" data-label="{_xml_attr(lab)}" data-val="{valstr}">'
-            f"<title>{lab} · {valstr}</title></rect>"
+            f"<title>{_xml_attr(lab)} · {valstr}</title></rect>"
         )
         parts.append(
             f'<text x="{cx:.1f}" y="{height - mb + 14}" text-anchor="middle" font-size="9.5" '
-            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_sans)}">{lab}</text>'
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_sans)}">{_xml_attr(lab)}</text>'
         )
         vy = min(y_top, y_bot) - 4 if value >= 0 else max(y_top, y_bot) + 12
         parts.append(
@@ -420,7 +424,7 @@ def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool
         v = nums[i]
         y0, y1 = y(0.0), y(v)
         col = theme.pos if v >= 0 else theme.neg
-        label = lab
+        label = _xml_attr(lab)
         valstr = _tip_val(v, y_pct)
         parts.append(
             f'<rect class="fq-hb" x="{cx - bw / 2:.1f}" y="{min(y0, y1):.1f}" width="{bw:.1f}" '
@@ -430,7 +434,7 @@ def bar_chart(labels: list[str], values: list[Any], *, theme: Theme, y_pct: bool
         )
         parts.append(
             f'<text x="{cx:.1f}" y="{height - mb + 15}" text-anchor="middle" font-size="10" '
-            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{lab}</text>'
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{_xml_attr(lab)}</text>'
         )
         vy = y1 - 4 if v >= 0 else y1 + 12
         vlabel = f"{'+' if v >= 0 else ''}{v:.0f}%" if y_pct else f"{v:,.0f}"

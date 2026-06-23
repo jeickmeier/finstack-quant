@@ -174,3 +174,21 @@ def test_fan_chart_empty_is_wellformed() -> None:
     svg = charts.fan_chart([], [], [], [], theme=INSTITUTIONAL)
     assert svg.startswith("<svg")
     minidom.parseString(svg)  # noqa: S318
+
+
+def test_charts_escape_hostile_labels() -> None:
+    # A label with &, <, >, and " must not break SVG/XML in any primitive that
+    # renders caller-supplied labels into attributes and <title> text.
+    hostile = 'A & B <y> "q"'
+    svgs = [
+        charts.bar_chart([hostile, "ok"], [1.0, 2.0], theme=INSTITUTIONAL),
+        charts.tornado_chart([(hostile, -5.0, 7.0)], theme=INSTITUTIONAL),
+        charts.waterfall_chart([hostile, "ok"], [3.0, -1.0], theme=INSTITUTIONAL),
+        charts.cashflow_ladder([hostile, "ok"], [0.5, 0.5], [0.0, 1.0], theme=INSTITUTIONAL),
+    ]
+    for svg in svgs:
+        minidom.parseString(svg)  # noqa: S318  must be well-formed XML
+        assert "&amp;" in svg
+        assert "&lt;" in svg
+        assert "&gt;" in svg
+        assert "&quot;" in svg
