@@ -55,6 +55,10 @@ def parse_statement(results: Any) -> StatementView:
     Accepts a ``StatementResult`` object (anything exposing ``to_json()``), a
     JSON string, an already-parsed ``dict``, or a :class:`StatementView`
     (returned unchanged).
+
+    Raises:
+        TypeError: if ``results`` is none of the accepted types.
+        json.JSONDecodeError: if ``results`` is a string that is not valid JSON.
     """
     if isinstance(results, StatementView):
         return results

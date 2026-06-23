@@ -535,8 +535,13 @@ def fan_chart(
 
     The median (``p_mid``) line is drawn over evenly spaced ``periods`` (category x-axis).
     The three series align by index; ``None``/``NaN`` entries are skipped for the
-    band/line. Reuses the gridline + hover-band conventions of :func:`line_chart`.
-    Deterministic.
+    band/line.
+
+    The three percentile series must align with ``periods`` by index. An interior
+    gap (a period missing from the band) is bridged by a straight segment rather
+    than splitting the band into separate polygons.
+
+    Reuses the gridline + hover-band conventions of :func:`line_chart`. Deterministic.
     """
     ml, mr, mt, mb = 48, 14, 12, 26
     pw, ph = _W - ml - mr, height - mt - mb
