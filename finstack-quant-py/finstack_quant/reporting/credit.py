@@ -33,7 +33,7 @@ _EBITDA_BUILD: list[tuple[str, str, Any]] = [
 
 
 def _section_ratios(assessment: dict[str, Any], theme: Theme) -> Section | None:
-    series = assessment.get("series") or []
+    series = [pt for pt in (assessment.get("series") or []) if isinstance(pt, dict)]
     if not series:
         return None
     periods = [pt.get("period") for pt in series]
@@ -59,7 +59,10 @@ def _section_coverage(coverage: Any, theme: Theme) -> Section | None:
             "LTV": r.get("ltv"),
         }
         for r in coverage
+        if isinstance(r, dict)
     ]
+    if not rows:
+        return None
     return Section(
         "Per-Instrument Coverage",
         tables.data_table(
@@ -83,7 +86,10 @@ def _section_covenants(covenants: Any, theme: Theme) -> Section | None:
             "Status": r.get("status"),
         }
         for r in covenants
+        if isinstance(r, dict)
     ]
+    if not rows:
+        return None
     return Section(
         "Covenant Compliance",
         tables.data_table(

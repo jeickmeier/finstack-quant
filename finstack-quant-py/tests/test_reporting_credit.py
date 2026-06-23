@@ -79,3 +79,15 @@ def test_credit_tearsheet_rejects_unknown_section() -> None:
     res = _results()
     with pytest.raises(ValueError, match="unknown section"):
         credit_tearsheet(_assessment(res), sections=["ratios", "nope"])
+
+
+def test_credit_tearsheet_tolerates_bad_rows() -> None:
+    res = _results()
+    asmt = dict(_assessment(res))
+    asmt["series"] = [*asmt["series"], None, "bad"]  # malformed series points
+    html = credit_tearsheet(
+        asmt, results=res, coverage=[None, "bad"], covenants=[None], generated=dt.date(2026, 6, 22)
+    ).to_html()
+    assert "Leverage &amp; Coverage" in html  # valid series points still render
+    assert "Per-Instrument Coverage" not in html  # all coverage rows bad -> skipped
+    assert "Covenant Compliance" not in html  # all covenant rows bad -> skipped
