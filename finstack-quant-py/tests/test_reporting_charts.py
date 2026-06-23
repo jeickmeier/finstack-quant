@@ -152,3 +152,25 @@ def test_tornado_chart_empty_is_wellformed() -> None:
     svg = charts.tornado_chart([], theme=INSTITUTIONAL)
     assert svg.startswith("<svg")
     minidom.parseString(svg)  # noqa: S318
+
+
+def test_fan_chart_is_wellformed_svg() -> None:
+    svg = charts.fan_chart(
+        ["2025Q3", "2025Q4", "2026Q1"],
+        [18.0, 17.0, 16.0],  # p_low
+        [22.0, 23.0, 24.0],  # p_mid (median)
+        [26.0, 28.0, 30.0],  # p_high
+        theme=INSTITUTIONAL,
+    )
+    assert svg.startswith("<svg")
+    minidom.parseString(svg)  # noqa: S318
+    assert "<polygon" in svg  # shaded band
+    assert "<polyline" in svg  # median line
+    assert svg.count('class="fq-hb"') == 3  # one hover band per period
+    assert "2025Q3" in svg
+
+
+def test_fan_chart_empty_is_wellformed() -> None:
+    svg = charts.fan_chart([], [], [], [], theme=INSTITUTIONAL)
+    assert svg.startswith("<svg")
+    minidom.parseString(svg)  # noqa: S318

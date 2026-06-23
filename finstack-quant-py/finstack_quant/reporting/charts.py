@@ -519,3 +519,93 @@ def tornado_chart(
     parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
     parts.append("</svg>")
     return "".join(parts)
+
+
+def fan_chart(
+    periods: list[str],
+    p_low: list[Any],
+    p_mid: list[Any],
+    p_high: list[Any],
+    *,
+    theme: Theme,
+    y_pct: bool = False,
+    height: int = 200,
+) -> str:
+    """Render a Monte-Carlo fan: a shaded band between ``p_low``/``p_high`` plus a median line.
+
+    The median (``p_mid``) line is drawn over evenly spaced ``periods`` (category x-axis).
+    The three series align by index; ``None``/``NaN`` entries are skipped for the
+    band/line. Reuses the gridline + hover-band conventions of :func:`line_chart`.
+    Deterministic.
+    """
+    ml, mr, mt, mb = 48, 14, 12, 26
+    pw, ph = _W - ml - mr, height - mt - mb
+    n = len(periods)
+    vals = [float(v) for v in (*p_low, *p_mid, *p_high) if not _missing(v)]
+    if not vals or n == 0:
+        return f'<svg viewBox="0 0 {_W} {height}" xmlns="http://www.w3.org/2000/svg"></svg>'
+
+    lo, hi = min(vals), max(vals)
+    if lo == hi:
+        hi = lo + 1.0
+    ticks = nice_ticks(lo, hi, 4)
+    lo, hi = ticks[0], ticks[-1]
+    if lo == hi:
+        hi = lo + 1.0
+
+    def x(i: int) -> float:
+        return ml + (i / (n - 1) if n > 1 else 0) * pw
+
+    def y(v: float) -> float:
+        return mt + (1 - (v - lo) / (hi - lo)) * ph
+
+    parts: list[str] = [f'<svg viewBox="0 0 {_W} {height}" xmlns="http://www.w3.org/2000/svg">']
+    for t in ticks:
+        yy = y(t)
+        stroke = theme.grid if abs(t) < 1e-9 else theme.faint
+        parts.append(f'<line x1="{ml}" y1="{yy:.1f}" x2="{_W - mr}" y2="{yy:.1f}" stroke="{stroke}"/>')
+        parts.append(
+            f'<text x="{ml - 6}" y="{yy + 3:.1f}" text-anchor="end" font-size="10" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{_tick_label(t, y_pct)}</text>'
+        )
+    for i, lab in enumerate(periods):
+        parts.append(
+            f'<text x="{x(i):.1f}" y="{height - mb + 15}" text-anchor="middle" font-size="9.5" '
+            f'fill="{theme.muted}" font-family="{_xml_attr(theme.font_num)}">{_xml_attr(str(lab))}</text>'
+        )
+
+    band_idx = [i for i in range(n) if not _missing(p_low[i]) and not _missing(p_high[i])]
+    if band_idx:
+        top = " ".join(f"{x(i):.1f},{y(float(p_high[i])):.1f}" for i in band_idx)
+        bot = " ".join(f"{x(i):.1f},{y(float(p_low[i])):.1f}" for i in reversed(band_idx))
+        parts.append(f'<polygon points="{top} {bot}" fill="{rgba(theme.accent, 0.15)}"/>')
+
+    mid = [(i, float(p_mid[i])) for i in range(n) if not _missing(p_mid[i])]
+    if mid:
+        pts = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in mid)
+        parts.append(
+            f'<polyline points="{pts}" fill="none" stroke="{theme.ink}" stroke-width="1.6" stroke-linejoin="round"/>'
+        )
+
+    band_w = pw / (n - 1) if n > 1 else pw
+    for i, lab in enumerate(periods):
+        cx = x(i)
+        bx = max(ml, cx - band_w / 2)
+        lo_v = _tip_val(float(p_low[i]), y_pct) if not _missing(p_low[i]) else "·"
+        mid_v = _tip_val(float(p_mid[i]), y_pct) if not _missing(p_mid[i]) else "·"
+        hi_v = _tip_val(float(p_high[i]), y_pct) if not _missing(p_high[i]) else "·"
+        cy = y(float(p_mid[i])) if not _missing(p_mid[i]) else mt
+        title = f"{lab} · p50 {mid_v} · [{lo_v}, {hi_v}]"
+        parts.append(
+            f'<rect class="fq-hb" x="{bx:.1f}" y="{mt}" width="{band_w:.1f}" height="{ph}" '
+            f'data-cx="{cx:.1f}" data-cy="{cy:.1f}" data-label="{_xml_attr(str(lab))}" data-val="{_xml_attr(mid_v)}">'
+            f"<title>{_xml_attr(title)}</title></rect>"
+        )
+
+    parts.append(
+        f'<line class="fq-cross" x1="0" x2="0" y1="{mt}" y2="{mt + ph}" '
+        f'style="visibility:hidden" pointer-events="none"/>'
+    )
+    parts.append('<circle class="fq-mk" r="3.5" cx="0" cy="0" style="visibility:hidden" pointer-events="none"/>')
+    parts.append("</svg>")
+    return "".join(parts)
