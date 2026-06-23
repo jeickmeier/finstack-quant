@@ -75,6 +75,7 @@ Deep dives: `instruments/` (15 notebooks, including credit events, Fourier prici
 | Reporting: Scenario Tear Sheet | Driver tornado, scenario comparison, Monte-Carlo fan, variance (`scenario_tearsheet`) |
 | Reporting: Portfolio Tear Sheet | Holdings, exposure by entity, aggregated sensitivities, cashflow ladder (`portfolio_tearsheet`) |
 | Reporting: Portfolio Risk Tear Sheet | Euler VaR/ES contributions and risk budget (`portfolio_risk_tearsheet`) |
+| Reporting: Benchmark-Relative Tear Sheet | Alpha/beta, capture, rolling greeks, relative series, multi-factor (`benchmark_tearsheet`) |
 
 ### Level 4 -- Financial Statement Modeling (`04_statement_modeling/`)
 
