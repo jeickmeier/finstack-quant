@@ -72,3 +72,25 @@ def test_scenario_tearsheet_deterministic() -> None:
 def test_scenario_tearsheet_rejects_unknown_section() -> None:
     with pytest.raises(ValueError, match="unknown section"):
         scenario_tearsheet(tornado=_TORNADO, sections=["tornado", "nope"])
+
+
+def test_scenario_tearsheet_tolerates_bad_inputs() -> None:
+    html = scenario_tearsheet(
+        tornado=["bad", None],
+        scenarios={"base": "N/A", "x": None},
+        monte_carlo={"periods": ["Q1", "Q2"], "p_low": [1.0], "p_mid": [2.0], "p_high": [3.0]},
+        variance={"rows": [None, "bad"]},
+        generated=dt.date(2026, 6, 22),
+    ).to_html()
+    assert "Driver Sensitivity" not in html
+    assert "Scenario Comparison" not in html
+    assert "Monte Carlo Distribution" not in html
+    assert "Variance vs Baseline" not in html
+
+
+def test_scenario_tearsheet_excluding_montecarlo_drops_kpis() -> None:
+    html = scenario_tearsheet(
+        tornado=_TORNADO, sections=["tornado"], monte_carlo=_MC, generated=dt.date(2026, 6, 22)
+    ).to_html()
+    assert "Driver Sensitivity" in html
+    assert "Median" not in html  # MC KPIs gated out

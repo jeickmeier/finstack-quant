@@ -141,7 +141,10 @@ def variance_table(variance: Any, *, theme: Theme) -> str | None:
             "% Δ": _pct_disp(r.get("pct_var")),
         }
         for r in rows
+        if isinstance(r, dict)
     ]
+    if not table_rows:
+        return None
     return tables.data_table(
         table_rows,
         columns=["Period", "Metric", "Baseline", "Comparison", "Abs Δ", "% Δ"],

@@ -26,7 +26,9 @@ ALL_SECTIONS = ["tornado", "scenarios", "montecarlo", "variance"]
 def _section_tornado(tornado: Any, theme: Theme) -> Section | None:
     if not tornado or not isinstance(tornado, list):
         return None
-    entries = [(e.get("parameter_id"), e.get("downside"), e.get("upside")) for e in tornado]
+    entries = [(e.get("parameter_id"), e.get("downside"), e.get("upside")) for e in tornado if isinstance(e, dict)]
+    if not entries:
+        return None
     entries.sort(key=lambda t: abs(t[1] or 0.0) + abs(t[2] or 0.0), reverse=True)
     return Section(
         "Driver Sensitivity",
@@ -38,8 +40,11 @@ def _section_tornado(tornado: Any, theme: Theme) -> Section | None:
 def _section_scenarios(scenarios: Any, theme: Theme) -> Section | None:
     if not scenarios or not isinstance(scenarios, dict):
         return None
-    labels = list(scenarios.keys())
-    values = [scenarios[k] for k in labels]
+    items = [(k, v) for k, v in scenarios.items() if isinstance(v, (int, float))]
+    if not items:
+        return None
+    labels = [k for k, _ in items]
+    values = [v for _, v in items]
     return Section("Scenario Comparison", charts.bar_chart(labels, values, theme=theme))
 
 
@@ -49,13 +54,13 @@ def _section_montecarlo(monte_carlo: Any, breach_probability: Any, theme: Theme)
     periods = monte_carlo.get("periods") or []
     if not periods:
         return None
-    body = charts.fan_chart(
-        list(periods),
-        list(monte_carlo.get("p_low") or []),
-        list(monte_carlo.get("p_mid") or []),
-        list(monte_carlo.get("p_high") or []),
-        theme=theme,
-    )
+    p_low = list(monte_carlo.get("p_low") or [])
+    p_mid = list(monte_carlo.get("p_mid") or [])
+    p_high = list(monte_carlo.get("p_high") or [])
+    n = len(periods)
+    if len(p_low) != n or len(p_mid) != n or len(p_high) != n:
+        return None
+    body = charts.fan_chart(list(periods), p_low, p_mid, p_high, theme=theme)
     subtitle = None
     if isinstance(breach_probability, (int, float)):
         subtitle = f"Breach probability: {fmt.pct(breach_probability * 100)}"
@@ -134,13 +139,15 @@ def scenario_tearsheet(
     if "variance" in wanted and (s := _section_variance(variance, theme)) is not None:
         secs.append(s)
 
-    breach = fmt.pct(breach_probability * 100) if isinstance(breach_probability, (int, float)) else "·"
-    kpis = [
-        KPI("P5 (Downside)", fmt.money(_mc_last(monte_carlo, "p_low")), ""),
-        KPI("Median (P50)", fmt.money(_mc_last(monte_carlo, "p_mid")), ""),
-        KPI("P95 (Upside)", fmt.money(_mc_last(monte_carlo, "p_high")), ""),
-        KPI("Breach Prob.", breach, ""),
-    ]
+    kpis: list[KPI] = []
+    if "montecarlo" in wanted:
+        breach = fmt.pct(breach_probability * 100) if isinstance(breach_probability, (int, float)) else "·"
+        kpis = [
+            KPI("P5 (Downside)", fmt.money(_mc_last(monte_carlo, "p_low")), ""),
+            KPI("Median (P50)", fmt.money(_mc_last(monte_carlo, "p_mid")), ""),
+            KPI("P95 (Upside)", fmt.money(_mc_last(monte_carlo, "p_high")), ""),
+            KPI("Breach Prob.", breach, ""),
+        ]
 
     return TearSheet(
         theme=theme,

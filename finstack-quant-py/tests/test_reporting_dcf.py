@@ -100,3 +100,11 @@ def test_dcf_tearsheet_custom_ufcf_node() -> None:
         _VAL, results=res, ufcf_node="fcff", sections=["ufcf"], generated=dt.date(2026, 6, 22)
     ).to_html()
     assert "Unlevered Free Cash Flow" in html
+
+
+def test_dcf_tearsheet_tolerates_bad_sensitivity() -> None:
+    html = dcf_tearsheet(
+        _VAL, sensitivity=["bad", None], sections=["sensitivity", "bridge"], generated=dt.date(2026, 6, 22)
+    ).to_html()
+    assert "Equity Value Sensitivity" not in html
+    assert "Equity Bridge" in html
