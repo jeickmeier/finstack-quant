@@ -115,3 +115,17 @@ def test_portfolio_risk_tearsheet_tolerates_bad_rows() -> None:
     decomp["contributions"] = [*_DECOMP["contributions"], None, "bad"]
     html = portfolio_risk_tearsheet(decomp, generated=dt.date(2026, 6, 23)).to_html()
     assert "VaR Contributions" in html  # valid rows still render, no crash
+
+
+def test_portfolio_risk_tearsheet_positions_kpi_without_method() -> None:
+    decomp = {k: v for k, v in _DECOMP.items() if k != "method"}
+    html = portfolio_risk_tearsheet(decomp, generated=dt.date(2026, 6, 23)).to_html()
+    assert "Positions" in html
+
+
+def test_portfolio_risk_tearsheet_es_budget_bad_rows() -> None:
+    es = {"contributions": [*_ES["contributions"], None, "bad"]}
+    budget = {**_BUDGET, "positions": [*_BUDGET["positions"], None, 42]}
+    html = portfolio_risk_tearsheet(_DECOMP, es=es, budget=budget, generated=dt.date(2026, 6, 23)).to_html()
+    assert "ES Contributions" in html
+    assert "Risk Budget" in html
