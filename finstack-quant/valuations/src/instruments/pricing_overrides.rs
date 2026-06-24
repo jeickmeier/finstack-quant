@@ -380,12 +380,12 @@ impl BumpConfig {
 
 /// Merton Monte Carlo configuration stored on the bond for registry-based pricing.
 ///
-/// This is an opaque wrapper around
+/// This is a wrapper around
 /// [`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]
 /// that allows the pricer registry to access the MC configuration from
 /// `PricingOverrides`.
-/// Not serializable (set programmatically, not from JSON).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(transparent)]
 pub struct MertonMcOverride(
     pub crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig,
 );
@@ -415,10 +415,9 @@ pub struct ModelConfig {
     pub use_gobet_miri: bool,
     /// Merton Monte Carlo configuration for structural credit PIK pricing.
     ///
-    /// When set, the `MertonMc` pricer in the registry uses this config.
-    /// Set programmatically; not serialized.
-
-    #[serde(skip)]
+    /// When set (via flat JSON under `pricing_overrides.merton_mc_config` or the
+    /// Rust builder), the `MertonMc` pricer in the registry uses this config.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merton_mc_config: Option<MertonMcOverride>,
     /// Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.
     ///

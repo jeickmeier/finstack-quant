@@ -54,7 +54,9 @@ use indexmap::IndexMap;
 /// `Discrete` only checks the barrier at grid points (fast but biased for
 /// coarse time steps). `BrownianBridge` uses a Brownian-bridge crossing
 /// probability between grid points to approximate continuous monitoring.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub enum BarrierCrossing {
     /// Discrete monitoring: default if `V(t_i) < B(t_i)` at time steps.
     Discrete,
@@ -63,7 +65,9 @@ pub enum BarrierCrossing {
 }
 
 /// Which structural parameter to calibrate in the MC engine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub enum CalibrationParameter {
     /// Calibrate the debt barrier B.
     DebtBarrier,
@@ -76,7 +80,7 @@ pub enum CalibrationParameter {
 /// When set on [`MertonMcConfig::calibration`], the pricer runs a low-path
 /// bisection to solve for a structural parameter so that the cash base-case
 /// MC price matches the target market quote, then re-prices with full paths.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct MertonMcCalibrationSpec {
     /// Target market quote to match (interpreted at quote/settlement date).
     pub target: crate::instruments::fixed_income::bond::pricing::quote_conversions::BondQuoteInput,
@@ -193,7 +197,7 @@ impl PikSchedule {
 // ---------------------------------------------------------------------------
 
 /// Configuration for Monte Carlo PIK bond pricing.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 pub struct MertonMcConfig {
     /// Merton structural credit model.
     pub merton: MertonModel,
@@ -2435,5 +2439,59 @@ mod tests {
             (result.clean_price_pct - result2.clean_price_pct).abs() < 1e-10,
             "Same seed must give identical results after fix"
         );
+    }
+
+    #[test]
+    fn merton_mc_config_roundtrips_via_pricing_overrides_json() {
+        // Ensures the notebook path (instrument JSON with a flat
+        // pricing_overrides.merton_mc_config key) can deserialize and be accepted.
+        use crate::instruments::PricingOverrides;
+        let cfg = MertonMcConfig::new(test_merton())
+            .num_paths(64)
+            .seed(7)
+            .pik_schedule(PikSchedule::Uniform(PikMode::Cash));
+        let mut ov = PricingOverrides::default();
+        ov = ov.with_merton_mc(cfg.clone());
+        let json = serde_json::to_string(&ov).expect("ser");
+        let back: PricingOverrides = serde_json::from_str(&json).expect("de");
+        assert!(back.model_config.merton_mc_config.is_some());
+        // The inner config should roundtrip key fields
+        let restored = &back.model_config.merton_mc_config.unwrap().0;
+        assert_eq!(restored.num_paths, 64);
+        assert_eq!(restored.seed, 7);
+
+        let notebook_shape = serde_json::json!({
+            "merton_mc_config": {
+                "merton": {
+                    "asset_value": 200.0,
+                    "asset_vol": 0.25,
+                    "debt_barrier": 100.0,
+                    "risk_free_rate": 0.04,
+                    "payout_rate": 0.0,
+                    "barrier_type": {"FirstPassage": {"barrier_growth_rate": 0.0}},
+                    "dynamics": "GeometricBrownian"
+                },
+                "pik_schedule": {"Uniform": "Pik"},
+                "num_paths": 2000,
+                "seed": 42,
+                "antithetic": true,
+                "time_steps_per_year": 50,
+                "default_recovery_rate": 0.40,
+                "barrier_crossing": "BrownianBridge"
+            }
+        });
+        let from_notebook: PricingOverrides =
+            serde_json::from_value(notebook_shape).expect("notebook merton_mc_config shape");
+        let restored = &from_notebook
+            .model_config
+            .merton_mc_config
+            .expect("merton_mc_config should be populated")
+            .0;
+        assert_eq!(restored.num_paths, 2000);
+        assert_eq!(restored.seed, 42);
+        assert!(matches!(
+            restored.pik_schedule,
+            PikSchedule::Uniform(PikMode::Pik)
+        ));
     }
 }
