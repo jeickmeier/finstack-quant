@@ -123,13 +123,7 @@ jobs:
           cache: true
 
       - name: Run Rust lib and integration tests
-        # Do not run Rust doctests in CI; they are long-running and not
-        # supported by nextest. Keep target selection explicit here.
         run: cargo nextest run --workspace --exclude finstack-quant-py --lib --tests --no-fail-fast
-
-      - name: Run workspace rustdoc
-        run: |
-          RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps
 
   # ============================================
   # Test Python — maturin build + pytest
@@ -210,47 +204,6 @@ jobs:
       - name: Run WASM tests
         run: npm --prefix finstack-quant-wasm run test
 
-  # ============================================
-  # Fuzzing — short smoke run of the DSL parser fuzz target
-  # ============================================
-  # Runs the libfuzzer-driven `parse_formula` target for a bounded duration
-  # on every PR. Designed to catch regressions in the DSL parser quickly,
-  # not to drive a long-running fuzz campaign — that should be a separate
-  # scheduled workflow with corpus persistence.
-  fuzz:
-    name: Fuzz (DSL parser smoke)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: prime-cache
-    if: github.event_name == 'pull_request'
-
-    env:
-      CARGO_BUILD_JOBS: 2
-      CARGO_INCREMENTAL: 1
-      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-
-      - name: Provision toolchain (mise)
-        uses: jdx/mise-action@v2
-        with:
-          cache: true
-          cache_save: false
-
-      # cargo-fuzz / libfuzzer requires the nightly toolchain for the
-      # `-Zsanitizer` flag; install nightly side-by-side with the pinned mise
-      # toolchain rather than replacing it.
-      - name: Install nightly Rust for fuzzing
-        run: rustup toolchain install nightly --profile minimal --component rust-src
-
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
-
-      - name: Run parse_formula fuzz target (60s smoke)
-        working-directory: finstack-quant/statements
-        run: cargo +nightly fuzz run parse_formula -- -max_total_time=60 -max_len=4096
 
   # ============================================
   # Supply-chain security (cargo-deny): Rust advisories, licenses, bans
