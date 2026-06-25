@@ -8,13 +8,33 @@ description = "Python bindings for the Finstack Quant financial computation libr
 readme = "finstack-quant-py/README.md"
 requires-python = ">=3.12"
 license = "MIT OR Apache-2.0"
+keywords = [
+    "quantitative finance",
+    "quant finance",
+    "fixed income",
+    "credit",
+    "portfolio analytics",
+    "risk analytics",
+    "derivatives",
+    "monte carlo",
+    "xva",
+    "financial modeling",
+    "rust",
+    "pyo3",
+]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
     "License :: OSI Approved :: MIT License",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Typing :: Typed",
 ]
 dependencies = [
     "matplotlib>=3.10.7",
@@ -23,6 +43,13 @@ dependencies = [
     "pydantic>=2.12.5",
     "python-dotenv>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/jeickmeier/finstack-quant"
+Repository = "https://github.com/jeickmeier/finstack-quant"
+Issues = "https://github.com/jeickmeier/finstack-quant/issues"
+Documentation = "https://github.com/jeickmeier/finstack-quant/tree/master/docs"
+Examples = "https://github.com/jeickmeier/finstack-quant/tree/master/finstack-quant-py/examples/notebooks"
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
