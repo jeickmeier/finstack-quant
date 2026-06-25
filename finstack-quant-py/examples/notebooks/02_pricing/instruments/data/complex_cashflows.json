@@ -1,0 +1,53 @@
+{
+  "bond_amort": {
+    "spec": {
+      "accrual_method": "Linear",
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "call_put": null,
+      "cashflow_spec": {
+        "Amortizing": {
+          "base": {
+            "Fixed": {
+              "bdc": "following",
+              "calendar_id": "weekends_only",
+              "coupon_type": "Cash",
+              "dc": "Thirty360",
+              "end_of_month": false,
+              "freq": {
+                "count": 6,
+                "unit": "months"
+              },
+              "payment_lag_days": 0,
+              "rate": "0.04",
+              "stub": "ShortFront"
+            }
+          },
+          "schedule": {
+            "LinearTo": {
+              "final_notional": {
+                "amount": "200000",
+                "currency": "USD"
+              }
+            }
+          }
+        }
+      },
+      "credit_curve_id": null,
+      "discount_curve_id": "USD-OIS",
+      "ex_coupon_days": 0,
+      "id": "AMORT-FIXED",
+      "issue_date": "2024-01-15",
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pricing_overrides": {},
+      "settlement_days": 2
+    },
+    "type": "bond"
+  }
+}

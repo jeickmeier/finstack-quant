@@ -19,6 +19,12 @@ class RoundingMode:
     """Rounding mode for monetary and rate calculations.
 
     Enum-style class with class-level constants for each supported mode.
+
+    Example
+    -------
+    >>> from finstack_quant.core.config import RoundingMode
+    >>> RoundingMode.BANKERS  # doctest: +ELLIPSIS
+    <finstack_quant.core.config.RoundingMode ...>
     """
 
     BANKERS: RoundingMode
@@ -49,13 +55,47 @@ class RoundingMode:
         ------
         ValueError
             If *name* is not recognised.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.config import RoundingMode
+        >>> RoundingMode.from_name("bankers")  # doctest: +ELLIPSIS
+        <finstack_quant.core.config.RoundingMode ...>
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __hash__(self) -> int: ...
-    def __eq__(self, other: object) -> bool: ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this rounding mode.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __str__(self) -> str:
+        """Return a human-readable name for this rounding mode.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __hash__(self) -> int:
+        """Return a hash for this rounding mode.
+
+        Returns
+        -------
+        int
+        """
+        ...
+    def __eq__(self, other: object) -> bool:
+        """Return whether two rounding modes are equal.
+
+        Returns
+        -------
+        bool
+        """
+        ...
 
 class ToleranceConfig:
     """Numerical tolerance settings for rate and generic comparisons.
@@ -68,6 +108,11 @@ class ToleranceConfig:
     generic_epsilon : float | None
         Epsilon for generic floating-point comparisons. If ``None``,
         the library default is used.
+
+    Example
+    -------
+    >>> from finstack_quant.core.config import ToleranceConfig
+    >>> tol = ToleranceConfig(rate_epsilon=1e-9)  # doctest: +SKIP
     """
 
     def __init__(
@@ -83,20 +128,54 @@ class ToleranceConfig:
             Epsilon for rate-style comparisons.
         generic_epsilon : float | None
             Epsilon for generic floating-point comparisons.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.config import ToleranceConfig
+        >>> tol = ToleranceConfig(rate_epsilon=1e-9, generic_epsilon=1e-12)  # doctest: +SKIP
         """
         ...
 
     @property
     def rate_epsilon(self) -> float:
-        """Epsilon used for rate-style comparisons."""
+        """Epsilon used for rate-style comparisons.
+
+        Returns
+        -------
+        float
+
+        Examples
+        --------
+        >>> tol = ToleranceConfig(rate_epsilon=1e-9)  # doctest: +SKIP
+        >>> tol.rate_epsilon  # doctest: +SKIP
+        1e-09
+        """
         ...
 
     @property
     def generic_epsilon(self) -> float:
-        """Epsilon used for generic floating-point comparisons."""
+        """Epsilon used for generic floating-point comparisons.
+
+        Returns
+        -------
+        float
+
+        Examples
+        --------
+        >>> tol = ToleranceConfig(generic_epsilon=1e-12)  # doctest: +SKIP
+        >>> tol.generic_epsilon  # doctest: +SKIP
+        1e-12
+        """
         ...
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this tolerance config.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 class FinstackConfig:
     """Top-level library configuration combining rounding and tolerances.
@@ -108,6 +187,11 @@ class FinstackConfig:
     tolerances : ToleranceConfig | None
         Tolerance configuration override. If ``None``, the library default
         is used.
+
+    Example
+    -------
+    >>> from finstack_quant.core.config import FinstackConfig
+    >>> cfg = FinstackConfig()  # doctest: +SKIP
     """
 
     def __init__(
@@ -123,6 +207,11 @@ class FinstackConfig:
             Rounding mode.
         tolerances : ToleranceConfig | None
             Tolerance configuration.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.config import FinstackConfig, RoundingMode
+        >>> cfg = FinstackConfig(rounding_mode=RoundingMode.BANKERS)  # doctest: +SKIP
         """
         ...
 
@@ -143,6 +232,12 @@ class FinstackConfig:
         ------
         ValueError
             If *currency* is not recognised.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> cfg.output_scale("USD")  # doctest: +SKIP
+        2
         """
         ...
 
@@ -163,39 +258,157 @@ class FinstackConfig:
         ------
         ValueError
             If *currency* is not recognised.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> cfg.ingest_scale("USD")  # doctest: +SKIP
+        2
         """
         ...
 
     def set_extension(self, key: str, value: Any) -> None:
-        """Set a versioned registry/config extension from Python data or a JSON string."""
+        """Set a versioned registry/config extension from Python data or a JSON string.
+
+        Parameters
+        ----------
+        key:
+            Extension key.
+        value:
+            Python data or a JSON string.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> cfg.set_extension("custom_key", '{"v":1}')  # doctest: +SKIP
+        """
         ...
 
     def remove_extension(self, key: str) -> bool:
         """Remove a versioned registry/config extension.
 
-        Returns ``True`` when an extension was present.
+        Parameters
+        ----------
+        key:
+            Extension key to remove.
+
+        Returns
+        -------
+        bool
+            ``True`` when an extension was present.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> cfg.remove_extension("custom_key")  # doctest: +SKIP
+        False
         """
         ...
 
     def extension_keys(self) -> list[str]:
-        """Return configured extension keys."""
+        """Return configured extension keys.
+
+        Returns
+        -------
+        list[str]
+            Extension key list.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> cfg.extension_keys()  # doctest: +SKIP
+        []
+        """
         ...
 
     def get_extension_json(self, key: str) -> Optional[str]:
-        """Return one extension as a JSON string, or ``None`` if absent."""
+        """Return one extension as a JSON string, or ``None`` if absent.
+
+        Parameters
+        ----------
+        key:
+            Extension key.
+
+        Returns
+        -------
+        str or None
+            JSON string, or ``None``.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> cfg.get_extension_json("custom_key")  # doctest: +SKIP
+        None
+        """
         ...
 
     def get_extension(self, key: str) -> Optional[Any]:
-        """Return one extension as native Python data, or ``None`` if absent."""
+        """Return one extension as native Python data, or ``None`` if absent.
+
+        Parameters
+        ----------
+        key:
+            Extension key.
+
+        Returns
+        -------
+        Any or None
+            Python data, or ``None``.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> cfg.get_extension("custom_key")  # doctest: +SKIP
+        None
+        """
         ...
 
     def to_json(self) -> str:
-        """Serialize this config, including extensions, to JSON."""
+        """Serialize this config, including extensions, to JSON.
+
+        Returns
+        -------
+        str
+            JSON text.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig()  # doctest: +SKIP
+        >>> '"rounding_mode"' in cfg.to_json()  # doctest: +SKIP
+        True
+        """
         ...
 
     @classmethod
     def from_json(cls, json: str) -> FinstackConfig:
-        """Deserialize a config from JSON."""
+        """Deserialize a config from JSON.
+
+        Parameters
+        ----------
+        json:
+            JSON document matching the config schema.
+
+        Returns
+        -------
+        FinstackConfig
+            Parsed configuration.
+
+        Raises
+        ------
+        ValueError
+            If JSON parsing or schema validation fails.
+
+        Examples
+        --------
+        >>> cfg = FinstackConfig.from_json('{"rounding_mode":"bankers"}')  # doctest: +SKIP
+        """
         ...
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this config.
+
+        Returns
+        -------
+        str
+        """
+        ...

@@ -172,7 +172,7 @@ class CommoditySwaption(_CommodityInstrument):
 class CommoditySpreadOption(_CommodityInstrument):
     """Option on the spread between two commodity underlyings."""
 
-__all__: list[str] = [
+__all__ = [
     "CommodityOption",
     "CommodityAsianOption",
     "CommodityForward",

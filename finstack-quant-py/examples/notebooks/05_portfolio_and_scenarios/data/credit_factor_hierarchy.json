@@ -1,0 +1,22 @@
+{
+  "calibration_config": {
+    "annualization_factor": 12.0,
+    "beta_shrinkage": "none",
+    "covariance_strategy": "diagonal",
+    "hierarchy": {
+      "levels": [
+        "rating",
+        "region"
+      ]
+    },
+    "min_bucket_size_per_level": {
+      "per_level": [
+        2,
+        2
+      ]
+    },
+    "policy": "globally_off",
+    "use_returns_or_levels": "returns",
+    "vol_model": "sample"
+  }
+}

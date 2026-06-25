@@ -1,10 +1,18 @@
+"""P&L attribution: decompose portfolio P&L into risk-factor contributions.
+
+Bindings for ``finstack_quant_core::attribution``. Provides the
+:class:`PnlAttribution` result type and the :func:`attribute_pnl` /
+:func:`attribute_return_contribution` entry points, along with validation
+helpers and default metric / waterfall ordering utilities.
+"""
+
 from __future__ import annotations
 
 from typing import Any
 
 import pandas as pd
 
-__all__: list[str] = [
+__all__ = [
     "PnlAttribution",
     "attribute_pnl",
     "attribute_pnl_from_spec",
@@ -28,34 +36,64 @@ class PnlAttribution:
 
     Construct via :meth:`from_json` or the :func:`attribute_pnl` helper.
 
-    Example:
-        >>> from finstack_quant.attribution import PnlAttribution
-        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+    Examples
+    --------
+    >>> from finstack_quant.attribution import PnlAttribution
+    >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
     """
 
     @staticmethod
     def from_json(json: str) -> PnlAttribution:
         """Deserialize a ``PnlAttribution`` from JSON.
 
-        Args:
-            json: JSON string (the ``attribution`` field from an
-                ``AttributionResultEnvelope``).
+        Parameters
+        ----------
+        json : str
+            JSON string (the ``attribution`` field from an
+            ``AttributionResultEnvelope``).
 
-        Returns:
+        Returns
+        -------
+        PnlAttribution
             Parsed ``PnlAttribution`` instance.
+
+        Examples
+        --------
+        >>> from finstack_quant.attribution import PnlAttribution
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
         """
         ...
 
     def to_json(self) -> str:
         """Serialize to compact JSON.
 
-        Returns:
+        Returns
+        -------
+        str
             Compact JSON string.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> json_str = attr.to_json()  # doctest: +SKIP
         """
         ...
 
     def to_dict(self) -> dict[str, object]:
-        """Export the canonical serde-shaped attribution payload as a dict."""
+        """Export the canonical serde-shaped attribution payload as a dict.
+
+        Returns
+        -------
+        dict[str, object]
+            Attribution payload as a Python dict.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> d = attr.to_dict()  # doctest: +SKIP
+        >>> "total_pnl" in d  # doctest: +SKIP
+        True
+        """
         ...
 
     @property
@@ -235,47 +273,92 @@ class PnlAttribution:
 
     @property
     def currency(self) -> str:
-        """Currency code for all P&L amounts."""
+        """Currency code for all P&L amounts.
+
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def instrument_id(self) -> str:
-        """Instrument identifier."""
+        """Instrument identifier.
+
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def method(self) -> str:
-        """Attribution method name (Parallel, Waterfall, MetricsBased, Taylor)."""
+        """Attribution method name (Parallel, Waterfall, MetricsBased, Taylor).
+
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def t0(self) -> str:
-        """Start date (T₀) as ISO string."""
+        """Start date (T₀) as ISO string.
+
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def t1(self) -> str:
-        """End date (T₁) as ISO string."""
+        """End date (T₁) as ISO string.
+
+        Returns
+        -------
+        str
+        """
         ...
 
     @property
     def num_repricings(self) -> int:
-        """Number of repricings performed."""
+        """Number of repricings performed.
+
+        Returns
+        -------
+        int
+        """
         ...
 
     @property
     def residual_pct(self) -> float:
-        """Residual as percentage of total P&L."""
+        """Residual as percentage of total P&L.
+
+        Returns
+        -------
+        float
+        """
         ...
 
     @property
     def notes(self) -> list[str]:
-        """Diagnostic notes and warnings."""
+        """Diagnostic notes and warnings.
+
+        Returns
+        -------
+        list[str]
+        """
         ...
 
     @property
     def result_invalid(self) -> bool:
-        """True when attribution was flagged invalid and residual checks should fail."""
+        """True when attribution was flagged invalid and residual checks should fail.
+
+        Returns
+        -------
+        bool
+        """
         ...
 
     def residual_within_tolerance(
@@ -285,19 +368,41 @@ class PnlAttribution:
     ) -> bool:
         """Check if residual is within tolerance.
 
-        Args:
-            pct_tolerance: Percentage tolerance (e.g. 0.1 for 0.1%).
-                Defaults to the attribution's stored ``meta.tolerance_pct``.
-            abs_tolerance: Absolute tolerance (e.g. 100.0 for $100).
-                Defaults to the attribution's stored ``meta.tolerance_abs``.
+        Parameters
+        ----------
+        pct_tolerance : float or None
+            Percentage tolerance (e.g. 0.1 for 0.1%).
+            Defaults to the attribution's stored ``meta.tolerance_pct``.
+        abs_tolerance : float or None
+            Absolute tolerance (e.g. 100.0 for $100).
+            Defaults to the attribution's stored ``meta.tolerance_abs``.
 
-        Returns:
+        Returns
+        -------
+        bool
             ``True`` if residual is within tolerance.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> attr.residual_within_tolerance(pct_tolerance=0.1)  # doctest: +SKIP
+        True
         """
         ...
 
     def residual_within_meta_tolerance(self) -> bool:
-        """Check residual using the attribution's stored method-specific tolerances."""
+        """Check residual using the attribution's stored method-specific tolerances.
+
+        Returns
+        -------
+        bool
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> attr.residual_within_meta_tolerance()  # doctest: +SKIP
+        True
+        """
         ...
 
     def validate_currencies(self) -> None:
@@ -305,24 +410,45 @@ class PnlAttribution:
 
         Useful before building a DataFrame or summing across instruments.
 
-        Raises:
-            ValueError: When any factor's currency differs from ``total_pnl.currency``.
+        Raises
+        ------
+        ValueError
+            When any factor's currency differs from ``total_pnl.currency``.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> attr.validate_currencies()  # doctest: +SKIP
         """
         ...
 
     def explain(self) -> str:
         """Human-readable tree explanation (non-zero factors only).
 
-        Returns:
+        Returns
+        -------
+        str
             Multi-line string with tree structure showing P&L breakdown.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> print(attr.explain())  # doctest: +SKIP
         """
         ...
 
     def explain_verbose(self) -> str:
         """Verbose tree explanation including zero-valued factors.
 
-        Returns:
+        Returns
+        -------
+        str
             Multi-line string with tree structure showing all factors.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> print(attr.explain_verbose())  # doctest: +SKIP
         """
         ...
 
@@ -334,8 +460,15 @@ class PnlAttribution:
         factor P&L amounts, ``residual``, ``residual_pct``,
         ``num_repricings``, and ``result_invalid``.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             Single-row DataFrame.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> df = attr.to_dataframe()  # doctest: +SKIP
         """
         ...
 
@@ -367,8 +500,15 @@ class PnlAttribution:
         ``df.pivot_table(index="key_a", columns="key_b", values="amount")``
         to slice the desired view.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             Long-format DataFrame.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> df = attr.to_long_dataframe()  # doctest: +SKIP
         """
         ...
 
@@ -383,8 +523,15 @@ class PnlAttribution:
 
         Returns an empty DataFrame when ``carry_detail`` is not populated.
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             Carry-decomposition DataFrame.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> df = attr.to_carry_detail_dataframe()  # doctest: +SKIP
         """
         ...
 
@@ -399,12 +546,26 @@ class PnlAttribution:
         populated (no ``credit_factor_model`` was supplied, or the instrument
         has no resolvable issuer).
 
-        Returns:
+        Returns
+        -------
+        pd.DataFrame
             Credit-factor DataFrame.
+
+        Examples
+        --------
+        >>> attr = PnlAttribution.from_json(result_json)  # doctest: +SKIP
+        >>> df = attr.to_credit_factor_dataframe()  # doctest: +SKIP
         """
         ...
 
-    def __repr__(self) -> str: ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this attribution.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 def attribute_pnl(
     instrument_json: str,
@@ -423,27 +584,39 @@ def attribute_pnl(
     canonical JSON form of the attribution. Use
     ``PnlAttribution.from_json(...)`` when you want the richer wrapper.
 
-    Args:
-        instrument_json: Tagged instrument JSON (``{"type": "bond", ...}``).
-        market_t0_json: JSON-serialized ``MarketContext`` at T₀.
-        market_t1_json: JSON-serialized ``MarketContext`` at T₁.
-        as_of_t0: Valuation date T₀ in ISO 8601 format.
-        as_of_t1: Valuation date T₁ in ISO 8601 format.
-        method: Attribution method — one of ``"Parallel"``,
-            ``{"Waterfall": ["Carry", "RatesCurves", ...]}``,
-            ``"MetricsBased"``, or ``{"Taylor": {"include_gamma": True, ...}}``.
-        config: Optional config overrides (tolerance, metrics, bump sizes,
-            target currency, or ``{"execution_policy": "serial"}`` for
-            callers that already parallelize at the portfolio/batch level).
-        full_cross_attribution: Option to compute all 36 cross-factor pairs when enabled.
+    Parameters
+    ----------
+    instrument_json : str
+        Tagged instrument JSON (``{"type": "bond", ...}``).
+    market_t0_json : str
+        JSON-serialized ``MarketContext`` at T₀.
+    market_t1_json : str
+        JSON-serialized ``MarketContext`` at T₁.
+    as_of_t0 : str
+        Valuation date T₀ in ISO 8601 format.
+    as_of_t1 : str
+        Valuation date T₁ in ISO 8601 format.
+    method : str or dict[str, Any]
+        Attribution method — one of ``"Parallel"``,
+        ``{"Waterfall": ["Carry", "RatesCurves", ...]}``,
+        ``"MetricsBased"``, or ``{"Taylor": {"include_gamma": True, ...}}``.
+    config : dict[str, Any] or None
+        Optional config overrides (tolerance, metrics, bump sizes,
+        target currency, or ``{"execution_policy": "serial"}`` for
+        callers that already parallelize at the portfolio/batch level).
+    full_cross_attribution : bool or None
+        Option to compute all 36 cross-factor pairs when enabled.
 
-    Returns:
+    Returns
+    -------
+    str
         Compact JSON ``PnlAttribution`` payload.
 
-    Example:
-        >>> attr_json = attribute_pnl(inst, mkt_t0, mkt_t1, "2025-01-15", "2025-01-16", "Parallel")
-        >>> attr = PnlAttribution.from_json(attr_json)  # doctest: +SKIP
-        >>> print(attr.explain())  # doctest: +SKIP
+    Examples
+    --------
+    >>> attr_json = attribute_pnl(inst, mkt_t0, mkt_t1, "2025-01-15", "2025-01-16", "Parallel")
+    >>> attr = PnlAttribution.from_json(attr_json)  # doctest: +SKIP
+    >>> print(attr.explain())  # doctest: +SKIP
     """
     ...
 
@@ -453,22 +626,38 @@ def attribute_pnl_from_spec(spec_json: str) -> str:
     Power-user variant for full envelope round-trip workflows.
     Most users should prefer :func:`attribute_pnl`.
 
-    Args:
-        spec_json: JSON-serialized ``AttributionEnvelope``.
+    Parameters
+    ----------
+    spec_json : str
+        JSON-serialized ``AttributionEnvelope``.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``AttributionResultEnvelope``.
+
+    Examples
+    --------
+    >>> result = attribute_pnl_from_spec(spec_json)  # doctest: +SKIP
     """
     ...
 
 def attribute_return_contribution(spec_json: str) -> str:
     """Compute single-period return contribution attribution.
 
-    Args:
-        spec_json: JSON-serialized return contribution specification.
+    Parameters
+    ----------
+    spec_json : str
+        JSON-serialized return contribution specification.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized return contribution result.
+
+    Examples
+    --------
+    >>> result = attribute_return_contribution(spec_json)  # doctest: +SKIP
     """
     ...
 
@@ -478,44 +667,64 @@ def validate_attribution_json(json: str) -> str:
     Deserializes against the ``AttributionEnvelope`` schema and returns
     the canonical (re-serialized) JSON.
 
-    Args:
-        json: JSON-serialized ``AttributionEnvelope``.
+    Parameters
+    ----------
+    json : str
+        JSON-serialized ``AttributionEnvelope``.
 
-    Returns:
+    Returns
+    -------
+    str
         Canonical compact JSON.
+
+    Examples
+    --------
+    >>> canonical = validate_attribution_json(spec_json)  # doctest: +SKIP
     """
     ...
 
 def validate_return_contribution_json(spec_json: str) -> None:
     """Validate a return contribution specification JSON.
 
-    Args:
-        spec_json: JSON-serialized return contribution specification.
+    Parameters
+    ----------
+    spec_json : str
+        JSON-serialized return contribution specification.
+
+    Examples
+    --------
+    >>> validate_return_contribution_json(spec_json)  # doctest: +SKIP
     """
     ...
 
 def default_waterfall_order() -> list[str]:
     """Return the default waterfall factor ordering.
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Factor names in the default waterfall order.
 
-    Example:
-        >>> from finstack_quant.attribution import default_waterfall_order
-        >>> default_waterfall_order()  # doctest: +SKIP
-        ['Carry', 'RatesCurves', 'CreditCurves', ...]
+    Examples
+    --------
+    >>> from finstack_quant.attribution import default_waterfall_order
+    >>> default_waterfall_order()  # doctest: +SKIP
+    ['Carry', 'RatesCurves', 'CreditCurves', ...]
     """
     ...
 
 def default_attribution_metrics() -> list[str]:
     """Return the default metric IDs used by metrics-based attribution.
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Metric identifier strings.
 
-    Example:
-        >>> from finstack_quant.attribution import default_attribution_metrics
-        >>> default_attribution_metrics()  # doctest: +SKIP
-        ['theta', 'dv01', 'cs01', ...]
+    Examples
+    --------
+    >>> from finstack_quant.attribution import default_attribution_metrics
+    >>> default_attribution_metrics()  # doctest: +SKIP
+    ['theta', 'dv01', 'cs01', ...]
     """
     ...

@@ -1,0 +1,48 @@
+{
+  "bond_5y": {
+    "spec": {
+      "attributes": {},
+      "cashflow_spec": {
+        "Fixed": {
+          "bdc": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "Cash",
+          "dc": "Thirty360",
+          "end_of_month": false,
+          "freq": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": 0.05,
+          "stub": "None"
+        }
+      },
+      "discount_curve_id": "USD-OIS",
+      "id": "BOND-5Y",
+      "issue_date": "2025-01-15",
+      "maturity": "2030-01-15",
+      "notional": {
+        "amount": 1000000.0,
+        "currency": "USD"
+      }
+    },
+    "type": "bond"
+  },
+  "deposit_6m": {
+    "spec": {
+      "attributes": {},
+      "day_count": "Act360",
+      "discount_curve_id": "USD-OIS",
+      "id": "DEP-6M",
+      "maturity": "2025-07-15",
+      "notional": {
+        "amount": 1000000.0,
+        "currency": "USD"
+      },
+      "quote_rate": 0.05,
+      "start_date": "2025-01-15"
+    },
+    "type": "deposit"
+  }
+}

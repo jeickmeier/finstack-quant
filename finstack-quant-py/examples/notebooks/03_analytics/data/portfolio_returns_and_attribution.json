@@ -1,0 +1,24 @@
+{
+  "sub_periods": [
+    {
+      "beginning_market_value": 10000000.0,
+      "cashflows": [
+        {
+          "amount": 1000000.0,
+          "fraction_of_period_remaining": 0.6
+        }
+      ],
+      "ending_market_value": 10500000.0
+    },
+    {
+      "beginning_market_value": 10500000.0,
+      "cashflows": [
+        {
+          "amount": -500000.0,
+          "fraction_of_period_remaining": 0.4
+        }
+      ],
+      "ending_market_value": 10150000.0
+    }
+  ]
+}

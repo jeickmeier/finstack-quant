@@ -79,16 +79,22 @@ __all__ = [
 def run_sensitivity(model: FinancialModelSpec | str, config_json: str) -> str:
     """Run sensitivity analysis on a financial model.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        config_json: JSON-serialized ``SensitivityConfig``.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    config_json : str
+        JSON-serialized ``SensitivityConfig``.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``SensitivityResult``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import run_sensitivity
-        >>> out = run_sensitivity(model_json, config_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import run_sensitivity
+    >>> out = run_sensitivity(model_json, config_json)  # doctest: +SKIP
     """
     ...
 
@@ -99,17 +105,24 @@ def generate_tornado_entries(
 ) -> str:
     """Build tornado chart entries from a sensitivity result (JSON in/out).
 
-    Args:
-        result_json: JSON-serialized ``SensitivityResult``.
-        metric_node: Node ID to extract tornado entries for.
-        period: Optional period string to pin the tornado to.
+    Parameters
+    ----------
+    result_json : str
+        JSON-serialized ``SensitivityResult``.
+    metric_node : str
+        Node ID to extract tornado entries for.
+    period : str or None
+        Optional period string to pin the tornado to.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized list of ``TornadoEntry``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import generate_tornado_entries
-        >>> entries_json = generate_tornado_entries(res_json, "ebitda", "2025Q4")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import generate_tornado_entries
+    >>> entries_json = generate_tornado_entries(res_json, "ebitda", "2025Q4")  # doctest: +SKIP
     """
     ...
 
@@ -120,66 +133,91 @@ def run_variance(
 ) -> str:
     """Run variance analysis comparing two statement results.
 
-    Args:
-        base: Baseline ``StatementResult`` object or JSON string.
-        comparison: Comparison ``StatementResult`` object or JSON string.
-        config_json: JSON-serialized ``VarianceConfig``.
+    Parameters
+    ----------
+    base : StatementResult or str
+        Baseline ``StatementResult`` object or JSON string.
+    comparison : StatementResult or str
+        Comparison ``StatementResult`` object or JSON string.
+    config_json : str
+        JSON-serialized ``VarianceConfig``.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized variance report.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import run_variance
-        >>> report_json = run_variance(base_json, cmp_json, cfg_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import run_variance
+    >>> report_json = run_variance(base_json, cmp_json, cfg_json)  # doctest: +SKIP
     """
     ...
 
 def evaluate_scenario_set(model: FinancialModelSpec | str, scenario_set_json: str) -> str:
     """Evaluate every scenario in a scenario set against a model.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        scenario_set_json: JSON-serialized ``ScenarioSet``.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    scenario_set_json : str
+        JSON-serialized ``ScenarioSet``.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON object mapping scenario name to ``StatementResult`` JSON.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import evaluate_scenario_set
-        >>> results_map_json = evaluate_scenario_set(model_json, set_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import evaluate_scenario_set
+    >>> results_map_json = evaluate_scenario_set(model_json, set_json)  # doctest: +SKIP
     """
     ...
 
 def run_monte_carlo(model: FinancialModelSpec | str, config_json: str) -> str:
     """Run Monte Carlo simulation on a financial model.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        config_json: JSON-serialized ``MonteCarloConfig`` (``n_paths``, ``seed``, optional ``percentiles`` and ``include_path_data``).
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    config_json : str
+        JSON-serialized ``MonteCarloConfig`` (``n_paths``, ``seed``, optional ``percentiles`` and ``include_path_data``).
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``MonteCarloResults``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import run_monte_carlo
-        >>> mc_json = run_monte_carlo(model_json, mc_cfg_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import run_monte_carlo
+    >>> mc_json = run_monte_carlo(model_json, mc_cfg_json)  # doctest: +SKIP
     """
     ...
 
 def backtest_forecast(actual: list[float], forecast: list[float]) -> dict[str, float | int]:
     """Compute forecast accuracy metrics (MAE, MAPE, RMSE).
 
-    Args:
-        actual: Observed values.
-        forecast: Predicted values (same length as ``actual``).
+    Parameters
+    ----------
+    actual : list[float]
+        Observed values.
+    forecast : list[float]
+        Predicted values (same length as ``actual``).
 
-    Returns:
+    Returns
+    -------
+    dict[str, float | int]
         Dict with keys ``mae``, ``mape``, ``rmse``, and ``n``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import backtest_forecast
-        >>> backtest_forecast([1.0, 2.0], [1.1, 1.9])["mae"]
-        0.1
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import backtest_forecast
+    >>> backtest_forecast([1.0, 2.0], [1.1, 1.9])["mae"]
+    0.1
     """
     ...
 
@@ -195,23 +233,35 @@ def goal_seek(
 ) -> tuple[float, str | None]:
     """Find the driver value that makes a target node hit a target value.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        target_node: Node optimized toward ``target_value``.
-        target_period: Period string for the target (e.g. ``"2025Q4"``).
-        target_value: Desired value for the target node.
-        driver_node: Node adjusted to reach the target.
-        driver_period: Period string for the driver.
-        update_model: If ``True``, write the solved value back into the returned model JSON.
-        bounds: Optional ``(lo, hi)`` search bounds for bisection.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    target_node : str
+        Node optimized toward ``target_value``.
+    target_period : str
+        Period string for the target (e.g. ``"2025Q4"``).
+    target_value : float
+        Desired value for the target node.
+    driver_node : str
+        Node adjusted to reach the target.
+    driver_period : str
+        Period string for the driver.
+    update_model : bool
+        If ``True``, write the solved value back into the returned model JSON.
+    bounds : tuple[float, float] or None
+        Optional ``(lo, hi)`` search bounds for bisection.
 
-    Returns:
+    Returns
+    -------
+    tuple[float, str | None]
         ``(solved_driver_value, updated_model_json)``. The updated model JSON
         is ``None`` when ``update_model`` is ``False``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import goal_seek
-        >>> solved, new_model = goal_seek(mj, "ni", "2025", 10.0, "rev", "2025")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import goal_seek
+    >>> solved, new_model = goal_seek(mj, "ni", "2025", 10.0, "rev", "2025")  # doctest: +SKIP
     """
     ...
 
@@ -229,27 +279,39 @@ def evaluate_dcf(
 ) -> dict[str, float | str]:
     """Evaluate DCF valuation on a financial model.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string (metadata must include ``currency``).
-        wacc: Weighted average cost of capital as a decimal (``0.10`` = 10%).
-        terminal_value_json: JSON ``TerminalValueSpec`` (tagged enum).
-        ufcf_node: Node ID for unlevered free cash flow.
-        net_debt_override: Optional flat net debt.
-        mid_year_convention: Use mid-year discounting when ``True``.
-        shares_outstanding: Optional basic shares for per-share equity value.
-        equity_bridge_json: Optional JSON ``EquityBridge``.
-        valuation_discounts_json: Optional JSON ``ValuationDiscounts`` (DLOM, DLOC).
-        market: Optional ``MarketContext`` object or JSON string for curve-based discounting.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string (metadata must include ``currency``).
+    wacc : float
+        Weighted average cost of capital as a decimal (``0.10`` = 10%).
+    terminal_value_json : str
+        JSON ``TerminalValueSpec`` (tagged enum).
+    ufcf_node : str
+        Node ID for unlevered free cash flow.
+    net_debt_override : float or None
+        Optional flat net debt.
+    mid_year_convention : bool
+        Use mid-year discounting when ``True``.
+    shares_outstanding : float or None
+        Optional basic shares for per-share equity value.
+    equity_bridge_json : str or None
+        Optional JSON ``EquityBridge``.
+    valuation_discounts_json : str or None
+        Optional JSON ``ValuationDiscounts`` (DLOM, DLOC).
+    market : MarketContext or str or None
+        Optional ``MarketContext`` object or JSON string for curve-based discounting.
 
-    Returns:
+    Returns
+    -------
+    dict[str, float | str]
         Dict with ``equity_value``, ``equity_currency``, ``enterprise_value``, ``net_debt``,
         ``terminal_value_pv``, ``equity_value_per_share``, ``diluted_shares``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import evaluate_dcf
-        >>> dcf = evaluate_dcf(mj, 0.09, tv_json)
-        >>> float(dcf["equity_value"])
-        0.0
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import evaluate_dcf
+    >>> dcf = evaluate_dcf(mj, 0.09, tv_json)  # doctest: +SKIP
     """
     ...
 
@@ -264,22 +326,33 @@ def run_corporate_analysis(
 ) -> dict[str, Any]:
     """Run statements plus optional DCF equity and credit context.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        wacc: If set, enables DCF at this discount rate (decimal).
-        terminal_value_json: Required JSON ``TerminalValueSpec`` when ``wacc`` is set.
-        net_debt_override: Optional flat net debt for the equity bridge.
-        coverage_node: Node for DSCR / interest coverage (default ``ebitda``).
-        market: Optional ``MarketContext`` object or JSON string.
-        as_of: Optional ISO 8601 valuation date string.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    wacc : float or None
+        If set, enables DCF at this discount rate (decimal).
+    terminal_value_json : str or None
+        Required JSON ``TerminalValueSpec`` when ``wacc`` is set.
+    net_debt_override : float or None
+        Optional flat net debt for the equity bridge.
+    coverage_node : str
+        Node for DSCR / interest coverage (default ``ebitda``).
+    market : MarketContext or str or None
+        Optional ``MarketContext`` object or JSON string.
+    as_of : str or None
+        Optional ISO 8601 valuation date string.
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dict with ``statement_json``, optional ``equity`` scalars, and ``credit`` (instrument_id → metrics JSON).
         The credit metrics include ``skipped_periods`` for periods dropped from min/max stats.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import run_corporate_analysis
-        >>> out = run_corporate_analysis(model_json, wacc=0.1, terminal_value_json=tv_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import run_corporate_analysis
+    >>> out = run_corporate_analysis(model_json, wacc=0.1, terminal_value_json=tv_json)  # doctest: +SKIP
     """
     ...
 
@@ -290,124 +363,216 @@ def pl_summary_report(
 ) -> str:
     """Render a P&L summary report as formatted text.
 
-    Args:
-        results: ``StatementResult`` object or JSON string.
-        line_items: Node IDs to include as rows.
-        periods: Period strings for columns (e.g. ``["2025Q1", "2025Q2"]``).
+    Parameters
+    ----------
+    results : StatementResult or str
+        ``StatementResult`` object or JSON string.
+    line_items : list[str]
+        Node IDs to include as rows.
+    periods : list[str]
+        Period strings for columns (e.g. ``["2025Q1", "2025Q2"]``).
 
-    Returns:
+    Returns
+    -------
+    str
         Formatted report text.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import pl_summary_report
-        >>> text = pl_summary_report(res_json, ["rev", "cogs"], ["2025Q1"])
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import pl_summary_report
+    >>> text = pl_summary_report(res_json, ["rev", "cogs"], ["2025Q1"])  # doctest: +SKIP
     """
     ...
 
 def credit_assessment_report(results: StatementResult | str, as_of: str) -> str:
     """Render a credit assessment report as formatted text.
 
-    Args:
-        results: ``StatementResult`` object or JSON string.
-        as_of: Period string for the as-of date (e.g. ``"2025Q1"``).
+    Parameters
+    ----------
+    results : StatementResult or str
+        ``StatementResult`` object or JSON string.
+    as_of : str
+        Period string for the as-of date (e.g. ``"2025Q1"``).
 
-    Returns:
+    Returns
+    -------
+    str
         Formatted credit report text.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import credit_assessment_report
-        >>> report = credit_assessment_report(res_json, "2025Q1")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import credit_assessment_report
+    >>> report = credit_assessment_report(res_json, "2025Q1")  # doctest: +SKIP
     """
     ...
 
 def credit_assessment(results: StatementResult | str, as_of: str) -> dict[str, Any]:
     """Compute a structured credit assessment (leverage, coverage, FCF).
 
-    Args:
-        results: ``StatementResult`` object or JSON string.
-        as_of: Period string for the as-of date (e.g. ``"2025Q4"``).
+    Parameters
+    ----------
+    results : StatementResult or str
+        ``StatementResult`` object or JSON string.
+    as_of : str
+        Period string for the as-of date (e.g. ``"2025Q4"``).
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dict with ``as_of`` (str), ``leverage_ratio``, ``interest_coverage``,
         ``free_cash_flow`` (float | None), and ``series`` (list of per-period
         dicts with the same metric keys plus ``period``).
 
-    Example:
-        >>> from finstack_quant.statements_analytics import credit_assessment
-        >>> out = credit_assessment(res_json, "2025Q4")
-        >>> out["leverage_ratio"]
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import credit_assessment
+    >>> out = credit_assessment(res_json, "2025Q4")  # doctest: +SKIP
     """
     ...
 
 class DependencyTracer:
     """Reusable dependency tracer for a financial model.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import DependencyTracer
-        >>> tree = DependencyTracer(model_json).dependency_tree("ebitda")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import DependencyTracer
+    >>> tree = DependencyTracer(model_json).dependency_tree("ebitda")  # doctest: +SKIP
     """
 
-    def __init__(self, model: FinancialModelSpec | str) -> None: ...
+    def __init__(self, model: FinancialModelSpec | str) -> None:
+        """Create a dependency tracer for the given model.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec or str
+            ``FinancialModelSpec`` object or JSON string.
+        """
+        ...
     def dependency_tree(self, node_id: str) -> str:
-        """Return an ASCII dependency tree for ``node_id``."""
+        """Return an ASCII dependency tree for ``node_id``.
+
+        Parameters
+        ----------
+        node_id : str
+            Root node to trace.
+
+        Returns
+        -------
+        str
+        """
         ...
 
     def dependency_tree_detailed(self, results: StatementResult | str, node_id: str, period: str) -> str:
-        """Return an ASCII dependency tree annotated with values for one period."""
+        """Return an ASCII dependency tree annotated with values for one period.
+
+        Parameters
+        ----------
+        results : StatementResult or str
+            Statement results to annotate with.
+        node_id : str
+            Root node to trace.
+        period : str
+            Period to annotate.
+
+        Returns
+        -------
+        str
+        """
         ...
 
-    def direct_dependencies(self, node_id: str) -> list[str]: ...
-    def all_dependencies(self, node_id: str) -> list[str]: ...
-    def dependents(self, node_id: str) -> list[str]: ...
+    def direct_dependencies(self, node_id: str) -> list[str]:
+        """List immediate dependencies of ``node_id``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
+    def all_dependencies(self, node_id: str) -> list[str]:
+        """List all transitive dependencies of ``node_id``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
+    def dependents(self, node_id: str) -> list[str]:
+        """List nodes that depend on ``node_id``.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
 
 def direct_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[str]:
     """List immediate dependencies of a node.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        node_id: Node whose direct dependencies are listed.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    node_id : str
+        Node whose direct dependencies are listed.
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Direct dependency node IDs.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import direct_dependencies
-        >>> deps = direct_dependencies(model_json, "ebitda")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import direct_dependencies
+    >>> deps = direct_dependencies(model_json, "ebitda")  # doctest: +SKIP
     """
     ...
 
 def all_dependencies(model: FinancialModelSpec | str, node_id: str) -> list[str]:
     """List all transitive dependencies of a node in dependency order.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        node_id: Root node for the dependency walk.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    node_id : str
+        Root node for the dependency walk.
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Transitive dependency node IDs.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import all_dependencies
-        >>> chain = all_dependencies(model_json, "ni")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import all_dependencies
+    >>> chain = all_dependencies(model_json, "ni")  # doctest: +SKIP
     """
     ...
 
 def dependents(model: FinancialModelSpec | str, node_id: str) -> list[str]:
     """List nodes that depend on the given node (reverse dependencies).
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        node_id: Node whose dependents are listed.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    node_id : str
+        Node whose dependents are listed.
 
-    Returns:
+    Returns
+    -------
+    list[str]
         Dependent node IDs.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import dependents
-        >>> rev_deps = dependents(model_json, "rev")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import dependents
+    >>> rev_deps = dependents(model_json, "rev")  # doctest: +SKIP
     """
     ...
 
@@ -419,19 +584,27 @@ def explain_formula(
 ) -> dict[str, Any]:
     """Structured formula explanation for a node and period.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        results: ``StatementResult`` object or JSON string.
-        node_id: Node to explain.
-        period: Period string.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    results : StatementResult or str
+        ``StatementResult`` object or JSON string.
+    node_id : str
+        Node to explain.
+    period : str
+        Period string.
 
-    Returns:
+    Returns
+    -------
+    dict[str, Any]
         Dict with ``node_id``, ``period_id``, ``final_value``, ``node_type``, ``formula_text``,
         and ``breakdown`` (list of component dicts: ``component``, ``value``, ``operation``).
 
-    Example:
-        >>> from finstack_quant.statements_analytics import explain_formula
-        >>> detail = explain_formula(mj, rj, "rev", "2025Q1")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import explain_formula
+    >>> detail = explain_formula(mj, rj, "rev", "2025Q1")  # doctest: +SKIP
     """
     ...
 
@@ -443,18 +616,26 @@ def explain_formula_text(
 ) -> str:
     """Human-readable multi-line formula explanation.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        results: ``StatementResult`` object or JSON string.
-        node_id: Node to explain.
-        period: Period string.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    results : StatementResult or str
+        ``StatementResult`` object or JSON string.
+    node_id : str
+        Node to explain.
+    period : str
+        Period string.
 
-    Returns:
+    Returns
+    -------
+    str
         Detailed text explanation.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import explain_formula_text
-        >>> text = explain_formula_text(mj, rj, "rev", "2025Q1")
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import explain_formula_text
+    >>> text = explain_formula_text(mj, rj, "rev", "2025Q1")  # doctest: +SKIP
     """
     ...
 
@@ -468,18 +649,25 @@ def run_checks(
     Resolves both built-in and formula checks, evaluates the model,
     and returns a full check report.
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        suite_spec_json: JSON-serialized ``CheckSuiteSpec``.
-        results: Optional pre-computed ``StatementResult`` (object or JSON);
-            skips re-evaluation when provided.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    suite_spec_json : str
+        JSON-serialized ``CheckSuiteSpec``.
+    results : StatementResult or str or None
+        Optional pre-computed ``StatementResult`` (object or JSON);
+        skips re-evaluation when provided.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``CheckReport``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import run_checks
-        >>> report_json = run_checks(model_json, suite_spec_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import run_checks
+    >>> report_json = run_checks(model_json, suite_spec_json)  # doctest: +SKIP
     """
     ...
 
@@ -490,18 +678,25 @@ def run_three_statement_checks(
 ) -> str:
     """Run three-statement checks using a node mapping (JSON in/out).
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        mapping_json: JSON-serialized ``ThreeStatementMapping``.
-        results: Optional pre-computed ``StatementResult`` (object or JSON);
-            skips re-evaluation when provided.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    mapping_json : str
+        JSON-serialized ``ThreeStatementMapping``.
+    results : StatementResult or str or None
+        Optional pre-computed ``StatementResult`` (object or JSON);
+        skips re-evaluation when provided.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``CheckReport``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import run_three_statement_checks
-        >>> report_json = run_three_statement_checks(model_json, mapping_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import run_three_statement_checks
+    >>> report_json = run_three_statement_checks(model_json, mapping_json)  # doctest: +SKIP
     """
     ...
 
@@ -512,48 +707,65 @@ def run_credit_underwriting_checks(
 ) -> str:
     """Run credit underwriting checks using a node mapping (JSON in/out).
 
-    Args:
-        model: ``FinancialModelSpec`` object or JSON string.
-        mapping_json: JSON-serialized ``CreditMapping``.
-        results: Optional pre-computed ``StatementResult`` (object or JSON);
-            skips re-evaluation when provided.
+    Parameters
+    ----------
+    model : FinancialModelSpec or str
+        ``FinancialModelSpec`` object or JSON string.
+    mapping_json : str
+        JSON-serialized ``CreditMapping``.
+    results : StatementResult or str or None
+        Optional pre-computed ``StatementResult`` (object or JSON);
+        skips re-evaluation when provided.
 
-    Returns:
+    Returns
+    -------
+    str
         JSON-serialized ``CheckReport``.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import run_credit_underwriting_checks
-        >>> report_json = run_credit_underwriting_checks(model_json, mapping_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import run_credit_underwriting_checks
+    >>> report_json = run_credit_underwriting_checks(model_json, mapping_json)  # doctest: +SKIP
     """
     ...
 
 def render_check_report_text(report_json: str) -> str:
     """Render a check report as plain text.
 
-    Args:
-        report_json: JSON-serialized ``CheckReport``.
+    Parameters
+    ----------
+    report_json : str
+        JSON-serialized ``CheckReport``.
 
-    Returns:
+    Returns
+    -------
+    str
         Human-readable plain-text report.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import render_check_report_text
-        >>> text = render_check_report_text(report_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import render_check_report_text
+    >>> text = render_check_report_text(report_json)  # doctest: +SKIP
     """
     ...
 
 def render_check_report_html(report_json: str) -> str:
     """Render a check report as HTML with inline styles.
 
-    Args:
-        report_json: JSON-serialized ``CheckReport``.
+    Parameters
+    ----------
+    report_json : str
+        JSON-serialized ``CheckReport``.
 
-    Returns:
+    Returns
+    -------
+    str
         HTML-formatted report suitable for Jupyter notebooks.
 
-    Example:
-        >>> from finstack_quant.statements_analytics import render_check_report_html
-        >>> html = render_check_report_html(report_json)
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import render_check_report_html
+    >>> html = render_check_report_html(report_json)  # doctest: +SKIP
     """
     ...
 
@@ -562,6 +774,30 @@ class Exposure:
 
     All monetary fields are in the exposure's base currency; all rates and
     probabilities are expressed as decimals (``0.05`` = 5%).
+
+    Parameters
+    ----------
+    id : str
+        Exposure identifier.
+    ead : float
+        Exposure at default.
+    lgd : float
+        Loss given default (decimal).
+    eir : float
+        Effective interest rate (decimal).
+    remaining_maturity : float
+        Remaining maturity in years.
+    current_pd : float
+        Current probability of default (decimal).
+    origination_pd : float
+        Probability of default at origination (decimal).
+    dpd : int or None
+        Days past due (optional).
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import Exposure
+    >>> exp = Exposure("loan_1", 1_000_000.0, 0.4, 0.05, 3.0, 0.02, 0.01)  # doctest: +SKIP
     """
 
     id: str
@@ -593,15 +829,29 @@ def classify_stage(
 ) -> tuple[str, str]:
     """Classify an exposure into an IFRS 9 stage.
 
-    Args:
-        exposure: Credit exposure.
-        pd_delta_stage2: Absolute PD increase threshold (decimal) for SICR.
-        dpd_30_trigger: Apply the 30-DPD Stage 2 rebuttable backstop.
-        dpd_90_trigger: Apply the 90-DPD Stage 3 non-rebuttable backstop.
+    Parameters
+    ----------
+    exposure : Exposure
+        Credit exposure.
+    pd_delta_stage2 : float or None
+        Absolute PD increase threshold (decimal) for SICR.
+    dpd_30_trigger : bool or None
+        Apply the 30-DPD Stage 2 rebuttable backstop.
+    dpd_90_trigger : bool or None
+        Apply the 90-DPD Stage 3 non-rebuttable backstop.
 
-    Returns:
+    Returns
+    -------
+    tuple[str, str]
         ``(stage, trigger_reason)`` where stage is ``"Stage 1"``, ``"Stage 2"``,
         or ``"Stage 3"``.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import Exposure, classify_stage
+    >>> exp = Exposure("loan_1", 1e6, 0.4, 0.05, 3.0, 0.02, 0.01)  # doctest: +SKIP
+    >>> classify_stage(exp)  # doctest: +SKIP
+    ('Stage 1', 'no_trigger')
     """
     ...
 
@@ -618,22 +868,38 @@ def compute_ecl(
 ) -> float:
     """Compute single-scenario ECL for one exposure.
 
-    Args:
-        ead: Exposure at default.
-        pd_schedule: ``[(time_years, cumulative_pd), ...]`` knots. A
-            ``(0.0, 0.0)`` knot is inserted automatically if not present.
-        lgd: Loss given default (decimal).
-        eir: Effective interest rate (decimal).
-        max_horizon_years: Remaining maturity cap.
-        bucket_width_years: Time-bucket width (default ``0.25`` for quarterly).
-        stage: ``"stage1"``, ``"stage2"``, or ``"stage3"``.
-        ead_schedule: Optional EAD amortization profile as
-            ``[(time_years, ead), ...]`` knots.
-        stage3_time_to_recovery_years: Stage 3 discounting horizon to expected
-            recovery, in years.
+    Parameters
+    ----------
+    ead : float
+        Exposure at default.
+    pd_schedule : list[tuple[float, float]]
+        ``[(time_years, cumulative_pd), ...]`` knots. A
+        ``(0.0, 0.0)`` knot is inserted automatically if not present.
+    lgd : float
+        Loss given default (decimal).
+    eir : float
+        Effective interest rate (decimal).
+    max_horizon_years : float
+        Remaining maturity cap.
+    bucket_width_years : float or None
+        Time-bucket width (default ``0.25`` for quarterly).
+    stage : str
+        ``"stage1"``, ``"stage2"``, or ``"stage3"``.
+    ead_schedule : list[tuple[float, float]] or None
+        Optional EAD amortization profile as
+        ``[(time_years, ead), ...]`` knots.
+    stage3_time_to_recovery_years : float or None
+        Stage 3 discounting horizon to expected recovery, in years.
 
-    Returns:
+    Returns
+    -------
+    float
         ECL amount in the exposure's base currency.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import compute_ecl
+    >>> ecl = compute_ecl(1e6, [(1.0, 0.02), (3.0, 0.05)], 0.4, 0.05, 3.0)  # doctest: +SKIP
     """
     ...
 
@@ -649,22 +915,37 @@ def compute_ecl_weighted(
 ) -> float:
     """Compute probability-weighted ECL across macro scenarios.
 
-    Args:
-        ead: Exposure at default.
-        scenarios: List of ``(weight, pd_schedule)``. Weights must sum to 1.0.
-            A ``(0.0, 0.0)`` knot is inserted automatically into each schedule
-            if not present (same convention as ``compute_ecl``).
-        lgd: Loss given default (decimal).
-        eir: Effective interest rate (decimal).
-        max_horizon: Remaining maturity cap (years).
-        stage: ``"stage1"``, ``"stage2"``, or ``"stage3"``.
-        ead_schedule: Optional EAD amortization profile as
-            ``[(time_years, ead), ...]`` knots.
-        stage3_time_to_recovery_years: Stage 3 discounting horizon to expected
-            recovery, in years.
+    Parameters
+    ----------
+    ead : float
+        Exposure at default.
+    scenarios : list[tuple[float, list[tuple[float, float]]]]
+        List of ``(weight, pd_schedule)``. Weights must sum to 1.0.
+        A ``(0.0, 0.0)`` knot is inserted automatically into each schedule
+        if not present (same convention as ``compute_ecl``).
+    lgd : float
+        Loss given default (decimal).
+    eir : float
+        Effective interest rate (decimal).
+    max_horizon : float
+        Remaining maturity cap (years).
+    stage : str
+        ``"stage1"``, ``"stage2"``, or ``"stage3"``.
+    ead_schedule : list[tuple[float, float]] or None
+        Optional EAD amortization profile as
+        ``[(time_years, ead), ...]`` knots.
+    stage3_time_to_recovery_years : float or None
+        Stage 3 discounting horizon to expected recovery, in years.
 
-    Returns:
+    Returns
+    -------
+    float
         Probability-weighted ECL amount.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import compute_ecl_weighted
+    >>> ecl = compute_ecl_weighted(1e6, [(0.5, [(1.0, 0.01)]), (0.5, [(1.0, 0.03)])], 0.4, 0.05, 1.0)  # doctest: +SKIP
     """
     ...
 
@@ -673,11 +954,49 @@ def compute_ecl_weighted(
 # ---------------------------------------------------------------------------
 
 def percentile_rank(value: float, peer_values: list[float]) -> float | None:
-    """Percentile rank of ``value`` within ``peer_values`` on a 0-1 scale."""
+    """Percentile rank of ``value`` within ``peer_values`` on a 0-1 scale.
+
+    Parameters
+    ----------
+    value : float
+        Value to rank.
+    peer_values : list[float]
+        Peer distribution.
+
+    Returns
+    -------
+    float or None
+        Percentile rank in ``[0, 1]``, or ``None`` for empty peers.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import percentile_rank
+    >>> percentile_rank(3.0, [1.0, 2.0, 3.0, 4.0, 5.0])
+    0.5
+    """
     ...
 
 def z_score(value: float, peer_values: list[float]) -> float | None:
-    """Standard score of ``value`` within the peer distribution."""
+    """Standard score of ``value`` within the peer distribution.
+
+    Parameters
+    ----------
+    value : float
+        Value to score.
+    peer_values : list[float]
+        Peer distribution.
+
+    Returns
+    -------
+    float or None
+        Z-score, or ``None`` for empty peers or zero variance.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import z_score
+    >>> round(z_score(3.0, [1.0, 2.0, 3.0, 4.0, 5.0]), 10)
+    0.0
+    """
     ...
 
 def peer_stats(peer_values: list[float]) -> dict[str, float]:
@@ -686,6 +1005,23 @@ def peer_stats(peer_values: list[float]) -> dict[str, float]:
     Returns a dict with keys ``mean``, ``median``, ``q1``, ``q3``, ``iqr``,
     ``std_dev``, ``min``, ``max``, ``count`` (mirroring the Rust ``PeerStats``
     field names), or an empty dict when ``peer_values`` is empty.
+
+    Parameters
+    ----------
+    peer_values : list[float]
+        Peer distribution.
+
+    Returns
+    -------
+    dict[str, float]
+        Descriptive statistics.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import peer_stats
+    >>> stats = peer_stats([1.0, 2.0, 3.0, 4.0, 5.0])
+    >>> stats["mean"]
+    3.0
     """
     ...
 
@@ -695,14 +1031,55 @@ def regression_fair_value(
     subject_x: float,
     subject_y: float,
 ) -> dict[str, float]:
-    """Single-factor OLS regression fair value with canonical residual semantics."""
+    """Single-factor OLS regression fair value with canonical residual semantics.
+
+    Parameters
+    ----------
+    x_values : list[float]
+        Independent variable values for the peer set.
+    y_values : list[float]
+        Dependent variable values for the peer set.
+    subject_x : float
+        Independent variable value for the subject company.
+    subject_y : float
+        Observed dependent variable value for the subject company.
+
+    Returns
+    -------
+    dict[str, float]
+        Regression fair value metrics.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import regression_fair_value
+    >>> result = regression_fair_value([1.0, 2.0, 3.0], [2.0, 4.0, 6.0], 2.5, 5.0)  # doctest: +SKIP
+    """
     ...
 
 def compute_multiple(
     company_metrics: dict[str, float],
     multiple: str,
 ) -> float | None:
-    """Canonical multiple computation for one company."""
+    """Canonical multiple computation for one company.
+
+    Parameters
+    ----------
+    company_metrics : dict[str, float]
+        Metric values for the company.
+    multiple : str
+        Multiple identifier (e.g. ``"ev_ebitda"``).
+
+    Returns
+    -------
+    float or None
+        Computed multiple, or ``None`` when inputs are missing.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import compute_multiple
+    >>> compute_multiple({"ev": 100.0, "ebitda": 20.0}, "ev_ebitda")  # doctest: +SKIP
+    5.0
+    """
     ...
 
 def score_relative_value(
@@ -721,6 +1098,27 @@ def score_relative_value(
     returned dict uses the canonical Rust/WASM shape:
     ``company_id``, ``composite_score``, ``dimensions``, ``confidence``, and
     ``peer_count``.
+
+    Parameters
+    ----------
+    subject_metrics : dict[str, float | None]
+        Metric values for the subject company.
+    peer_metrics : list[dict[str, float | None]]
+        Metric values for each peer company.
+    dimensions : list[tuple[str, float] | dict[str, Any]]
+        Dimension specifications (metric name + weight or dict spec).
+
+    Returns
+    -------
+    dict[str, Any]
+        Composite relative-value score.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements_analytics import score_relative_value
+    >>> result = score_relative_value(
+    ...     {"ev_ebitda": 8.0}, [{"ev_ebitda": 6.0}, {"ev_ebitda": 10.0}], [("ev_ebitda", 1.0)]
+    ... )  # doctest: +SKIP
     """
     ...
 

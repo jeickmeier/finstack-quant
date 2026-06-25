@@ -1,0 +1,29 @@
+{
+  "EXTENSION_KEYS": {
+    "analytics_defaults": "analytics.defaults.v1",
+    "calibration_defaults": "valuations.calibration_defaults.v1",
+    "contract_specs": "valuations.contract_specs.v1",
+    "credit_assumptions": "core.credit_assumptions.v1",
+    "ecl_policy": "statements_analytics.ecl_policy.v1",
+    "margin_registry": "valuations.margin_registry.v1",
+    "monte_carlo_defaults": "monte_carlo.defaults.v1",
+    "portfolio_liquidity_defaults": "portfolio.liquidity_defaults.v1",
+    "rating_scales": "core.rating_scales.v1",
+    "structured_credit_assumptions": "valuations.structured_credit_assumptions.v1",
+    "tba_assumptions": "valuations.tba_assumptions.v1"
+  },
+  "analytics_defaults": {
+    "python_bindings": {
+      "lookback": {
+        "default_fiscal_calendar": {
+          "calendar_id": "nyse",
+          "id": "calendar_year_nyse",
+          "start_day": 1,
+          "start_month": 1
+        }
+      }
+    },
+    "schema": "finstack_quant.analytics.defaults.v1",
+    "version": 1
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "SENIORITY_ORDER": [
+    "dip_financing",
+    "administrative",
+    "priority",
+    "first_lien",
+    "second_lien",
+    "junior_secured",
+    "senior_unsecured",
+    "senior_subordinated",
+    "subordinated",
+    "mezzanine",
+    "preferred_equity",
+    "equity"
+  ],
+  "claims": [
+    {
+      "accrued": 1000000.0,
+      "collateral_value": 40000000.0,
+      "haircut": 0.0,
+      "id": "first_lien_tl",
+      "label": "First Lien Term Loan",
+      "principal": 50000000.0,
+      "seniority": "first_lien"
+    },
+    {
+      "accrued": 2000000.0,
+      "id": "sr_unsec_notes",
+      "label": "Senior Unsecured Notes",
+      "principal": 80000000.0,
+      "seniority": "senior_unsecured"
+    },
+    {
+      "accrued": 1000000.0,
+      "id": "sub_notes",
+      "label": "Subordinated Notes",
+      "principal": 40000000.0,
+      "seniority": "subordinated"
+    },
+    {
+      "id": "common_equity",
+      "label": "Common Equity",
+      "principal": 0.01,
+      "seniority": "equity"
+    }
+  ]
+}

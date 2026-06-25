@@ -313,7 +313,7 @@ class StructuredCredit(_FixedIncomeInstrument):
         """
         ...
 
-__all__: list[str] = [
+__all__ = [
     "Bond",
     "ConvertibleBond",
     "InflationLinkedBond",

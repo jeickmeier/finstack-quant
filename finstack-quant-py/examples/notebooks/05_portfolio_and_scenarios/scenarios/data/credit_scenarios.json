@@ -1,0 +1,27 @@
+{
+  "ops_sector": [
+    {
+      "bp": 25.0,
+      "curve_id": "CORP-IG",
+      "curve_kind": "par_cds",
+      "discount_curve_id": "USD-OIS",
+      "kind": "curve_parallel_bp"
+    },
+    {
+      "bp": 150.0,
+      "curve_id": "CORP-HY",
+      "curve_kind": "par_cds",
+      "discount_curve_id": "USD-OIS",
+      "kind": "curve_parallel_bp"
+    }
+  ],
+  "ops_uniform": [
+    {
+      "bp": 75.0,
+      "curve_id": "CORP-IG",
+      "curve_kind": "par_cds",
+      "discount_curve_id": "USD-OIS",
+      "kind": "curve_parallel_bp"
+    }
+  ]
+}

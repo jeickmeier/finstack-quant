@@ -412,7 +412,7 @@ class FxVarianceSwap(_FxInstrument):
 class QuantoOption(_FxOptionInstrument):
     """Quanto option with FX-adjusted equity or rate payoff."""
 
-__all__: list[str] = [
+__all__ = [
     "FxBarrierOption",
     "FxDigitalOption",
     "FxForward",

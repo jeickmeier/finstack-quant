@@ -1,0 +1,44 @@
+{
+  "inflation_quotes": [
+    {
+      "inflation_swap": {
+        "convention": "USD-CPI",
+        "id": "USA-CPI-U-ZCIS-2026",
+        "index": "USA-CPI-U",
+        "maturity": "2026-01-15",
+        "rate": 0.025
+      },
+      "kind": "inflation_quote"
+    },
+    {
+      "inflation_swap": {
+        "convention": "USD-CPI",
+        "id": "USA-CPI-U-ZCIS-2028",
+        "index": "USA-CPI-U",
+        "maturity": "2028-01-15",
+        "rate": 0.026
+      },
+      "kind": "inflation_quote"
+    },
+    {
+      "inflation_swap": {
+        "convention": "USD-CPI",
+        "id": "USA-CPI-U-ZCIS-2030",
+        "index": "USA-CPI-U",
+        "maturity": "2030-01-15",
+        "rate": 0.0255
+      },
+      "kind": "inflation_quote"
+    },
+    {
+      "inflation_swap": {
+        "convention": "USD-CPI",
+        "id": "USA-CPI-U-ZCIS-2035",
+        "index": "USA-CPI-U",
+        "maturity": "2035-01-15",
+        "rate": 0.0245
+      },
+      "kind": "inflation_quote"
+    }
+  ]
+}

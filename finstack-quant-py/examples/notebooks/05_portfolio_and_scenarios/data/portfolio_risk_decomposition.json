@@ -1,0 +1,111 @@
+{
+  "factor_model_config": {
+    "covariance": {
+      "data": [
+        0.0001
+      ],
+      "factor_ids": [
+        "usd_rates"
+      ],
+      "n": 1
+    },
+    "factors": [
+      {
+        "description": "Parallel USD rates shift",
+        "factor_type": "Rates",
+        "id": "usd_rates",
+        "market_mapping": {
+          "CurveParallel": {
+            "curve_ids": [
+              "USD-OIS"
+            ],
+            "units": "rate_bp"
+          }
+        }
+      }
+    ],
+    "matching": {
+      "MappingTable": [
+        {
+          "attribute_filter": {},
+          "dependency_filter": {},
+          "factor_id": "usd_rates"
+        }
+      ]
+    },
+    "pricing_mode": "delta_based",
+    "risk_measure": "variance"
+  },
+  "inv_vol_spec": {
+    "money_decimal_places": 2,
+    "scheme": "inverse_volatility",
+    "strategies": [
+      {
+        "id": "low_vol_carry",
+        "returns": [
+          0.01,
+          0.012,
+          0.009,
+          0.011,
+          0.01
+        ]
+      },
+      {
+        "id": "trend",
+        "returns": [
+          0.05,
+          -0.04,
+          0.045,
+          -0.035,
+          0.03
+        ]
+      },
+      {
+        "id": "value",
+        "returns": [
+          0.02,
+          -0.01,
+          0.015,
+          0.005,
+          -0.005
+        ]
+      }
+    ],
+    "total_capital": 1000000.0
+  },
+  "portfolio_spec": {
+    "as_of": "2025-01-15",
+    "base_ccy": "USD",
+    "entities": {
+      "BOOK": {
+        "id": "BOOK"
+      }
+    },
+    "id": "factor-engine-demo",
+    "positions": [
+      {
+        "entity_id": "BOOK",
+        "instrument_id": "DEP-1",
+        "instrument_spec": {
+          "spec": {
+            "attributes": {},
+            "day_count": "Act360",
+            "discount_curve_id": "USD-OIS",
+            "id": "DEP-1",
+            "maturity": "2025-07-15",
+            "notional": {
+              "amount": 1000000.0,
+              "currency": "USD"
+            },
+            "quote_rate": 0.05,
+            "start_date": "2025-01-15"
+          },
+          "type": "deposit"
+        },
+        "position_id": "DEP_LONG",
+        "quantity": 1.0,
+        "unit": "units"
+      }
+    ]
+  }
+}

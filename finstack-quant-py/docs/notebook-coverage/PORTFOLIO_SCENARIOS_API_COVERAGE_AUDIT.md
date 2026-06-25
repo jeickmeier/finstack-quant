@@ -154,6 +154,6 @@ Legend:
 - `parity_contract.toml` (portfolio + scenarios sections + public symbol lists)
 - `finstack_quant/portfolio/__init__.pyi` and `scenarios/__init__.pyi`
 - All 13 notebooks under `05_portfolio_and_scenarios/` (via content search + execution scans)
-- Precedent audits: `01_foundations/FOUNDATIONS_API_COVERAGE_AUDIT.md`, `04_statement_modeling/STATEMENTS_API_COVERAGE_AUDIT.md`
+- Precedent audits: `FOUNDATIONS_API_COVERAGE_AUDIT.md`, `04_statement_modeling/STATEMENTS_API_COVERAGE_AUDIT.md`
 
 No edits made to notebooks during this initial read-only audit pass.

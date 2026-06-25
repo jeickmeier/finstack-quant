@@ -1,0 +1,15 @@
+{
+  "meta": {
+    "numeric_mode": "F64",
+    "rounding": {
+      "ingest_scale_by_ccy": {},
+      "mode": "Bankers",
+      "output_scale_by_ccy": {},
+      "tolerances": {
+        "generic_epsilon": 1e-10,
+        "rate_epsilon": 1e-12
+      },
+      "version": 1
+    }
+  }
+}

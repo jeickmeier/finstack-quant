@@ -192,7 +192,7 @@ class LeveredRealEstateEquity(_EquityInstrument):
 class DiscountedCashFlow(_EquityInstrument):
     """Discounted-cash-flow equity valuation wrapper."""
 
-__all__: list[str] = [
+__all__ = [
     "Equity",
     "EquityOption",
     "VarianceSwap",

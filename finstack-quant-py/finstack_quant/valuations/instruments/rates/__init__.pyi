@@ -219,7 +219,7 @@ class CmsSpreadOption(_RatesInstrument):
 class CallableRangeAccrual(_RatesInstrument):
     """Callable range accrual wrapper."""
 
-__all__: list[str] = [
+__all__ = [
     "InterestRateSwap",
     "BasisSwap",
     "XccySwap",

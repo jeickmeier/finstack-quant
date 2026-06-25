@@ -1,0 +1,301 @@
+{
+  "amort_bond": {
+    "spec": {
+      "accrual_method": "Linear",
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "call_put": null,
+      "cashflow_spec": {
+        "Amortizing": {
+          "base": {
+            "Fixed": {
+              "bdc": "following",
+              "calendar_id": "weekends_only",
+              "coupon_type": "Cash",
+              "dc": "Thirty360",
+              "end_of_month": false,
+              "freq": {
+                "count": 6,
+                "unit": "months"
+              },
+              "payment_lag_days": 0,
+              "rate": "0.045",
+              "stub": "ShortFront"
+            }
+          },
+          "schedule": {
+            "LinearTo": {
+              "final_notional": {
+                "amount": "250000",
+                "currency": "USD"
+              }
+            }
+          }
+        }
+      },
+      "credit_curve_id": null,
+      "discount_curve_id": "USD-OIS",
+      "ex_coupon_days": 0,
+      "id": "AMORT-NOTE",
+      "issue_date": "2024-01-15",
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pricing_overrides": {},
+      "settlement_days": 2
+    },
+    "type": "bond"
+  },
+  "callable_bond": {
+    "spec": {
+      "accrual_method": "Linear",
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "call_put": {
+        "calls": [
+          {
+            "end_date": "2027-01-15",
+            "price_pct_of_par": 100.0,
+            "start_date": "2027-01-15"
+          }
+        ],
+        "puts": []
+      },
+      "cashflow_spec": {
+        "Fixed": {
+          "bdc": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "Cash",
+          "dc": "Thirty360",
+          "end_of_month": false,
+          "freq": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.05",
+          "stub": "None"
+        }
+      },
+      "credit_curve_id": null,
+      "discount_curve_id": "USD-OIS",
+      "ex_coupon_days": 0,
+      "id": "CALL-5Y",
+      "issue_date": "2024-01-15",
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pricing_overrides": {
+        "quoted_clean_price": 99.0
+      },
+      "settlement_days": 1
+    },
+    "type": "bond"
+  },
+  "fixed_bond": {
+    "spec": {
+      "accrual_method": "Linear",
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "call_put": null,
+      "cashflow_spec": {
+        "Fixed": {
+          "bdc": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "Cash",
+          "dc": "Thirty360",
+          "end_of_month": false,
+          "freq": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.0425",
+          "stub": "None"
+        }
+      },
+      "credit_curve_id": null,
+      "discount_curve_id": "USD-OIS",
+      "ex_coupon_days": 0,
+      "id": "UST-FIXED-10Y",
+      "issue_date": "2024-01-15",
+      "maturity": "2034-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pricing_overrides": {
+        "quoted_clean_price": 98.75
+      },
+      "settlement_days": 1
+    },
+    "type": "bond"
+  },
+  "frn_bond": {
+    "spec": {
+      "accrual_method": "Linear",
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "call_put": null,
+      "cashflow_spec": {
+        "Floating": {
+          "coupon_type": "Cash",
+          "freq": {
+            "count": 3,
+            "unit": "months"
+          },
+          "rate_spec": {
+            "all_in_floor_bp": null,
+            "bdc": "modified_following",
+            "calendar_id": "weekends_only",
+            "cap_bp": null,
+            "dc": "Act360",
+            "end_of_month": false,
+            "fixing_calendar_id": null,
+            "floor_bp": "0",
+            "gearing": "1",
+            "gearing_includes_spread": true,
+            "index_cap_bp": null,
+            "index_id": "USD-SOFR-3M",
+            "payment_lag_days": 0,
+            "reset_freq": {
+              "count": 3,
+              "unit": "months"
+            },
+            "reset_lag_days": 2,
+            "spread_bp": "150"
+          },
+          "stub": "ShortFront"
+        }
+      },
+      "credit_curve_id": null,
+      "discount_curve_id": "USD-OIS",
+      "ex_coupon_days": 0,
+      "id": "FRN-USD-SOFR",
+      "issue_date": "2024-01-15",
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pricing_overrides": {},
+      "settlement_days": 2
+    },
+    "type": "bond"
+  },
+  "hazard_bond": {
+    "spec": {
+      "accrual_method": "Linear",
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "call_put": null,
+      "cashflow_spec": {
+        "Fixed": {
+          "bdc": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "Cash",
+          "dc": "Thirty360",
+          "end_of_month": false,
+          "freq": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.055",
+          "stub": "None"
+        }
+      },
+      "credit_curve_id": "USD-CREDIT",
+      "discount_curve_id": "USD-OIS",
+      "ex_coupon_days": 0,
+      "id": "CORP-HZD-5Y",
+      "issue_date": "2024-01-15",
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "1000000",
+        "currency": "USD"
+      },
+      "pricing_overrides": {},
+      "settlement_days": 1
+    },
+    "type": "bond"
+  },
+  "pik_bond": {
+    "spec": {
+      "accrual_method": "Linear",
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "call_put": null,
+      "cashflow_spec": {
+        "Fixed": {
+          "bdc": "following",
+          "calendar_id": "weekends_only",
+          "coupon_type": "PIK",
+          "dc": "Thirty360",
+          "end_of_month": false,
+          "freq": {
+            "count": 6,
+            "unit": "months"
+          },
+          "payment_lag_days": 0,
+          "rate": "0.08",
+          "stub": "None"
+        }
+      },
+      "credit_curve_id": null,
+      "discount_curve_id": "USD-OIS",
+      "ex_coupon_days": 0,
+      "id": "PIK-STRUCT-5Y",
+      "issue_date": "2024-01-15",
+      "maturity": "2029-01-15",
+      "notional": {
+        "amount": "100",
+        "currency": "USD"
+      },
+      "pricing_overrides": {
+        "merton_mc_config": {
+          "antithetic": true,
+          "barrier_crossing": "BrownianBridge",
+          "default_recovery_rate": 0.4,
+          "merton": {
+            "asset_value": 200.0,
+            "asset_vol": 0.25,
+            "barrier_type": {
+              "FirstPassage": {
+                "barrier_growth_rate": 0.0
+              }
+            },
+            "debt_barrier": 100.0,
+            "dynamics": "GeometricBrownian",
+            "payout_rate": 0.0,
+            "risk_free_rate": 0.04
+          },
+          "num_paths": 2000,
+          "pik_schedule": {
+            "Uniform": "Pik"
+          },
+          "seed": 42,
+          "time_steps_per_year": 50
+        }
+      },
+      "settlement_days": 0
+    },
+    "type": "bond"
+  }
+}

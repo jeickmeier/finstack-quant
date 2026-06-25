@@ -1,0 +1,42 @@
+{
+  "cfg_json": {
+    "adjustments": [
+      {
+        "id": "restructuring",
+        "name": "Restructuring add-back",
+        "value": {
+          "amounts": {
+            "2025Q1": 8.0,
+            "2025Q2": 5.0
+          },
+          "type": "fixed"
+        }
+      },
+      {
+        "id": "mgmt_fee",
+        "name": "Mgmt fee (% of revenue)",
+        "value": {
+          "node_id": "revenue",
+          "percentage": 0.02,
+          "type": "percentage_of_node"
+        }
+      },
+      {
+        "cap": {
+          "base_node": "ebitda",
+          "value": 0.15
+        },
+        "id": "synergies",
+        "name": "Synergies (capped at 15% of running adjusted EBITDA)",
+        "value": {
+          "amounts": {
+            "2025Q1": 30.0,
+            "2025Q2": 25.0
+          },
+          "type": "fixed"
+        }
+      }
+    ],
+    "target_node": "ebitda"
+  }
+}

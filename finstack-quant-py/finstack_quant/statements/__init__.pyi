@@ -152,47 +152,172 @@ class ForecastMethod:
         ...
 
 class ForecastSpec:
-    """Forecast configuration for a statement node."""
+    """Forecast configuration for a statement node.
+
+    Example
+    -------
+    >>> from finstack_quant.statements import ForecastSpec
+    >>> spec = ForecastSpec.forward_fill()  # doctest: +SKIP
+    """
 
     def __init__(self, method: ForecastMethod, params_json: str | None = None) -> None:
-        """Create a forecast spec from a method and optional JSON params."""
+        """Create a forecast spec from a method and optional JSON params.
+
+        Parameters
+        ----------
+        method:
+            A :class:`ForecastMethod` describing the projection approach.
+        params_json:
+            Optional JSON string with method-specific parameters.
+
+        Example
+        -------
+        >>> from finstack_quant.statements import ForecastMethod
+        >>> spec = ForecastSpec(ForecastMethod.forward_fill())  # doctest: +SKIP
+        """
         ...
 
     @staticmethod
     def forward_fill() -> ForecastSpec:
-        """Carry the last observed value forward."""
+        """Carry the last observed value forward.
+
+        Returns
+        -------
+        ForecastSpec
+            A forward-fill forecast specification.
+
+        Example
+        -------
+        >>> spec = ForecastSpec.forward_fill()  # doctest: +SKIP
+        """
         ...
 
     @staticmethod
     def growth(rate: float) -> ForecastSpec:
-        """Compound each future period by ``rate``."""
+        """Compound each future period by ``rate``.
+
+        Parameters
+        ----------
+        rate:
+            Period-over-period growth rate as a decimal (e.g. ``0.05`` for 5%).
+
+        Returns
+        -------
+        ForecastSpec
+            A constant-growth forecast specification.
+
+        Example
+        -------
+        >>> spec = ForecastSpec.growth(0.05)  # doctest: +SKIP
+        """
         ...
 
     @staticmethod
     def curve(curve: list[float]) -> ForecastSpec:
-        """Use period-specific growth rates."""
+        """Use period-specific growth rates.
+
+        Parameters
+        ----------
+        curve:
+            Per-period growth rates as decimals, aligned to future periods.
+
+        Returns
+        -------
+        ForecastSpec
+            A curve-based forecast specification.
+
+        Example
+        -------
+        >>> spec = ForecastSpec.curve([0.03, 0.05, 0.07])  # doctest: +SKIP
+        """
         ...
 
     @staticmethod
     def normal(mean: float, std_dev: float, seed: int) -> ForecastSpec:
-        """Use deterministic additive normal draws."""
+        """Use deterministic additive normal draws.
+
+        Parameters
+        ----------
+        mean:
+            Mean of the normal distribution.
+        std_dev:
+            Standard deviation of the normal distribution.
+        seed:
+            Random seed for deterministic reproducibility.
+
+        Returns
+        -------
+        ForecastSpec
+            A normal-draw forecast specification.
+
+        Example
+        -------
+        >>> spec = ForecastSpec.normal(0.0, 0.1, 42)  # doctest: +SKIP
+        """
         ...
 
     @staticmethod
     def lognormal(mean: float, std_dev: float, seed: int) -> ForecastSpec:
-        """Use deterministic multiplicative log-normal draws."""
+        """Use deterministic multiplicative log-normal draws.
+
+        Parameters
+        ----------
+        mean:
+            Mean of the underlying normal distribution.
+        std_dev:
+            Standard deviation of the underlying normal distribution.
+        seed:
+            Random seed for deterministic reproducibility.
+
+        Returns
+        -------
+        ForecastSpec
+            A log-normal-draw forecast specification.
+
+        Example
+        -------
+        >>> spec = ForecastSpec.lognormal(0.0, 0.1, 42)  # doctest: +SKIP
+        """
         ...
 
     @staticmethod
     def from_json(json: str) -> ForecastSpec:
-        """Deserialize a forecast spec from JSON."""
+        """Deserialize a forecast spec from JSON.
+
+        Parameters
+        ----------
+        json:
+            JSON document matching the forecast spec schema.
+
+        Returns
+        -------
+        ForecastSpec
+            Parsed forecast specification.
+
+        Raises
+        ------
+        ValueError
+            If JSON parsing or schema validation fails.
+
+        Example
+        -------
+        >>> spec = ForecastSpec.from_json('{"method":"forward_fill"}')  # doctest: +SKIP
+        """
         ...
 
     def to_json(self) -> str:
         """Serialize this forecast spec to JSON.
+
         Returns
         -------
         str
+            JSON text.
+
+        Example
+        -------
+        >>> spec = ForecastSpec.forward_fill()  # doctest: +SKIP
+        >>> spec.to_json()  # doctest: +SKIP
+        '{...}'
         """
         ...
 
@@ -504,16 +629,24 @@ class FinancialModelSpec:
         ...
 
 class ModelBuilder:
-    """Fluent builder for a ``FinancialModelSpec``.
+    """Builder for a ``FinancialModelSpec``.
 
     Call ``periods`` once, then add nodes with ``value`` / ``compute``, and
     finish with ``build``.
+
+    Note
+    ----
+    Methods on this class mutate the builder in place and return ``None``.
+    Call them sequentially rather than chaining.
 
     Example
     -------
     >>> from finstack_quant.statements import ModelBuilder
     >>> b = ModelBuilder("co")
     >>> b.periods("2025Q1..Q2", None)  # doctest: +SKIP
+    >>> b.value("revenue", [("2025Q1", 100.0)])  # doctest: +SKIP
+    >>> b.compute("cogs", "revenue * 0.6")  # doctest: +SKIP
+    >>> spec = b.build()  # doctest: +SKIP
     """
 
     def __init__(self, id: str) -> None:
@@ -577,11 +710,50 @@ class ModelBuilder:
         ...
 
     def value_scalar(self, node_id: str, values: list[tuple[str, float]]) -> None:
-        """Add a scalar value node with explicit per-period values."""
+        """Add a scalar value node with explicit per-period values.
+
+        Parameters
+        ----------
+        node_id:
+            Identifier for the new node.
+        values:
+            ``(period_id, value)`` pairs, for example ``[("2025Q1", 1.0)]``.
+
+        Raises
+        ------
+        ValueError
+            If periods were not configured, a period id is invalid, or the builder was consumed.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.periods("2025Q1..Q1", None)  # doctest: +SKIP
+        >>> b.value_scalar("margin_pct", [("2025Q1", 0.15)])  # doctest: +SKIP
+        """
         ...
 
     def value_money(self, node_id: str, values: list[tuple[str, Money]]) -> None:
-        """Add a monetary value node with explicit per-period values."""
+        """Add a monetary value node with explicit per-period values.
+
+        Parameters
+        ----------
+        node_id:
+            Identifier for the new node.
+        values:
+            ``(period_id, Money)`` pairs, for example ``[("2025Q1", Money(100.0, "USD"))]``.
+
+        Raises
+        ------
+        ValueError
+            If periods were not configured, a period id is invalid, or the builder was consumed.
+
+        Example
+        -------
+        >>> from finstack_quant.core.money import Money
+        >>> b = ModelBuilder("x")
+        >>> b.periods("2025Q1..Q1", None)  # doctest: +SKIP
+        >>> b.value_money("revenue", [("2025Q1", Money(100.0, "USD"))])  # doctest: +SKIP
+        """
         ...
 
     def compute(self, node_id: str, formula: str) -> None:
@@ -592,7 +764,7 @@ class ModelBuilder:
         node_id:
             Identifier for the computed node.
         formula:
-            Expression in the statements DSL (for example ``\"revenue - cogs\"``).
+            Expression in the statements DSL (for example ``"revenue - cogs"``).
 
         Raises
         ------
@@ -608,39 +780,118 @@ class ModelBuilder:
         ...
 
     def mixed(self, node_id: str) -> MixedNodeBuilder:
-        """Start configuring a mixed node and consume this builder until ``build`` returns."""
+        """Start configuring a mixed node and consume this builder until ``build`` returns.
+
+        Parameters
+        ----------
+        node_id:
+            Identifier for the new mixed node.
+
+        Returns
+        -------
+        MixedNodeBuilder
+            A builder for the mixed node.  Call ``build`` on the returned
+            builder to attach the node and resume this builder.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.periods("2025Q1..Q1", None)  # doctest: +SKIP
+        >>> mb = b.mixed("hybrid")  # doctest: +SKIP
+        >>> mb.values([("2025Q1", 10.0)])  # doctest: +SKIP
+        >>> mb.formula("revenue * 0.1")  # doctest: +SKIP
+        >>> b = mb.build()  # doctest: +SKIP
+        """
         ...
 
     def forecast(self, node_id: str, forecast_spec: ForecastSpec) -> None:
-        """Attach a forecast to an existing node or create a forecast-only mixed node."""
+        """Attach a forecast to an existing node or create a forecast-only mixed node.
+
+        Parameters
+        ----------
+        node_id:
+            Identifier for the node to forecast.
+        forecast_spec:
+            A :class:`ForecastSpec` describing the projection method and parameters.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.periods("2025Q1..Q4", None)  # doctest: +SKIP
+        >>> b.forecast("revenue", ForecastSpec.from_json("..."))  # doctest: +SKIP
+        """
         ...
 
     def where_clause(self, where_clause: str) -> None:
-        """Attach a conditional expression to the last added node."""
+        """Attach a conditional expression to the last added node.
+
+        Parameters
+        ----------
+        where_clause:
+            DSL expression evaluated per period to gate the node's value.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.periods("2025Q1..Q1", None)  # doctest: +SKIP
+        >>> b.value("rev", [("2025Q1", 10.0)])  # doctest: +SKIP
+        >>> b.where_clause('period == "2025Q1"')  # doctest: +SKIP
+        """
         ...
 
     def with_meta(self, key: str, value_json: str) -> None:
-        """Add model-level metadata from a JSON payload."""
+        """Add model-level metadata from a JSON payload.
+
+        Parameters
+        ----------
+        key:
+            Metadata key.
+        value_json:
+            JSON-serialized metadata value.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.with_meta("sector", '""healthcare""')  # doctest: +SKIP
+        """
         ...
 
     def with_name_normalization(self) -> None:
         """Enable standard accounting term alias normalization.
-        Returns
+
+        Example
         -------
-        None
+        >>> b = ModelBuilder("x")
+        >>> b.with_name_normalization()  # doctest: +SKIP
         """
         ...
 
     def with_builtin_metrics(self) -> None:
         """Add all built-in statement metrics to the model.
-        Returns
+
+        Example
         -------
-        None
+        >>> b = ModelBuilder("x")
+        >>> b.with_builtin_metrics()  # doctest: +SKIP
         """
         ...
 
     def add_metric_from_registry(self, qualified_id: str, registry: MetricRegistry) -> None:
-        """Add one metric and its dependencies from a metric registry."""
+        """Add one metric and its dependencies from a metric registry.
+
+        Parameters
+        ----------
+        qualified_id:
+            Fully qualified metric identifier.
+        registry:
+            A :class:`MetricRegistry` containing the metric definition.
+
+        Example
+        -------
+        >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
+        >>> b = ModelBuilder("x")
+        >>> b.add_metric_from_registry("ebitda", reg)  # doctest: +SKIP
+        """
         ...
 
     def add_bond(
@@ -656,6 +907,30 @@ class ModelBuilder:
 
         For non-USD conventions, use :meth:`add_custom_debt` with a pre-built
         ``Bond`` JSON specification.
+
+        Parameters
+        ----------
+        id:
+            Bond identifier.
+        notional:
+            Face value as a :class:`Money` amount.
+        coupon_rate:
+            Annual coupon rate as a decimal (e.g. ``0.05`` for 5%).
+        issue_date:
+            Bond issue date.
+        maturity_date:
+            Bond maturity date.
+        discount_curve_id:
+            Curve ID for discounting (e.g. ``"USD-OIS"``).
+
+        Example
+        -------
+        >>> from finstack_quant.core.money import Money
+        >>> import datetime
+        >>> b = ModelBuilder("x")
+        >>> b.add_bond(
+        ...     "bond_a", Money(1_000_000, "USD"), 0.05, datetime.date(2025, 1, 1), datetime.date(2030, 1, 1), "USD-OIS"
+        ... )  # doctest: +SKIP
         """
         ...
 
@@ -669,23 +944,102 @@ class ModelBuilder:
         discount_curve_id: str,
         forward_curve_id: str,
     ) -> None:
-        """Add an interest rate swap to the capital structure (US conventions)."""
+        """Add an interest rate swap to the capital structure (US conventions).
+
+        Parameters
+        ----------
+        id:
+            Swap identifier.
+        notional:
+            Notional amount as a :class:`Money` value.
+        fixed_rate:
+            Fixed leg rate as a decimal (e.g. ``0.04`` for 4%).
+        start_date:
+            Swap start date.
+        maturity_date:
+            Swap maturity date.
+        discount_curve_id:
+            Curve ID for discounting.
+        forward_curve_id:
+            Curve ID for forward rates.
+
+        Example
+        -------
+        >>> from finstack_quant.core.money import Money
+        >>> import datetime
+        >>> b = ModelBuilder("x")
+        >>> b.add_swap(
+        ...     "swap_a",
+        ...     Money(10_000_000, "USD"),
+        ...     0.04,
+        ...     datetime.date(2025, 1, 1),
+        ...     datetime.date(2030, 1, 1),
+        ...     "USD-OIS",
+        ...     "USD-SOFR-3M",
+        ... )  # doctest: +SKIP
+        """
         ...
 
     def add_custom_debt(self, id: str, spec_json: str) -> None:
-        """Add an arbitrary debt instrument via its serde JSON representation."""
+        """Add an arbitrary debt instrument via its serde JSON representation.
+
+        Parameters
+        ----------
+        id:
+            Instrument identifier.
+        spec_json:
+            JSON-serialized instrument specification (e.g. a bond or term loan).
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.add_custom_debt("loan_a", '{"type":"term_loan",...}')  # doctest: +SKIP
+        """
         ...
 
     def reporting_currency(self, currency: Currency) -> None:
-        """Set the reporting currency used for capital-structure totals."""
+        """Set the reporting currency used for capital-structure totals.
+
+        Parameters
+        ----------
+        currency:
+            A :class:`Currency` instance or ISO-4217 code string.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.reporting_currency(Currency.USD)  # doctest: +SKIP
+        """
         ...
 
     def fx_policy(self, policy: str) -> None:
-        """Set the FX policy (``cashflow_date``/``period_end``/``period_average``/``custom``)."""
+        """Set the FX policy (``cashflow_date``/``period_end``/``period_average``/``custom``).
+
+        Parameters
+        ----------
+        policy:
+            FX conversion policy label.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.fx_policy("period_end")  # doctest: +SKIP
+        """
         ...
 
     def waterfall(self, waterfall_spec: WaterfallSpec) -> None:
-        """Attach a waterfall specification (PIK toggle + ECF sweep + priorities)."""
+        """Attach a waterfall specification (PIK toggle + ECF sweep + priorities).
+
+        Parameters
+        ----------
+        waterfall_spec:
+            A :class:`WaterfallSpec` defining cash distribution priorities.
+
+        Example
+        -------
+        >>> b = ModelBuilder("x")
+        >>> b.waterfall(WaterfallSpec.from_json("..."))  # doctest: +SKIP
+        """
         ...
 
     def build(self) -> FinancialModelSpec:
@@ -710,70 +1064,207 @@ class ModelBuilder:
         ...
 
 class MixedNodeBuilder:
-    """Fluent builder for a mixed statement node."""
+    """Builder for a mixed statement node.
+
+    A mixed node combines explicit values, a forecast spec, and/or a fallback
+    formula.  Obtain an instance via :meth:`ModelBuilder.mixed`.
+
+    Note
+    ----
+    Methods on this class mutate the builder in place and return ``None``.
+    Call them sequentially rather than chaining.
+
+    Example
+    -------
+    >>> b = ModelBuilder("x")
+    >>> b.periods("2025Q1..Q2", None)  # doctest: +SKIP
+    >>> mb = b.mixed("hybrid")  # doctest: +SKIP
+    >>> mb.values([("2025Q1", 10.0)])  # doctest: +SKIP
+    >>> mb.formula("revenue * 0.1")  # doctest: +SKIP
+    >>> b = mb.build()  # doctest: +SKIP
+    """
 
     def values(self, values: list[tuple[str, float]]) -> None:
-        """Set scalar explicit values."""
+        """Set scalar explicit values.
+
+        Parameters
+        ----------
+        values:
+            ``(period_id, value)`` pairs for periods where an explicit scalar
+            overrides the formula or forecast.
+
+        Example
+        -------
+        >>> mb.values([("2025Q1", 10.0)])  # doctest: +SKIP
+        """
         ...
 
     def values_money(self, values: list[tuple[str, Money]]) -> None:
-        """Set monetary explicit values."""
+        """Set monetary explicit values.
+
+        Parameters
+        ----------
+        values:
+            ``(period_id, Money)`` pairs for periods where an explicit monetary
+            value overrides the formula or forecast.
+
+        Example
+        -------
+        >>> from finstack_quant.core.money import Money
+        >>> mb.values_money([("2025Q1", Money(100.0, "USD"))])  # doctest: +SKIP
+        """
         ...
 
     def forecast(self, forecast_spec: ForecastSpec) -> None:
-        """Set the forecast spec."""
+        """Set the forecast spec.
+
+        Parameters
+        ----------
+        forecast_spec:
+            A :class:`ForecastSpec` describing the projection method.
+
+        Example
+        -------
+        >>> mb.forecast(ForecastSpec.from_json("..."))  # doctest: +SKIP
+        """
         ...
 
     def formula(self, formula: str) -> None:
-        """Set the fallback formula."""
+        """Set the fallback formula.
+
+        Parameters
+        ----------
+        formula:
+            DSL expression used when no explicit value or forecast is available.
+
+        Example
+        -------
+        >>> mb.formula("revenue * 0.1")  # doctest: +SKIP
+        """
         ...
 
     def name(self, name: str) -> None:
-        """Set the display name."""
+        """Set the display name.
+
+        Parameters
+        ----------
+        name:
+            Human-readable node name.
+
+        Example
+        -------
+        >>> mb.name("Hybrid Revenue")  # doctest: +SKIP
+        """
         ...
 
     def build(self) -> ModelBuilder:
         """Attach the mixed node and return a ready model builder.
+
         Returns
         -------
         ModelBuilder
+            The parent :class:`ModelBuilder` with the mixed node attached.
+
+        Example
+        -------
+        >>> b = mb.build()  # doctest: +SKIP
         """
         ...
 
 class MetricRegistry:
-    """Reusable statement metric registry."""
+    """Reusable statement metric registry.
+
+    Example
+    -------
+    >>> from finstack_quant.statements import MetricRegistry
+    >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
+    >>> reg.has("ebitda")  # doctest: +SKIP
+    True
+    """
 
     def __init__(self) -> None:
         """Create an empty registry.
-        Returns
+
+        Example
         -------
-        None
+        >>> reg = MetricRegistry()  # doctest: +SKIP
         """
         ...
 
     @staticmethod
     def with_builtins() -> MetricRegistry:
-        """Create a registry preloaded with built-in metrics."""
+        """Create a registry preloaded with built-in metrics.
+
+        Returns
+        -------
+        MetricRegistry
+            A registry containing all built-in statement metrics.
+
+        Example
+        -------
+        >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
+        """
         ...
 
     def load_builtins(self) -> None:
         """Load built-in metrics into this registry.
-        Returns
+
+        Example
         -------
-        None
+        >>> reg = MetricRegistry()
+        >>> reg.load_builtins()  # doctest: +SKIP
         """
         ...
 
     def load_from_json_str(self, json: str) -> None:
-        """Load metrics from a JSON document."""
+        """Load metrics from a JSON document.
+
+        Parameters
+        ----------
+        json:
+            JSON string containing metric definitions.
+
+        Example
+        -------
+        >>> reg = MetricRegistry()
+        >>> reg.load_from_json_str('[{"id":"custom_metric",...}]')  # doctest: +SKIP
+        """
         ...
 
     def load_from_json(self, path: str) -> None:
-        """Load metrics from a JSON file path."""
+        """Load metrics from a JSON file path.
+
+        Parameters
+        ----------
+        path:
+            Filesystem path to a JSON document containing metric definitions.
+
+        Example
+        -------
+        >>> reg = MetricRegistry()
+        >>> reg.load_from_json("metrics.json")  # doctest: +SKIP
+        """
         ...
 
     def has(self, qualified_id: str) -> bool:
-        """Return whether a fully qualified metric exists."""
+        """Return whether a fully qualified metric exists.
+
+        Parameters
+        ----------
+        qualified_id:
+            Fully qualified metric identifier.
+
+        Returns
+        -------
+        bool
+            ``True`` if the metric is registered.
+
+        Example
+        -------
+        >>> reg = MetricRegistry.with_builtins()  # doctest: +SKIP
+        >>> reg.has("ebitda")  # doctest: +SKIP
+        True
+        """
         ...
 
     def __len__(self) -> int:
@@ -841,8 +1332,6 @@ class StatementResult:
         Example
         -------
         >>> # r = Evaluator().evaluate(spec); r.to_json()  # doctest: +SKIP
-        >>> FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}').to_json()[0]
-        '{'
         """
         ...
 
@@ -869,8 +1358,6 @@ class StatementResult:
         Example
         -------
         >>> # r = Evaluator().evaluate(spec); r.get("revenue", "2025Q1")  # doctest: +SKIP
-        >>> parse_formula("revenue - cogs")  # doctest: +ELLIPSIS
-        '...'
         """
         ...
 
@@ -940,8 +1427,6 @@ class StatementResult:
         Example
         -------
         >>> # m = r.get_node("revenue")  # doctest: +SKIP
-        >>> validate_formula("revenue / 2")
-        True
         """
         ...
 
@@ -956,8 +1441,6 @@ class StatementResult:
         Example
         -------
         >>> # ids = r.node_ids()  # doctest: +SKIP
-        >>> sorted(FinancialModelSpec.from_json('{"id":"m","periods":[],"nodes":{}}').node_ids())
-        []
         """
         ...
 
@@ -1096,6 +1579,30 @@ class Evaluator:
 
         Use this for capital-structure-aware models and as-of filtering of
         future actual periods.
+
+        Parameters
+        ----------
+        model:
+            Specification produced by ``ModelBuilder.build`` or ``from_json``.
+        market:
+            A :class:`MarketContext` with curves, FX, and vol surfaces.
+        as_of:
+            Valuation date for discounting and period filtering.
+
+        Returns
+        -------
+        StatementResult
+            Populated result object with market-aware valuations.
+
+        Raises
+        ------
+        ValueError
+            If evaluation fails or required market data is missing.
+
+        Example
+        -------
+        >>> ev = Evaluator()
+        >>> # r = ev.evaluate_with_market(spec, mkt, datetime.date(2025, 1, 1))  # doctest: +SKIP
         """
         ...
 

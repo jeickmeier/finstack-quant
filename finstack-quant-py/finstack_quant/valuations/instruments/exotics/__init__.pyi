@@ -351,7 +351,7 @@ class LookbackOption(_ExoticOptionInstrument):
 class Basket(_ExoticInstrument):
     """Basket instrument for multi-underlier valuation."""
 
-__all__: list[str] = [
+__all__ = [
     "AsianOption",
     "BarrierOption",
     "Basket",

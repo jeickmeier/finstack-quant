@@ -1,0 +1,79 @@
+{
+  "spec": {
+    "as_of": "2026-03-31",
+    "factors": [
+      {
+        "exposure": 0.35,
+        "factor": "value",
+        "factor_return": 0.012
+      },
+      {
+        "exposure": -0.1,
+        "factor": "momentum",
+        "factor_return": 0.02
+      },
+      {
+        "exposure": 0.2,
+        "factor": "quality",
+        "factor_return": 0.008
+      }
+    ],
+    "positions": [
+      {
+        "benchmark_return": 0.015,
+        "benchmark_weight": 0.25,
+        "groups": {
+          "sector": "tech",
+          "strategy": "core"
+        },
+        "id": "AAPL.XNAS",
+        "market_value": 30000.0,
+        "return": 0.018
+      },
+      {
+        "benchmark_return": 0.012,
+        "benchmark_weight": 0.22,
+        "groups": {
+          "sector": "tech",
+          "strategy": "core"
+        },
+        "id": "MSFT.XNAS",
+        "market_value": 25000.0,
+        "return": 0.011
+      },
+      {
+        "benchmark_return": -0.004,
+        "benchmark_weight": 0.18,
+        "groups": {
+          "sector": "energy"
+        },
+        "id": "XOM.XNYS",
+        "market_value": 15000.0,
+        "return": -0.006
+      },
+      {
+        "benchmark_return": 0.007,
+        "benchmark_weight": 0.2,
+        "groups": {
+          "sector": "financials",
+          "strategy": "tactical"
+        },
+        "id": "JPM.XNYS",
+        "market_value": 18000.0,
+        "return": 0.009
+      },
+      {
+        "benchmark_return": 0.005,
+        "benchmark_weight": 0.15,
+        "groups": {
+          "sector": "staples",
+          "strategy": "core"
+        },
+        "id": "PG.XNYS",
+        "market_value": 12000.0,
+        "return": 0.004
+      }
+    ],
+    "weighting": "gross"
+  }
+}

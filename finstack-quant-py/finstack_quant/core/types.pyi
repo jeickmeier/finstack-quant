@@ -171,6 +171,14 @@ class Bps:
     ------
     ValueError
         If *bps* is not finite.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.types import Bps
+    >>> Bps(250).as_decimal
+    0.025
+    >>> Bps(100).as_bps
+    100
     """
 
     ZERO: Bps
@@ -188,6 +196,12 @@ class Bps:
         ------
         ValueError
             If *bps* is not finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Bps
+        >>> Bps(250).as_decimal
+        0.025
         """
         ...
 
@@ -198,6 +212,11 @@ class Bps:
         Returns
         -------
         float
+
+        Examples
+        --------
+        >>> Bps(250).as_decimal
+        0.025
         """
         ...
 
@@ -208,6 +227,11 @@ class Bps:
         Returns
         -------
         int
+
+        Examples
+        --------
+        >>> Bps(250).as_bps
+        250
         """
         ...
 
@@ -240,6 +264,14 @@ class Percentage:
     ------
     ValueError
         If *percent* is not finite.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.types import Percentage
+    >>> Percentage(12.5).as_decimal
+    0.125
+    >>> Percentage(50.0).as_percent
+    50.0
     """
 
     ZERO: Percentage
@@ -257,6 +289,12 @@ class Percentage:
         ------
         ValueError
             If *percent* is not finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Percentage
+        >>> Percentage(12.5).as_decimal
+        0.125
         """
         ...
 
@@ -267,6 +305,11 @@ class Percentage:
         Returns
         -------
         float
+
+        Examples
+        --------
+        >>> Percentage(12.5).as_decimal
+        0.125
         """
         ...
 
@@ -277,6 +320,11 @@ class Percentage:
         Returns
         -------
         float
+
+        Examples
+        --------
+        >>> Percentage(12.5).as_percent
+        12.5
         """
         ...
 
@@ -302,6 +350,14 @@ class CreditRating:
     None
         Use class attributes (e.g. ``CreditRating.AAA``) or
         :meth:`from_name` to construct.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.types import CreditRating
+    >>> CreditRating.AAA.name
+    'AAA'
+    >>> CreditRating.from_name("bbb+") == CreditRating.BBB
+    True
     """
 
     AAA: CreditRating
@@ -344,6 +400,12 @@ class CreditRating:
         ------
         ValueError
             If *name* cannot be parsed.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import CreditRating
+        >>> CreditRating.from_name("bbb+").name
+        'BBB'
         """
         ...
 
@@ -354,6 +416,11 @@ class CreditRating:
         Returns
         -------
         str
+
+        Examples
+        --------
+        >>> CreditRating.AAA.name
+        'AAA'
         """
         ...
 
@@ -372,6 +439,12 @@ class CurveId:
     ----------
     value : str
         Curve identifier string.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.types import CurveId
+    >>> CurveId("USD-OIS").as_str()
+    'USD-OIS'
     """
 
     def __init__(self, value: str) -> None:
@@ -381,6 +454,12 @@ class CurveId:
         ----------
         value : str
             Curve identifier.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import CurveId
+        >>> CurveId("USD-OIS").as_str()
+        'USD-OIS'
         """
         ...
 
@@ -390,14 +469,54 @@ class CurveId:
         Returns
         -------
         str
+
+        Examples
+        --------
+        >>> CurveId("USD-OIS").as_str()
+        'USD-OIS'
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __hash__(self) -> int: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this curve id.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __str__(self) -> str:
+        """Return the string value of this curve id.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __hash__(self) -> int:
+        """Return a hash for this curve id.
+
+        Returns
+        -------
+        int
+        """
+        ...
+    def __eq__(self, other: object) -> bool:
+        """Return whether two curve ids are equal.
+
+        Returns
+        -------
+        bool
+        """
+        ...
+    def __ne__(self, other: object) -> bool:
+        """Return whether two curve ids are not equal.
+
+        Returns
+        -------
+        bool
+        """
+        ...
 
 class InstrumentId:
     """A unique identifier for a financial instrument.
@@ -408,6 +527,12 @@ class InstrumentId:
     ----------
     value : str
         Instrument identifier string.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.types import InstrumentId
+    >>> InstrumentId("BOND_A").as_str()
+    'BOND_A'
     """
 
     def __init__(self, value: str) -> None:
@@ -417,6 +542,12 @@ class InstrumentId:
         ----------
         value : str
             Instrument identifier.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import InstrumentId
+        >>> InstrumentId("BOND_A").as_str()
+        'BOND_A'
         """
         ...
 
@@ -426,26 +557,76 @@ class InstrumentId:
         Returns
         -------
         str
+
+        Examples
+        --------
+        >>> InstrumentId("BOND_A").as_str()
+        'BOND_A'
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __hash__(self) -> int: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, other: object) -> bool: ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this instrument id.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __str__(self) -> str:
+        """Return the string value of this instrument id.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __hash__(self) -> int:
+        """Return a hash for this instrument id.
+
+        Returns
+        -------
+        int
+        """
+        ...
+    def __eq__(self, other: object) -> bool:
+        """Return whether two instrument ids are equal.
+
+        Returns
+        -------
+        bool
+        """
+        ...
+    def __ne__(self, other: object) -> bool:
+        """Return whether two instrument ids are not equal.
+
+        Returns
+        -------
+        bool
+        """
+        ...
 
 class Attributes:
     """A mutable key-value metadata bag.
 
     Stores string-typed metadata entries with set/get semantics.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.types import Attributes
+    >>> attrs = Attributes()  # doctest: +SKIP
+    >>> attrs.set_meta("sector", "tech")  # doctest: +SKIP
+    >>> attrs.get_meta("sector")  # doctest: +SKIP
+    'tech'
     """
 
     def __init__(self) -> None:
         """Create an empty attribute set.
-        Returns
-        -------
-        None
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Attributes
+        >>> attrs = Attributes()  # doctest: +SKIP
         """
         ...
 
@@ -461,6 +642,12 @@ class Attributes:
         -------
         str | None
             Value if present, otherwise ``None``.
+
+        Examples
+        --------
+        >>> attrs = Attributes()  # doctest: +SKIP
+        >>> attrs.get_meta("missing")  # doctest: +SKIP
+        None
         """
         ...
 
@@ -473,6 +660,11 @@ class Attributes:
             Metadata key.
         value : str
             Metadata value.
+
+        Examples
+        --------
+        >>> attrs = Attributes()  # doctest: +SKIP
+        >>> attrs.set_meta("sector", "tech")  # doctest: +SKIP
         """
         ...
 
@@ -487,6 +679,12 @@ class Attributes:
         Returns
         -------
         bool
+
+        Examples
+        --------
+        >>> attrs = Attributes()  # doctest: +SKIP
+        >>> attrs.contains_meta_key("sector")  # doctest: +SKIP
+        False
         """
         ...
 
@@ -496,8 +694,28 @@ class Attributes:
         Returns
         -------
         list[str]
+
+        Examples
+        --------
+        >>> attrs = Attributes()  # doctest: +SKIP
+        >>> attrs.keys()  # doctest: +SKIP
+        []
         """
         ...
 
-    def __repr__(self) -> str: ...
-    def __len__(self) -> int: ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this attribute set.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __len__(self) -> int:
+        """Return the number of metadata entries.
+
+        Returns
+        -------
+        int
+        """
+        ...

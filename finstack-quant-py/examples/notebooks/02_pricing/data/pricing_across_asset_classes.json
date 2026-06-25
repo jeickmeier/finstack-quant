@@ -1,0 +1,23 @@
+{
+  "commodity_fwd": {
+    "spec": {
+      "attributes": {},
+      "commodity_type": "Energy",
+      "contract_month": "2025M03",
+      "currency": "USD",
+      "discount_curve_id": "USD-OIS",
+      "exchange": "NYMEX",
+      "forward_curve_id": "WTI-FORWARD",
+      "id": "WTI-FWD-2025M03",
+      "maturity": "2025-03-15",
+      "multiplier": 1.0,
+      "position": "long",
+      "pricing_overrides": {},
+      "quantity": 1000.0,
+      "settlement": "cash",
+      "ticker": "CL",
+      "unit": "BBL"
+    },
+    "type": "commodity_forward"
+  }
+}

@@ -11,15 +11,21 @@ __all__ = ["count_consecutive", "linalg", "stats", "special_functions", "summati
 def count_consecutive(values: list[float]) -> int:
     """Count longest consecutive run of strictly positive values.
 
-    Args:
-        values: Numeric series.
+    Parameters
+    ----------
+    values:
+        Numeric series.
 
-    Returns:
+    Returns
+    -------
+    int
         Longest positive run length.
 
-    Example:
-        >>> count_consecutive([1.0, 2.0, -1.0, 3.0])
-        2
+    Examples
+    --------
+    >>> from finstack_quant.core.math import count_consecutive
+    >>> count_consecutive([1.0, 2.0, -1.0, 3.0])
+    2
     """
     ...
 
@@ -70,6 +76,11 @@ class linalg:
             mismatched dimensions.
         ValueError
             If the input is not a square matrix.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import linalg
+        >>> L = linalg.cholesky_decomposition([[1.0, 0.5], [0.5, 1.0]])  # doctest: +SKIP
         """
         ...
 
@@ -96,6 +107,11 @@ class linalg:
             On dimension mismatch or singular factor.
         ValueError
             If dimensions are inconsistent.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import linalg
+        >>> x = linalg.cholesky_solve(L, [1.0, 2.0])  # doctest: +SKIP
         """
         ...
 
@@ -117,6 +133,11 @@ class linalg:
             If any validation check fails.
         ValueError
             If the input is not a square matrix.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import linalg
+        >>> linalg.validate_correlation_matrix([[1.0, 0.5], [0.5, 1.0]])  # doctest: +SKIP
         """
         ...
 
@@ -137,6 +158,13 @@ class stats:
         Returns
         -------
         float
+            Arithmetic mean.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import stats
+        >>> stats.mean([1.0, 2.0, 3.0])
+        2.0
         """
         ...
 
@@ -154,6 +182,13 @@ class stats:
         Returns
         -------
         float
+            Sample variance.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import stats
+        >>> round(stats.variance([1.0, 2.0, 3.0]), 10)
+        1.0
         """
         ...
 
@@ -171,6 +206,13 @@ class stats:
         Returns
         -------
         float
+            Population variance.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import stats
+        >>> round(stats.population_variance([1.0, 2.0, 3.0]), 10)
+        0.6666666667
         """
         ...
 
@@ -191,6 +233,12 @@ class stats:
         -------
         float
             Correlation in ``[-1, 1]``, or ``NaN`` on error.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import stats
+        >>> round(stats.correlation([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]), 10)
+        1.0
         """
         ...
 
@@ -210,6 +258,13 @@ class stats:
         Returns
         -------
         float
+            Sample covariance.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import stats
+        >>> round(stats.covariance([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]), 10)
+        2.0
         """
         ...
 
@@ -230,6 +285,13 @@ class stats:
         Returns
         -------
         float
+            Quantile value.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import stats
+        >>> stats.quantile([1.0, 2.0, 3.0, 4.0, 5.0], 0.5)
+        3.0
         """
         ...
 
@@ -251,6 +313,12 @@ class special_functions:
         -------
         float
             Probability in ``[0, 1]``.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.norm_cdf(0.0), 10)
+        0.5
         """
         ...
 
@@ -268,6 +336,13 @@ class special_functions:
         Returns
         -------
         float
+            Density value.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.norm_pdf(0.0), 10)
+        0.3989422804
         """
         ...
 
@@ -285,6 +360,13 @@ class special_functions:
         Returns
         -------
         float
+            Quantile *x* such that ``Phi(x) = p``.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.standard_normal_inv_cdf(0.5), 10)
+        0.0
         """
         ...
 
@@ -301,6 +383,12 @@ class special_functions:
         -------
         float
             Value in ``[-1, 1]``.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.erf(1.0), 10)
+        0.8427007929
         """
         ...
 
@@ -318,6 +406,13 @@ class special_functions:
         Returns
         -------
         float
+            ``ln(Gamma(x))``.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.ln_gamma(1.0), 10)
+        0.0
         """
         ...
 
@@ -338,6 +433,12 @@ class special_functions:
         -------
         float
             Probability in ``[0, 1]``.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.student_t_cdf(0.0, 10.0), 10)
+        0.5
         """
         ...
 
@@ -357,6 +458,13 @@ class special_functions:
         Returns
         -------
         float
+            Quantile *x*.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import special_functions
+        >>> round(special_functions.student_t_inv_cdf(0.5, 10.0), 10)
+        0.0
         """
         ...
 
@@ -378,6 +486,13 @@ class summation:
         Returns
         -------
         float
+            Compensated sum.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import summation
+        >>> summation.kahan_sum([1.0, 2.0, 3.0])
+        6.0
         """
         ...
 
@@ -396,5 +511,12 @@ class summation:
         Returns
         -------
         float
+            Compensated sum.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.math import summation
+        >>> summation.neumaier_sum([1.0, -2.0, 3.0])
+        2.0
         """
         ...

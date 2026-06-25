@@ -1,0 +1,36 @@
+{
+  "FACTOR_COLS": [
+    [
+      "carry",
+      "Carry"
+    ],
+    [
+      "rates_curves_pnl",
+      "Rates"
+    ],
+    [
+      "credit_curves_pnl",
+      "Credit"
+    ],
+    [
+      "vol_pnl",
+      "Vol"
+    ],
+    [
+      "fx_pnl",
+      "FX"
+    ],
+    [
+      "market_scalars_pnl",
+      "Scalars"
+    ],
+    [
+      "cross_factor_pnl",
+      "Cross"
+    ],
+    [
+      "residual",
+      "Residual"
+    ]
+  ]
+}

@@ -12,7 +12,14 @@ from __future__ import annotations
 from finstack_quant.core.config import FinstackConfig
 
 class UnknownScalePolicy:
-    """Policy for unknown scorecard rating-scale names."""
+    """Policy for unknown scorecard rating-scale names.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
+    >>> UnknownScalePolicy.ERROR.name  # doctest: +SKIP
+    'error'
+    """
 
     ERROR: UnknownScalePolicy
     """Reject unknown scale names (raises ``ValueError``)."""
@@ -42,6 +49,12 @@ class UnknownScalePolicy:
         ------
         ValueError
             If ``name`` is not a recognized policy.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import UnknownScalePolicy
+        >>> UnknownScalePolicy.from_name("error").name  # doctest: +SKIP
+        'error'
         """
 
     @property
@@ -52,18 +65,78 @@ class UnknownScalePolicy:
         -------
         str
             Policy identifier string.
+
+        Examples
+        --------
+        >>> UnknownScalePolicy.ERROR.name  # doctest: +SKIP
+        'error'
         """
 
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """Serialize this policy to a JSON string.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @classmethod
-    def from_json(cls, json: str) -> UnknownScalePolicy: ...
-    def __repr__(self) -> str: ...
-    def __str__(self) -> str: ...
-    def __eq__(self, other: object) -> bool: ...
-    def __hash__(self) -> int: ...
+    def from_json(cls, json: str) -> UnknownScalePolicy:
+        """Deserialize a policy from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document matching the policy schema.
+
+        Returns
+        -------
+        UnknownScalePolicy
+        """
+        ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this policy.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __str__(self) -> str:
+        """Return the policy name.
+
+        Returns
+        -------
+        str
+        """
+        ...
+    def __eq__(self, other: object) -> bool:
+        """Return whether two policies are equal.
+
+        Returns
+        -------
+        bool
+        """
+        ...
+    def __hash__(self) -> int:
+        """Return a hash for this policy.
+
+        Returns
+        -------
+        int
+        """
+        ...
 
 class RatingLevel:
-    """A single rating threshold row on a scorecard scale."""
+    """A single rating threshold row on a scorecard scale.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.rating_scales import RatingLevel
+    >>> lvl = RatingLevel("BBB", 70.0, 65.0)  # doctest: +SKIP
+    >>> lvl.name  # doctest: +SKIP
+    'BBB'
+    """
 
     def __init__(self, name: str, score: float, min_score: float) -> None:
         """Construct one rating threshold row.
@@ -76,6 +149,11 @@ class RatingLevel:
             Representative score on the 0–100 scorecard scale for this rating.
         min_score : float
             Minimum score threshold required to qualify for this rating.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import RatingLevel
+        >>> lvl = RatingLevel("BBB", 70.0, 65.0)  # doctest: +SKIP
         """
         ...
     @property
@@ -86,6 +164,12 @@ class RatingLevel:
         -------
         str
             Rating label.
+
+        Examples
+        --------
+        >>> lvl = RatingLevel("BBB", 70.0, 65.0)  # doctest: +SKIP
+        >>> lvl.name  # doctest: +SKIP
+        'BBB'
         """
 
     @property
@@ -96,6 +180,12 @@ class RatingLevel:
         -------
         float
             Representative score for the rating.
+
+        Examples
+        --------
+        >>> lvl = RatingLevel("BBB", 70.0, 65.0)  # doctest: +SKIP
+        >>> lvl.score  # doctest: +SKIP
+        70.0
         """
 
     @property
@@ -106,18 +196,57 @@ class RatingLevel:
         -------
         float
             Lower bound on the scorecard scale.
+
+        Examples
+        --------
+        >>> lvl = RatingLevel("BBB", 70.0, 65.0)  # doctest: +SKIP
+        >>> lvl.min_score  # doctest: +SKIP
+        65.0
         """
 
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """Serialize this rating level to a JSON string.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @classmethod
-    def from_json(cls, json: str) -> RatingLevel: ...
-    def __repr__(self) -> str: ...
+    def from_json(cls, json: str) -> RatingLevel:
+        """Deserialize a rating level from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document matching the rating-level schema.
+
+        Returns
+        -------
+        RatingLevel
+        """
+        ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this rating level.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 class ScorecardScale:
     """A named, ordered list of scorecard rating thresholds.
 
     Distinct from ``finstack_quant.core.credit.migration.RatingScale`` (which models
     the ordered state set of a credit-migration / transition matrix).
+
+    Examples
+    --------
+    >>> from finstack_quant.core.rating_scales import ScorecardScale, RatingLevel
+    >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 85.0)])  # doctest: +SKIP
+    >>> scale.scale_name  # doctest: +SKIP
+    'custom'
     """
 
     def __init__(
@@ -136,6 +265,11 @@ class ScorecardScale:
             Ordered levels from best to worst.
         description : str, optional
             Human-readable description of the scale.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.rating_scales import ScorecardScale, RatingLevel
+        >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 85.0)])  # doctest: +SKIP
         """
         ...
     @property
@@ -146,6 +280,12 @@ class ScorecardScale:
         -------
         str
             Scale identifier.
+
+        Examples
+        --------
+        >>> scale = ScorecardScale("custom", [])  # doctest: +SKIP
+        >>> scale.scale_name  # doctest: +SKIP
+        'custom'
         """
 
     @property
@@ -156,6 +296,12 @@ class ScorecardScale:
         -------
         str or None
             Description text when set.
+
+        Examples
+        --------
+        >>> scale = ScorecardScale("custom", [], description="My scale")  # doctest: +SKIP
+        >>> scale.description  # doctest: +SKIP
+        'My scale'
         """
 
     @property
@@ -166,16 +312,63 @@ class ScorecardScale:
         -------
         list[RatingLevel]
             Rating threshold rows.
+
+        Examples
+        --------
+        >>> scale = ScorecardScale("custom", [RatingLevel("A", 90.0, 85.0)])  # doctest: +SKIP
+        >>> len(scale.ratings)  # doctest: +SKIP
+        1
         """
 
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """Serialize this scale to a JSON string.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @classmethod
-    def from_json(cls, json: str) -> ScorecardScale: ...
-    def __len__(self) -> int: ...
-    def __repr__(self) -> str: ...
+    def from_json(cls, json: str) -> ScorecardScale:
+        """Deserialize a scorecard scale from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document matching the scorecard-scale schema.
+
+        Returns
+        -------
+        ScorecardScale
+        """
+        ...
+    def __len__(self) -> int:
+        """Return the number of rating levels on this scale.
+
+        Returns
+        -------
+        int
+        """
+        ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this scale.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 class RatingScaleRegistry:
-    """Versioned registry of scorecard scales and policy."""
+    """Versioned registry of scorecard scales and policy.
+
+    Examples
+    --------
+    >>> from finstack_quant.core.rating_scales import embedded_registry
+    >>> reg = embedded_registry()  # doctest: +SKIP
+    >>> reg.is_known_rating_scale("sp")  # doctest: +SKIP
+    True
+    """
 
     def default_scorecard_score(self) -> float:
         """Return the configured default scorecard score for threshold gaps.
@@ -185,6 +378,12 @@ class RatingScaleRegistry:
         float
             Default score on the 0–100 scale used when interpolating between
             published rating thresholds.
+
+        Examples
+        --------
+        >>> reg = embedded_registry()  # doctest: +SKIP
+        >>> reg.default_scorecard_score()  # doctest: +SKIP
+        50.0
         """
 
     def default_scale_id(self) -> str:
@@ -194,6 +393,12 @@ class RatingScaleRegistry:
         -------
         str
             Default scale identifier (e.g. ``"sp"``).
+
+        Examples
+        --------
+        >>> reg = embedded_registry()  # doctest: +SKIP
+        >>> reg.default_scale_id()  # doctest: +SKIP
+        'sp'
         """
 
     def unknown_scale_policy(self) -> UnknownScalePolicy:
@@ -203,6 +408,12 @@ class RatingScaleRegistry:
         -------
         UnknownScalePolicy
             Error, fallback, or warn-and-fallback policy.
+
+        Examples
+        --------
+        >>> reg = embedded_registry()  # doctest: +SKIP
+        >>> reg.unknown_scale_policy().name  # doctest: +SKIP
+        'error'
         """
 
     def is_known_rating_scale(self, name: str) -> bool:
@@ -218,6 +429,12 @@ class RatingScaleRegistry:
         bool
             ``True`` when the name resolves without applying the unknown-scale
             policy.
+
+        Examples
+        --------
+        >>> reg = embedded_registry()  # doctest: +SKIP
+        >>> reg.is_known_rating_scale("sp")  # doctest: +SKIP
+        True
         """
 
     def rating_scale(self, name: str) -> ScorecardScale:
@@ -240,12 +457,45 @@ class RatingScaleRegistry:
         ------
         ValueError
             When policy is ``ERROR`` and ``name`` is unknown.
+
+        Examples
+        --------
+        >>> reg = embedded_registry()  # doctest: +SKIP
+        >>> scale = reg.rating_scale("sp")  # doctest: +SKIP
+        >>> scale.scale_name  # doctest: +SKIP
+        'S&P'
         """
 
-    def to_json(self) -> str: ...
+    def to_json(self) -> str:
+        """Serialize this registry to a JSON string.
+
+        Returns
+        -------
+        str
+        """
+        ...
     @classmethod
-    def from_json(cls, json: str) -> RatingScaleRegistry: ...
-    def __repr__(self) -> str: ...
+    def from_json(cls, json: str) -> RatingScaleRegistry:
+        """Deserialize a registry from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON document matching the registry schema.
+
+        Returns
+        -------
+        RatingScaleRegistry
+        """
+        ...
+    def __repr__(self) -> str:
+        """Return a debug representation of this registry.
+
+        Returns
+        -------
+        str
+        """
+        ...
 
 def embedded_registry() -> RatingScaleRegistry:
     """Return the embedded (built-in) rating-scale registry.

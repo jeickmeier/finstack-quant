@@ -1,0 +1,14 @@
+{
+  "PL_NODES": [
+    "revenue",
+    "cogs",
+    "gross_profit",
+    "opex",
+    "da",
+    "ebit",
+    "interest_expense",
+    "ebt",
+    "taxes",
+    "net_income"
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "revolver": {
+    "spec": {
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "base_rate_spec": {
+        "Floating": {
+          "all_in_floor_bp": null,
+          "bdc": "modified_following",
+          "calendar_id": "weekends_only",
+          "cap_bp": null,
+          "dc": "Act360",
+          "end_of_month": false,
+          "fixing_calendar_id": null,
+          "floor_bp": "0",
+          "gearing": "1",
+          "gearing_includes_spread": true,
+          "index_cap_bp": null,
+          "index_id": "USD-SOFR-3M",
+          "payment_lag_days": 0,
+          "reset_freq": {
+            "count": 3,
+            "unit": "months"
+          },
+          "reset_lag_days": 2,
+          "spread_bp": "250"
+        }
+      },
+      "commitment_amount": {
+        "amount": "50000000",
+        "currency": "USD"
+      },
+      "commitment_date": "2024-01-01",
+      "day_count": "Act360",
+      "discount_curve_id": "USD-OIS",
+      "draw_repay_spec": {
+        "Deterministic": [
+          {
+            "amount": {
+              "amount": "5000000",
+              "currency": "USD"
+            },
+            "date": "2024-03-01",
+            "is_draw": true
+          },
+          {
+            "amount": {
+              "amount": "3000000",
+              "currency": "USD"
+            },
+            "date": "2025-06-01",
+            "is_draw": false
+          }
+        ]
+      },
+      "drawn_amount": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "fees": {
+        "commitment_fee_tiers": [
+          {
+            "bps": "25",
+            "threshold": "0"
+          }
+        ],
+        "facility_fee_bp": 5.0,
+        "usage_fee_tiers": [
+          {
+            "bps": "10",
+            "threshold": "0"
+          }
+        ]
+      },
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "id": "RCF-USD-3Y",
+      "maturity": "2027-01-01",
+      "pricing_overrides": {},
+      "recovery_rate": 0.7,
+      "stub": "ShortFront"
+    },
+    "type": "revolving_credit"
+  },
+  "term_loan": {
+    "spec": {
+      "amortization": {
+        "PercentPerPeriod": {
+          "bp": 250
+        }
+      },
+      "attributes": {
+        "meta": {},
+        "tags": []
+      },
+      "bdc": "modified_following",
+      "calendar_id": null,
+      "coupon_type": "Cash",
+      "currency": "USD",
+      "day_count": "Act360",
+      "discount_curve_id": "USD-OIS",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "id": "TERM-LOAN-USD-5Y",
+      "issue_date": "2024-01-01",
+      "maturity": "2029-01-01",
+      "notional_limit": {
+        "amount": "10000000",
+        "currency": "USD"
+      },
+      "pricing_overrides": {},
+      "rate": {
+        "Fixed": {
+          "rate_bp": 600
+        }
+      },
+      "settlement_days": 2,
+      "stub": "None"
+    },
+    "type": "term_loan"
+  }
+}
