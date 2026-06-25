@@ -2,6 +2,10 @@
 
 use crate::calibration::hull_white::HullWhiteParams;
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::rates::exotics_shared::{
+    resolve_hw1f_params, Hw1fCalibrationFlavor, Hw1fParamSource, Hw1fResolveRequest,
+    Hw1fSurfaceCalibration,
+};
 use crate::instruments::rates::swaption::pricing::BermudanSwaptionTreeValuator;
 use crate::instruments::rates::swaption::BermudanSwaption;
 use crate::models::trees::HullWhiteTree;
@@ -13,6 +17,15 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
 use std::sync::Arc;
+
+fn hw1f_overrides_json(swaption: &BermudanSwaption) -> Option<serde_json::Value> {
+    let kappa = swaption
+        .pricing_overrides
+        .model_config
+        .hw1f_mean_reversion?;
+    let sigma = swaption.pricing_overrides.model_config.hw1f_sigma?;
+    Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
+}
 
 // LSMC imports (gated by feature)
 use crate::instruments::common_impl::parameters::OptionType;
@@ -268,6 +281,73 @@ impl BermudanSwaptionPricer {
         self.config.pre_calibrated_model.as_ref()
     }
 
+    fn effective_tree_steps(&self, swaption: &BermudanSwaption) -> usize {
+        swaption
+            .pricing_overrides
+            .model_config
+            .tree_steps
+            .unwrap_or(self.config.tree_steps)
+    }
+
+    fn effective_mc_paths(&self, swaption: &BermudanSwaption) -> usize {
+        swaption
+            .pricing_overrides
+            .model_config
+            .mc_paths
+            .unwrap_or(self.config.mc_paths)
+    }
+
+    fn effective_hw_params(
+        &self,
+        swaption: &BermudanSwaption,
+        market: &MarketContext,
+        ttm: f64,
+    ) -> std::result::Result<(HullWhiteParams, Hw1fParamSource), PricingError> {
+        let context_label = format!("BermudanSwaption {}", swaption.id);
+        let overrides = hw1f_overrides_json(swaption);
+        let req = Hw1fResolveRequest {
+            curve_id: swaption.discount_curve_id.as_str(),
+            flavor: Hw1fCalibrationFlavor::Swaption,
+            overrides: overrides.as_ref(),
+            surface: Some(Hw1fSurfaceCalibration::Swaption {
+                surface_id: swaption.vol_surface_id.as_str(),
+                max_expiry: Some(ttm),
+                frequency: crate::calibration::hull_white::SwapFrequency::SemiAnnual,
+            }),
+            fallback: Some(self.config.hw_params),
+            context: context_label.as_str(),
+        };
+
+        resolve_hw1f_params(&req, market).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })
+    }
+
+    fn enforce_resolved_hw_params(
+        &self,
+        swaption: &BermudanSwaption,
+        hw_params: HullWhiteParams,
+        source: Hw1fParamSource,
+    ) -> std::result::Result<(), PricingError> {
+        if self.config.enforce_calibration
+            && source == Hw1fParamSource::DefaultFallback
+            && hw_params.is_uncalibrated_default()
+        {
+            return Err(PricingError::model_failure_with_context(
+                format!(
+                    "Bermudan swaption {} received uncalibrated HullWhiteParams::default() \
+                     (κ={:.3}, σ={:.3}) and no calibrated HW1F overrides, surface, market scalars, \
+                     or pre-calibrated model. Supply pricing_overrides.hw1f_mean_reversion and \
+                     pricing_overrides.hw1f_sigma, calibrated market scalars, or a pre-calibrated \
+                     tree on `BermudanSwaptionPricerConfig`.",
+                    swaption.id, hw_params.kappa, hw_params.sigma,
+                ),
+                PricingErrorContext::default(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Price using Hull-White tree.
     ///
     /// If a pre-calibrated model is set on the config, it will be used
@@ -312,80 +392,61 @@ impl BermudanSwaptionPricer {
         }
 
         // Use pre-calibrated model if available, otherwise calibrate a new one
-        let (pv, used_cached_model) = if let Some(ref cached_tree) =
-            self.config.pre_calibrated_model
-        {
-            // Use pre-calibrated model (O(1) per instrument)
-            let valuator =
-                BermudanSwaptionTreeValuator::new(swaption, cached_tree, disc.as_ref(), as_of)
-                    .map_err(|e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    })?;
-            let pv = valuator.price().map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-            (pv, true)
-        } else {
-            // Calibrate new model (O(Steps × Time) per instrument)
-            if self.config.hw_params.is_uncalibrated_default() {
-                if self.config.enforce_calibration {
-                    return Err(PricingError::model_failure_with_context(
-                        format!(
-                            "Bermudan swaption {} received uncalibrated HullWhiteParams::default() \
-                             (κ={:.3}, σ={:.3}) and no pre-calibrated model. Supply calibrated \
-                             params via `HullWhiteParams::new(κ, σ)` or a pre-calibrated tree on \
-                             `BermudanSwaptionPricerConfig`.",
-                            swaption.id, self.config.hw_params.kappa, self.config.hw_params.sigma,
-                        ),
+        let (pv, used_cached_model) =
+            if let Some(ref cached_tree) = self.config.pre_calibrated_model {
+                // Use pre-calibrated model (O(1) per instrument)
+                let valuator =
+                    BermudanSwaptionTreeValuator::new(swaption, cached_tree, disc.as_ref(), as_of)
+                        .map_err(|e| {
+                            PricingError::model_failure_with_context(
+                                e.to_string(),
+                                PricingErrorContext::default(),
+                            )
+                        })?;
+                let pv = valuator.price().map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
                         PricingErrorContext::default(),
-                    ));
-                }
-                tracing::warn!(
-                    instrument_id = %swaption.id,
-                    kappa = self.config.hw_params.kappa,
-                    sigma = self.config.hw_params.sigma,
-                    "Pricing Bermudan swaption with uncalibrated HullWhiteParams::default(); calibrate to co-terminal swaptions for production use"
-                );
-            }
-            // Thread exercise dates into the tree grid so Bermudan exercise
-            // decisions land exactly on grid points.
-            let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-            let model = CalibratedHullWhiteModel::calibrate_with_times(
-                self.config.hw_params,
-                self.config.tree_steps,
-                disc.as_ref(),
-                ttm,
-                &exercise_times,
-            )?;
-
-            let valuator =
-                BermudanSwaptionTreeValuator::new(swaption, &model, disc.as_ref(), as_of).map_err(
-                    |e| {
-                        PricingError::model_failure_with_context(
-                            e.to_string(),
-                            PricingErrorContext::default(),
-                        )
-                    },
+                    )
+                })?;
+                (pv, true)
+            } else {
+                // Calibrate new model (O(Steps × Time) per instrument)
+                let (hw_params, hw_source) = self.effective_hw_params(swaption, market, ttm)?;
+                self.enforce_resolved_hw_params(swaption, hw_params, hw_source)?;
+                // Thread exercise dates into the tree grid so Bermudan exercise
+                // decisions land exactly on grid points.
+                let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
+                let tree_steps = self.effective_tree_steps(swaption);
+                let model = CalibratedHullWhiteModel::calibrate_with_times(
+                    hw_params,
+                    tree_steps,
+                    disc.as_ref(),
+                    ttm,
+                    &exercise_times,
                 )?;
-            let pv = valuator.price().map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-            (pv, false)
-        };
+
+                let valuator =
+                    BermudanSwaptionTreeValuator::new(swaption, &model, disc.as_ref(), as_of)
+                        .map_err(|e| {
+                            PricingError::model_failure_with_context(
+                                e.to_string(),
+                                PricingErrorContext::default(),
+                            )
+                        })?;
+                let pv = valuator.price().map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
+                (pv, false)
+            };
 
         let mut result = ValuationResult::stamped(
             swaption.id.as_str(),
@@ -420,25 +481,6 @@ impl BermudanSwaptionPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
-        // Refuse uncalibrated defaults when enforcement is enabled (as
-        // the pricer registry does). LSMC has no cached model path, so
-        // this guard runs before any curve loading.
-        if self.config.enforce_calibration
-            && self.config.pre_calibrated_model.is_none()
-            && self.config.hw_params.is_uncalibrated_default()
-        {
-            return Err(PricingError::model_failure_with_context(
-                format!(
-                    "Bermudan swaption {} LSMC received uncalibrated \
-                     HullWhiteParams::default() (κ={:.3}, σ={:.3}). Supply \
-                     calibrated params via `HullWhiteParams::new(κ, σ)` or a \
-                     pre-calibrated tree on `BermudanSwaptionPricerConfig`.",
-                    swaption.id, self.config.hw_params.kappa, self.config.hw_params.sigma,
-                ),
-                PricingErrorContext::default(),
-            ));
-        }
-
         if swaption.forward_curve_id != swaption.discount_curve_id {
             return Err(PricingError::model_failure_with_context(
                 "Bermudan Hull-White pricing is currently single-curve only. \
@@ -471,6 +513,9 @@ impl BermudanSwaptionPricer {
                 Money::new(0.0, swaption.notional.currency()),
             ));
         }
+
+        let (hw_params, hw_source) = self.effective_hw_params(swaption, market, ttm)?;
+        self.enforce_resolved_hw_params(swaption, hw_params, hw_source)?;
 
         // Get exercise times in years
         let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
@@ -629,8 +674,8 @@ impl BermudanSwaptionPricer {
 
         // Calibrate Hull-White parameters from discount curve
         let hw_params = calibrate_theta_from_curve(
-            self.config.hw_params.kappa,
-            self.config.hw_params.sigma,
+            hw_params.kappa,
+            hw_params.sigma,
             &discount_fn,
             &theta_times,
         );
@@ -648,7 +693,8 @@ impl BermudanSwaptionPricer {
         let hw_process = HullWhite1FProcess::new(hw_params);
 
         // Create LSMC config
-        let lsmc_config = SwaptionLsmcConfig::new(self.config.mc_paths, self.config.mc_seed)
+        let mc_paths = self.effective_mc_paths(swaption);
+        let lsmc_config = SwaptionLsmcConfig::new(mc_paths, self.config.mc_seed)
             .with_basis_degree(3)
             .with_antithetic(true);
 
@@ -686,7 +732,7 @@ impl BermudanSwaptionPricer {
         );
         result.measures.insert(
             crate::metrics::MetricId::custom("lsmc_num_paths"),
-            self.config.mc_paths as f64,
+            mc_paths as f64,
         );
         result.measures.insert(
             crate::metrics::MetricId::custom("lsmc_seed"),

@@ -154,9 +154,10 @@ pub(crate) fn register_exotic_pricers(registry: &mut PricerRegistry) {
     // Registered with `enforce_calibration`: uncalibrated
     // `HullWhiteParams::default()` (κ=3%, σ=1%) produces 10–30% errors
     // on early-exercise premia. Callers must supply calibrated params
-    // via `HullWhiteParams::new(κ, σ)` or a pre-calibrated tree on
-    // `BermudanSwaptionPricerConfig`; otherwise pricing returns
-    // `PricingError::ModelFailure`.
+    // through instrument `pricing_overrides`, constructor-level
+    // `HullWhiteParams::new(κ, σ)`, market scalars/surface calibration, or
+    // a pre-calibrated tree on `BermudanSwaptionPricerConfig`; otherwise
+    // pricing returns `PricingError::ModelFailure`.
 
     registry.register(
         InstrumentType::BermudanSwaption,

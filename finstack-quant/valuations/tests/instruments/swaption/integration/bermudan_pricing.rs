@@ -17,7 +17,8 @@ use finstack_quant_valuations::instruments::rates::swaption::{
 use finstack_quant_valuations::instruments::rates::swaption::{
     BermudanSwaptionPricer, BermudanSwaptionPricerConfig,
 };
-use finstack_quant_valuations::instruments::OptionType;
+use finstack_quant_valuations::instruments::{OptionType, PricingOptions};
+use finstack_quant_valuations::prelude::Instrument;
 use finstack_quant_valuations::pricer::Pricer;
 use time::Month;
 
@@ -718,5 +719,73 @@ fn test_require_calibration_with_explicit_params_prices_successfully() {
     let result = pricer
         .price_dyn(&swaption, &market, as_of)
         .expect("explicit params should be accepted under require_calibration");
+    assert!(result.value.amount().is_finite());
+}
+
+#[test]
+fn test_require_calibration_accepts_instrument_hw1f_overrides() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
+    let swap_start = as_of;
+    let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("valid");
+    let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("valid");
+    let mut swaption =
+        test_bermudan_swaption(swap_start, swap_end, first_exercise, 0.03, OptionType::Call);
+    swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+    swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+
+    let market = build_market_context();
+    let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
+        mc_paths: 1_000,
+        mc_seed: 42,
+        enforce_calibration: true,
+        ..Default::default()
+    });
+
+    let result = pricer
+        .price_dyn(&swaption, &market, as_of)
+        .expect("instrument HW1F overrides should satisfy calibration enforcement");
+    assert!(result.value.amount().is_finite());
+}
+
+#[test]
+fn test_tree_require_calibration_accepts_instrument_hw1f_overrides() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
+    let swap_start = as_of;
+    let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("valid");
+    let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("valid");
+    let mut swaption =
+        test_bermudan_swaption(swap_start, swap_end, first_exercise, 0.03, OptionType::Call);
+    swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+    swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+    swaption.pricing_overrides.model_config.tree_steps = Some(50);
+
+    let market = build_market_context();
+    let pricer = BermudanSwaptionPricer::tree_with_config(BermudanSwaptionPricerConfig {
+        enforce_calibration: true,
+        ..Default::default()
+    });
+
+    let result = pricer
+        .price_dyn(&swaption, &market, as_of)
+        .expect("instrument HW1F overrides should satisfy tree calibration enforcement");
+    assert!(result.value.amount().is_finite());
+}
+
+#[test]
+fn test_registry_default_prices_with_instrument_hw1f_overrides() {
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid");
+    let swap_start = as_of;
+    let swap_end = Date::from_calendar_date(2030, Month::January, 1).expect("valid");
+    let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("valid");
+    let mut swaption =
+        test_bermudan_swaption(swap_start, swap_end, first_exercise, 0.03, OptionType::Call);
+    swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+    swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+    swaption.pricing_overrides.model_config.mc_paths = Some(1_000);
+
+    let market = build_market_context();
+    let result = swaption
+        .price_with_metrics(&market, as_of, &[], PricingOptions::default())
+        .expect("default registry Bermudan pricing should accept calibrated HW1F overrides");
     assert!(result.value.amount().is_finite());
 }
