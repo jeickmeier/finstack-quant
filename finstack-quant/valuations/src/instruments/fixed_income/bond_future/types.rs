@@ -1942,6 +1942,10 @@ mod tests {
 impl crate::instruments::common_impl::traits::Instrument for BondFuture {
     impl_instrument_base!(crate::pricer::InstrumentType::BondFuture);
 
+    fn default_model(&self) -> crate::pricer::ModelKey {
+        crate::pricer::ModelKey::BondFutureCleanPriceProxy
+    }
+
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         MarketDependencies::from_curve_dependencies(self)
     }

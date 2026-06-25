@@ -63,7 +63,7 @@ Notebooks: 99 | distinct public (__all__) symbols: 523
   UNCOVERED:         93
 ```
 
-User-facing coverage is complete: **all 33 functions**, **all user-facing result/enum/spec types**, and the **margin / Monte-Carlo / features / covenants** gaps have runnable cells. `02_pricing/instruments/typed_instrument_api.ipynb` demonstrates the typed instrument surface (`from_json`/`validate`/`to_json`/`price`) for **all 70 priceable instrument classes** across every `finstack_quant.valuations.instruments.*` module (commodity 6, credit_derivatives 4, equity 13, exotics 4, fixed_income 12, fx 10, rates 21), plus an end-to-end priced swap.
+User-facing coverage is complete: **all 33 functions**, **all user-facing result/enum/spec types**, and the **margin / Monte-Carlo / features / covenants** gaps have runnable cells. `02_pricing/instruments/typed_instrument_api.ipynb` demonstrates the typed instrument surface (`from_json`/`validate`/`to_json`/`price`) for **all 70 priceable instrument classes** across every `finstack_quant.valuations.instruments.*` module (commodity 6, credit_derivatives 4, equity 13, exotics 4, fixed_income 12, fx 10, rates 21), including best-effort end-to-end pricing for **69/70** against one shared synthesized `MarketContext`.
 
 **`finstack_quant.valuations.instruments.*` is now at 100% (70/70).** Specs were sourced from the canonical schema `examples` in `finstack-quant/valuations/schemas/instruments/1/` (plus golden pricing fixtures and notebook payloads), each verified via `from_json` + `validate`.
 
@@ -82,6 +82,8 @@ All **priceable instrument classes are now covered**; the remaining uncovered sy
 ### Instrument coverage detail
 
 `02_pricing/instruments/typed_instrument_api.ipynb` carries a `CATALOG` of verified specs for **all 70** `instruments.*` classes and confirms `from_json` → `validate` → `to_json` for each. Spec provenance: the canonical schema `examples` arrays under `finstack-quant/valuations/schemas/instruments/1/` (authoritative, snake_case), supplemented by golden pricing fixtures and existing notebook payloads. (The repo's `tests/instruments/json_examples/*.json` use a divergent PascalCase enum casing that the Python `from_json` deserializer rejects, so they were not used directly.)
+
+The same notebook now derives market-data references from `CATALOG`, builds one synthetic `MarketContext` via typed market-data classes (`DiscountCurve`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`, `VolSurface`, `VolCube`, `VolatilityIndexCurve`, `FxMatrix`), and prices **69/70** instruments end-to-end with default registered models. The remaining annotated residual is `BermudanSwaption`, whose registered pricer correctly refuses uncalibrated Hull-White defaults; it needs calibrated HW parameters or a pre-calibrated tree supplied through the typed JSON pricing path rather than more shared market data.
 
 ### Known binding inconsistency (flagged, not fixed here)
 

@@ -16,6 +16,7 @@ use finstack_quant_valuations::instruments::fixed_income::bond_future::{
     BondFuture, BondFutureSpecs, DeliverableBond, Position,
 };
 use finstack_quant_valuations::instruments::Attributes;
+use finstack_quant_valuations::prelude::Instrument;
 use finstack_quant_valuations::pricer::{standard_registry, InstrumentType, ModelKey};
 use time::macros::date;
 
@@ -464,6 +465,26 @@ fn test_bond_future_pricer_registry_ctd_npv() {
         "Registry pricing should match CTD NPV, diff={}",
         diff
     );
+}
+
+#[test]
+fn test_bond_future_default_model_uses_clean_price_proxy() {
+    let mut deliverable_bonds = create_deliverable_basket().1;
+    deliverable_bonds[0].conversion_factor = 0.8234;
+    let future = create_ust_10y_future(TestBondFutureConfig {
+        id: "TYH5",
+        notional: 1_000_000.0,
+        expiry: date!(2025 - 03 - 20),
+        delivery_start: date!(2025 - 03 - 21),
+        delivery_end: date!(2025 - 03 - 31),
+        quoted_price: 125.50,
+        position: Position::Long,
+        deliverable_basket: vec![deliverable_bonds[0].clone()],
+        ctd_bond_id: "US912828XG33",
+        discount_curve_id: "USD-TREASURY",
+    });
+
+    assert_eq!(future.default_model(), ModelKey::BondFutureCleanPriceProxy);
 }
 
 #[test]
