@@ -253,8 +253,20 @@ impl PricerRegistry {
         let shared = if metrics.is_empty() {
             SharedPricingInputs::default()
         } else {
+            // The metrics pipeline needs an `Arc<PricerRegistry>` so calculators
+            // can reprice through the same dispatch table. When `self` is the
+            // process-wide standard-registry singleton (the common case — e.g.
+            // `standard_registry().price_with_metrics(...)`), reuse its shared
+            // `Arc` instead of deep-cloning the 100+ pricer `BTreeMap`. Only a
+            // bespoke, non-singleton registry falls back to a clone.
+            let singleton = crate::pricer::shared_standard_registry();
+            let registry = if std::ptr::eq(singleton.as_ref(), self) {
+                singleton
+            } else {
+                Arc::new(self.clone())
+            };
             SharedPricingInputs {
-                registry: Some(Arc::new(self.clone())),
+                registry: Some(registry),
                 market: Some(Arc::new(market.clone())),
             }
         };
@@ -498,8 +510,17 @@ impl PricerRegistry {
         let shared = if metrics.is_empty() {
             SharedPricingInputs::default()
         } else {
+            // Reuse the shared standard-registry `Arc` when `self` is that
+            // singleton (avoids deep-cloning the pricer dispatch table); a
+            // bespoke registry falls back to a one-time clone for the batch.
+            let singleton = crate::pricer::shared_standard_registry();
+            let registry = if std::ptr::eq(singleton.as_ref(), self) {
+                singleton
+            } else {
+                Arc::new(self.clone())
+            };
             SharedPricingInputs {
-                registry: Some(Arc::new(self.clone())),
+                registry: Some(registry),
                 market: Some(Arc::new(market.clone())),
             }
         };

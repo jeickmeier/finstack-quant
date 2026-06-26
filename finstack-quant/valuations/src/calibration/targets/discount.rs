@@ -1126,50 +1126,61 @@ Ensure quotes map to strictly increasing year fractions.",
         // Central finite differences: O(h^2) accuracy vs O(h) for forward FD.
         let fd_eps = self.config.discount_curve.jacobian_step_size;
         let mut params_bumped = params.to_vec();
-        let mut temp_context = self.scratch.base().clone();
+
+        // The pillar time of each quote is independent of the bumped parameters,
+        // so derive it once rather than recomputing it inside every ±h column
+        // loop (previously `2 * n_params * n_quotes` redundant calls).
+        let quote_times = quotes
+            .iter()
+            .map(|q| self.quote_time(q))
+            .collect::<Result<Vec<f64>>>()?;
+
+        // Reused across columns: for any quote the +h and -h loops skip exactly
+        // the same entries (same `t_cutoff` / `quote_times`), so every entry
+        // that is read in the -h loop was freshly written in the +h loop. One
+        // buffer therefore suffices instead of allocating per column.
+        let mut vals_plus = vec![0.0_f64; quotes.len()];
 
         for j in 0..params.len() {
             let p_orig = params[j];
 
             let h = (p_orig.abs() * fd_eps).max(fd_eps);
-
-            // +h evaluation
-            params_bumped[j] = p_orig + h;
-            let curve_plus = self.build_curve_for_solver_from_params(times, &params_bumped)?;
-            temp_context = temp_context.insert(curve_plus);
-            let ctx_plus = &temp_context;
-
-            let mut vals_plus = vec![0.0_f64; quotes.len()];
             let t_cutoff = if j > 0 { times[j - 1] } else { 0.0 };
 
-            for (i, quote) in quotes.iter().enumerate() {
-                let t_quote = self.quote_time(quote)?;
-                if t_quote < t_cutoff - 1e-4 {
-                    continue;
+            // +h evaluation. Insert the bumped curve into the scratch context
+            // in place (`with_curve` uses `insert_mut`), avoiding the full
+            // `MarketContext` clone + consuming rebuild the previous code did.
+            params_bumped[j] = p_orig + h;
+            let curve_plus = self.build_curve_for_solver_from_params(times, &params_bumped)?;
+            self.scratch.with_curve(&curve_plus, |ctx_plus| {
+                for (i, quote) in quotes.iter().enumerate() {
+                    if quote_times[i] < t_cutoff - 1e-4 {
+                        continue;
+                    }
+                    let pv = quote.get_instrument().value_raw(ctx_plus, self.base_date)?;
+                    vals_plus[i] = pv / self.residual_notional;
                 }
-                let pv = quote.get_instrument().value_raw(ctx_plus, self.base_date)?;
-                vals_plus[i] = pv / self.residual_notional;
-            }
+                Ok(())
+            })?;
 
             // -h evaluation
             params_bumped[j] = p_orig - h;
             let curve_minus = self.build_curve_for_solver_from_params(times, &params_bumped)?;
-            temp_context = temp_context.insert(curve_minus);
-            let ctx_minus = &temp_context;
+            self.scratch.with_curve(&curve_minus, |ctx_minus| {
+                for (i, quote) in quotes.iter().enumerate() {
+                    if quote_times[i] < t_cutoff - 1e-4 {
+                        jacobian[i][j] = 0.0;
+                        continue;
+                    }
+                    let pv = quote
+                        .get_instrument()
+                        .value_raw(ctx_minus, self.base_date)?;
+                    let val_minus = pv / self.residual_notional;
 
-            for (i, quote) in quotes.iter().enumerate() {
-                let t_quote = self.quote_time(quote)?;
-                if t_quote < t_cutoff - 1e-4 {
-                    jacobian[i][j] = 0.0;
-                    continue;
+                    jacobian[i][j] = (vals_plus[i] - val_minus) / (2.0 * h);
                 }
-                let pv = quote
-                    .get_instrument()
-                    .value_raw(ctx_minus, self.base_date)?;
-                let val_minus = pv / self.residual_notional;
-
-                jacobian[i][j] = (vals_plus[i] - val_minus) / (2.0 * h);
-            }
+                Ok(())
+            })?;
 
             params_bumped[j] = p_orig;
         }

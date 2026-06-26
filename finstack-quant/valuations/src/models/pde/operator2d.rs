@@ -209,14 +209,30 @@ fn compute_cross_derivative(problem: &dyn PdeProblem2D, grid: &Grid2D, t: f64) -
 /// Returns a flat vector of length `nx_int * ny_int` containing
 /// `a_xy / (4 hx hy) * [u(i+1,j+1) - u(i+1,j-1) - u(i-1,j+1) + u(i-1,j-1)]`.
 pub fn apply_cross_derivative(cross_coeffs: &[f64], u_full: &[f64], grid: &Grid2D) -> Vec<f64> {
+    let mut result = vec![0.0; grid.nx_interior() * grid.ny_interior()];
+    apply_cross_derivative_into(&mut result, cross_coeffs, u_full, grid);
+    result
+}
+
+/// In-place variant of [`apply_cross_derivative`] that writes into `out`
+/// (length `nx_int * ny_int`) rather than allocating a fresh vector.
+///
+/// The Modified Craig-Sneyd ADI stepper applies the cross-derivative operator
+/// twice per timestep; reusing a caller-owned scratch buffer here removes two
+/// full interior-grid allocations from every step of the time march.
+pub fn apply_cross_derivative_into(
+    out: &mut [f64],
+    cross_coeffs: &[f64],
+    u_full: &[f64],
+    grid: &Grid2D,
+) {
     let nx_int = grid.nx_interior();
     let ny_int = grid.ny_interior();
     let ny = grid.ny();
 
     debug_assert_eq!(u_full.len(), grid.total());
     debug_assert_eq!(cross_coeffs.len(), nx_int * ny_int);
-
-    let mut result = vec![0.0; nx_int * ny_int];
+    debug_assert_eq!(out.len(), nx_int * ny_int);
 
     for ii in 0..nx_int {
         let i = ii + 1; // grid index
@@ -229,11 +245,9 @@ pub fn apply_cross_derivative(cross_coeffs: &[f64], u_full: &[f64], grid: &Grid2
             let u_mp = u_full[(i - 1) * ny + (j + 1)];
             let u_mm = u_full[(i - 1) * ny + (j - 1)];
 
-            result[ii * ny_int + jj] = cross_coeffs[ii * ny_int + jj] * (u_pp - u_pm - u_mp + u_mm);
+            out[ii * ny_int + jj] = cross_coeffs[ii * ny_int + jj] * (u_pp - u_pm - u_mp + u_mm);
         }
     }
-
-    result
 }
 
 #[cfg(test)]

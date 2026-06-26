@@ -59,7 +59,7 @@
 
 use super::boundary::BoundaryCondition;
 use super::grid2d::Grid2D;
-use super::operator2d::{apply_cross_derivative, Operators2D};
+use super::operator2d::{apply_cross_derivative_into, Operators2D};
 use super::problem2d::PdeProblem2D;
 use super::stepper::StepperError;
 
@@ -91,6 +91,10 @@ pub struct AdiWorkBuffers {
     ax_y2: Vec<f64>,
     /// `F_2(t_{n+1}, Y_2) = A_y * Y_2` (interior), for the MCS corrector.
     ay_y2: Vec<f64>,
+    /// `F_0(t_n, u^n)`: cross-derivative term at `u^n` (interior).
+    cross: Vec<f64>,
+    /// `F_0(t_{n+1}, Y_2)`: cross-derivative term at `Y_2` (interior).
+    cross_y2: Vec<f64>,
 }
 
 impl AdiWorkBuffers {
@@ -113,6 +117,8 @@ impl AdiWorkBuffers {
             ay_u: vec![0.0; interior],
             ax_y2: vec![0.0; interior],
             ay_y2: vec![0.0; interior],
+            cross: vec![0.0; interior],
+            cross_y2: vec![0.0; interior],
         }
     }
 
@@ -157,6 +163,12 @@ impl AdiWorkBuffers {
         }
         if self.ay_y2.len() != interior {
             self.ay_y2.resize(interior, 0.0);
+        }
+        if self.cross.len() != interior {
+            self.cross.resize(interior, 0.0);
+        }
+        if self.cross_y2.len() != interior {
+            self.cross_y2.resize(interior, 0.0);
         }
     }
 }
@@ -427,13 +439,15 @@ impl CraigSneydStepper {
             ay_u,
             ax_y2,
             ay_y2,
+            cross,
+            cross_y2,
         } = buffers;
 
         // Assemble operators at t_from (for the explicit evaluation of F at u^n).
         let ops = Operators2D::assemble(problem, grid, t_from);
 
         // F_0(t_n, u^n): the mixed (cross-derivative) term applied to u^n.
-        let cross = apply_cross_derivative(&ops.cross_deriv, u_full, grid);
+        apply_cross_derivative_into(cross, &ops.cross_deriv, u_full, grid);
 
         // F_1(t_n, u^n) = A_x * u^n  (for each y-line).
         apply_x_operator(&ops, u_int, nx_int, ny_int, x_line, line_out, ax_u);
@@ -483,7 +497,7 @@ impl CraigSneydStepper {
 
         // --- MCS mixed-term corrector ---
         // F_0(t_{n+1}, Y_2): mixed term applied to Y_2.
-        let cross_y2 = apply_cross_derivative(&ops_impl.cross_deriv, u_full, grid);
+        apply_cross_derivative_into(cross_y2, &ops_impl.cross_deriv, u_full, grid);
         // F_1(t_{n+1}, Y_2) = A_x * Y_2 and F_2(t_{n+1}, Y_2) = A_y * Y_2,
         // needed for the full-operator difference in the Ytld_0 line.
         apply_x_operator(&ops_impl, y2, nx_int, ny_int, x_line, line_out, ax_y2);

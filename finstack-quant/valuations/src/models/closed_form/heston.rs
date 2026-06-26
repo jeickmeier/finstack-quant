@@ -433,6 +433,9 @@ pub struct HestonStripPricer {
     params: HestonParams,
     /// Composite quadrature grid as `(phi, weight)` pairs.
     grid: Vec<(f64, f64)>,
+    /// Start of the tail window `u_max * (1 - HESTON_TAIL_WINDOW_FRACTION)`,
+    /// precomputed from `grid` so `probability` does not rescan it per call.
+    tail_window_start: f64,
     /// Cached `psi_1(phi) / (i * phi)` values on the grid.
     psi1_over_iphi: Vec<Complex<f64>>,
     /// Cached `psi_2(phi) / (i * phi)` values on the grid.
@@ -518,11 +521,18 @@ impl HestonStripPricer {
                 > HESTON_STRIP_MAX_CORRUPT_FRACTION
                 || ok_nodes == 0);
 
+        // `u_max` (largest grid abscissa) and the tail-window start are fixed
+        // once the grid is built, so compute them here rather than rescanning
+        // the grid on every `probability` call.
+        let u_max = grid.iter().map(|(phi, _)| *phi).fold(0.0_f64, f64::max);
+        let tail_window_start = u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
+
         Some(Self {
             spot,
             time,
             params: *params,
             grid,
+            tail_window_start,
             psi1_over_iphi,
             psi2_over_iphi,
             integrand_corrupted,
@@ -542,14 +552,9 @@ impl HestonStripPricer {
         let mut integral = 0.0;
         let mut tail_abs_mass = 0.0;
 
-        // `u_max` is the largest grid abscissa; the tail window is its last
-        // `HESTON_TAIL_WINDOW_FRACTION`.
-        let u_max = self
-            .grid
-            .iter()
-            .map(|(phi, _)| *phi)
-            .fold(0.0_f64, f64::max);
-        let tail_window_start = u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
+        // `u_max` (largest grid abscissa) and the tail-window start were
+        // precomputed at construction.
+        let tail_window_start = self.tail_window_start;
 
         for ((phi, weight), cached) in self.grid.iter().zip(cached_values.iter()) {
             let exp_term = (-i * *phi * log_strike).exp();
@@ -989,6 +994,29 @@ fn heston_pj_with_diagnostics(
         };
     };
 
+    heston_pj_on_grid(j, spot, strike, time, params, settings, &grid)
+}
+
+/// Gil-Pelaez `Pj` probability and diagnostics evaluated on a *prebuilt*
+/// composite Gauss-Legendre grid.
+///
+/// The grid depends only on `settings` (not on `j`, `spot`, `strike`, or
+/// `time`), so [`heston_call_price_fourier_with_settings`] builds it once and
+/// shares it across the `j = 1` and `j = 2` evaluations instead of rebuilding
+/// the `gl_order * panels`-node grid twice per scalar price.
+fn heston_pj_on_grid(
+    j: u8,
+    spot: f64,
+    strike: f64,
+    time: f64,
+    params: &HestonParams,
+    settings: &HestonFourierSettings,
+    grid: &[(f64, f64)],
+) -> HestonPjDiagnostics {
+    let log_spot = spot.ln();
+    let log_strike = strike.ln();
+    let i = Complex::new(0.0, 1.0);
+
     // The tail window starts at this φ; absolute integrand mass beyond it
     // estimates the error from truncating the integral at `u_max`.
     let tail_window_start = settings.u_max * (1.0 - HESTON_TAIL_WINDOW_FRACTION);
@@ -999,7 +1027,7 @@ fn heston_pj_with_diagnostics(
     let mut corrupted_nodes = 0_usize;
     let mut ok_nodes = 0_usize;
 
-    for (phi, weight) in &grid {
+    for (phi, weight) in grid {
         // Handle singularity at φ=0.
         if phi.abs() < settings.phi_eps {
             continue;
@@ -1251,9 +1279,23 @@ pub fn heston_call_price_fourier_with_settings(
         );
     }
 
-    // Compute P1 and P2 via Fourier inversion, with diagnostics.
-    let d1 = heston_pj_with_diagnostics(1, spot, strike, time, params, settings);
-    let d2 = heston_pj_with_diagnostics(2, spot, strike, time, params, settings);
+    // Compute P1 and P2 via Fourier inversion, with diagnostics. The composite
+    // Gauss-Legendre grid depends only on `settings`, so build it once and share
+    // it across the j=1 / j=2 evaluations rather than rebuilding it twice. The
+    // degenerate-settings path (grid build fails) falls back to the
+    // self-contained `heston_pj_with_diagnostics`, which uses library quadrature.
+    let grid =
+        composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels);
+    let (d1, d2) = match &grid {
+        Some(g) => (
+            heston_pj_on_grid(1, spot, strike, time, params, settings, g),
+            heston_pj_on_grid(2, spot, strike, time, params, settings, g),
+        ),
+        None => (
+            heston_pj_with_diagnostics(1, spot, strike, time, params, settings),
+            heston_pj_with_diagnostics(2, spot, strike, time, params, settings),
+        ),
+    };
 
     // Audit item 5: characteristic-function overflow corruption fallback.
     // `heston_pj_characteristic_function` reports `HestonCfStatus::Overflow`

@@ -606,6 +606,10 @@ where
         0
     };
 
+    // Reusable scratch knot vector for the per-knot FD bumps, restored to the
+    // base knots each iteration instead of allocating two fresh vectors.
+    let mut knots_scratch = knots.to_vec();
+
     for (sorted_idx, sq) in sorted_quotes.iter().enumerate() {
         let knot_idx = n_initial + sorted_idx;
         let resid = resid_values.get(sorted_idx).copied().unwrap_or(0.0);
@@ -615,17 +619,18 @@ where
             let h = bump_h * (1.0 + v.abs());
             let quote = &quotes[sq.original_idx];
 
-            // Central differences: O(h^2) accuracy
-            let mut knots_up = knots.to_vec();
-            knots_up[knot_idx] = (t, v + h);
-            let mut knots_dn = knots.to_vec();
-            knots_dn[knot_idx] = (t, v - h);
-
+            // Central differences: O(h^2) accuracy. Reuse `knots_scratch`:
+            // restore it to the base knots, perturb only `knot_idx` for the up
+            // bump, evaluate, then re-perturb the same entry for the down bump
+            // (every other entry already equals the base knots).
+            knots_scratch.copy_from_slice(knots);
+            knots_scratch[knot_idx] = (t, v + h);
             let resid_up = target
-                .build_curve_for_solver(&knots_up)
+                .build_curve_for_solver(&knots_scratch)
                 .and_then(|c| target.calculate_residual(&c, quote));
+            knots_scratch[knot_idx] = (t, v - h);
             let resid_dn = target
-                .build_curve_for_solver(&knots_dn)
+                .build_curve_for_solver(&knots_scratch)
                 .and_then(|c| target.calculate_residual(&c, quote));
 
             match (resid_up, resid_dn) {

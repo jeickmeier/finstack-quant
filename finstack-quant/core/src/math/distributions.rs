@@ -312,24 +312,37 @@ pub fn binomial_probability(n: usize, k: usize, p: f64) -> f64 {
 ///   (2nd ed.). Wiley. Chapter 3.
 #[must_use]
 pub fn binomial_pmf_all(n: usize, p: f64) -> Vec<f64> {
-    let mut pmf = vec![0.0; n + 1];
+    let mut pmf = Vec::new();
+    binomial_pmf_all_into(&mut pmf, n, p);
+    pmf
+}
+
+/// In-place variant of [`binomial_pmf_all`] that writes the PMF into `out`
+/// (cleared and resized to `n + 1`) rather than allocating a fresh vector.
+///
+/// Hot loops that evaluate the binomial PMF many times — e.g. a CDS-tranche
+/// factor-quadrature integrand, which calls this once per Gauss-Hermite node
+/// per payment date — can pass a reusable scratch buffer to avoid an
+/// allocation on every evaluation.
+pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) {
+    out.clear();
+    out.resize(n + 1, 0.0);
     if p <= 0.0 {
-        pmf[0] = 1.0;
-        return pmf;
+        out[0] = 1.0;
+        return;
     }
     if p >= 1.0 {
-        pmf[n] = 1.0;
-        return pmf;
+        out[n] = 1.0;
+        return;
     }
 
     let log_ratio = p.ln() - (1.0 - p).ln();
     let mut log_prob = n as f64 * (1.0 - p).ln();
-    pmf[0] = log_prob.exp();
+    out[0] = log_prob.exp();
     for k in 0..n {
         log_prob += ((n - k) as f64).ln() - ((k + 1) as f64).ln() + log_ratio;
-        pmf[k + 1] = log_prob.exp();
+        out[k + 1] = log_prob.exp();
     }
-    pmf
 }
 
 /// Calculate log of binomial coefficient ln(C(n,k)).

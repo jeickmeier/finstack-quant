@@ -44,6 +44,7 @@ use finstack_quant_core::{Error as CoreError, Result};
 use finstack_quant_monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_monte_carlo::traits::RandomStream;
+use rayon::prelude::*;
 
 /// Configuration for Monte Carlo OAS calculation.
 #[derive(Debug, Clone)]
@@ -407,19 +408,31 @@ pub(crate) fn calculate_mc_oas(
     // to NaN. The first non-zero error is preserved across iterations.
     let pricing_error: std::cell::RefCell<Option<CoreError>> = std::cell::RefCell::new(None);
 
-    // Objective: average price across paths minus market price
+    // Objective: average price across paths minus market price.
+    //
+    // Paths are independent, so price them in parallel and collect the results
+    // in path order; the sum is then taken serially in that order, keeping the
+    // objective value bit-identical to the serial implementation (and therefore
+    // keeping Brent's iterates — and the solved OAS — unchanged).
     let objective = |oas: f64| -> f64 {
+        let path_pvs: Vec<Result<f64>> = paths
+            .par_iter()
+            .map(|path| {
+                price_on_path(
+                    mbs,
+                    path,
+                    initial_rate,
+                    oas,
+                    config.prepay_rate_sensitivity,
+                    as_of,
+                    &payment_extras,
+                )
+            })
+            .collect();
+
         let mut total = 0.0_f64;
-        for path in &paths {
-            match price_on_path(
-                mbs,
-                path,
-                initial_rate,
-                oas,
-                config.prepay_rate_sensitivity,
-                as_of,
-                &payment_extras,
-            ) {
+        for pv in path_pvs {
+            match pv {
                 Ok(pv) => total += pv,
                 Err(e) => {
                     if pricing_error.borrow().is_none() {
@@ -457,19 +470,22 @@ pub(crate) fn calculate_mc_oas(
         ))
     })?;
 
-    // Recompute path prices at the converged OAS for statistics.
-    let mut path_prices = Vec::with_capacity(config.num_paths);
-    for path in &paths {
-        path_prices.push(price_on_path(
-            mbs,
-            path,
-            initial_rate,
-            oas,
-            config.prepay_rate_sensitivity,
-            as_of,
-            &payment_extras,
-        )?);
-    }
+    // Recompute path prices at the converged OAS for statistics (in parallel,
+    // collected in path order so the downstream mean/variance are unchanged).
+    let path_prices: Vec<f64> = paths
+        .par_iter()
+        .map(|path| {
+            price_on_path(
+                mbs,
+                path,
+                initial_rate,
+                oas,
+                config.prepay_rate_sensitivity,
+                as_of,
+                &payment_extras,
+            )
+        })
+        .collect::<Result<Vec<f64>>>()?;
 
     let avg_price = path_prices.iter().sum::<f64>() / config.num_paths as f64;
 

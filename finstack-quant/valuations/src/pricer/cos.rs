@@ -342,14 +342,18 @@ impl<'a> CosPricer<'a> {
         let bma = b - a;
         let df = (-r * t).exp();
 
-        // Pre-compute the CF values (strike-independent).
-        // phi(u_k, t) for u_k = k*pi/(b-a)
+        // Pre-compute the strike-independent COS coefficients
+        //   a_k = Re[phi_Y(u_k) * exp(-i*u_k*a)],   u_k = k*pi/(b-a)
+        // for the whole strip. Only the payoff coefficient `v_k` depends on the
+        // strike, so the characteristic-function evaluation and the complex
+        // `exp(-i*u_k*a)` phase factor (the dominant per-term cost) are computed
+        // once here rather than once per strike inside `put_price`.
         //
         // A non-finite CF value (NaN/inf) — e.g. a model parameterised
         // outside its domain of validity — would otherwise propagate into
         // `raw` and then be silently swallowed by a `max(0.0)` clamp,
         // reporting a fully-failed pricing as a benign `$0`. Reject it here.
-        let mut cf_vals: Vec<Complex64> = Vec::with_capacity(n);
+        let mut aks: Vec<f64> = Vec::with_capacity(n);
         for k in 0..n {
             let u_k = k as f64 * PI / bma;
             let cf_val = self.cf.cf(Complex64::new(u_k, 0.0), t);
@@ -363,7 +367,8 @@ impl<'a> CosPricer<'a> {
                     crate::pricer::PricingErrorContext::default(),
                 ));
             }
-            cf_vals.push(cf_val);
+            let phase = Complex64::new(0.0, -u_k * a).exp();
+            aks.push((cf_val * phase).re);
         }
 
         // The COS cosine-series sum is evaluated on the *put* payoff for every
@@ -404,7 +409,7 @@ impl<'a> CosPricer<'a> {
         strikes
             .iter()
             .map(|&strike| {
-                let put = self.put_price(strike, r, t, spot, a, b, bma, df, &cf_vals)?;
+                let put = self.put_price(strike, r, t, spot, a, b, bma, df, &aks)?;
                 if !is_call {
                     return Ok(put);
                 }
@@ -431,7 +436,7 @@ impl<'a> CosPricer<'a> {
         b: f64,
         bma: f64,
         df: f64,
-        cf_vals: &[Complex64],
+        aks: &[f64],
     ) -> std::result::Result<f64, PricingError> {
         // x0 = ln(S/K): shift from Y to X = Y + x0.
         // Integration window in X-space, following the moneyness shift.
@@ -445,10 +450,7 @@ impl<'a> CosPricer<'a> {
         // weights decay (sub-)exponentially. A naive `+=` accumulator loses
         // low-order bits; use Neumaier compensated summation.
         let mut sum = NeumaierAccumulator::new();
-        for (k, &cf_val) in cf_vals.iter().enumerate() {
-            let k_f = k as f64;
-            let u_k = k_f * PI / bma;
-
+        for (k, &ak) in aks.iter().enumerate() {
             // Put payoff (1 - e^x)^+ is supported on X <= 0. The payoff
             // sub-interval is the intersection of that half-line with the
             // X-centred window [a_x, b_x] — for deep OTM/ITM strikes the
@@ -457,12 +459,9 @@ impl<'a> CosPricer<'a> {
             let hi = 0.0_f64.clamp(a_x, b_x);
             let v_k = -chi_k(k, a_x, b_x, a_x, hi) + psi_k(k, a_x, b_x, a_x, hi);
 
-            // phi_X(u_k) = exp(i*u_k*x0) * phi_Y(u_k)
-            // We need: Re[phi_X(u_k) * exp(-i*u_k*a_x)]
-            //        = Re[phi_Y(u_k) * exp(-i*u_k*a)]   since a_x - x0 = a.
-            let phase = Complex64::new(0.0, -u_k * a).exp();
-            let ak = (cf_val * phase).re;
-
+            // `ak = Re[phi_Y(u_k) * exp(-i*u_k*a)]` is strike-independent and was
+            // precomputed for the whole strip; only `v_k` varies with the strike.
+            // (The phase identity uses `a_x - x0 = a`.)
             let weight = if k == 0 { 0.5 } else { 1.0 };
             sum.add(weight * (2.0 / bma) * ak * v_k);
         }

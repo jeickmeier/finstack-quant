@@ -271,6 +271,11 @@ impl HestonModel {
         )?;
         let error_cell: RefCell<Option<finstack_quant_core::Error>> = RefCell::new(None);
 
+        // Loop invariants hoisted out of the per-evaluation integrand (the
+        // adaptive quadrature may call the closure thousands of times).
+        let i_complex = Complex::new(0.0, 1.0);
+        let log_k = K.ln();
+
         // Integrand function for adaptive quadrature
         let integrand_fn = |phi: f64| -> f64 {
             if phi <= 0.0 {
@@ -290,8 +295,6 @@ impl HestonModel {
             };
 
             // Integrand: Re[ (e^{-i * phi * ln(K)} * psi) / (i * phi) ]
-            let i_complex = Complex::new(0.0, 1.0);
-            let log_k = K.ln();
             let term = (-i_complex * phi * log_k).exp() * psi / (i_complex * phi);
 
             // Return real part, handling potential NaN/Inf

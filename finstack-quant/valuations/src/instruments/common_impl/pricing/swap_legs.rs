@@ -860,6 +860,20 @@ where
     // Use incremental Kahan accumulator to avoid Vec allocation
     let mut acc = NeumaierAccumulator::new();
 
+    // For compounded legs the per-fixing index floor/cap are applied inside the
+    // projection, so they are stripped from the rate params used for the all-in
+    // rate. That stripped copy is loop-invariant, so build it once here rather
+    // than cloning `params.rate_params` on every compounded period.
+    let compounded_rate_params = if matches!(params.compounding_method, CompoundingMethod::Simple) {
+        None
+    } else {
+        Some(crate::cashflow::builder::rate_helpers::FloatingRateParams {
+            index_floor_bp: None,
+            index_cap_bp: None,
+            ..params.rate_params.clone()
+        })
+    };
+
     for period in periods {
         // Apply payment delay to determine the actual payment date
         let payment_date = add_payment_delay(
@@ -1014,16 +1028,10 @@ where
         // per-fixing inside `compounded_forward_projection`; strip them from the
         // rate params so they are not applied a second time to the now-averaged
         // period rate. Spread, gearing, and the all-in floor/cap still apply.
-        let all_in_rate = if is_compounded {
-            let rate_params_no_index_bounds =
-                crate::cashflow::builder::rate_helpers::FloatingRateParams {
-                    index_floor_bp: None,
-                    index_cap_bp: None,
-                    ..params.rate_params.clone()
-                };
+        let all_in_rate = if let Some(rate_params_no_index_bounds) = &compounded_rate_params {
             crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                 index_rate,
-                &rate_params_no_index_bounds,
+                rate_params_no_index_bounds,
             )
         } else {
             crate::cashflow::builder::rate_helpers::calculate_floating_rate(

@@ -73,8 +73,7 @@ use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 
-use super::state_keys;
-use super::tree_framework::{NodeState, TreeModel, TreeValuator};
+use super::tree_framework::{CachedValues, NodeState, TreeModel, TreeValuator};
 
 /// Maximum allowed mean-reversion speed (κ) for either factor.
 ///
@@ -516,29 +515,37 @@ impl TreeModel for RatesCreditTree {
         // OAS from initial variables (bp units, same convention as ShortRateTree)
         let oas_decimal = initial_vars.get("oas").copied().unwrap_or(0.0) / 10_000.0;
 
-        // Pre-allocate double buffers for backward induction (zero allocations in loop)
+        // Pre-allocate flat double buffers for backward induction (zero
+        // allocations in the loop). Row-major `[i * max_nodes + j]` storage is
+        // cache-friendlier than a `Vec<Vec<f64>>` (no per-row pointer chase).
         let max_nodes = steps + 1;
-        let mut curr_values: Vec<Vec<f64>> = vec![vec![0.0; max_nodes]; max_nodes];
-        let mut next_values: Vec<Vec<f64>> = vec![vec![0.0; max_nodes]; max_nodes];
-        let mut vars = initial_vars.clone();
+        let mut curr_values: Vec<f64> = vec![0.0; max_nodes * max_nodes];
+        let mut next_values: Vec<f64> = vec![0.0; max_nodes * max_nodes];
+
+        // No valuator used with this tree reads node coordinates from
+        // `state.vars`; they consume the cached `interest_rate`/`hazard_rate`
+        // fields and `state.step`. Build each `NodeState` via `with_cached`
+        // (supplying the per-node values directly) and skip the per-node
+        // `HashMap` writes entirely — `initial_vars` passes through unchanged.
 
         // Initialize terminal values
-        #[allow(clippy::needless_range_loop)]
         for i in 0..=steps {
             let r_t = self.calibrated_rates[steps][i];
-            #[allow(clippy::needless_range_loop)]
             for j in 0..=steps {
                 let h_t = self.calibrated_hazards[steps][j];
-
-                vars.insert(state_keys::INTEREST_RATE, r_t.max(1e-8));
-                vars.insert(state_keys::HAZARD_RATE, h_t.max(0.0));
-                vars.insert("step", steps as f64);
-                vars.insert("node_i", i as f64);
-                vars.insert("node_j", j as f64);
-                vars.insert("time", time_to_maturity);
-
-                let state = NodeState::new(steps, time_to_maturity, &vars, market_context);
-                curr_values[i][j] = valuator.value_at_maturity(&state)?;
+                let cached = CachedValues {
+                    interest_rate: Some(r_t.max(1e-8)),
+                    hazard_rate: Some(h_t.max(0.0)),
+                    ..CachedValues::default()
+                };
+                let state = NodeState::with_cached(
+                    steps,
+                    time_to_maturity,
+                    &initial_vars,
+                    market_context,
+                    cached,
+                );
+                curr_values[i * max_nodes + j] = valuator.value_at_maturity(&state)?;
             }
         }
 
@@ -576,10 +583,10 @@ impl TreeModel for RatesCreditTree {
                     let (p_uu, p_ud, p_du, p_dd) = self.joint_probabilities(p_r, p_h);
 
                     // Continuation from four children at step k+1
-                    let v_uu = curr_values[i + 1][j + 1];
-                    let v_ud = curr_values[i + 1][j];
-                    let v_du = curr_values[i][j + 1];
-                    let v_dd = curr_values[i][j];
+                    let v_uu = curr_values[(i + 1) * max_nodes + (j + 1)];
+                    let v_ud = curr_values[(i + 1) * max_nodes + j];
+                    let v_du = curr_values[i * max_nodes + (j + 1)];
+                    let v_dd = curr_values[i * max_nodes + j];
 
                     // Risk-free discounting with calibrated rate + OAS.
                     //
@@ -594,23 +601,31 @@ impl TreeModel for RatesCreditTree {
                     let df = (-(r_t + oas_decimal) * dt).exp();
                     let cont = df * (p_uu * v_uu + p_ud * v_ud + p_du * v_du + p_dd * v_dd);
 
-                    vars.insert(state_keys::INTEREST_RATE, r_t.max(1e-8));
-                    vars.insert(state_keys::HAZARD_RATE, h_t.max(0.0));
-                    vars.insert(state_keys::DF, df);
-                    vars.insert("step", k as f64);
-                    vars.insert("node_i", i as f64);
-                    vars.insert("node_j", j as f64);
-                    vars.insert("time", k as f64 * dt);
-
-                    let state = NodeState::new(k, k as f64 * dt, &vars, market_context);
-                    next_values[i][j] = valuator.value_at_node(&state, cont, dt)?;
+                    // `r_t`/`h_t` are floored only for the cached *state*
+                    // variables (shields valuators that reject non-positive
+                    // rates); the discounting above intentionally uses the raw
+                    // calibrated rate.
+                    let cached = CachedValues {
+                        interest_rate: Some(r_t.max(1e-8)),
+                        hazard_rate: Some(h_t.max(0.0)),
+                        df: Some(df),
+                        ..CachedValues::default()
+                    };
+                    let state = NodeState::with_cached(
+                        k,
+                        k as f64 * dt,
+                        &initial_vars,
+                        market_context,
+                        cached,
+                    );
+                    next_values[i * max_nodes + j] = valuator.value_at_node(&state, cont, dt)?;
                 }
             }
             // Swap buffers (O(1) pointer swap, no data copy)
             std::mem::swap(&mut curr_values, &mut next_values);
         }
 
-        Ok(curr_values[0][0])
+        Ok(curr_values[0])
     }
 }
 

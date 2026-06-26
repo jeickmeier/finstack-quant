@@ -733,6 +733,11 @@ fn calculate_var_taylor_approximation(
     let mut pnls = Vec::with_capacity(history.len());
     let mut skipped = TaylorSkipFlags::default();
 
+    // When the sensitivities are already in the reporting currency,
+    // `convert_money_to_reporting` short-circuits and never consults the
+    // market, so we can skip rebuilding the scenario-shifted market entirely.
+    let needs_fx_conversion = sensitivities.currency != reporting_currency;
+
     for scenario in history.iter() {
         let pnl_local = taylor_pnl_for_scenario(
             &sensitivities,
@@ -741,18 +746,32 @@ fn calculate_var_taylor_approximation(
             &mut spot_cache,
             &mut skipped,
         )?;
+        let pnl_money = Money::new(pnl_local, sensitivities.currency);
         // Convert P&L using the scenario-shifted market's FX rates, not the
         // base market's: when a scenario shocks FX, the reporting-currency
         // value of the P&L must reflect the shifted rates. This mirrors the
-        // full-revaluation path (`calculate_var_full_revaluation`).
-        let scenario_market = scenario.apply(base_market)?;
-        pnls.push(convert_money_to_reporting(
-            Money::new(pnl_local, sensitivities.currency),
-            reporting_currency,
-            &scenario_market,
-            as_of,
-            "Historical VaR",
-        )?);
+        // full-revaluation path (`calculate_var_full_revaluation`). For the
+        // same-currency case the conversion ignores the market, so the
+        // expensive `scenario.apply` rebuild is skipped.
+        let converted = if needs_fx_conversion {
+            let scenario_market = scenario.apply(base_market)?;
+            convert_money_to_reporting(
+                pnl_money,
+                reporting_currency,
+                &scenario_market,
+                as_of,
+                "Historical VaR",
+            )?
+        } else {
+            convert_money_to_reporting(
+                pnl_money,
+                reporting_currency,
+                base_market,
+                as_of,
+                "Historical VaR",
+            )?
+        };
+        pnls.push(converted);
     }
 
     // Surface (once) any factors the Taylor approximation had to skip rather
@@ -1070,11 +1089,13 @@ fn collect_bucketed_series(
 ) -> BucketedSeries {
     let mut result = BucketedSeries::default();
 
+    // Build the strip prefix once rather than reformatting it for every entry.
+    let prefix = format!("{base_id}::");
     for (metric_id, series) in series_map {
         let id_str = metric_id.as_str();
         if id_str == base_id {
             result.fallback = series.iter().cloned().collect();
-        } else if let Some(curve_id) = id_str.strip_prefix(&format!("{base_id}::")) {
+        } else if let Some(curve_id) = id_str.strip_prefix(&prefix) {
             let entry = result
                 .per_curve
                 .entry(curve_id.to_string())
@@ -1145,11 +1166,23 @@ fn calculate_portfolio_var_taylor(
     let mut pnls = Vec::with_capacity(history.len());
     let mut skipped = TaylorSkipFlags::default();
 
+    // Only sensitivities not already in the reporting currency need the
+    // scenario-shifted market for FX conversion; if every leg is already in the
+    // reporting currency the per-scenario `scenario.apply` rebuild is skipped.
+    let needs_fx_conversion = sensitivities
+        .iter()
+        .any(|sens| sens.currency != reporting_currency);
+
     for scenario in history.iter() {
         // Build the scenario-shifted market once per scenario so P&L is
         // converted to the reporting currency at the scenario's FX rates,
         // matching the full-revaluation path.
-        let scenario_market = scenario.apply(base_market)?;
+        let scenario_market = if needs_fx_conversion {
+            Some(scenario.apply(base_market)?)
+        } else {
+            None
+        };
+        let conversion_market = scenario_market.as_ref().unwrap_or(base_market);
         let mut acc = NeumaierAccumulator::new();
         for sens in &sensitivities {
             let mut sens_skipped = TaylorSkipFlags::default();
@@ -1164,7 +1197,7 @@ fn calculate_portfolio_var_taylor(
             let term = convert_money_to_reporting(
                 Money::new(pnl_local, sens.currency),
                 reporting_currency,
-                &scenario_market,
+                conversion_market,
                 as_of,
                 "Historical VaR",
             )?;

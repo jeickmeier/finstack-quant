@@ -163,11 +163,6 @@ impl ContextScratch {
         }
     }
 
-    /// Borrow of the immutable base context — used when no curve insertion is needed.
-    pub(crate) fn base(&self) -> &MarketContext {
-        &self.base_context
-    }
-
     /// Run `op` against a `MarketContext` containing `curve` plus the base context's data.
     /// Reuses internal scratch (no clone) when configured single-threaded.
     pub(crate) fn with_curve<C, F, T>(&self, curve: &C, op: F) -> Result<T>

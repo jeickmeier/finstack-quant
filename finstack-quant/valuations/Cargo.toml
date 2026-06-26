@@ -98,6 +98,10 @@ name = "swaption_pricing"
 harness = false
 
 [[bench]]
+name = "fourier_var_pricing"
+harness = false
+
+[[bench]]
 name = "cashflow_generation"
 harness = false
 

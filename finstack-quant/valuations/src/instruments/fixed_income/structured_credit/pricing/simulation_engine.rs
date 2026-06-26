@@ -306,6 +306,10 @@ pub(crate) struct StochasticPathFlowSource {
     /// `default_scratch`. Entry `k` is the recovery the `k`-th performing
     /// asset realizes if it defaults this period.
     recovery_scratch: Vec<f64>,
+    /// Scratch buffer holding one marginal-PD entry per still-performing asset,
+    /// reused each period to avoid allocating a fresh vector for the per-name
+    /// copula simulation.
+    marginal_scratch: Vec<f64>,
 }
 
 impl StochasticPathFlowSource {
@@ -317,6 +321,7 @@ impl StochasticPathFlowSource {
             per_name: None,
             default_scratch: Vec::new(),
             recovery_scratch: Vec::new(),
+            marginal_scratch: Vec::new(),
         }
     }
 
@@ -331,6 +336,7 @@ impl StochasticPathFlowSource {
             per_name: Some(per_name),
             default_scratch: Vec::new(),
             recovery_scratch: Vec::new(),
+            marginal_scratch: Vec::new(),
         }
     }
 }
@@ -365,7 +371,10 @@ impl PoolFlowSource for StochasticPathFlowSource {
                         .zip(request.state.pool_state.balances.iter())
                         .filter(|(defaulted, balance)| !**defaulted && **balance > 0.0)
                         .count();
-                    let marginal = vec![plan.marginal_pd; alive];
+                    // Reuse a per-source scratch buffer for the marginal-PD
+                    // vector instead of allocating one per period.
+                    self.marginal_scratch.clear();
+                    self.marginal_scratch.resize(alive, plan.marginal_pd);
                     // Antithetic partners negate their idiosyncratic εᵢ draws
                     // so the copula latent variable is the antithetic variate
                     // of the paired path (the systematic Z is already negated
@@ -373,14 +382,14 @@ impl PoolFlowSource for StochasticPathFlowSource {
                     if engine.antithetic {
                         engine.simulator.simulate_period_antithetic(
                             plan.systematic_z,
-                            &marginal,
+                            &self.marginal_scratch,
                             &mut engine.rng,
                             &mut self.default_scratch,
                         );
                     } else {
                         engine.simulator.simulate_period(
                             plan.systematic_z,
-                            &marginal,
+                            &self.marginal_scratch,
                             &mut engine.rng,
                             &mut self.default_scratch,
                         );
@@ -2744,9 +2753,12 @@ fn simulate_period(
             .map(|r| r.total_writedown.amount())
             .sum();
         let mut remaining_loss = (state.cumulative_realized_loss - already_allocated).max(0.0);
-        // Clone loss_alloc_order to avoid borrow conflict with state
-        let loss_order = state.loss_alloc_order.clone();
-        for &idx in &loss_order {
+        // Iterate `loss_alloc_order` by index rather than cloning it each
+        // period: each `idx` read is a short immutable borrow of `state` that
+        // ends before the tranche-balance / results mutations below, so there
+        // is no borrow conflict and no per-period allocation.
+        for k in 0..state.loss_alloc_order.len() {
+            let idx = state.loss_alloc_order[k];
             if remaining_loss <= WRITEDOWN_DE_MINIMIS {
                 break;
             }

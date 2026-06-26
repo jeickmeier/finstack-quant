@@ -8,7 +8,7 @@ use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
 use finstack_quant_core::dates::{next_cds_date, Date};
 use finstack_quant_core::market_data::{context::MarketContext, term_structures::CreditIndexData};
-use finstack_quant_core::math::binomial_pmf_all;
+use finstack_quant_core::math::binomial_pmf_all_into;
 use finstack_quant_core::{Error, Result};
 
 impl CDSTranchePricer {
@@ -69,23 +69,35 @@ impl CDSTranchePricer {
         let individual_notional = 1.0 / num_constituents as f64; // Normalized to 1.0 total
 
         // Evaluate the whole conditional binomial PMF once (O(n)) instead of
-        // reconstructing a distribution per `k`.
-        let pmf = binomial_pmf_all(num_constituents, conditional_default_prob);
-
-        let mut expected = 0.0;
-
-        // Sum over all possible numbers of defaults
-        for (k, &prob_k_defaults) in pmf.iter().enumerate() {
-            // Pool quantity (loss or recovered notional) given k defaults
-            let pool_amount = k as f64 * individual_notional * exposure;
-
-            // Capped at the strike (equity tranche [0, cap_notional])
-            let capped = pool_amount.min(cap_notional);
-
-            expected += prob_k_defaults * capped;
+        // reconstructing a distribution per `k`. The PMF is written into a
+        // per-thread scratch buffer that is reused across quadrature-node
+        // evaluations, so this integrand allocates no `(N + 1)`-element vector
+        // on every call. The buffer is thread-local, so parallel tranche
+        // pricing remains correct and deterministic.
+        thread_local! {
+            static PMF_SCRATCH: std::cell::RefCell<Vec<f64>> =
+                const { std::cell::RefCell::new(Vec::new()) };
         }
 
-        expected
+        PMF_SCRATCH.with(|cell| {
+            let mut pmf = cell.borrow_mut();
+            binomial_pmf_all_into(&mut pmf, num_constituents, conditional_default_prob);
+
+            let mut expected = 0.0;
+
+            // Sum over all possible numbers of defaults
+            for (k, &prob_k_defaults) in pmf.iter().enumerate() {
+                // Pool quantity (loss or recovered notional) given k defaults
+                let pool_amount = k as f64 * individual_notional * exposure;
+
+                // Capped at the strike (equity tranche [0, cap_notional])
+                let capped = pool_amount.min(cap_notional);
+
+                expected += prob_k_defaults * capped;
+            }
+
+            expected
+        })
     }
 
     /// Get default probability for the index at a given maturity.
@@ -875,6 +887,7 @@ impl CDSTranchePricer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_core::math::binomial_pmf_all;
 
     /// W-20: `conditional_equity_tranche_loss` evaluates the conditional binomial
     /// PMF for every `k` in `0..=N` via [`binomial_pmf_all`]. With `N = 125` a

@@ -457,13 +457,16 @@ impl SwaptionLsmcPricer {
         for pair_id in 0..num_pairs {
             let mut path_rng = rng.substream(pair_id as u64);
 
-            // Generate random draws for this pair
+            // Generate all random draws for this pair in a single call. The
+            // Box-Muller generator caches the second element of each pair in
+            // `spare_normal`, so one length-`num_steps` fill yields exactly the
+            // same sequence as `num_steps` length-1 fills did — but without the
+            // per-step heap allocation.
             let mut z_draws: Vec<f64> = vec![0.0; num_steps];
-            for z in &mut z_draws {
-                let mut z_buf = vec![0.0];
-                path_rng.fill_std_normals(&mut z_buf);
-                *z = z_buf[0];
-            }
+            path_rng.fill_std_normals(&mut z_draws);
+
+            // Reusable single-factor innovation buffer (HW1F: one factor).
+            let mut z_step = [0.0_f64];
 
             // Original path using +Z
             let mut state_orig = vec![initial_rate];
@@ -475,8 +478,8 @@ impl SwaptionLsmcPricer {
                 let t = time_grid.time(step);
                 let dt = time_grid.dt(step);
 
-                let z = vec![z_val];
-                disc.step(&self.hw_process, t, dt, &mut state_orig, &z, &mut work);
+                z_step[0] = z_val;
+                disc.step(&self.hw_process, t, dt, &mut state_orig, &z_step, &mut work);
                 rate_path_orig.push(state_orig[0]);
             }
 
@@ -489,8 +492,8 @@ impl SwaptionLsmcPricer {
                 let t = time_grid.time(step);
                 let dt = time_grid.dt(step);
 
-                let z = vec![-z_val]; // Negate the random draw
-                disc.step(&self.hw_process, t, dt, &mut state_anti, &z, &mut work);
+                z_step[0] = -z_val; // Negate the random draw
+                disc.step(&self.hw_process, t, dt, &mut state_anti, &z_step, &mut work);
                 rate_path_anti.push(state_anti[0]);
             }
 
@@ -719,36 +722,20 @@ impl SwaptionLsmcPricer {
 
                 // Exercise decision
                 for (j, &i) in regression_indices.iter().enumerate() {
-                    let r_t = paths[i][exercise_step];
-                    let swap_rate = ForwardSwapRate::compute(
-                        params,
-                        r_t,
-                        t,
-                        &payoff.swap_schedule,
-                        discount_curve_fn,
-                    );
+                    // Reuse the swap rate and annuity already computed in the
+                    // regression-collection pass above. `regression_x` /
+                    // `regression_annuity` were pushed in the same order as
+                    // `regression_indices`, so index `j` corresponds to path
+                    // `i`. This avoids re-running `ForwardSwapRate::compute`
+                    // (bond prices + finite-difference forwards) and the annuity
+                    // bond-price loop a second time per ITM path.
+                    let swap_rate = regression_x[j];
+                    let annuity = regression_annuity[j];
 
                     let swap_value = match payoff.option_type {
                         SwaptionType::Payer => swap_rate - payoff.strike,
                         SwaptionType::Receiver => payoff.strike - swap_rate,
                     };
-
-                    let mut annuity = 0.0;
-                    for (k, &payment_time_k) in
-                        payoff.swap_schedule.payment_dates.iter().enumerate()
-                    {
-                        if payment_time_k > t {
-                            let p_k = HullWhiteBondPrice::bond_price(
-                                params,
-                                r_t,
-                                t,
-                                payment_time_k,
-                                discount_curve_fn,
-                            );
-                            let tau_k = payoff.swap_schedule.accrual_fractions[k];
-                            annuity += tau_k * p_k;
-                        }
-                    }
 
                     let immediate_value = swap_value.max(0.0) * annuity * payoff.notional;
                     let continuation = continuation_values[j];

@@ -13,6 +13,7 @@ use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use rayon::prelude::*;
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::Instrument;
@@ -472,13 +473,19 @@ impl RevolvingCreditPricer {
             as_of,
         )?;
 
-        // Price each path
-        let mut path_results = Vec::with_capacity(paths.len());
-        for path_data in paths {
-            let schedule = engine.generate_stochastic_path(path_data)?;
-            let result = Self::price_single_path(facility, market, as_of, &schedule)?;
-            path_results.push(result);
-        }
+        // Price each path. Paths carry their own pre-generated randomness and
+        // `generate_stochastic_path` / `price_single_path` are pure functions of
+        // `path_data` plus the shared (immutable) engine/facility/market, so the
+        // valuation is parallelised. `into_par_iter().collect()` preserves path
+        // order, keeping the antithetic pairing and the PV statistics identical
+        // to the serial implementation.
+        let path_results: Vec<_> = paths
+            .into_par_iter()
+            .map(|path_data| {
+                let schedule = engine.generate_stochastic_path(path_data)?;
+                Self::price_single_path(facility, market, as_of, &schedule)
+            })
+            .collect::<Result<Vec<_>>>()?;
 
         // Compute MC statistics using Bessel-corrected variance (N-1 denominator)
         // for unbiased standard error estimation.
