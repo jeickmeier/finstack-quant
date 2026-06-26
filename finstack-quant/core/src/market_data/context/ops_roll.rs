@@ -96,36 +96,36 @@ impl MarketContext {
         //
         // Callers that need fully consistent rolled prices or surfaces
         // should rebuild them from rolled curves after this call.
+        // Roll each curve forward, populating plain maps before wrapping them in
+        // `Arc` for the new context (the other maps are shared by `Arc` clone).
+        let mut rolled_curves = HashMap::default();
+        rolled_curves.reserve(self.curves.len());
+        for (id, storage) in self.curves.iter() {
+            let rolled_storage = storage.roll_forward_storage(days)?;
+            rolled_curves.insert(id.clone(), rolled_storage);
+        }
+
+        let mut rolled_credit = HashMap::default();
+        rolled_credit.reserve(self.credit_indices.len());
+        for (id, credit_index) in self.credit_indices.iter() {
+            rolled_credit.insert(id.clone(), Arc::clone(credit_index));
+        }
+
         let mut new_ctx = Self {
-            curves: {
-                let mut m = HashMap::default();
-                m.reserve(self.curves.len());
-                m
-            },
+            curves: Arc::new(rolled_curves),
             fx: self.fx.clone(),
-            surfaces: self.surfaces.clone(),
-            prices: self.prices.clone(),
-            series: self.series.clone(),
-            inflation_indices: self.inflation_indices.clone(),
-            credit_indices: HashMap::default(),
-            dividends: self.dividends.clone(),
-            fx_delta_vol_surfaces: self.fx_delta_vol_surfaces.clone(),
-            vol_cubes: self.vol_cubes.clone(),
-            collateral: self.collateral.clone(),
+            surfaces: Arc::clone(&self.surfaces),
+            prices: Arc::clone(&self.prices),
+            series: Arc::clone(&self.series),
+            inflation_indices: Arc::clone(&self.inflation_indices),
+            credit_indices: Arc::new(rolled_credit),
+            dividends: Arc::clone(&self.dividends),
+            fx_delta_vol_surfaces: Arc::clone(&self.fx_delta_vol_surfaces),
+            vol_cubes: Arc::clone(&self.vol_cubes),
+            collateral: Arc::clone(&self.collateral),
             hierarchy: self.hierarchy.clone(),
         };
 
-        // Roll each curve forward
-        for (id, storage) in &self.curves {
-            let rolled_storage = storage.roll_forward_storage(days)?;
-            new_ctx.curves.insert(id.clone(), rolled_storage);
-        }
-
-        for (id, credit_index) in &self.credit_indices {
-            new_ctx
-                .credit_indices
-                .insert(id.clone(), Arc::clone(credit_index));
-        }
         let invalidated = new_ctx.rebind_all_credit_indices();
 
         Ok((

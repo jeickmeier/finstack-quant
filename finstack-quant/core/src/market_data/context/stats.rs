@@ -209,8 +209,8 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<VolSurface>)>,
     {
-        self.surfaces.clear();
-        self.surfaces.extend(surfaces);
+        Arc::make_mut(&mut self.surfaces).clear();
+        Arc::make_mut(&mut self.surfaces).extend(surfaces);
         self
     }
 
@@ -224,7 +224,7 @@ impl MarketContext {
         &mut self,
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
     ) -> &mut Self {
-        self.curves.retain(|id, curve| pred(id, curve));
+        Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
         self
     }
 
@@ -247,8 +247,8 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<VolCube>)>,
     {
-        self.vol_cubes.clear();
-        self.vol_cubes.extend(cubes);
+        Arc::make_mut(&mut self.vol_cubes).clear();
+        Arc::make_mut(&mut self.vol_cubes).extend(cubes);
         self
     }
 
@@ -259,8 +259,8 @@ impl MarketContext {
     where
         I: IntoIterator<Item = (CurveId, Arc<FxDeltaVolSurface>)>,
     {
-        self.fx_delta_vol_surfaces.clear();
-        self.fx_delta_vol_surfaces.extend(surfaces);
+        Arc::make_mut(&mut self.fx_delta_vol_surfaces).clear();
+        Arc::make_mut(&mut self.fx_delta_vol_surfaces).extend(surfaces);
         self
     }
 
@@ -274,7 +274,7 @@ impl MarketContext {
         &mut self,
         mut pred: impl FnMut(&CurveId, &ScalarTimeSeries) -> bool,
     ) -> &mut Self {
-        self.series.retain(|id, series| pred(id, series));
+        Arc::make_mut(&mut self.series).retain(|id, series| pred(id, series));
         self
     }
 
@@ -285,10 +285,10 @@ impl MarketContext {
     /// semantics: a scalar present in the current market but absent from the
     /// snapshot must not survive the restore.
     pub fn clear_market_scalars_mut(&mut self) -> &mut Self {
-        self.prices.clear();
-        self.series.clear();
-        self.inflation_indices.clear();
-        self.dividends.clear();
+        Arc::make_mut(&mut self.prices).clear();
+        Arc::make_mut(&mut self.series).clear();
+        Arc::make_mut(&mut self.inflation_indices).clear();
+        Arc::make_mut(&mut self.dividends).clear();
         self
     }
 }

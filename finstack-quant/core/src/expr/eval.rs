@@ -17,7 +17,6 @@ use super::{
     context::SimpleContext,
     dag::{DagBuilder, ExecutionPlan},
 };
-use crate::collections::HashMap;
 use smallvec::SmallVec;
 use std::sync::{Mutex, OnceLock};
 use std::vec::Vec;
@@ -151,6 +150,13 @@ pub(super) struct ScratchArena {
     pub(super) tmp: Vec<f64>,
     /// Window buffer for rolling operations that need a writable copy.
     pub(super) window: Vec<f64>,
+    /// Node-result arena reused across `eval()` calls to avoid reallocating
+    /// `len * node_count` f64s every evaluation.
+    pub(super) arena: Vec<f64>,
+    /// Per-node result offsets indexed by DAG node id, reused across `eval()`
+    /// calls. Replaces a per-call `HashMap<u64, (usize, usize)>`; node ids are
+    /// dense, so direct indexing avoids hashing on every dependency lookup.
+    pub(super) offsets: Vec<Option<(usize, usize)>>,
 }
 
 impl Clone for CompiledExpr {
@@ -309,33 +315,70 @@ impl CompiledExpr {
                 .into());
             }
 
-            // Pre-allocate arena for all node results to avoid per-node Vec allocations
-            let mut arena = vec![0.0; arena_elements];
-            let mut offsets: HashMap<u64, (usize, usize)> = HashMap::default();
+            // DAG node ids are dense (assigned 0..next_id during plan build), so
+            // index offsets by id directly instead of hashing.
+            let id_capacity = plan_to_use
+                .nodes
+                .iter()
+                .map(|n| n.id as usize)
+                .max()
+                .map_or(0, |m| m + 1);
+
+            // Borrow the pooled arena/offsets buffers (retaining capacity across
+            // calls) and release the scratch lock immediately so nested
+            // median/rolling ops can re-lock the same scratch without deadlock.
+            let (mut arena, mut offsets) = {
+                let mut guard = self
+                    .scratch
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                (
+                    std::mem::take(&mut guard.arena),
+                    std::mem::take(&mut guard.offsets),
+                )
+            };
+            arena.clear();
+            arena.resize(arena_elements, 0.0);
+            offsets.clear();
+            offsets.resize(id_capacity, None);
+
             let mut cursor = 0;
+            let eval_result: crate::Result<Vec<f64>> = (|| {
+                for node in &plan_to_use.nodes {
+                    // Allocate space in arena for this node's result
+                    let start = cursor;
+                    let end = cursor + len;
 
-            for node in &plan_to_use.nodes {
-                // Allocate space in arena for this node's result
-                let start = cursor;
-                let end = cursor + len;
+                    // Evaluate node directly into arena slice
+                    // Split the arena to avoid borrow conflicts
+                    let (arena_deps, arena_out) = arena.split_at_mut(start);
+                    let out_slice = &mut arena_out[..len];
+                    self.eval_node_into(ctx, cols, node, arena_deps, &offsets, out_slice)?;
 
-                // Evaluate node directly into arena slice
-                // Split the arena to avoid borrow conflicts
-                let (arena_deps, arena_out) = arena.split_at_mut(start);
-                let out_slice = &mut arena_out[..len];
-                self.eval_node_into(ctx, cols, node, arena_deps, &offsets, out_slice)?;
+                    offsets[node.id as usize] = Some((start, end));
+                    cursor = end;
+                }
 
-                offsets.insert(node.id, (start, end));
-                cursor = end;
+                // Extract root result
+                Ok(plan_to_use
+                    .roots
+                    .first()
+                    .and_then(|&root_id| offsets.get(root_id as usize).copied().flatten())
+                    .map(|(start, end)| arena[start..end].to_vec())
+                    .unwrap_or_default())
+            })();
+
+            // Return the buffers to the pool for reuse, even on error.
+            {
+                let mut guard = self
+                    .scratch
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.arena = arena;
+                guard.offsets = offsets;
             }
 
-            // Extract root result
-            plan_to_use
-                .roots
-                .first()
-                .and_then(|&root_id| offsets.get(&root_id))
-                .map(|&(start, end)| arena[start..end].to_vec())
-                .unwrap_or_default()
+            eval_result?
         };
 
         // Stamp the metadata carried by the execution plan (set by the caller
@@ -357,9 +400,11 @@ impl CompiledExpr {
         cols: &[&[f64]],
         node: &super::dag::DagNode,
         arena: &[f64],
-        offsets: &HashMap<u64, (usize, usize)>,
+        offsets: &[Option<(usize, usize)>],
         out: &mut [f64],
     ) -> crate::Result<()> {
+        // Look up a dependency's arena offset by (dense) node id.
+        let dep_offset = |id: u64| offsets.get(id as usize).copied().flatten();
         match &node.expr.node {
             ExprNode::Column(name) => {
                 let Some(idx) = ctx.index_of(name) else {
@@ -391,9 +436,7 @@ impl CompiledExpr {
                 let arg_slices: SmallVec<[&[f64]; 4]> = node
                     .dependencies
                     .iter()
-                    .filter_map(|&dep_id| {
-                        offsets.get(&dep_id).map(|&(start, end)| &arena[start..end])
-                    })
+                    .filter_map(|&dep_id| dep_offset(dep_id).map(|(start, end)| &arena[start..end]))
                     .collect();
 
                 if arg_slices.len() != node.dependencies.len() {
@@ -413,18 +456,16 @@ impl CompiledExpr {
                         node.id
                     )));
                 }
-                let left = offsets
-                    .get(&node.dependencies[0])
-                    .map(|&(start, end)| &arena[start..end])
+                let left = dep_offset(node.dependencies[0])
+                    .map(|(start, end)| &arena[start..end])
                     .ok_or_else(|| {
                         crate::Error::Validation(format!(
                             "Binary expression node {} is missing its left dependency result",
                             node.id
                         ))
                     })?;
-                let right = offsets
-                    .get(&node.dependencies[1])
-                    .map(|&(start, end)| &arena[start..end])
+                let right = dep_offset(node.dependencies[1])
+                    .map(|(start, end)| &arena[start..end])
                     .ok_or_else(|| {
                         crate::Error::Validation(format!(
                             "Binary expression node {} is missing its right dependency result",
@@ -441,9 +482,8 @@ impl CompiledExpr {
                         node.id
                     )));
                 }
-                let operand = offsets
-                    .get(&node.dependencies[0])
-                    .map(|&(start, end)| &arena[start..end])
+                let operand = dep_offset(node.dependencies[0])
+                    .map(|(start, end)| &arena[start..end])
                     .ok_or_else(|| {
                         crate::Error::Validation(format!(
                             "Unary expression node {} is missing its operand result",
@@ -460,27 +500,24 @@ impl CompiledExpr {
                         node.id
                     )));
                 }
-                let condition = offsets
-                    .get(&node.dependencies[0])
-                    .map(|&(start, end)| &arena[start..end])
+                let condition = dep_offset(node.dependencies[0])
+                    .map(|(start, end)| &arena[start..end])
                     .ok_or_else(|| {
                         crate::Error::Validation(format!(
                             "If-then-else node {} is missing its condition result",
                             node.id
                         ))
                     })?;
-                let then_vals = offsets
-                    .get(&node.dependencies[1])
-                    .map(|&(start, end)| &arena[start..end])
+                let then_vals = dep_offset(node.dependencies[1])
+                    .map(|(start, end)| &arena[start..end])
                     .ok_or_else(|| {
                         crate::Error::Validation(format!(
                             "If-then-else node {} is missing its then-branch result",
                             node.id
                         ))
                     })?;
-                let else_vals = offsets
-                    .get(&node.dependencies[2])
-                    .map(|&(start, end)| &arena[start..end])
+                let else_vals = dep_offset(node.dependencies[2])
+                    .map(|(start, end)| &arena[start..end])
                     .ok_or_else(|| {
                         crate::Error::Validation(format!(
                             "If-then-else node {} is missing its else-branch result",

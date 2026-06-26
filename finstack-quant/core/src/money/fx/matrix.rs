@@ -1,10 +1,12 @@
-use std::collections::{HashMap, HashSet};
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use lru::LruCache;
 use parking_lot::Mutex;
 
+// Non-cryptographic keys (currency pairs, query keys) use the workspace-standard
+// FxHash rather than std's SipHash for ~2x faster lookups on the FX hot path.
+use crate::collections::{HashMap, HashSet};
 use crate::currency::Currency;
 use crate::dates::Date;
 
@@ -101,9 +103,9 @@ impl FxMatrix {
         });
         Self {
             provider,
-            quotes: Mutex::new(HashMap::new()),
+            quotes: Mutex::new(HashMap::default()),
             observed_quotes: Mutex::new(LruCache::new(capacity)),
-            pinned_quotes: Mutex::new(HashMap::new()),
+            pinned_quotes: Mutex::new(HashMap::default()),
             config,
         }
     }
@@ -119,9 +121,9 @@ impl FxMatrix {
         let observed_quotes = LruCache::new(capacity);
         Ok(Self {
             provider,
-            quotes: Mutex::new(HashMap::new()),
+            quotes: Mutex::new(HashMap::default()),
             observed_quotes: Mutex::new(observed_quotes),
-            pinned_quotes: Mutex::new(HashMap::new()),
+            pinned_quotes: Mutex::new(HashMap::default()),
             config,
         })
     }
@@ -185,14 +187,11 @@ impl FxMatrix {
             });
         }
 
-        // Check cache first. Explicit quotes are pair-global, while provider-observed
+        // Check caches in precedence order, locking each store lazily so the common
+        // case (an explicit direct quote, e.g. a pegged pair) acquires a single lock
+        // instead of all three. Explicit quotes are pair-global, while provider-observed
         // quotes are scoped by date/policy to avoid cross-query contamination.
         let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
-        let (pinned_direct_opt, pinned_reciprocal_opt) =
-            self.read_pinned_pair_bidir(from, to, on, policy);
-        let (observed_direct_opt, observed_reciprocal_opt) =
-            self.read_observed_pair_bidir(from, to, on, policy);
-
         if let Some(rate) = direct_opt {
             let rate = validate_fx_rate(from, to, rate)?;
             return Ok(FxRateResult {
@@ -200,9 +199,12 @@ impl FxMatrix {
                 triangulated: false,
             });
         }
+
         // Pinned fixings are authoritative and outrank the transient provider
         // cache, reciprocal pair-global quotes, and the provider itself for
         // their `(on, policy)`.
+        let (pinned_direct_opt, pinned_reciprocal_opt) =
+            self.read_pinned_pair_bidir(from, to, on, policy);
         if let Some(rate) = pinned_direct_opt {
             let rate = validate_fx_rate(from, to, rate)?;
             return Ok(FxRateResult {
@@ -222,6 +224,9 @@ impl FxMatrix {
                 triangulated: false,
             });
         }
+
+        let (observed_direct_opt, observed_reciprocal_opt) =
+            self.read_observed_pair_bidir(from, to, on, policy);
         if let Some(q) = observed_direct_opt {
             let rate = validate_fx_rate(from, to, q.rate)?;
             return Ok(FxRateResult {
@@ -440,7 +445,7 @@ impl FxMatrix {
     /// assert!(state.quotes.is_empty());
     /// ```
     pub fn get_serializable_state(&self) -> FxMatrixState {
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::default();
         let mut quote_vec: Vec<(Currency, Currency, f64)> = Vec::new();
 
         // Explicit pair-global quotes take precedence.
@@ -620,8 +625,8 @@ impl FxMatrix {
             )));
         }
 
-        let mut rates: HashMap<(Currency, Currency), f64> = HashMap::new();
-        let mut currencies: HashSet<Currency> = HashSet::new();
+        let mut rates: HashMap<(Currency, Currency), f64> = HashMap::default();
+        let mut currencies: HashSet<Currency> = HashSet::default();
 
         {
             let quotes = self.quotes.lock();
@@ -847,19 +852,18 @@ impl FxMatrix {
         if from == to {
             return Ok(1.0);
         }
-        // Read direct and reciprocal under a single lock per store, then drop
-        // the locks before any further work.
-        let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
-        let (pinned_direct_opt, pinned_reciprocal_opt) =
-            self.read_pinned_pair_bidir(from, to, on, policy);
-        let (observed_direct_opt, observed_reciprocal_opt) =
-            self.read_observed_pair_bidir(from, to, on, policy);
+        // Lock each store lazily in precedence order: the common explicit-direct-quote
+        // case acquires a single lock instead of all three. Each helper reads direct
+        // and reciprocal under one lock and drops it before returning.
         // 1) Explicit direct pair-global quote wins
+        let (direct_opt, reciprocal_opt) = self.read_cached_pair_bidir(from, to);
         if let Some(r) = direct_opt {
             return validate_fx_rate(from, to, r);
         }
         // 2) Pinned fixings outrank reciprocal pair-global quotes, the
         // transient observed cache, and the provider.
+        let (pinned_direct_opt, pinned_reciprocal_opt) =
+            self.read_pinned_pair_bidir(from, to, on, policy);
         if let Some(r) = pinned_direct_opt {
             return validate_fx_rate(from, to, r);
         }
@@ -871,6 +875,8 @@ impl FxMatrix {
             return reciprocal_rate_or_err(r_rev, to, from);
         }
         // 4) Provider-observed cache
+        let (observed_direct_opt, observed_reciprocal_opt) =
+            self.read_observed_pair_bidir(from, to, on, policy);
         if let Some(q) = observed_direct_opt {
             return validate_fx_rate(from, to, q.rate);
         }

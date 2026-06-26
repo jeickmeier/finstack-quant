@@ -369,9 +369,18 @@ impl LevenbergMarquardtSolver {
             resid[0] = objective(params);
         };
 
+        // Reusable finite-difference scratch, allocated once instead of per LM
+        // iteration.
+        let mut jac_params_plus = initial.to_vec();
+        let mut jac_params_minus = initial.to_vec();
         let jacobian_func = |p: &[f64], _r: &[f64], _eval_counter: &mut usize, out: &mut [f64]| {
-            let jac = self.compute_jacobian(&objective, p);
-            out.copy_from_slice(&jac);
+            self.compute_jacobian_into(
+                &objective,
+                p,
+                &mut jac_params_plus,
+                &mut jac_params_minus,
+                out,
+            );
         };
 
         // Convergence check: Gradient Norm (jac is flat 1×n = gradient)
@@ -457,22 +466,48 @@ impl LevenbergMarquardtSolver {
     {
         let n = params.len();
         let mut jacobian = vec![0.0; n]; // For scalar objective, Jacobian is 1×n
-
         let mut params_plus = params.to_vec();
         let mut params_minus = params.to_vec();
-
-        for j in 0..n {
-            let h = (params[j].abs() * self.fd_step).max(self.fd_step);
-            params_plus[j] = params[j] + h;
-            params_minus[j] = params[j] - h;
-            let f_plus = objective(&params_plus);
-            let f_minus = objective(&params_minus);
-            jacobian[j] = (f_plus - f_minus) / (2.0 * h);
-            params_plus[j] = params[j];
-            params_minus[j] = params[j];
-        }
-
+        self.compute_jacobian_into(
+            objective,
+            params,
+            &mut params_plus,
+            &mut params_minus,
+            &mut jacobian,
+        );
         jacobian
+    }
+
+    /// Compute the scalar-objective gradient (1×n Jacobian) into `out` using
+    /// central finite differences, reusing caller-provided scratch buffers to
+    /// avoid per-iteration heap allocation on the LM hot path.
+    ///
+    /// `params_plus`, `params_minus`, and `out` must each have the same length
+    /// as `params`. On return, `params_plus`/`params_minus` are restored to
+    /// equal `params`.
+    fn compute_jacobian_into<Obj>(
+        &self,
+        objective: &Obj,
+        params: &[f64],
+        params_plus: &mut [f64],
+        params_minus: &mut [f64],
+        out: &mut [f64],
+    ) where
+        Obj: Fn(&[f64]) -> f64,
+    {
+        params_plus.copy_from_slice(params);
+        params_minus.copy_from_slice(params);
+
+        for (j, &p_j) in params.iter().enumerate() {
+            let h = (p_j.abs() * self.fd_step).max(self.fd_step);
+            params_plus[j] = p_j + h;
+            params_minus[j] = p_j - h;
+            let f_plus = objective(params_plus);
+            let f_minus = objective(params_minus);
+            out[j] = (f_plus - f_minus) / (2.0 * h);
+            params_plus[j] = p_j;
+            params_minus[j] = p_j;
+        }
     }
 
     /// Compute gradient using analytical derivatives if available, otherwise finite differences.
@@ -486,16 +521,46 @@ impl LevenbergMarquardtSolver {
         Obj: Fn(&[f64]) -> f64,
         D: AnalyticalDerivatives,
     {
+        let mut gradient = vec![0.0; params.len()];
+        let mut params_plus = params.to_vec();
+        let mut params_minus = params.to_vec();
+        self.compute_gradient_with_analytical_into(
+            objective,
+            params,
+            derivatives,
+            &mut params_plus,
+            &mut params_minus,
+            &mut gradient,
+        );
+        gradient
+    }
+
+    /// Compute the gradient into `out`, using analytical derivatives when
+    /// available and otherwise central finite differences. Reuses
+    /// caller-provided scratch buffers to avoid per-iteration allocation on the
+    /// LM hot path. `params_plus`/`params_minus`/`out` must match `params` in
+    /// length.
+    fn compute_gradient_with_analytical_into<Obj, D>(
+        &self,
+        objective: &Obj,
+        params: &[f64],
+        derivatives: Option<&D>,
+        params_plus: &mut [f64],
+        params_minus: &mut [f64],
+        out: &mut [f64],
+    ) where
+        Obj: Fn(&[f64]) -> f64,
+        D: AnalyticalDerivatives,
+    {
         if let Some(deriv) = derivatives {
             if deriv.has_gradient() {
-                let mut gradient = vec![0.0; params.len()];
-                deriv.gradient(params, &mut gradient);
-                return gradient;
+                deriv.gradient(params, out);
+                return;
             }
         }
 
         // Fall back to finite differences (Jacobian is 1×n, flat row)
-        self.compute_jacobian(objective, params)
+        self.compute_jacobian_into(objective, params, params_plus, params_minus, out);
     }
 
     /// Compute Jacobian for a system of residuals into a pre-allocated buffer.
@@ -829,9 +894,19 @@ impl LevenbergMarquardtSolver {
             resid[0] = objective(params);
         };
 
+        // Reusable finite-difference scratch (used only on the FD fallback path),
+        // allocated once instead of per LM iteration.
+        let mut jac_params_plus = initial.to_vec();
+        let mut jac_params_minus = initial.to_vec();
         let jacobian_func = |p: &[f64], _r: &[f64], _eval_counter: &mut usize, out: &mut [f64]| {
-            let grad = self.compute_gradient_with_analytical(&objective, p, Some(derivatives));
-            out.copy_from_slice(&grad);
+            self.compute_gradient_with_analytical_into(
+                &objective,
+                p,
+                Some(derivatives),
+                &mut jac_params_plus,
+                &mut jac_params_minus,
+                out,
+            );
         };
 
         // Convergence check: Gradient Norm (jac is flat 1×n = gradient)

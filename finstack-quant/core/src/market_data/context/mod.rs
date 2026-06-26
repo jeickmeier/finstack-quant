@@ -90,8 +90,11 @@ pub enum ContextScratchBump {
         id: CurveId,
         /// Pre-bump curve storage.
         previous: CurveStorage,
-        /// Pre-bump credit-index snapshot.
-        previous_credit_indices: HashMap<CurveId, Arc<CreditIndexData>>,
+        /// Pre-bump credit-index snapshot, captured only when the bumped curve
+        /// actually feeds a credit index. `None` means no credit indices were
+        /// rebound, so the snapshot is skipped on the common rates path. The
+        /// snapshot is a cheap `Arc` clone of the whole map (copy-on-write).
+        previous_credit_indices: Option<Arc<HashMap<CurveId, Arc<CreditIndexData>>>>,
     },
     /// A bumped volatility surface.
     Surface {
@@ -147,38 +150,42 @@ use super::{
 /// pricing engines.
 #[derive(Clone, Default)]
 pub struct MarketContext {
+    // Each map is wrapped in `Arc` so cloning the context (e.g. per finite-
+    // difference greek bump) is a refcount bump rather than re-allocating and
+    // rehashing every map. Mutators use `Arc::make_mut`, so a bump that touches
+    // one map copies only that map (copy-on-write) and leaves the rest shared.
     /// All curves stored in unified enum-based map
-    curves: HashMap<CurveId, CurveStorage>,
+    curves: Arc<HashMap<CurveId, CurveStorage>>,
 
     /// Foreign-exchange matrix
     fx: Option<Arc<FxMatrix>>,
 
     /// Volatility surfaces
-    surfaces: HashMap<CurveId, Arc<VolSurface>>,
+    surfaces: Arc<HashMap<CurveId, Arc<VolSurface>>>,
 
     /// Market scalars and prices
-    prices: HashMap<CurveId, MarketScalar>,
+    prices: Arc<HashMap<CurveId, MarketScalar>>,
 
     /// Generic time series
-    series: HashMap<CurveId, ScalarTimeSeries>,
+    series: Arc<HashMap<CurveId, ScalarTimeSeries>>,
 
     /// Inflation indices
-    inflation_indices: HashMap<CurveId, Arc<InflationIndex>>,
+    inflation_indices: Arc<HashMap<CurveId, Arc<InflationIndex>>>,
 
     /// Credit index aggregates
-    credit_indices: HashMap<CurveId, Arc<CreditIndexData>>,
+    credit_indices: Arc<HashMap<CurveId, Arc<CreditIndexData>>>,
 
     /// Shared dividend schedules keyed by `CurveId` (e.g., "AAPL-DIVS")
-    dividends: HashMap<CurveId, Arc<DividendSchedule>>,
+    dividends: Arc<HashMap<CurveId, Arc<DividendSchedule>>>,
 
     /// FX delta-quoted volatility surfaces
-    fx_delta_vol_surfaces: HashMap<CurveId, Arc<FxDeltaVolSurface>>,
+    fx_delta_vol_surfaces: Arc<HashMap<CurveId, Arc<FxDeltaVolSurface>>>,
 
     /// SABR volatility cubes (expiry x tenor x strike)
-    vol_cubes: HashMap<CurveId, Arc<VolCube>>,
+    vol_cubes: Arc<HashMap<CurveId, Arc<VolCube>>>,
 
     /// Collateral CSA code mappings
-    collateral: HashMap<String, CurveId>,
+    collateral: Arc<HashMap<String, CurveId>>,
 
     /// Optional market data hierarchy for organizational grouping.
     hierarchy: Option<MarketDataHierarchy>,
@@ -279,19 +286,19 @@ impl MarketContext {
     /// This clones the `Arc` handles (cheap) without exposing internal storage.
     #[inline]
     pub fn surfaces_snapshot(&self) -> HashMap<CurveId, Arc<VolSurface>> {
-        self.surfaces.clone()
+        self.surfaces.as_ref().clone()
     }
 
     /// Snapshot (clone) all stored market scalars/prices.
     #[inline]
     pub fn prices_snapshot(&self) -> HashMap<CurveId, MarketScalar> {
-        self.prices.clone()
+        self.prices.as_ref().clone()
     }
 
     /// Snapshot (clone) all stored scalar time series.
     #[inline]
     pub fn series_snapshot(&self) -> HashMap<CurveId, ScalarTimeSeries> {
-        self.series.clone()
+        self.series.as_ref().clone()
     }
 
     #[inline]
@@ -443,7 +450,7 @@ impl MarketContext {
         rebuilt.reserve(self.credit_indices.len());
         let mut invalidated = Vec::new();
 
-        for (id, data) in &self.credit_indices {
+        for (id, data) in self.credit_indices.iter() {
             match self.rebind_credit_index_data(data) {
                 Ok(index) => {
                     rebuilt.insert(id.clone(), Arc::new(index));
@@ -459,7 +466,7 @@ impl MarketContext {
             }
         }
 
-        self.credit_indices = rebuilt;
+        self.credit_indices = Arc::new(rebuilt);
         invalidated
     }
 }
@@ -1367,14 +1374,14 @@ impl MarketContext {
             return false;
         };
         let curve_id = new_curve.id().to_owned();
-        self.curves.insert(
+        Arc::make_mut(&mut self.curves).insert(
             curve_id,
             CurveStorage::BaseCorrelation(Arc::clone(&new_curve)),
         );
         let mut updated_index = (**existing_index).clone();
         updated_index.base_correlation_curve = new_curve;
         // Update the context
-        self.credit_indices.insert(cid, Arc::new(updated_index));
+        Arc::make_mut(&mut self.credit_indices).insert(cid, Arc::new(updated_index));
         let _invalidated = self.rebind_all_credit_indices();
         true
     }
@@ -1399,7 +1406,7 @@ impl MarketContext {
     {
         let curve: CurveStorage = curve.into();
         let id = curve.id().to_owned();
-        self.curves.insert(id, curve);
+        Arc::make_mut(&mut self.curves).insert(id, curve);
         if !self.credit_indices.is_empty() {
             let _invalidated = self.rebind_all_credit_indices();
         }
@@ -1444,7 +1451,7 @@ impl MarketContext {
     pub fn insert_surface(mut self, surface: impl Into<Arc<VolSurface>>) -> Self {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
-        self.surfaces.insert(id, arc_surface);
+        Arc::make_mut(&mut self.surfaces).insert(id, arc_surface);
         self
     }
     /// Insert an FX delta-quoted volatility surface.
@@ -1476,7 +1483,7 @@ impl MarketContext {
     ) -> Self {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
-        self.fx_delta_vol_surfaces.insert(id, arc_surface);
+        Arc::make_mut(&mut self.fx_delta_vol_surfaces).insert(id, arc_surface);
         self
     }
     /// Insert a SABR volatility cube.
@@ -1490,7 +1497,7 @@ impl MarketContext {
     pub fn insert_vol_cube(mut self, cube: impl Into<Arc<VolCube>>) -> Self {
         let arc = cube.into();
         let id = arc.id().to_owned();
-        self.vol_cubes.insert(id, arc);
+        Arc::make_mut(&mut self.vol_cubes).insert(id, arc);
         self
     }
     /// Insert a dividend schedule.
@@ -1504,7 +1511,7 @@ impl MarketContext {
     pub fn insert_dividends(mut self, schedule: impl Into<Arc<DividendSchedule>>) -> Self {
         let arc_schedule = schedule.into();
         let id = arc_schedule.id.to_owned();
-        self.dividends.insert(id, arc_schedule);
+        Arc::make_mut(&mut self.dividends).insert(id, arc_schedule);
         self
     }
     /// Insert a market scalar/price.
@@ -1513,7 +1520,7 @@ impl MarketContext {
     /// - `id`: identifier (string-like) stored as [`CurveId`]
     /// - `price`: scalar value to store
     pub fn insert_price(mut self, id: impl AsRef<str>, price: MarketScalar) -> Self {
-        self.prices.insert(CurveId::from(id.as_ref()), price);
+        Arc::make_mut(&mut self.prices).insert(CurveId::from(id.as_ref()), price);
         self
     }
     /// Insert a scalar time series.
@@ -1522,7 +1529,7 @@ impl MarketContext {
     /// - `series`: [`ScalarTimeSeries`] to store
     pub fn insert_series(mut self, series: ScalarTimeSeries) -> Self {
         let id = series.id().to_owned();
-        self.series.insert(id, series);
+        Arc::make_mut(&mut self.series).insert(id, series);
         self
     }
     /// Insert an inflation index.
@@ -1571,7 +1578,7 @@ impl MarketContext {
     ) -> Self {
         let index = index.into();
         let key = Self::inflation_index_key_for_insert(id, index.as_ref());
-        self.inflation_indices.insert(key, index);
+        Arc::make_mut(&mut self.inflation_indices).insert(key, index);
         self
     }
     /// Insert a credit index aggregate.
@@ -1609,7 +1616,7 @@ impl MarketContext {
     /// ```
     pub fn insert_credit_index(mut self, id: impl AsRef<str>, data: CreditIndexData) -> Self {
         let key = CurveId::from(id.as_ref());
-        self.credit_indices.insert(key, Arc::new(data));
+        Arc::make_mut(&mut self.credit_indices).insert(key, Arc::new(data));
         self
     }
     /// Insert an FX matrix.
@@ -1713,7 +1720,7 @@ impl MarketContext {
     /// assert!(ctx.get_collateral("USD-CSA").is_ok());
     /// ```
     pub fn map_collateral(mut self, csa_code: impl Into<String>, discount_id: CurveId) -> Self {
-        self.collateral.insert(csa_code.into(), discount_id);
+        Arc::make_mut(&mut self.collateral).insert(csa_code.into(), discount_id);
         self
     }
     // -----------------------------------------------------------------------------
@@ -1736,7 +1743,7 @@ impl MarketContext {
     {
         let curve: CurveStorage = curve.into();
         let id = curve.id().to_owned();
-        self.curves.insert(id, curve);
+        Arc::make_mut(&mut self.curves).insert(id, curve);
         if !self.credit_indices.is_empty() {
             let _invalidated = self.rebind_all_credit_indices();
         }
@@ -1748,7 +1755,7 @@ impl MarketContext {
     pub fn insert_surface_mut(&mut self, surface: impl Into<Arc<VolSurface>>) -> &mut Self {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
-        self.surfaces.insert(id, arc_surface);
+        Arc::make_mut(&mut self.surfaces).insert(id, arc_surface);
         self
     }
     /// Insert an FX delta-quoted volatility surface, mutating in place.
@@ -1760,7 +1767,7 @@ impl MarketContext {
     ) -> &mut Self {
         let arc_surface = surface.into();
         let id = arc_surface.id().to_owned();
-        self.fx_delta_vol_surfaces.insert(id, arc_surface);
+        Arc::make_mut(&mut self.fx_delta_vol_surfaces).insert(id, arc_surface);
         self
     }
     /// Insert a SABR volatility cube, mutating in place.
@@ -1769,7 +1776,7 @@ impl MarketContext {
     pub fn insert_vol_cube_mut(&mut self, cube: impl Into<Arc<VolCube>>) -> &mut Self {
         let arc = cube.into();
         let id = arc.id().to_owned();
-        self.vol_cubes.insert(id, arc);
+        Arc::make_mut(&mut self.vol_cubes).insert(id, arc);
         self
     }
     /// Insert a dividend schedule, mutating in place.
@@ -1781,14 +1788,14 @@ impl MarketContext {
     ) -> &mut Self {
         let arc_schedule = schedule.into();
         let id = arc_schedule.id.to_owned();
-        self.dividends.insert(id, arc_schedule);
+        Arc::make_mut(&mut self.dividends).insert(id, arc_schedule);
         self
     }
     /// Insert a market scalar/price, mutating in place.
     ///
     /// Mirrors [`Self::insert_price`] but takes `&mut self`.
     pub fn insert_price_mut(&mut self, id: impl AsRef<str>, price: MarketScalar) -> &mut Self {
-        self.prices.insert(CurveId::from(id.as_ref()), price);
+        Arc::make_mut(&mut self.prices).insert(CurveId::from(id.as_ref()), price);
         self
     }
     /// Insert a scalar time series, mutating in place.
@@ -1796,7 +1803,7 @@ impl MarketContext {
     /// Mirrors [`Self::insert_series`] but takes `&mut self`.
     pub fn insert_series_mut(&mut self, series: ScalarTimeSeries) -> &mut Self {
         let id = series.id().to_owned();
-        self.series.insert(id, series);
+        Arc::make_mut(&mut self.series).insert(id, series);
         self
     }
     /// Insert an inflation index, mutating in place.
@@ -1809,7 +1816,7 @@ impl MarketContext {
     ) -> &mut Self {
         let index = index.into();
         let key = Self::inflation_index_key_for_insert(id, index.as_ref());
-        self.inflation_indices.insert(key, index);
+        Arc::make_mut(&mut self.inflation_indices).insert(key, index);
         self
     }
     /// Insert a credit index aggregate, mutating in place.
@@ -1821,7 +1828,7 @@ impl MarketContext {
         data: CreditIndexData,
     ) -> &mut Self {
         let key = CurveId::from(id.as_ref());
-        self.credit_indices.insert(key, Arc::new(data));
+        Arc::make_mut(&mut self.credit_indices).insert(key, Arc::new(data));
         self
     }
     /// Insert an FX matrix, mutating in place.
@@ -1846,7 +1853,7 @@ impl MarketContext {
         csa_code: impl Into<String>,
         discount_id: CurveId,
     ) -> &mut Self {
-        self.collateral.insert(csa_code.into(), discount_id);
+        Arc::make_mut(&mut self.collateral).insert(csa_code.into(), discount_id);
         self
     }
 }

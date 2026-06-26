@@ -591,7 +591,64 @@ impl DiscountCurve {
     #[inline]
     #[must_use]
     pub fn df_batch(&self, times: &[f64]) -> Vec<f64> {
-        times.iter().map(|&t| self.df(t)).collect()
+        let mut out = vec![0.0; times.len()];
+        self.df_batch_into(times, &mut out);
+        out
+    }
+
+    /// Batch evaluation of discount factors into a caller-provided buffer,
+    /// avoiding a per-call allocation in hot loops (e.g. Monte Carlo time grids).
+    ///
+    /// Writes `min(times.len(), out.len())` discount factors; callers should size
+    /// `out` to match `times`.
+    #[inline]
+    pub fn df_batch_into(&self, times: &[f64], out: &mut [f64]) {
+        for (slot, &t) in out.iter_mut().zip(times) {
+            *slot = self.df(t);
+        }
+    }
+
+    /// Compute consecutive forward rates over a strictly increasing time grid,
+    /// evaluating each discount factor once and reusing the shared endpoint
+    /// between adjacent intervals.
+    ///
+    /// Returns `times.len() - 1` forward rates, where element `k` is the
+    /// (continuously-compounded) forward over `[times[k], times[k+1]]`, matching
+    /// [`forward`](Self::forward) exactly. This is roughly 2x cheaper than calling
+    /// `forward` in a loop, which recomputes both discount factors — and their
+    /// binary searches — for every interval.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `times` has fewer than two points, any time is
+    /// non-finite, the grid is not strictly increasing, any interval is shorter
+    /// than `min_forward_tenor`, or any discount factor is non-positive.
+    #[must_use = "computed forward rates should not be discarded"]
+    pub fn forward_grid(&self, times: &[f64]) -> crate::Result<Vec<f64>> {
+        if times.len() < 2 {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+        // Evaluate each DF once.
+        let mut dfs = vec![0.0; times.len()];
+        for (slot, &t) in dfs.iter_mut().zip(times) {
+            if !t.is_finite() {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+            let df = self.df(t);
+            if !(df.is_finite() && df > 0.0) {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+            *slot = df;
+        }
+        let mut forwards = Vec::with_capacity(times.len() - 1);
+        for k in 0..times.len() - 1 {
+            let (t1, t2) = (times[k], times[k + 1]);
+            if t2 <= t1 || (t2 - t1) < self.min_forward_tenor {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+            forwards.push(-(dfs[k + 1] / dfs[k]).ln() / (t2 - t1));
+        }
+        Ok(forwards)
     }
 
     /// Fallible: discount factor on a specific date `date` using explicit day-count `dc`.

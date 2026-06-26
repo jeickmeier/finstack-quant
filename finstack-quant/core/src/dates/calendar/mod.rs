@@ -8,10 +8,11 @@
 //!
 //! - **100+ market calendars**: Major exchanges, central banks, and settlement systems
 //! - **Rule-based definitions**: JSON-defined rules for transparency and auditability
-//! - **Bitset optimization**: O(1) lookup for years 1970-2150
+//! - **Rule evaluation**: [`is_holiday`](HolidayCalendar::is_holiday) checks a
+//!   date against the calendar's `&'static` rule set (a short linear scan;
+//!   typically a handful of rules per calendar) — no per-date heap allocation
 //! - **Composite calendars**: Combine multiple calendars for multi-currency schedules
 //! - **Business day adjustments**: Following, Modified Following, Preceding conventions
-//! - **Zero allocation**: Calendar lookups use stack memory only
 //!
 //! # Supported Date Range
 //!

@@ -702,14 +702,23 @@ impl Rule {
                 // review, Moderate/Dates), so test the rule materialized from
                 // the adjacent years as well (observance shifts at most 2
                 // days, so ±1 year is sufficient).
-                [date.year() - 1, date.year(), date.year() + 1]
-                    .iter()
-                    .any(|&y| {
-                        Date::from_calendar_date(y, *month, *day)
-                            .ok()
-                            .map(|base| apply_observed(base, *observed) == date)
-                            .unwrap_or(false)
-                    })
+                //
+                // Fast path: the current year matches almost every query. An
+                // adjacent-year base can only land on `date` within 2 days of a
+                // year boundary, so skip those two date constructions otherwise.
+                let check = |y: i32| {
+                    Date::from_calendar_date(y, *month, *day)
+                        .ok()
+                        .map(|base| apply_observed(base, *observed) == date)
+                        .unwrap_or(false)
+                };
+                check(date.year())
+                    || (date.month() == time::Month::January
+                        && date.day() <= 2
+                        && check(date.year() - 1))
+                    || (date.month() == time::Month::December
+                        && date.day() >= 30
+                        && check(date.year() + 1))
             }
             Rule::NthWeekday { n, weekday, month } => {
                 crate::dates::calendar::generated::nth_weekday_of_month(

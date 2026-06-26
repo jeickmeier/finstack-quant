@@ -953,8 +953,7 @@ impl InterpolationStrategy for MonotoneConvexStrategy {
         // Interior: d/dx[DF(t)] = -f(t) * DF(t)
         // Safe: check_extrapolation returning None guarantees x is in bounds.
         let i = locate_segment_unchecked(knots, x);
-        let df = self.interpolate_segment(i, x, knots);
-        let fwd = self.forward_rate_in_segment(i, x, knots);
+        let (df, fwd) = self.segment_df_and_forward(i, x, knots);
         -fwd * df
     }
 }
@@ -1223,29 +1222,6 @@ impl MonotoneConvexStrategy {
     /// Compute the forward rate at time t within segment i.
     ///
     /// Uses the Hagan-West formula:
-    /// f(t) = f^d_i + g(x)
-    /// where g(x) = g_left * (1 - 4x + 3x²) + g_right * (-2x + 3x²)
-    /// and x = (t - t_i) / (t_{i+1} - t_i)
-    ///
-    /// IMPORTANT: g_left and g_right must be computed relative to the SAME
-    /// discrete forward fd[i] for this segment:
-    ///   g_left = f[i] - fd[i]
-    ///   g_right = f[i+1] - fd[i]
-    fn forward_rate_in_segment(&self, i: usize, t: f64, knots: &[f64]) -> f64 {
-        let x = (t - knots[i]) / self.dt[i];
-        let x2 = x * x;
-
-        // g values relative to THIS segment's discrete forward
-        let fd_i = self.fd[i];
-        let g_left = self.f[i] - fd_i;
-        let g_right = self.f[i + 1] - fd_i;
-
-        // g(x) = g_left * (1 - 4x + 3x²) + g_right * (-2x + 3x²)
-        let g_x = g_left * (1.0 - 4.0 * x + 3.0 * x2) + g_right * (-2.0 * x + 3.0 * x2);
-
-        fd_i + g_x
-    }
-
     /// Interpolate the discount factor at time t within segment i.
     ///
     /// DF(t) = DF(t_i) * exp(-∫_{t_i}^{t} f(s) ds)
@@ -1275,6 +1251,36 @@ impl MonotoneConvexStrategy {
 
         // DF(t) = exp(-(log_df[i] + integral))
         (-(self.log_df[i] + integral)).exp()
+    }
+
+    /// Compute both the discount factor `DF(t)` and the instantaneous forward
+    /// rate `f(t)` within segment `i` in a single pass, returning `(df, forward)`.
+    ///
+    /// Shares the `x`, `x²`, `x³` and g-deviation computations so derivative
+    /// queries ([`interp_prime`](MonotoneConvexStrategy::interp_prime), used in
+    /// CS01/DV01 bump loops) compute the discount factor and the segment forward
+    /// rate together instead of recomputing the polynomial and a second `exp`.
+    fn segment_df_and_forward(&self, i: usize, t: f64, knots: &[f64]) -> (f64, f64) {
+        let dt_seg = self.dt[i];
+        let x = (t - knots[i]) / dt_seg;
+        let x2 = x * x;
+        let x3 = x2 * x;
+
+        // g values relative to THIS segment's discrete forward.
+        let fd_i = self.fd[i];
+        let g_left = self.f[i] - fd_i;
+        let g_right = self.f[i + 1] - fd_i;
+
+        // Forward: f(t) = fd_i + g(x).
+        let g_x = g_left * (1.0 - 4.0 * x + 3.0 * x2) + g_right * (-2.0 * x + 3.0 * x2);
+        let forward = fd_i + g_x;
+
+        // DF: integral of f from t_i to t, then DF(t) = exp(-(log_df[i] + integral)).
+        let g_integral = g_left * (x - 2.0 * x2 + x3) + g_right * (-x2 + x3);
+        let integral = fd_i * (t - knots[i]) + dt_seg * g_integral;
+        let df = (-(self.log_df[i] + integral)).exp();
+
+        (df, forward)
     }
 
     /// Get the epsilon value used for near-zero detection.

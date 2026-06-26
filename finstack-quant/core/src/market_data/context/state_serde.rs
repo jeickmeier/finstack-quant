@@ -424,12 +424,12 @@ impl TryFrom<MarketContextState> for MarketContext {
         // Reconstruct all curves
         for curve_state in state.curves {
             let storage = CurveStorage::from_state(curve_state);
-            ctx.curves.insert(storage.id().clone(), storage);
+            Arc::make_mut(&mut ctx.curves).insert(storage.id().clone(), storage);
         }
 
         // Reconstruct all surfaces
         for surface in state.surfaces {
-            ctx.surfaces.insert(surface.id().clone(), Arc::new(surface));
+            Arc::make_mut(&mut ctx.surfaces).insert(surface.id().clone(), Arc::new(surface));
         }
 
         // Reconstruct FX matrix as a quote-only snapshot. Persisted state does not
@@ -447,24 +447,24 @@ impl TryFrom<MarketContextState> for MarketContext {
 
         // Reconstruct prices
         for (id_str, scalar) in state.prices {
-            ctx.prices.insert(CurveId::from(id_str), scalar);
+            Arc::make_mut(&mut ctx.prices).insert(CurveId::from(id_str), scalar);
         }
 
         // Reconstruct series
         for series in state.series {
-            ctx.series.insert(series.id().clone(), series);
+            Arc::make_mut(&mut ctx.series).insert(series.id().clone(), series);
         }
 
         // Reconstruct inflation indices
         for idx in state.inflation_indices {
             let id = MarketContext::inflation_index_key_for_insert(idx.id.clone(), &idx);
-            ctx.inflation_indices.insert(id, Arc::new(idx));
+            Arc::make_mut(&mut ctx.inflation_indices).insert(id, Arc::new(idx));
         }
 
         // Reconstruct dividends
         for schedule in state.dividends {
             let id = schedule.id.clone();
-            ctx.dividends.insert(id, Arc::new(schedule));
+            Arc::make_mut(&mut ctx.dividends).insert(id, Arc::new(schedule));
         }
 
         // Reconstruct credit indices (resolve curve references)
@@ -501,7 +501,7 @@ impl TryFrom<MarketContextState> for MarketContext {
                     .map(|m| m.into_iter().collect::<HashMap<_, _>>()),
             };
 
-            ctx.credit_indices
+            Arc::make_mut(&mut ctx.credit_indices)
                 .insert(CurveId::from(credit_state.id), Arc::new(data));
         }
         let _invalidated = ctx.rebind_all_credit_indices();
@@ -509,18 +509,18 @@ impl TryFrom<MarketContextState> for MarketContext {
         // Reconstruct FX delta vol surfaces
         for surface in state.fx_delta_vol_surfaces {
             let id = surface.id().to_owned();
-            ctx.fx_delta_vol_surfaces.insert(id, Arc::new(surface));
+            Arc::make_mut(&mut ctx.fx_delta_vol_surfaces).insert(id, Arc::new(surface));
         }
 
         // Reconstruct vol cubes
         for cube in state.vol_cubes {
             let id = cube.id().to_owned();
-            ctx.vol_cubes.insert(id, Arc::new(cube));
+            Arc::make_mut(&mut ctx.vol_cubes).insert(id, Arc::new(cube));
         }
 
         // Reconstruct collateral mappings
         for (csa, curve_id_str) in state.collateral {
-            ctx.collateral.insert(csa, CurveId::from(curve_id_str));
+            Arc::make_mut(&mut ctx.collateral).insert(csa, CurveId::from(curve_id_str));
         }
 
         ctx.hierarchy = state.hierarchy;

@@ -35,7 +35,7 @@ impl MarketContext {
                 ))
             }
         };
-        self.prices.insert(key.clone(), bumped);
+        Arc::make_mut(&mut self.prices).insert(key.clone(), bumped);
         Ok(ContextScratchBump::Price {
             id: key,
             previous: current,
@@ -56,7 +56,7 @@ impl MarketContext {
             }
         })?;
         let bumped = previous.apply_bump(spec)?;
-        self.surfaces.insert(key.clone(), Arc::new(bumped));
+        Arc::make_mut(&mut self.surfaces).insert(key.clone(), Arc::new(bumped));
         Ok(ContextScratchBump::Surface { id: key, previous })
     }
 
@@ -72,14 +72,22 @@ impl MarketContext {
                 id: curve_id.to_string(),
             }
         })?;
-        let previous_credit_indices = self.credit_indices.clone();
-        let storage = self.curves.get_mut(curve_id.as_str()).ok_or_else(|| {
-            crate::error::InputError::NotFound {
+        // Snapshot the credit-index map only when this curve actually feeds one;
+        // the common rates DV01/CS01 bucket-bump case touches no credit indices
+        // and should not clone the (possibly large) map per bucket.
+        let affects_credit = self.curve_affects_credit_indices(curve_id);
+        let previous_credit_indices = if affects_credit {
+            Some(Arc::clone(&self.credit_indices))
+        } else {
+            None
+        };
+        let storage = Arc::make_mut(&mut self.curves)
+            .get_mut(curve_id.as_str())
+            .ok_or_else(|| crate::error::InputError::NotFound {
                 id: curve_id.to_string(),
-            }
-        })?;
+            })?;
         storage.apply_bump_preserving_id(curve_id, spec)?;
-        if self.curve_affects_credit_indices(curve_id) {
+        if affects_credit {
             let _invalidated = self.rebind_all_credit_indices();
         }
         Ok(ContextScratchBump::Curve {
@@ -93,18 +101,22 @@ impl MarketContext {
     pub fn revert_scratch_bump(&mut self, bump: ContextScratchBump) -> Result<()> {
         match bump {
             ContextScratchBump::Price { id, previous } => {
-                self.prices.insert(id, previous);
+                Arc::make_mut(&mut self.prices).insert(id, previous);
             }
             ContextScratchBump::Surface { id, previous } => {
-                self.surfaces.insert(id, previous);
+                Arc::make_mut(&mut self.surfaces).insert(id, previous);
             }
             ContextScratchBump::Curve {
                 id,
                 previous,
                 previous_credit_indices,
             } => {
-                self.curves.insert(id, previous);
-                self.credit_indices = previous_credit_indices;
+                Arc::make_mut(&mut self.curves).insert(id, previous);
+                // Only restore the credit-index map if it was actually rebound
+                // during the bump (see `apply_curve_bump_in_place`).
+                if let Some(previous_credit_indices) = previous_credit_indices {
+                    self.credit_indices = previous_credit_indices;
+                }
             }
         }
         Ok(())
@@ -227,7 +239,7 @@ impl MarketContext {
             let bumped = curve
                 .apply_bucket_bump(detachments.as_deref(), points)
                 .ok_or(InputError::DimensionMismatch)?;
-            ctx.curves
+            Arc::make_mut(&mut ctx.curves)
                 .insert(surface_id, CurveStorage::BaseCorrelation(Arc::new(bumped)));
             needs_credit_rebind = true;
         }
@@ -272,7 +284,7 @@ impl MarketContext {
         for (curve_id, bump_spec) in bumps {
             let cid = curve_id.as_str();
 
-            if let Some(storage) = self.curves.get_mut(cid) {
+            if let Some(storage) = Arc::make_mut(&mut self.curves).get_mut(cid) {
                 storage.apply_bump_preserving_id(&curve_id, bump_spec)?;
                 if !needs_credit_rebind {
                     needs_credit_rebind = self.curve_affects_credit_indices(&curve_id);
@@ -282,19 +294,19 @@ impl MarketContext {
 
             if let Some(original) = self.surfaces.get(cid).cloned() {
                 let bumped = original.apply_bump(bump_spec)?;
-                self.surfaces.insert(curve_id.clone(), Arc::new(bumped));
+                Arc::make_mut(&mut self.surfaces).insert(curve_id.clone(), Arc::new(bumped));
                 continue;
             }
 
             if let Some(original) = self.prices.get(cid).cloned() {
                 let bumped = original.apply_bump(bump_spec)?;
-                self.prices.insert(curve_id.clone(), bumped);
+                Arc::make_mut(&mut self.prices).insert(curve_id.clone(), bumped);
                 continue;
             }
 
             if let Some(original) = self.series.get(cid).cloned() {
                 let bumped = original.apply_bump(bump_spec)?;
-                self.series.insert(curve_id.clone(), bumped);
+                Arc::make_mut(&mut self.series).insert(curve_id.clone(), bumped);
                 continue;
             }
 

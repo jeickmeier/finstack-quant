@@ -23,6 +23,8 @@
 //!   Rating Drift with Continuous Observations." *Journal of Banking & Finance*,
 //!   26(2-3), 423-444.
 
+use std::sync::Arc;
+
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
@@ -46,8 +48,11 @@ pub struct RatingPath {
     transitions: Vec<(f64, usize)>,
     /// Total simulation horizon.
     horizon: f64,
-    /// Rating scale used for the simulation.
-    scale: RatingScale,
+    /// Rating scale used for the simulation. Shared via `Arc` so the
+    /// hot batch-simulation loops bump a refcount per path instead of
+    /// re-allocating the labels `Vec` and rebuilding the index map. The serde
+    /// "rc" feature keeps the wire format identical to an inline `RatingScale`.
+    scale: Arc<RatingScale>,
 }
 
 impl RatingPath {
@@ -113,7 +118,7 @@ impl RatingPath {
     /// The rating scale associated with this path.
     #[must_use]
     pub fn scale(&self) -> &RatingScale {
-        &self.scale
+        self.scale.as_ref()
     }
 
     /// The simulation horizon.
@@ -180,8 +185,9 @@ impl MigrationSimulator {
         n_paths: usize,
         rng: &mut R,
     ) -> Vec<RatingPath> {
+        let scale = Arc::new(self.generator.scale.clone());
         (0..n_paths)
-            .map(|_| simulate_path(&self.generator, initial_state, self.horizon, rng))
+            .map(|_| simulate_path(&self.generator, &scale, initial_state, self.horizon, rng))
             .collect()
     }
 
@@ -200,38 +206,35 @@ impl MigrationSimulator {
         rng: &mut R,
     ) -> TransitionMatrix {
         let n = self.generator.n_states();
-        let mut counts = vec![vec![0usize; n]; n];
+        let scale = Arc::new(self.generator.scale.clone());
+        // Flat row-major counts (index `from * n + to`) for cache-friendly
+        // accumulation and a single allocation.
+        let mut counts = vec![0usize; n * n];
 
-        for (from, row) in counts.iter_mut().enumerate() {
+        for from in 0..n {
             for _ in 0..n_paths_per_state {
-                let path = simulate_path(&self.generator, from, self.horizon, rng);
+                let path = simulate_path(&self.generator, &scale, from, self.horizon, rng);
                 let to = path.state_at(self.horizon);
-                row[to] += 1;
+                counts[from * n + to] += 1;
             }
         }
 
-        let total = n_paths_per_state as f64;
-        let data: Vec<f64> = counts
-            .iter()
-            .flat_map(|row| row.iter().map(|&c| c as f64 / total))
-            .collect();
+        // Normalize each row to sum to 1.0 in place (correct rounding); for tiny
+        // `n_paths` an empty row falls back to a divisor of 1.0.
+        let mut data = vec![0.0f64; n * n];
+        for from in 0..n {
+            let row = &counts[from * n..(from + 1) * n];
+            let row_sum: usize = row.iter().sum();
+            let divisor = if row_sum == 0 { 1.0 } else { row_sum as f64 };
+            for to in 0..n {
+                data[from * n + to] = row[to] as f64 / divisor;
+            }
+        }
 
-        // Build raw TransitionMatrix (may not pass strict absorbing-state check
-        // for tiny n_paths; construct directly to avoid false validation failures).
-        let matrix = nalgebra::DMatrix::from_row_slice(n, n, &data);
-
-        // Post-process: re-normalize rows to sum to 1.0 (correct rounding).
-        let data_normalized: Vec<f64> = (0..n)
-            .flat_map(|i| {
-                let row_sum: f64 = (0..n).map(|j| matrix[(i, j)]).sum();
-                let row_sum = if row_sum < 1e-15 { 1.0 } else { row_sum };
-                let row: Vec<f64> = (0..n).map(|j| matrix[(i, j)] / row_sum).collect();
-                row
-            })
-            .collect();
-
+        // Construct directly to avoid the strict absorbing-state check, which may
+        // not hold for small sample sizes.
         TransitionMatrix {
-            data: nalgebra::DMatrix::from_row_slice(n, n, &data_normalized),
+            data: nalgebra::DMatrix::from_row_slice(n, n, &data),
             horizon: self.horizon,
             scale: self.generator.scale.clone(),
         }
@@ -257,6 +260,7 @@ impl MigrationSimulator {
 /// Simulate a single rating path using Gillespie's competing exponentials.
 fn simulate_path<R: Rng>(
     gen: &GeneratorMatrix,
+    scale: &Arc<RatingScale>,
     initial_state: usize,
     horizon: f64,
     rng: &mut R,
@@ -324,6 +328,6 @@ fn simulate_path<R: Rng>(
     RatingPath {
         transitions,
         horizon,
-        scale: gen.scale.clone(),
+        scale: Arc::clone(scale),
     }
 }
