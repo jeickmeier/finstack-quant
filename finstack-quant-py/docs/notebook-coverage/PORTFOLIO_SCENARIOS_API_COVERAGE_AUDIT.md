@@ -1,8 +1,8 @@
-# Portfolio & Scenarios API Coverage Audit (05_portfolio_and_scenarios notebooks)
+# Portfolio & Scenarios API Coverage Audit (05_portfolio and 06_scenarios notebooks)
 
 Date: 2026-06-23
 
-Scope: Public symbols under `finstack_quant.portfolio` and `finstack_quant.scenarios` per `parity_contract.toml` and the `.pyi` files. Focus on the 13 notebooks (including `scenarios/` subdirectory) in `05_portfolio_and_scenarios/`.
+Scope: Public symbols under `finstack_quant.portfolio` and `finstack_quant.scenarios` per `parity_contract.toml` and the `.pyi` files. Focus on the 13 notebooks split across `05_portfolio/` and `06_scenarios/`.
 
 Legend:
 - ✅ Demonstrated with runnable example
@@ -146,14 +146,14 @@ Legend:
 - Keep additions small and colocated (e.g., one new "Performance & Attribution" section in construction or risk notebook; one "Typed Optimization" cell; one "Typed Scenario Operations" cell in scenarios_and_stress_testing or a scenarios/ notebook).
 - Prefer demonstrating the short canonical name (`twrr_modified_dietz`, `optimize_portfolio_typed`) as the primary path.
 - Use existing notebook boilerplate (AS_OF, MARKET_JSON, simple instrument/portfolio JSON) for new cells.
-- After changes: run `uv run python .../run_all_notebooks.py --directory 05_portfolio_and_scenarios`
+- After changes: run `uv run python .../run_all_notebooks.py --directory 05_portfolio` and `--directory 06_scenarios`
 - Focused type/lint only (notebooks do not affect surrounding .py sources).
 - Update this audit as gaps close.
 
 ## 7. Files Consulted
 - `parity_contract.toml` (portfolio + scenarios sections + public symbol lists)
 - `finstack_quant/portfolio/__init__.pyi` and `scenarios/__init__.pyi`
-- All 13 notebooks under `05_portfolio_and_scenarios/` (via content search + execution scans)
+- All 13 notebooks under `05_portfolio/` (via content search + execution scans)
 - Precedent audits: `FOUNDATIONS_API_COVERAGE_AUDIT.md`, `04_statement_modeling/STATEMENTS_API_COVERAGE_AUDIT.md`
 
 No edits made to notebooks during this initial read-only audit pass.

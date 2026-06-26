@@ -82,7 +82,7 @@ def test_vol_surfaces_notebook_runs_successfully(module: ModuleType) -> None:
 
 def test_liquidity_notebook_runs_successfully(module: ModuleType) -> None:
     """The liquidity risk notebook should execute end-to-end."""
-    notebook = NOTEBOOKS_DIR / "05_portfolio_and_scenarios" / "liquidity_risk.ipynb"
+    notebook = NOTEBOOKS_DIR / "05_portfolio" / "liquidity_risk.ipynb"
 
     ok, message, _elapsed = module.run_notebook(notebook, timeout=60)
 
@@ -91,7 +91,7 @@ def test_liquidity_notebook_runs_successfully(module: ModuleType) -> None:
 
 def test_credit_factor_hierarchy_notebook_runs_successfully(module: ModuleType) -> None:
     """The credit factor hierarchy notebook should execute end-to-end."""
-    notebook = NOTEBOOKS_DIR / "05_portfolio_and_scenarios" / "credit_factor_hierarchy.ipynb"
+    notebook = NOTEBOOKS_DIR / "05_portfolio" / "credit_factor_hierarchy.ipynb"
 
     ok, message, _elapsed = module.run_notebook(notebook, timeout=60)
 

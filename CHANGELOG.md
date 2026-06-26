@@ -73,7 +73,7 @@ A hierarchical credit factor model that decomposes every issuer's spread into a 
 **Deferred to v2:** term-structure level factors, PCA-derived generic, multivariate / DCC GARCH, online covariance updating, Ledoit-Wolf shrinkage, FRTB regulatory adapters, `CreditFactorModelRef::FilePath` variant.
 
 **PR-12 final hardening (this entry):**
-- Jupyter notebook `05_portfolio_and_scenarios/credit_factor_hierarchy.ipynb`: end-to-end synthetic demo covering calibration, artifact save/reload, period decomposition, portfolio attribution, and vol forecast.
+- Jupyter notebook `05_portfolio/credit_factor_hierarchy.ipynb`: end-to-end synthetic demo covering calibration, artifact save/reload, period decomposition, portfolio attribution, and vol forecast.
 - Benchmarks: `finstack-quant/valuations/benches/credit_factor_calibration.rs` (500 issuers × 60 months × 3 levels); `attribution_scale.rs` extended with a 200-position parallel-attribution-with-credit-model group.
 - Compatibility sweep: `no_model_compatibility.rs` tests that (1) pre-PR-7 `AttributionEnvelope` JSON deserializes with `credit_factor_model = None`, (2) pre-PR-7 `PnlAttribution` JSON deserializes with new fields defaulting to `None`, and (3) all four attribution methods (MetricsBased, Taylor, Parallel, Waterfall) produce finite, non-NaN totals when no credit model is supplied. `factor_model_serialization.rs` in `finstack-quant-portfolio` adds a test confirming pre-PR-6 `RiskDecomposition` JSON (no `position_residual_contributions` key) deserializes with the field defaulting to empty.
 

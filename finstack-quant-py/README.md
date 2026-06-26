@@ -92,9 +92,11 @@ Notebook curriculum under `finstack-quant-py/examples/notebooks/`:
 - `02_pricing` — instruments, attribution
 - `03_analytics` — performance and risk analytics
 - `04_statement_modeling` — statements and statement analytics
-- `05_portfolio_and_scenarios` — portfolio, scenarios, liquidity
-- `06_advanced_quant` — Monte Carlo, correlation, margin/XVA
-- `07_capstone` — end-to-end workflow
+- `05_portfolio` — portfolio construction, optimization, risk, liquidity
+- `06_scenarios` — scenario authoring, stress tests, impact analysis
+- `07_advanced_quant` — Monte Carlo, correlation, margin/XVA
+- `08_capstone` — end-to-end workflow
+- `09_reporting` — reporting tear sheets
 
 Index: [`examples/notebooks/README.md`](examples/notebooks/README.md).
 
@@ -109,7 +111,7 @@ uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py
 One section:
 
 ```bash
-uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py --directory 05_portfolio_and_scenarios
+uv run python finstack-quant-py/examples/notebooks/run_all_notebooks.py --directory 05_portfolio
 ```
 
 ## Stubs, parity, and tests

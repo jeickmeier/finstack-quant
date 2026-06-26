@@ -1,8 +1,8 @@
-# Advanced Quant API Coverage Audit (06_advanced_quant notebooks)
+# Advanced Quant API Coverage Audit (07_advanced_quant notebooks)
 
 Date: 2026-06-23
 
-Scope: Public symbols under `finstack_quant.monte_carlo`, `finstack_quant.margin`, `finstack_quant.valuations.correlation`, and `finstack_quant.valuations.models.credit` (per `parity_contract.toml` and the `.pyi` files). Focus on the 11 notebooks in `06_advanced_quant/`.
+Scope: Public symbols under `finstack_quant.monte_carlo`, `finstack_quant.margin`, `finstack_quant.valuations.correlation`, and `finstack_quant.valuations.models.credit` (per `parity_contract.toml` and the `.pyi` files). Focus on the 12 notebooks in `07_advanced_quant/`.
 
 Legend:
 - ✅ Demonstrated with runnable example (direct call + property/method access)
@@ -104,13 +104,13 @@ Legend:
 - Add a centralized "Estimates in depth" cell (or section) in one of the MC notebooks showing all MoneyEstimate properties + relative_stderr().
 - Add one `nearest_correlation` example in `correlation_and_credit_models.ipynb`.
 - Perform explicit JSON roundtrips and property walks for CopulaSpec<->Copula, RecoverySpec<->Model, MertonModel, XvaConfig.
-- After changes: run `uv run python .../run_all_notebooks.py --directory 06_advanced_quant`.
+- After changes: run `uv run python .../run_all_notebooks.py --directory 07_advanced_quant`.
 - Keep additions small and runnable; update this audit as gaps close.
 
 ## Files Consulted
 - `parity_contract.toml` (monte_carlo, margin, valuations.correlation, valuations.models.credit sections)
 - `finstack_quant/monte_carlo/__init__.pyi`, `margin/__init__.pyi`, `valuations/correlation/__init__.pyi`, `valuations/models/credit/__init__.pyi`
-- All 11 notebooks under `06_advanced_quant/` (via content searches for symbols and patterns)
+- All 12 notebooks under `07_advanced_quant/` (via content searches for symbols and patterns)
 
 No edits were made to notebooks during this read-only audit pass. The artifact drives the subsequent implementation steps per the plan.
 
@@ -126,7 +126,7 @@ No edits were made to notebooks during this read-only audit pass. The artifact d
   - Added "Estimates in depth" cell exercising `MoneyEstimate` props (mean/stderr/relative_stderr/num_*/ci/std_dev/percentiles/min/max) + `price_asian_put` variant.
 - Added `nearest_correlation` runnable demo + import in `correlation_and_credit_models.ipynb`.
 - Roundtrips: explicit in structural notebook (Merton + DynamicRecovery/Endogenous/CreditState); analogous patterns for Copula/Recovery elsewhere in tier.
-- `run_all_notebooks.py --directory 06_advanced_quant`: New notebook PASS; several others PASS. One transient ZMQ kernel error on long-running notebook (known env artifact, not logic regression; matches prior tier observations).
+- `run_all_notebooks.py --directory 07_advanced_quant`: New notebook PASS; several others PASS. One transient ZMQ kernel error on long-running notebook (known env artifact, not logic regression; matches prior tier observations).
 - Margin/XVA/regulatory: broad coverage already present in `regulatory_capital.ipynb` + `margin_collateral_and_xva.ipynb`; no new thin-spot cells required after spot-checks.
 - Audit table above remains the source of truth; all high-visibility public symbols now have at least one runnable path (or documented omission).
 

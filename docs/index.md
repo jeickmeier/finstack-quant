@@ -40,11 +40,13 @@ The notebook curriculum is the main tutorial path:
    reporting tear sheets.
 4. `04_statement_modeling`: statement formulas, forecasts, sensitivities,
    covenants, and credit scoring.
-5. `05_portfolio_and_scenarios`: portfolio valuation, stress testing, horizon
-   total return, liquidity risk, and risk decomposition.
-6. `06_advanced_quant`: Monte Carlo, correlation, credit models, margin, XVA,
+5. `05_portfolio`: portfolio valuation, optimization, horizon total return,
+   liquidity risk, and risk decomposition.
+6. `06_scenarios`: scenario authoring, stress testing, and impact analysis.
+7. `07_advanced_quant`: Monte Carlo, correlation, credit models, margin, XVA,
    and regulatory capital.
-7. `07_capstone`: end-to-end credit portfolio workflow.
+8. `08_capstone`: end-to-end credit portfolio workflow.
+9. `09_reporting`: reporting tear sheets.
 
 Run the full curriculum from the repository root:
 
