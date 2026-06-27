@@ -17,6 +17,14 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions;
 
+        // Lower any guaranteed-return floor into a concrete call schedule, then
+        // price the resulting callable bond through the normal path. The cloned
+        // bond has `return_floor == None`, so this recursion terminates.
+        if self.return_floor.is_some() {
+            let effective = self.effective_for_pricing(curves, as_of)?;
+            return effective.base_value(curves, as_of);
+        }
+
         // Scenario spread shock: applied as an additional flat Z-spread on top
         // of either the quoted Z-spread or the curve-implied (zero-spread)
         // price. Restricted to configurations where that is exact — vanilla

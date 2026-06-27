@@ -280,6 +280,27 @@ pub(crate) fn lower_return_floor(
     Ok(CallPutSchedule { calls, puts })
 }
 
+impl Bond {
+    /// Return a pricing-ready clone of this bond with any `return_floor` lowered
+    /// into `call_put` (merged with contractual calls) and `return_floor` cleared.
+    ///
+    /// When no floor is present the clone is unchanged. Gating callers on
+    /// `self.return_floor.is_some()` avoids the clone otherwise.
+    pub(crate) fn effective_for_pricing(
+        &self,
+        curves: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<Bond> {
+        let mut clone = self.clone();
+        if let Some(spec) = self.return_floor.as_ref() {
+            let merged = lower_return_floor(self, spec, curves, as_of)?;
+            clone.call_put = Some(merged);
+            clone.return_floor = None;
+        }
+        Ok(clone)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -432,5 +453,66 @@ mod tests {
             .calls
             .iter()
             .all(|c| c.price_pct_of_par >= 100.0 - 1e-9));
+    }
+
+    #[test]
+    fn effective_for_pricing_lowers_floor_into_call_put() {
+        let curves = MarketContext::new();
+        let as_of = date!(2024 - 01 - 15);
+
+        // Plain bond: effective == itself, no call schedule added, no floor.
+        let plain = fixed_10pct_bullet();
+        let eff_plain = plain.effective_for_pricing(&curves, as_of).unwrap();
+        assert!(eff_plain.call_put.is_none());
+        assert!(eff_plain.return_floor.is_none());
+
+        // Floored bond: floor lowered into call_put, return_floor cleared.
+        let floored = fixed_10pct_bullet().min_moic(1.25);
+        let eff_floored = floored.effective_for_pricing(&curves, as_of).unwrap();
+        assert!(eff_floored.return_floor.is_none());
+        assert!(eff_floored
+            .call_put
+            .as_ref()
+            .is_some_and(|c| !c.calls.is_empty()));
+    }
+
+    #[test]
+    fn base_value_hook_prices_floored_bond_via_tree() {
+        use crate::instruments::common_impl::traits::Instrument;
+        use finstack_quant_core::market_data::context::MarketContext;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_core::math::interp::InterpStyle;
+
+        let as_of = date!(2024 - 01 - 15);
+
+        // Build a flat 5% discount curve so the tree engine has something to work with.
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (3.0, 0.857)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("flat discount curve for smoke test");
+        let market = MarketContext::new().insert(disc);
+
+        // A floored bond must route through the base_value hook and return Ok with a
+        // positive price. The plain bond (no floor) must also still price correctly.
+        let plain = fixed_10pct_bullet();
+        let price_plain = plain.base_value(&market, as_of).unwrap();
+        assert!(
+            price_plain.amount() > 0.0,
+            "plain bond price should be positive"
+        );
+
+        let floored = fixed_10pct_bullet().min_moic(1.25);
+        let price_floored = floored.base_value(&market, as_of).unwrap();
+        assert!(
+            price_floored.amount() > 0.0,
+            "floored bond price should be positive"
+        );
+        assert_eq!(
+            price_floored.currency(),
+            price_plain.currency(),
+            "currency should match notional"
+        );
     }
 }
