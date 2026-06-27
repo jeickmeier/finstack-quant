@@ -40,15 +40,18 @@ use finstack_quant_core::types::Rate;
 pub enum ReturnFloorKind {
     /// Minimum money-on-money multiple (e.g. `1.25` = 1.25× invested capital).
     ///
-    /// The redemption price at time `t` is the minimum amount such that
-    /// `(received_cashflows + redemption) / V0 >= multiple`, where `V0` is the
-    /// invested capital defined by [`IssuePrice`].
+    /// On an early issuer-called redemption at time `t`, the redemption price is
+    /// the minimum amount such that `(received_cashflows + redemption) / V0 >=
+    /// multiple`, where `V0` is the invested capital defined by [`IssuePrice`].
+    /// The floor binds only on early redemptions, not at maturity.
     Moic(f64),
     /// Minimum annualized internal rate of return.
     ///
-    /// The redemption price at time `t` is computed so that the XIRR of all
-    /// cashflows from issue equals the target rate. Day count defaults to the
-    /// bond's day count unless overridden via [`ReturnFloorSpec::day_count`].
+    /// On an early issuer-called redemption at time `t`, the redemption price is
+    /// computed so that the XIRR of all cashflows from issue equals the target
+    /// rate. The floor binds only on early redemptions, not at maturity. Day
+    /// count defaults to Act/365F (matching `core::cashflow::xirr`) unless
+    /// overridden via [`ReturnFloorSpec::day_count`].
     Xirr(#[schemars(with = "f64")] Rate),
 }
 
@@ -75,14 +78,16 @@ pub enum IssuePrice {
 /// The window defines the interval over which the issuer can trigger a
 /// floor-protected early redemption. Outside this window the floor is
 /// inactive (the bond behaves as uncallable or follows its normal call
-/// schedule).
+/// schedule). The floor binds only on early issuer-called redemptions; it
+/// never applies at maturity.
 #[derive(
     Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
 )]
 #[non_exhaustive]
 pub enum ProtectionWindow {
-    /// From issue (or `as_of`) through maturity (default). The floor applies
-    /// at any redemption date within the bond's life.
+    /// From issue (or `as_of`) up to — but not including — maturity (default).
+    /// The floor applies to any early issuer-called redemption during the
+    /// bond's life, but not to redemption at maturity.
     Full,
     /// Active only on or after this date (encodes a no-call period ending at
     /// maturity). The floor is not applied to redemptions before `from`.
@@ -142,8 +147,8 @@ pub struct ReturnFloorSpec {
     /// Protection window. Default: [`ProtectionWindow::Full`].
     #[serde(default = "default_window")]
     pub window: ProtectionWindow,
-    /// Day count convention for XIRR discounting. Defaults to the bond's day
-    /// count when `None`. Ignored for MOIC floors.
+    /// Day count convention for XIRR discounting. Defaults to Act/365F
+    /// (matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub day_count: Option<DayCount>,
 }
