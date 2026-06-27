@@ -1,0 +1,237 @@
+//! MOIC (money-on-invested-capital) metrics: to-maturity and to-worst-exit.
+//!
+//! MOIC is the total investor return as a multiple of the invested capital:
+//!
+//! ```text
+//! MOIC = Σ(positive cashflows received after issue) / V0
+//! ```
+//!
+//! where `V0` is the cost basis (invested capital) derived from the bond's
+//! [`IssuePrice`]: par notional by default, or an explicit amount / OID percentage.
+//!
+//! # Floor scope (important)
+//!
+//! The return floor is **call-protection only**: it bounds the realized return
+//! on EARLY (issuer-called/put) redemptions, NOT the held-to-maturity path (see
+//! `lower_return_floor` in `bond/pricing/return_floor.rs`). The to-worst metric
+//! takes the minimum over **all** exits — every early-call/put path AND the
+//! unfloored held-to-maturity path — so it is **not** bounded below by the floor
+//! target. When the bond's natural maturity return is below the target, the
+//! maturity path is the worst case and the metric reflects that. The floor's
+//! guarantee (every early-call path meets the target) is verified separately by
+//! the `xirr_floor_meets_target_at_each_call` test in
+//! `bond/pricing/return_floor.rs`.
+
+use crate::instruments::fixed_income::bond::Bond;
+use crate::instruments::fixed_income::bond::IssuePrice;
+use crate::metrics::{MetricCalculator, MetricContext};
+
+/// Resolve the cost basis `(issue_date, V0)` from the bond.
+///
+/// `V0` (invested capital) uses the bond's `return_floor.issue_price` when
+/// present, otherwise par notional. The anchor date is always `bond.issue_date`
+/// (issuer-side convention). This mirrors `invested_capital` in
+/// `bond/pricing/return_floor.rs`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` if an [`IssuePrice::Amount`] currency does not
+/// match the bond's notional currency, or if the resolved `V0` is not strictly
+/// positive.
+pub(crate) fn cost_basis(
+    bond: &Bond,
+) -> finstack_quant_core::Result<(finstack_quant_core::dates::Date, f64)> {
+    let v0 = match bond.return_floor.as_ref().map(|s| &s.issue_price) {
+        Some(IssuePrice::PctOfPar(p)) => bond.notional.amount() * p / 100.0,
+        Some(IssuePrice::Amount(m)) => {
+            if m.currency() != bond.notional.currency() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "return floor IssuePrice::Amount currency must match notional".to_string(),
+                ));
+            }
+            m.amount()
+        }
+        _ => bond.notional.amount(), // Par or no floor spec
+    };
+    if v0 <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(
+            "return floor metrics require a positive issue price".to_string(),
+        ));
+    }
+    Ok((bond.issue_date, v0))
+}
+
+/// MOIC if held to maturity.
+///
+/// Computes the sum of all positive cashflows received by the holder strictly
+/// after the issue date, divided by `V0`.
+///
+/// # Returns
+///
+/// `Ok(moic)` where `moic >= 1.0` for a par bond that pays coupons and returns
+/// principal. Values below 1.0 indicate a loss of principal.
+///
+/// # Errors
+///
+/// Returns an error if the instrument is not a `Bond` or if cashflow generation fails.
+pub(crate) struct MoicCalculator;
+
+impl MetricCalculator for MoicCalculator {
+    fn calculate(&self, ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let bond: &Bond = ctx.instrument_as()?;
+        let (t0, v0) = cost_basis(bond)?;
+        let flows = bond.pricing_dated_cashflows(&ctx.curves, ctx.as_of)?;
+        let total_in: f64 = flows
+            .iter()
+            .filter(|(d, _)| *d > t0)
+            .map(|(_, m)| m.amount().max(0.0))
+            .sum();
+        Ok(total_in / v0)
+    }
+}
+
+/// Worst (minimum) realized money multiple across **all** exits: every
+/// early-call/put path AND the held-to-maturity path.
+///
+/// Considers:
+/// 1. The held-to-maturity path (all positive flows after issue).
+/// 2. Every call/put candidate produced by `enumerate_exit_paths`: coupons
+///    received in `(issue, exit]` plus the stated redemption price (% of notional).
+///
+/// Returns the **minimum** MOIC across these paths.
+///
+/// # Floor scope
+///
+/// The return floor protects only EARLY redemptions; the held-to-maturity path
+/// is unfloored. This value is therefore **not** bounded below by the floor
+/// target — when the bond's natural maturity return is below the target, the
+/// maturity path is the worst case and this metric reflects that. The floor's
+/// guarantee (every EARLY-CALL path meets the target) is verified separately by
+/// the `xirr_floor_meets_target_at_each_call` test in
+/// `bond/pricing/return_floor.rs`.
+///
+/// # Limitation
+///
+/// Redemption uses the initial notional (`bond.notional`), which is exact for
+/// bullet bonds. Amortizing bonds need the outstanding principal at the call
+/// date here; that is a v1 limitation (TODO).
+///
+/// # Errors
+///
+/// Returns an error if the instrument is not a `Bond`, if the effective bond
+/// cannot be derived, or if cashflow generation fails.
+pub(crate) struct MoicToWorstCalculator;
+
+impl MetricCalculator for MoicToWorstCalculator {
+    fn calculate(&self, ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
+        let bond: &Bond = ctx.instrument_as()?;
+        let (t0, v0) = cost_basis(bond)?;
+
+        // Lower any return-floor into call_put before enumerating exit paths.
+        let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
+        let flows = eff.pricing_dated_cashflows(&ctx.curves, ctx.as_of)?;
+
+        let candidates = crate::instruments::fixed_income::bond::pricing::quote_conversions::enumerate_exit_paths(
+            &eff, &flows, ctx.as_of,
+        );
+
+        // Held-to-maturity path: all positive inflows after issue.
+        let to_mat: f64 = flows
+            .iter()
+            .filter(|(d, _)| *d > t0)
+            .map(|(_, m)| m.amount().max(0.0))
+            .sum::<f64>()
+            / v0;
+
+        // Worst across maturity and each call/put candidate.
+        let mut worst = to_mat;
+        for cand in candidates {
+            // Coupons received in (issue, exit_date].
+            let coupons: f64 = flows
+                .iter()
+                .filter(|(d, _)| *d > t0 && *d <= cand.date)
+                .map(|(_, m)| m.amount().max(0.0))
+                .sum();
+            // Redemption cash = stated price % of notional.
+            let redemption = bond.notional.amount() * cand.price_pct_of_par / 100.0;
+            worst = worst.min((coupons + redemption) / v0);
+        }
+
+        Ok(worst)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::fixed_income::bond::Bond;
+    use crate::metrics::{MetricCalculator, MetricContext};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::money::Money;
+    use finstack_quant_core::types::Rate;
+    use std::sync::Arc;
+    use time::macros::date;
+
+    /// 2-year 10% semi-annual bullet at par-100.
+    ///
+    /// 4 coupons × 5.0 = 20.0, plus 100 redemption = 120.0 total inflow.
+    /// MOIC = 120 / 100 = 1.20.
+    #[test]
+    fn moic_to_maturity_for_par_10pct_2y_is_1_20() {
+        let bond = Bond::fixed(
+            "L",
+            Money::new(100.0, Currency::USD),
+            Rate::from_percent(10.0),
+            date!(2024 - 01 - 15),
+            date!(2026 - 01 - 15),
+            "USD-OIS",
+        )
+        .unwrap();
+
+        let curves = Arc::new(MarketContext::new());
+        let mut ctx = MetricContext::new(
+            Arc::new(bond),
+            curves,
+            date!(2024 - 01 - 15),
+            Money::new(100.0, Currency::USD),
+            MetricContext::default_config(),
+        );
+
+        let moic = MoicCalculator.calculate(&mut ctx).unwrap();
+        assert!(
+            (moic - 1.20).abs() < 1e-3,
+            "expected MOIC ≈ 1.20, got {moic}"
+        );
+    }
+
+    /// Bullet bond without call options: to-worst equals to-maturity.
+    #[test]
+    fn moic_to_worst_equals_to_maturity_for_bullet_bond() {
+        let bond = Bond::fixed(
+            "L",
+            Money::new(100.0, Currency::USD),
+            Rate::from_percent(10.0),
+            date!(2024 - 01 - 15),
+            date!(2026 - 01 - 15),
+            "USD-OIS",
+        )
+        .unwrap();
+
+        let curves = Arc::new(MarketContext::new());
+        let mut ctx = MetricContext::new(
+            Arc::new(bond),
+            curves,
+            date!(2024 - 01 - 15),
+            Money::new(100.0, Currency::USD),
+            MetricContext::default_config(),
+        );
+
+        let moic_mat = MoicCalculator.calculate(&mut ctx).unwrap();
+        let moic_worst = MoicToWorstCalculator.calculate(&mut ctx).unwrap();
+        assert!(
+            (moic_mat - moic_worst).abs() < 1e-9,
+            "bullet bond: to-maturity {moic_mat} should equal to-worst {moic_worst}"
+        );
+    }
+}

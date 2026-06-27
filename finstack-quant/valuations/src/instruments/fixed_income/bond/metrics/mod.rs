@@ -62,6 +62,8 @@ pub(crate) mod dv01;
 pub(crate) mod effective;
 /// Price, yield, and spread metrics
 pub(crate) mod price_yield_spread;
+/// MOIC and XIRR return-floor verification metrics
+pub(crate) mod return_metrics;
 /// Quote-reproducing risk view for bond bump-based sensitivities
 mod risk_view;
 /// Weighted Average Life calculator
@@ -202,6 +204,11 @@ pub(crate) fn register_bond_metrics(registry: &mut crate::metrics::MetricRegistr
 
             (Cs01, BondCs01Calculator),
             (BucketedCs01, BondBucketedCs01Calculator),
+
+            (Moic, return_metrics::moic::MoicCalculator),
+            (MoicToWorst, return_metrics::moic::MoicToWorstCalculator),
+            (Xirr, return_metrics::xirr::XirrCalculator),
+            (XirrToWorst, return_metrics::xirr::XirrToWorstCalculator),
 
         ]
     };
