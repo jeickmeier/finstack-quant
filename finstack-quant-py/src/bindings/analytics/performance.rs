@@ -153,6 +153,7 @@ fn extract_float64_column(series: &Bound<'_, PyAny>, col_label: &str) -> PyResul
 
 /// Build a `Performance` from pre-extracted arrays.
 fn build_performance(
+    py: Python<'_>,
     dates: Vec<time::Date>,
     prices: Vec<Vec<f64>>,
     ticker_names: Vec<String>,
@@ -160,13 +161,15 @@ fn build_performance(
     freq: &str,
 ) -> PyResult<PyPerformance> {
     let period_kind = parse_freq(freq)?;
-    let inner = fa::Performance::new(dates, prices, ticker_names, benchmark_ticker, period_kind)
+    let inner = py
+        .detach(|| fa::Performance::new(dates, prices, ticker_names, benchmark_ticker, period_kind))
         .map_err(core_to_py)?;
     Ok(PyPerformance { inner })
 }
 
 /// Build a `Performance` from pre-extracted return arrays.
 fn build_returns_performance(
+    py: Python<'_>,
     dates: Vec<time::Date>,
     returns: Vec<Vec<f64>>,
     ticker_names: Vec<String>,
@@ -174,9 +177,17 @@ fn build_returns_performance(
     freq: &str,
 ) -> PyResult<PyPerformance> {
     let period_kind = parse_freq(freq)?;
-    let inner =
-        fa::Performance::from_returns(dates, returns, ticker_names, benchmark_ticker, period_kind)
-            .map_err(core_to_py)?;
+    let inner = py
+        .detach(|| {
+            fa::Performance::from_returns(
+                dates,
+                returns,
+                ticker_names,
+                benchmark_ticker,
+                period_kind,
+            )
+        })
+        .map_err(core_to_py)?;
     Ok(PyPerformance { inner })
 }
 
@@ -275,12 +286,18 @@ impl PyPerformance {
     /// values, and each column represents one ticker's price series.
     #[new]
     #[pyo3(signature = (prices, benchmark_ticker=None, freq="daily"))]
-    fn new(prices: Bound<'_, PyAny>, benchmark_ticker: Option<&str>, freq: &str) -> PyResult<Self> {
+    fn new(
+        py: Python<'_>,
+        prices: Bound<'_, PyAny>,
+        benchmark_ticker: Option<&str>,
+        freq: &str,
+    ) -> PyResult<Self> {
         let panel = extract_dataframe_panel(
             &prices,
             "Expected a pandas DataFrame; use Performance.from_arrays() for raw lists",
         )?;
         build_performance(
+            py,
             panel.dates,
             panel.columns,
             panel.ticker_names,
@@ -293,6 +310,7 @@ impl PyPerformance {
     #[staticmethod]
     #[pyo3(signature = (dates, prices, ticker_names, benchmark_ticker=None, freq="daily"))]
     fn from_arrays(
+        py: Python<'_>,
         dates: Vec<Bound<'_, PyAny>>,
         prices: Vec<Vec<f64>>,
         ticker_names: Vec<String>,
@@ -300,7 +318,7 @@ impl PyPerformance {
         freq: &str,
     ) -> PyResult<Self> {
         let rust_dates = py_dates_to_rust(&dates)?;
-        build_performance(rust_dates, prices, ticker_names, benchmark_ticker, freq)
+        build_performance(py, rust_dates, prices, ticker_names, benchmark_ticker, freq)
     }
 
     /// Construct from a pandas DataFrame of returns.
@@ -311,6 +329,7 @@ impl PyPerformance {
     #[staticmethod]
     #[pyo3(signature = (returns, benchmark_ticker=None, freq="daily"))]
     fn from_returns(
+        py: Python<'_>,
         returns: Bound<'_, PyAny>,
         benchmark_ticker: Option<&str>,
         freq: &str,
@@ -320,6 +339,7 @@ impl PyPerformance {
             "Expected a pandas DataFrame; use Performance.from_returns_arrays() for raw lists",
         )?;
         build_returns_performance(
+            py,
             panel.dates,
             panel.columns,
             panel.ticker_names,
@@ -332,6 +352,7 @@ impl PyPerformance {
     #[staticmethod]
     #[pyo3(signature = (dates, returns, ticker_names, benchmark_ticker=None, freq="daily"))]
     fn from_returns_arrays(
+        py: Python<'_>,
         dates: Vec<Bound<'_, PyAny>>,
         returns: Vec<Vec<f64>>,
         ticker_names: Vec<String>,
@@ -339,7 +360,14 @@ impl PyPerformance {
         freq: &str,
     ) -> PyResult<Self> {
         let rust_dates = py_dates_to_rust(&dates)?;
-        build_returns_performance(rust_dates, returns, ticker_names, benchmark_ticker, freq)
+        build_returns_performance(
+            py,
+            rust_dates,
+            returns,
+            ticker_names,
+            benchmark_ticker,
+            freq,
+        )
     }
 
     // -- Mutators --
@@ -671,8 +699,8 @@ impl PyPerformance {
     }
 
     /// Correlation matrix across all tickers.
-    fn correlation_matrix(&self) -> Vec<Vec<f64>> {
-        self.inner.correlation_matrix()
+    fn correlation_matrix(&self, py: Python<'_>) -> Vec<Vec<f64>> {
+        py.detach(|| self.inner.correlation_matrix())
     }
 
     /// Cumulative returns outperformance vs benchmark.
@@ -883,34 +911,38 @@ impl PyPerformance {
     ) -> PyResult<Bound<'py, PyAny>> {
         // Share work where the analytics layer offers combined helpers, so
         // pairs that always travel together (VaR/ES, skewness/kurtosis) only
-        // walk each ticker once.
-        let (var, es) = self.inner.value_at_risk_and_es(confidence);
-        let (skew, kurt) = self.inner.skew_kurt();
-
-        let metrics: [(&str, Vec<f64>); 22] = [
-            ("cagr", self.inner.cagr().map_err(core_to_py)?),
-            ("mean_return", self.inner.mean_return(true)),
-            ("volatility", self.inner.volatility(true)),
-            ("sharpe", self.inner.sharpe(risk_free_rate)),
-            ("sortino", self.inner.sortino(0.0)),
-            ("calmar", self.inner.calmar().map_err(core_to_py)?),
-            ("max_drawdown", self.inner.max_drawdown()),
-            ("value_at_risk", var),
-            ("expected_shortfall", es),
-            ("tracking_error", self.inner.tracking_error()),
-            ("information_ratio", self.inner.information_ratio()),
-            ("skewness", skew),
-            ("kurtosis", kurt),
-            ("geometric_mean", self.inner.geometric_mean()),
-            ("downside_deviation", self.inner.downside_deviation(0.0)),
-            ("omega_ratio", self.inner.omega_ratio(0.0)),
-            ("gain_to_pain", self.inner.gain_to_pain()),
-            ("ulcer_index", self.inner.ulcer_index()),
-            ("pain_index", self.inner.pain_index()),
-            ("recovery_factor", self.inner.recovery_factor()),
-            ("tail_ratio", self.inner.tail_ratio(confidence)),
-            ("r_squared", self.inner.r_squared()),
-        ];
+        // walk each ticker once. All 22 metrics each walk the full return
+        // panel; release the GIL for the whole O(22 * n * m) block so other
+        // Python threads run concurrently.
+        let metrics: [(&str, Vec<f64>); 22] =
+            py.detach(|| -> PyResult<[(&str, Vec<f64>); 22]> {
+                let (var, es) = self.inner.value_at_risk_and_es(confidence);
+                let (skew, kurt) = self.inner.skew_kurt();
+                Ok([
+                    ("cagr", self.inner.cagr().map_err(core_to_py)?),
+                    ("mean_return", self.inner.mean_return(true)),
+                    ("volatility", self.inner.volatility(true)),
+                    ("sharpe", self.inner.sharpe(risk_free_rate)),
+                    ("sortino", self.inner.sortino(0.0)),
+                    ("calmar", self.inner.calmar().map_err(core_to_py)?),
+                    ("max_drawdown", self.inner.max_drawdown()),
+                    ("value_at_risk", var),
+                    ("expected_shortfall", es),
+                    ("tracking_error", self.inner.tracking_error()),
+                    ("information_ratio", self.inner.information_ratio()),
+                    ("skewness", skew),
+                    ("kurtosis", kurt),
+                    ("geometric_mean", self.inner.geometric_mean()),
+                    ("downside_deviation", self.inner.downside_deviation(0.0)),
+                    ("omega_ratio", self.inner.omega_ratio(0.0)),
+                    ("gain_to_pain", self.inner.gain_to_pain()),
+                    ("ulcer_index", self.inner.ulcer_index()),
+                    ("pain_index", self.inner.pain_index()),
+                    ("recovery_factor", self.inner.recovery_factor()),
+                    ("tail_ratio", self.inner.tail_ratio(confidence)),
+                    ("r_squared", self.inner.r_squared()),
+                ])
+            })?;
 
         let data = PyDict::new(py);
         for (name, values) in metrics {

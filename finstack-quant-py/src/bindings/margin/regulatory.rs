@@ -298,9 +298,8 @@ impl PyFrtbSbaEngine {
         py: Python<'_>,
         sensitivities: &PyFrtbSensitivities,
     ) -> PyResult<(f64, Py<PyDict>)> {
-        let result = self
-            .inner
-            .calculate(&sensitivities.inner)
+        let result = py
+            .detach(|| self.inner.calculate(&sensitivities.inner))
             .map_err(core_to_py)?;
         frtb_result_to_py(py, &result)
     }
@@ -566,9 +565,8 @@ impl PySaCcrEngine {
         trades: Vec<PyRef<'_, PySaCcrTrade>>,
     ) -> PyResult<Py<PyDict>> {
         let trade_vec: Vec<SaCcrTrade> = trades.iter().map(|t| t.inner.clone()).collect();
-        let result = self
-            .inner
-            .calculate_ead(&config.inner, &trade_vec)
+        let result = py
+            .detach(|| self.inner.calculate_ead(&config.inner, &trade_vec))
             .map_err(core_to_py)?;
         ead_result_to_py(py, &result)
     }
@@ -674,7 +672,9 @@ pub fn frtb_sba_charge(
         builder = builder.scenarios(vec![scenario]);
     }
     let engine = builder.build().map_err(core_to_py)?;
-    let result = engine.calculate(&sensitivities.inner).map_err(core_to_py)?;
+    let result = py
+        .detach(|| engine.calculate(&sensitivities.inner))
+        .map_err(core_to_py)?;
 
     frtb_result_to_py(py, &result)
 }
@@ -692,6 +692,7 @@ pub fn frtb_sba_charge(
 #[pyfunction]
 #[pyo3(signature = (trades, margined = false, collateral = 0.0))]
 pub fn saccr_ead(
+    py: Python<'_>,
     trades: Vec<PyRef<'_, PySaCcrTrade>>,
     margined: bool,
     collateral: f64,
@@ -709,8 +710,8 @@ pub fn saccr_ead(
     } else {
         SaCcrNettingSetConfig::unmargined(netting_id, collateral, as_of)
     };
-    let result = engine
-        .calculate_ead(&config, &trade_vec)
+    let result = py
+        .detach(|| engine.calculate_ead(&config, &trade_vec))
         .map_err(core_to_py)?;
     Ok((result.rc, result.pfe, result.ead))
 }

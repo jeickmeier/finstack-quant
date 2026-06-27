@@ -65,8 +65,15 @@ fn seniority_recovery_stats<'py>(
 ///     seed: RNG seed. The same seed yields the same sequence.
 #[pyfunction]
 #[pyo3(text_signature = "(mean, std, n_samples, seed)")]
-fn beta_recovery_sample(mean: f64, std: f64, n_samples: usize, seed: u64) -> PyResult<Vec<f64>> {
-    lgd::beta_recovery_sample(mean, std, n_samples, seed).map_err(core_to_py)
+fn beta_recovery_sample(
+    py: Python<'_>,
+    mean: f64,
+    std: f64,
+    n_samples: usize,
+    seed: u64,
+) -> PyResult<Vec<f64>> {
+    py.detach(|| lgd::beta_recovery_sample(mean, std, n_samples, seed))
+        .map_err(core_to_py)
 }
 
 /// Return the value at quantile ``q`` for a Beta recovery distribution

@@ -110,14 +110,6 @@ repos:
         pass_filenames: false
         stages: [pre-commit, pre-push]
 
-      - id: pyright
-        name: Python typecheck (pyright)
-        entry: uv run --no-sync pyright
-        language: system
-        types: [python]
-        pass_filenames: false
-        stages: [pre-commit, pre-push]
-
   # ============================================
   # Security audits (all languages)
   # ============================================

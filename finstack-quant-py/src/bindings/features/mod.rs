@@ -70,8 +70,10 @@ fn neutralize(
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
     let params = parse_params(py, params, "neutralize params")?;
-    finstack_quant_features::neutralize(&values, &time_key, &exposures, params.as_ref())
-        .map_err(core_to_py)
+    py.detach(move || {
+        finstack_quant_features::neutralize(&values, &time_key, &exposures, params.as_ref())
+            .map_err(core_to_py)
+    })
 }
 
 /// Transform two time-series panel columns per entity.
@@ -110,14 +112,16 @@ fn rolling_regression_residual(
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
     let params = parse_params(py, params, "rolling regression residual params")?;
-    finstack_quant_features::rolling_regression_residual(
-        &values,
-        &exposures,
-        &entity,
-        &order,
-        params.as_ref(),
-    )
-    .map_err(core_to_py)
+    py.detach(move || {
+        finstack_quant_features::rolling_regression_residual(
+            &values,
+            &exposures,
+            &entity,
+            &order,
+            params.as_ref(),
+        )
+        .map_err(core_to_py)
+    })
 }
 
 /// Convert a signal to inverse-risk-scaled weights per timestamp.

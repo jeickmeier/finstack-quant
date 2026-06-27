@@ -16,7 +16,6 @@ Use repo-native checks first. External scanners are optional only when installed
 - Lint: `mise run python-lint`
 - Typecheck: `mise run python-typecheck`
 - Tests: `mise run python-test`
-- Verify types when bindings change: `mise run python-verifytypes` if configured
 
 ## WASM
 

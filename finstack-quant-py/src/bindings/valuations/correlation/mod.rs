@@ -894,6 +894,7 @@ fn validate_correlation_matrix(matrix: Vec<f64>, n: usize) -> PyResult<()> {
 #[pyfunction]
 #[pyo3(signature = (matrix, n, max_iter=None, tol=None))]
 fn nearest_correlation(
+    py: Python<'_>,
     matrix: Vec<f64>,
     n: usize,
     max_iter: Option<usize>,
@@ -906,7 +907,8 @@ fn nearest_correlation(
         max_iter: max_iter.unwrap_or(defaults.max_iter),
         tol: tol.unwrap_or(defaults.tol),
     };
-    corr::nearest_correlation_matrix(&matrix, n, opts).map_err(display_to_py)
+    py.detach(|| corr::nearest_correlation_matrix(&matrix, n, opts))
+        .map_err(display_to_py)
 }
 
 /// Pivoted Cholesky decomposition of a correlation matrix (flattened
@@ -923,9 +925,8 @@ fn nearest_correlation(
 /// indefinite.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
-fn cholesky_decompose(matrix: Vec<f64>, n: usize) -> PyResult<Vec<f64>> {
-    corr::cholesky_decompose(&matrix, n)
-        .map(|f| f.factor_matrix().to_vec())
+fn cholesky_decompose(py: Python<'_>, matrix: Vec<f64>, n: usize) -> PyResult<Vec<f64>> {
+    py.detach(|| corr::cholesky_decompose(&matrix, n).map(|f| f.factor_matrix().to_vec()))
         .map_err(display_to_py)
 }
 

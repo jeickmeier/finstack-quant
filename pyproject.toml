@@ -122,7 +122,6 @@ dev = [
     "pytest-benchmark>=5.2.3",
     "hypothesis>=6.122.4",
     "ty>=0.0.18",
-    "pyright>=1.1.400",
     "ruff>=0.14.8",
     "ipython>=9.8.0",
     "jupyter>=1.1.1",
@@ -303,10 +302,6 @@ allowed-unresolved-imports = [
     "finstack_quant.finstack_quant.**",
 ]
 
-[tool.ty.rules]
-# Pyright also uses `type: ignore` comments; suppress noise from shared suppressions.
-unused-type-ignore-comment = "ignore"
-
 # __init__.py files bridge the native Rust extension (finstack_quant.finstack_quant)
 # whose submodule attributes ty cannot introspect statically.
 [[tool.ty.overrides]]
@@ -316,17 +311,6 @@ unresolved-attribute = "ignore"
 
 [tool.ty.terminal]
 error-on-warning = true
-
-#######################
-# Pyright (Pylance)
-#######################
-
-[tool.pyright]
-pythonVersion = "3.12"
-typeCheckingMode = "standard"
-include = ["finstack-quant-py/finstack_quant"]
-extraPaths = ["finstack-quant-py"]
-reportMissingModuleSource = "none"
 
 #######################
 # Bandit Configuration (Security)

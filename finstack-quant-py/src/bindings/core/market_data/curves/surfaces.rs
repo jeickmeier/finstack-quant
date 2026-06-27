@@ -452,10 +452,14 @@ impl PyVolCube {
 
     /// Materialize a tenor slice as a [`VolSurface`].
     #[pyo3(text_signature = "(self, tenor, strikes)")]
-    fn materialize_tenor_slice(&self, tenor: f64, strikes: Vec<f64>) -> PyResult<PyVolSurface> {
-        let surface = self
-            .inner
-            .materialize_tenor_slice(tenor, &strikes)
+    fn materialize_tenor_slice(
+        &self,
+        py: Python<'_>,
+        tenor: f64,
+        strikes: Vec<f64>,
+    ) -> PyResult<PyVolSurface> {
+        let surface = py
+            .detach(|| self.inner.materialize_tenor_slice(tenor, &strikes))
             .map_err(core_to_py)?;
         Ok(PyVolSurface::from_inner(Arc::new(surface)))
     }
@@ -467,22 +471,26 @@ impl PyVolCube {
     #[pyo3(text_signature = "(self, tenor, strikes)")]
     fn materialize_tenor_slice_normal(
         &self,
+        py: Python<'_>,
         tenor: f64,
         strikes: Vec<f64>,
     ) -> PyResult<PyVolSurface> {
-        let surface = self
-            .inner
-            .materialize_tenor_slice_normal(tenor, &strikes)
+        let surface = py
+            .detach(|| self.inner.materialize_tenor_slice_normal(tenor, &strikes))
             .map_err(core_to_py)?;
         Ok(PyVolSurface::from_inner(Arc::new(surface)))
     }
 
     /// Materialize an expiry slice as a [`VolSurface`].
     #[pyo3(text_signature = "(self, expiry, strikes)")]
-    fn materialize_expiry_slice(&self, expiry: f64, strikes: Vec<f64>) -> PyResult<PyVolSurface> {
-        let surface = self
-            .inner
-            .materialize_expiry_slice(expiry, &strikes)
+    fn materialize_expiry_slice(
+        &self,
+        py: Python<'_>,
+        expiry: f64,
+        strikes: Vec<f64>,
+    ) -> PyResult<PyVolSurface> {
+        let surface = py
+            .detach(|| self.inner.materialize_expiry_slice(expiry, &strikes))
             .map_err(core_to_py)?;
         Ok(PyVolSurface::from_inner(Arc::new(surface)))
     }
@@ -494,12 +502,12 @@ impl PyVolCube {
     #[pyo3(text_signature = "(self, expiry, strikes)")]
     fn materialize_expiry_slice_normal(
         &self,
+        py: Python<'_>,
         expiry: f64,
         strikes: Vec<f64>,
     ) -> PyResult<PyVolSurface> {
-        let surface = self
-            .inner
-            .materialize_expiry_slice_normal(expiry, &strikes)
+        let surface = py
+            .detach(|| self.inner.materialize_expiry_slice_normal(expiry, &strikes))
             .map_err(core_to_py)?;
         Ok(PyVolSurface::from_inner(Arc::new(surface)))
     }

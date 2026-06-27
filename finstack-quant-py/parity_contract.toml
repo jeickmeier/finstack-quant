@@ -1486,7 +1486,7 @@ instruments = [
 #   revisit by adding a `cargo public-api` snapshot test under
 #   `finstack-quant/tests/`.
 # - `.pyi` symbol-level signatures. Stub-checker tools (`mypy --strict`,
-#   `pyright`) already exercise these from the consumer side.
+#   `ty`) already exercise these from the consumer side.
 # - WASM `index.d.ts` signature shape. Covered by the existing
 #   `finstack-quant-wasm/tests/dts_contract.rs` for the high-value entries.
 #   (Note: that test's runnability is being tracked separately.)

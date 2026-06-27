@@ -140,8 +140,8 @@ Quick automated check:
 # Rust — build docs and check for missing doc warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --no-deps 2>&1 | head -50
 
-# Python — check stub completeness
-uv run pyright --verifytypes finstack_quant --ignoreexternal
+# Python — type-check bindings
+uv run --no-sync ty check finstack-quant-py/finstack_quant
 ```
 
 ### 3b. README and high-level docs

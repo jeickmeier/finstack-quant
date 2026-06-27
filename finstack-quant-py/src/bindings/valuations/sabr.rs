@@ -382,6 +382,7 @@ impl PySabrCalibrator {
     ///     Calibrated parameters (``beta`` fixed to the input value).
     fn calibrate(
         &self,
+        py: Python<'_>,
         forward: f64,
         strikes: Vec<f64>,
         market_vols: Vec<f64>,
@@ -389,10 +390,12 @@ impl PySabrCalibrator {
         beta: f64,
     ) -> PyResult<PySabrParameters> {
         check_smile_lengths(&strikes, &market_vols)?;
-        self.inner
-            .calibrate(forward, &strikes, &market_vols, t, beta)
-            .map(|inner| PySabrParameters { inner })
-            .map_err(display_to_py)
+        py.detach(|| {
+            self.inner
+                .calibrate(forward, &strikes, &market_vols, t, beta)
+        })
+        .map(|inner| PySabrParameters { inner })
+        .map_err(display_to_py)
     }
 
     /// Calibrate with automatic shift selection for negative-rate smiles.
@@ -420,6 +423,7 @@ impl PySabrCalibrator {
     ///     Calibrated parameters; ``shift`` is set when a shifted fit was used.
     fn calibrate_auto_shift(
         &self,
+        py: Python<'_>,
         forward: f64,
         strikes: Vec<f64>,
         market_vols: Vec<f64>,
@@ -427,10 +431,12 @@ impl PySabrCalibrator {
         beta: f64,
     ) -> PyResult<PySabrParameters> {
         check_smile_lengths(&strikes, &market_vols)?;
-        self.inner
-            .calibrate_auto_shift(forward, &strikes, &market_vols, t, beta)
-            .map(|inner| PySabrParameters { inner })
-            .map_err(display_to_py)
+        py.detach(|| {
+            self.inner
+                .calibrate_auto_shift(forward, &strikes, &market_vols, t, beta)
+        })
+        .map(|inner| PySabrParameters { inner })
+        .map_err(display_to_py)
     }
 
     fn __repr__(&self) -> String {

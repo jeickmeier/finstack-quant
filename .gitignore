@@ -117,3 +117,6 @@ docs/superpowers/*
 .worktree/
 
 .superpowers/*
+.vscode/*
+
+docs/reviews/

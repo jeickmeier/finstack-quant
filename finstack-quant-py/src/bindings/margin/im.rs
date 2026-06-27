@@ -210,6 +210,7 @@ impl PySimmCalculator {
     #[pyo3(signature = (sensitivities, currency, year, month, day))]
     fn calculate_from_sensitivities(
         &self,
+        py: Python<'_>,
         sensitivities: &PySimmSensitivities,
         currency: &str,
         year: i32,
@@ -218,10 +219,11 @@ impl PySimmCalculator {
     ) -> PyResult<PyImResult> {
         let ccy = parse_currency(currency)?;
         let as_of = parse_date(year, month, day)?;
-        Ok(PyImResult::from_inner(
+        let inner = py.detach(|| {
             self.inner
-                .calculate_from_sensitivities_result(&sensitivities.inner, ccy, as_of),
-        ))
+                .calculate_from_sensitivities_result(&sensitivities.inner, ccy, as_of)
+        });
+        Ok(PyImResult::from_inner(inner))
     }
 }
 

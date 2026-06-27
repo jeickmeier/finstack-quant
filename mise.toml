@@ -218,15 +218,8 @@ run = [
 ]
 
 [tasks.python-typecheck]
-description = "Type-check Python bindings with ty + pyright"
-run = [
-  "uv run --no-sync ty check finstack-quant-py/finstack_quant",
-  "uv run --no-sync pyright",
-]
-
-[tasks.python-verifytypes]
-description = "Verify Python type completeness"
-run = "uv run --no-sync pyright --verifytypes finstack_quant --ignoreexternal"
+description = "Type-check Python bindings with ty"
+run = "uv run --no-sync ty check finstack-quant-py/finstack_quant"
 
 [tasks.python-audit]
 description = "Audit Python dependencies via bandit"

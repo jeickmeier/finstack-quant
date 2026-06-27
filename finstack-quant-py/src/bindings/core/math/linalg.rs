@@ -99,9 +99,10 @@ fn cholesky_solve(py: Python<'_>, chol: Vec<Vec<f64>>, b: Vec<f64>) -> PyResult<
 /// Raises ``CholeskyError`` if any check fails.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix)")]
-fn validate_correlation_matrix(matrix: Vec<Vec<f64>>) -> PyResult<()> {
+fn validate_correlation_matrix(py: Python<'_>, matrix: Vec<Vec<f64>>) -> PyResult<()> {
     let (flat, n) = flatten_matrix(matrix)?;
-    linalg::validate_correlation_matrix(&flat, n).map_err(|e| CholeskyError::new_err(e.to_string()))
+    py.detach(|| linalg::validate_correlation_matrix(&flat, n))
+        .map_err(|e| CholeskyError::new_err(e.to_string()))
 }
 
 // ---------------------------------------------------------------------------
