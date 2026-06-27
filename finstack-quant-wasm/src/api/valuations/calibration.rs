@@ -67,7 +67,7 @@ pub fn validate_calibration_json(json: &str) -> Result<String, JsValue> {
 /// (which carries the structured `EnvelopeError` payload when the failure is
 /// envelope-related).
 fn calibrate_inner(envelope_json: &str) -> Result<String, ExecuteError> {
-    let envelope = validate::parse_envelope_v3(envelope_json)?;
+    let envelope = validate::parse_envelope(envelope_json)?;
     let result = engine::execute_with_diagnostics(&envelope)?;
     // Serializing a freshly built result envelope cannot realistically fail;
     // surface any failure as an internal error rather than discarding it.

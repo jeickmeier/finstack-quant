@@ -377,8 +377,7 @@ fn dependency_graph_json(py: Python<'_>, json: &str) -> PyResult<String> {
 ///     If the JSON is invalid or calibration fails.
 #[pyfunction]
 fn calibrate(py: Python<'_>, json: &str) -> PyResult<PyCalibrationResult> {
-    let envelope =
-        validate_api::parse_envelope_v3(json).map_err(|e| envelope_error_to_py(py, &e))?;
+    let envelope = validate_api::parse_envelope(json).map_err(|e| envelope_error_to_py(py, &e))?;
     // Release the GIL for the duration of the solver: calibration can run for seconds.
     // The error is boxed inside the closure: `ExecuteError` is a large enum, and
     // an un-boxed large `Err` variant on the `detach` closure trips

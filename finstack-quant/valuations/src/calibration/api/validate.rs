@@ -99,14 +99,14 @@ pub fn validate(envelope: &CalibrationEnvelope) -> ValidationReport {
 /// Returns the report serialized as pretty-printed JSON. Returns an
 /// [`EnvelopeError::JsonParse`] if the envelope is malformed.
 pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
-    let envelope = parse_envelope_v3(envelope_json)?;
+    let envelope = parse_envelope(envelope_json)?;
     let report = validate(&envelope);
     serialize_pretty_json(&report, "ValidationReport")
 }
 
 /// JSON-friendly wrapper that returns just the dependency graph.
 pub fn dependency_graph_json(envelope_json: &str) -> Result<String, EnvelopeError> {
-    let envelope = parse_envelope_v3(envelope_json)?;
+    let envelope = parse_envelope(envelope_json)?;
     let nodes = build_nodes(&envelope.plan.steps);
     let mut sorted_initial: Vec<String> = collect_initial_ids(&envelope).into_iter().collect();
     sorted_initial.sort();
@@ -123,7 +123,7 @@ pub fn dependency_graph_json(envelope_json: &str) -> Result<String, EnvelopeErro
 /// centralizes the parse and pretty-serialization path so Python and WASM do
 /// not each reimplement the same validation logic.
 pub fn validate_calibration_json(envelope_json: &str) -> Result<String, EnvelopeError> {
-    let envelope = parse_envelope_v3(envelope_json)?;
+    let envelope = parse_envelope(envelope_json)?;
     serialize_pretty_json(&envelope, "CalibrationEnvelope")
 }
 
@@ -144,7 +144,7 @@ fn serialize_pretty_json<T: Serialize>(value: &T, target: &str) -> Result<String
 /// section with flat `market_data` / `prior_market` lists. Envelopes that still
 /// carry the v2 `initial_market` key get a targeted message pointing at the
 /// migration design doc rather than the generic serde `unknown field` error.
-pub fn parse_envelope_v3(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
+pub fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
     let value: serde_json::Value =
         serde_json::from_str(json).map_err(|e| EnvelopeError::JsonParse {
             message: e.to_string(),
@@ -811,7 +811,7 @@ mod tests {
             "plan":{"id":"x","description":null,"quote_sets":{},"steps":[],"settings":{}},
             "initial_market":null
         }"#;
-        let err = parse_envelope_v3(v2).unwrap_err();
+        let err = parse_envelope(v2).unwrap_err();
         match err {
             EnvelopeError::JsonParse { message, .. } => {
                 assert!(message.contains("v3 shape"), "message was: {message}")
