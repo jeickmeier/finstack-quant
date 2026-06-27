@@ -3,7 +3,7 @@
 //! Provides [`realized_distributions`], which reconstructs per-coupon-date cash
 //! distributions from a bond's full cashflow schedule. The output feeds
 //! [`lower_return_floor`], which compiles a [`ReturnFloorSpec`] into a concrete
-//! [`CallPutSchedule`] (Task 5), and the MOIC/XIRR metrics (Task 10).
+//! [`CallPutSchedule`], and the MOIC/XIRR metrics.
 //!
 //! Floating-rate caveat (v1): cumulative coupons are forward-projected off the
 //! forward curve, which ignores the correlation between the realized rate path
@@ -15,7 +15,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 
 use crate::cashflow::primitives::CFKind;
 use crate::instruments::fixed_income::bond::{
-    Bond, CallPut, CallPutSchedule, IssuePrice, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec,
+    Bond, CallPut, CallPutSchedule, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec,
 };
 
 /// One candidate redemption date with the cash paid at it and the running state.
@@ -129,22 +129,6 @@ pub(crate) fn realized_distributions(
 
 // ── Return-floor lowering ─────────────────────────────────────────────────────
 
-/// Resolve invested capital `V0` from the issue price spec.
-fn invested_capital(bond: &Bond, price: &IssuePrice) -> finstack_quant_core::Result<f64> {
-    Ok(match price {
-        IssuePrice::Par => bond.notional.amount(),
-        IssuePrice::PctOfPar(pct) => bond.notional.amount() * pct / 100.0,
-        IssuePrice::Amount(m) => {
-            if m.currency() != bond.notional.currency() {
-                return Err(finstack_quant_core::Error::Validation(
-                    "return floor IssuePrice::Amount currency must match notional".to_string(),
-                ));
-            }
-            m.amount()
-        }
-    })
-}
-
 /// Return `true` when `d` falls inside the protection window.
 fn in_window(window: &ProtectionWindow, d: Date, issue: Date, maturity: Date) -> bool {
     match window {
@@ -205,44 +189,54 @@ pub(crate) fn lower_return_floor(
     as_of: Date,
 ) -> finstack_quant_core::Result<CallPutSchedule> {
     spec.validate()?;
-    let v0 = invested_capital(bond, &spec.issue_price)?;
+    let v0 = spec.issue_price.resolve(bond.notional)?;
     let issue = bond.issue_date;
     let dist = realized_distributions(bond, curves, issue)?;
-    // The XIRR floor must discount on the same basis as the verification metric
-    // (`core::cashflow::xirr`, Act/365F) for the guarantee to hold exactly.
+    // The XIRR floor discounts on the same basis as the verification metric
+    // (`core::cashflow::xirr`, Act/365F) so the guarantee holds exactly.
     let dc = spec.day_count.unwrap_or(DayCount::Act365F);
 
+    // Resolve the kind once so the loop is a single O(N) pass. For XIRR we carry a
+    // running PV of coupons discounted from issue, accumulated one date at a time,
+    // rather than re-summing every prior coupon per candidate (which is O(N²)).
+    enum Target {
+        Moic(f64),
+        Xirr(f64),
+    }
+    let target = match spec.kind {
+        ReturnFloorKind::Moic(m) => Target::Moic(m),
+        ReturnFloorKind::Xirr(rate) => Target::Xirr(rate.as_decimal()),
+    };
+
     let mut calls: Vec<CallPut> = Vec::new();
+    // XIRR only: discounted coupons paid up to and including the current date.
+    let mut pv_coupons = 0.0_f64;
 
     for p in &dist {
-        if !in_window(&spec.window, p.date, issue, bond.maturity) || p.date < as_of {
-            continue;
-        }
-        // Normally unreachable (a positive-notional bond has positive outstanding),
-        // but guards against custom schedules that fully amortize the principal.
-        if p.outstanding <= 0.0 {
+        // Accumulate this date's discounted coupon BEFORE any skip — a later
+        // in-window candidate still earned the coupons paid on skipped dates.
+        let yf_p = if let Target::Xirr(rate) = target {
+            let yf = dc.year_fraction(issue, p.date, DayCountContext::default())?;
+            pv_coupons += p.coupon / (1.0_f64 + rate).powf(yf);
+            yf
+        } else {
+            0.0
+        };
+
+        // Skip dates outside the protection window, before `as_of`, or with no
+        // outstanding principal (the last guards fully-amortized custom schedules).
+        if !in_window(&spec.window, p.date, issue, bond.maturity)
+            || p.date < as_of
+            || p.outstanding <= 0.0
+        {
             continue;
         }
 
-        // Cash paid from issue up to and including this date.
-        let cash_incl = p.cum_before + p.coupon;
-
-        let r = match spec.kind {
-            ReturnFloorKind::Moic(m) => m * v0 - cash_incl,
-            ReturnFloorKind::Xirr(rate) => {
-                let rate_dec = rate.as_decimal();
-                let yf_t = dc.year_fraction(issue, p.date, DayCountContext::default())?;
-                // Discount each coupon from issue to its date at the target rate.
-                let mut pv_coupons = 0.0_f64;
-                for q in &dist {
-                    if q.date > p.date {
-                        break;
-                    }
-                    let yf = dc.year_fraction(issue, q.date, DayCountContext::default())?;
-                    pv_coupons += q.coupon / (1.0_f64 + rate_dec).powf(yf);
-                }
-                (v0 - pv_coupons) * (1.0_f64 + rate_dec).powf(yf_t)
-            }
+        let r = match target {
+            // MOIC: redemption lifting cumulative cash to m * V0.
+            Target::Moic(m) => m * v0 - (p.cum_before + p.coupon),
+            // XIRR: redemption R such that NPV from issue at the target rate is zero.
+            Target::Xirr(rate) => (v0 - pv_coupons) * (1.0_f64 + rate).powf(yf_p),
         };
 
         // Merge with any contractual call active at this date. Make-whole calls

@@ -32,8 +32,9 @@ use crate::metrics::{MetricCalculator, MetricContext};
 ///
 /// `V0` (invested capital) uses the bond's `return_floor.issue_price` when
 /// present, otherwise par notional. The anchor date is always `bond.issue_date`
-/// (issuer-side convention). This mirrors `invested_capital` in
-/// `bond/pricing/return_floor.rs`.
+/// (issuer-side convention). `V0` is resolved via the shared
+/// [`IssuePrice::resolve`] (the same resolver the floor lowering uses) so the
+/// metric and the floor cannot drift.
 ///
 /// # Errors
 ///
@@ -43,18 +44,11 @@ use crate::metrics::{MetricCalculator, MetricContext};
 pub(crate) fn cost_basis(
     bond: &Bond,
 ) -> finstack_quant_core::Result<(finstack_quant_core::dates::Date, f64)> {
-    let v0 = match bond.return_floor.as_ref().map(|s| &s.issue_price) {
-        Some(IssuePrice::PctOfPar(p)) => bond.notional.amount() * p / 100.0,
-        Some(IssuePrice::Amount(m)) => {
-            if m.currency() != bond.notional.currency() {
-                return Err(finstack_quant_core::Error::Validation(
-                    "return floor IssuePrice::Amount currency must match notional".to_string(),
-                ));
-            }
-            m.amount()
-        }
-        _ => bond.notional.amount(), // Par or no floor spec
-    };
+    let issue_price = bond
+        .return_floor
+        .as_ref()
+        .map_or(IssuePrice::Par, |s| s.issue_price);
+    let v0 = issue_price.resolve(bond.notional)?;
     if v0 <= 0.0 {
         return Err(finstack_quant_core::Error::Validation(
             "return floor metrics require a positive issue price".to_string(),

@@ -80,6 +80,34 @@ pub enum IssuePrice {
     PctOfPar(f64),
 }
 
+impl IssuePrice {
+    /// Resolve invested capital `V0` against a bond's `notional`.
+    ///
+    /// `Par` → `notional`; `PctOfPar(p)` → `notional * p / 100`; `Amount(m)` → the
+    /// explicit cash amount (which must be denominated in the notional's currency).
+    ///
+    /// This is the single source of truth for `V0`, shared by the floor lowering
+    /// and the MOIC/XIRR metrics so the two cannot drift.
+    ///
+    /// # Errors
+    /// Returns [`finstack_quant_core::Error::Validation`] if an [`IssuePrice::Amount`]
+    /// is denominated in a different currency than `notional`.
+    pub(crate) fn resolve(self, notional: Money) -> finstack_quant_core::Result<f64> {
+        Ok(match self {
+            IssuePrice::Par => notional.amount(),
+            IssuePrice::PctOfPar(pct) => notional.amount() * pct / 100.0,
+            IssuePrice::Amount(m) => {
+                if m.currency() != notional.currency() {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "return floor IssuePrice::Amount currency must match notional".to_string(),
+                    ));
+                }
+                m.amount()
+            }
+        })
+    }
+}
+
 /// When the return-floor protection window applies.
 ///
 /// The window defines the interval over which the issuer can trigger a
