@@ -44,7 +44,11 @@ impl AttributionSpec {
             .unwrap_or_default();
 
         // Resolve optional credit-factor model for waterfall/parallel cascade.
-        let resolved_credit_model = self.credit_factor_model.as_ref().map(|m| (**m).clone());
+        // Borrow the boxed model directly — the cascade entry points take
+        // `Option<&CreditFactorModel>`, so deref-borrowing avoids deep-cloning
+        // the entire model (issuer betas, covariance, hierarchy, diagnostics)
+        // on every spec execution.
+        let resolved_credit_model = self.credit_factor_model.as_deref();
 
         // Execute attribution based on method
         let mut attribution = match &self.method {
@@ -56,7 +60,7 @@ impl AttributionSpec {
                 self.as_of_t1,
                 &config,
                 self.model_params_t0.as_ref(),
-                resolved_credit_model.as_ref(),
+                resolved_credit_model,
                 &self.credit_factor_detail_options,
                 self.full_cross_attribution,
                 execution_policy,
@@ -72,7 +76,7 @@ impl AttributionSpec {
                 order.clone(),
                 strict_validation,
                 self.model_params_t0.as_ref(),
-                resolved_credit_model.as_ref(),
+                resolved_credit_model,
                 &self.credit_factor_detail_options,
             )?,
 

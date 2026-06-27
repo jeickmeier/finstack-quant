@@ -168,34 +168,29 @@ fn note_skipped_empty_t0_factors(
     market_t1: &MarketContext,
 ) {
     use ParallelRestoredFactor as F;
-    let families: [(F, MarketRestoreFlags, &str); 7] = [
-        (F::Rates, MarketRestoreFlags::RATES, "RatesCurves"),
-        (F::Credit, MarketRestoreFlags::CREDIT, "CreditCurves"),
-        (
-            F::Inflation,
-            MarketRestoreFlags::INFLATION,
-            "InflationCurves",
-        ),
-        (
-            F::Correlations,
-            MarketRestoreFlags::CORRELATION,
-            "Correlations",
-        ),
-        (F::FX, MarketRestoreFlags::FX, "Fx"),
-        (F::Volatility, MarketRestoreFlags::VOL, "Volatility"),
-        (
-            F::MarketScalars,
-            MarketRestoreFlags::SCALARS,
-            "MarketScalars",
-        ),
+    let families: [(F, &str); 7] = [
+        (F::Rates, "RatesCurves"),
+        (F::Credit, "CreditCurves"),
+        (F::Inflation, "InflationCurves"),
+        (F::Correlations, "Correlations"),
+        (F::FX, "Fx"),
+        (F::Volatility, "Volatility"),
+        (F::MarketScalars, "MarketScalars"),
     ];
-    for (factor, flags, name) in families {
-        let snap_t0 = MarketSnapshot::extract(market_t0, flags);
+    // `restored_factor_has_data` only inspects the per-family fields, so a
+    // single all-families snapshot answers every family's has-data question
+    // while iterating the market's curves once — instead of one extract per
+    // family (and a second per empty family on T1). The T1 snapshot is built
+    // lazily and only when at least one family is genuinely absent at T0.
+    let snap_t0 = MarketSnapshot::extract(market_t0, MarketRestoreFlags::all());
+    let mut snap_t1: Option<MarketSnapshot> = None;
+    for (factor, name) in families {
         if restored_factor_has_data(factor, &snap_t0) {
             continue;
         }
-        let snap_t1 = MarketSnapshot::extract(market_t1, flags);
-        if restored_factor_has_data(factor, &snap_t1) {
+        let snap_t1 = snap_t1
+            .get_or_insert_with(|| MarketSnapshot::extract(market_t1, MarketRestoreFlags::all()));
+        if restored_factor_has_data(factor, snap_t1) {
             tracing::warn!(
                 instrument_id = %attribution.meta.instrument_id,
                 factor = name,

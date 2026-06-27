@@ -147,9 +147,13 @@ fn extract_bucketed_dv01_per_curve(
 ) -> HashMap<CurveId, f64> {
     let mut result = HashMap::default();
 
-    // Pattern 1: Explicit per-curve keys "bucketed_dv01::{curve_id}"
+    // Pattern 1: Explicit per-curve keys "bucketed_dv01::{curve_id}".
+    // Reuse a single key buffer instead of a per-curve `format!` allocation.
+    let mut key = String::new();
     for curve_id in curve_ids {
-        let key = format!("bucketed_dv01::{}", curve_id.as_str());
+        key.clear();
+        key.push_str("bucketed_dv01::");
+        key.push_str(curve_id.as_str());
         if let Some(&dv01) = measures.get(key.as_str()) {
             result.insert(curve_id.clone(), dv01);
         }
@@ -195,13 +199,23 @@ fn extract_keyrate_dv01_per_curve(
     use finstack_quant_valuations::metrics::{STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS};
 
     let mut result: HashMap<CurveId, Vec<(f64, f64)>> = HashMap::default();
+    // Reuse one key buffer across all curves/tenors: build the
+    // `bucketed_dv01::{curve}::` prefix once per curve, then swap only the
+    // trailing tenor label — no per-tenor `format!` allocation.
+    let mut key = String::new();
     for curve_id in curve_ids {
         let mut buckets: Vec<(f64, f64)> = Vec::new();
+        key.clear();
+        key.push_str("bucketed_dv01::");
+        key.push_str(curve_id.as_str());
+        key.push_str("::");
+        let prefix_len = key.len();
         for (&tenor_years, label) in STANDARD_BUCKETS_YEARS
             .iter()
             .zip(STANDARD_BUCKET_LABELS.iter())
         {
-            let key = format!("bucketed_dv01::{}::{}", curve_id.as_str(), label);
+            key.truncate(prefix_len);
+            key.push_str(label);
             if let Some(&dv01) = measures.get(key.as_str()) {
                 buckets.push((tenor_years, dv01));
             }
@@ -230,13 +244,23 @@ pub(crate) fn extract_keyrate_cs01_per_curve(
     use finstack_quant_valuations::metrics::{STANDARD_BUCKETS_YEARS, STANDARD_BUCKET_LABELS};
 
     let mut result: HashMap<CurveId, Vec<(f64, f64)>> = HashMap::default();
+    // Reuse one key buffer across all curves/tenors (see
+    // `extract_keyrate_dv01_per_curve`): build the prefix once per curve, then
+    // swap only the trailing tenor label.
+    let mut key = String::new();
     for curve_id in curve_ids {
         let mut buckets: Vec<(f64, f64)> = Vec::new();
+        key.clear();
+        key.push_str("bucketed_cs01::");
+        key.push_str(curve_id.as_str());
+        key.push_str("::");
+        let prefix_len = key.len();
         for (&tenor_years, label) in STANDARD_BUCKETS_YEARS
             .iter()
             .zip(STANDARD_BUCKET_LABELS.iter())
         {
-            let key = format!("bucketed_cs01::{}::{}", curve_id.as_str(), label);
+            key.truncate(prefix_len);
+            key.push_str(label);
             if let Some(&cs01) = measures.get(key.as_str()) {
                 buckets.push((tenor_years, cs01));
             }
