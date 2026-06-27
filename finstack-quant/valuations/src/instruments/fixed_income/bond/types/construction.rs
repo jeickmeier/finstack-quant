@@ -11,6 +11,7 @@ use finstack_quant_core::Result;
 use time::macros::date;
 
 use super::definitions::{Bond, BondSettlementConvention, CallPut, CallPutSchedule};
+use super::return_floor::ReturnFloorSpec;
 use super::CashflowSpec;
 
 impl Bond {
@@ -913,5 +914,112 @@ impl Bond {
 
         bond.validate()?;
         Ok(bond)
+    }
+}
+
+// ── Return-floor builder ergonomics ──────────────────────────────────────────
+
+impl Bond {
+    /// Attach a guaranteed minimum-return floor (full spec).
+    ///
+    /// Replaces any previously set `return_floor` on this bond.
+    ///
+    /// # Arguments
+    ///
+    /// * `spec` - The [`ReturnFloorSpec`] describing the floor kind, issue price,
+    ///   and protection window.
+    ///
+    /// # Returns
+    ///
+    /// `self` with `return_floor` set to `Some(spec)`.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, ReturnFloorSpec};
+    ///
+    /// let bond = Bond::example().unwrap().with_return_floor(ReturnFloorSpec::moic(1.5));
+    /// assert!(bond.return_floor.is_some());
+    /// ```
+    #[must_use]
+    pub fn with_return_floor(mut self, spec: ReturnFloorSpec) -> Self {
+        self.return_floor = Some(spec);
+        self
+    }
+
+    /// Shortcut: guarantee a minimum money multiple (MOIC) on early redemption.
+    ///
+    /// Equivalent to `.with_return_floor(ReturnFloorSpec::moic(multiple))`.
+    ///
+    /// # Arguments
+    ///
+    /// * `multiple` - Money-on-money multiple, e.g. `1.25` for 1.25× invested capital.
+    ///
+    /// # Returns
+    ///
+    /// `self` with a MOIC return floor set.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    ///
+    /// let bond = Bond::example().unwrap().min_moic(1.25);
+    /// assert!(bond.return_floor.is_some());
+    /// ```
+    #[must_use]
+    pub fn min_moic(self, multiple: f64) -> Self {
+        self.with_return_floor(ReturnFloorSpec::moic(multiple))
+    }
+
+    /// Shortcut: guarantee a minimum XIRR on early redemption.
+    ///
+    /// Equivalent to `.with_return_floor(ReturnFloorSpec::xirr(rate))`.
+    ///
+    /// # Arguments
+    ///
+    /// * `rate` - Target annualized IRR; accepts anything that converts `Into<Rate>`
+    ///   (e.g. `Rate::from_percent(12.0)`).
+    ///
+    /// # Returns
+    ///
+    /// `self` with an XIRR return floor set.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    /// use finstack_quant_core::types::Rate;
+    ///
+    /// let bond = Bond::example().unwrap().min_xirr(Rate::from_percent(12.0));
+    /// assert!(bond.return_floor.is_some());
+    /// ```
+    #[must_use]
+    pub fn min_xirr(self, rate: impl Into<Rate>) -> Self {
+        self.with_return_floor(ReturnFloorSpec::xirr(rate))
+    }
+}
+
+#[cfg(test)]
+mod return_floor_builder_tests {
+    use super::*;
+    use crate::instruments::fixed_income::bond::types::return_floor::{
+        ReturnFloorKind, ReturnFloorSpec,
+    };
+
+    #[test]
+    fn min_moic_sets_floor() {
+        let bond = Bond::example().unwrap().min_moic(1.25);
+        assert!(matches!(
+            bond.return_floor.as_ref().map(|s| &s.kind),
+            Some(ReturnFloorKind::Moic(m)) if (m - 1.25).abs() < 1e-12
+        ));
+    }
+
+    #[test]
+    fn with_return_floor_sets_full_spec() {
+        let spec = ReturnFloorSpec::moic(1.5);
+        let bond = Bond::example().unwrap().with_return_floor(spec.clone());
+        assert_eq!(bond.return_floor, Some(spec));
     }
 }
