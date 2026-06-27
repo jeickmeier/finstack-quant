@@ -574,4 +574,330 @@ mod tests {
                 .collect::<Vec<_>>()
         );
     }
+
+    // ── Task 11: guarantee tests ──────────────────────────────────────────────
+    //
+    // These tests prove that the return floor is CALL-PROTECTION ONLY: every
+    // early-call path in the lowered schedule delivers MOIC/XIRR >= target across
+    // rate scenarios.  They do NOT assert MoicToWorst >= target (that would be
+    // wrong — the unfloored maturity path can legitimately be below target).
+
+    /// Build a flat discount curve for the test bond's discount_curve_id "USD-OIS".
+    ///
+    /// `rate` is the continuously-compounding equivalent approximated via
+    /// `df(T) = exp(-r*T)`.  For simplicity we pass in discount factors at
+    /// representative tenors; the curve is flat so we only need two knots.
+    fn flat_discount_market(rate: f64, as_of: finstack_quant_core::dates::Date) -> MarketContext {
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use finstack_quant_core::math::interp::InterpStyle;
+
+        // df at t=0 is always 1.0; df at t=6y approximates a flat r curve.
+        let df6 = (-rate * 6.0_f64).exp();
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0_f64, 1.0_f64), (6.0_f64, df6)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("flat discount curve");
+        MarketContext::new().insert(disc)
+    }
+
+    /// Build a 5-year 10% annual coupon (semi-annual by Bond::fixed convention),
+    /// par-100, bullet bond.
+    fn fixed_5y_10pct() -> Bond {
+        Bond::fixed(
+            "T11",
+            Money::new(100.0, Currency::USD),
+            Rate::from_percent(10.0),
+            date!(2024 - 01 - 15),
+            date!(2029 - 01 - 15),
+            "USD-OIS",
+        )
+        .unwrap()
+    }
+
+    /// Test 1 — MOIC floor holds on every early-call path across rate scenarios.
+    ///
+    /// For a 5y 10% bullet at par-100 with min_moic(1.25), every call date in
+    /// the lowered schedule must deliver MOIC >= 1.25 regardless of the discount
+    /// rate environment (the floor is a contractual redemption price guarantee,
+    /// not rate-dependent).
+    #[test]
+    fn moic_floor_holds_on_every_early_call_path_across_rate_scenarios() {
+        let moic_target = 1.25_f64;
+        let v0 = 100.0_f64;
+        let bond = fixed_5y_10pct().min_moic(moic_target);
+        let as_of = date!(2024 - 01 - 15);
+        let spec = bond.return_floor.as_ref().unwrap();
+
+        let flat_rates = [0.0_f64, 0.02, 0.05, 0.10, 0.20];
+
+        // For a FIXED-coupon bond the discount rate does NOT affect
+        // `realized_distributions` — the cashflow schedule is curve-independent,
+        // so this loop is effectively redundant for a fixed bond. It is kept for
+        // parity with the floating test (Test 3), where varying the forward level
+        // genuinely changes the projected coupons and thus the floored redemption.
+        for &r in &flat_rates {
+            let market = flat_discount_market(r, as_of);
+            let sched = lower_return_floor(&bond, spec, &market, as_of)
+                .unwrap_or_else(|e| panic!("lower_return_floor failed at rate={r}: {e}"));
+
+            assert!(
+                !sched.calls.is_empty(),
+                "Expected non-empty call schedule at rate={r}"
+            );
+
+            let dist = realized_distributions(&bond, &market, bond.issue_date)
+                .unwrap_or_else(|e| panic!("realized_distributions failed at rate={r}: {e}"));
+
+            for call in &sched.calls {
+                // Find the DistPoint whose date matches the call's start_date.
+                let point = dist
+                    .iter()
+                    .find(|p| p.date == call.start_date)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "No DistPoint found for call date {} at rate={r}",
+                            call.start_date
+                        )
+                    });
+
+                let cash_incl = point.cum_before + point.coupon;
+                // Redemption = price_pct_of_par% of par notional (V0 = 100).
+                let redemption = call.price_pct_of_par / 100.0 * v0;
+                let moic = (cash_incl + redemption) / v0;
+
+                assert!(
+                    moic >= moic_target - 1e-9,
+                    "MOIC floor violated: rate={r}, date={}, moic={moic:.8}, target={moic_target}",
+                    call.start_date
+                );
+            }
+        }
+    }
+
+    /// Test 1b ("teeth") — the MOIC check is not vacuous.
+    ///
+    /// Test 1 verifies `(cash_incl + lowered_redemption)/V0 >= target`, but on the
+    /// dates where the floor binds above par the lowered redemption is derived from
+    /// the same arithmetic, so that check cannot fail there. This mutation test
+    /// proves the lowered redemption is the GENUINE minimum: cutting it by 5 points
+    /// breaks the target. That confirms the lowering sets redemption to exactly
+    /// what's needed (not arbitrarily high), so the property tests have bite.
+    #[test]
+    fn moic_check_has_teeth_redemption_below_floor_breaks_target() {
+        let moic_target = 1.25_f64;
+        let v0 = 100.0_f64;
+        let bond = fixed_5y_10pct().min_moic(moic_target);
+        let as_of = date!(2024 - 01 - 15);
+        let spec = bond.return_floor.as_ref().unwrap();
+
+        let market = flat_discount_market(0.05, as_of);
+        let sched = lower_return_floor(&bond, spec, &market, as_of).unwrap();
+        let dist = realized_distributions(&bond, &market, bond.issue_date).unwrap();
+
+        // Find a call date where the floor binds strictly ABOVE par — an early
+        // date where coupons received so far do not yet clear the target alone.
+        let binding_call = sched
+            .calls
+            .iter()
+            .find(|c| c.price_pct_of_par > 100.0 + 1e-9)
+            .expect("expected at least one early call where the floor binds above par");
+
+        let point = dist
+            .iter()
+            .find(|p| p.date == binding_call.start_date)
+            .expect("DistPoint for the binding call date");
+        let cash_incl = point.cum_before + point.coupon;
+
+        // Sanity: the lowered redemption hits the target exactly (within tol).
+        let at_floor = binding_call.price_pct_of_par / 100.0 * v0;
+        let moic_at_floor = (cash_incl + at_floor) / v0;
+        assert!(
+            (moic_at_floor - moic_target).abs() < 1e-6,
+            "lowered redemption should hit target exactly: moic={moic_at_floor:.8}"
+        );
+
+        // Mutation: a redemption 5 points BELOW the lowered price breaches target.
+        let short = (binding_call.price_pct_of_par - 5.0) / 100.0 * v0;
+        assert!(
+            (cash_incl + short) / v0 < moic_target,
+            "lowered redemption is not the binding minimum (date={}, price_pct={})",
+            binding_call.start_date,
+            binding_call.price_pct_of_par
+        );
+    }
+
+    /// Test 2 — XIRR floor holds on every early-call path (fixed-rate bond).
+    ///
+    /// For a 5y 10% bullet at par-100 with min_xirr(0.12), we reconstruct the
+    /// full investor cashflow stream for each call path and verify the solved
+    /// XIRR is >= 12%.  By construction the floor binds on every early call for
+    /// a 10% bond with a 12% target, so each path should return ~0.12 exactly.
+    #[test]
+    fn xirr_floor_holds_on_every_early_call_path() {
+        let xirr_target = 0.12_f64;
+        let v0 = 100.0_f64;
+        let bond = fixed_5y_10pct().min_xirr(Rate::from_percent(12.0));
+        let as_of = date!(2024 - 01 - 15);
+        let spec = bond.return_floor.as_ref().unwrap();
+
+        let market = flat_discount_market(0.05, as_of);
+        let sched = lower_return_floor(&bond, spec, &market, as_of).unwrap();
+
+        assert!(
+            !sched.calls.is_empty(),
+            "Expected non-empty call schedule for XIRR-floored bond"
+        );
+
+        let dist = realized_distributions(&bond, &market, bond.issue_date).unwrap();
+
+        for call in &sched.calls {
+            let point = dist
+                .iter()
+                .find(|p| p.date == call.start_date)
+                .unwrap_or_else(|| panic!("No DistPoint for call date {}", call.start_date));
+
+            // Reconstruct the investor cashflow stream for this call path:
+            //   (issue, -V0), then each coupon point.date <= call.start_date,
+            //   then the redemption at call.start_date.
+            let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> =
+                vec![(bond.issue_date, -v0)];
+
+            for p in &dist {
+                if p.date > call.start_date {
+                    break;
+                }
+                if p.date < call.start_date {
+                    flows.push((p.date, p.coupon));
+                }
+            }
+
+            // At the call date: coupon paid at that date + redemption.
+            let redemption = call.price_pct_of_par / 100.0 * v0;
+            flows.push((call.start_date, point.coupon + redemption));
+
+            let realized = finstack_quant_core::cashflow::xirr(&flows, None).unwrap_or_else(|e| {
+                panic!("XIRR solver failed at call date {}: {e}", call.start_date)
+            });
+
+            assert!(
+                realized >= xirr_target - 1e-6,
+                "XIRR floor violated: date={}, realized={realized:.8}, target={xirr_target}",
+                call.start_date
+            );
+        }
+    }
+
+    /// Test 3 — Floating: MOIC floor holds on every early-call path.
+    ///
+    /// `Bond::example_floating().min_moic(1.20)` is a quarterly SOFR-linked FRN
+    /// with $1M notional over 5 years.  We vary the forward rate across two
+    /// levels (4.5% and 8%) to confirm the floor holds regardless of where
+    /// projected coupons land.
+    #[test]
+    fn floating_moic_floor_holds_on_every_early_call_path() {
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+        use finstack_quant_core::math::interp::InterpStyle;
+
+        let moic_target = 1.20_f64;
+        let bond = Bond::example_floating().unwrap().min_moic(moic_target);
+        let as_of = date!(2024 - 01 - 15);
+        let v0 = bond.notional.amount(); // $1,000,000
+        let spec = bond.return_floor.as_ref().unwrap();
+
+        let forward_levels = [0.045_f64, 0.08_f64];
+
+        for &fwd_rate in &forward_levels {
+            let disc = DiscountCurve::builder("USD-OIS")
+                .base_date(as_of)
+                .knots([(0.0_f64, 1.0_f64), (6.0_f64, 0.741_f64)])
+                .interp(InterpStyle::Linear)
+                .build()
+                .expect("flat discount curve for FRN test");
+
+            let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+                .base_date(as_of)
+                .knots([(0.0_f64, fwd_rate), (6.0_f64, fwd_rate)])
+                .interp(InterpStyle::Linear)
+                .build()
+                .expect("flat forward curve for FRN test");
+
+            let market = MarketContext::new().insert(disc).insert(fwd);
+
+            let sched = lower_return_floor(&bond, spec, &market, as_of)
+                .unwrap_or_else(|e| panic!("lower_return_floor failed at fwd={fwd_rate}: {e}"));
+
+            assert!(
+                !sched.calls.is_empty(),
+                "Expected non-empty call schedule at fwd_rate={fwd_rate}"
+            );
+
+            let dist =
+                realized_distributions(&bond, &market, bond.issue_date).unwrap_or_else(|e| {
+                    panic!("realized_distributions failed at fwd_rate={fwd_rate}: {e}")
+                });
+
+            for call in &sched.calls {
+                let point = dist
+                    .iter()
+                    .find(|p| p.date == call.start_date)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "No DistPoint for call date {} at fwd_rate={fwd_rate}",
+                            call.start_date
+                        )
+                    });
+
+                let cash_incl = point.cum_before + point.coupon;
+                let redemption = call.price_pct_of_par / 100.0 * v0;
+                let moic = (cash_incl + redemption) / v0;
+
+                assert!(
+                    moic >= moic_target - 1e-9,
+                    "Floating MOIC floor violated: fwd={fwd_rate}, date={}, moic={moic:.8}, target={moic_target}",
+                    call.start_date
+                );
+            }
+        }
+    }
+
+    /// Test 4 — Honesty: `XirrToWorst` is NOT bounded by the floor target.
+    ///
+    /// For a 5y 10% bond with min_xirr(0.12), the held-to-maturity path returns
+    /// ~10% (below the 12% target).  Since `XirrToWorst` takes the minimum over
+    /// ALL exits including maturity, it must be < 0.12.  This confirms the metric
+    /// is honest: call protection does NOT guarantee the maturity return.
+    #[test]
+    fn xirr_to_worst_is_not_bounded_by_floor_target_maturity_path_dominates() {
+        use crate::instruments::fixed_income::bond::metrics::return_metrics::xirr::XirrToWorstCalculator;
+        use crate::metrics::{MetricCalculator, MetricContext};
+        use std::sync::Arc;
+
+        let xirr_target = 0.12_f64;
+        let bond = fixed_5y_10pct().min_xirr(Rate::from_percent(12.0));
+        let as_of = date!(2024 - 01 - 15);
+
+        // Use a 5% flat discount environment — the XIRR to worst should be ~10%
+        // (the bond's coupon rate) since the maturity path is the worst exit.
+        let market = Arc::new(flat_discount_market(0.05, as_of));
+        let base_value = Money::new(100.0, Currency::USD);
+
+        let mut ctx = MetricContext::new(
+            Arc::new(bond),
+            market,
+            as_of,
+            base_value,
+            MetricContext::default_config(),
+        );
+
+        let xirr_worst = XirrToWorstCalculator.calculate(&mut ctx).unwrap();
+
+        // The maturity path (10% coupon, par redemption) dominates — so XirrToWorst
+        // is near 10%, well below the 12% floor target.
+        assert!(
+            xirr_worst < xirr_target,
+            "XirrToWorst should be < floor target {xirr_target} (maturity path dominates), got {xirr_worst:.6}"
+        );
+    }
 }
