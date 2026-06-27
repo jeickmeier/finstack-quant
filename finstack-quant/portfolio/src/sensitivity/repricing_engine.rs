@@ -145,48 +145,55 @@ impl FullRepricingEngine {
             })
             .collect::<Result<_>>()?;
 
-        let mut profiles = Vec::with_capacity(factors.len());
-        for factor in factors {
-            let (bump_size, bump_unit) = self
-                .bump_config
-                .bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
-            Self::validate_bump_size(factor, bump_size)?;
-            let mut position_pnls = Vec::with_capacity(self.scenario_grid.shifts().len());
+        // Each factor's profile is an independent, side-effect-free function of
+        // the read-only base market, the base PVs, and the factor definition, so
+        // fanning out across factors is deterministic: `par_iter().collect()`
+        // preserves factor order and produces identical results regardless of
+        // scheduling. This mirrors `DeltaBasedEngine`, which already
+        // parallelizes the equivalent (and cheaper) work over factors.
+        use rayon::prelude::*;
+        factors
+            .par_iter()
+            .map(|factor| {
+                let (bump_size, bump_unit) = self
+                    .bump_config
+                    .bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
+                Self::validate_bump_size(factor, bump_size)?;
+                let mut position_pnls = Vec::with_capacity(self.scenario_grid.shifts().len());
 
-            for &shift in self.scenario_grid.shifts() {
-                let bumped_market = market.bump(mapping_to_market_bumps(
-                    &factor.market_mapping,
-                    bump_size * shift,
-                    bump_unit,
-                    as_of,
-                )?)?;
+                for &shift in self.scenario_grid.shifts() {
+                    let bumped_market = market.bump(mapping_to_market_bumps(
+                        &factor.market_mapping,
+                        bump_size * shift,
+                        bump_unit,
+                        as_of,
+                    )?)?;
 
-                let pnl_row: Vec<f64> = positions
-                    .iter()
-                    .enumerate()
-                    .map(|(position_idx, (_, instrument, weight))| {
-                        let pv = instrument.value_raw(&bumped_market, as_of)?;
-                        if !pv.is_finite() {
-                            let position_id = &positions[position_idx].0;
-                            return Err(Error::Validation(format!(
-                                "minor 15: non-finite bumped PV for position '{position_id}' on factor '{}' at shift {shift} ({pv})",
-                                factor.id.as_str()
-                            )));
-                        }
-                        Ok((pv - base_pvs[position_idx]) * *weight)
-                    })
-                    .collect::<Result<_>>()?;
-                position_pnls.push(pnl_row);
-            }
+                    let pnl_row: Vec<f64> = positions
+                        .iter()
+                        .enumerate()
+                        .map(|(position_idx, (_, instrument, weight))| {
+                            let pv = instrument.value_raw(&bumped_market, as_of)?;
+                            if !pv.is_finite() {
+                                let position_id = &positions[position_idx].0;
+                                return Err(Error::Validation(format!(
+                                    "minor 15: non-finite bumped PV for position '{position_id}' on factor '{}' at shift {shift} ({pv})",
+                                    factor.id.as_str()
+                                )));
+                            }
+                            Ok((pv - base_pvs[position_idx]) * *weight)
+                        })
+                        .collect::<Result<_>>()?;
+                    position_pnls.push(pnl_row);
+                }
 
-            profiles.push(FactorPnlProfile {
-                factor_id: factor.id.clone(),
-                shifts: self.scenario_grid.shifts().to_vec(),
-                position_pnls,
-            });
-        }
-
-        Ok(profiles)
+                Ok(FactorPnlProfile {
+                    factor_id: factor.id.clone(),
+                    shifts: self.scenario_grid.shifts().to_vec(),
+                    position_pnls,
+                })
+            })
+            .collect()
     }
 }
 

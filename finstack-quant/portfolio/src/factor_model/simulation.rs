@@ -87,18 +87,6 @@ struct ScenarioSet {
     n_factors: usize,
 }
 
-impl ScenarioSet {
-    #[inline]
-    fn factor_pnl(&self, scenario: usize, factor: usize) -> f64 {
-        self.factor_pnls[scenario * self.n_factors + factor]
-    }
-
-    #[inline]
-    fn factor_shock(&self, scenario: usize, factor: usize) -> f64 {
-        self.factor_shocks[scenario * self.n_factors + factor]
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 struct SplitMix64 {
     state: u64,
@@ -359,25 +347,72 @@ impl SimulationDecomposer {
         centered_sum / (lhs.len() - 1) as f64
     }
 
-    /// Sample covariance of `lhs` against a strided view over a
-    /// scenario-major buffer: column `factor` of a `(n_scenarios x n_factors)`
-    /// matrix stored as `buffer[s * n_factors + factor]`. Avoids the
-    /// allocation-and-copy cost of materializing the column, which matters
-    /// because these routines are called once per factor on hot paths.
-    fn sample_covariance_strided(
-        lhs: &[f64],
-        buffer: &[f64],
-        factor: usize,
-        n_factors: usize,
-    ) -> f64 {
+    /// Sample covariance of `lhs` against *every* column of a scenario-major
+    /// `buffer` (a `(n_scenarios x n_factors)` matrix stored row-major as
+    /// `buffer[s * n_factors + factor]`), returned as a `Vec<f64>` of length
+    /// `n_factors`.
+    ///
+    /// This computes all factor covariances in two passes that read `buffer`
+    /// *row-contiguously* (one accumulating per-column means, one accumulating
+    /// centered cross-products) instead of one column-strided pass per factor.
+    /// Strided access jumps `n_factors` elements per step and misses cache once
+    /// `n_factors` exceeds a cache line; the contiguous layout keeps the hot
+    /// `factor_pnls` / `factor_shocks` buffers streaming.
+    ///
+    /// Results are bit-identical to computing each column separately: for any
+    /// fixed factor the accumulation order is still ascending scenario index,
+    /// and the same `sum / n` (not `sum * (1/n)`) divisions are used.
+    fn sample_covariances_columnwise(lhs: &[f64], buffer: &[f64], n_factors: usize) -> Vec<f64> {
+        if n_factors == 0 {
+            return Vec::new();
+        }
         let n = lhs.len();
         let lhs_mean = Self::sample_mean(lhs);
-        let rhs_sum: f64 = (0..n).map(|s| buffer[s * n_factors + factor]).sum();
-        let rhs_mean = rhs_sum / n as f64;
-        let centered_sum: f64 = (0..n)
-            .map(|s| (lhs[s] - lhs_mean) * (buffer[s * n_factors + factor] - rhs_mean))
-            .sum();
-        centered_sum / (n - 1) as f64
+
+        // Pass 1: per-column means, accumulated over contiguous rows.
+        let mut col_means = vec![0.0; n_factors];
+        for s in 0..n {
+            let row = &buffer[s * n_factors..(s + 1) * n_factors];
+            for (mean_acc, &value) in col_means.iter_mut().zip(row) {
+                *mean_acc += value;
+            }
+        }
+        for mean_acc in col_means.iter_mut() {
+            *mean_acc /= n as f64;
+        }
+
+        // Pass 2: per-column centered cross-products against `lhs`.
+        let mut cov = vec![0.0; n_factors];
+        for s in 0..n {
+            let lhs_centered = lhs[s] - lhs_mean;
+            let row = &buffer[s * n_factors..(s + 1) * n_factors];
+            for ((cov_acc, &value), &mean) in cov.iter_mut().zip(row).zip(col_means.iter()) {
+                *cov_acc += lhs_centered * (value - mean);
+            }
+        }
+        for cov_acc in cov.iter_mut() {
+            *cov_acc /= (n - 1) as f64;
+        }
+        cov
+    }
+
+    /// Sum every column of a scenario-major `buffer` over the selected `rows`,
+    /// reading each selected row contiguously. Returns a `Vec<f64>` of length
+    /// `n_factors`.
+    ///
+    /// Equivalent to summing `buffer[row * n_factors + factor]` over `rows` for
+    /// each factor; the per-column accumulation order (the order of `rows`) is
+    /// preserved, so results are identical to the per-column computation while
+    /// avoiding the column-strided gather.
+    fn column_sums_over_rows(buffer: &[f64], rows: &[usize], n_factors: usize) -> Vec<f64> {
+        let mut sums = vec![0.0; n_factors];
+        for &row_idx in rows {
+            let row = &buffer[row_idx * n_factors..(row_idx + 1) * n_factors];
+            for (sum_acc, &value) in sums.iter_mut().zip(row) {
+                *sum_acc += value;
+            }
+        }
+        sums
     }
 
     fn build_factor_contributions(
@@ -416,26 +451,16 @@ impl SimulationDecomposer {
         let sigma = variance.sqrt();
 
         let n_factors = scenarios.n_factors;
-        let component_variances: Vec<f64> = (0..n_factors)
-            .map(|factor| {
-                Self::sample_covariance_strided(
-                    &scenarios.portfolio_pnls,
-                    &scenarios.factor_pnls,
-                    factor,
-                    n_factors,
-                )
-            })
-            .collect();
-        let marginal_component_variances: Vec<f64> = (0..n_factors)
-            .map(|factor| {
-                Self::sample_covariance_strided(
-                    &scenarios.portfolio_pnls,
-                    &scenarios.factor_shocks,
-                    factor,
-                    n_factors,
-                )
-            })
-            .collect();
+        let component_variances = Self::sample_covariances_columnwise(
+            &scenarios.portfolio_pnls,
+            &scenarios.factor_pnls,
+            n_factors,
+        );
+        let marginal_component_variances = Self::sample_covariances_columnwise(
+            &scenarios.portfolio_pnls,
+            &scenarios.factor_shocks,
+            n_factors,
+        );
 
         let (total_risk, scale) = match measure {
             RiskMeasure::Variance => (variance, 1.0),
@@ -503,24 +528,16 @@ impl SimulationDecomposer {
             / tail_count as f64;
 
         let n_factors = scenarios.n_factors;
-        let component_es: Vec<f64> = (0..n_factors)
-            .map(|factor| {
-                tail_indices
-                    .iter()
-                    .map(|&index| scenarios.factor_pnl(index, factor))
-                    .sum::<f64>()
-                    / tail_count as f64
-            })
-            .collect();
-        let marginal_es: Vec<f64> = (0..n_factors)
-            .map(|factor| {
-                tail_indices
-                    .iter()
-                    .map(|&index| scenarios.factor_shock(index, factor))
-                    .sum::<f64>()
-                    / tail_count as f64
-            })
-            .collect();
+        let mut component_es =
+            Self::column_sums_over_rows(&scenarios.factor_pnls, tail_indices, n_factors);
+        for value in component_es.iter_mut() {
+            *value /= tail_count as f64;
+        }
+        let mut marginal_es =
+            Self::column_sums_over_rows(&scenarios.factor_shocks, tail_indices, n_factors);
+        for value in marginal_es.iter_mut() {
+            *value /= tail_count as f64;
+        }
 
         let (total_risk, absolute, marginal) = match measure {
             RiskMeasure::ExpectedShortfall { .. } => (es.min(0.0), component_es, marginal_es),

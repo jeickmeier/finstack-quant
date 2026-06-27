@@ -1128,14 +1128,12 @@ impl PyTailScenarioBreakdown {
         self.inner.portfolio_pnl
     }
 
-    /// Per-position ``(position_id, pnl)`` entries for this scenario.
+    /// Per-position P&L for this scenario, index-aligned to
+    /// :attr:`StressAttribution.position_ids` (entry ``i`` is the P&L for
+    /// ``position_ids[i]``).
     #[getter]
-    fn position_pnls(&self) -> Vec<(String, f64)> {
-        self.inner
-            .position_pnls
-            .iter()
-            .map(|(id, pnl)| (id.as_str().to_owned(), *pnl))
-            .collect()
+    fn position_pnls(&self) -> Vec<f64> {
+        self.inner.position_pnls.clone()
     }
 
     fn __repr__(&self) -> String {
@@ -1188,6 +1186,18 @@ impl PyStressAttribution {
     #[getter]
     fn n_tail_scenarios(&self) -> usize {
         self.inner.n_tail_scenarios
+    }
+
+    /// Canonical position ordering shared by every entry of
+    /// :attr:`tail_scenarios`. ``tail_scenarios[k].position_pnls[i]`` is the
+    /// P&L for ``position_ids[i]``.
+    #[getter]
+    fn position_ids(&self) -> Vec<String> {
+        self.inner
+            .position_ids
+            .iter()
+            .map(|id| id.as_str().to_owned())
+            .collect()
     }
 
     #[getter]

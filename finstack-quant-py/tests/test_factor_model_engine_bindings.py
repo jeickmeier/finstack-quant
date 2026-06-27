@@ -30,6 +30,12 @@ def test_build_stress_attribution_from_position_pnls() -> None:
     assert attr.var_threshold == pytest.approx(6.0)
     assert [scenario.scenario_index for scenario in attr.tail_scenarios] == [0, 1]
 
+    # Position ids are carried once on the parent; each tail scenario's
+    # position_pnls is a plain float list index-aligned to position_ids.
+    assert attr.position_ids == ["A", "B"]
+    assert attr.tail_scenarios[0].position_pnls == pytest.approx([-8.0, -2.0])
+    assert attr.tail_scenarios[1].position_pnls == pytest.approx([-2.0, -4.0])
+
     by_id = {entry.position_id: entry for entry in attr.position_contributions}
     assert by_id["A"].avg_tail_pnl == pytest.approx(-5.0)
     assert by_id["B"].avg_tail_pnl == pytest.approx(-3.0)

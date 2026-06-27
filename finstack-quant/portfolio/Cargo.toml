@@ -53,5 +53,9 @@ harness = false
 name = "parallel_thresholds"
 harness = false
 
+[[bench]]
+name = "sensitivity_simulation"
+harness = false
+
 [lints]
 workspace = true

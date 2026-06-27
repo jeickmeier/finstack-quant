@@ -235,9 +235,12 @@ impl<'a> FactorCovarianceForecast<'a> {
         // Σ[i][j] = σ_i · ρ[i][j] · σ_j (row-major flat).
         let mut data = vec![0.0_f64; n * n];
         for i in 0..n {
+            // Hoist the correlation row out of the inner loop so the nested
+            // `Vec<Vec<f64>>` is dereferenced once per row, not once per element.
+            let rho_row = &self.model.static_correlation.data[i];
+            let sigma_i = sigma[i];
             for j in 0..n {
-                let rho_ij = self.model.static_correlation.data[i][j];
-                data[i * n + j] = sigma[i] * rho_ij * sigma[j];
+                data[i * n + j] = sigma_i * rho_row[j] * sigma[j];
             }
         }
 

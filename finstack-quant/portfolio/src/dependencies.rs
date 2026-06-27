@@ -218,11 +218,15 @@ impl DependencyIndex {
             return;
         };
 
+        // `idx` is the new, strictly-increasing appended index (enforced by the
+        // append-only contract asserted above) and `flatten_dependencies` yields
+        // each key at most once per call, so `idx` can never already be present
+        // in an entry. Push unconditionally: the previous `entry.contains(&idx)`
+        // guard was a dead O(entry_len) scan that made repeated `add_position`
+        // calls O(n²) for a widely-shared factor. Each entry therefore stays
+        // sorted and duplicate-free, matching `finalize_dependency_map`.
         for key in flatten_dependencies(&deps) {
-            let entry = self.inner.entry(key).or_default();
-            if !entry.contains(&idx) {
-                entry.push(idx);
-            }
+            self.inner.entry(key).or_default().push(idx);
         }
     }
 

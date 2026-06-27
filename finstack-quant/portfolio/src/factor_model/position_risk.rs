@@ -285,6 +285,15 @@ pub struct StressAttribution {
     /// Number of tail scenarios analyzed.
     pub n_tail_scenarios: usize,
 
+    /// Canonical position ordering shared by every [`tail_scenarios`] entry.
+    ///
+    /// `tail_scenarios[k].position_pnls[i]` is the P&L for `position_ids[i]`.
+    /// Storing the id list once here (rather than re-attaching it to every tail
+    /// scenario) avoids duplicating it `n_tail_scenarios` times.
+    ///
+    /// [`tail_scenarios`]: Self::tail_scenarios
+    pub position_ids: Vec<PositionId>,
+
     /// Per-position average contribution to tail losses.
     ///
     /// Sorted by absolute contribution (largest risk driver first).
@@ -292,7 +301,8 @@ pub struct StressAttribution {
 
     /// Individual tail scenario breakdowns.
     ///
-    /// Contains `n_tail_scenarios` entries, each with per-position P&L.
+    /// Contains `n_tail_scenarios` entries, each with per-position P&L
+    /// index-aligned to [`position_ids`](Self::position_ids).
     /// Sorted by portfolio loss (worst first).
     pub tail_scenarios: Vec<TailScenarioBreakdown>,
 }
@@ -322,8 +332,10 @@ pub struct TailScenarioBreakdown {
     /// Total portfolio P&L for this scenario.
     pub portfolio_pnl: f64,
 
-    /// Per-position P&L contributions.
-    pub position_pnls: Vec<(PositionId, f64)>,
+    /// Per-position P&L contributions, index-aligned to
+    /// [`StressAttribution::position_ids`]. Entry `i` is the P&L for
+    /// `StressAttribution::position_ids[i]`.
+    pub position_pnls: Vec<f64>,
 }
 
 /// Build tail-scenario stress attribution from position-level historical P&Ls.
@@ -354,6 +366,7 @@ pub fn build_stress_attribution(
             return Ok(StressAttribution {
                 var_threshold: 0.0,
                 n_tail_scenarios: 0,
+                position_ids: Vec::new(),
                 position_contributions: Vec::new(),
                 tail_scenarios: Vec::new(),
             });
@@ -418,16 +431,17 @@ pub fn build_stress_attribution(
     for &(scenario_index, portfolio_pnl) in tail {
         let row_start = scenario_index * n_positions;
         let row = &position_pnls[row_start..row_start + n_positions];
-        let mut position_breakdown = Vec::with_capacity(n_positions);
         for (idx, pnl) in row.iter().copied().enumerate() {
             pnl_sums[idx] += pnl;
             worst_pnls[idx] = worst_pnls[idx].min(pnl);
-            position_breakdown.push((position_ids[idx].clone(), pnl));
         }
+        // Store only the `f64` row; the position id for column `i` is
+        // `StressAttribution::position_ids[i]`, carried once on the parent
+        // result instead of cloned into every tail scenario.
         tail_scenarios.push(TailScenarioBreakdown {
             scenario_index,
             portfolio_pnl,
-            position_pnls: position_breakdown,
+            position_pnls: row.to_vec(),
         });
     }
 
@@ -460,6 +474,7 @@ pub fn build_stress_attribution(
     Ok(StressAttribution {
         var_threshold,
         n_tail_scenarios: n_tail,
+        position_ids: position_ids.to_vec(),
         position_contributions,
         tail_scenarios,
     })
@@ -713,6 +728,9 @@ impl ParametricPositionDecomposer {
         // Per-position decomposition.
         let mut var_contributions = Vec::with_capacity(n);
         let mut es_contributions = Vec::with_capacity(n);
+        // Accumulated inline (ascending position order) so the Euler residual
+        // below does not need a second pass over `var_contributions`.
+        let mut sum_component_var = 0.0;
 
         for i in 0..n {
             // Component variance = w_i * (Sigma * w)_i.
@@ -720,6 +738,7 @@ impl ParametricPositionDecomposer {
 
             // Component VaR = CV_i / sigma_p * z_alpha.
             let component_var = cv_i * inv_sigma * z_alpha;
+            sum_component_var += component_var;
 
             // Marginal VaR = (Sigma * w)_i / sigma_p * z_alpha.
             let marginal_var = sigma_w[i] * inv_sigma * z_alpha;
@@ -780,7 +799,8 @@ impl ParametricPositionDecomposer {
         }
 
         // Euler residual (parametric only; meaningful as a numerical diagnostic).
-        let sum_component_var: f64 = var_contributions.iter().map(|c| c.component_var).sum();
+        // `sum_component_var` was accumulated inline above in the same ascending
+        // position order this fold would use, so the result is unchanged.
         let euler_residual = Some(portfolio_var - sum_component_var);
 
         Ok(PositionRiskDecomposition {
@@ -1569,6 +1589,13 @@ mod tests {
         assert!((attr.var_threshold - 10.0).abs() < 1e-12);
         assert_eq!(attr.tail_scenarios[0].scenario_index, 0);
         assert_eq!(attr.tail_scenarios[0].portfolio_pnl, -10.0);
+        // Per-position P&L is index-aligned to the shared `position_ids` list
+        // carried once on the parent (no per-scenario id duplication).
+        assert_eq!(
+            attr.position_ids,
+            vec![PositionId::new("A"), PositionId::new("B")]
+        );
+        assert_eq!(attr.tail_scenarios[0].position_pnls, vec![-8.0, -2.0]);
         assert_eq!(
             attr.position_contributions[0].position_id,
             PositionId::new("A")

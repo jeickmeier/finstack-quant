@@ -1824,11 +1824,13 @@ class TailScenarioBreakdown:
         ...
 
     @property
-    def position_pnls(self) -> list[tuple[str, float]]:
-        """Per-position P&L pairs for this scenario.
+    def position_pnls(self) -> list[float]:
+        """Per-position P&L for this scenario, index-aligned to
+        ``StressAttribution.position_ids`` (entry ``i`` is the P&L for
+        ``position_ids[i]``).
         Returns
         -------
-        list[tuple[str, float]]
+        list[float]
         """
         ...
 
@@ -1871,6 +1873,16 @@ class StressAttribution:
         Returns
         -------
         int
+        """
+        ...
+
+    @property
+    def position_ids(self) -> list[str]:
+        """Canonical position ordering shared by every ``tail_scenarios`` entry.
+        ``tail_scenarios[k].position_pnls[i]`` is the P&L for ``position_ids[i]``.
+        Returns
+        -------
+        list[str]
         """
         ...
 
