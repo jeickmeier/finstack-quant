@@ -13,7 +13,7 @@ released version only.
 ## Reporting a Vulnerability
 
 Please report suspected vulnerabilities privately by emailing
-me@jeickmeier.com. Do not open a public issue for suspected vulnerabilities.
+<me@jeickmeier.com>. Do not open a public issue for suspected vulnerabilities.
 
 Include:
 

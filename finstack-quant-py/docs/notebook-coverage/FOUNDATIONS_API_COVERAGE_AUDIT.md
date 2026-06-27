@@ -12,17 +12,20 @@ Legend:
 ## Summary Table
 
 ### core.currency
+
 | Symbol | Status | Notes / Notebook |
 |--------|--------|------------------|
 | Currency (ctor, from_numeric, code, numeric, decimals, to/from_json, ==/!=/</>, compare str) | ✅ | core_types_and_money.ipynb |
 | Module constants (USD, EUR, ...) | ✅ | core_types_and_money.ipynb |
 
 ### core.money
+
 | Symbol | Status | Notes / Notebook |
 |--------|--------|------------------|
 | Money (ctor with str/Currency, zero, amount, currency, format, to/from_json, to/from_tuple, + - * / unary-, cross-currency ValueError) | ✅ | core_types_and_money.ipynb + mini example |
 
 ### core.types
+
 | Symbol | Status | Notes / Notebook |
 |--------|--------|------------------|
 | Rate (decimal, from_percent, from_bps, as_*, ZERO, arith) | ✅ | core_types_and_money.ipynb |
@@ -33,6 +36,7 @@ Legend:
 | Attributes (set/get/contains/keys/len) | ✅ | core_types_and_money.ipynb |
 
 ### core.config
+
 | Symbol | Status | Notes / Notebook |
 |--------|--------|------------------|
 | RoundingMode (BANKERS etc, from_name) | ✅ | core_types_and_money.ipynb |
@@ -40,6 +44,7 @@ Legend:
 | FinstackConfig (ctor default, output_scale/ingest_scale, extensions, to/from_json, remove) | ✅ | core_types_and_money.ipynb + registry_defaults_and_overrides.ipynb (FinstackConfig() shown as canonical default) |
 
 ### core.dates
+
 | Symbol | Status | Notes / Notebook |
 |--------|--------|------------------|
 | DayCount (all 8: ACT_360..BUS_252, from_name, year_fraction, calendar_days; DayCountContext for ISMA/BUS) | ✅ | dates_calendars_schedules.ipynb + dates/day_count_conventions.ipynb |
@@ -56,6 +61,7 @@ Legend:
 | create_date, days_since_epoch, date_from_epoch_days | ⚠️ | Low-level; not explicitly demoed but available |
 
 ### core.market_data
+
 | Symbol / Area | Status | Notes / Notebook |
 |---------------|--------|------------------|
 | DiscountCurve (id, base_date, df, zero, forward, knots, day_count) | ✅ | market_data_and_curves.ipynb + market_data/discount_curves.ipynb |
@@ -73,6 +79,7 @@ Legend:
 | BaseCorrelationCurve, CreditIndexData, FxDeltaVolSurface, VolCube (types) | ⚠️ | Listed in parity; accessible via MarketContext getters or calibration snapshot; no direct foundation demo of construction/usage |
 
 ### core.math
+
 | Symbol / Area | Status | Notes / Notebook |
 |---------------|--------|------------------|
 | count_consecutive | ❌ | Exposed in __all__ and .pyi; no usage |
@@ -82,6 +89,7 @@ Legend:
 | summation (kahan_sum, neumaier_sum) | ✅ | math_toolkit.ipynb + stability example |
 
 ### core.rating_scales (entire module)
+
 | Symbol | Status | Notes / Notebook |
 |--------|--------|------------------|
 | UnknownScalePolicy (ERROR/FALLBACK_TO_DEFAULT/WARN_AND_FALLBACK + from_name) | ❌ | Only extension key "core.rating_scales.v1" string appears in registry notebook |
@@ -93,14 +101,17 @@ Legend:
 | RATING_SCALES_EXTENSION_KEY | ⚠️ | Mentioned as key only |
 
 ## Cross-cutting / Calibration
+
 - market_bootstrap_tour.ipynb: ✅ canonical calibrate -> result.market, report_to_dataframe, market_json snapshot, dry_run/dependency_graph in error paths, TypedDict envelope construction.
 
 ## Notes on "FinstackConfig default"
+
 - Notebooks consistently use `FinstackConfig()` for default.
 - A stale doctest in rating_scales.pyi references `FinstackConfig.default()` (does not exist on the binding; defaulting happens in the Rust `new` + Python `FinstackConfig()`).
 - Recommendation: keep `FinstackConfig()` as the documented default in foundations; the doctest can be cleaned separately.
 
 ## Recommendations (aligns with implementation plan)
+
 1. Add rating_scales demo (embedded + registry_from_config) — tie to registry notebook.
 2. Add `count_consecutive` cell.
 3. Add vol grid arbitrage checks in vol_surfaces.ipynb.

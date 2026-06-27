@@ -12,6 +12,7 @@ Legend:
 ## 1. `finstack_quant.monte_carlo`
 
 ### 1.1 Core Engine & Grid
+
 | Symbol | Status | Notes / Notebook |
 |--------|--------|------------------|
 | `TimeGrid` (ctor, dt, etc.) | ✅ | stochastic_processes, discretization_schemes, monte_carlo_simulation |
@@ -22,6 +23,7 @@ Legend:
 | `McEngine` + `EuropeanPricer` full options (num_steps, antithetic notes) | ⚠️ | Good usage; some advanced flags only mentioned |
 
 ### 1.2 Estimates
+
 | Symbol | Status | Notes |
 |--------|--------|-------|
 | `MoneyEstimate` (mean, stderr, ci_lower, ci_upper, num_paths) | ✅ | Widespread |
@@ -29,6 +31,7 @@ Legend:
 | `Estimate` (scalar non-money) | ⚠️ | Mentioned in prose; less direct demo than MoneyEstimate |
 
 ### 1.3 Closed-form & Greeks
+
 | Symbol | Status | Notes |
 |--------|--------|-------|
 | `black_scholes_call`, `black_scholes_put` | ✅ | black_scholes_benchmarks, exotic |
@@ -41,6 +44,7 @@ Legend:
 ## 2. `finstack_quant.margin` (incl. XVA & Regulatory)
 
 ### 2.1 CSA / Margin Calculators
+
 | Symbol | Status | Notes |
 |--------|--------|-------|
 | `CsaSpec` (usd_regulatory etc.), `VmCalculator`, `VmResult` | ✅ | margin_collateral_and_xva |
@@ -49,6 +53,7 @@ Legend:
 | `ExposureProfile`, `ExposureDiagnostics`, `XvaConfig`, `FundingConfig`, `XvaResult` | ✅ | margin_collateral_and_xva |
 
 ### 2.2 Regulatory (FRTB / SA-CCR)
+
 | Symbol | Status | Notes |
 |--------|--------|-------|
 | `FrtbSensitivities`, `FrtbSbaEngine`, `frtb_sba_charge` | ✅ | regulatory_capital (multiple scenarios + engine) |
@@ -59,6 +64,7 @@ Legend:
 ## 3. `finstack_quant.valuations.correlation`
 
 ### 3.1 Copulas
+
 | Symbol | Status | Notes |
 |--------|--------|-------|
 | `CopulaSpec.gaussian`, `.student_t`, `.random_factor_loading`, `.multi_factor`, `.build` | ✅ | correlation_and_credit_models, portfolio_default_simulation, clo_tranche_modeling, recovery_modeling |
@@ -66,6 +72,7 @@ Legend:
 | `RecoverySpec.constant` / `market_correlated` / `market_standard_stochastic`, `RecoveryModel` (conditional_lgd etc.) | ✅ | recovery_modeling, clo_tranche_modeling |
 
 ### 3.2 Latent Factor & Matrix Utils
+
 | Symbol | Status | Notes |
 |--------|--------|-------|
 | `LatentSingleFactor`, `LatentTwoFactor` (incl. `.clo_standard`, `.rmbs_standard`), `LatentMultiFactor`, `LatentFactorSpec`/`Kind` | ✅ | correlation_and_credit_models, clo_tranche_modeling |
@@ -85,6 +92,7 @@ Legend:
 **Major gap:** Entire structural credit models surface has no runnable notebook content in this tier.
 
 ## 5. Notebook Inventory — High-Level Coverage
+
 - **monte_carlo/* and monte_carlo_simulation.ipynb**: Strong on pricers, BS/Heston, basic Estimate access, TimeGrid/McEngine. Good for teaching exact vs approximate.
 - **correlation_and_credit_models.ipynb**: Excellent for copula + latent + matrix + two-name Bernoulli + RecoverySpec.
 - **portfolio_default_simulation.ipynb + recovery_modeling + clo_tranche_modeling**: Good simulation + recovery + structured credit correlation usage.
@@ -93,6 +101,7 @@ Legend:
 - **Missing cross-cutting demos**: Full MoneyEstimate property table in one place; `nearest_correlation`; all structural credit models.
 
 ## 6. Prioritized Gaps (for implementation)
+
 1. Structural credit (`MertonModel` + friends) — highest visibility missing surface.
 2. Full `MoneyEstimate`/`Estimate` introspection + any missing put variants / unbiased paths.
 3. `nearest_correlation`.
@@ -100,6 +109,7 @@ Legend:
 5. Ensure every high-visibility name from the four public lists appears in at least one runnable cell (or is explicitly noted as Rust-internal).
 
 ## 7. Recommendations
+
 - Create one small focused notebook (e.g. `correlation/structural_credit_models.ipynb`) for Merton + DynamicRecovery/Endogenous/Toggle/CreditState to keep other files clean.
 - Add a centralized "Estimates in depth" cell (or section) in one of the MC notebooks showing all MoneyEstimate properties + relative_stderr().
 - Add one `nearest_correlation` example in `correlation_and_credit_models.ipynb`.
@@ -108,6 +118,7 @@ Legend:
 - Keep additions small and runnable; update this audit as gaps close.
 
 ## Files Consulted
+
 - `parity_contract.toml` (monte_carlo, margin, valuations.correlation, valuations.models.credit sections)
 - `finstack_quant/monte_carlo/__init__.pyi`, `margin/__init__.pyi`, `valuations/correlation/__init__.pyi`, `valuations/models/credit/__init__.pyi`
 - All 12 notebooks under `07_advanced_quant/` (via content searches for symbols and patterns)

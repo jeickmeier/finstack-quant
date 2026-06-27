@@ -68,6 +68,7 @@ User-facing coverage is complete: **all 33 functions**, **all user-facing result
 **`finstack_quant.valuations.instruments.*` is now at 100% (70/70).** Specs were sourced from the canonical schema `examples` in `finstack-quant/valuations/schemas/instruments/1/` (plus golden pricing fixtures and notebook payloads), each verified via `from_json` + `validate`.
 
 ### Notebooks added/edited
+
 - **Added:** `02_pricing/instruments/typed_instrument_api.ipynb` (typed instrument catalog + priced example).
 - **Edited:** `equity_and_options` (bs_greeks/implied-vol/lookback), `complex_cashflows` (cashflows `*_json`), `feature_transforms` (neutralize/normalize/panel/pairwise/grouped), `covenant_monitoring` (covenant presets + evaluate/validate), `monte_carlo/stochastic_processes` (Heston), `monte_carlo/black_scholes_benchmarks` (MC finite-diff Greeks + CRN), `statement_analytics` (run_checks/CheckReport/renderers + three-statement/credit checks), `credit_scoring_and_pd` (scorecard), `real_estate_and_roll_forward_templates` (rich LeaseSpec + CorkscrewReport), `portfolio_risk_decomposition` (historical_var_decomposition + typed result/enum classes), `portfolio_optimization` (typed result + TradeSpec/Universe/PerPositionMetric), `factor_sensitivity` (SensitivityMatrix/FactorRiskDecomposition), `performance_analytics` (PeriodStats/BetaResult/… result types), `scenarios_and_stress_testing` (scenario enums + RateBindingSpec), `credit_factor_hierarchy` (LevelsAtDate/PeriodDecomposition), `margin_collateral_and_xva` (VmResult/Exposure/Xva/value types), `reporting_portfolio_tearsheet` (Theme/INSTITUTIONAL).
 
@@ -90,5 +91,6 @@ The same notebook now derives market-data references from `CATALOG`, builds one 
 `YoYInflationSwap` has an asymmetric type tag: `from_json` expects `"yoy_inflation_swap"` (canonical) but `to_json()` emits `"yo_y_inflation_swap"` (auto-derived from the Rust variant name), so a `to_json()`→`from_json()` round-trip fails for that one class. All other 69 instruments round-trip cleanly. This is a Rust-binding/parity defect (serde `rename` needed on the `YoYInflationSwap` variant), outside the scope of notebook coverage; the catalog therefore demonstrates `from_json`/`validate`/`to_json` without the re-parse step.
 
 ### Verification
+
 - `/tmp/coverage_audit.py` re-run confirms the counts above; `instruments.*` = 70/70 covered.
 - The catalog notebook and all edited notebooks pass an in-process execution smoke test; `run_all_notebooks.py` is run as the canonical check (transient Jupyter ZMQ kernel errors on long-running notebooks are a known environment artifact, not a logic regression).
