@@ -191,7 +191,6 @@ Cross-currency options priced in a different currency than the underlying's deno
 |----------|-------------|
 | `quanto_drift_adjustment` | Returns `-ρ·σ_S·σ_X` |
 | `quanto_call` / `quanto_put` | Full quanto pricing with FX correlation |
-| `quanto_call_simple` / `quanto_put_simple` | Convenience wrappers (zero correlation) |
 
 **Formula:**
 

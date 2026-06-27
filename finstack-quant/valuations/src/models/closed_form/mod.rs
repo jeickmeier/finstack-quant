@@ -164,9 +164,7 @@ pub use lookback::{
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put,
 };
-pub use quanto::{
-    quanto_call, quanto_call_simple, quanto_drift_adjustment, quanto_put, quanto_put_simple,
-};
+pub use quanto::{quanto_call, quanto_drift_adjustment, quanto_put};
 pub(crate) use vanilla::{black76_call, black76_put};
 pub use vanilla::{
     bs_greeks, bs_price, bs_price_checked, checked_closed_form_value, option_type_from_bool,

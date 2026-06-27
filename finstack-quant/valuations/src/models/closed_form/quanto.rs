@@ -173,56 +173,6 @@ pub fn quanto_put(
     discount * (strike * norm_cdf(-d2) - forward_adj * norm_cdf(-d1))
 }
 
-/// Price a quanto call with simplified parameters (FX vol and correlation defaulted).
-///
-/// This is a convenience wrapper when FX volatility and correlation are not explicitly provided.
-/// Uses reasonable defaults or zero correlation.
-pub fn quanto_call_simple(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate_domestic: f64,
-    rate_foreign: f64,
-    div_yield: f64,
-    vol_asset: f64,
-) -> f64 {
-    // Zero correlation assumption (no quanto adjustment)
-    quanto_call(
-        spot,
-        strike,
-        time,
-        rate_domestic,
-        rate_foreign,
-        div_yield,
-        vol_asset,
-        0.0,
-        0.0,
-    )
-}
-
-/// Price a quanto put with simplified parameters.
-pub fn quanto_put_simple(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate_domestic: f64,
-    rate_foreign: f64,
-    div_yield: f64,
-    vol_asset: f64,
-) -> f64 {
-    quanto_put(
-        spot,
-        strike,
-        time,
-        rate_domestic,
-        rate_foreign,
-        div_yield,
-        vol_asset,
-        0.0,
-        0.0,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
