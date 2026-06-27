@@ -157,7 +157,63 @@ class _FixedIncomeInstrument:
         ...
 
 class Bond(_FixedIncomeInstrument):
-    """Fixed-rate, floating-rate, amortizing, callable, or putable bond."""
+    """Fixed-rate, floating-rate, amortizing, callable, or putable bond.
+
+    Accepts all standard bond spec fields through the ``spec`` dict or keyword
+    arguments. Notable optional field:
+
+    ``return_floor`` : dict, optional
+        Guaranteed minimum-return call protection (private-credit / leveraged-loan
+        convention). The field is JSON-native and mirrors the Rust serde shape::
+
+            {
+                "kind": {"Moic": 1.25},  # or {"Xirr": 0.12}
+                "issue_price": "Par",  # or {"PctOfPar": 98.0}
+                "window": "Full",  # or {"From": "2026-01-01"}
+                # or {"Between": {"start": ..., "end": ...}}
+            }
+
+        When present, the bond is treated as prepayable across the protection
+        window and early-redemption prices are floored to meet the target return.
+
+    Return-floor metrics (pass as strings to ``price_with_metrics``):
+
+    ``"moic"``
+        Money-on-invested-capital multiple to maturity.
+    ``"moic_to_worst"``
+        Minimum MOIC across all exits (calls, puts, maturity).
+    ``"xirr"``
+        Annualized internal rate of return to maturity.
+    ``"xirr_to_worst"``
+        Minimum XIRR across all exits.
+
+    These four metric IDs are available on **any** bond, with or without a
+    ``return_floor`` spec attached.
+
+    Examples
+    --------
+    >>> import json
+    >>> from finstack_quant.valuations.instruments.fixed_income import Bond
+    >>> spec = {
+    ...     "id": "MY-LOAN",
+    ...     "notional": {"amount": "1000000", "currency": "USD"},
+    ...     "issue_date": "2024-01-01",
+    ...     "maturity": "2029-01-01",
+    ...     "cashflow_spec": {
+    ...         "Fixed": {
+    ...             "rate": "0.10",
+    ...             "freq": {"count": 12, "unit": "months"},
+    ...             "dc": "Thirty360",
+    ...             "bdc": "following",
+    ...             "calendar_id": "weekends_only",
+    ...         }
+    ...     },
+    ...     "discount_curve_id": "USD-OIS",
+    ...     "return_floor": {"kind": {"Moic": 1.25}, "issue_price": "Par", "window": "Full"},
+    ... }
+    >>> bond = Bond(spec=spec)  # doctest: +SKIP
+    >>> result = bond.price_with_metrics(market, "2024-01-01", metrics=["moic", "xirr"])  # doctest: +SKIP
+    """
 
 class ConvertibleBond(_FixedIncomeInstrument):
     """Convertible bond with embedded equity conversion optionality."""

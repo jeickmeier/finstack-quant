@@ -573,6 +573,30 @@ public = [
     "TermLoan",
 ]
 
+# Bond.return_floor field note:
+# The Rust ``Bond`` struct has an optional ``return_floor: Option<ReturnFloorSpec>``
+# field (``ReturnFloorSpec`` / ``ReturnFloorKind`` / ``IssuePrice`` / ``ProtectionWindow``
+# from ``finstack_quant_valuations::instruments::fixed_income::bond``). These types are
+# JSON-native — they are not exposed as Python classes (consistent with the JSON-first
+# house convention for all bond nested-spec types such as CallPut/MakeWholeSpec).
+# Users pass them as Python dicts matching the Rust serde shape.
+#
+# Return-floor metric IDs (registered in MetricId::ALL_STANDARD; reachable via
+# ``price_with_metrics(metrics=[...])`` on any Bond and via the global
+# ``price_instrument_with_metrics`` function):
+#   "moic"          — money-on-invested-capital multiple to maturity
+#   "moic_to_worst" — minimum MOIC across all exits (calls, puts, maturity)
+#   "xirr"          — annualized IRR to maturity
+#   "xirr_to_worst" — minimum XIRR across all exits
+# These metrics are available on any Bond, with or without return_floor attached.
+[crates.valuations.instruments.fixed_income.return_floor]
+status = "exists"
+approach = "json-native"
+rust_types = ["ReturnFloorSpec", "ReturnFloorKind", "IssuePrice", "ProtectionWindow"]
+rust_module = "finstack_quant_valuations::instruments::fixed_income::bond"
+note = "Consistent with house convention: nested bond spec types travel as JSON dicts. No Python class wrappers. Metric IDs 'moic', 'moic_to_worst', 'xirr', 'xirr_to_worst' are standard and accessible via price_with_metrics."
+metric_ids = ["moic", "moic_to_worst", "xirr", "xirr_to_worst"]
+
 [crates.valuations.instruments.fx]
 python_package = "finstack_quant.valuations.instruments.fx"
 public = [
