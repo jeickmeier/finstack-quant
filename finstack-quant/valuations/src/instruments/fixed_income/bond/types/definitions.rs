@@ -78,6 +78,14 @@ pub struct Bond {
     pub pricing_overrides: PricingOverrides,
     /// Optional call/put schedule (dates and redemption prices as % of par amount).
     pub call_put: Option<CallPutSchedule>,
+    /// Optional guaranteed minimum-return ("return floor") call protection.
+    ///
+    /// When present, the bond is treated as prepayable across the protection
+    /// window with redemption floored so the investor meets the target MOIC/XIRR.
+    /// Lowered into `call_put` at pricing time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub return_floor: Option<super::return_floor::ReturnFloorSpec>,
     /// Optional pre-built cashflow schedule. If provided, this will be used instead of
     /// generating cashflows from the cashflow_spec.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -123,6 +131,8 @@ impl<'de> serde::Deserialize<'de> for Bond {
             #[serde(default)]
             pricing_overrides: PricingOverrides,
             call_put: Option<CallPutSchedule>,
+            #[serde(default)]
+            return_floor: Option<super::return_floor::ReturnFloorSpec>,
             #[serde(default)]
             custom_cashflows: Option<CashFlowSchedule>,
             #[serde(default)]
@@ -176,6 +186,7 @@ impl<'de> serde::Deserialize<'de> for Bond {
             funding_curve_id: helper.funding_curve_id,
             pricing_overrides: helper.pricing_overrides,
             call_put: helper.call_put,
+            return_floor: helper.return_floor,
             custom_cashflows: helper.custom_cashflows,
             accrual_method: helper.accrual_method,
             attributes: helper.attributes,
@@ -291,5 +302,29 @@ impl CallPutSchedule {
     /// ```
     pub fn has_options(&self) -> bool {
         !self.calls.is_empty() || !self.puts.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod return_floor_field_tests {
+    use crate::instruments::fixed_income::bond::types::return_floor::ReturnFloorSpec;
+
+    #[test]
+    fn bond_roundtrips_return_floor_via_serde() {
+        let mut bond = crate::instruments::fixed_income::bond::Bond::example().unwrap();
+        bond.return_floor = Some(ReturnFloorSpec::moic(1.25));
+        let json = serde_json::to_string(&bond).unwrap();
+        assert!(json.contains("return_floor"));
+        let back: crate::instruments::fixed_income::bond::Bond =
+            serde_json::from_str(&json).unwrap();
+        assert_eq!(back.return_floor, Some(ReturnFloorSpec::moic(1.25)));
+    }
+
+    #[test]
+    fn bond_omits_return_floor_from_json_when_none() {
+        let bond = crate::instruments::fixed_income::bond::Bond::example().unwrap();
+        assert!(bond.return_floor.is_none());
+        let json = serde_json::to_string(&bond).unwrap();
+        assert!(!json.contains("return_floor"));
     }
 }
