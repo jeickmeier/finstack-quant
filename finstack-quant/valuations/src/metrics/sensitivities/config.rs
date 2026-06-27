@@ -97,9 +97,13 @@ impl Default for SensitivitiesConfig {
     }
 }
 
+/// Optional-override form of [`SensitivitiesConfig`], deserialized from the
+/// `valuations.sensitivities.v1` `FinstackConfig` extension. Every field is
+/// optional; present fields override the resolved defaults in
+/// [`from_finstack_config_or_default`].
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct SensitivitiesConfigV1 {
+pub(crate) struct SensitivitiesOverrides {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) rate_bump_bp: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -158,7 +162,7 @@ pub(crate) fn from_finstack_config_or_default(
     let mut base = SensitivitiesConfig::default();
 
     if let Some(raw) = cfg.extensions.get(SENSITIVITIES_CONFIG_KEY_V1) {
-        let overrides: SensitivitiesConfigV1 =
+        let overrides: SensitivitiesOverrides =
             serde_json::from_value(raw.clone()).map_err(|e| {
                 finstack_quant_core::Error::Calibration {
                     message: format!(
