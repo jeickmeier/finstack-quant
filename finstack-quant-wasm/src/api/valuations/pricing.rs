@@ -770,4 +770,166 @@ mod tests {
 
     // (Credit-model evaluator parity tests live in `super::credit::tests`,
     // co-located with the functions they exercise.)
+
+    /// Build a floored-bond InstrumentJson string from a raw JSON spec.
+    ///
+    /// Uses the same 5-year 10% annual bullet as the Python `test_return_floor.py`
+    /// fixture so the two surfaces stay directly comparable.
+    fn return_floor_bond_instrument_json(return_floor: serde_json::Value) -> String {
+        let spec = serde_json::json!({
+            "id": "WASM-RETURN-FLOOR-BOND",
+            "notional": { "amount": "1000000", "currency": "USD" },
+            "issue_date": "2024-01-01",
+            "maturity": "2029-01-01",
+            "cashflow_spec": {
+                "Fixed": {
+                    "rate": "0.10",
+                    "freq": { "count": 12, "unit": "months" },
+                    "dc": "Thirty360",
+                    "bdc": "following",
+                    "calendar_id": "weekends_only"
+                }
+            },
+            "discount_curve_id": "USD-OIS",
+            "settlement_days": 0,
+            "ex_coupon_days": 0,
+            "attributes": {},
+            "return_floor": return_floor
+        });
+        serde_json::json!({ "type": "bond", "spec": spec }).to_string()
+    }
+
+    /// Minimal 5-year flat discount market for the return-floor tests.
+    fn return_floor_market_json() -> String {
+        serde_json::json!({
+            "version": 2,
+            "curves": [{
+                "type": "discount",
+                "id": "USD-OIS",
+                "base": "2024-01-01",
+                "day_count": "Act365F",
+                "knot_points": [[0.0, 1.0], [5.0, 0.85]],
+                "interp_style": "monotone_convex",
+                "extrapolation": "flat_forward",
+                "min_forward_rate": null,
+                "allow_non_monotonic": false,
+                "min_forward_tenor": 1e-6
+            }],
+            "fx": null,
+            "surfaces": [],
+            "prices": {},
+            "series": [],
+            "inflation_indices": [],
+            "dividends": [],
+            "credit_indices": [],
+            "fx_delta_vol_surfaces": [],
+            "vol_cubes": [],
+            "collateral": {}
+        })
+        .to_string()
+    }
+
+    #[test]
+    fn return_floor_bond_moic_floor_validates_and_prices() {
+        // Smoke test: a bond with a 1.25× MOIC return-floor spec round-trips
+        // through the JSON validator and prices successfully via the discounting
+        // model — no new Rust binding code is required; return_floor is already a
+        // serde field on the core Bond type.
+        let floor_spec = serde_json::json!({
+            "kind": { "Moic": 1.25 },
+            "issue_price": "Par",
+            "window": "Full"
+        });
+        let inst = return_floor_bond_instrument_json(floor_spec);
+
+        // Validate round-trips through the binding
+        let canonical = validate_instrument_json(&inst).expect("validate");
+        assert!(canonical.contains("return_floor"), "return_floor survived round-trip");
+
+        // Price and check the four return metrics via the internal helper
+        // (avoids serde_wasm_bindgen which requires a wasm32 target).
+        let mkt = return_floor_market_json();
+        let market = parse_market_json(&mkt).expect("market");
+        let metrics = vec![
+            "moic".to_string(),
+            "moic_to_worst".to_string(),
+            "xirr".to_string(),
+            "xirr_to_worst".to_string(),
+        ];
+        let result_json = price_instrument_with_metrics_context(
+            &inst,
+            &market,
+            "2024-01-01",
+            "discounting",
+            metrics,
+            None,
+            None,
+        )
+        .expect("price_with_metrics");
+        let parsed: serde_json::Value = serde_json::from_str(&result_json).expect("parse");
+
+        // 10% annual 5Y par bullet: MOIC ≈ 1.50 (5 × 0.10 + 1.0 principal)
+        let moic = parsed["measures"]["moic"].as_f64().expect("moic");
+        assert!(moic > 1.0, "MOIC must be > 1.0 (coupon income)");
+        assert!((moic - 1.50).abs() < 0.02, "MOIC ≈ 1.50, got {moic}");
+
+        // XIRR ≈ 10% for a par bullet
+        let xirr = parsed["measures"]["xirr"].as_f64().expect("xirr");
+        assert!((xirr - 0.10).abs() < 0.005, "XIRR ≈ 0.10, got {xirr}");
+
+        // moic_to_worst ≤ moic: the floored bond has synthetic call options injected
+        // by the return-floor machinery, so the worst-exit path can only be equal
+        // to or worse than the held-to-maturity multiple.
+        let moic_tw = parsed["measures"]["moic_to_worst"].as_f64().expect("moic_to_worst");
+        assert!(moic_tw <= moic + 1e-9, "moic_to_worst must be ≤ moic, got {moic_tw} vs {moic}");
+    }
+
+    #[test]
+    fn return_floor_bond_xirr_floor_prices_without_error() {
+        let floor_spec = serde_json::json!({
+            "kind": { "Xirr": 0.12 },
+            "issue_price": "Par",
+            "window": "Full"
+        });
+        let inst = return_floor_bond_instrument_json(floor_spec);
+        let mkt = return_floor_market_json();
+        let market = parse_market_json(&mkt).expect("market");
+        let metrics = vec!["xirr".to_string(), "xirr_to_worst".to_string()];
+        let result_json = price_instrument_with_metrics_context(
+            &inst,
+            &market,
+            "2024-01-01",
+            "discounting",
+            metrics,
+            None,
+            None,
+        )
+        .expect("xirr floor bond prices");
+        let parsed: serde_json::Value = serde_json::from_str(&result_json).expect("parse");
+        // Price > 0 and xirr metric present
+        let amount = parsed["value"]["amount"]
+            .as_f64()
+            .or_else(|| {
+                parsed["value"]["amount"]
+                    .as_str()
+                    .and_then(|s| s.parse::<f64>().ok())
+            })
+            .expect("value.amount");
+        assert!(amount > 0.0, "floored bond price must be positive");
+        let xirr = parsed["measures"]["xirr"].as_f64().expect("xirr");
+        assert!(xirr > 0.0, "xirr must be positive");
+    }
+
+    #[test]
+    fn return_floor_metrics_in_standard_metrics_list() {
+        // The four return-floor metric IDs must be present in the global registry.
+        // Uses the underlying Rust pricer function directly (no JsValue).
+        let ids = finstack_quant_valuations::pricer::list_standard_metrics();
+        for metric in ["moic", "moic_to_worst", "xirr", "xirr_to_worst"] {
+            assert!(
+                ids.iter().any(|id| id == metric),
+                "'{metric}' missing from standard metrics"
+            );
+        }
+    }
 }
