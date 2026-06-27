@@ -1004,14 +1004,17 @@ impl<'a> EquityWaterfallEngine<'a> {
         // be legitimately *undefined* early in a fund's life — a single
         // contribution (too few flows) or an all-negative history (no NPV
         // sign change) — which is economically "below any hurdle", so the
-        // tier proceeds to solve for the required amount. Genuine input
-        // errors (e.g. day-count failures) propagate instead of being
-        // silently treated as a 0% IRR.
+        // tier proceeds to solve for the required amount. The canonical
+        // `core::xirr` solver signals an absent sign change as
+        // `InputError::Invalid`; it, `TooFewPoints`, and `Validation` all map
+        // to "below hurdle" here. Genuine input errors (e.g. day-count
+        // failures) propagate instead of being silently treated as a 0% IRR.
         let base_date = lp_flows[0].0;
         let current_irr = match self.calculate_irr(lp_flows, base_date) {
             Ok(irr) => irr,
             Err(finstack_quant_core::Error::Input(
-                finstack_quant_core::InputError::TooFewPoints,
+                finstack_quant_core::InputError::TooFewPoints
+                | finstack_quant_core::InputError::Invalid,
             ))
             | Err(finstack_quant_core::Error::Validation(_)) => f64::NEG_INFINITY,
             Err(e) => return Err(e),

@@ -3,7 +3,6 @@
 use crate::instruments::equity::pe_fund::PrivateMarketsFund;
 use crate::metrics::{MetricCalculator, MetricContext, MetricRegistry};
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::money::Money;
 
 /// LP Internal Rate of Return calculator.
@@ -183,123 +182,30 @@ impl MetricCalculator for CarryAccruedCalculator {
     }
 }
 
-/// IRR search domain: -99.99% (total loss) to +1000%.
-const IRR_SCAN_LO: f64 = -0.9999;
-const IRR_SCAN_HI: f64 = 10.0;
-/// Number of scan intervals used to bracket NPV sign changes.
-const IRR_SCAN_POINTS: usize = 400;
-
-/// Helper function to calculate IRR using robust root finding.
+/// Calculate the LP/fund IRR for dated currency cashflows.
 ///
-/// Cashflow times are measured with `day_count` from the first flow's date.
-/// NPV uses the closed-form discount factor `(1 + r)^{-t}`, which is
-/// well-defined and continuous at `r = 0` (`1.0^{-t} = 1.0`), so no zero-rate
-/// special case is needed; the waterfall IRR routine
+/// Thin adapter over the canonical
+/// [`xirr_with_daycount`](finstack_quant_core::cashflow::xirr_with_daycount)
+/// solver. It drops currency from the `Money` amounts — the IRR is a pure scalar
+/// root of NPV — and measures cashflow times with `day_count` from the earliest
+/// flow. Both the discount form `(1 + r)^{-t}` and multi-root handling
+/// (deterministic selection of the root closest to `r = 0`) come from the core
+/// solver, so PE-fund metrics inherit its compensated summation, scale
+/// invariance, and unbounded high-rate handling. The waterfall IRR routine
 /// (`WaterfallSpec::calculate_irr`) delegates here so both stay consistent.
 ///
 /// # Errors
 ///
-/// - Fewer than two cashflows.
-/// - Day-count failure on any cashflow date (propagated instead of silently
-///   treating the flow as occurring at `t = 0`).
-/// - NPV has no sign change on the scan domain `[-99.99%, 1000%]` (the IRR is
-///   undefined for the cashflow profile), or the in-bracket solve fails.
-///
-/// When NPV changes sign more than once on the scan domain (possible for
-/// non-conventional cashflow profiles with multiple sign flips), the root in
-/// the bracket closest to `r = 0` is returned and a warning is emitted, since
-/// "the" IRR is ambiguous in that case.
+/// Propagates errors from
+/// [`xirr_with_daycount`](finstack_quant_core::cashflow::xirr_with_daycount):
+/// fewer than two cashflows, no sign change in the cashflow stream, a day-count
+/// failure on any flow date, or no valid root.
 pub fn calculate_irr(
     flows: &[(Date, Money)],
     day_count: DayCount,
 ) -> finstack_quant_core::Result<f64> {
-    if flows.len() < 2 {
-        return Err(finstack_quant_core::InputError::TooFewPoints.into());
-    }
-
-    let base_date = flows[0].0;
-
-    // Precompute (t, amount) pairs, propagating day-count failures.
-    let timed_flows = flows
-        .iter()
-        .map(|(date, amount)| {
-            day_count
-                .year_fraction(
-                    base_date,
-                    *date,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )
-                .map(|t| (t, amount.amount()))
-        })
-        .collect::<finstack_quant_core::Result<Vec<(f64, f64)>>>()?;
-
-    let npv_function = |rate: f64| -> f64 {
-        timed_flows
-            .iter()
-            .map(|&(t, amount)| amount * (1.0 + rate).powf(-t))
-            .sum()
-    };
-
-    // Scan the domain for sign-change brackets before solving. This guards
-    // against the multiple-root ambiguity of IRR (NPV polynomials can cross
-    // zero more than once for non-conventional cashflows) and against
-    // guess-based bracket searches wandering outside the economically
-    // meaningful range.
-    let step = (IRR_SCAN_HI - IRR_SCAN_LO) / IRR_SCAN_POINTS as f64;
-    let mut brackets: Vec<(f64, f64)> = Vec::new();
-    let mut prev_r = IRR_SCAN_LO;
-    let mut prev_f = npv_function(prev_r);
-    if prev_f == 0.0 {
-        return Ok(prev_r);
-    }
-    for i in 1..=IRR_SCAN_POINTS {
-        let r = IRR_SCAN_LO + step * i as f64;
-        let f = npv_function(r);
-        if f == 0.0 {
-            return Ok(r);
-        }
-        if prev_f.is_finite() && f.is_finite() && prev_f * f < 0.0 {
-            brackets.push((prev_r, r));
-        }
-        prev_r = r;
-        prev_f = f;
-    }
-
-    let (lo, hi) = match brackets.as_slice() {
-        [] => {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "IRR is undefined: NPV has no sign change for rates in \
-                 [{IRR_SCAN_LO}, {IRR_SCAN_HI}]"
-            )));
-        }
-        [only] => *only,
-        multiple => {
-            // Ambiguous IRR: pick the root bracket closest to r = 0 (the
-            // economically conventional choice) and surface the ambiguity.
-            tracing::warn!(
-                num_brackets = multiple.len(),
-                "IRR: NPV changes sign more than once on [{IRR_SCAN_LO}, {IRR_SCAN_HI}]; \
-                 the IRR is ambiguous — returning the root closest to 0"
-            );
-            multiple
-                .iter()
-                .copied()
-                .min_by(|a, b| {
-                    let mid_a = (a.0 + a.1) / 2.0;
-                    let mid_b = (b.0 + b.1) / 2.0;
-                    mid_a
-                        .abs()
-                        .partial_cmp(&mid_b.abs())
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .unwrap_or((IRR_SCAN_LO, IRR_SCAN_HI))
-        }
-    };
-
-    let solver = BrentSolver::new().tolerance(1e-12);
-    solver
-        .solve_in_bracket(npv_function, lo, hi)
-        .map_err(|_| finstack_quant_core::InputError::Invalid.into())
+    let dated: Vec<(Date, f64)> = flows.iter().map(|(d, m)| (*d, m.amount())).collect();
+    finstack_quant_core::cashflow::xirr_with_daycount(&dated, day_count, None)
 }
 
 mod carry01;
@@ -418,8 +324,13 @@ mod tests {
             .expect("year fraction");
         let exact_irr = (distribution / contribution).powf(1.0 / t) - 1.0;
 
+        // Bound is core::xirr's documented solver tolerance (1e-8), not the
+        // 1e-12 of the former bespoke pe_fund solver. At 1e-7 this still
+        // distinguishes the exact `(1 + r)^{-t}` discount form from a
+        // linearized `1 − r·t` (which would diverge by ~r·t² ≫ 1e-7 here),
+        // so the test's intent — exact closed-form discounting — is preserved.
         assert!(
-            (irr - exact_irr).abs() < 1e-9,
+            (irr - exact_irr).abs() < 1e-7,
             "near-zero IRR must match the exact (D/C)^(1/t) − 1 closed form: \
              got {irr}, expected {exact_irr}"
         );
