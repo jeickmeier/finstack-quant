@@ -276,6 +276,17 @@
           },
           "description": "Pricing overrides (including quoted clean price)"
         },
+        "return_floor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReturnFloorSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional guaranteed minimum-return (\"return floor\") call protection.\n\nWhen present, the bond is treated as prepayable across the protection\nwindow with redemption floored so the investor meets the target MOIC/XIRR.\nLowered into `call_put` at pricing time."
+        },
         "settlement_days": {
           "default": 0,
           "description": "Number of settlement days after trade date (e.g., 2 for T+2).",
@@ -1046,6 +1057,43 @@
       ],
       "type": "object"
     },
+    "IssuePrice": {
+      "description": "Issue price = invested capital `V0` (amount funded at issue; IRR initial outflow\nand MOIC denominator).\n\nDefaults to [`IssuePrice::Par`] when not specified.",
+      "oneOf": [
+        {
+          "const": "Par",
+          "description": "Par notional (default). `V0 = notional`.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Explicit cash amount funded at issue. Must match the bond's notional currency.",
+          "properties": {
+            "Amount": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            }
+          },
+          "required": [
+            "Amount"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Percent of par, e.g. `98.0` for 2 points of original issue discount.\n`V0 = notional * pct / 100`.",
+          "properties": {
+            "PctOfPar": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "PctOfPar"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "MakeWholeSpec": {
       "description": "Make-whole call specification.\n\nDefines the reference curve and spread used to compute the make-whole redemption\nprice. The issuer pays the holder the greater of par and the present value of\nremaining cashflows discounted at the reference rate plus a spread.\n\n# Industry Practice\n\n- Investment-grade corporates: typically Treasury + 25-50 bps\n- High-yield: typically Treasury + 50-100 bps\n- Convertibles: typically Treasury + 50 bps",
       "properties": {
@@ -1204,6 +1252,56 @@
         }
       ]
     },
+    "ProtectionWindow": {
+      "description": "When the return-floor protection window applies.\n\nThe window defines the interval over which the issuer can trigger a\nfloor-protected early redemption. Outside this window the floor is\ninactive (the bond behaves as uncallable or follows its normal call\nschedule). The floor binds only on early issuer-called redemptions; it\nnever applies at maturity.",
+      "oneOf": [
+        {
+          "const": "Full",
+          "description": "From issue (or `as_of`) up to — but not including — maturity (default).\nThe floor applies to any early issuer-called redemption during the\nbond's life, but not to redemption at maturity.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Active only on or after this date (encodes a no-call period ending at\nmaturity). The floor is not applied to redemptions before `from`.",
+          "properties": {
+            "From": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "From"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Explicit closed interval `[start, end]` (both ends inclusive). The floor\napplies only for redemptions with `start <= redemption_date <= end`.",
+          "properties": {
+            "Between": {
+              "properties": {
+                "end": {
+                  "description": "Last date on which the floor-protected call window closes (inclusive).",
+                  "type": "string"
+                },
+                "start": {
+                  "description": "First date on which the floor-protected call window opens.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "start",
+                "end"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "Between"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "RepoDayCountBasis": {
       "description": "Day-count basis used to annualize implied repo rates.",
       "oneOf": [
@@ -1218,6 +1316,74 @@
           "type": "string"
         }
       ]
+    },
+    "ReturnFloorKind": {
+      "description": "Which return metric is guaranteed by the floor, and its target.\n\nUse [`ReturnFloorKind::Moic`] for money-multiple protection (common in\nleveraged loans and private credit) or [`ReturnFloorKind::Xirr`] for\nannualized IRR protection.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Minimum money-on-money multiple (e.g. `1.25` = 1.25× invested capital).\n\nOn an early issuer-called redemption at time `t`, the redemption price is\nthe minimum amount such that `(received_cashflows + redemption) / V0 >=\nmultiple`, where `V0` is the invested capital defined by [`IssuePrice`].\nThe floor binds only on early redemptions, not at maturity.",
+          "properties": {
+            "Moic": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "Moic"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Minimum annualized internal rate of return.\n\nOn an early issuer-called redemption at time `t`, the redemption price is\ncomputed so that the XIRR of all cashflows from issue equals the target\nrate. The floor binds only on early redemptions, not at maturity. Day\ncount defaults to Act/365F (matching `core::cashflow::xirr`) unless\noverridden via [`ReturnFloorSpec::day_count`].",
+          "properties": {
+            "Xirr": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "Xirr"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ReturnFloorSpec": {
+      "additionalProperties": false,
+      "description": "Guaranteed minimum-return call protection on a bond or loan.\n\nAttaching this spec declares that on any early issuer-called or prepaid\nredemption within the protection window, the redemption price will be\nfloored so the investor's realized return meets the target. This is the\nstandard private-credit loan model (often called a \"prepayment premium\" or\n\"call protection\" in credit agreements). The floor is anchored at the issue\ndate and issue price `V0`. The spec is lowered into a concrete call schedule\nat pricing time; see `bond/pricing/return_floor.rs`.\n\n**Call-protection only**: the floor applies to EARLY issuer redemptions\nwithin the [`ProtectionWindow`] and never at maturity. The held-to-maturity\npath is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /\n[`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case\nreturn across all paths including the unfloored maturity path.\n\n# Mathematical Foundation\n\nLet:\n- `V0` = invested capital (issue price).\n- `t` = early-redemption date.\n- `cash_through(t)` = sum of positive cashflows received by the holder in\n  the half-open interval `(issue, t]` (coupons and amortization; excludes\n  the redemption itself).\n- `yf(a, b)` = year fraction from date `a` to date `b` under `Act/365F`.\n\n**MOIC floor** — minimum money-on-invested-capital multiple `m`:\n\n```text\nR(t) = m · V0 − cash_through(t)\n```\n\nThe required redemption at `t` is `max(R(t), contractual_call(t), V0)`.\n\n**XIRR floor** — minimum annualized IRR `r`:\n\n```text\nR(t) = (1 + r)^yf(issue, t) · (V0 − Σ_{q ≤ t} coupon_q / (1 + r)^yf(issue, q))\n```\n\nThe day-count convention for `yf` defaults to `Act/365F`, matching\n[`finstack_quant_core::cashflow::xirr`] so the verification metrics\nreproduce the floor target exactly.\n\nBoth floors are then clamped to `max(R(t), 100.0)` (never below par) and\ndivided by the outstanding notional at `t`.\n\n# Limitations (v1)\n\n- **Floating-rate coupons**: forward-projected using the yield curve at\n  pricing time. Path-accurate LSMC (where rate paths determine both coupon\n  magnitudes and call-trigger probabilities simultaneously) is deferred to v2.\n- **Make-whole calls**: contractual make-whole provisions cannot compose\n  with a return floor in v1 — attempting this returns a validation error.\n  Make-whole effective prices are path-dependent and cannot be pre-computed\n  statically when lowering the floor.\n- **Amortizing bonds (to-worst)**: the `MoicToWorst` / `XirrToWorst`\n  metrics use the initial notional as the redemption basis rather than the\n  outstanding notional at the exit date. This is exact for bullet bonds but\n  overstates the redemption for amortizing structures (TODO v2).\n- **`min_moic` / `min_xirr` shortcuts**: these set\n  [`ProtectionWindow::Full`] (prepayable across the bond's entire life).\n  Narrow the window via [`ReturnFloorSpec::window`] if a no-call period\n  applies.\n\n# Invariants\n\n- MOIC multiple must be positive (`> 0`).\n- XIRR rate must be finite and greater than `-1` (i.e., `-100%`).\n- A [`ProtectionWindow::Between`] window must have `start < end`.\n\n# References\n\n- **MOIC**: Standard private-equity and private-credit return metric.\n  MOIC = total distributions / invested capital. See e.g. Rosenbaum, J. &\n  Pearl, J. (2013). *Investment Banking: Valuation, Leveraged Buyouts, and\n  Mergers & Acquisitions* (2nd ed.). Wiley Finance.\n- **XIRR / IRR**: Internal rate of return. See Brealey, R. A., Myers, S.\n  C. & Allen, F. (2023). *Principles of Corporate Finance* (14th ed.).\n  McGraw-Hill. Chapter 5 (\"Net Present Value and Other Investment Criteria\").\n- **Call-protection / prepayment premiums**: Standard private-credit\n  agreement term. LSTA (Loan Syndications and Trading Association).\n  *The Handbook of Loan Syndications and Trading* (2nd ed.). Chapter on\n  loan documentation and call protection.\n- **Act/365F day count**: ISDA 2006 Definitions, Section 4.16(f).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    ReturnFloorSpec, IssuePrice,\n};\nuse finstack_quant_core::types::Rate;\n\n// 1.20× MOIC floor at par, full protection window\nlet spec = ReturnFloorSpec::moic(1.20);\nassert!(spec.validate().is_ok());\n\n// 10% XIRR floor with 98 OID, validated\nlet spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0))\n    .issue_price(IssuePrice::PctOfPar(98.0));\nassert!(spec.validate().is_ok());\n```\n\nAttach to a bond using the fluent builder:\n\n```rust,ignore\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    Bond, ReturnFloorSpec, ProtectionWindow,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse time::macros::date;\n\n// 5-year loan with 1.25× MOIC floor active after a 2-year no-call period.\nlet loan = Bond::fixed(\n    \"LOAN-001\",\n    Money::new(1_000_000.0, Currency::USD),\n    0.10,\n    date!(2025 - 01 - 01),\n    date!(2030 - 01 - 01),\n    \"USD-OIS\",\n)?\n.with_return_floor(\n    ReturnFloorSpec::moic(1.25)\n        .window(ProtectionWindow::From(date!(2027 - 01 - 01))),\n);\n# Ok::<(), Box<dyn std::error::Error>>(())\n```",
+      "properties": {
+        "day_count": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Day count convention for XIRR discounting. Defaults to Act/365F\n(matching `core::cashflow::xirr`) when `None`. Ignored for MOIC floors."
+        },
+        "issue_price": {
+          "$ref": "#/$defs/IssuePrice",
+          "default": "Par",
+          "description": "Issue price = invested capital `V0` (amount funded at issue). Default: par."
+        },
+        "kind": {
+          "$ref": "#/$defs/ReturnFloorKind",
+          "description": "Which return metric is guaranteed, and its target."
+        },
+        "window": {
+          "$ref": "#/$defs/ProtectionWindow",
+          "default": "Full",
+          "description": "Protection window. Default: [`ProtectionWindow::Full`]."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
     },
     "StepUpCouponSpec": {
       "additionalProperties": false,
