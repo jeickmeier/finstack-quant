@@ -776,6 +776,78 @@ fn outstanding_principal_at_date(
     outstanding.max(0.0)
 }
 
+/// One candidate early-exit for yield-to-worst enumeration.
+///
+/// Represents a single admissible exercise date and the corresponding clean
+/// redemption price expressed as a percentage of par (e.g. `103.0` for 103%).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ExitCandidate {
+    /// The admissible exercise date (call or put date, aligned to a flow date
+    /// where possible, and clipped to `[as_of, bond.maturity]`).
+    pub(crate) date: Date,
+    /// Clean redemption price as percent of par (e.g. `103.0` for 103%).
+    pub(crate) price_pct_of_par: f64,
+}
+
+/// Enumerate call/put exit candidates for yield-to-worst analysis.
+///
+/// For each call or put window `[start_date, end_date]` in `bond.call_put`,
+/// this function produces one `ExitCandidate` per admissible exercise date:
+///
+/// 1. Seed with `start_date` and `end_date`.
+/// 2. Extend with any flow dates that fall within `[start_date, end_date]`.
+/// 3. Sort and de-duplicate the resulting dates.
+/// 4. Retain only dates in `[as_of, bond.maturity]`.
+///
+/// Returns an empty `Vec` when the bond has no `call_put` schedule.
+///
+/// # Arguments
+///
+/// * `bond`  – The bond whose `call_put` schedule is enumerated.
+/// * `flows` – Holder-view cashflows used to align candidates to payment dates.
+/// * `as_of` – Earliest admissible exercise date (valuation/quote date).
+pub(crate) fn enumerate_exit_paths(
+    bond: &Bond,
+    flows: &[(Date, Money)],
+    as_of: Date,
+) -> Vec<ExitCandidate> {
+    let Some(cp) = &bond.call_put else {
+        return Vec::new();
+    };
+
+    let mut candidates: Vec<ExitCandidate> = Vec::new();
+
+    let mut push_period_candidates = |start_date: Date, end_date: Date, price_pct_of_par: f64| {
+        let mut exercise_dates = vec![start_date, end_date];
+        exercise_dates.extend(
+            flows
+                .iter()
+                .map(|(date, _)| *date)
+                .filter(|date| *date >= start_date && *date <= end_date),
+        );
+        exercise_dates.sort_unstable();
+        exercise_dates.dedup();
+
+        for exercise_date in exercise_dates {
+            if exercise_date >= as_of && exercise_date <= bond.maturity {
+                candidates.push(ExitCandidate {
+                    date: exercise_date,
+                    price_pct_of_par,
+                });
+            }
+        }
+    };
+
+    for c in &cp.calls {
+        push_period_candidates(c.start_date, c.end_date, c.price_pct_of_par);
+    }
+    for p in &cp.puts {
+        push_period_candidates(p.start_date, p.end_date, p.price_pct_of_par);
+    }
+
+    candidates
+}
+
 /// Solve yield-to-worst over all call/put/maturity candidates for a given flow set.
 ///
 /// Returns the worst (minimum) yield and the corresponding truncated cashflow path.
@@ -803,38 +875,19 @@ pub(crate) fn solve_ytw_from_flows(
     dirty_price_target: Money,
     schedule: Option<&crate::cashflow::builder::CashFlowSchedule>,
 ) -> finstack_quant_core::Result<(f64, Vec<(Date, Money)>)> {
-    // Generate call/put candidates + maturity
-    let mut candidates: Vec<(Date, Money)> = Vec::new();
+    // Generate call/put candidates + maturity.
+    // Call/put paths come from enumerate_exit_paths; maturity is appended separately.
+    let exit_paths = enumerate_exit_paths(bond, flows, as_of);
+    let mut candidates: Vec<(Date, Money)> = exit_paths
+        .into_iter()
+        .map(|ec| {
+            (
+                ec.date,
+                Money::new(ec.price_pct_of_par, bond.notional.currency()),
+            )
+        })
+        .collect();
 
-    if let Some(cp) = &bond.call_put {
-        let mut push_period_candidates =
-            |start_date: Date, end_date: Date, price_pct_of_par: f64| {
-                let mut exercise_dates = vec![start_date, end_date];
-                exercise_dates.extend(
-                    flows
-                        .iter()
-                        .map(|(date, _)| *date)
-                        .filter(|date| *date >= start_date && *date <= end_date),
-                );
-                exercise_dates.sort_unstable();
-                exercise_dates.dedup();
-
-                for exercise_date in exercise_dates {
-                    if exercise_date >= as_of && exercise_date <= bond.maturity {
-                        candidates.push((
-                            exercise_date,
-                            Money::new(price_pct_of_par, bond.notional.currency()),
-                        ));
-                    }
-                }
-            };
-        for c in &cp.calls {
-            push_period_candidates(c.start_date, c.end_date, c.price_pct_of_par);
-        }
-        for p in &cp.puts {
-            push_period_candidates(p.start_date, p.end_date, p.price_pct_of_par);
-        }
-    }
     // At maturity, principal redemption is already present in the cashflow schedule,
     // so use a zero additional redemption here to avoid double-counting.
     //

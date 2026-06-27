@@ -368,3 +368,56 @@ fn test_ytw_amortizing_bond_matches_ytm_from_price() {
         ytw
     );
 }
+
+/// Characterization test: pins the YTW for `Bond::example_callable()` so that the
+/// `enumerate_exit_paths` extraction refactor is provably behavior-preserving.
+///
+/// The bond has three call dates (2027-01-15 at 103%, 2029-01-15 at 101%,
+/// 2031-01-15 at 100%) and matures 2034-01-15. For the pinned 102% clean
+/// price quote, the worst-yield path is the 2031-01-15 call at 100% (par
+/// redemption with fewer accruing periods than holding to maturity), which
+/// is what the recorded YTW (0.046139633912627) reflects.
+#[test]
+fn test_ytw_characterization_example_callable() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::interp::InterpStyle;
+    use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+    use finstack_quant_valuations::instruments::Instrument;
+    use finstack_quant_valuations::instruments::PricingOverrides;
+    use finstack_quant_valuations::metrics::MetricId;
+    use time::macros::date;
+
+    let as_of = date!(2025 - 01 - 15);
+
+    let mut bond = Bond::example_callable().expect("example_callable should build");
+    // Set a clean price quote at 102% of par (premium, triggers call analysis)
+    bond.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(102.0);
+
+    let curve = DiscountCurve::builder("USD-OIS")
+        .base_date(as_of)
+        .knots([(0.0, 1.0), (10.0, 0.67032)])
+        .interp(InterpStyle::Linear)
+        .build()
+        .expect("discount curve should build");
+    let market = MarketContext::new().insert(curve);
+
+    let result = bond
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Ytw],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("price_with_metrics should succeed");
+
+    let ytw = *result.measures.get("ytw").expect("ytw should be present");
+
+    // Value recorded on first run (2025-01-15 as_of, 102% clean price, flat 4% curve).
+    // Must remain bit-identical after the enumerate_exit_paths extraction refactor.
+    const EXPECTED_YTW: f64 = 0.046_139_633_912_627;
+    assert!(
+        (ytw - EXPECTED_YTW).abs() < 1e-9,
+        "YTW changed after refactor: expected {EXPECTED_YTW:.15}, got {ytw:.15}"
+    );
+}
