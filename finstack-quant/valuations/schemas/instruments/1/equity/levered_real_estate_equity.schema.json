@@ -1705,7 +1705,7 @@
           "description": "Barrier level (price that triggers knock-in/out)"
         },
         "barrier_type": {
-          "$ref": "#/$defs/BarrierType",
+          "$ref": "#/$defs/BarrierType2",
           "description": "Barrier type (up/down, in/out)"
         },
         "day_count": {
@@ -1840,7 +1840,7 @@
       ],
       "type": "object"
     },
-    "BarrierType": {
+    "BarrierType2": {
       "description": "Barrier type for barrier options.",
       "oneOf": [
         {
@@ -9696,7 +9696,7 @@
           "type": "number"
         },
         "barrier_type": {
-          "$ref": "#/$defs/BarrierType",
+          "$ref": "#/$defs/BarrierType2",
           "description": "Barrier type (up/down, in/out)"
         },
         "base_currency": {

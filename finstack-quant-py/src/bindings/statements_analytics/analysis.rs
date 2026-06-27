@@ -601,7 +601,7 @@ fn credit_assessment<'py>(
     let results = extract_results_ref(results)?;
     let period: finstack_quant_core::dates::PeriodId = as_of.parse().map_err(display_to_py)?;
     let assessment =
-        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&*results, period);
+        finstack_quant_statements_analytics::analysis::CreditAssessment::compute(&results, period);
 
     let dict = PyDict::new(py);
     dict.set_item("as_of", &assessment.as_of)?;
