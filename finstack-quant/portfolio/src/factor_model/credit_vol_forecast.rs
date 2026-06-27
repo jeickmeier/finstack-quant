@@ -221,11 +221,13 @@ impl<'a> FactorCovarianceForecast<'a> {
             })?;
             let variance = match vol_model {
                 FactorVolModel::Sample { variance } => horizon.scale_sample_variance(*variance),
-                _ => return Err(ValuationsError::Core(
-                    finstack_quant_core::Error::Validation(format!(
-                        "FactorCovarianceForecast: unsupported vol model for factor {fid}"
+                _ => {
+                    return Err(ValuationsError::Core(
+                        finstack_quant_core::Error::Validation(format!(
+                            "FactorCovarianceForecast: unsupported vol model for factor {fid}"
+                        )),
                     ))
-                )),
+                }
             };
             if !variance.is_finite() || variance < 0.0 {
                 return Err(ValuationsError::Core(
@@ -277,12 +279,14 @@ impl<'a> FactorCovarianceForecast<'a> {
             })?;
         let variance = match model {
             IdiosyncraticVolModel::Sample { variance } => horizon.scale_sample_variance(*variance),
-            _ => return Err(ValuationsError::Core(
-                finstack_quant_core::Error::Validation(format!(
+            _ => {
+                return Err(ValuationsError::Core(
+                    finstack_quant_core::Error::Validation(format!(
                     "FactorCovarianceForecast: unsupported idiosyncratic vol model for issuer {}",
                     issuer_id.as_str()
+                )),
                 ))
-            )),
+            }
         };
         if !variance.is_finite() || variance < 0.0 {
             return Err(ValuationsError::Core(
