@@ -228,6 +228,7 @@ impl ParametricDecomposer {
                     (0.0, 0.0)
                 }
             }
+            _ => unreachable!(),
         };
 
         Ok(scaled)

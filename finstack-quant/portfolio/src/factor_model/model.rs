@@ -188,8 +188,8 @@ fn default_sensitivity_engine(
     bump_config: &BumpSizeConfig,
 ) -> Box<dyn FactorSensitivityEngine> {
     match pricing_mode {
-        PricingMode::DeltaBased => Box::new(DeltaBasedEngine::new(bump_config.clone())),
         PricingMode::FullRepricing => Box::new(FullRepricingEngine::new(bump_config.clone(), 5)),
+        _ => Box::new(DeltaBasedEngine::new(bump_config.clone())),
     }
 }
 
@@ -610,7 +610,7 @@ fn collect_credit_idiosyncratic_variance(
                 collect_credit_idiosyncratic_variance(config, out);
             }
         }
-        MatchingConfig::MappingTable(_) | MatchingConfig::Hierarchical(_) => {}
+        _ => {}
     }
 }
 
@@ -697,6 +697,7 @@ fn variance_from_measure(measure: RiskMeasure, total_risk: f64) -> f64 {
                 0.0
             }
         }
+        _ => 0.0,
     }
 }
 
@@ -729,6 +730,7 @@ fn risk_total_and_component_scale(measure: RiskMeasure, variance: f64) -> (f64, 
                 (0.0, 0.0)
             }
         }
+        _ => (0.0, 0.0),
     }
 }
 

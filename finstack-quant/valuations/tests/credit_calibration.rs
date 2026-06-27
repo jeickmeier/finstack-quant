@@ -597,7 +597,9 @@ fn sparse_bucket_emits_none_for_empty_dates() {
         .factors
         .get(&ig_factor_id)
         .expect("IG factor vol present");
-    let FactorVolModel::Sample { variance } = vol_entry;
+    let FactorVolModel::Sample { variance } = vol_entry else {
+        panic!("expected Sample variant for IG factor vol model")
+    };
     assert!(
         *variance > 0.0,
         "IG factor variance must be positive (computed over non-zero-sentinel dates)"

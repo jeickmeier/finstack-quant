@@ -124,6 +124,7 @@ impl PyCreditFactorModel {
                 HierarchyDimension::Region => "Region".to_owned(),
                 HierarchyDimension::Sector => "Sector".to_owned(),
                 HierarchyDimension::Custom(name) => name.clone(),
+                _ => "Unknown".to_owned(),
             })
             .collect()
     }

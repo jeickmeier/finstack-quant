@@ -471,7 +471,7 @@ impl SimulationDecomposer {
                     (0.0, 0.0)
                 }
             }
-            RiskMeasure::VaR { .. } | RiskMeasure::ExpectedShortfall { .. } => unreachable!(),
+            _ => unreachable!(),
         };
 
         let absolute: Vec<f64> = component_variances
@@ -554,7 +554,7 @@ impl SimulationDecomposer {
                     marginal_es.iter().map(|value| value * ratio).collect(),
                 )
             }
-            RiskMeasure::Variance | RiskMeasure::Volatility => unreachable!(),
+            _ => unreachable!(),
         };
 
         RiskDecomposition {
@@ -601,6 +601,7 @@ impl RiskDecomposer for SimulationDecomposer {
             RiskMeasure::VaR { confidence } | RiskMeasure::ExpectedShortfall { confidence } => {
                 self.tail_risk_decomposition(covariance, &scenarios, measure, *confidence)
             }
+            _ => unreachable!(),
         };
 
         Ok(decomposition)

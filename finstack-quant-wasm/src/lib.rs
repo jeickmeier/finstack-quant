@@ -4,6 +4,7 @@
 //! that groups raw `wasm-bindgen` exports into crate-level namespaces mirroring
 //! the Rust umbrella crate structure.
 
+#![forbid(unsafe_code)]
 #![deny(clippy::unwrap_used)]
 #![deny(clippy::expect_used)]
 #![deny(clippy::panic)]

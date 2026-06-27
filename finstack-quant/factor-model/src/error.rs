@@ -54,6 +54,7 @@ pub enum FactorModelError {
 /// still accepted on input via serde aliases.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum UnmatchedPolicy {
     /// Fail immediately when any dependency is unmatched.
     ///

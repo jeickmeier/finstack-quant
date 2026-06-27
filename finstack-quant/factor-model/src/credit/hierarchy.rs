@@ -114,6 +114,7 @@ pub struct DateRange {
 /// - `ForceBucketOnly` — never run per-issuer regression for this issuer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum IssuerBetaOverride {
     /// Let calibration decide based on available history.
     Auto,
@@ -128,6 +129,7 @@ pub enum IssuerBetaOverride {
 /// A `BucketOnly` issuer's betas are all 1.0 and carry no fit statistics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum IssuerBetaMode {
     /// Per-issuer OLS beta was estimated.
     IssuerBeta,
@@ -142,6 +144,7 @@ pub enum IssuerBetaMode {
 ///   regression is run.  Useful for simpler factor models or data-sparse periods.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum IssuerBetaPolicy {
     /// Regression is gated on a minimum history threshold with per-issuer overrides.
     Dynamic {
@@ -169,6 +172,7 @@ pub enum IssuerBetaPolicy {
 /// such as `"Currency"` or `"AssetType"`.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum HierarchyDimension {
     /// Credit rating bucket (e.g. `"IG"`, `"HY"`, `"NR"`).
     Rating,
@@ -247,6 +251,7 @@ pub struct IssuerBetas {
 /// Source provenance of an issuer's idiosyncratic vol estimate.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum AdderVolSource {
     /// Estimated from the issuer's own residual history.
     FromHistory,
@@ -493,6 +498,7 @@ impl FactorCorrelationMatrix {
 /// additive extension without breaking readers of older writers.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum FactorVolModel {
     /// Simple sample-variance estimate.
     Sample {
@@ -507,6 +513,7 @@ pub enum FactorVolModel {
 /// per-factor models can diverge independently in later PRs.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum IdiosyncraticVolModel {
     /// Simple sample-variance estimate for the idiosyncratic adder.
     Sample {

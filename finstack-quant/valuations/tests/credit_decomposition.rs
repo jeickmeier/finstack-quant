@@ -171,6 +171,7 @@ fn bucket_paths_for(tags: &IssuerTags, levels: &[HierarchyDimension]) -> Vec<Str
                 HierarchyDimension::Region => "region".to_owned(),
                 HierarchyDimension::Sector => "sector".to_owned(),
                 HierarchyDimension::Custom(s) => s.clone(),
+                _ => "unknown".to_owned(),
             };
             parts.push(tags.0.get(&key).cloned().unwrap());
         }

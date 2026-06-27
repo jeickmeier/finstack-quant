@@ -81,6 +81,7 @@ use finstack_quant_core::{Error, Result};
 /// S_i(t) - S_i(t-1)` and the generic factor is differenced the same way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PanelSpace {
     /// Difference consecutive observations into a return panel before peeling.
     #[default]
@@ -97,6 +98,7 @@ pub enum PanelSpace {
 /// if any non-`Sample` variant is supplied.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum VolModelChoice {
     /// Plain sample variance.
     Sample,
@@ -115,6 +117,7 @@ pub enum VolModelChoice {
 ///
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum CovarianceStrategy {
     /// Diagonal Σ = diag(σ²) under identity correlation.
     Diagonal,
@@ -132,6 +135,7 @@ pub enum CovarianceStrategy {
 /// OLS β shrinkage rule.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum BetaShrinkage {
     /// No shrinkage; use the OLS estimate directly.
     None,
@@ -1958,5 +1962,127 @@ mod calibration_estimator_tests {
             (var - 2.0).abs() < 1e-12,
             "expected unbiased variance 2.0 (n-1), got {var}"
         );
+    }
+}
+
+#[cfg(test)]
+mod calibration_config_tests {
+    use super::*;
+
+    #[test]
+    fn credit_calibration_config_default_values() {
+        let config = CreditCalibrationConfig::default();
+        assert_eq!(config.policy, IssuerBetaPolicy::GloballyOff);
+        assert!(config.hierarchy.levels.is_empty());
+        assert_eq!(config.vol_model, VolModelChoice::Sample);
+        assert_eq!(config.covariance_strategy, CovarianceStrategy::Diagonal);
+        assert_eq!(config.beta_shrinkage, BetaShrinkage::None);
+        assert_eq!(config.use_returns_or_levels, PanelSpace::Returns);
+        assert_eq!(config.annualization_factor, 12.0);
+    }
+
+    #[test]
+    fn panel_space_serde_roundtrip() {
+        for variant in [PanelSpace::Returns, PanelSpace::Levels] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: PanelSpace = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn panel_space_default_is_returns() {
+        assert_eq!(PanelSpace::default(), PanelSpace::Returns);
+    }
+
+    #[test]
+    fn vol_model_choice_serde_roundtrip() {
+        let variant = VolModelChoice::Sample;
+        let json = serde_json::to_string(&variant).unwrap();
+        let back: VolModelChoice = serde_json::from_str(&json).unwrap();
+        assert_eq!(variant, back);
+    }
+
+    #[test]
+    fn covariance_strategy_serde_roundtrip() {
+        for variant in [
+            CovarianceStrategy::Diagonal,
+            CovarianceStrategy::Ridge { alpha: 0.05 },
+            CovarianceStrategy::FullSampleRepaired,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: CovarianceStrategy = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn beta_shrinkage_serde_roundtrip() {
+        for variant in [BetaShrinkage::None, BetaShrinkage::TowardOne { alpha: 0.1 }] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: BetaShrinkage = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn credit_calibration_config_serde_roundtrip() {
+        let config = CreditCalibrationConfig {
+            policy: IssuerBetaPolicy::GloballyOff,
+            hierarchy: CreditHierarchySpec {
+                levels: vec![crate::credit::hierarchy::HierarchyDimension::Rating],
+            },
+            min_bucket_size_per_level: BucketSizeThresholds { per_level: vec![5] },
+            vol_model: VolModelChoice::Sample,
+            covariance_strategy: CovarianceStrategy::Diagonal,
+            beta_shrinkage: BetaShrinkage::None,
+            use_returns_or_levels: PanelSpace::Returns,
+            annualization_factor: 12.0,
+        };
+        let json = serde_json::to_string(&config).unwrap();
+        let back: CreditCalibrationConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(config.policy, back.policy);
+        assert_eq!(config.vol_model, back.vol_model);
+        assert_eq!(config.covariance_strategy, back.covariance_strategy);
+        assert_eq!(config.beta_shrinkage, back.beta_shrinkage);
+        assert_eq!(config.use_returns_or_levels, back.use_returns_or_levels);
+        assert_eq!(config.annualization_factor, back.annualization_factor);
+    }
+
+    #[test]
+    fn bucket_size_thresholds_default_for_levels() {
+        let thresholds = BucketSizeThresholds::default_for_levels(3);
+        assert_eq!(thresholds.per_level, vec![5, 5, 5]);
+        assert_eq!(thresholds.threshold_for_level(0), 5);
+        assert_eq!(thresholds.threshold_for_level(2), 5);
+        assert_eq!(thresholds.threshold_for_level(99), 5);
+    }
+
+    #[test]
+    fn bucket_size_thresholds_custom_values() {
+        let thresholds = BucketSizeThresholds {
+            per_level: vec![3, 7],
+        };
+        assert_eq!(thresholds.threshold_for_level(0), 3);
+        assert_eq!(thresholds.threshold_for_level(1), 7);
+        assert_eq!(thresholds.threshold_for_level(2), 5);
+    }
+
+    #[test]
+    fn history_panel_serde_roundtrip() {
+        use finstack_quant_core::types::IssuerId;
+        let mut spreads = BTreeMap::new();
+        spreads.insert(IssuerId::new("A"), vec![Some(100.0), Some(101.0)]);
+        spreads.insert(IssuerId::new("B"), vec![Some(200.0), None]);
+        let panel = HistoryPanel {
+            dates: vec![
+                Date::from_calendar_date(2024, time::Month::January, 31).unwrap(),
+                Date::from_calendar_date(2024, time::Month::February, 29).unwrap(),
+            ],
+            spreads,
+        };
+        let json = serde_json::to_string(&panel).unwrap();
+        let back: HistoryPanel = serde_json::from_str(&json).unwrap();
+        assert_eq!(panel, back);
     }
 }

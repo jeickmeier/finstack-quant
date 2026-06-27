@@ -6,6 +6,8 @@
 //! equity, volatility, commodity, and inflation factors are expressed
 //! through generic [`FactorType`] and [`FactorDefinition`].
 
+#![forbid(unsafe_code)]
+
 /// Factor-model run configuration, risk measures, and bump sizing.
 pub mod config;
 /// Factor covariance matrix storage and validation.

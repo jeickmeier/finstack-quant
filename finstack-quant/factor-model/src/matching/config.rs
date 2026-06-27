@@ -21,6 +21,7 @@ pub struct HierarchicalConfig {
 /// Declarative matcher configuration that can be serialized and rebuilt.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[non_exhaustive]
 pub enum MatchingConfig {
     /// Flat mapping table with first-match-wins semantics.
     MappingTable(Vec<MappingRule>),

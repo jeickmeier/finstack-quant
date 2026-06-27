@@ -59,6 +59,8 @@
 //! - [`ThresholdSchedule`] for time-varying thresholds
 //! - `forecast_breaches_generic` for breach forecasting
 
+#![forbid(unsafe_code)]
+
 pub(crate) mod engine;
 pub(crate) mod forward;
 pub mod json;

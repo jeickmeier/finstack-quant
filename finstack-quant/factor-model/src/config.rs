@@ -11,6 +11,7 @@ use std::str::FromStr;
 /// Strategy used when extracting factor sensitivities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum PricingMode {
     /// Use central finite differences to approximate linear deltas.
     ///
@@ -56,6 +57,7 @@ impl FromStr for PricingMode {
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
+#[non_exhaustive]
 pub enum RiskMeasure {
     /// Aggregate exposures using factor covariance and portfolio variance.
     #[default]

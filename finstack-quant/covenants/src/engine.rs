@@ -1426,3 +1426,357 @@ pub trait InstrumentMutator: Send + Sync {
     /// Change maturity date.
     fn set_maturity(&mut self, new_maturity: Date) -> finstack_quant_core::Result<()>;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::metric::HashMapMetricSource;
+    use finstack_quant_core::dates::Tenor;
+
+    fn date(y: i32, m: u8, d: u8) -> Date {
+        Date::from_calendar_date(y, time::Month::try_from(m).unwrap(), d).unwrap()
+    }
+
+    #[test]
+    fn max_leverage_passes_when_below_threshold() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.2)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(report.passed);
+        assert_eq!(report.actual_value, Some(3.2));
+        assert_eq!(report.threshold, Some(4.5));
+    }
+
+    #[test]
+    fn max_leverage_breaches_when_above_threshold() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(!report.passed);
+        assert_eq!(report.actual_value, Some(5.0));
+    }
+
+    #[test]
+    fn negative_ratio_treated_as_breach() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", -1.0)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(!report.passed);
+    }
+
+    #[test]
+    fn min_coverage_passes_when_above_threshold() {
+        let covenant = Covenant::new(
+            CovenantType::MinInterestCoverage { threshold: 2.0 },
+            Tenor::quarterly(),
+        );
+        let spec = CovenantSpec::with_metric(covenant, "interest_coverage");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("interest_coverage", 3.5)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["min_interest_coverage"];
+        assert!(report.passed);
+    }
+
+    #[test]
+    fn min_coverage_breaches_when_below_threshold() {
+        let covenant = Covenant::new(
+            CovenantType::MinInterestCoverage { threshold: 2.0 },
+            Tenor::quarterly(),
+        );
+        let spec = CovenantSpec::with_metric(covenant, "interest_coverage");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("interest_coverage", 1.5)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["min_interest_coverage"];
+        assert!(!report.passed);
+    }
+
+    #[test]
+    fn inactive_covenant_auto_passes() {
+        let mut covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        covenant.is_active = false;
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 99.0)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(report.passed);
+    }
+
+    #[test]
+    fn full_waiver_skips_evaluation() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        engine.add_waiver(CovenantWaiver {
+            covenant_id: "max_debt_ebitda".to_string(),
+            effective_date: date(2024, 1, 1),
+            expiry_date: Some(date(2024, 12, 31)),
+            amended_threshold: None,
+            description: "Full waiver".to_string(),
+        });
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 10.0)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 6, 30)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(report.passed);
+    }
+
+    #[test]
+    fn amended_threshold_waiver_overrides_static() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        engine.add_waiver(CovenantWaiver {
+            covenant_id: "max_debt_ebitda".to_string(),
+            effective_date: date(2024, 1, 1),
+            expiry_date: Some(date(2024, 12, 31)),
+            amended_threshold: Some(6.0),
+            description: "Amended to 6.0x".to_string(),
+        });
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.5)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 6, 30)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(report.passed);
+        assert_eq!(report.threshold, Some(6.0));
+    }
+
+    #[test]
+    fn headroom_positive_when_passing_max_covenant() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.0)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(report.passed);
+        let headroom = report.headroom.unwrap();
+        assert!(headroom > 0.0);
+    }
+
+    #[test]
+    fn headroom_negative_when_breaching_max_covenant() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        let report = &reports["max_debt_ebitda"];
+        assert!(!report.passed);
+        let headroom = report.headroom.unwrap();
+        assert!(headroom < 0.0);
+    }
+
+    #[test]
+    fn duplicate_instance_keys_rejected() {
+        let cov1 =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let cov2 =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 5.0 }, Tenor::quarterly());
+        let spec1 = CovenantSpec::with_metric(cov1, "debt_to_ebitda");
+        let spec2 = CovenantSpec::with_metric(cov2, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec1);
+        engine.add_spec(spec2);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.0)]);
+        let result = engine.evaluate(&mut metrics, date(2024, 3, 31));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn labeled_covenants_coexist() {
+        let cov1 = Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly())
+            .with_label("senior");
+        let cov2 = Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 6.0 }, Tenor::quarterly())
+            .with_label("total");
+        let spec1 = CovenantSpec::with_metric(cov1, "debt_to_ebitda");
+        let spec2 = CovenantSpec::with_metric(cov2, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec1);
+        engine.add_spec(spec2);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]);
+        let reports = engine.evaluate(&mut metrics, date(2024, 3, 31)).unwrap();
+        assert!(reports.contains_key("senior"));
+        assert!(reports.contains_key("total"));
+        assert!(!reports["senior"].passed);
+        assert!(reports["total"].passed);
+    }
+
+    #[test]
+    fn is_covenant_breached_nan_is_breach() {
+        let ct = CovenantType::MaxDebtToEBITDA { threshold: 4.5 };
+        assert!(is_covenant_breached(&ct, f64::NAN, 4.5));
+    }
+
+    #[test]
+    fn is_covenant_breached_at_most() {
+        let ct = CovenantType::MaxDebtToEBITDA { threshold: 4.5 };
+        assert!(!is_covenant_breached(&ct, 4.5, 4.5));
+        assert!(is_covenant_breached(&ct, 4.51, 4.5));
+        assert!(!is_covenant_breached(&ct, 4.49, 4.5));
+    }
+
+    #[test]
+    fn is_covenant_breached_at_least() {
+        let ct = CovenantType::MinInterestCoverage { threshold: 2.0 };
+        assert!(!is_covenant_breached(&ct, 2.0, 2.0));
+        assert!(is_covenant_breached(&ct, 1.99, 2.0));
+        assert!(!is_covenant_breached(&ct, 2.01, 2.0));
+    }
+
+    #[test]
+    fn headroom_for_at_most_positive_when_below() {
+        let hr = headroom_for(Some(BoundKind::AtMost), 3.0, 4.5);
+        assert!(hr > 0.0);
+    }
+
+    #[test]
+    fn headroom_for_at_least_positive_when_above() {
+        let hr = headroom_for(Some(BoundKind::AtLeast), 3.0, 2.0);
+        assert!(hr > 0.0);
+    }
+
+    #[test]
+    fn headroom_for_none_returns_zero() {
+        let hr = headroom_for(None, 3.0, 4.5);
+        assert_eq!(hr, 0.0);
+    }
+
+    #[test]
+    fn headroom_for_nan_inputs_returns_nan() {
+        let hr = headroom_for(Some(BoundKind::AtMost), f64::NAN, 4.5);
+        assert!(hr.is_nan());
+    }
+
+    #[test]
+    fn evaluate_and_track_records_breach() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]);
+        let reports = engine.evaluate_and_track(&mut metrics, date(2024, 3, 31)).unwrap();
+        assert!(!reports["max_debt_ebitda"].passed);
+        assert_eq!(engine.breach_history.len(), 1);
+        assert_eq!(engine.breach_history[0].covenant_id, "max_debt_ebitda");
+        assert!(!engine.breach_history[0].is_cured);
+    }
+
+    #[test]
+    fn evaluate_and_track_cures_on_recovery() {
+        let covenant = Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly())
+            .with_cure_period(Some(90));
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        let mut metrics = HashMapMetricSource::from_pairs([("debt_to_ebitda", 5.0)]);
+        engine.evaluate_and_track(&mut metrics, date(2024, 3, 31)).unwrap();
+        assert_eq!(engine.breach_history.len(), 1);
+        assert!(!engine.breach_history[0].is_cured);
+        let mut metrics2 = HashMapMetricSource::from_pairs([("debt_to_ebitda", 3.0)]);
+        engine.evaluate_and_track(&mut metrics2, date(2024, 5, 15)).unwrap();
+        assert!(engine.breach_history[0].is_cured);
+    }
+
+    #[test]
+    fn validate_rejects_negative_cure_period() {
+        let covenant = Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly())
+            .with_cure_period(Some(-1));
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(spec);
+        assert!(engine.validate().is_err());
+    }
+
+    #[test]
+    fn validate_rejects_overlapping_windows() {
+        let covenant =
+            Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        let spec = CovenantSpec::with_metric(covenant, "debt_to_ebitda");
+        let mut engine = CovenantEngine::new();
+        engine.add_window(CovenantWindow {
+            start: date(2024, 1, 1),
+            end: date(2024, 6, 30),
+            covenants: vec![spec.clone()],
+        });
+        engine.add_window(CovenantWindow {
+            start: date(2024, 4, 1),
+            end: date(2024, 12, 31),
+            covenants: vec![spec],
+        });
+        assert!(engine.validate().is_err());
+    }
+
+    #[test]
+    fn covenant_type_display_formats_correctly() {
+        let ct = CovenantType::MaxDebtToEBITDA { threshold: 4.5 };
+        assert_eq!(ct.to_string(), "Debt/EBITDA <= 4.50x");
+        let ct = CovenantType::MinInterestCoverage { threshold: 2.0 };
+        assert_eq!(ct.to_string(), "Interest Coverage >= 2.00x");
+    }
+
+    #[test]
+    fn covenant_type_covenant_id_is_stable() {
+        let ct = CovenantType::MaxDebtToEBITDA { threshold: 4.5 };
+        assert_eq!(ct.covenant_id(), "max_debt_ebitda");
+        let ct = CovenantType::MinInterestCoverage { threshold: 2.0 };
+        assert_eq!(ct.covenant_id(), "min_interest_coverage");
+    }
+
+    #[test]
+    fn covenant_type_bound_kind() {
+        assert_eq!(
+            CovenantType::MaxDebtToEBITDA { threshold: 4.5 }.bound_kind(),
+            Some(BoundKind::AtMost)
+        );
+        assert_eq!(
+            CovenantType::MinInterestCoverage { threshold: 2.0 }.bound_kind(),
+            Some(BoundKind::AtLeast)
+        );
+        assert_eq!(
+            CovenantType::Negative { restriction: "no debt".into() }.bound_kind(),
+            None
+        );
+    }
+
+    #[test]
+    fn instance_key_uses_label_when_set() {
+        let cov = Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly())
+            .with_label("senior");
+        assert_eq!(cov.instance_key(), "senior");
+    }
+
+    #[test]
+    fn instance_key_falls_back_to_covenant_id() {
+        let cov = Covenant::new(CovenantType::MaxDebtToEBITDA { threshold: 4.5 }, Tenor::quarterly());
+        assert_eq!(cov.instance_key(), "max_debt_ebitda");
+    }
+}
