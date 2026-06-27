@@ -56,10 +56,18 @@ pub fn kind_rank(kind: CFKind) -> u8 {
 /// 4. **Amount** — `f64::total_cmp`, so signed values sort consistently and
 ///    NaN handling is well-defined.
 /// 5. **Reset date** — `Option<Date>` ordering, with `None` first.
+/// 6. **Accrual factor** — `f64::total_cmp`.
+/// 7. **Rate** — `Option<f64>` ordering, with `None` first, then `total_cmp`.
 ///
 /// This is the canonical order downstream consumers
 /// (`outstanding_by_date`, `pv_by_period`, accrual, dataframe export, etc.)
-/// rely on. The sort is stable across runs and across `Vec` reorderings.
+/// rely on. Because the comparator distinguishes every field that can vary
+/// between two flows, it is a *total order*: the result is independent of input
+/// order (deterministic across runs and across `Vec` reorderings).
+///
+/// A stable sort is used deliberately: `merge_cashflow_schedules` concatenates
+/// already-sorted schedules, and the stable sort's run detection handles those
+/// pre-sorted runs in near-linear time (an unstable sort re-partitions them).
 pub fn sort_flows(flows: &mut [CashFlow]) {
     flows.sort_by(|a, b| {
         a.date
@@ -68,6 +76,13 @@ pub fn sort_flows(flows: &mut [CashFlow]) {
             .then_with(|| a.amount.currency().cmp(&b.amount.currency()))
             .then_with(|| a.amount.amount().total_cmp(&b.amount.amount()))
             .then_with(|| a.reset_date.cmp(&b.reset_date))
+            .then_with(|| a.accrual_factor.total_cmp(&b.accrual_factor))
+            .then_with(|| match (a.rate, b.rate) {
+                (None, None) => std::cmp::Ordering::Equal,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (Some(x), Some(y)) => x.total_cmp(&y),
+            })
     });
 }
 
@@ -214,8 +229,13 @@ impl Discountable for CashFlowSchedule {
             )));
         }
 
-        // Second pass: accumulate discounted amounts
-        let mut total = Money::new(0.0, ccy);
+        // Second pass: accumulate discounted amounts. `Money` is `Decimal`-backed,
+        // so summing per-flow `Money` values pays a `Decimal` multiply + add each
+        // iteration; since `df` is already `f64`, accumulate the discounted
+        // amounts with the same Neumaier-compensated `f64` policy used by the
+        // aggregation module and materialize `Money` once at the end.
+        let inv_df_base = 1.0 / df_base;
+        let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::default();
         for cf in &self.flows {
             if cf.kind == CFKind::DefaultedNotional {
                 continue;
@@ -227,12 +247,11 @@ impl Discountable for CashFlowSchedule {
                 });
             }
             let t = day_count.signed_year_fraction(curve_base, cf.date, ctx)?;
-            let df = disc.df(t) / df_base;
-            let disc_amt = cf.amount * df;
-            total = total.checked_add(disc_amt)?;
+            let df = disc.df(t) * inv_df_base;
+            acc.add(cf.amount.amount() * df);
         }
 
-        Ok(total)
+        Money::try_new(acc.total(), ccy)
     }
 }
 

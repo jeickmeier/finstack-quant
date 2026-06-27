@@ -505,35 +505,43 @@ impl CashFlowSchedule {
             .issue_date
             .or_else(|| self.flows.first().map(|cf| cf.date));
 
-        // Sort periods by start date for cursor advance
-        let mut sorted_period_indices: Vec<usize> = (0..periods.len()).collect();
-        sorted_period_indices.sort_by_key(|&i| periods[i].start);
-
+        // Periods are validated sorted-by-start (half-open, non-overlapping) by
+        // `validate_periods` above, so a plain cursor over `periods` suffices —
+        // no separate sorted-index vector is needed.
         let mut period_cursor = 0;
-        let mut sorted_flow_indices: Vec<usize> = (0..self.flows.len()).collect();
-        sorted_flow_indices.sort_by_key(|&i| self.flows[i].date);
+
+        // Schedule flows are kept in canonical date order by every builder
+        // constructor (`from_parts`/`finalize_flows`/`normalize_public`). Only
+        // build and sort an index vector when a caller handed us an unsorted
+        // schedule (e.g. a direct struct literal); the common path iterates the
+        // slice directly with no allocation, sort, or pointer indirection.
+        let flows_in_date_order = self.flows.windows(2).all(|w| w[0].date <= w[1].date);
+        let flow_order: Option<Vec<usize>> = if flows_in_date_order {
+            None
+        } else {
+            let mut idx: Vec<usize> = (0..self.flows.len()).collect();
+            idx.sort_by_key(|&i| self.flows[i].date);
+            Some(idx)
+        };
+
         let mut initial_funding_seen = false;
+        // Discounting, accrual, and forward-reset year fractions all share the
+        // same calendar/frequency context.
         let dc_ctx = DayCountContext {
             calendar: resolved_calendar,
             frequency: options.frequency,
             bus_basis: None,
             coupon_period: None,
         };
-        let disc_dc_ctx = DayCountContext {
-            calendar: resolved_calendar,
-            frequency: options.frequency,
-            bus_basis: None,
-            coupon_period: None,
-        };
-        let fwd_dc_ctx = DayCountContext {
-            calendar: resolved_calendar,
-            frequency: options.frequency,
-            bus_basis: None,
-            coupon_period: None,
-        };
+        let disc_dc_ctx = dc_ctx;
+        let fwd_dc_ctx = dc_ctx;
 
-        for &flow_index in &sorted_flow_indices {
-            let cf = &self.flows[flow_index];
+        let n_flows = self.flows.len();
+        for iter_pos in 0..n_flows {
+            let cf = match &flow_order {
+                Some(order) => &self.flows[order[iter_pos]],
+                None => &self.flows[iter_pos],
+            };
             // Outstanding before this cashflow
             let outstanding_pre = outstanding;
 
@@ -570,15 +578,12 @@ impl CashFlowSchedule {
             // Bucketing is half-open `[start, end)`, matching
             // `aggregation::aggregate_by_period`: a flow dated exactly on a
             // period boundary belongs to the NEXT period.
-            while period_cursor < sorted_period_indices.len()
-                && cf.date >= periods[sorted_period_indices[period_cursor]].end
-            {
+            while period_cursor < periods.len() && cf.date >= periods[period_cursor].end {
                 period_cursor += 1;
             }
             // Check if current cashflow falls in the current period
-            let period = if period_cursor < sorted_period_indices.len() {
-                let pi = sorted_period_indices[period_cursor];
-                let p = &periods[pi];
+            let period = if period_cursor < periods.len() {
+                let p = &periods[period_cursor];
                 if cf.date >= p.start && cf.date < p.end {
                     p
                 } else {
@@ -651,7 +656,6 @@ impl CashFlowSchedule {
                     options.recovery_rate,
                     base,
                 )
-                .amount()
             } else {
                 // PIK rows are notional accruals, not cash flows, so they
                 // contribute zero PV in the plain discounting view. Their

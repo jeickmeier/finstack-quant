@@ -577,30 +577,35 @@ pub(crate) struct ResolvedFloatMarket<'a> {
     pub(crate) fixings: &'a [Option<ScalarTimeSeries>],
 }
 
-fn apply_daily_index_constraints_if_needed(
-    daily_rates: &[(f64, u32)],
+fn apply_daily_index_constraints_if_needed<'a>(
+    daily_rates: &'a [(f64, u32)],
     params: &super::super::rate_helpers::FloatingRateParams,
     runtime_spec: &super::super::rate_helpers::ResolvedFloatingRateSpec,
-) -> Vec<(f64, u32)> {
+) -> std::borrow::Cow<'a, [(f64, u32)]> {
     if runtime_spec.overnight_index_constraints
         != super::super::specs::OvernightIndexConstraintApplication::Daily
     {
-        return daily_rates.to_vec();
+        // No per-day cap/floor to apply: borrow the sampled rates instead of
+        // copying the whole per-day vector (a SOFR coupon period samples one
+        // entry per business day).
+        return std::borrow::Cow::Borrowed(daily_rates);
     }
 
-    daily_rates
-        .iter()
-        .map(|&(rate, days)| {
-            let mut constrained = rate;
-            if let Some(floor) = params.index_floor_bp {
-                constrained = constrained.max(floor * 1e-4);
-            }
-            if let Some(cap) = params.index_cap_bp {
-                constrained = constrained.min(cap * 1e-4);
-            }
-            (constrained, days)
-        })
-        .collect()
+    std::borrow::Cow::Owned(
+        daily_rates
+            .iter()
+            .map(|&(rate, days)| {
+                let mut constrained = rate;
+                if let Some(floor) = params.index_floor_bp {
+                    constrained = constrained.max(floor * 1e-4);
+                }
+                if let Some(cap) = params.index_cap_bp {
+                    constrained = constrained.min(cap * 1e-4);
+                }
+                (constrained, days)
+            })
+            .collect(),
+    )
 }
 
 fn period_rate_params_for_overnight(

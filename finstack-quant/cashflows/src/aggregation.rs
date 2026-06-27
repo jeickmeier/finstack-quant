@@ -325,7 +325,11 @@ fn pv_by_period_generic<T, F>(
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>>
 where
     T: HasDate,
-    F: FnMut(&T, f64, f64) -> Money,
+    // Returns `(currency, pv_amount)` as plain scalars. Returning `f64` rather
+    // than `Money` avoids a `Decimal::from_f64`/`to_f64` round-trip per flow
+    // (`Money` is `Decimal`-backed); the compensated `f64` sum is materialized
+    // into `Money` once per `(period, currency)` below.
+    F: FnMut(&T, f64, f64) -> (Currency, f64),
 {
     validate_periods(periods)?;
     // Pre-size the outer map to avoid reallocations during insertion.
@@ -344,9 +348,8 @@ where
         per_ccy.clear();
         for flow in flows_in_period {
             let (_t, df, sp) = time_discount_survival(flow.flow_date(), disc, hazard, date_ctx)?;
-            let pv = value_fn(flow, df, sp);
-            let ccy = pv.currency();
-            per_ccy.entry(ccy).or_default().add(pv.amount());
+            let (ccy, pv) = value_fn(flow, df, sp);
+            per_ccy.entry(ccy).or_default().add(pv);
         }
 
         // Skip periods with no value (all flows filtered to zero)
@@ -367,7 +370,7 @@ where
 
 fn pv_by_period_precomputed(
     sorted: &[CashFlow],
-    pv_per_flow: &[Money],
+    pv_per_flow: &[(Currency, f64)],
     periods: &[Period],
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
     debug_assert_eq!(sorted.len(), pv_per_flow.len());
@@ -388,8 +391,8 @@ fn pv_by_period_precomputed(
 
         per_ccy.clear();
         while flow_idx < n && sorted[flow_idx].date < p.end {
-            let pv = pv_per_flow[flow_idx];
-            per_ccy.entry(pv.currency()).or_default().add(pv.amount());
+            let (ccy, pv) = pv_per_flow[flow_idx];
+            per_ccy.entry(ccy).or_default().add(pv);
             flow_idx += 1;
         }
 
@@ -424,12 +427,12 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
     let date_ctx = DateContext::new(base, dc, dc_ctx);
     pv_by_period_generic(sorted, periods, disc, hazard, &date_ctx, |cf, df, sp| {
+        let ccy = cf.amount.currency();
         // Historical flows (date <= base) carry zero PV by convention.
         if cf.kind == CFKind::DefaultedNotional || cf.date <= base {
-            return Money::new(0.0, cf.amount.currency());
+            return (ccy, 0.0);
         }
-        let pv_amount = cf.amount.amount() * df * sp;
-        Money::new(pv_amount, cf.amount.currency())
+        (ccy, cf.amount.amount() * df * sp)
     })
 }
 
@@ -504,11 +507,11 @@ pub(crate) fn credit_adjusted_period_pv(
     sp: f64,
     recovery_rate: Option<f64>,
     base: Date,
-) -> Money {
+) -> f64 {
     // Historical flows (date <= valuation base) carry zero PV by convention,
     // matching the DataFrame export and the plain PV path.
     if cf.kind == CFKind::DefaultedNotional || cf.date <= base {
-        return Money::new(0.0, cf.amount.currency());
+        return 0.0;
     }
 
     // Recovery and AccruedOnDefault are realized post-default cash flows
@@ -516,7 +519,7 @@ pub(crate) fn credit_adjusted_period_pv(
     // discounted at their scheduled dates without survival adjustment
     // because default has already occurred for this portion.
     if matches!(cf.kind, CFKind::Recovery | CFKind::AccruedOnDefault) {
-        return Money::new(cf.amount.amount() * df, cf.amount.currency());
+        return cf.amount.amount() * df;
     }
 
     let recovery_term = if let Some(r) = recovery_rate {
@@ -529,8 +532,7 @@ pub(crate) fn credit_adjusted_period_pv(
     };
 
     let pv_factor = df * (sp + recovery_term);
-    let amount = cf.amount;
-    Money::new(amount.amount() * pv_factor, amount.currency())
+    cf.amount.amount() * pv_factor
 }
 
 /// Recovery-leg timing convention for credit-adjusted PV aggregation.
@@ -718,7 +720,10 @@ pub(crate) fn pv_by_period_credit_adjusted_detailed_with_timing(
         RecoveryTiming::AtPaymentDate => {
             let base = date_ctx.base;
             let pv_fn = |cf: &CashFlow, df: f64, sp: f64| {
-                credit_adjusted_period_pv(cf, df, sp, recovery_rate, base)
+                (
+                    cf.amount.currency(),
+                    credit_adjusted_period_pv(cf, df, sp, recovery_rate, base),
+                )
             };
             if is_sorted {
                 return pv_by_period_generic(flows, periods, disc, Some(hazard), &date_ctx, pv_fn);
@@ -759,8 +764,10 @@ fn precompute_integrated_pv(
     hazard: &dyn Survival,
     recovery_rate: Option<f64>,
     date_ctx: &DateContext<'_>,
-) -> finstack_quant_core::Result<Vec<Money>> {
-    let mut out: Vec<Money> = Vec::with_capacity(sorted.len());
+) -> finstack_quant_core::Result<Vec<(Currency, f64)>> {
+    // Per-flow PV is carried as `(currency, amount)` scalars; `Money` (Decimal)
+    // is materialized once per `(period, currency)` in `pv_by_period_precomputed`.
+    let mut out: Vec<(Currency, f64)> = Vec::with_capacity(sorted.len());
     // Boundary T_prev for the principal date group currently being processed.
     let mut prev_principal: Date = date_ctx.base;
     // Date of the principal group currently being processed. Principal flows
@@ -774,7 +781,7 @@ fn precompute_integrated_pv(
         // Historical flows (date <= valuation base) carry zero PV by
         // convention, matching the DataFrame export and the plain PV path.
         if cf.date <= date_ctx.base {
-            out.push(Money::new(0.0, ccy));
+            out.push((ccy, 0.0));
             continue;
         }
 
@@ -782,12 +789,12 @@ fn precompute_integrated_pv(
 
         // DefaultedNotional: zeroed (identical to AtPaymentDate path)
         if cf.kind == CFKind::DefaultedNotional {
-            out.push(Money::new(0.0, ccy));
+            out.push((ccy, 0.0));
             continue;
         }
         // Realised post-default: discounted at scheduled date, no SP
         if matches!(cf.kind, CFKind::Recovery | CFKind::AccruedOnDefault) {
-            out.push(Money::try_new(cf.amount.amount() * df_t, ccy)?);
+            out.push((ccy, cf.amount.amount() * df_t));
             continue;
         }
 
@@ -827,7 +834,7 @@ fn precompute_integrated_pv(
             }
         }
 
-        out.push(Money::try_new(pv, ccy)?);
+        out.push((ccy, pv));
     }
     Ok(out)
 }
