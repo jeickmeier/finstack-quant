@@ -3,6 +3,7 @@
 mod construction;
 mod definitions;
 mod pricing;
+mod return_floor;
 mod traits;
 
 #[cfg(test)]
@@ -17,3 +18,4 @@ pub(crate) use super::cashflow_spec::CashflowSpec;
 pub use crate::cashflow::builder::AmortizationSpec;
 
 pub use definitions::{Bond, BondSettlementConvention, CallPut, CallPutSchedule, MakeWholeSpec};
+pub use return_floor::{IssuePrice, ProtectionWindow, ReturnFloorKind, ReturnFloorSpec};

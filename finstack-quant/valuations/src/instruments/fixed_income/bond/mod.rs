@@ -130,7 +130,11 @@ pub use types::Bond;
 pub use types::BondSettlementConvention;
 pub use types::CallPut;
 pub use types::CallPutSchedule;
+pub use types::IssuePrice;
 pub use types::MakeWholeSpec;
+pub use types::ProtectionWindow;
+pub use types::ReturnFloorKind;
+pub use types::ReturnFloorSpec;
 
 #[cfg(test)]
 mod tests {
