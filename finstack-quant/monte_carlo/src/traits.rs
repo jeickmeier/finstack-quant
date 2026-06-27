@@ -659,11 +659,14 @@ pub trait StochasticProcess: Send + Sync {
     /// - `x[0]` => `SPOT`
     /// - `x[1]` => `VARIANCE` (if dim >= 2)
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
+        // Use the indexed `set_key` fast path (array write + bitmask) rather than
+        // the string-keyed `set`, which resolves the key through a per-call
+        // `&str` match. This method runs once per step per path.
         if !x.is_empty() {
-            state.set(state_keys::SPOT, x[0]);
+            state.set_key(StateKey::Spot, x[0]);
         }
         if x.len() >= 2 {
-            state.set(state_keys::VARIANCE, x[1]);
+            state.set_key(StateKey::Variance, x[1]);
         }
     }
 }
@@ -723,6 +726,23 @@ pub trait Discretization<P: StochasticProcess + ?Sized>: Send + Sync {
     ///
     /// This method updates `x` in-place using the provided random shocks `z`.
     fn step(&self, process: &P, t: f64, dt: f64, x: &mut [f64], z: &[f64], work: &mut [f64]);
+
+    /// Precompute per-run constants that depend on the process and the time
+    /// grid but not on the simulated path.
+    ///
+    /// The engine calls this exactly once, on a private owned copy of the
+    /// scheme, before the path loop; the prepared copy is then shared read-only
+    /// across every path and every parallel chunk. Schemes whose [`Self::step`]
+    /// recomputes `dt`-dependent transcendentals (e.g. `exp(-κΔt)` in exact
+    /// rate or QE variance schemes) override this to hoist that work out of the
+    /// per-step hot path.
+    ///
+    /// Implementations **must** stay correct when `step` later sees a `dt` that
+    /// differs from any cached value (non-uniform grids): treat the cache as a
+    /// fast path guarded by an exact `dt` match and fall back to direct
+    /// computation otherwise, so results remain bit-identical regardless of
+    /// whether `prepare` ran. The default is a no-op.
+    fn prepare(&mut self, _process: &P, _time_grid: &crate::time_grid::TimeGrid) {}
 
     /// Workspace size required for intermediate calculations.
     fn work_size(&self, process: &P) -> usize {

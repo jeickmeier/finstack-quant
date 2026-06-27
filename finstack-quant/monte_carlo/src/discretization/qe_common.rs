@@ -45,14 +45,9 @@ pub(crate) fn validate_psi_c(psi_c: f64) -> finstack_quant_core::Result<()> {
     Ok(())
 }
 
-/// Conditional moments of the CIR-type variance update: returns `(m, s²)`.
-///
-/// * `m  = E[v_{t+Δt} | v_t] = θ + (v_t − θ) e^{−κΔt}`
-/// * `s² = Var[v_{t+Δt} | v_t]`
-///
-/// Falls back to the first-order Taylor expansion of `(1 − e^{−κΔt})/κ`
-/// when `|κ·Δt|` is near the precision limit (see
-/// [`KAPPA_DT_EXPANSION_EPS`]).
+/// Test-only convenience wrapper that computes `exp(-κΔt)` itself; production
+/// callers use [`qe_conditional_moments_with_exp`] with a precomputed value.
+#[cfg(test)]
 #[inline]
 pub(crate) fn qe_conditional_moments(
     v_t: f64,
@@ -61,7 +56,28 @@ pub(crate) fn qe_conditional_moments(
     sigma: f64,
     dt: f64,
 ) -> (f64, f64) {
-    let exp_kappa_dt = (-kappa * dt).exp();
+    qe_conditional_moments_with_exp(v_t, kappa, theta, sigma, dt, (-kappa * dt).exp())
+}
+
+/// Conditional moments of the CIR-type variance update with a caller-supplied
+/// `exp(-κΔt)`: returns `(m, s²)`.
+///
+/// `exp_kappa_dt` is `e^{−κΔt}`; it depends only on `(κ, Δt)` and so is constant
+/// across a uniform grid, so schemes that precompute it (via
+/// `Discretization::prepare`) pass it in to avoid recomputing the transcendental
+/// on every step. Passing `(-κΔt).exp()` reproduces the direct computation
+/// bit-for-bit. Falls back to the first-order Taylor expansion of
+/// `(1 − e^{−κΔt})/κ` when `|κ·Δt|` is near the precision limit (see
+/// [`KAPPA_DT_EXPANSION_EPS`]).
+#[inline]
+pub(crate) fn qe_conditional_moments_with_exp(
+    v_t: f64,
+    kappa: f64,
+    theta: f64,
+    sigma: f64,
+    dt: f64,
+    exp_kappa_dt: f64,
+) -> (f64, f64) {
     let m = theta + (v_t - theta) * exp_kappa_dt;
     let s2 = if (kappa * dt).abs() < KAPPA_DT_EXPANSION_EPS {
         v_t * sigma * sigma * dt
@@ -163,8 +179,24 @@ pub(crate) fn qe_regime(
     dt: f64,
     psi_c: f64,
 ) -> QeRegime {
+    qe_regime_with_exp(v_t, kappa, theta, sigma, dt, psi_c, (-kappa * dt).exp())
+}
+
+/// As [`qe_regime`], but with a caller-supplied `exp(-κΔt)` (see
+/// [`qe_conditional_moments_with_exp`]). Passing `(-κΔt).exp()` reproduces
+/// [`qe_regime`] bit-for-bit.
+#[inline]
+pub(crate) fn qe_regime_with_exp(
+    v_t: f64,
+    kappa: f64,
+    theta: f64,
+    sigma: f64,
+    dt: f64,
+    psi_c: f64,
+    exp_kappa_dt: f64,
+) -> QeRegime {
     let v_t = v_t.max(0.0);
-    let (m, s2) = qe_conditional_moments(v_t, kappa, theta, sigma, dt);
+    let (m, s2) = qe_conditional_moments_with_exp(v_t, kappa, theta, sigma, dt, exp_kappa_dt);
 
     // Safeguard 1: force Case B when the conditional mean is near zero to
     // avoid division by tiny numbers in ψ = s²/m² and in Case B's `β`.

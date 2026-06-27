@@ -47,12 +47,50 @@ use super::super::traits::Discretization;
 ///   Std[r_{t+Δt}|r_t] = σ√[(1 - e^{-2κΔt}) / (2κ)]
 /// ```
 #[derive(Debug, Clone, Default)]
-pub struct ExactHullWhite1F;
+pub struct ExactHullWhite1F {
+    /// Per-run cache of the `dt`-dependent step constants, populated by
+    /// [`Discretization::prepare`]. `None` until the engine prepares the scheme
+    /// (e.g. when stepped directly without the engine), in which case the
+    /// constants are computed inline.
+    prepared: Option<Hw1fStepConstants>,
+}
+
+/// Path-independent HW1F step constants for a fixed step size.
+///
+/// `exp_kappa_dt = e^{-κΔt}` and `std_dev = σ·√[(1−e^{−2κΔt})/(2κ)]` depend only
+/// on `(κ, σ, Δt)`, so they are identical on every step of a uniform grid and
+/// across every path.
+#[derive(Debug, Clone, Copy)]
+struct Hw1fStepConstants {
+    dt: f64,
+    exp_kappa_dt: f64,
+    std_dev: f64,
+}
+
+impl Hw1fStepConstants {
+    /// Compute the constants for one step size. Mirrors the arithmetic in
+    /// [`ExactHullWhite1F::step`] exactly so cached and inline paths are
+    /// bit-identical.
+    #[inline]
+    fn compute(kappa: f64, sigma: f64, dt: f64) -> Self {
+        let exp_kappa_dt = (-kappa * dt).exp();
+        let std_dev = if (kappa * dt).abs() < 1e-8 {
+            sigma * dt.sqrt() * (1.0 - kappa * dt / 2.0)
+        } else {
+            sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
+        };
+        Self {
+            dt,
+            exp_kappa_dt,
+            std_dev,
+        }
+    }
+}
 
 impl ExactHullWhite1F {
     /// Create a new exact HW1F discretization.
     pub fn new() -> Self {
-        Self
+        Self { prepared: None }
     }
 }
 
@@ -67,31 +105,35 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         _work: &mut [f64],
     ) {
         let params = process.params();
-        let kappa = params.kappa;
-        let sigma = params.sigma;
         // Time-averaged θ over [t, t+dt]: sampling θ at the step start would
         // carry an O(dt) local bias whenever the step straddles a θ knot
         // (common on event-aligned grids); averaging the piecewise-constant
         // θ across the step reduces this to O(dt²).
         let theta = process.theta_average(t, dt);
 
-        // Compute exact conditional mean and standard deviation
-        let exp_kappa_dt = (-kappa * dt).exp();
-
-        // Conditional mean: E[r_{t+Δt}|r_t]
-        let mean = x[0] * exp_kappa_dt + theta * (1.0 - exp_kappa_dt);
-
-        // Conditional standard deviation: Std[r_{t+Δt}|r_t]
-        // For small κΔt, use Taylor expansion to avoid numerical issues
-        let std_dev = if (kappa * dt).abs() < 1e-8 {
-            // Taylor: √[(1 - e^{-2κΔt})/(2κ)] = √Δt·(1 - κΔt/2 + O((κΔt)²))
-            sigma * dt.sqrt() * (1.0 - kappa * dt / 2.0)
-        } else {
-            sigma * ((1.0 - (-2.0 * kappa * dt).exp()) / (2.0 * kappa)).sqrt()
+        // Reuse the precomputed `dt`-dependent constants when this step's `dt`
+        // matches the prepared one (exact bit match → identical value); fall
+        // back to inline computation for unprepared or non-uniform grids.
+        let consts = match self.prepared {
+            Some(c) if c.dt.to_bits() == dt.to_bits() => c,
+            _ => Hw1fStepConstants::compute(params.kappa, params.sigma, dt),
         };
 
-        // Exact step
-        x[0] = mean + std_dev * z[0];
+        // Conditional mean E[r_{t+Δt}|r_t] and exact step.
+        let mean = x[0] * consts.exp_kappa_dt + theta * (1.0 - consts.exp_kappa_dt);
+        x[0] = mean + consts.std_dev * z[0];
+    }
+
+    fn prepare(&mut self, process: &HullWhite1FProcess, time_grid: &crate::time_grid::TimeGrid) {
+        if time_grid.num_steps() == 0 {
+            return;
+        }
+        let params = process.params();
+        self.prepared = Some(Hw1fStepConstants::compute(
+            params.kappa,
+            params.sigma,
+            time_grid.dt(0),
+        ));
     }
 
     fn work_size(&self, _process: &HullWhite1FProcess) -> usize {

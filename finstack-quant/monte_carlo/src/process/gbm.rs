@@ -119,7 +119,7 @@
 //! ```
 
 use super::super::paths::ProcessParams;
-use super::super::traits::{state_keys, PathState, ProportionalDiffusion, StochasticProcess};
+use super::super::traits::{PathState, ProportionalDiffusion, StateKey, StochasticProcess};
 use super::correlation::validate_correlation_matrix;
 use super::metadata::ProcessMetadata;
 use std::sync::Arc;
@@ -447,7 +447,7 @@ impl StochasticProcess for MultiGbmProcess {
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
         if let Some(&spot) = x.first() {
-            state.set(state_keys::SPOT, spot);
+            state.set_key(StateKey::Spot, spot);
         }
         for (i, &spot) in x.iter().enumerate() {
             state.set_indexed_spot(i, spot);

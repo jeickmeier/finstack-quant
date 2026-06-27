@@ -142,6 +142,8 @@ where
 
         // Apply exact GBM formula for each component
         // For diagonal diffusion: S_i(t+dt) = S_i(t) exp((μ_i - ½σ_i²)dt + σ_i√dt Z_i)
+        // √dt is constant across dimensions; hoist it out of the per-component loop.
+        let sqrt_dt = dt.sqrt();
         for i in 0..dim {
             // Zero is an absorbing boundary for multiplicative GBM dynamics, so
             // skip the rate reconstruction that would otherwise evaluate 0 / 0.
@@ -153,7 +155,7 @@ where
                 recover_rate_coefficients(&mut recovery_ctx, x, drift_vec[i], diff_vec[i], i);
 
             let drift_term = (mu - 0.5 * sigma * sigma) * dt;
-            let diffusion_term = sigma * dt.sqrt() * z[i];
+            let diffusion_term = sigma * sqrt_dt * z[i];
 
             x[i] *= (drift_term + diffusion_term).exp();
         }
@@ -264,6 +266,8 @@ impl Discretization<MultiGbmProcess> for ExactMultiGbmCorrelated {
 
         // Apply exact GBM formula for each component using correlated shocks
         // S_i(t+dt) = S_i(t) exp((μ_i - ½σ_i²)dt + σ_i√dt Z_corr_i)
+        // √dt is constant across dimensions; hoist it out of the per-component loop.
+        let sqrt_dt = dt.sqrt();
         for i in 0..dim {
             // Zero is an absorbing boundary for multiplicative GBM dynamics, so
             // skip the rate reconstruction that would otherwise evaluate 0 / 0.
@@ -275,7 +279,7 @@ impl Discretization<MultiGbmProcess> for ExactMultiGbmCorrelated {
                 recover_rate_coefficients(&mut recovery_ctx, x, drift_vec[i], diff_vec[i], i);
 
             let drift_term = (mu - 0.5 * sigma * sigma) * dt;
-            let diffusion_term = sigma * dt.sqrt() * z_corr[i];
+            let diffusion_term = sigma * sqrt_dt * z_corr[i];
 
             x[i] *= (drift_term + diffusion_term).exp();
         }

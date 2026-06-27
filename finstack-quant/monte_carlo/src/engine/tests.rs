@@ -68,6 +68,7 @@ impl StochasticProcess for DummyProcess {
     }
 }
 
+#[derive(Clone)]
 struct DummyDisc;
 impl Discretization<DummyProcess> for DummyDisc {
     fn step(

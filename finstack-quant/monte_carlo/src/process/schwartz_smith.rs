@@ -26,7 +26,7 @@
 //! - Schwartz, E. & Smith, J. E. (2000). "Short-Term Variations and Long-Term
 //!   Dynamics in Commodity Prices." *Management Science*, 46(7), 893–911.
 
-use super::super::traits::StochasticProcess;
+use super::super::traits::{StateKey, StochasticProcess};
 
 /// Schwartz-Smith process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -272,7 +272,7 @@ impl StochasticProcess for SchwartzSmithProcess {
         // For Schwartz-Smith: state is [X, Y] but spot = exp(X + Y)
         if x.len() >= 2 {
             let spot = (x[0] + x[1]).exp();
-            state.set(super::super::traits::state_keys::SPOT, spot);
+            state.set_key(StateKey::Spot, spot);
         }
     }
 }

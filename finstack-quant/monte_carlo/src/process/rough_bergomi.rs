@@ -83,7 +83,9 @@
 //! ```
 
 use super::super::paths::ProcessParams;
-use super::super::traits::{state_keys, PathState, StochasticProcess};
+#[cfg(test)]
+use super::super::traits::state_keys;
+use super::super::traits::{PathState, StateKey, StochasticProcess};
 use super::metadata::ProcessMetadata;
 use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 use finstack_quant_core::math::fractional::HurstExponent;
@@ -250,7 +252,7 @@ impl StochasticProcess for RoughBergomiProcess {
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
-        state.set(state_keys::SPOT, x[0]);
+        state.set_key(StateKey::Spot, x[0]);
     }
 }
 

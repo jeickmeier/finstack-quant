@@ -61,7 +61,7 @@ fn simulate_zcb_prices(
     seed: u64,
 ) -> Vec<(f64, f64)> {
     let process = HullWhite1FProcess::new(params.clone());
-    let disc = ExactHullWhite1F;
+    let disc = ExactHullWhite1F::new();
 
     let &max_t = maturities.last().expect("at least one maturity");
     let total_steps = (max_t * steps_per_year as f64).ceil() as usize;

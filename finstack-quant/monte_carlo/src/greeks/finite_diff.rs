@@ -118,7 +118,7 @@ pub fn finite_diff_delta<R, P, D, F>(
 where
     R: RandomStream,
     P: StochasticProcess,
-    D: Discretization<P>,
+    D: Discretization<P> + Clone,
     F: Payoff,
 {
     require_splittable_rng(rng, "finite_diff_delta")?;
@@ -183,7 +183,7 @@ pub fn finite_diff_gamma<R, P, D, F>(
 where
     R: RandomStream,
     P: StochasticProcess,
-    D: Discretization<P>,
+    D: Discretization<P> + Clone,
     F: Payoff,
 {
     require_splittable_rng(rng, "finite_diff_gamma")?;
@@ -264,7 +264,7 @@ fn paired_per_path_payoffs<R, P, D, F>(
 where
     R: RandomStream,
     P: StochasticProcess,
-    D: Discretization<P>,
+    D: Discretization<P> + Clone,
     F: Payoff,
 {
     let n_states = initial_states.len();
@@ -381,7 +381,7 @@ pub fn finite_diff_delta_crn<R, P, D, F>(
 where
     R: RandomStream,
     P: StochasticProcess,
-    D: Discretization<P>,
+    D: Discretization<P> + Clone,
     F: Payoff,
 {
     require_splittable_rng(rng, "finite_diff_delta_crn")?;
@@ -440,7 +440,7 @@ pub fn finite_diff_gamma_crn<R, P, D, F>(
 where
     R: RandomStream,
     P: StochasticProcess,
-    D: Discretization<P>,
+    D: Discretization<P> + Clone,
     F: Payoff,
 {
     require_splittable_rng(rng, "finite_diff_gamma_crn")?;

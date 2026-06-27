@@ -9,7 +9,7 @@ use super::super::process::heston::HestonProcess;
 use super::super::traits::Discretization;
 #[cfg(test)]
 use super::qe_common::qe_step_variance;
-use super::qe_common::{qe_regime, KAPPA_DT_EXPANSION_EPS};
+use super::qe_common::{qe_regime, qe_regime_with_exp, KAPPA_DT_EXPANSION_EPS};
 
 /// Integrated variance approximation method.
 ///
@@ -87,6 +87,20 @@ pub struct QeHeston {
     psi_c: f64,
     /// Integrated variance method
     int_var_method: IntegratedVarianceMethod,
+    /// Per-run cache of `e^{-κΔt}`, populated by [`Discretization::prepare`].
+    /// `None` until prepared (e.g. stepped directly without the engine), in
+    /// which case the variance step computes the transcendental inline.
+    prepared: Option<QeHestonConstants>,
+}
+
+/// Path-independent QE-Heston variance-step constant for a fixed step size.
+///
+/// `exp_kappa_dt = e^{-κΔt}` depends only on `(κ, Δt)`, so it is identical on
+/// every step of a uniform grid and across every path.
+#[derive(Debug, Clone, Copy)]
+struct QeHestonConstants {
+    dt: f64,
+    exp_kappa_dt: f64,
 }
 
 impl QeHeston {
@@ -95,6 +109,7 @@ impl QeHeston {
         Self {
             psi_c: 1.5,
             int_var_method: IntegratedVarianceMethod::default(),
+            prepared: None,
         }
     }
 
@@ -114,6 +129,7 @@ impl QeHeston {
         Ok(Self {
             psi_c,
             int_var_method: IntegratedVarianceMethod::default(),
+            prepared: None,
         })
     }
 
@@ -142,6 +158,7 @@ impl QeHeston {
         Self {
             psi_c: 1.5,
             int_var_method: IntegratedVarianceMethod::MeanReversionAdjusted,
+            prepared: None,
         }
     }
 
@@ -267,14 +284,29 @@ impl Discretization<HestonProcess> for QeHeston {
         // spot leg can form the exact conditional MGF of v_{t+Δt} for the
         // martingale-exact K0* correction (Andersen 2008, §4.2).
         let z_v = z[1]; // Independent shock for variance
-        let regime = qe_regime(
-            v_t,
-            params.kappa,
-            params.theta,
-            params.sigma_v,
-            dt,
-            self.psi_c,
-        );
+                        // Reuse the precomputed `e^{-κΔt}` when this step's `dt` matches the
+                        // prepared one (exact bit match → identical value); otherwise fall back
+                        // to the inline transcendental so unprepared/non-uniform grids stay
+                        // bit-identical.
+        let regime = match self.prepared {
+            Some(c) if c.dt.to_bits() == dt.to_bits() => qe_regime_with_exp(
+                v_t,
+                params.kappa,
+                params.theta,
+                params.sigma_v,
+                dt,
+                self.psi_c,
+                c.exp_kappa_dt,
+            ),
+            _ => qe_regime(
+                v_t,
+                params.kappa,
+                params.theta,
+                params.sigma_v,
+                dt,
+                self.psi_c,
+            ),
+        };
         let v_next = regime.sample(z_v);
 
         // Step 2: Evolve the spot. With the affine integrated-variance
@@ -337,6 +369,17 @@ impl Discretization<HestonProcess> for QeHeston {
         // Update state
         x[0] = s_next;
         x[1] = v_next;
+    }
+
+    fn prepare(&mut self, process: &HestonProcess, time_grid: &crate::time_grid::TimeGrid) {
+        if time_grid.num_steps() == 0 {
+            return;
+        }
+        let dt = time_grid.dt(0);
+        self.prepared = Some(QeHestonConstants {
+            dt,
+            exp_kappa_dt: (-process.params().kappa * dt).exp(),
+        });
     }
 
     fn work_size(&self, _process: &HestonProcess) -> usize {

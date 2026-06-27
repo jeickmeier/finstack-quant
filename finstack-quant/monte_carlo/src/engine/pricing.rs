@@ -395,7 +395,7 @@ impl McEngine {
     where
         R: RandomStream,
         P: StochasticProcess,
-        D: Discretization<P>,
+        D: Discretization<P> + Clone,
         F: Payoff,
     {
         let _span = tracing::info_span!(
@@ -507,7 +507,7 @@ impl McEngine {
     where
         R: RandomStream,
         P: StochasticProcess,
-        D: Discretization<P>,
+        D: Discretization<P> + Clone,
         F: Payoff,
     {
         self.validate_runtime(
@@ -629,7 +629,7 @@ impl McEngine {
     where
         R: RandomStream,
         P: StochasticProcess,
-        D: Discretization<P>,
+        D: Discretization<P> + Clone,
         F: Payoff,
     {
         if self.config.use_parallel {
@@ -673,9 +673,16 @@ impl McEngine {
     where
         R: RandomStream,
         P: StochasticProcess,
-        D: Discretization<P>,
+        D: Discretization<P> + Clone,
         F: Payoff,
     {
+        // Hoist per-run, path-independent scheme constants out of the per-step
+        // hot path (e.g. exp(-κΔt) in exact rate / QE variance schemes). The
+        // prepared copy is shared read-only by every path in this run.
+        let mut prepared_disc = (*disc).clone();
+        prepared_disc.prepare(process, &self.config.time_grid);
+        let disc = &prepared_disc;
+
         let dim = process.dim();
         let num_factors = process.num_factors();
         let work_size = disc.work_size(process);
@@ -887,9 +894,16 @@ impl McEngine {
     where
         R: RandomStream,
         P: StochasticProcess,
-        D: Discretization<P>,
+        D: Discretization<P> + Clone,
         F: Payoff,
     {
+        // Hoist per-run, path-independent scheme constants once before fanning
+        // out; the prepared copy is shared read-only across all chunks (it is
+        // `Sync`), so every parallel path sees the same precomputed constants.
+        let mut prepared_disc = (*disc).clone();
+        prepared_disc.prepare(process, &self.config.time_grid);
+        let disc = &prepared_disc;
+
         // Split paths into chunks for parallel processing. `None` requests
         // adaptive chunking; `Some(n)` uses exactly `n`.
         let effective_chunk_size = self

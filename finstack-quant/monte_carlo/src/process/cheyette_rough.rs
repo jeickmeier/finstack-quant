@@ -81,7 +81,9 @@
 //! ```
 
 use super::super::paths::ProcessParams;
-use super::super::traits::{state_keys, PathState, StochasticProcess};
+#[cfg(test)]
+use super::super::traits::state_keys;
+use super::super::traits::{PathState, StateKey, StochasticProcess};
 use super::metadata::ProcessMetadata;
 use finstack_quant_core::market_data::term_structures::ForwardVarianceCurve;
 use finstack_quant_core::math::fractional::HurstExponent;
@@ -256,7 +258,7 @@ impl CheyetteRoughVolParams {
 /// target), both supplied by the engine's fractional noise integration.
 ///
 /// The short rate is reconstructed as r(t) = x(t) + φ(t) and written to
-/// [`state_keys::SHORT_RATE`] in [`populate_path_state`](StochasticProcess::populate_path_state).
+/// [`crate::traits::state_keys::SHORT_RATE`] in [`populate_path_state`](StochasticProcess::populate_path_state).
 #[derive(Debug, Clone)]
 pub struct CheyetteRoughVolProcess {
     /// Model parameters.
@@ -324,7 +326,7 @@ impl StochasticProcess for CheyetteRoughVolProcess {
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
         let t = state.time;
         let phi_t = self.params.phi(t);
-        state.set(state_keys::SHORT_RATE, x[0] + phi_t);
+        state.set_key(StateKey::ShortRate, x[0] + phi_t);
     }
 }
 

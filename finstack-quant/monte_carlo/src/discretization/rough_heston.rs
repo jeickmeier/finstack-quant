@@ -101,14 +101,20 @@ use super::super::traits::Discretization;
 pub struct RoughHestonHybrid {
     /// Number of time steps in the grid.
     num_steps: usize,
-    /// Fractional exponent α = H + 0.5.
-    alpha: f64,
     /// Precomputed 1 / Γ(α).
     inv_gamma_alpha: f64,
-    /// Cumulative times from the time grid: \[t₀, t₁, …, t_n\].
-    times: Vec<f64>,
-    /// Time step sizes: \[Δt₀, Δt₁, …, Δt_{n−1}\].
-    dt_grid: Vec<f64>,
+    /// Precomputed lower-triangular kernel-integral weights.
+    ///
+    /// Entry `(step, j)` for `0 ≤ j ≤ step` lives at index
+    /// `step·(step+1)/2 + j` and holds the exact interval integral
+    /// `∫_{t_j}^{t_{j+1}} (t_{step+1} − s)^{α−1} ds`. These depend only on the
+    /// fixed grid and α, so they are identical across every simulated path and
+    /// are computed once here instead of via O(n²) `powf` calls per path.
+    kernel_int: Vec<f64>,
+    /// Precomputed lower-triangular noise weights (interval-average kernel in
+    /// the far field; variance-exact `Δtⱼ^{α−1}/√(2α−1)` on the diagonal),
+    /// using the same triangular indexing as [`Self::kernel_int`].
+    noise_weight: Vec<f64>,
 }
 
 impl RoughHestonHybrid {
@@ -153,12 +159,40 @@ impl RoughHestonHybrid {
         }
         let dt_grid: Vec<f64> = times.windows(2).map(|w| w[1] - w[0]).collect();
 
+        // Precompute the lower-triangular Volterra kernel weights. For step `k`
+        // the integral V_{k+1} sums over intervals j = 0..=k; the per-interval
+        // kernel integral and noise weight depend only on the fixed grid and α
+        // (not on path state), so they are identical across every simulated
+        // path. Precomputing them here turns the O(n²) `powf` calls in the
+        // per-step hot path into O(n²) multiply-adds. `t_next` uses the same
+        // `t + dt` expression as the runtime loop (t = times[k], dt = dt_grid[k]),
+        // so the accumulated values stay bit-identical to the direct evaluation.
+        let alpha_m1 = alpha - 1.0;
+        let near_denom = (2.0 * alpha - 1.0).sqrt();
+        let tri_len = num_steps * (num_steps + 1) / 2;
+        let mut kernel_int = Vec::with_capacity(tri_len);
+        let mut noise_weight = Vec::with_capacity(tri_len);
+        for step in 0..num_steps {
+            let t_next = times[step] + dt_grid[step];
+            for j in 0..=step {
+                let a = t_next - times[j]; // lag to interval start (> 0)
+                let b = (t_next - times[j + 1]).max(0.0); // lag to interval end
+                let ki = (a.powf(alpha) - b.powf(alpha)) / alpha;
+                let nw = if j == step {
+                    dt_grid[j].powf(alpha_m1) / near_denom
+                } else {
+                    ki / dt_grid[j]
+                };
+                kernel_int.push(ki);
+                noise_weight.push(nw);
+            }
+        }
+
         Ok(Self {
             num_steps,
-            alpha,
             inv_gamma_alpha,
-            times: times.to_vec(),
-            dt_grid,
+            kernel_int,
+            noise_weight,
         })
     }
 }
@@ -167,7 +201,7 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
     fn step(
         &self,
         process: &RoughHestonProcess,
-        t: f64,
+        _t: f64,
         dt: f64,
         x: &mut [f64],
         z: &[f64],
@@ -200,31 +234,19 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
         //   V_{next} = v₀ + (1/Γ(α)) Σ_{j=0}^{step} [a_j·∫_{t_j}^{t_{j+1}}K ds
         //                                            + w_j·n_j]
         //
-        // with K(s) = (t_next − s)^{α−1}. The drift uses the exact
-        // per-interval kernel integral; far-field noise uses the interval-
-        // average kernel; the singular last interval uses the variance-exact
-        // near-field weight Δt^{α−1}/√(2α−1) .
-        let t_next = t + dt;
-        let alpha = self.alpha;
-        let alpha_m1 = alpha - 1.0;
+        // The per-interval kernel integral and noise weight depend only on the
+        // fixed grid and α, so they are precomputed once in `new`
+        // (`kernel_int`/`noise_weight`, triangular-indexed by step). This hot
+        // path only accumulates the path-dependent drift/noise components
+        // (`work[..]`) against those weights — no `powf` per step. The
+        // accumulation order is unchanged, so results are bit-identical to the
+        // direct evaluation.
+        let base = step * (step + 1) / 2;
         let mut volterra_sum = 0.0;
-        for (j, &dt_j) in self.dt_grid[..=step].iter().enumerate() {
-            let a = t_next - self.times[j]; // lag to interval start (> 0)
-            let b = (t_next - self.times[j + 1]).max(0.0); // lag to interval end
-                                                           // Exact ∫_{t_j}^{t_{j+1}} (t_next − s)^{α−1} ds.
-            let kernel_int = (a.powf(alpha) - b.powf(alpha)) / alpha;
-
-            // Drift: exact kernel integral against the constant drift rate.
-            volterra_sum += work[j] * kernel_int;
-
-            // Noise: average kernel weight in the far field; variance-exact
-            // weight on the singular last interval.
-            let noise_weight = if j == step {
-                dt_j.powf(alpha_m1) / (2.0 * alpha - 1.0).sqrt()
-            } else {
-                kernel_int / dt_j
-            };
-            volterra_sum += work[n + j] * noise_weight;
+        for j in 0..=step {
+            let w = base + j;
+            volterra_sum += work[j] * self.kernel_int[w];
+            volterra_sum += work[n + j] * self.noise_weight[w];
         }
         let v_next = (p.v0 + self.inv_gamma_alpha * volterra_sum).max(0.0);
 

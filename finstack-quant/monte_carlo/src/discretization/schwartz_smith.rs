@@ -26,6 +26,46 @@ pub struct ExactSchwartzSmith {
     /// Precomputed Cholesky factor for 2×2 correlation matrix [[1, ρ], [ρ, 1]].
     /// Stored in original variable order via `CorrelationFactor`.
     cholesky_factor: finstack_quant_core::math::linalg::CorrelationFactor,
+    /// Per-run cache of the `dt`-dependent X-leg constants, populated by
+    /// [`Discretization::prepare`]. `None` until prepared (e.g. stepped
+    /// directly without the engine), in which case constants are computed inline.
+    prepared: Option<SsStepConstants>,
+}
+
+/// Path-independent Schwartz-Smith step constants for a fixed step size.
+///
+/// All quantities depend only on `(κ_X, σ_X, Δt)`, so they are identical on
+/// every step of a uniform grid and across every path.
+#[derive(Debug, Clone, Copy)]
+struct SsStepConstants {
+    dt: f64,
+    exp_kappa_dt: f64,
+    one_minus_exp_over_kappa: f64,
+    x_std: f64,
+    sqrt_dt: f64,
+}
+
+impl SsStepConstants {
+    /// Compute the constants for one step size. Mirrors the arithmetic in
+    /// [`ExactSchwartzSmith::step`] exactly so cached and inline paths are
+    /// bit-identical.
+    #[inline]
+    fn compute(kappa_x: f64, sigma_x: f64, dt: f64) -> Self {
+        let exp_kappa_dt = (-kappa_x * dt).exp();
+        let one_minus_exp_over_kappa = -(-kappa_x * dt).exp_m1() / kappa_x;
+        let x_std = if (kappa_x * dt).abs() < 1e-8 {
+            sigma_x * dt.sqrt() * (1.0 - kappa_x * dt / 2.0)
+        } else {
+            sigma_x * ((1.0 - (-2.0 * kappa_x * dt).exp()) / (2.0 * kappa_x)).sqrt()
+        };
+        Self {
+            dt,
+            exp_kappa_dt,
+            one_minus_exp_over_kappa,
+            x_std,
+            sqrt_dt: dt.sqrt(),
+        }
+    }
 }
 
 impl ExactSchwartzSmith {
@@ -49,6 +89,7 @@ impl ExactSchwartzSmith {
 
         Ok(Self {
             cholesky_factor: chol,
+            prepared: None,
         })
     }
 
@@ -83,24 +124,32 @@ impl Discretization<SchwartzSmithProcess> for ExactSchwartzSmith {
         // Exact solution for X (OU process with constant drift shift −λ_X)
         // X_{t+Δt} = X_t e^{-κ_X Δt} − (λ_X/κ_X)(1 − e^{-κ_X Δt})
         //          + σ_X √[(1-e^{-2κ_X Δt})/(2κ_X)] Z_X
-        // `exp_m1` keeps (1 − e^{-κΔt})/κ stable as κΔt → 0.
-        let exp_kappa_dt = (-kappa_x * dt).exp();
-        let one_minus_exp_over_kappa = -(-kappa_x * dt).exp_m1() / kappa_x;
-        let x_mean = x[0] * exp_kappa_dt - lambda_x * one_minus_exp_over_kappa;
-
-        let x_std = if (kappa_x * dt).abs() < 1e-8 {
-            // Taylor expansion for small κ_X Δt:
-            // √[(1 − e^{-2κΔt})/(2κ)] = √Δt·(1 − κΔt/2 + O((κΔt)²))
-            sigma_x * dt.sqrt() * (1.0 - kappa_x * dt / 2.0)
-        } else {
-            sigma_x * ((1.0 - (-2.0 * kappa_x * dt).exp()) / (2.0 * kappa_x)).sqrt()
+        // The `dt`-dependent constants (e^{-κΔt}, (1−e^{-κΔt})/κ, the X std-dev,
+        // and √Δt) are reused from the prepared cache when this step's `dt`
+        // matches (exact bit match → identical value); otherwise computed inline
+        // so unprepared/non-uniform grids stay bit-identical.
+        let consts = match self.prepared {
+            Some(c) if c.dt.to_bits() == dt.to_bits() => c,
+            _ => SsStepConstants::compute(kappa_x, sigma_x, dt),
         };
-
-        x[0] = x_mean + x_std * z_corr[0];
+        let x_mean = x[0] * consts.exp_kappa_dt - lambda_x * consts.one_minus_exp_over_kappa;
+        x[0] = x_mean + consts.x_std * z_corr[0];
 
         // Exact solution for Y (arithmetic Brownian motion)
         // Y_{t+Δt} = Y_t + μ_Y Δt + σ_Y √Δt Z_Y
-        x[1] = x[1] + mu_y * dt + sigma_y * dt.sqrt() * z_corr[1];
+        x[1] = x[1] + mu_y * dt + sigma_y * consts.sqrt_dt * z_corr[1];
+    }
+
+    fn prepare(&mut self, process: &SchwartzSmithProcess, time_grid: &crate::time_grid::TimeGrid) {
+        if time_grid.num_steps() == 0 {
+            return;
+        }
+        let params = process.params();
+        self.prepared = Some(SsStepConstants::compute(
+            params.kappa_x,
+            params.sigma_x,
+            time_grid.dt(0),
+        ));
     }
 
     fn work_size(&self, _process: &SchwartzSmithProcess) -> usize {

@@ -31,7 +31,7 @@
 //! The Hull-White 1F model uses a time-dependent θ(t) to fit the initial
 //! yield curve; the Ornstein-Uhlenbeck (Vasicek) model uses constant θ.
 
-use super::super::traits::{state_keys, PathState, StochasticProcess};
+use super::super::traits::{PathState, StateKey, StochasticProcess};
 use tracing::warn;
 
 /// Hull-White 1-factor parameters.
@@ -209,8 +209,8 @@ impl StochasticProcess for HullWhite1FProcess {
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
         if !x.is_empty() {
-            state.set(state_keys::SHORT_RATE, x[0]);
-            state.set(state_keys::SPOT, x[0]);
+            state.set_key(StateKey::ShortRate, x[0]);
+            state.set_key(StateKey::Spot, x[0]);
         }
     }
 }

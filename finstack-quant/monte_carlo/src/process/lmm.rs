@@ -39,7 +39,9 @@
 //! - Andersen & Piterbarg (2010). *Interest Rate Modeling*, Vol. 2,
 //!   Ch. 15-16, Atlantic Financial Press.
 
-use super::super::traits::{state_keys, StochasticProcess};
+#[cfg(test)]
+use super::super::traits::state_keys;
+use super::super::traits::StochasticProcess;
 
 /// Maximum number of LMM factors supported.
 const MAX_FACTORS: usize = 3;
@@ -311,7 +313,7 @@ impl StochasticProcess for LmmProcess {
         let n = self.params.num_forwards;
         // Store each forward rate as indexed_spot(i)
         for (i, &fwd) in x.iter().enumerate().take(n) {
-            state.set(state_keys::indexed_spot(i), fwd);
+            state.set_indexed_spot(i, fwd);
         }
 
         // Compute numeraire ratio P(t, T_N) from forwards:

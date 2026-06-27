@@ -90,7 +90,7 @@ impl RateExoticHw1fMcPricer {
         )?;
 
         let process = HullWhite1FProcess::new(self.process_params.clone());
-        let disc = ExactHullWhite1F;
+        let disc = ExactHullWhite1F::new();
         let num_steps = grid.num_steps();
         let work_size = disc.work_size(&process);
         let raw_paths = self.config.raw_stream_count();

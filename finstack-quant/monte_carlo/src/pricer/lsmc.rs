@@ -68,6 +68,48 @@ struct PolicyTiming {
     num_steps: usize,
 }
 
+/// Row-major flat storage for simulated spot paths.
+///
+/// Spot of path `i` at step `s` lives at `data[i * stride + s]`, with
+/// `stride = num_steps + 1`. Backing all paths with a single allocation (rather
+/// than a `Vec<Vec<f64>>`) removes one heap allocation per path and keeps the
+/// backward-induction reads inside one contiguous buffer instead of chasing a
+/// pointer per path.
+struct PathMatrix {
+    data: Vec<f64>,
+    stride: usize,
+}
+
+impl PathMatrix {
+    /// Number of stored paths.
+    #[inline]
+    fn num_paths(&self) -> usize {
+        if self.stride == 0 {
+            0
+        } else {
+            self.data.len() / self.stride
+        }
+    }
+
+    /// Borrow the full spot trajectory of path `path` (length `stride`).
+    #[inline]
+    fn row(&self, path: usize) -> &[f64] {
+        let base = path * self.stride;
+        &self.data[base..base + self.stride]
+    }
+
+    /// Build a matrix from per-path row vectors (test helper).
+    #[cfg(test)]
+    fn from_rows(rows: &[Vec<f64>]) -> Self {
+        let stride = rows.first().map_or(0, Vec::len);
+        let mut data = Vec::with_capacity(rows.len() * stride);
+        for row in rows {
+            data.extend_from_slice(row);
+        }
+        Self { data, stride }
+    }
+}
+
 /// Immediate exercise payoff function.
 ///
 /// Returns the payoff from exercising immediately at the given state.
@@ -295,7 +337,7 @@ impl LsmcPricer {
         initial_spot: f64,
         time_to_maturity: f64,
         num_steps: usize,
-    ) -> Result<Vec<Vec<f64>>> {
+    ) -> Result<PathMatrix> {
         self.generate_paths_with_seed(
             process,
             initial_spot,
@@ -316,7 +358,7 @@ impl LsmcPricer {
         time_to_maturity: f64,
         num_steps: usize,
         seed: u64,
-    ) -> Result<Vec<Vec<f64>>> {
+    ) -> Result<PathMatrix> {
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
 
         if self.config.use_parallel {
@@ -340,19 +382,22 @@ impl LsmcPricer {
         time_grid: &TimeGrid,
         num_steps: usize,
         seed: u64,
-    ) -> Result<Vec<Vec<f64>>> {
+    ) -> Result<PathMatrix> {
         let disc = ExactGbm::new();
         let rng = PhiloxRng::new(seed);
-        let mut paths = Vec::with_capacity(self.config.num_paths);
+        let stride = num_steps + 1;
+        let mut data = vec![0.0; self.config.num_paths * stride];
 
         for path_id in 0..self.config.num_paths {
             let mut path_rng = rng.substream(path_id as u64);
-            let mut spot_path = Vec::with_capacity(num_steps + 1);
-            let mut state = vec![initial_spot];
-            let mut z = vec![0.0];
-            let mut work = vec![];
+            // Scalar GBM: single state component, no discretization workspace.
+            // Stack arrays avoid a per-path heap allocation for state/z.
+            let mut state = [initial_spot];
+            let mut z = [0.0];
+            let mut work: [f64; 0] = [];
 
-            spot_path.push(initial_spot);
+            let base = path_id * stride;
+            data[base] = initial_spot;
 
             for step in 0..num_steps {
                 let t = time_grid.time(step);
@@ -361,13 +406,11 @@ impl LsmcPricer {
                 path_rng.fill_std_normals(&mut z);
                 disc.step(process, t, dt, &mut state, &z, &mut work);
 
-                spot_path.push(state[0]);
+                data[base + step + 1] = state[0];
             }
-
-            paths.push(spot_path);
         }
 
-        Ok(paths)
+        Ok(PathMatrix { data, stride })
     }
 
     /// Parallel path generation using rayon with deterministic per-path RNG.
@@ -378,22 +421,25 @@ impl LsmcPricer {
         time_grid: &TimeGrid,
         num_steps: usize,
         seed: u64,
-    ) -> Result<Vec<Vec<f64>>> {
+    ) -> Result<PathMatrix> {
         use rayon::prelude::*;
 
         let rng = PhiloxRng::new(seed);
         let disc = ExactGbm::new();
+        let stride = num_steps + 1;
+        let mut data = vec![0.0; self.config.num_paths * stride];
 
-        let paths: Vec<Vec<f64>> = (0..self.config.num_paths)
-            .into_par_iter()
-            .map(|path_id| {
+        // Each path fills its own contiguous row; `substream(path_id)` keeps the
+        // result independent of thread count (workspace determinism invariant).
+        data.par_chunks_mut(stride)
+            .enumerate()
+            .for_each(|(path_id, row)| {
                 let mut path_rng = rng.substream(path_id as u64);
-                let mut spot_path = Vec::with_capacity(num_steps + 1);
-                let mut state = vec![initial_spot];
-                let mut z = vec![0.0];
-                let mut work = vec![];
+                let mut state = [initial_spot];
+                let mut z = [0.0];
+                let mut work: [f64; 0] = [];
 
-                spot_path.push(initial_spot);
+                row[0] = initial_spot;
 
                 for step in 0..num_steps {
                     let t = time_grid.time(step);
@@ -402,14 +448,11 @@ impl LsmcPricer {
                     path_rng.fill_std_normals(&mut z);
                     disc.step(process, t, dt, &mut state, &z, &mut work);
 
-                    spot_path.push(state[0]);
+                    row[step + 1] = state[0];
                 }
+            });
 
-                spot_path
-            })
-            .collect();
-
-        Ok(paths)
+        Ok(PathMatrix { data, stride })
     }
 
     /// Perform backward induction with regression.
@@ -429,7 +472,7 @@ impl LsmcPricer {
     #[allow(clippy::too_many_arguments)]
     fn backward_induction<E, B>(
         &self,
-        paths: &[Vec<f64>],
+        paths: &PathMatrix,
         exercise: &E,
         basis: &B,
         discount_rate: f64,
@@ -440,7 +483,7 @@ impl LsmcPricer {
         E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
-        let num_paths = paths.len();
+        let num_paths = paths.num_paths();
         let dt = time_to_maturity / num_steps as f64;
 
         // Cashflow matrix: when each path exercises
@@ -448,9 +491,9 @@ impl LsmcPricer {
         let mut exercise_times = vec![time_to_maturity; num_paths];
 
         // Initialize with terminal values
-        for (i, path) in paths.iter().enumerate() {
-            let terminal_spot = path[num_steps];
-            cashflows[i] = exercise.exercise_value(terminal_spot);
+        for (i, cf) in cashflows.iter_mut().enumerate() {
+            let terminal_spot = paths.row(i)[num_steps];
+            *cf = exercise.exercise_value(terminal_spot);
         }
 
         // Backward induction through exercise dates
@@ -472,9 +515,9 @@ impl LsmcPricer {
         }
 
         // Pre-allocate regression buffers to avoid reallocations
-        let mut regression_x = Vec::with_capacity(paths.len() / 2);
-        let mut regression_y = Vec::with_capacity(paths.len() / 2);
-        let mut regression_indices = Vec::with_capacity(paths.len() / 2);
+        let mut regression_x = Vec::with_capacity(num_paths / 2);
+        let mut regression_y = Vec::with_capacity(num_paths / 2);
+        let mut regression_indices = Vec::with_capacity(num_paths / 2);
 
         for &exercise_step in &sorted_exercise_dates {
             // Drop guards against:
@@ -492,7 +535,8 @@ impl LsmcPricer {
             regression_y.clear();
             regression_indices.clear();
 
-            for (i, path) in paths.iter().enumerate() {
+            for i in 0..num_paths {
+                let path = paths.row(i);
                 let spot = path[exercise_step];
                 let immediate = exercise.exercise_value(spot);
 
@@ -514,7 +558,7 @@ impl LsmcPricer {
                     Ok(continuation_values) => {
                         // Exercise decision
                         for (j, &i) in regression_indices.iter().enumerate() {
-                            let spot = paths[i][exercise_step];
+                            let spot = paths.row(i)[exercise_step];
                             let immediate = exercise.exercise_value(spot);
                             let continuation = continuation_values[j];
 
@@ -742,7 +786,7 @@ impl LsmcPricer {
     /// in-sample variant.
     fn fit_policy_from_paths<E, B>(
         &self,
-        paths: &[Vec<f64>],
+        paths: &PathMatrix,
         exercise: &E,
         basis: &B,
         discount_rate: f64,
@@ -753,13 +797,13 @@ impl LsmcPricer {
         E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
-        let num_paths = paths.len();
+        let num_paths = paths.num_paths();
         let dt = time_to_maturity / num_steps as f64;
 
         let mut cashflows = vec![0.0; num_paths];
         let mut exercise_times = vec![time_to_maturity; num_paths];
-        for (i, path) in paths.iter().enumerate() {
-            cashflows[i] = exercise.exercise_value(path[num_steps]);
+        for (i, cf) in cashflows.iter_mut().enumerate() {
+            *cf = exercise.exercise_value(paths.row(i)[num_steps]);
         }
 
         let mut sorted_exercise_dates = self.config.exercise_dates.clone();
@@ -782,7 +826,8 @@ impl LsmcPricer {
             regression_y.clear();
             regression_indices.clear();
 
-            for (i, path) in paths.iter().enumerate() {
+            for i in 0..num_paths {
+                let path = paths.row(i);
                 let spot = path[exercise_step];
                 let immediate = exercise.exercise_value(spot);
                 if immediate > 0.0 {
@@ -800,7 +845,7 @@ impl LsmcPricer {
                         // Use the fitted coefficients to update training cashflows
                         // (so subsequent earlier-date regressions see the right Y).
                         for &i in &regression_indices {
-                            let spot = paths[i][exercise_step];
+                            let spot = paths.row(i)[exercise_step];
                             basis.evaluate(spot, &mut basis_vals);
                             let mut continuation = 0.0;
                             for k in 0..coeffs.len() {
@@ -849,7 +894,7 @@ impl LsmcPricer {
     /// bias), which is the whole point of the two-pass scheme.
     fn apply_policy_to_paths<E, B>(
         &self,
-        paths: &[Vec<f64>],
+        paths: &PathMatrix,
         exercise: &E,
         basis: &B,
         policy: &ExercisePolicy,
@@ -862,9 +907,10 @@ impl LsmcPricer {
         let dt = timing.time_to_maturity / timing.num_steps as f64;
 
         let mut basis_vals = vec![0.0; basis.num_basis()];
-        let mut present_values = Vec::with_capacity(paths.len());
+        let mut present_values = Vec::with_capacity(paths.num_paths());
 
-        for path in paths {
+        for i in 0..paths.num_paths() {
+            let path = paths.row(i);
             let mut exercised = false;
             let mut path_pv = 0.0;
 
@@ -1079,7 +1125,7 @@ mod tests {
         let pricer = LsmcPricer::new(config);
         let exercise = AmericanCall { strike: 100.0 };
         let basis = PolynomialBasis::new(2);
-        let paths = vec![vec![100.0, 110.0, 130.0]];
+        let paths = PathMatrix::from_rows(&[vec![100.0, 110.0, 130.0]]);
 
         let present_values = pricer
             .backward_induction(&paths, &exercise, &basis, 0.05, 1.0, 2)
@@ -1206,7 +1252,7 @@ mod tests {
         let pricer = LsmcPricer::new(config);
         let exercise = AmericanCall { strike: 100.0 };
         let basis = PolynomialBasis::new(1);
-        let paths = vec![vec![100.0, 100.0 + 1.0e-8, 100.0]; 16];
+        let paths = PathMatrix::from_rows(&vec![vec![100.0, 100.0 + 1.0e-8, 100.0]; 16]);
 
         let present_values = pricer
             .backward_induction(&paths, &exercise, &basis, 0.0, 1.0, 2)

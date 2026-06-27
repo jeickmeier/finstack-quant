@@ -298,12 +298,13 @@ impl StochasticProcess for HestonProcess {
     fn diffusion(&self, _t: f64, x: &[f64], out: &mut [f64]) {
         let s = x[0];
         let v = x[1].max(0.0); // Ensure non-negative for sqrt
+        let sqrt_v = v.sqrt();
 
         // Diffusion for S: √v S
-        out[0] = v.sqrt() * s;
+        out[0] = sqrt_v * s;
 
         // Diffusion for v: σ_v √v
-        out[1] = self.params.sigma_v * v.sqrt();
+        out[1] = self.params.sigma_v * sqrt_v;
     }
 
     fn factor_correlation(&self) -> Option<Vec<f64>> {
