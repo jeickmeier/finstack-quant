@@ -122,10 +122,11 @@ Bonds with embedded options allowing early redemption.
 ```rust
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPutSchedule, CallPut};
 
+// Discrete (one-day) call dates use the same value for start_date and end_date.
 let call_schedule = CallPutSchedule {
     calls: vec![
-        CallPut { date: date!(2027 - 01 - 01), price_pct_of_par: 102.0 },
-        CallPut { date: date!(2028 - 01 - 01), price_pct_of_par: 101.0 },
+        CallPut { start_date: date!(2027 - 01 - 01), end_date: date!(2027 - 01 - 01), price_pct_of_par: 102.0, make_whole: None },
+        CallPut { start_date: date!(2028 - 01 - 01), end_date: date!(2028 - 01 - 01), price_pct_of_par: 101.0, make_whole: None },
     ],
     puts: vec![],
 };
@@ -257,6 +258,88 @@ All bond cashflows follow a **holder-view** convention:
 | Japan | ACT/365F | Semi-annual | T+2 |
 
 Use `Bond::with_convention()` for standard regional conventions.
+
+## Return Floors (Guaranteed Minimum MOIC / XIRR)
+
+A **return floor** is an issuer-side, call-protection-only term common in private credit and leveraged loan structures. It guarantees that on any early issuer-called or prepaid redemption, the investor's realized return (measured from the issue date against the invested capital `V0`) meets a stated minimum. It does **not** guarantee the held-to-maturity return — the maturity path is always unfloored.
+
+### One-Line Declaration
+
+```rust
+use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
+use finstack_quant_core::currency::Currency;
+use finstack_quant_core::money::Money;
+use time::macros::date;
+
+// 1.25× MOIC floor, prepayable across the bond's full life:
+let loan = Bond::fixed("LOAN-001", Money::new(1_000_000.0, Currency::USD),
+    0.10, date!(2025-01-01), date!(2030-01-01), "USD-OIS")
+    .unwrap()
+    .min_moic(1.25);
+
+// 12% minimum XIRR floor:
+let loan = Bond::fixed("LOAN-002", Money::new(1_000_000.0, Currency::USD),
+    0.10, date!(2025-01-01), date!(2030-01-01), "USD-OIS")
+    .unwrap()
+    .min_xirr(0.12);
+```
+
+For a 2-year no-call (NC-2) structure, narrow the window:
+
+```rust
+use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, ReturnFloorSpec, ProtectionWindow};
+use finstack_quant_core::{currency::Currency, money::Money};
+use time::macros::date;
+
+let loan = Bond::fixed("LOAN-NC2", Money::new(1_000_000.0, Currency::USD),
+    0.10, date!(2025-01-01), date!(2030-01-01), "USD-OIS")
+    .unwrap()
+    .with_return_floor(
+        ReturnFloorSpec::moic(1.25)
+            .window(ProtectionWindow::From(date!(2027-01-01))),
+    );
+```
+
+### Semantics
+
+- The floor is **issuer-side**: it raises the minimum redemption price the issuer must pay on a voluntary call or prepayment, protecting the investor's return.
+- The floor binds **only on early redemptions** within the [`ProtectionWindow`]. At maturity, the normal contractual cashflows apply unchanged.
+- The spec is lowered into a [`CallPutSchedule`] at pricing time, making every in-window coupon date a potential floor-protected call date.
+
+### Verification Metrics
+
+Four `MetricId` constants expose the investor's realized return across exit scenarios:
+
+| Metric | Meaning |
+|--------|---------|
+| `MetricId::Moic` | MOIC if held to maturity: total distributions / invested capital |
+| `MetricId::MoicToWorst` | **Minimum** MOIC across all exits (every call/put path AND maturity) |
+| `MetricId::Xirr` | XIRR (Act/365F) if held to maturity |
+| `MetricId::XirrToWorst` | **Minimum** XIRR across all exits (every call/put path AND maturity) |
+
+**`*ToWorst` honesty caveat**: the to-worst metrics take the minimum over ALL paths — including the unfloored maturity path. They are therefore **not bounded below by the floor target**. When the bond's natural maturity return falls below the floor target, the maturity path is the worst case and the metric reflects that. The floor's guarantee (every *early-call* path meets the target) is verified by the return-floor unit tests in `bond/pricing/return_floor.rs`.
+
+```rust,ignore
+use finstack_quant_valuations::{instruments::Instrument, metrics::MetricId};
+use finstack_quant_valuations::instruments::PricingOptions;
+
+let result = loan.price_with_metrics(
+    &market, as_of,
+    &[MetricId::Moic, MetricId::MoicToWorst, MetricId::Xirr, MetricId::XirrToWorst],
+    PricingOptions::default(),
+)?;
+println!("MOIC to maturity:  {:.3}x", result.measures[MetricId::Moic.as_str()]);
+println!("MOIC to worst:     {:.3}x", result.measures[MetricId::MoicToWorst.as_str()]);
+println!("XIRR to maturity:  {:.2}%", result.measures[MetricId::Xirr.as_str()] * 100.0);
+println!("XIRR to worst:     {:.2}%", result.measures[MetricId::XirrToWorst.as_str()] * 100.0);
+```
+
+### v1 Limitations
+
+- **Floating-rate coupons**: forward-projected using the yield curve at pricing time. Path-accurate LSMC (where rate paths determine both coupon and call-trigger simultaneously) is deferred to v2.
+- **Make-whole calls**: contractual make-whole provisions cannot compose with a return floor in v1; attempting this returns a validation error. Make-whole effective prices are path-dependent and cannot be pre-computed statically.
+- **Amortizing bonds (to-worst)**: `MoicToWorst` / `XirrToWorst` use the initial notional as the redemption basis, which is exact for bullet bonds but overstates the redemption for amortizing structures (TODO v2).
+- **`min_moic` / `min_xirr` shortcuts**: these set `ProtectionWindow::Full` (prepayable across the bond's entire life). Use `.with_return_floor(ReturnFloorSpec::moic(m).window(...))` for a no-call period.
 
 ## Limitations / Known Issues
 

@@ -19,8 +19,10 @@
 //! target. When the bond's natural maturity return is below the target, the
 //! maturity path is the worst case and the metric reflects that. The floor's
 //! guarantee (every early-call path meets the target) is verified separately by
-//! the `xirr_floor_meets_target_at_each_call` test in
-//! `bond/pricing/return_floor.rs`.
+//! the property and mutation tests in `bond/pricing/return_floor.rs`
+//! (`moic_floor_holds_on_every_early_call_path_across_rate_scenarios`,
+//! `xirr_floor_holds_on_every_early_call_path`,
+//! `moic_check_has_teeth_redemption_below_floor_breaks_target`).
 
 use crate::instruments::fixed_income::bond::Bond;
 use crate::instruments::fixed_income::bond::IssuePrice;
@@ -107,8 +109,10 @@ impl MetricCalculator for MoicCalculator {
 /// target — when the bond's natural maturity return is below the target, the
 /// maturity path is the worst case and this metric reflects that. The floor's
 /// guarantee (every EARLY-CALL path meets the target) is verified separately by
-/// the `xirr_floor_meets_target_at_each_call` test in
-/// `bond/pricing/return_floor.rs`.
+/// the property and mutation tests in `bond/pricing/return_floor.rs`
+/// (`moic_floor_holds_on_every_early_call_path_across_rate_scenarios`,
+/// `xirr_floor_holds_on_every_early_call_path`,
+/// `moic_check_has_teeth_redemption_below_floor_breaks_target`).
 ///
 /// # Limitation
 ///

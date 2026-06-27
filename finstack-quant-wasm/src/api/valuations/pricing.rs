@@ -844,7 +844,10 @@ mod tests {
 
         // Validate round-trips through the binding
         let canonical = validate_instrument_json(&inst).expect("validate");
-        assert!(canonical.contains("return_floor"), "return_floor survived round-trip");
+        assert!(
+            canonical.contains("return_floor"),
+            "return_floor survived round-trip"
+        );
 
         // Price and check the four return metrics via the internal helper
         // (avoids serde_wasm_bindgen which requires a wasm32 target).
@@ -880,8 +883,13 @@ mod tests {
         // moic_to_worst ≤ moic: the floored bond has synthetic call options injected
         // by the return-floor machinery, so the worst-exit path can only be equal
         // to or worse than the held-to-maturity multiple.
-        let moic_tw = parsed["measures"]["moic_to_worst"].as_f64().expect("moic_to_worst");
-        assert!(moic_tw <= moic + 1e-9, "moic_to_worst must be ≤ moic, got {moic_tw} vs {moic}");
+        let moic_tw = parsed["measures"]["moic_to_worst"]
+            .as_f64()
+            .expect("moic_to_worst");
+        assert!(
+            moic_tw <= moic + 1e-9,
+            "moic_to_worst must be ≤ moic, got {moic_tw} vs {moic}"
+        );
     }
 
     #[test]
