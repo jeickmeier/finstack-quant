@@ -60,6 +60,21 @@
 //! - `forecast_breaches_generic` for breach forecasting
 
 #![forbid(unsafe_code)]
+#![warn(clippy::float_cmp)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![cfg_attr(
+    test,
+    allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::indexing_slicing,
+        clippy::float_cmp,
+    )
+)]
+#![doc(test(attr(allow(clippy::expect_used))))]
 
 pub(crate) mod engine;
 pub(crate) mod forward;

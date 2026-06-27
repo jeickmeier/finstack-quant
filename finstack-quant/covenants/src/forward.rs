@@ -290,7 +290,11 @@ pub fn forecast_covenant_generic<MTS: ModelTimeSeries>(
     // where T = year-fraction from reference date to test date.
 
     if config.stochastic {
-        let sigma = config.volatility.expect("validated stochastic volatility");
+        let sigma = config.volatility.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "stochastic forecast requires volatility but none was set".to_owned(),
+            )
+        })?;
         tracing::debug!(
             sigma,
             "starting analytic lognormal breach probability calculation"
