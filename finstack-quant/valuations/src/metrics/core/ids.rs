@@ -326,6 +326,18 @@ impl MetricId {
     /// Yield to worst
     pub const Ytw: Self = Self(Cow::Borrowed("ytw"));
 
+    /// Money multiple (MOIC) to maturity: total distributions / invested capital.
+    pub const Moic: Self = Self(Cow::Borrowed("moic"));
+
+    /// Minimum MOIC across exit paths (guarantee check).
+    pub const MoicToWorst: Self = Self(Cow::Borrowed("moic_to_worst"));
+
+    /// XIRR to maturity over realized cashflows.
+    pub const Xirr: Self = Self(Cow::Borrowed("xirr"));
+
+    /// Minimum XIRR across exit paths (guarantee check).
+    pub const XirrToWorst: Self = Self(Cow::Borrowed("xirr_to_worst"));
+
     /// Macaulay duration
     pub const DurationMac: Self = Self(Cow::Borrowed("duration_mac"));
 
@@ -1243,6 +1255,10 @@ impl MetricId {
         MetricId::Accrued,
         MetricId::Ytm,
         MetricId::Ytw,
+        MetricId::Moic,
+        MetricId::MoicToWorst,
+        MetricId::Xirr,
+        MetricId::XirrToWorst,
         MetricId::ZSpread,
         MetricId::Oas,
         MetricId::ISpread,
@@ -1539,16 +1555,16 @@ impl MetricGroup {
 
     fn metric_range(&self) -> (usize, usize) {
         match self {
-            MetricGroup::Pricing => (0, 23),
-            MetricGroup::Carry => (23, 34),
-            MetricGroup::Sensitivity => (34, 53),
-            MetricGroup::Greeks => (53, 77),
-            MetricGroup::Credit => (77, 94),
-            MetricGroup::Rates => (94, 122),
-            MetricGroup::Fx => (122, 129),
-            MetricGroup::Equity => (129, 147),
-            MetricGroup::StructuredCredit => (147, 176),
-            MetricGroup::Alternatives => (176, 201),
+            MetricGroup::Pricing => (0, 27),
+            MetricGroup::Carry => (27, 38),
+            MetricGroup::Sensitivity => (38, 57),
+            MetricGroup::Greeks => (57, 81),
+            MetricGroup::Credit => (81, 98),
+            MetricGroup::Rates => (98, 126),
+            MetricGroup::Fx => (126, 133),
+            MetricGroup::Equity => (133, 151),
+            MetricGroup::StructuredCredit => (151, 180),
+            MetricGroup::Alternatives => (180, 205),
         }
     }
 }
