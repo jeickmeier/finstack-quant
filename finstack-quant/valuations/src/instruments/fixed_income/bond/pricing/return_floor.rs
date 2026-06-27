@@ -4,6 +4,11 @@
 //! distributions from a bond's full cashflow schedule. The output feeds
 //! [`lower_return_floor`], which compiles a [`ReturnFloorSpec`] into a concrete
 //! [`CallPutSchedule`] (Task 5), and the MOIC/XIRR metrics (Task 10).
+//!
+//! Floating-rate caveat (v1): cumulative coupons are forward-projected off the
+//! forward curve, which ignores the correlation between the realized rate path
+//! and when the floor binds. This is an approximation; the path-exact treatment
+//! is the deferred v2 Longstaff-Schwartz Monte Carlo payoff.
 
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -513,6 +518,60 @@ mod tests {
             price_floored.currency(),
             price_plain.currency(),
             "currency should match notional"
+        );
+    }
+
+    #[test]
+    fn floating_floor_uses_projected_coupons() {
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+        use finstack_quant_core::math::interp::InterpStyle;
+
+        let bond = Bond::example_floating().unwrap().min_moic(1.20);
+        let as_of = date!(2024 - 01 - 15);
+
+        // Build a flat 5% discount curve named "USD-OIS" (the bond's discount_curve_id).
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (6.0, 0.741)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("flat discount curve for FRN smoke test");
+
+        // Build a flat 4.5% forward curve named "USD-SOFR-3M" (the bond's index_id).
+        // Tenor 0.25 = quarterly (3M SOFR), matching the FloatingRateSpec in example_floating.
+        let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(as_of)
+            .knots([(0.0, 0.045), (6.0, 0.045)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("flat forward curve for FRN smoke test");
+
+        // MarketContext must carry BOTH the discount curve and the forward curve so that
+        // Bond::full_cashflow_schedule can project the floating coupons.
+        let curves = MarketContext::new().insert(disc).insert(fwd);
+
+        let spec = bond.return_floor.as_ref().unwrap();
+        let sched = lower_return_floor(&bond, spec, &curves, as_of).unwrap();
+
+        // The FRN has quarterly coupons over 5 years inside the protection window,
+        // so the schedule must be non-empty.
+        assert!(
+            !sched.calls.is_empty(),
+            "Expected non-empty call schedule for floored FRN; got 0 entries"
+        );
+
+        // Every floored redemption price must be at or above par.
+        assert!(
+            sched
+                .calls
+                .iter()
+                .all(|c| c.price_pct_of_par >= 100.0 - 1e-9),
+            "All floored call prices must be >= 100% of par; got: {:?}",
+            sched
+                .calls
+                .iter()
+                .map(|c| c.price_pct_of_par)
+                .collect::<Vec<_>>()
         );
     }
 }
