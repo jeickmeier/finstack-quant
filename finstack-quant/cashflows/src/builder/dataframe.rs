@@ -288,7 +288,7 @@ pub struct PeriodDataFrame {
 
 impl PeriodDataFrame {
     /// Create a DataFrame with preallocated capacity.
-    pub fn with_capacity(capacity: usize) -> Self {
+    pub(crate) fn with_capacity(capacity: usize) -> Self {
         Self {
             start_dates: Vec::with_capacity(capacity),
             end_dates: Vec::with_capacity(capacity),
@@ -314,7 +314,7 @@ impl PeriodDataFrame {
     }
 
     /// Clear all columns while preserving allocations.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.start_dates.clear();
         self.end_dates.clear();
         self.pay_dates.clear();

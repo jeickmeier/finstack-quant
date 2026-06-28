@@ -156,7 +156,6 @@ mod serde_defaults;
 // -----------------------------------------------------------------------------
 
 pub use accrual::{accrued_interest_amount, AccrualConfig, AccrualMethod, ExCouponRule};
-pub use aggregation::RecoveryTiming;
 pub use builder::CashFlowBuilder;
 pub use json::{
     accrued_interest_json, build_cashflow_schedule_envelope_json, build_cashflow_schedule_json,
