@@ -5,16 +5,15 @@
 //! submodules below. There is no polymorphic adapter trait — the enum is
 //! closed and the dispatch is exhaustive at compile time.
 
-pub mod asset_corr;
-pub mod basecorr;
-pub mod curves;
-pub mod equity;
-pub mod fx;
-pub mod instruments;
-pub mod statements;
-pub mod time_roll;
+pub(crate) mod asset_corr;
+pub(crate) mod basecorr;
+pub(crate) mod curves;
+pub(crate) mod equity;
+pub(crate) mod fx;
+pub(crate) mod instruments;
+pub(crate) mod statements;
+pub(crate) mod time_roll;
 pub(crate) mod traits;
-pub mod vol;
+pub(crate) mod vol;
 
-pub use time_roll::RollForwardReport;
-pub use vol::ArbitrageViolation;
+pub(crate) use time_roll::RollForwardReport;

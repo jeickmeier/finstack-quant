@@ -101,7 +101,8 @@ pub(crate) mod utils;
 pub mod warning;
 
 pub use adapters::time_roll::apply_time_roll_forward;
-pub use adapters::{ArbitrageViolation, RollForwardReport};
+pub use adapters::vol::ArbitrageViolation;
+pub use adapters::time_roll::RollForwardReport;
 pub use engine::{ApplicationEnvelope, ApplicationReport, ExecutionContext, ScenarioEngine};
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonResult};
@@ -113,8 +114,5 @@ pub use templates::{
     AssetClass, RegisteredTemplate, ScenarioSpecBuilder, Severity, TemplateMetadata,
     TemplateRegistry,
 };
-pub use utils::{
-    calculate_interpolation_weights, parse_period_to_days, parse_tenor_to_years,
-    InterpolationResult,
-};
+pub use utils::InterpolationResult;
 pub use warning::Warning;
