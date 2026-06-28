@@ -1,7 +1,8 @@
 use finstack_quant_core::math::{
-    adaptive_simpson, erf, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
-    gauss_legendre_integrate_composite, norm_cdf, simpson_rule, trapezoidal_rule,
-    GaussHermiteQuadrature,
+    erf, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
+    gauss_legendre_integrate_composite,
+    integration::{adaptive_simpson, simpson_rule, trapezoidal_rule},
+    norm_cdf, GaussHermiteQuadrature,
 };
 use std::f64::consts::PI;
 

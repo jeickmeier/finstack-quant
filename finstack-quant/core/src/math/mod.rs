@@ -111,16 +111,12 @@ pub mod volatility;
 
 // Re-exports for ergonomic access
 pub use distributions::{
-    binomial_distribution, binomial_pmf_all, binomial_pmf_all_into, binomial_probability,
-    chi_squared_cdf, chi_squared_pdf, chi_squared_quantile, exponential_cdf, exponential_pdf,
-    exponential_quantile, log_binomial_coefficient, log_factorial, lognormal_cdf, lognormal_pdf,
-    lognormal_quantile, sample_beta, sample_chi_squared, sample_exponential, sample_gamma,
-    sample_lognormal, sample_student_t,
+    binomial_pmf_all, binomial_pmf_all_into, binomial_probability, chi_squared_cdf,
+    chi_squared_quantile, log_binomial_coefficient, log_factorial,
 };
 pub use integration::{
-    adaptive_simpson, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
-    gauss_legendre_integrate_composite, simpson_rule, trapezoidal_rule, GaussHermiteQuadrature,
-    GaussLaguerreQuadrature,
+    gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
+    gauss_legendre_integrate_composite, GaussHermiteQuadrature, GaussLaguerreQuadrature,
 };
 pub use interp::{
     CubicHermiteStrategy, ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy,
@@ -129,7 +125,6 @@ pub use interp::{
 pub use linalg::{
     apply_correlation, build_correlation_matrix, cholesky_correlation, cholesky_decomposition,
     symmetric_eigen, validate_correlation_matrix, CholeskyError, CorrelationFactor,
-    PIVOT_TOLERANCE_RELATIVE,
 };
 pub use probability::{correlation_bounds, joint_probabilities, CorrelatedBernoulli};
 pub use random::sobol::{SobolRng, MAX_SOBOL_DIMENSION};
