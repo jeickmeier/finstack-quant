@@ -12,13 +12,6 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
-// DayCountContext is now threaded via `TwoClockParams`; the test-only
-// import is retained here because analytical tests still build without
-// `mc` and need the reference.
-#[cfg(test)]
-#[allow(unused_imports)]
-use finstack_quant_core::dates::DayCountContext;
-
 // MC-specific imports
 use finstack_quant_monte_carlo::payoff::barrier::BarrierOptionPayoff;
 use finstack_quant_monte_carlo::payoff::barrier::{BarrierType as McBarrierType, OptionKind};

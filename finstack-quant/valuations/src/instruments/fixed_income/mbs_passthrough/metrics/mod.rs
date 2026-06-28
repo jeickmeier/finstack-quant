@@ -10,15 +10,12 @@
 //!   the generic `UnifiedDv01Calculator` with triangular key-rate config.
 
 pub(crate) mod duration;
-#[allow(dead_code)] // Public API items used by external bindings
 pub(crate) mod mc_oas;
 pub(crate) mod oas;
 
 pub(crate) use duration::{effective_convexity, effective_duration};
-#[allow(unused_imports)] // Public API re-exports for external consumers
-pub(crate) use mc_oas::McOasResult;
 pub(crate) use mc_oas::{calculate_mc_oas, McOasConfig};
-#[allow(unused_imports)] // static Z-spread retained as a public-API helper
+#[cfg(test)]
 pub(crate) use oas::calculate_static_zspread;
 
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;

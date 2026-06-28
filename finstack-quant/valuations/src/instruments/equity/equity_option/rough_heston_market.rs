@@ -10,7 +10,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 
 /// Default rough-Heston parameters used when no market scalar is supplied.
 #[allow(dead_code)]
-pub mod rough_heston_defaults {
+pub(crate) mod rough_heston_defaults {
     /// Default initial variance (v₀).
     pub const V0: f64 = 0.04;
     /// Default mean reversion speed of variance (κ).
@@ -49,7 +49,7 @@ impl RoughHestonScalars {
     /// `RoughHestonParams::new`, `HurstExponent::new`) enforce numerical
     /// invariants.
     #[allow(dead_code)]
-    pub fn from_market(market: &MarketContext) -> Self {
+    pub(crate) fn from_market(market: &MarketContext) -> Self {
         Self {
             v0: get_unitless_scalar(market, "ROUGH_HESTON_V0", rough_heston_defaults::V0),
             kappa: get_unitless_scalar(market, "ROUGH_HESTON_KAPPA", rough_heston_defaults::KAPPA),

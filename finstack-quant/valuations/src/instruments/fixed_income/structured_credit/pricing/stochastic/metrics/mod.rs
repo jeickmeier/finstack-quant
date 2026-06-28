@@ -60,5 +60,7 @@
 mod calculator;
 mod sensitivities;
 
+#[allow(unused_imports)]
 pub(crate) use calculator::{StochasticMetrics, StochasticMetricsCalculator};
+#[allow(unused_imports)]
 pub(crate) use sensitivities::{CorrelationSensitivities, SensitivityConfig};

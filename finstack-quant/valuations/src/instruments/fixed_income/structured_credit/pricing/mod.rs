@@ -59,9 +59,6 @@ pub fn generate_tranche_cashflows(
 }
 
 // Re-export stochastic types (accessible via stochastic module if needed)
-#[allow(unused_imports)] // May be used by external bindings
 pub use stochastic::CorrelationStructure;
-#[allow(unused_imports)] // May be used by external bindings
 pub use stochastic::StochasticDefaultSpec;
-#[allow(unused_imports)] // May be used by external bindings
 pub use stochastic::StochasticPrepaySpec;

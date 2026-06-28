@@ -37,6 +37,8 @@ mod tree;
 
 pub(crate) use config::{BranchingSpec, ScenarioTreeConfig};
 #[cfg(test)]
+#[allow(unused_imports)]
 pub(crate) use node::{ScenarioNode, ScenarioNodeId, ScenarioPath};
 #[cfg(test)]
+#[allow(unused_imports)]
 pub(crate) use tree::ScenarioTree;

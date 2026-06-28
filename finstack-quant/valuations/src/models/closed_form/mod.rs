@@ -165,8 +165,7 @@ pub use lookback::{
     floating_strike_lookback_put,
 };
 pub use quanto::{quanto_call, quanto_drift_adjustment, quanto_put};
-pub(crate) use vanilla::{black76_call, black76_put};
 pub use vanilla::{
-    bs_greeks, bs_price, bs_price_checked, checked_closed_form_value, option_type_from_bool,
-    BsGreeks, ONE_PERCENT,
+    black76_call, black76_put, bs_greeks, bs_price, bs_price_checked, checked_closed_form_value,
+    option_type_from_bool, BsGreeks, ONE_PERCENT,
 };

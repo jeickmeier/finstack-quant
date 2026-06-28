@@ -425,7 +425,7 @@ pub fn bs_greeks(
 /// Multiply by a discount factor at the call site to obtain a present value.
 #[must_use]
 #[inline]
-pub(crate) fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+pub fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
     if t <= 0.0 || sigma <= 0.0 || forward <= 0.0 || strike <= 0.0 {
         return (forward - strike).max(0.0);
     }
@@ -452,7 +452,7 @@ pub(crate) fn black76_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64
 /// Multiply by a discount factor at the call site to obtain a present value.
 #[must_use]
 #[inline]
-pub(crate) fn black76_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+pub fn black76_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
     if t <= 0.0 || sigma <= 0.0 || forward <= 0.0 || strike <= 0.0 {
         return (strike - forward).max(0.0);
     }

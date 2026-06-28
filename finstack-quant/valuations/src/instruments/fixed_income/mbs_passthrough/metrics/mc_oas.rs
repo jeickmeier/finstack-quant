@@ -82,6 +82,7 @@ impl Default for McOasConfig {
 }
 
 /// Result of a Monte Carlo OAS calculation.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub(crate) struct McOasResult {
     /// Option-adjusted spread in decimal (e.g., 0.01 for 100 bps).

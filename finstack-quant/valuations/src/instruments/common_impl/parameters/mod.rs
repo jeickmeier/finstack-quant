@@ -7,10 +7,8 @@
 //! - **contract**: Contract specifications and general types
 //! - **conventions**: Standard market conventions for bonds and swaps
 
-pub mod commodity_settlement;
 pub mod contract;
 pub mod conventions;
-pub mod indexation;
 pub mod legs;
 pub mod market;
 pub mod option_market;
