@@ -20,11 +20,6 @@ nalgebra = { version = "0.34" }
 
 [features]
 default = []
-# Enables experimental variance-reduction utilities that are not yet wired into
-# the engine or pricers (importance sampling, moment matching). Build them only
-# when developing or evaluating the underlying estimators; production paths use
-# control variates and antithetic pairing, both of which are always available.
-vr-experimental = []
 
 [dev-dependencies]
 criterion = { workspace = true }

@@ -935,7 +935,8 @@ fn test_price_with_capture_captures_initial_event_cashflows_and_payoff() {
         .expect("capture should succeed");
 
     let path = result
-        .paths()
+        .paths
+        .as_ref()
         .and_then(|dataset| dataset.path(0))
         .expect("captured path should exist");
     let initial_point = path.initial_point().expect("initial point should exist");
@@ -1021,7 +1022,7 @@ fn test_price_with_capture_uses_actual_path_count_after_auto_stop() {
         )
         .expect("pricing should succeed");
 
-    let captured = result.paths().expect("captured paths should exist");
+    let captured = result.paths.as_ref().expect("captured paths should exist");
     let expected = super::pricing::AUTO_STOP_MIN_SAMPLES;
     assert_eq!(result.estimate.num_paths, expected);
     assert_eq!(captured.num_paths_total, expected);
@@ -1116,6 +1117,7 @@ fn test_num_skipped_defaults_to_zero() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_estimate_num_skipped_builder() {
     use crate::estimate::Estimate;
 
@@ -1132,6 +1134,7 @@ fn test_estimate_num_skipped_builder() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_estimate_display_with_skipped() {
     use crate::estimate::Estimate;
 
@@ -1152,6 +1155,7 @@ fn test_estimate_display_with_skipped() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_money_estimate_propagates_num_skipped() {
     use crate::estimate::Estimate;
     use crate::results::MoneyEstimate;

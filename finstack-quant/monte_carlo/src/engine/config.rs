@@ -86,15 +86,6 @@ impl McEngineConfig {
         }
     }
 
-    /// Set the target 95% CI half-width for serial auto-stopping.
-    ///
-    /// The engine currently rejects this option when `use_parallel` is `true`.
-    #[must_use]
-    pub fn target_ci(mut self, target: f64) -> Self {
-        self.target_ci_half_width = Some(target);
-        self
-    }
-
     /// Enable or disable parallel execution.
     #[must_use]
     pub fn parallel(mut self, parallel: bool) -> Self {
@@ -112,33 +103,12 @@ impl McEngineConfig {
         self
     }
 
-    /// Install a path-capture configuration for the run.
-    #[must_use]
-    pub fn path_capture(mut self, config: PathCaptureConfig) -> Self {
-        self.path_capture = config;
-        self
-    }
-
     /// Enable or disable antithetic path pairing.
     ///
     /// Path capture and antithetic pricing are currently mutually exclusive.
     #[must_use]
     pub fn antithetic(mut self, enabled: bool) -> Self {
         self.antithetic = enabled;
-        self
-    }
-
-    /// Convenience helper equivalent to `path_capture(PathCaptureConfig::all())`.
-    #[must_use]
-    pub fn capture_all_paths(mut self) -> Self {
-        self.path_capture = PathCaptureConfig::all();
-        self
-    }
-
-    /// Convenience helper equivalent to `path_capture(PathCaptureConfig::sample(count, seed))`.
-    #[must_use]
-    pub fn capture_sample_paths(mut self, count: usize, seed: u64) -> Self {
-        self.path_capture = PathCaptureConfig::sample(count, seed);
         self
     }
 }

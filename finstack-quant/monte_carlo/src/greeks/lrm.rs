@@ -144,41 +144,39 @@ pub fn lrm_vega_from_scores(
     (stats.mean(), stats.stderr())
 }
 
-/// Compute rho (sensitivity to the flat risk-free rate) using LRM.
-///
-/// For discounted GBM payoffs with standardized terminal shock `Z`, the score is:
-/// ```text
-/// ∂ln(p)/∂r = √T Z / σ
-/// ```
-/// so the present-value contribution becomes:
-/// ```text
-/// e^{-rT} payoff × (√T Z / σ - T)
-/// ```
-#[must_use]
-#[cfg(test)]
-pub fn lrm_rho(
-    payoffs: &[f64],
-    terminal_shocks: &[f64],
-    volatility: f64,
-    time_to_maturity: f64,
-    discount_factor: f64,
-) -> (f64, f64) {
-    let mut stats = OnlineStats::new();
-    let drift_score_multiplier = time_to_maturity.sqrt() / volatility;
-
-    for (i, &payoff) in payoffs.iter().enumerate() {
-        let z_t = terminal_shocks[i];
-        let score = drift_score_multiplier * z_t - time_to_maturity;
-        let rho_contribution = discount_factor * payoff * score;
-        stats.update(rho_contribution);
-    }
-
-    (stats.mean(), stats.stderr())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Compute rho (sensitivity to the flat risk-free rate) using LRM.
+    ///
+    /// For discounted GBM payoffs with standardized terminal shock `Z`, the score is:
+    /// ```text
+    /// ∂ln(p)/∂r = √T Z / σ
+    /// ```
+    /// so the present-value contribution becomes:
+    /// ```text
+    /// e^{-rT} payoff × (√T Z / σ - T)
+    /// ```
+    fn lrm_rho(
+        payoffs: &[f64],
+        terminal_shocks: &[f64],
+        volatility: f64,
+        time_to_maturity: f64,
+        discount_factor: f64,
+    ) -> (f64, f64) {
+        let mut stats = OnlineStats::new();
+        let drift_score_multiplier = time_to_maturity.sqrt() / volatility;
+
+        for (i, &payoff) in payoffs.iter().enumerate() {
+            let z_t = terminal_shocks[i];
+            let score = drift_score_multiplier * z_t - time_to_maturity;
+            let rho_contribution = discount_factor * payoff * score;
+            stats.update(rho_contribution);
+        }
+
+        (stats.mean(), stats.stderr())
+    }
 
     #[test]
     fn test_lrm_delta_basic() {

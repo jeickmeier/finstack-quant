@@ -14,8 +14,6 @@ Crate-level usage, examples, feature flags, and runtime constraints are in
 
 - Default build: control variates, antithetic pairing (via `McEngineConfig`), full
   process/payoff/pricer surface, Rayon parallel paths.
-- `vr-experimental`: `moment_matching` and `importance_sampling` modules only;
-  not wired into the engine or pricers.
 
 ## Directory map
 
@@ -29,7 +27,7 @@ Crate-level usage, examples, feature flags, and runtime constraints are in
 | `pricer/` | European, path-dependent, LSMC, basis functions |
 | `process/` | SDE definitions and correlation helpers |
 | `rng/` | Philox, Sobol, Poisson, fractional noise helpers |
-| `variance_reduction/` | Control variate (always); experimental estimators behind `vr-experimental` |
+| `variance_reduction/` | Control variate (always available) |
 
 ## Conventions
 

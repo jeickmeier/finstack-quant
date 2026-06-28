@@ -37,15 +37,6 @@ Available functionality:
 - Variance-reduction tools: antithetic pairing (engine-native) and control
   variates with closed-form Black-Scholes are always available
 
-## Feature Flags
-
-- `vr-experimental` (off by default): compiles the experimental
-  `importance_sampling` and `moment_matching` variance-reduction modules.
-  These estimators are not yet wired into the engine or pricers and are
-  intended for offline development and evaluation rather than production
-  pricing. Production paths use control variates and antithetic pairing,
-  both of which are always available.
-
 Rayon-backed parallel simulation is compiled by default; there is no opt-out
 flag for it currently.
 
@@ -318,10 +309,8 @@ All payoff and pricer modules are compiled by default:
 ### Other supporting modules
 
 - `rng` for pseudo-random and quasi-random generation
-- `variance_reduction` for control-variate helpers (always available);
-  `importance_sampling` and `moment_matching` are gated behind the
-  `vr-experimental` feature. Antithetic pairing is engine-native and
-  configured via `McEngineConfig::antithetic`
+- `variance_reduction` for control-variate helpers (always available).
+  Antithetic pairing is engine-native and configured via `McEngineConfig::antithetic`
 - `greeks` for pathwise, LRM, and finite-difference estimators
 - `barriers` for Brownian-bridge hit checks and continuity corrections
 - `time_grid` for simulation time grids expressed in year fractions

@@ -1236,7 +1236,10 @@ mod tests {
             .expect("Sobol path capture should succeed for multiple paths");
 
         assert_eq!(result.estimate.num_paths, 8);
-        assert_eq!(result.num_captured_paths(), 8);
+        assert_eq!(
+            result.paths.as_ref().map(|p| p.num_captured()).unwrap_or(0),
+            8
+        );
 
         let captured = result.paths.as_ref().expect("paths should be captured");
         let mut final_values: Vec<f64> =

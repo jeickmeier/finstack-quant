@@ -133,26 +133,16 @@ impl Estimate {
     /// Attach a legacy skipped-path count.
     ///
     /// Retained for backward-compatible deserialization/display of older
-    /// survivor-pricing estimates.
+    /// survivor-pricing estimates. New engine loops reject non-finite payoffs
+    /// instead of censoring paths, so this should always be zero for
+    /// engine-created estimates.
+    #[deprecated(
+        since = "0.6.0",
+        note = "Engine loops now reject non-finite payoffs; num_skipped is always zero for new estimates. Retained for serde backward compatibility only."
+    )]
     pub fn with_num_skipped(mut self, num_skipped: usize) -> Self {
         self.num_skipped = num_skipped;
         self
-    }
-
-    /// Return the interquartile range when captured percentiles are available.
-    pub fn iqr(&self) -> Option<f64> {
-        match (self.percentile_25, self.percentile_75) {
-            (Some(p25), Some(p75)) => Some(p75 - p25),
-            _ => None,
-        }
-    }
-
-    /// Return `max - min` when captured extrema are available.
-    pub fn range(&self) -> Option<f64> {
-        match (self.min, self.max) {
-            (Some(min), Some(max)) => Some(max - min),
-            _ => None,
-        }
     }
 
     /// Return `stderr / abs(mean)`.
@@ -164,17 +154,6 @@ impl Estimate {
         } else {
             self.stderr.abs() / self.mean.abs()
         }
-    }
-
-    /// Return the coefficient of variation `std_dev / abs(mean)` when available.
-    pub fn cv(&self) -> Option<f64> {
-        self.std_dev.map(|sd| {
-            if self.mean.abs() < 1e-10 {
-                f64::INFINITY
-            } else {
-                sd.abs() / self.mean.abs()
-            }
-        })
     }
 
     /// Return half the width of `ci_95`.

@@ -185,26 +185,6 @@ impl MonteCarloResult {
         self.run = Some(run);
         self
     }
-
-    /// Return `true` when captured-path diagnostics are present.
-    pub fn has_paths(&self) -> bool {
-        self.paths.is_some()
-    }
-
-    /// Borrow the captured-path subset if available.
-    pub fn paths(&self) -> Option<&PathDataset> {
-        self.paths.as_ref()
-    }
-
-    /// Return the number of captured paths, or `0` when none were retained.
-    pub fn num_captured_paths(&self) -> usize {
-        self.paths.as_ref().map(|p| p.num_captured()).unwrap_or(0)
-    }
-
-    /// Borrow the aggregate discounted estimate.
-    pub fn estimate(&self) -> &MoneyEstimate {
-        &self.estimate
-    }
 }
 
 #[cfg(test)]
