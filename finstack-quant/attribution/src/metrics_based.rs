@@ -1894,7 +1894,7 @@ pub fn attribute_pnl_metrics_based(
 
 #[cfg(test)]
 mod tests {
-    #[allow(clippy::expect_used, dead_code, unused_imports)]
+    #[allow(dead_code, unused_imports)]
     mod test_utils {
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),

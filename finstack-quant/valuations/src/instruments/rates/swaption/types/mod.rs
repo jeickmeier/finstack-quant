@@ -12,7 +12,6 @@ mod definitions;
 mod swaption;
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::panic)]
 mod tests;
 
 pub use bermudan::BermudanSwaption;

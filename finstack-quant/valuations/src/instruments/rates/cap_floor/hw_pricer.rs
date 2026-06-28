@@ -332,7 +332,7 @@ fn capfloor_surface_points(
 
 #[cfg(test)]
 mod tests {
-    #[allow(clippy::expect_used, clippy::unwrap_used, dead_code, unused_imports)]
+    #[allow(dead_code, unused_imports)]
     mod test_utils {
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),

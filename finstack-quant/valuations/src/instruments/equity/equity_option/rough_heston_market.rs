@@ -82,7 +82,6 @@ impl RoughHestonScalars {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used)]
 mod tests {
     use super::*;
     use finstack_quant_core::market_data::scalars::MarketScalar;

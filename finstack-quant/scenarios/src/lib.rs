@@ -101,8 +101,8 @@ pub(crate) mod utils;
 pub mod warning;
 
 pub use adapters::time_roll::apply_time_roll_forward;
-pub use adapters::vol::ArbitrageViolation;
 pub use adapters::time_roll::RollForwardReport;
+pub use adapters::vol::ArbitrageViolation;
 pub use engine::{ApplicationEnvelope, ApplicationReport, ExecutionContext, ScenarioEngine};
 pub use error::{Error, Result};
 pub use horizon::{HorizonAnalysis, HorizonResult};

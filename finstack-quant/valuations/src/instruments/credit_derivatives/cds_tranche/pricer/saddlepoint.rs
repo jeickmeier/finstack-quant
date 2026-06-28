@@ -67,7 +67,6 @@ pub(super) fn conditional_min_loss_normal(k: f64, mean: f64, var: f64) -> f64 {
 const MIN_SPA_STD: f64 = 1e-7;
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::panic)]
 mod tests {
     use super::*;
 

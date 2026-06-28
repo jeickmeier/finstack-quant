@@ -76,5 +76,4 @@ pub(crate) fn register_repo_metrics(registry: &mut MetricRegistry) {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::panic)]
 mod tests;

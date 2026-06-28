@@ -7,10 +7,8 @@ mod return_floor;
 mod traits;
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests;
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests_stepup;
 
 // Re-export for compatibility in tests and external users referencing bond::AmortizationSpec

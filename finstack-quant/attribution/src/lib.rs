@@ -345,7 +345,7 @@ pub(crate) mod parallel;
 pub(crate) mod return_contribution;
 pub(crate) mod spec;
 pub(crate) mod target_ccy;
-pub mod taylor;
+pub(crate) mod taylor;
 pub(crate) mod types;
 pub(crate) mod waterfall;
 

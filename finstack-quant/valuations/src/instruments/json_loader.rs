@@ -609,7 +609,7 @@ pub fn cashflow_provider_from_value(
 mod tests {
     use rust_decimal::Decimal;
 
-    #[allow(clippy::expect_used, clippy::unwrap_used, dead_code, unused_imports)]
+    #[allow(dead_code, unused_imports)]
     mod test_utils {
         include!(concat!(
             env!("CARGO_MANIFEST_DIR"),

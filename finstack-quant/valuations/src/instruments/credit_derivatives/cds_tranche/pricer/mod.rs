@@ -61,7 +61,6 @@ mod saddlepoint;
 mod sensitivities;
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::panic)]
 mod tests;
 
 pub use config::{CDSTranchePricer, CDSTranchePricerConfig, HeteroMethod};

@@ -284,7 +284,6 @@ mod tests {
     use time::Month;
 
     #[test]
-    #[allow(clippy::unwrap_used)] // Test code
     fn test_attribution_envelope_roundtrip() {
         use finstack_quant_valuations::instruments::Bond;
 

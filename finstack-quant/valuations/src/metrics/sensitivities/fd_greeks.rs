@@ -946,7 +946,7 @@ where
 // ================================================================================================
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::panic, dead_code)]
+#[allow(dead_code)]
 mod tests {
     use super::*;
 

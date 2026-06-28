@@ -120,7 +120,6 @@ impl PdeProblem2D for HestonPde {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::panic, clippy::too_many_arguments)]
 mod tests {
     use super::super::adi::{fill_boundaries, CraigSneydStepper};
     use super::super::grid::Grid1D;
@@ -131,6 +130,7 @@ mod tests {
     /// Heston Fourier reference price for validation.
     ///
     /// Uses the existing analytical implementation for comparison.
+    #[allow(clippy::too_many_arguments)]
     fn heston_call_reference(
         spot: f64,
         strike: f64,

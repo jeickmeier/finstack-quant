@@ -16,8 +16,8 @@
 //! `Instrument` trait objects via the shared instrument JSON pipeline.
 
 mod delta_engine;
-pub mod json;
-pub mod positions;
+pub(crate) mod json;
+pub(crate) mod positions;
 mod repricing_engine;
 mod traits;
 

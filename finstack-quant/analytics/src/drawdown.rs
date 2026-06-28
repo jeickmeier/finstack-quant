@@ -213,7 +213,6 @@ where
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn make_episode(
     dates: &[Date],
     start_idx: usize,

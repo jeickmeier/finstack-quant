@@ -47,7 +47,6 @@ mod pricing;
 mod simulation;
 
 #[cfg(test)]
-#[allow(clippy::expect_used, clippy::panic)]
 mod tests;
 
 pub use config::{McEngineBuilder, McEngineConfig, MAX_CAPTURED_PATHS, MAX_NUM_PATHS};
