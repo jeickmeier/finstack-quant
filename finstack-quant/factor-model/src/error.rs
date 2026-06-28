@@ -1,3 +1,10 @@
+//! Factor-model error types and unmatched-dependency policy.
+//!
+//! [`FactorModelError`] covers the failure modes of factor-model workflows:
+//! unmatched dependencies, missing factors, invalid covariance, repricing
+//! failures, and ambiguous matches. [`UnmatchedPolicy`] controls whether an
+//! unmatched dependency is a hard error or a skipped entry.
+
 use super::{FactorId, MarketDependency};
 use serde::{Deserialize, Serialize};
 use std::fmt;

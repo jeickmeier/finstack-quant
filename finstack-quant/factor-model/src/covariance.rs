@@ -1,3 +1,9 @@
+//! Factor covariance matrix storage and validation.
+//!
+//! [`FactorCovarianceMatrix`] stores a row-major symmetric PSD matrix with
+//! canonical factor ordering. See the type-level docs for the units contract
+//! and validation guarantees.
+
 use super::FactorId;
 use finstack_quant_core::HashMap;
 use serde::{Deserialize, Deserializer, Serialize};

@@ -1,3 +1,9 @@
+//! Covenant threshold schedules and interpolation.
+//!
+//! [`ThresholdSchedule`] stores a piecewise-constant mapping from dates to
+//! threshold values, sorted ascending. The effective threshold for a test
+//! date is the last entry with date <= test date.
+
 use finstack_quant_core::dates::Date;
 use serde::{Deserialize, Serialize};
 

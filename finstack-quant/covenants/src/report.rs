@@ -1,3 +1,9 @@
+//! Covenant report types and structures.
+//!
+//! [`CovenantReport`] is the serializable result of a single covenant
+//! evaluation, carrying pass/fail status, actual and threshold values,
+//! headroom, and optional details.
+
 use serde::{Deserialize, Serialize};
 
 /// Covenant check result.

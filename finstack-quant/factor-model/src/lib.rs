@@ -5,6 +5,51 @@
 //! Credit hierarchy calibration is one current implementation; rates,
 //! equity, volatility, commodity, and inflation factors are expressed
 //! through generic [`FactorType`] and [`FactorDefinition`].
+//!
+//! # Module Guide
+//!
+//! | Module | Purpose |
+//! |--------|---------|
+//! | [`primitives`] | `FactorId`, `FactorType`, `FactorDefinition`, market dependencies |
+//! | [`matching`] | Mapping-table, cascade, and hierarchy matchers for dependency-to-factor resolution |
+//! | [`credit`] | Credit hierarchy artifacts, calibration, and spread decomposition |
+//! | [`config`] | `FactorModelConfig`, `RiskMeasure`, `PricingMode`, bump sizing |
+//! | [`covariance`] | `FactorCovarianceMatrix` with symmetry and PSD validation |
+//! | [`error`] | `FactorModelError` and `UnmatchedPolicy` |
+//! | [`sensitivity_matrix`] | `SensitivityMatrix`: positions × factors dense layout |
+//!
+//! # Quick Start
+//!
+//! ```rust
+//! use finstack_quant_factor_model::{
+//!     FactorDefinition, FactorId, FactorType, MarketMapping,
+//! };
+//! use finstack_quant_core::market_data::bumps::BumpUnits;
+//! use finstack_quant_core::types::CurveId;
+//!
+//! let def = FactorDefinition {
+//!     id: FactorId::new("USD_10Y_SWAP"),
+//!     factor_type: FactorType::Rates,
+//!     market_mapping: MarketMapping::CurveParallel {
+//!         curve_ids: vec![CurveId::new("USD-SOIS")],
+//!         units: BumpUnits::RateBp,
+//!     },
+//!     description: Some("USD 10Y swap rate".to_string()),
+//! };
+//! assert_eq!(def.factor_type, FactorType::Rates);
+//! ```
+//!
+//! # Conventions
+//!
+//! - Factor identifiers (`FactorId`) are string-backed and case-sensitive.
+//! - Covariance entries are annualized (co)variances in each factor's canonical
+//!   bump unit (bps for rates/credit, % for equity/commodity/FX, vol points for
+//!   volatility). See [`FactorCovarianceMatrix`] for the units contract.
+//! - Credit decomposition enforces the reconciliation invariant to absolute
+//!   tolerance `1e-10`.
+//! - Pricing engines that consume `FactorModelConfig` live in
+//!   `finstack-quant-portfolio::sensitivity` because they depend on the
+//!   instrument trait surface.
 
 #![forbid(unsafe_code)]
 #![warn(clippy::float_cmp)]

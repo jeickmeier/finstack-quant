@@ -1,3 +1,54 @@
+//! Vectorized panel feature transforms for finstack-quant.
+//!
+//! This crate turns a flat value column plus grouping keys into derived feature
+//! columns, either backward-looking per entity (time-series) or partitioned per
+//! timestamp (cross-sectional). Values are `Option<f64>`; `None` and non-finite
+//! inputs are skipped and produce `None` outputs, so callers can carry missing
+//! data through a pipeline without sentinel values.
+//!
+//! # Module Guide
+//!
+//! - **Time-series** — Backward-looking transforms per entity (returns, rolling
+//!   stats, EWMA, drawdown, Hampel filter, …). Entry point:
+//!   [`transform_timeseries`] / [`transform_timeseries_with_op`].
+//! - **Cross-sectional** — Transforms across entities within each time
+//!   partition (rank, z-score, normalize, winsorize, …). Entry point:
+//!   [`transform_cross_sectional`] / [`transform_cross_sectional_with_op`].
+//! - **Panel** — JSON-specified or typed-spec pipeline of named time-series and
+//!   cross-sectional operations. Entry point: [`transform_panel`] /
+//!   [`transform_panel_spec`].
+//! - **Multi** — Pairwise and grouped transforms, signal cleaning, and
+//!   neutralization helpers. Entry point: [`neutralize`], [`clean_signal`],
+//!   [`transform_timeseries_pairwise`], [`transform_cross_sectional_grouped`].
+//!
+//! # Quick Start
+//!
+//! ```rust
+//! use finstack_quant_features::{transform_timeseries_with_op, TimeSeriesOp};
+//!
+//! let values = vec![Some(100.0), Some(102.0), Some(101.0), Some(105.0)];
+//! let entity = vec!["A".to_string(), "A".to_string(), "A".to_string(), "A".to_string()];
+//! let order = vec!["1".to_string(), "2".to_string(), "3".to_string(), "4".to_string()];
+//! let result = transform_timeseries_with_op(
+//!     &values, &entity, &order,
+//!     TimeSeriesOp::Returns, None,
+//! )?;
+//! assert_eq!(result[0], None);
+//! assert!((result[1].unwrap() - 0.02).abs() < 1e-12);
+//! # Ok::<(), finstack_quant_core::Error>(())
+//! ```
+//!
+//! # Conventions
+//!
+//! - Outputs preserve input order and length; element `i` of the output
+//!   corresponds to element `i` of `values`.
+//! - `None` and non-finite inputs are skipped; they produce `None` outputs.
+//! - Rolling operations require `min_periods` finite points in the window
+//!   before emitting a value.
+//! - String/JSON entry points are retained for Python and WASM bindings; Rust
+//!   callers should use the typed-op variants (`TimeSeriesOp`,
+//!   `CrossSectionalOp`, `PairwiseOp`, `PanelTransformSpec`).
+
 #![forbid(unsafe_code)]
 #![warn(clippy::float_cmp)]
 #![deny(clippy::unwrap_used)]
@@ -13,8 +64,7 @@
         clippy::float_cmp,
     )
 )]
-
-//! Vectorized panel feature transforms.
+#![doc(test(attr(allow(clippy::expect_used))))]
 
 mod cross_sectional;
 mod multi;

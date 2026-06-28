@@ -1,3 +1,11 @@
+//! Factor-model run configuration, risk measures, and bump sizing.
+//!
+//! [`FactorModelConfig`] is the top-level configuration consumed by pricing
+//! engines in `finstack-quant-portfolio::sensitivity`. It bundles factor
+//! definitions, a matching config, an optional covariance matrix, and
+//! sensitivity extraction settings ([`PricingMode`], [`RiskMeasure`],
+//! [`BumpSizeConfig`]).
+
 use super::covariance::FactorCovarianceMatrix;
 use super::matching::MatchingConfig;
 use super::primitives::definition::FactorDefinition;

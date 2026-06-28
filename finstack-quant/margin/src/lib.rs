@@ -17,7 +17,47 @@
 
 //! Margin, collateral, XVA configuration, and regulatory capital helpers.
 //!
-//! See the [crate README](../README.md) for workflows, embedded data, and examples.
+//! This crate is standalone from `finstack-quant-valuations` so consumers can
+//! share agreement terms, IM/VM engines, registry-backed defaults, and
+//! regulatory capital helpers without pulling the full instrument stack.
+//!
+//! # Module Guide
+//!
+//! | Module | Role |
+//! |--------|------|
+//! | [`types`] | CSA, collateral, repo, SIMM, netting identifiers |
+//! | [`calculators`] | VM and IM engines (SIMM, schedule, haircut, CCP proxy) |
+//! | [`traits`] | `Marginable` for consumer-crate integration |
+//! | [`metrics`] | IM/VM metrics, utilization, excess collateral, funding cost, Haircut01 |
+//! | [`regulatory`] | FRTB sensitivity-based approach and SA-CCR EAD |
+//! | [`constants`] | Shared heuristics |
+//! | [`xva`] | Deterministic exposure, netting, CVA/DVA/FVA, and shared XVA types |
+//!
+//! # Quick Start
+//!
+//! ```no_run
+//! use finstack_quant_margin::{CsaSpec, OtcMarginSpec};
+//!
+//! # fn main() -> finstack_quant_core::Result<()> {
+//! let csa = CsaSpec::usd_regulatory()?;
+//! let spec = OtcMarginSpec::bilateral_simm(csa);
+//!
+//! assert!(spec.csa.requires_im());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Conventions
+//!
+//! - Registry JSON is embedded at build time. Overlays use the Finstack config
+//!   extension key `valuations.margin_registry.v1`.
+//! - Factory methods such as `CsaSpec::usd_regulatory()` and
+//!   `OtcMarginSpec::usd_bilateral()` resolve defaults from the embedded
+//!   registry.
+//! - XVA exposure engines are deterministic (roll-forward); Monte Carlo
+//!   exposure paths live in `finstack-quant-monte-carlo`.
+//!
+//! See the [crate README](../README.md) for detailed workflows and embedded data.
 
 /// Margin calculation engines.
 pub mod calculators;
