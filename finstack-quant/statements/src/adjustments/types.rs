@@ -196,6 +196,7 @@ impl Adjustment {
     }
 
     /// Add a cap to the adjustment. Uses the default `Reported` base mode.
+    #[must_use]
     pub fn with_cap(mut self, base_node: Option<String>, value: f64) -> Self {
         self.cap = Some(AdjustmentCap {
             base_node,

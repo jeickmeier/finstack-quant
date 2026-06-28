@@ -102,30 +102,35 @@ impl Covenant {
     }
 
     /// Set cure period (days before breach becomes default)
+    #[must_use]
     pub fn with_cure_period(mut self, days: Option<i32>) -> Self {
         self.cure_period_days = days;
         self
     }
 
     /// Add a consequence for covenant breach
+    #[must_use]
     pub fn with_consequence(mut self, consequence: CovenantConsequence) -> Self {
         self.consequences.push(consequence);
         self
     }
 
     /// Set covenant scope (maintenance vs incurrence).
+    #[must_use]
     pub fn with_scope(mut self, scope: CovenantScope) -> Self {
         self.scope = scope;
         self
     }
 
     /// Attach a springing condition that controls activation.
+    #[must_use]
     pub fn with_springing_condition(mut self, condition: SpringingCondition) -> Self {
         self.springing_condition = Some(condition);
         self
     }
 
     /// Set an instance label disambiguating covenants that share a type.
+    #[must_use]
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
@@ -589,6 +594,7 @@ impl CovenantSpec {
     }
 
     /// Attach a time-varying threshold schedule (e.g., leverage step-downs).
+    #[must_use]
     pub fn with_threshold_schedule(mut self, schedule: ThresholdSchedule) -> Self {
         self.threshold_schedule = Some(schedule);
         self

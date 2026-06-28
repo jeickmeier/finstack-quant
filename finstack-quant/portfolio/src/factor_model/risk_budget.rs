@@ -95,6 +95,7 @@ impl RiskBudget {
     }
 
     /// Set a custom utilization threshold.
+    #[must_use]
     pub fn with_threshold(mut self, threshold: f64) -> Self {
         self.utilization_threshold = threshold;
         self

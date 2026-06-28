@@ -56,6 +56,7 @@ impl EuropeanPricer {
     }
 
     /// Override the RNG seed.
+    #[must_use]
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = seed;
         self
@@ -65,6 +66,7 @@ impl EuropeanPricer {
     ///
     /// If the crate is built without the `parallel` feature the underlying
     /// engine falls back to serial execution regardless of this flag.
+    #[must_use]
     pub fn with_parallel(mut self, parallel: bool) -> Self {
         self.use_parallel = parallel;
         self
@@ -143,7 +145,7 @@ impl EuropeanPricer {
     {
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
         let engine_config =
-            McEngineConfig::new(self.num_paths, time_grid).with_parallel(self.use_parallel);
+            McEngineConfig::new(self.num_paths, time_grid).parallel(self.use_parallel);
         let engine = McEngine::new(engine_config);
 
         let rng = PhiloxRng::new(self.seed);

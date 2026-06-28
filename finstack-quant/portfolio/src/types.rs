@@ -80,6 +80,7 @@ impl Entity {
     /// # Returns
     ///
     /// The updated entity for fluent chaining.
+    #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self
@@ -95,6 +96,7 @@ impl Entity {
     /// # Returns
     ///
     /// The updated entity for fluent chaining.
+    #[must_use]
     pub fn with_tag(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.tags.insert(key.into(), value.into());
         self

@@ -108,12 +108,14 @@ impl SwaptionLsmcConfig {
     }
 
     /// Set basis function degree.
+    #[must_use]
     pub fn with_basis_degree(mut self, degree: usize) -> Self {
         self.basis_degree = degree;
         self
     }
 
     /// Enable/disable antithetic variates.
+    #[must_use]
     pub fn with_antithetic(mut self, enabled: bool) -> Self {
         self.antithetic = enabled;
         self

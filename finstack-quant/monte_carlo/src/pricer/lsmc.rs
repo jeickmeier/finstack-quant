@@ -236,6 +236,7 @@ impl LsmcConfig {
     }
 
     /// Set random seed.
+    #[must_use]
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = seed;
         self
@@ -248,6 +249,7 @@ impl LsmcConfig {
     /// derives its own RNG via [`crate::rng::philox::PhiloxRng::split`] keyed
     /// on the path index, which keeps results bit-identical to the serial
     /// run.
+    #[must_use]
     pub fn with_parallel(mut self, enabled: bool) -> Self {
         self.use_parallel = enabled;
         self

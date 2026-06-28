@@ -89,13 +89,15 @@ impl McEngineConfig {
     /// Set the target 95% CI half-width for serial auto-stopping.
     ///
     /// The engine currently rejects this option when `use_parallel` is `true`.
-    pub fn with_target_ci(mut self, target: f64) -> Self {
+    #[must_use]
+    pub fn target_ci(mut self, target: f64) -> Self {
         self.target_ci_half_width = Some(target);
         self
     }
 
     /// Enable or disable parallel execution.
-    pub fn with_parallel(mut self, parallel: bool) -> Self {
+    #[must_use]
+    pub fn parallel(mut self, parallel: bool) -> Self {
         self.use_parallel = parallel;
         self
     }
@@ -104,13 +106,15 @@ impl McEngineConfig {
     ///
     /// Leave unset (the default) to keep the engine's adaptive chunking. Runtime
     /// validation rejects `0`.
-    pub fn with_chunk_size(mut self, size: usize) -> Self {
+    #[must_use]
+    pub fn chunk_size(mut self, size: usize) -> Self {
         self.chunk_size = Some(size);
         self
     }
 
     /// Install a path-capture configuration for the run.
-    pub fn with_path_capture(mut self, config: PathCaptureConfig) -> Self {
+    #[must_use]
+    pub fn path_capture(mut self, config: PathCaptureConfig) -> Self {
         self.path_capture = config;
         self
     }
@@ -118,18 +122,21 @@ impl McEngineConfig {
     /// Enable or disable antithetic path pairing.
     ///
     /// Path capture and antithetic pricing are currently mutually exclusive.
-    pub fn with_antithetic(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub fn antithetic(mut self, enabled: bool) -> Self {
         self.antithetic = enabled;
         self
     }
 
-    /// Convenience helper equivalent to `with_path_capture(PathCaptureConfig::all())`.
+    /// Convenience helper equivalent to `path_capture(PathCaptureConfig::all())`.
+    #[must_use]
     pub fn capture_all_paths(mut self) -> Self {
         self.path_capture = PathCaptureConfig::all();
         self
     }
 
-    /// Convenience helper equivalent to `with_path_capture(PathCaptureConfig::sample(count, seed))`.
+    /// Convenience helper equivalent to `path_capture(PathCaptureConfig::sample(count, seed))`.
+    #[must_use]
     pub fn capture_sample_paths(mut self, count: usize, seed: u64) -> Self {
         self.path_capture = PathCaptureConfig::sample(count, seed);
         self

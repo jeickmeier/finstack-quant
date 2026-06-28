@@ -45,8 +45,7 @@ impl PyMcEngine {
         let defaults = &py_mc_defaults()?.engine;
         let seed = seed.unwrap_or(defaults.seed);
         let use_parallel = use_parallel.unwrap_or(defaults.use_parallel);
-        let config =
-            McEngineConfig::new(num_paths, time_grid.inner.clone()).with_parallel(use_parallel);
+        let config = McEngineConfig::new(num_paths, time_grid.inner.clone()).parallel(use_parallel);
         Ok(Self {
             inner: McEngine::new(config),
             seed,
@@ -286,7 +285,7 @@ fn price_heston(
     let num_steps = num_steps.unwrap_or(defaults.num_steps);
     let ccy = resolve_currency(currency)?;
     let time_grid = TimeGrid::uniform(expiry, num_steps).map_err(core_to_py)?;
-    let config = McEngineConfig::new(num_paths, time_grid).with_parallel(defaults.use_parallel);
+    let config = McEngineConfig::new(num_paths, time_grid).parallel(defaults.use_parallel);
     let engine = McEngine::new(config);
     let rng = PhiloxRng::new(seed);
     let process = HestonProcess::with_params(rate, div_yield, kappa, theta, vol_of_vol, rho, v0)

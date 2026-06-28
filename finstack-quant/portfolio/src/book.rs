@@ -99,6 +99,7 @@ impl Book {
     /// # Returns
     ///
     /// The updated book for fluent chaining.
+    #[must_use]
     pub fn with_parent(mut self, parent_id: impl Into<BookId>) -> Self {
         self.parent_id = Some(parent_id.into());
         self

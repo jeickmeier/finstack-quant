@@ -151,6 +151,7 @@ impl CandidatePosition {
     /// # Returns
     ///
     /// The updated candidate for fluent chaining.
+    #[must_use]
     pub fn with_max_weight(mut self, max: f64) -> Self {
         self.max_weight = max;
         self
@@ -165,6 +166,7 @@ impl CandidatePosition {
     /// # Returns
     ///
     /// The updated candidate for fluent chaining.
+    #[must_use]
     pub fn with_min_weight(mut self, min: f64) -> Self {
         self.min_weight = min;
         self
@@ -234,6 +236,7 @@ impl TradeUniverse {
     /// # Returns
     ///
     /// The updated trade universe for fluent chaining.
+    #[must_use]
     pub fn with_candidate(mut self, candidate: CandidatePosition) -> Self {
         self.candidates.push(candidate);
         self
@@ -248,6 +251,7 @@ impl TradeUniverse {
     /// # Returns
     ///
     /// The updated trade universe for fluent chaining.
+    #[must_use]
     pub fn with_candidates(
         mut self,
         candidates: impl IntoIterator<Item = CandidatePosition>,
@@ -265,6 +269,7 @@ impl TradeUniverse {
     /// # Returns
     ///
     /// The updated trade universe for fluent chaining.
+    #[must_use]
     pub fn with_held_positions(mut self, filter: PositionFilter) -> Self {
         self.held_filter = Some(filter);
         self

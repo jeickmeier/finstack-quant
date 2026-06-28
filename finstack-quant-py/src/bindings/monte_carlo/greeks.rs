@@ -74,9 +74,9 @@ fn build_engine(num_paths: usize, expiry: f64, num_steps: usize) -> PyResult<McE
     let time_grid = TimeGrid::uniform(expiry, num_steps).map_err(core_to_py)?;
     let defaults = greek_defaults()?;
     let config = McEngineConfig::new(num_paths, time_grid)
-        .with_parallel(defaults.use_parallel)
-        .with_chunk_size(defaults.chunk_size)
-        .with_antithetic(defaults.antithetic);
+        .parallel(defaults.use_parallel)
+        .chunk_size(defaults.chunk_size)
+        .antithetic(defaults.antithetic);
     Ok(McEngine::new(config))
 }
 

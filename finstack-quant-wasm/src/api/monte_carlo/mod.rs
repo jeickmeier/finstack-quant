@@ -706,7 +706,7 @@ fn price_heston(
         None => binding_defaults()?.european_pricer.num_steps,
     };
     let time_grid = TimeGrid::uniform(expiry, steps).map_err(to_js_err)?;
-    let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid).with_parallel(false));
+    let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid).parallel(false));
     let rng = PhiloxRng::new(seed);
     let process = HestonProcess::with_params(rate, div_yield, kappa, theta, vol_of_vol, rho, v0)
         .map_err(to_js_err)?;

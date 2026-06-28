@@ -245,6 +245,7 @@ impl Position {
     /// # Returns
     ///
     /// The updated position for fluent chaining.
+    #[must_use]
     pub fn with_book(mut self, book_id: impl Into<BookId>) -> Self {
         self.book_id = Some(book_id.into());
         self
@@ -260,6 +261,7 @@ impl Position {
     /// # Returns
     ///
     /// The updated position for fluent chaining.
+    #[must_use]
     pub fn with_text_attribute(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.attributes
             .insert(key.into(), AttributeValue::Text(value.into()));
@@ -276,6 +278,7 @@ impl Position {
     /// # Returns
     ///
     /// The updated position for fluent chaining.
+    #[must_use]
     pub fn with_numeric_attribute(mut self, key: impl Into<String>, value: f64) -> Self {
         self.attributes
             .insert(key.into(), AttributeValue::Number(value));
@@ -372,6 +375,7 @@ impl Position {
     /// # Returns
     ///
     /// The updated position for fluent chaining.
+    #[must_use]
     pub fn with_meta(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.meta.insert(key.into(), value);
         self

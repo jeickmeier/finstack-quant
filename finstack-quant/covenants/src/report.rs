@@ -61,30 +61,35 @@ impl CovenantReport {
     }
 
     /// Attach the stable covenant identifier.
+    #[must_use]
     pub fn with_covenant_id(mut self, id: &str) -> Self {
         self.covenant_id = Some(id.to_string());
         self
     }
 
     /// Add actual value to the report.
+    #[must_use]
     pub fn with_actual(mut self, value: f64) -> Self {
         self.actual_value = Some(value);
         self
     }
 
     /// Add threshold to the report.
+    #[must_use]
     pub fn with_threshold(mut self, threshold: f64) -> Self {
         self.threshold = Some(threshold);
         self
     }
 
     /// Add details to the report.
+    #[must_use]
     pub fn with_details(mut self, details: &str) -> Self {
         self.details = Some(details.to_string());
         self
     }
 
     /// Attach headroom (positive = cushion, negative = deficit).
+    #[must_use]
     pub fn with_headroom(mut self, headroom: f64) -> Self {
         self.headroom = Some(headroom);
         self

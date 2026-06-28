@@ -94,6 +94,7 @@ impl PathDependentPricerConfig {
     }
 
     /// Set random seed.
+    #[must_use]
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = seed;
         self
@@ -106,42 +107,49 @@ impl PathDependentPricerConfig {
     /// combination is rejected by [`Self::validate`] (and by the pricer at
     /// `price()` time); previous releases silently flipped `use_parallel` to
     /// `false`, which masked configuration mistakes.
+    #[must_use]
     pub fn with_parallel(mut self, parallel: bool) -> Self {
         self.use_parallel = parallel;
         self
     }
 
     /// Set chunk size.
+    #[must_use]
     pub fn with_chunk_size(mut self, size: usize) -> Self {
         self.chunk_size = size;
         self
     }
 
     /// Set path capture configuration.
+    #[must_use]
     pub fn with_path_capture(mut self, config: PathCaptureConfig) -> Self {
         self.path_capture = config;
         self
     }
 
     /// Enable path capture for all paths.
+    #[must_use]
     pub fn capture_all_paths(mut self) -> Self {
         self.path_capture = PathCaptureConfig::all();
         self
     }
 
     /// Enable path capture for a sample.
+    #[must_use]
     pub fn capture_sample_paths(mut self, count: usize, seed: u64) -> Self {
         self.path_capture = PathCaptureConfig::sample(count, seed);
         self
     }
 
     /// Set steps per year for time discretization.
+    #[must_use]
     pub fn with_steps_per_year(mut self, steps: f64) -> Self {
         self.steps_per_year = steps;
         self
     }
 
     /// Set minimum number of steps.
+    #[must_use]
     pub fn with_min_steps(mut self, min_steps: usize) -> Self {
         self.min_steps = min_steps;
         self
@@ -155,6 +163,7 @@ impl PathDependentPricerConfig {
     /// [`Self::with_brownian_bridge`] if needed. The combination
     /// `use_sobol = true && use_parallel = true` is rejected by
     /// [`Self::validate`].
+    #[must_use]
     pub fn with_sobol(mut self, use_sobol: bool) -> Self {
         self.use_sobol = use_sobol;
         if use_sobol {
@@ -164,12 +173,14 @@ impl PathDependentPricerConfig {
     }
 
     /// Enable antithetic variates.
+    #[must_use]
     pub fn with_antithetic(mut self, antithetic: bool) -> Self {
         self.antithetic = antithetic;
         self
     }
 
     /// Enable Brownian bridge (only used with Sobol RNG).
+    #[must_use]
     pub fn with_brownian_bridge(mut self, enable: bool) -> Self {
         self.use_brownian_bridge = enable;
         self

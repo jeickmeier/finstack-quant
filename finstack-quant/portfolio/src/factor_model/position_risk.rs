@@ -109,6 +109,7 @@ impl DecompositionConfig {
     }
 
     /// Enable incremental VaR computation.
+    #[must_use]
     pub fn with_incremental(mut self) -> Self {
         self.compute_incremental = true;
         self

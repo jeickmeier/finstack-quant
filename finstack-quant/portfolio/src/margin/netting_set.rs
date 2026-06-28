@@ -142,6 +142,7 @@ impl NettingSetManager {
     /// # Returns
     ///
     /// The updated manager for fluent chaining.
+    #[must_use]
     pub fn with_default_set(mut self, id: NettingSetId) -> Self {
         self.default_set = Some(id.clone());
         self.netting_sets

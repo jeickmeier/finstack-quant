@@ -5,6 +5,11 @@
 //! framework for workspace test suites.
 
 #![forbid(unsafe_code)]
+#![warn(clippy::float_cmp)]
+#![deny(clippy::unwrap_used)]
+#![deny(clippy::expect_used)]
+#![deny(clippy::panic)]
+#![doc(test(attr(allow(clippy::expect_used))))]
 
 pub mod golden;
 

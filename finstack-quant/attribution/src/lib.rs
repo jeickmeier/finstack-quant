@@ -13,6 +13,7 @@
         clippy::float_cmp,
     )
 )]
+#![doc(test(attr(allow(clippy::expect_used))))]
 
 //! Multi-period P&L attribution for financial instruments.
 //!
