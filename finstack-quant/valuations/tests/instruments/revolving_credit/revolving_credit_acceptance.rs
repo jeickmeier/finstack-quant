@@ -11,6 +11,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
@@ -27,7 +28,17 @@ fn _generate_deterministic_cashflows_with_curves_replaced(
     as_of: Date,
 ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule> {
     use finstack_quant_valuations::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;
-    let engine = CashflowEngine::new(facility, Some(market), as_of, None)?;
+    let fixings = match &facility.base_rate_spec {
+        BaseRateSpec::Floating(spec) => {
+            finstack_quant_core::market_data::fixings::get_fixing_series(
+                market,
+                spec.index_id.as_str(),
+            )
+            .ok()
+        }
+        BaseRateSpec::Fixed { .. } => None,
+    };
+    let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
     let path_schedule = engine.generate_deterministic()?;
     Ok(path_schedule.schedule)
 }
@@ -223,7 +234,20 @@ fn test_floating_vs_margin_only() {
         .build()
         .unwrap();
 
-    let market_with_curve = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market_with_curve = MarketContext::new()
+        .insert(disc_curve)
+        .insert(fwd_curve)
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(
+                    Date::from_calendar_date(2024, Month::December, 30).unwrap(),
+                    0.01,
+                )],
+                None,
+            )
+            .unwrap(),
+        );
 
     // Price with curves (should include forward rates)
     let pv_with_curves = facility.value(&market_with_curve, start).unwrap();
@@ -305,7 +329,20 @@ fn test_reset_frequency_mismatch() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .insert(disc_curve)
+        .insert(fwd_curve)
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-1M",
+                vec![(
+                    Date::from_calendar_date(2024, Month::December, 30).unwrap(),
+                    0.01,
+                )],
+                None,
+            )
+            .unwrap(),
+        );
 
     let schedule =
         _generate_deterministic_cashflows_with_curves_replaced(&facility, &market, start).unwrap();

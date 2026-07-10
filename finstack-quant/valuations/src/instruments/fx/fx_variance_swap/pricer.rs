@@ -7,7 +7,7 @@ use crate::models::bs_price;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 use finstack_quant_core::{
-    dates::{Date, DateExt, DayCountContext},
+    dates::{Date, DayCountContext},
     market_data::context::MarketContext,
     math::stats::realized_variance,
     money::Money,
@@ -76,59 +76,12 @@ pub(crate) fn compute_pv(
 }
 
 pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Vec<Date> {
-    use finstack_quant_core::dates::TenorUnit;
-    let mut dates = Vec::new();
-    let mut current = inst.start_date;
-
-    if let Some(months_step) = inst.observation_freq.months() {
-        while current <= inst.maturity {
-            dates.push(current);
-            current = current.add_months(months_step as i32);
-            if current > inst.maturity {
-                break;
-            }
-        }
-    } else if inst.observation_freq.unit == TenorUnit::Weeks {
-        let days_step = i64::from(inst.observation_freq.count) * 7;
-        while current <= inst.maturity {
-            dates.push(current);
-            current += time::Duration::days(days_step);
-        }
-    } else if inst.observation_freq.unit == TenorUnit::Days {
-        let business_step = inst.observation_freq.count;
-        while current <= inst.maturity {
-            if current.weekday() != time::Weekday::Saturday
-                && current.weekday() != time::Weekday::Sunday
-            {
-                dates.push(current);
-            }
-            let mut advanced = 0;
-            while advanced < business_step {
-                current += time::Duration::days(1);
-                if current.weekday() != time::Weekday::Saturday
-                    && current.weekday() != time::Weekday::Sunday
-                {
-                    advanced += 1;
-                }
-            }
-        }
-    } else {
-        while current <= inst.maturity {
-            if current.weekday() != time::Weekday::Saturday
-                && current.weekday() != time::Weekday::Sunday
-            {
-                dates.push(current);
-            }
-            current += time::Duration::days(1);
-        }
-    }
-
-    if (dates.is_empty() || dates.last() != Some(&inst.maturity)) && !dates.contains(&inst.maturity)
-    {
-        dates.push(inst.maturity);
-    }
-
-    dates
+    crate::instruments::common_impl::pricing::variance_observations::variance_observation_dates(
+        inst.start_date,
+        inst.maturity,
+        inst.observation_freq,
+        &inst.attributes,
+    )
 }
 
 pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {

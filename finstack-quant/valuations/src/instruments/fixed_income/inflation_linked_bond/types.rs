@@ -181,15 +181,24 @@ impl std::str::FromStr for DeflationProtection {
 enum InflationSource {
     Index(Arc<InflationIndex>),
     Curve(Arc<InflationCurve>),
+    Hybrid {
+        index: Arc<InflationIndex>,
+        curve: Arc<InflationCurve>,
+    },
 }
 
 impl InflationSource {
     fn from_market(curves: &MarketContext, id: &CurveId) -> Result<Self> {
-        if let Ok(index) = curves.get_inflation_index(id.as_str()) {
-            Ok(Self::Index(index))
-        } else {
-            let curve = curves.get_inflation_curve(id.as_str())?;
-            Ok(Self::Curve(curve))
+        let index = curves.get_inflation_index(id.as_str()).ok();
+        let curve = curves.get_inflation_curve(id.as_str()).ok();
+        match (index, curve) {
+            (Some(index), Some(curve)) => Ok(Self::Hybrid { index, curve }),
+            (Some(index), None) => Ok(Self::Index(index)),
+            (None, Some(curve)) => Ok(Self::Curve(curve)),
+            (None, None) => Err(finstack_quant_core::InputError::NotFound {
+                id: id.as_str().to_string(),
+            }
+            .into()),
         }
     }
 
@@ -197,6 +206,18 @@ impl InflationSource {
         match self {
             Self::Index(index) => bond.index_ratio(date, index.as_ref()),
             Self::Curve(curve) => bond.index_ratio_from_curve(date, curve.as_ref()),
+            Self::Hybrid { index, curve } => {
+                let reference_date = match bond.lag {
+                    InflationLag::Months(months) => date.add_months(-(i32::from(months))),
+                    InflationLag::Days(days) => date - Duration::days(i64::from(days)),
+                    _ => date,
+                };
+                if reference_date <= curve.base_date() {
+                    bond.index_ratio(date, index.as_ref())
+                } else {
+                    bond.index_ratio_from_curve(date, curve.as_ref())
+                }
+            }
         }
     }
 }
@@ -1221,8 +1242,7 @@ impl crate::instruments::common_impl::traits::CurveDependencies for InflationLin
     {
         crate::instruments::common_impl::traits::InstrumentCurves::builder()
             .discount(self.discount_curve_id.clone())
-            // Inflation term structures share the dependency registry's
-            // projection/forward category (as do inflation swaps).
+            // Inflation curves and published indices have their own dependency category.
             .inflation(self.inflation_index_id.clone())
             .build()
     }

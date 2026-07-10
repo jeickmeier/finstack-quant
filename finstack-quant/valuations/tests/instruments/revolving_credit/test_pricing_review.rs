@@ -1,6 +1,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve, HazardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
@@ -241,7 +242,20 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
         .build()
         .unwrap();
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .insert(disc_curve)
+        .insert(fwd_curve)
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(
+                    Date::from_calendar_date(2024, Month::December, 30).unwrap(),
+                    0.04,
+                )],
+                None,
+            )
+            .unwrap(),
+        );
 
     let result = facility
         .price_with_metrics(

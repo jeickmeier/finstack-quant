@@ -174,12 +174,15 @@ impl FxVarianceSwap {
     ///
     /// # Weekday-Aware Daily Observations
     ///
-    /// For daily observations (frequency = 1 day or no explicit step), weekends
-    /// (Saturday and Sunday) are skipped to be consistent with:
+    /// For day-tenor observations, dates advance in business-day steps. The
+    /// calendar is read from `attributes.meta["observation_calendar_id"]`
+    /// (or `calendar_id`) and defaults to weekends-only. Non-business start
+    /// and maturity dates adjust following and preceding, respectively.
+    /// This is consistent with:
     /// - Market data availability (FX spot rates published on weekdays)
     /// - Annualization factor of 252 (trading days per year)
     ///
-    /// For other frequencies (weekly, monthly), all dates are included and
+    /// For other frequencies (weekly, monthly), contractual calendar dates are included and
     /// the caller should ensure alignment with market data.
     pub fn observation_dates(&self) -> Vec<Date> {
         pricer::observation_dates(self)

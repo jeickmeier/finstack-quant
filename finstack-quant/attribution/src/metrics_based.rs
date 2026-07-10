@@ -1770,24 +1770,15 @@ pub fn attribute_pnl_metrics_based(
 
     // 9. Inflation sensitivity
     if let Some(inflation01) = val_t0.measures.get(MetricId::Inflation01.as_str()) {
-        // MarketDependencies does not (yet) declare inflation curves, so the
-        // average is taken over every inflation curve in the market. Sort the
-        // ids so the float summation order is deterministic (the context map
-        // is hash-ordered), and surface multi-curve averaging in the notes —
-        // in a shared multi-instrument market, unrelated inflation curves
-        // contaminate this instrument's average Δi (prior fix).
-        let mut curve_ids = Vec::new();
-        for curve_id in market_t1.curve_ids() {
-            if market_t1.get_inflation_curve(curve_id).is_ok() {
-                curve_ids.push(curve_id.clone());
-            }
-        }
-        curve_ids.sort_unstable();
+        // Restrict the shift to the instrument's declared inflation sources.
+        // This keeps unrelated curves in a shared market context from
+        // contaminating the instrument-level attribution.
+        let curve_ids = &market_deps.curve_dependencies().inflation_curves;
 
         let mut total_shift = 0.0;
         let mut curve_count = 0;
 
-        for curve_id in &curve_ids {
+        for curve_id in curve_ids {
             if let Ok(shift_bp) =
                 measure_inflation_curve_shift(curve_id.as_str(), market_t0, market_t1)
             {
@@ -1801,14 +1792,6 @@ pub fn attribute_pnl_metrics_based(
         } else {
             0.0
         };
-        if curve_count > 1 {
-            attribution.meta.notes.push(format!(
-                "Inflation attribution averaged the shift across {curve_count} inflation \
-                 curves found in the market (instrument-level inflation-curve dependencies \
-                 are not declared); unrelated curves may contaminate the average"
-            ));
-        }
-
         // First-order: Inflation01 × Δi (Δi in basis points)
         let inflation_amount = inflation01 * avg_shift;
         attribution.inflation_curves_pnl = factor_money_or_invalid(
@@ -1848,7 +1831,7 @@ pub fn attribute_pnl_metrics_based(
             // non-trivial). Same shape as the rates / credit twist guards.
             let mut total_abs = 0.0;
             let mut abs_count = 0usize;
-            for curve_id in &curve_ids {
+            for curve_id in curve_ids {
                 let v = inflation_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
                 if v > 0.0 {
                     total_abs += v;
@@ -2212,6 +2195,64 @@ mod tests {
 
         assert!((attribution.rates_curves_pnl.amount() + 400.0).abs() < 1e-6);
         assert!(attribution.residual_within_tolerance(0.1, 1.0));
+    }
+
+    #[test]
+    fn inflation_attribution_uses_only_declared_curve_dependencies() {
+        use finstack_quant_core::market_data::term_structures::InflationCurve;
+
+        let as_of_t0 = date!(2025 - 01 - 15);
+        let as_of_t1 = date!(2025 - 01 - 16);
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            TestInstrument::new("TEST-INFLATION", Money::new(100_000.0, Currency::USD))
+                .with_inflation_curves(&["US-CPI"]),
+        );
+        let curve = |id: &str, end_cpi: f64| {
+            InflationCurve::builder(id)
+                .base_date(as_of_t0)
+                .base_cpi(100.0)
+                .knots([(0.0, 100.0), (10.0, end_cpi)])
+                .build()
+                .expect("inflation curve")
+        };
+        let market_t0 = MarketContext::new()
+            .insert(curve("US-CPI", 120.0))
+            .insert(curve("EU-HICP", 120.0));
+        let market_t1 = MarketContext::new()
+            .insert(curve("US-CPI", 120.12))
+            .insert(curve("EU-HICP", 180.0));
+
+        let mut measures = IndexMap::new();
+        measures.insert(MetricId::Inflation01, 100.0);
+        let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
+        let val_t0 = ValuationResult::stamped_with_meta(
+            "TEST-INFLATION",
+            as_of_t0,
+            Money::new(100_000.0, Currency::USD),
+            meta.clone(),
+        )
+        .with_measures(measures);
+        let val_t1 = ValuationResult::stamped_with_meta(
+            "TEST-INFLATION",
+            as_of_t1,
+            Money::new(100_100.0, Currency::USD),
+            meta,
+        );
+
+        let expected_shift = measure_inflation_curve_shift("US-CPI", &market_t0, &market_t1)
+            .expect("US inflation shift");
+        let attribution = attribute_pnl_metrics_based(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            &val_t0,
+            &val_t1,
+            as_of_t0,
+            as_of_t1,
+        )
+        .expect("inflation attribution");
+
+        assert!((attribution.inflation_curves_pnl.amount() - 100.0 * expected_shift).abs() < 1e-9);
     }
 
     #[test]

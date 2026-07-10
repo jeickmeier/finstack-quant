@@ -202,4 +202,72 @@ mod tests {
             "Long ILB Inflation01 should be positive (higher inflation → higher PV), got {reported}"
         );
     }
+
+    #[test]
+    fn inflation01_supports_index_backed_linker() {
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::dates::DateExt;
+        use finstack_quant_core::market_data::scalars::{
+            InflationIndex, InflationInterpolation, InflationLag,
+        };
+
+        let as_of = date!(2024 - 01 - 15);
+        let discount = DiscountCurve::builder("US-CPI-DISC")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (15.0, 0.65)])
+            .build()
+            .expect("discount curve");
+        let first = date!(2023 - 10 - 01);
+        let observations = (0..=122)
+            .map(|month| (first.add_months(month), 100.0 + f64::from(month) * 0.2))
+            .collect();
+        let index = InflationIndex::new("US-CPI", observations, Currency::USD)
+            .expect("inflation index")
+            .with_interpolation(InflationInterpolation::Linear)
+            .with_lag(InflationLag::None);
+        let market = MarketContext::new()
+            .insert(discount)
+            .insert_inflation_index("US-CPI", index);
+        let bond = sample_bond();
+
+        let result = bond
+            .price_with_metrics(
+                &market,
+                as_of,
+                &[MetricId::Inflation01],
+                PricingOptions::default(),
+            )
+            .expect("index-backed Inflation01");
+        let inflation01 = result
+            .measures
+            .get(MetricId::Inflation01.as_str())
+            .copied()
+            .expect("Inflation01");
+        assert!(inflation01.is_finite());
+        assert!(inflation01 > 0.0);
+
+        let projected_curve = InflationCurve::builder("US-CPI")
+            .base_date(as_of)
+            .base_cpi(100.6)
+            .knots([(0.0, 100.6), (10.0, 125.0)])
+            .build()
+            .expect("projected inflation curve");
+        let hybrid_market = market.insert(projected_curve);
+        let hybrid = bond
+            .price_with_metrics(
+                &hybrid_market,
+                as_of,
+                &[MetricId::Inflation01],
+                PricingOptions::default(),
+            )
+            .expect("hybrid index/curve Inflation01");
+        assert!(
+            hybrid
+                .measures
+                .get(MetricId::Inflation01.as_str())
+                .copied()
+                .expect("hybrid Inflation01")
+                > 0.0
+        );
+    }
 }

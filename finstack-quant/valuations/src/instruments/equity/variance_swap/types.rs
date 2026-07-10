@@ -248,6 +248,11 @@ impl VarianceSwap {
     }
 
     /// Get observation dates based on frequency.
+    ///
+    /// Day tenors use the calendar in
+    /// `attributes.meta["observation_calendar_id"]` (or `calendar_id`),
+    /// defaulting to weekends-only. Non-business start and maturity dates are
+    /// adjusted following and preceding, respectively.
     pub fn observation_dates(&self) -> Vec<Date> {
         pricer::observation_dates(self)
     }

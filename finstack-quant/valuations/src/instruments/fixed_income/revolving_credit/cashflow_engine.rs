@@ -429,7 +429,7 @@ impl<'a> CashflowEngine<'a> {
                         let fixing_date =
                             super::utils::floating_fixing_date(spec, reset_effective)?;
 
-                        let coupon_rate = if reset_effective < self.as_of {
+                        let coupon_rate = if fixing_date < self.as_of {
                             let fixing_rate =
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                                     self.fixing_series,

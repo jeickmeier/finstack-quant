@@ -364,6 +364,42 @@ fn test_non_seasoned_facility_ignores_fixings() {
     );
 }
 
+#[test]
+fn valuation_date_reset_uses_contractual_t_minus_two_fixing() {
+    let as_of = date!(2025 - 01 - 15);
+    let mut facility = build_seasoned_floating_facility(as_of, date!(2026 - 01 - 15));
+    let BaseRateSpec::Floating(spec) = &mut facility.base_rate_spec else {
+        panic!("test facility must be floating");
+    };
+    spec.reset_lag_days = 2;
+
+    let fixing_series = ScalarTimeSeries::new(
+        "FIXING:USD-SOFR-3M",
+        vec![(date!(2025 - 01 - 13), 0.10)],
+        None,
+    )
+    .unwrap();
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.03, as_of, "USD-OIS"))
+        .insert(build_flat_forward_curve(0.04, as_of, "USD-SOFR-3M", 0.25))
+        .insert_series(fixing_series);
+    let fixings =
+        finstack_quant_core::market_data::fixings::get_fixing_series(&market, "USD-SOFR-3M").ok();
+    let schedule = CashflowEngine::new(&facility, Some(&market), as_of, fixings)
+        .unwrap()
+        .generate_deterministic()
+        .unwrap();
+    let first_rate = schedule
+        .schedule
+        .flows
+        .iter()
+        .find(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
+        .and_then(|flow| flow.rate)
+        .expect("floating coupon rate");
+
+    assert!((first_rate - 0.12).abs() < 1e-12);
+}
+
 /// Integration test: pricing a seasoned facility through the full pricer
 /// with fixings in the market context.
 #[test]

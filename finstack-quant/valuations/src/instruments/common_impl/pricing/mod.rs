@@ -14,6 +14,7 @@ mod generic;
 pub mod swap_legs;
 pub mod time;
 mod trs;
+pub(crate) mod variance_observations;
 pub mod variance_replication;
 
 // Re-export generic pricer types

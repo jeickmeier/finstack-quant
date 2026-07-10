@@ -9,6 +9,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::{
         DiscountCurve, ForwardCurve, HazardCurve,
     };
@@ -73,6 +74,16 @@ mod tests {
             .insert(disc_curve)
             .insert(fwd_curve)
             .insert(hazard_curve)
+            .insert_series(
+                ScalarTimeSeries::new(
+                    "FIXING:USD-SOFR-3M",
+                    (1..=4)
+                        .map(|days| (base_date - time::Duration::days(days), 0.03))
+                        .collect(),
+                    None,
+                )
+                .unwrap(),
+            )
     }
 
     /// Create a zero-volatility stochastic spec that mimics deterministic behavior

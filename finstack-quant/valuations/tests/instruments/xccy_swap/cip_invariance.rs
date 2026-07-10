@@ -400,6 +400,52 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
     );
 }
 
+#[test]
+fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
+    use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+
+    let as_of = Date::from_calendar_date(2025, Month::February, 3).expect("as of");
+    let reset_date = base_date();
+    let context = build_market_context()
+        .insert_series(
+            ScalarTimeSeries::new("FIXING:EUR-EURIBOR-3M", vec![(reset_date, 0.08)], None)
+                .expect("EUR fixing"),
+        )
+        .insert_series(
+            ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(reset_date, 0.02)], None)
+                .expect("USD fixing"),
+        )
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:FX-EUR-USD",
+                vec![(reset_date, SPOT_USD_PER_EUR)],
+                None,
+            )
+            .expect("FX reset fixing"),
+        );
+    let swap = build_swap(
+        NotionalExchange::MtmResetting {
+            resetting_side: ResettingSide::Leg1,
+        },
+        Decimal::from(-25),
+    );
+
+    let schedule = swap
+        .cashflow_schedule(&context, as_of)
+        .expect("seasoned schedule");
+    let resetting_coupon = schedule
+        .flows
+        .iter()
+        .find(|flow| {
+            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+                && flow.amount.currency() == Currency::EUR
+        })
+        .expect("EUR resetting coupon");
+
+    assert!((resetting_coupon.rate.expect("coupon rate") - 0.0775).abs() < 1e-12);
+}
+
 /// Direction-2 CIP invariance: swap the rate ordering (USD at 1%, EUR at 2%) so the forward FX
 /// moves the other way. The CIP-invariance identity must hold regardless of which
 /// currency has the higher rate.

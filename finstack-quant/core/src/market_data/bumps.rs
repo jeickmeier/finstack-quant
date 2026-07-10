@@ -19,13 +19,13 @@
 //!
 //! - Key-rate risk methodology: `docs/REFERENCES.md#tuckman-serrat-fixed-income`
 
-use super::scalars::{MarketScalar, ScalarTimeSeries};
+use super::scalars::{InflationIndex, MarketScalar, ScalarTimeSeries};
 use super::term_structures::{
     BaseCorrelationCurve, DiscountCurve, ForwardCurve, HazardCurve, InflationCurve, PriceCurve,
     VolatilityIndexCurve,
 };
 use crate::currency::Currency;
-use crate::dates::Date;
+use crate::dates::{Date, DayCount, DayCountContext};
 use crate::types::CurveId;
 
 // -----------------------------------------------------------------------------
@@ -686,6 +686,52 @@ impl Bumpable for InflationCurve {
             .knots(bumped_points)
             .interp(self.interp_style())
             .build()
+    }
+}
+
+impl Bumpable for InflationIndex {
+    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        spec.validate_parallel("InflationIndex")?;
+        let (shift, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
+            crate::error::InputError::UnsupportedBump {
+                reason: "InflationIndex only supports Additive/{Percent,Fraction} or \
+                         Multiplicative/Factor parallel bumps"
+                    .to_string(),
+            }
+        })?;
+
+        let observations = self.observations();
+        let Some(&(anchor_date, anchor_cpi)) = observations.first() else {
+            return Err(crate::error::InputError::TooFewPoints.into());
+        };
+        if !anchor_cpi.is_finite() || anchor_cpi <= 0.0 {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+
+        let mut bumped = Vec::with_capacity(observations.len());
+        for (date, cpi) in observations {
+            let t =
+                DayCount::Act365F.year_fraction(anchor_date, date, DayCountContext::default())?;
+            if t <= 0.0 {
+                bumped.push((date, anchor_cpi));
+                continue;
+            }
+            if !cpi.is_finite() || cpi <= 0.0 {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+            let zero_rate = (cpi / anchor_cpi).powf(1.0 / t) - 1.0;
+            let shifted_rate = if is_multiplicative {
+                (1.0 + zero_rate) * shift - 1.0
+            } else {
+                zero_rate + shift
+            };
+            if shifted_rate <= -1.0 || !shifted_rate.is_finite() {
+                return Err(crate::error::InputError::Invalid.into());
+            }
+            bumped.push((date, anchor_cpi * (1.0 + shifted_rate).powf(t)));
+        }
+
+        self.with_replaced_observations(bumped)
     }
 }
 

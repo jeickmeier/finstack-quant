@@ -402,6 +402,10 @@ pub(crate) fn mtm_resetting_leg_schedule(
     let disc_c = context.get_discount(&constant_leg.discount_curve_id)?;
     let disc_r = context.get_discount(&resetting_leg.discount_curve_id)?;
     let fwd_r = context.get_forward(&resetting_leg.forward_curve_id)?;
+    let fixing_id_r = finstack_quant_core::market_data::fixings::fixing_series_id(
+        resetting_leg.forward_curve_id.as_str(),
+    );
+    let fixings_r = context.get_series(&fixing_id_r).ok();
 
     let fx = context.fx().ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
@@ -492,13 +496,23 @@ pub(crate) fn mtm_resetting_leg_schedule(
 
         // Coupon at payment date on the period-start notional N_j^R.
         if period.payment_date > as_of {
-            let rate_r = crate::instruments::common_impl::pricing::time::rate_period_on_dates(
-                fwd_r.as_ref(),
-                // Project over the accrual interval (index tenor), not from the
-                // observation date — see the coupon-pricing note above.
-                period.accrual_start,
-                period.accrual_end,
-            )?;
+            let fixing_date_r = period.reset_date.unwrap_or(period.accrual_start);
+            let rate_r = if fixing_date_r < as_of {
+                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                    fixings_r,
+                    resetting_leg.forward_curve_id.as_str(),
+                    fixing_date_r,
+                    as_of,
+                )?
+            } else {
+                crate::instruments::common_impl::pricing::time::rate_period_on_dates(
+                    fwd_r.as_ref(),
+                    // Project over the accrual interval (index tenor), not from the
+                    // observation date — see the coupon-pricing note above.
+                    period.accrual_start,
+                    period.accrual_end,
+                )?
+            };
             let coupon_amount = resetting_leg.side.coupon_sign()
                 * n_r_j
                 * (rate_r + spread_decimal)

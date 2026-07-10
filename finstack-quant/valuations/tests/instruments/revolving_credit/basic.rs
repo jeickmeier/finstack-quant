@@ -3,6 +3,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
@@ -428,7 +429,17 @@ fn test_term_forward_with_floor() {
 
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .insert(disc_curve)
+        .insert(fwd_curve)
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(date!(2024 - 12 - 30), 0.0001)],
+                None,
+            )
+            .unwrap(),
+        );
 
     // Facility with floor at 0 bps
     let facility_with_floor = RevolvingCredit::builder()

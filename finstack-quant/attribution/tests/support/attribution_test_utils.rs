@@ -17,6 +17,7 @@ pub struct TestInstrument {
     value: Money,
     discount_curves: SmallVec<[CurveId; 2]>,
     forward_curves: SmallVec<[CurveId; 2]>,
+    inflation_curves: SmallVec<[CurveId; 2]>,
 }
 
 impl TestInstrument {
@@ -26,6 +27,7 @@ impl TestInstrument {
             value,
             discount_curves: SmallVec::<[CurveId; 2]>::new(),
             forward_curves: SmallVec::<[CurveId; 2]>::new(),
+            inflation_curves: SmallVec::<[CurveId; 2]>::new(),
         }
     }
 
@@ -36,6 +38,11 @@ impl TestInstrument {
 
     pub fn with_forward_curves(mut self, curves: &[&str]) -> Self {
         self.forward_curves = curves.iter().map(|id| CurveId::new(*id)).collect();
+        self
+    }
+
+    pub fn with_inflation_curves(mut self, curves: &[&str]) -> Self {
+        self.inflation_curves = curves.iter().map(|id| CurveId::new(*id)).collect();
         self
     }
 }
@@ -77,6 +84,9 @@ impl Instrument for TestInstrument {
         }
         for curve in &self.forward_curves {
             builder = builder.forward(curve.clone());
+        }
+        for curve in &self.inflation_curves {
+            builder = builder.inflation(curve.clone());
         }
         let mut deps = MarketDependencies::new();
         deps.add_curves(builder.build()?);

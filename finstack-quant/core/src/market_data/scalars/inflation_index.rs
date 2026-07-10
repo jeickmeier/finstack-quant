@@ -435,6 +435,21 @@ impl InflationIndex {
         self.series.observations()
     }
 
+    /// Rebuild this index with replacement observations while preserving its
+    /// interpolation, lag, currency, and seasonality conventions.
+    pub(crate) fn with_replaced_observations(
+        &self,
+        observations: Vec<(Date, f64)>,
+    ) -> Result<Self> {
+        let mut rebuilt = Self::new(self.id.clone(), observations, self.currency)?
+            .with_interpolation(self.interpolation)
+            .with_lag(self.lag);
+        if let Some(seasonality) = self.seasonality {
+            rebuilt = rebuilt.with_seasonality(seasonality)?;
+        }
+        Ok(rebuilt)
+    }
+
     /// Get the number of observations in the index.
     pub fn len(&self) -> usize {
         self.series.len()

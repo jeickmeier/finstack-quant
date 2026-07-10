@@ -292,6 +292,13 @@ impl MarketContext {
                 continue;
             }
 
+            if let Some(original) = self.inflation_indices.get(cid).cloned() {
+                let bumped = original.apply_bump(bump_spec)?;
+                Arc::make_mut(&mut self.inflation_indices)
+                    .insert(curve_id.clone(), Arc::new(bumped));
+                continue;
+            }
+
             if let Some(original) = self.surfaces.get(cid).cloned() {
                 let bumped = original.apply_bump(bump_spec)?;
                 Arc::make_mut(&mut self.surfaces).insert(curve_id.clone(), Arc::new(bumped));
@@ -329,11 +336,12 @@ impl MarketContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::currency::Currency;
     use crate::dates::Date;
     use crate::market_data::bumps::{BumpMode, BumpType, BumpUnits};
-    use crate::market_data::scalars::MarketScalar;
+    use crate::market_data::scalars::{InflationIndex, MarketScalar};
     use crate::market_data::surfaces::VolSurface;
-    use crate::market_data::term_structures::DiscountCurve;
+    use crate::market_data::term_structures::{DiscountCurve, InflationCurve};
     use crate::math::interp::InterpStyle;
     use time::Month;
 
@@ -348,6 +356,80 @@ mod tests {
             value,
             bump_type: BumpType::Parallel,
         }
+    }
+
+    #[test]
+    fn generic_curve_bump_supports_inflation_index_sources() {
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![
+                (
+                    Date::from_calendar_date(2024, Month::January, 1).expect("date"),
+                    300.0,
+                ),
+                (
+                    Date::from_calendar_date(2025, Month::January, 1).expect("date"),
+                    306.0,
+                ),
+            ],
+            Currency::USD,
+        )
+        .expect("inflation index");
+        let context = MarketContext::new().insert_inflation_index("US-CPI", index);
+
+        let bumped = context
+            .bump([MarketBump::Curve {
+                id: CurveId::new("US-CPI"),
+                spec: BumpSpec::inflation_shift_pct(0.01),
+            }])
+            .expect("index bump");
+        let bumped_index = bumped.get_inflation_index("US-CPI").expect("bumped index");
+        let end = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        assert!(bumped_index.value_on(end).expect("CPI") > 306.0);
+    }
+
+    #[test]
+    fn inflation_curve_bump_preserves_realized_same_id_index() {
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![
+                (as_of(), 300.0),
+                (as_of() + time::Duration::days(365), 306.0),
+            ],
+            Currency::USD,
+        )
+        .expect("inflation index");
+        let curve = InflationCurve::builder("US-CPI")
+            .base_date(as_of())
+            .base_cpi(300.0)
+            .knots([(0.0, 300.0), (1.0, 306.0)])
+            .build()
+            .expect("inflation curve");
+        let context = MarketContext::new()
+            .insert(curve)
+            .insert_inflation_index("US-CPI", index);
+
+        let bumped = context
+            .bump([MarketBump::Curve {
+                id: CurveId::new("US-CPI"),
+                spec: BumpSpec::inflation_shift_pct(0.01),
+            }])
+            .expect("inflation market bump");
+        assert!(
+            bumped
+                .get_inflation_curve("US-CPI")
+                .expect("curve")
+                .cpi(1.0)
+                > 306.0
+        );
+        assert_eq!(
+            bumped
+                .get_inflation_index("US-CPI")
+                .expect("index")
+                .value_on(as_of() + time::Duration::days(365))
+                .expect("CPI"),
+            306.0
+        );
     }
 
     #[test]
