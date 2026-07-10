@@ -127,21 +127,16 @@ pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Vec<Date> {
 
 pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
     if let Some(months) = inst.observation_freq.months() {
-        return match months {
-            1 => 12.0,
-            3 => 4.0,
-            6 => 2.0,
-            12 => 1.0,
-            _ => 252.0,
-        };
+        return 12.0 / months as f64;
     }
     if let Some(days) = inst.observation_freq.days() {
         // Restored after a `clippy --fix` pass corrupted these arms (dropped
         // `7 => 52.0`, rewrote `14 => 26.0` as `4 => 26.0`).
         return match days {
+            1 => 252.0,
             7 => 52.0,
             14 => 26.0,
-            _ => 252.0,
+            _ => 365.25 / days as f64,
         };
     }
     252.0
@@ -221,6 +216,16 @@ fn get_historical_prices_with_dates(
         if dates.len() >= 2 {
             return series.values_on(&dates);
         }
+    }
+
+    let accrued = obs_dates.iter().filter(|&&date| date <= as_of).count();
+    if accrued >= 2 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "FxVarianceSwap '{}' has {} past observation dates but no historical price data is available in series '{}'. Provide the time series before pricing a seasoned swap.",
+            inst.id.as_str(),
+            accrued,
+            close_id_owned
+        )));
     }
 
     let spot = inst.spot_rate(context, as_of)?;
@@ -509,9 +514,15 @@ mod tests {
 
     #[test]
     fn fx_variance_swap_pricer_compute_pv_matches_instrument_value() {
+        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
         let swap = FxVarianceSwap::example();
         let as_of = date!(2025 - 01 - 02);
-        let market = build_market(as_of);
+        let observations = observation_dates(&swap)
+            .into_iter()
+            .map(|date| (date, 1.10))
+            .collect();
+        let series = ScalarTimeSeries::new("EURUSD", observations, None).expect("series");
+        let market = build_market(as_of).insert_series(series);
 
         let via_pricer = compute_pv(&swap, &market, as_of).expect("pricer pv");
         let via_instrument = swap.value(&market, as_of).expect("instrument pv");

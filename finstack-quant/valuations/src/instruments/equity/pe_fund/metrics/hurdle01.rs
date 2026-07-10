@@ -76,10 +76,9 @@ impl MetricCalculator for Hurdle01Calculator {
         fund_down.waterfall_spec = spec_down;
         let pv_down = fund_down.value(context.curves.as_ref(), as_of)?.amount();
 
-        // Hurdle01 = (PV_up - PV_down) / (2 * bump_size)
+        // Scenarios are ±1bp; return the PV change for one basis point.
         // Higher hurdle typically benefits LPs (more preferred return before GP carry)
-        // Result is the derivative dPV/dh per unit hurdle rate (Dv01 convention)
-        let hurdle01 = (pv_up - pv_down) / (2.0 * HURDLE_BUMP);
+        let hurdle01 = (pv_up - pv_down) / 2.0;
 
         Ok(hurdle01)
     }

@@ -18,7 +18,7 @@ use finstack_quant_valuations::models::closed_form::implied_vol::{
     black76_implied_vol, bs_implied_vol,
 };
 use finstack_quant_valuations::models::closed_form::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks, bs_price_checked,
+    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks_checked, bs_price_checked,
     checked_closed_form_value, down_in_call, down_out_call, fixed_strike_lookback_call,
     fixed_strike_lookback_put, floating_strike_lookback_call, floating_strike_lookback_put,
     geometric_asian_call, geometric_asian_put, option_type_from_bool, quanto_call, quanto_put,
@@ -115,7 +115,7 @@ fn bs_greeks_wrapper<'py>(
             "theta_days must be positive, got {theta_days}"
         )));
     }
-    let greeks: BsGreeks = bs_greeks(
+    let greeks: BsGreeks = bs_greeks_checked(
         spot,
         strike,
         r,
@@ -124,7 +124,8 @@ fn bs_greeks_wrapper<'py>(
         t,
         option_type_from_bool(is_call),
         theta_days,
-    );
+    )
+    .map_err(display_to_py)?;
     let out = PyDict::new(py);
     out.set_item("delta", greeks.delta)?;
     out.set_item("gamma", greeks.gamma)?;

@@ -478,14 +478,41 @@ Global solve requires strictly increasing times.",
         }
 
         let (mut curve, mut report) = match params.method {
-            CalibrationMethod::Bootstrap => SequentialBootstrapper::bootstrap(
-                &target,
-                &prepared_quotes,
-                vec![(0.0, 1.0)],
-                &config,
-                success_tolerance,
-                None,
-            )?,
+            CalibrationMethod::Bootstrap => {
+                let (seed_curve, seed_report) = SequentialBootstrapper::bootstrap(
+                    &target,
+                    &prepared_quotes,
+                    vec![(0.0, 1.0)],
+                    &config,
+                    success_tolerance,
+                    None,
+                )?;
+                if matches!(
+                    params.interpolation,
+                    InterpStyle::Linear | InterpStyle::LogLinear
+                ) {
+                    (seed_curve, seed_report)
+                } else {
+                    // Non-local interpolation lets later knots move earlier
+                    // quote residuals, so a single causal bootstrap sweep is
+                    // only a seed. Polish all knots simultaneously to preserve
+                    // the caller's requested final interpolation while meeting
+                    // the same fit tolerance.
+                    target.initial_curve = Some(seed_curve);
+                    let refinement_config = CalibrationConfig {
+                        calibration_method: CalibrationMethod::GlobalSolve {
+                            use_analytical_jacobian: true,
+                        },
+                        ..config.clone()
+                    };
+                    GlobalFitOptimizer::optimize(
+                        &target,
+                        &prepared_quotes,
+                        &refinement_config,
+                        success_tolerance,
+                    )?
+                }
+            }
             CalibrationMethod::GlobalSolve { .. } => {
                 GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?
             }
@@ -1140,6 +1167,10 @@ Ensure quotes map to strictly increasing year fractions.",
         // that is read in the -h loop was freshly written in the +h loop. One
         // buffer therefore suffices instead of allocating per column.
         let mut vals_plus = vec![0.0_f64; quotes.len()];
+        let has_local_interpolation = matches!(
+            self.solve_interp,
+            InterpStyle::Linear | InterpStyle::LogLinear
+        );
 
         for j in 0..params.len() {
             let p_orig = params[j];
@@ -1154,7 +1185,7 @@ Ensure quotes map to strictly increasing year fractions.",
             let curve_plus = self.build_curve_for_solver_from_params(times, &params_bumped)?;
             self.scratch.with_curve(&curve_plus, |ctx_plus| {
                 for (i, quote) in quotes.iter().enumerate() {
-                    if quote_times[i] < t_cutoff - 1e-4 {
+                    if has_local_interpolation && quote_times[i] < t_cutoff - 1e-4 {
                         continue;
                     }
                     let pv = quote.get_instrument().value_raw(ctx_plus, self.base_date)?;
@@ -1168,7 +1199,7 @@ Ensure quotes map to strictly increasing year fractions.",
             let curve_minus = self.build_curve_for_solver_from_params(times, &params_bumped)?;
             self.scratch.with_curve(&curve_minus, |ctx_minus| {
                 for (i, quote) in quotes.iter().enumerate() {
-                    if quote_times[i] < t_cutoff - 1e-4 {
+                    if has_local_interpolation && quote_times[i] < t_cutoff - 1e-4 {
                         jacobian[i][j] = 0.0;
                         continue;
                     }
@@ -1191,10 +1222,9 @@ Ensure quotes map to strictly increasing year fractions.",
     /// Returns `true` to indicate an efficient Jacobian is available.
     ///
     /// The discount curve target provides a custom Jacobian implementation that
-    /// exploits the locality/sparsity of discount curve calibration: each quote
-    /// typically depends only on nearby knot points. This uses optimized row-wise
-    /// finite differences rather than generic column-wise FD, achieving significant
-    /// speedups for large curve fits.
+    /// uses row-wise finite differences and only applies the causal sparsity
+    /// shortcut for local interpolation schemes. Global/non-local schemes such
+    /// as monotone-convex reprice every quote for every bumped knot.
     ///
     /// See [`jacobian`](Self::jacobian) for implementation details.
     fn supports_efficient_jacobian(&self) -> bool {

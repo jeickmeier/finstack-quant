@@ -255,6 +255,25 @@ impl InstrumentTrait for FxVarianceSwap {
         if let Some(spot_id) = self.spot_id.as_deref() {
             deps.add_spot_id(spot_id);
         }
+        if self.realized_var_method.requires_ohlc() {
+            for series_id in [
+                self.open_series_id.as_deref(),
+                self.high_series_id.as_deref(),
+                self.low_series_id.as_deref(),
+                self.close_series_id.as_deref(),
+            ]
+            .into_iter()
+            .flatten()
+            {
+                deps.add_series_id(series_id);
+            }
+        } else {
+            deps.add_series_id(
+                self.close_series_id
+                    .clone()
+                    .unwrap_or_else(|| self.series_id()),
+            );
+        }
         deps.add_vol_surface_id(self.vol_surface_id.as_str());
         deps.add_fx_pair(self.base_currency, self.quote_currency);
         Ok(deps)

@@ -217,6 +217,39 @@ impl BasisSwap {
         self
     }
 
+    /// Validate structural invariants independently of the constructor.
+    ///
+    /// This is required for Serde-backed Rust/Python/WASM construction, which
+    /// does not pass through [`BasisSwap::new`].
+    pub fn validate(&self) -> Result<()> {
+        if self.primary_leg.start >= self.primary_leg.end {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BasisSwap '{}' primary leg has start ({}) >= end ({}); leg must have positive tenor",
+                self.id, self.primary_leg.start, self.primary_leg.end
+            )));
+        }
+        if self.reference_leg.start >= self.reference_leg.end {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BasisSwap '{}' reference leg has start ({}) >= end ({}); leg must have positive tenor",
+                self.id, self.reference_leg.start, self.reference_leg.end
+            )));
+        }
+        if !self.allow_same_curve
+            && self.primary_leg.forward_curve_id == self.reference_leg.forward_curve_id
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "BasisSwap '{}' has identical forward curves on both legs ({}); set allow_same_curve=true only for an intentional same-index spread trade",
+                self.id,
+                self.primary_leg.forward_curve_id.as_str()
+            )));
+        }
+        Self::validate_leg_lags(self.id.as_str(), "primary", &self.primary_leg)?;
+        Self::validate_leg_lags(self.id.as_str(), "reference", &self.reference_leg)?;
+        self.resolve_leg_calendar("primary", &self.primary_leg)?;
+        self.resolve_leg_calendar("reference", &self.reference_leg)?;
+        Ok(())
+    }
+
     /// Creates a basis swap without curve uniqueness validation.
     ///
     /// Use this constructor when you intentionally want both legs to reference the
@@ -341,6 +374,21 @@ impl BasisSwap {
         Ok(())
     }
 
+    fn resolve_leg_calendar<'a>(&self, leg_name: &str, leg: &'a BasisSwapLeg) -> Result<&'a str> {
+        if let Some(id) = leg.calendar_id.as_deref() {
+            if crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok() {
+                return Ok(id);
+            }
+        }
+        if self.allow_calendar_fallback {
+            return Ok(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+        }
+        Err(finstack_quant_core::Error::Validation(format!(
+            "BasisSwap '{}' {} leg requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
+            self.id, leg_name
+        )))
+    }
+
     /// Calculates the present value of a floating rate leg.
     ///
     /// This method uses the shared swap leg pricing infrastructure for
@@ -390,10 +438,7 @@ impl BasisSwap {
                 frequency: leg.frequency,
                 stub: leg.stub,
                 bdc: leg.bdc,
-                calendar_id: leg
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                calendar_id: self.resolve_leg_calendar("priced", leg)?,
                 end_of_month: false,
                 day_count: leg.day_count,
                 payment_lag_days: leg.payment_lag_days,
@@ -470,10 +515,7 @@ impl BasisSwap {
                 frequency: leg.frequency,
                 stub: leg.stub,
                 bdc: leg.bdc,
-                calendar_id: leg
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                calendar_id: self.resolve_leg_calendar("cashflow", leg)?,
                 end_of_month: false,
                 day_count: leg.day_count,
                 payment_lag_days: leg.payment_lag_days,
@@ -536,10 +578,7 @@ impl BasisSwap {
                     reset_lag_days: leg.reset_lag_days,
                     dc: leg.day_count,
                     bdc: leg.bdc,
-                    calendar_id: leg
-                        .calendar_id
-                        .clone()
-                        .unwrap_or_else(|| "weekends_only".to_string()),
+                    calendar_id: self.resolve_leg_calendar("cashflow", leg)?.to_string(),
                     fixing_calendar_id: None,
                     end_of_month: false,
                     payment_lag_days: leg.payment_lag_days,
@@ -564,6 +603,10 @@ impl BasisSwap {
 // Use the macro to implement Instrument with pricing
 impl crate::instruments::common_impl::traits::Instrument for BasisSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::BasisSwap);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        BasisSwap::validate(self)
+    }
 
     fn base_value(
         &self,
@@ -792,7 +835,8 @@ mod tests {
             primary_leg,
             reference_leg,
         )
-        .expect("should succeed");
+        .expect("should succeed")
+        .with_allow_calendar_fallback(true);
 
         let pv = swap.value(&context, base_date).expect("should succeed");
         assert!(
@@ -1306,7 +1350,8 @@ mod tests {
             primary_leg,
             reference_leg,
         )
-        .expect("should succeed");
+        .expect("should succeed")
+        .with_allow_calendar_fallback(true);
 
         let flows = swap
             .dated_cashflows(&context, base_date)

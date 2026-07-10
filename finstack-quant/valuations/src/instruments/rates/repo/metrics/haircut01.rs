@@ -65,6 +65,6 @@ impl MetricCalculator for Haircut01Calculator {
         // haircut_down < 2bp` and dividing by a fixed 2bp would understate
         // the sensitivity. `haircut_up > haircut_down` always holds, so the
         // helper's degenerate-width error path cannot trigger here.
-        central_diff_by_width(pv_up, pv_down, haircut_up - haircut_down)
+        Ok(central_diff_by_width(pv_up, pv_down, haircut_up - haircut_down)? * HAIRCUT_BUMP)
     }
 }

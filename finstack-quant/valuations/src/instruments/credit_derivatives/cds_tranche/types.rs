@@ -159,6 +159,25 @@ impl CDSTranche {
                 self.notional.amount()
             )));
         }
+        let currency = self.notional.currency();
+        if let Some((_, upfront)) = self.upfront {
+            if upfront.currency() != currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS tranche upfront currency {} must match notional currency {}",
+                    upfront.currency(),
+                    currency
+                )));
+            }
+        }
+        if let Some(upfront) = self.pricing_overrides.market_quotes.upfront_payment {
+            if upfront.currency() != currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS tranche upfront override currency {} must match notional currency {}",
+                    upfront.currency(),
+                    currency
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -410,6 +429,10 @@ impl CDSTranche {
 
 impl Instrument for CDSTranche {
     impl_instrument_base!(crate::pricer::InstrumentType::CDSTranche);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CDSTranche::validate(self)
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::HazardRate

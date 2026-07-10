@@ -230,13 +230,7 @@ pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
     const TRADING_DAYS_PER_YEAR: f64 = 252.0;
 
     if let Some(months) = inst.observation_freq.months() {
-        match months {
-            1 => 12.0,
-            3 => 4.0,
-            6 => 2.0,
-            12 => 1.0,
-            _ => TRADING_DAYS_PER_YEAR,
-        }
+        12.0 / months as f64
     } else if let Some(days) = inst.observation_freq.days() {
         match days {
             1 => TRADING_DAYS_PER_YEAR,
@@ -246,7 +240,8 @@ pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
             // understates realized variance ~31% (matches the FX sibling).
             7 => 52.0,
             14 => 26.0,
-            _ => TRADING_DAYS_PER_YEAR / days as f64,
+            // Multi-day schedules step in calendar days.
+            _ => 365.25 / days as f64,
         }
     } else {
         TRADING_DAYS_PER_YEAR
@@ -278,13 +273,7 @@ pub(crate) fn annualization_factor_with_policy(
         .unwrap_or(252.0);
 
     if let Some(months) = inst.observation_freq.months() {
-        return match months {
-            1 => 12.0,
-            3 => 4.0,
-            6 => 2.0,
-            12 => 1.0,
-            _ => tdy_override,
-        };
+        return 12.0 / months as f64;
     }
     if let Some(days) = inst.observation_freq.days() {
         return match days {
@@ -293,7 +282,7 @@ pub(crate) fn annualization_factor_with_policy(
             // year regardless of the trading-days-per-year policy override.
             7 => 52.0,
             14 => 26.0,
-            _ => tdy_override / days as f64,
+            _ => 365.25 / days as f64,
         };
     }
     tdy_override
@@ -334,6 +323,14 @@ pub(crate) fn get_historical_prices(
             return series.values_on(&past_dates);
         }
     }
+    if past_dates.len() >= 2 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "VarianceSwap '{}' has {} past observation dates but no historical price data is available in series '{}'. Provide the time series before pricing a seasoned swap.",
+            inst.id.as_str(),
+            past_dates.len(),
+            close_id
+        )));
+    }
     if let Ok(scalar) = context.get_price(&inst.underlying_ticker) {
         let spot = match scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
@@ -347,18 +344,6 @@ pub(crate) fn get_historical_prices(
     // variance is 0 by definition. Otherwise this is a data-availability
     // failure and must error rather than silently mark the swap to zero
     // realised variance.
-    if past_dates.len() >= 2 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "VarianceSwap '{}' has {} past observation dates but no historical price \
-             data is available (looked for series '{}' and spot scalar '{}'). \
-             Provide the time series to compute realised variance, or remove past \
-             observations before pricing.",
-            inst.id.as_str(),
-            past_dates.len(),
-            close_id,
-            inst.underlying_ticker.as_str()
-        )));
-    }
     Ok(vec![])
 }
 

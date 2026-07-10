@@ -531,6 +531,10 @@ pub enum FundingLegSpec {
 impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::CmsSwap);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CmsSwap::validate(self)
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76
     }
@@ -540,8 +544,24 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        self.validate()?;
         crate::instruments::rates::cms_swap::pricer::compute_pv(self, market, as_of)
+    }
+
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(self)?;
+        if let FundingLeg::Floating {
+            forward_curve_id, ..
+        } = &self.funding_leg
+        {
+            deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+                forward_curve_id.as_str(),
+            ));
+        }
+        Ok(deps)
     }
 
     fn effective_start_date(&self) -> Option<Date> {

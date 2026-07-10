@@ -202,10 +202,10 @@ impl TermLoanDiscountingPricer {
         // Build full cashflow schedule
         let mut schedule = generate_cashflows(loan, market, as_of)?;
 
-        // Post-process: replace forward-projected rates with historical fixings
-        // for seasoned floating-rate periods (reset_date < as_of).
-        // Graceful degradation: if fixings are unavailable, keep forward projection.
-        Self::apply_fixings(loan, market, as_of, &mut schedule);
+        // Post-process seasoned floating periods with their economically locked
+        // historical fixings. Missing past fixings are a market-data failure,
+        // not a signal to reproject the coupon from today's curve.
+        Self::apply_fixings(loan, market, as_of, &mut schedule)?;
 
         // Filter flows: exclude PIK (capitalized interest) and past flows from PV.
         // PIK increases outstanding and is repaid via principal redemption.
@@ -231,33 +231,37 @@ impl TermLoanDiscountingPricer {
     /// The all-in rate is computed from the raw fixing using the same floor/cap/
     /// gearing/spread logic as forward projection (via `calculate_floating_rate`).
     ///
-    /// Uses graceful degradation: if the fixing series is absent or the specific
-    /// date is missing, the forward-projected rate is retained.
     fn apply_fixings(
         loan: &TermLoan,
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
         schedule: &mut crate::cashflow::builder::schedule::CashFlowSchedule,
-    ) {
+    ) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::cashflow::CFKind;
         use rust_decimal::prelude::ToPrimitive;
 
         // Only applies to floating-rate loans.
         let float_spec = match &loan.rate {
             RateSpec::Floating(spec) => spec,
-            RateSpec::Fixed { .. } => return,
+            RateSpec::Fixed { .. } => return Ok(()),
         };
 
-        // Try to resolve the fixing series; if absent, nothing to do.
+        // A reset lag can place the first observation before the issue date.
+        // The loan is not seasoned until its contractual accrual has begun.
+        if loan.issue_date >= as_of {
+            return Ok(());
+        }
+
+        let has_past_reset = schedule.flows.iter().any(|flow| {
+            flow.kind == CFKind::FloatReset && flow.reset_date.is_some_and(|date| date < as_of)
+        });
+        if !has_past_reset {
+            return Ok(());
+        }
         let fixing_series = finstack_quant_core::market_data::fixings::get_fixing_series(
             market,
             float_spec.index_id.as_str(),
-        )
-        .ok();
-
-        if fixing_series.is_none() {
-            return;
-        }
+        )?;
 
         // Build FloatingRateParams from the loan's floating rate spec.
         // These parameters encode spread, gearing, floors, and caps for
@@ -280,9 +284,7 @@ impl TermLoanDiscountingPricer {
         };
 
         // Build outstanding path for notional lookup at each flow date.
-        let Ok(outstanding_path) = schedule.outstanding_by_date() else {
-            return;
-        };
+        let outstanding_path = schedule.outstanding_by_date()?;
         // Helper: find outstanding notional at a given date using the path.
         let notional_at = |target: finstack_quant_core::dates::Date| -> f64 {
             let mut last = 0.0_f64;
@@ -306,17 +308,12 @@ impl TermLoanDiscountingPricer {
                 _ => continue,
             };
 
-            // Try exact-date fixing lookup; gracefully skip if unavailable.
-            let Ok(raw_fixing) =
-                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                    fixing_series,
-                    float_spec.index_id.as_str(),
-                    reset_date,
-                    as_of,
-                )
-            else {
-                continue;
-            };
+            let raw_fixing = finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                Some(fixing_series),
+                float_spec.index_id.as_str(),
+                reset_date,
+                as_of,
+            )?;
             let all_in_rate = crate::cashflow::builder::rate_helpers::calculate_floating_rate(
                 raw_fixing, &params,
             );
@@ -328,6 +325,7 @@ impl TermLoanDiscountingPricer {
             flow.rate = Some(all_in_rate);
             flow.amount = Money::new(new_amount, flow.amount.currency());
         }
+        Ok(())
     }
 }
 
@@ -531,7 +529,8 @@ mod tests {
 
         // Generate cashflows and apply fixings (via the pricer's internal schedule).
         let mut schedule = generate_cashflows(&loan, &market, as_of).expect("cashflows");
-        TermLoanDiscountingPricer::apply_fixings(&loan, &market, as_of, &mut schedule);
+        TermLoanDiscountingPricer::apply_fixings(&loan, &market, as_of, &mut schedule)
+            .expect("complete fixing history");
 
         // Check that FloatReset flows with reset_date < as_of use the fixing rate.
         // Fixing rate = 0.02, spread = 300 bps = 0.03 => all_in = 0.05 (with gearing=1).
@@ -560,35 +559,13 @@ mod tests {
     }
 
     #[test]
-    fn no_fixings_keeps_forward_projected_rate() {
-        // Verify backwards compatibility: when no fixing series is provided,
-        // the pricer uses forward-projected rates for all periods.
+    fn no_fixings_rejects_seasoned_floating_loan() {
         let as_of = date(2025, 4, 1);
         let loan = floating_loan_for_fixings();
         let market_no_fix = market_without_fixings(as_of);
-        let market_with_fix = market_with_fixings(as_of);
-
-        // Price without fixings
-        let pv_no_fixings = TermLoanDiscountingPricer::price(&loan, &market_no_fix, as_of)
-            .expect("price without fixings");
-
-        // Price with fixings (different historical rate should change PV)
-        let pv_with_fixings = TermLoanDiscountingPricer::price(&loan, &market_with_fix, as_of)
-            .expect("price with fixings");
-
-        // Without fixings, the forward rate (5%) is used for all periods.
-        // With fixings, past periods use the fixing (2% index => 5% all-in).
-        // Since fixing (2%) + spread (3%) = 5% all-in, which happens to equal the
-        // forward rate (5%), the PVs should be very close in this particular case.
-        // The important thing is that no_fixings doesn't error or panic.
-        assert!(
-            pv_no_fixings.amount().abs() > 0.0,
-            "PV without fixings should be non-zero"
-        );
-        assert!(
-            pv_with_fixings.amount().abs() > 0.0,
-            "PV with fixings should be non-zero"
-        );
+        let err = TermLoanDiscountingPricer::price(&loan, &market_no_fix, as_of)
+            .expect_err("seasoned floating loan must require historical fixings");
+        assert!(err.to_string().contains("FIXING:USD-SOFR-3M"));
     }
 
     #[test]

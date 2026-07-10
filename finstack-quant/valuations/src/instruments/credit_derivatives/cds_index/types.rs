@@ -367,6 +367,34 @@ impl CDSIndex {
         self
     }
 
+    /// Validate trade-state invariants shared by all pricing modes.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.index_factor.is_finite() || !(0.0..=1.0).contains(&self.index_factor) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS Index '{}' has invalid index_factor {} (must be finite and within [0, 1])",
+                self.id, self.index_factor
+            )));
+        }
+        if !self.notional.amount().is_finite() || self.notional.amount() == 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS Index '{}' notional must be finite and non-zero, got {}",
+                self.id,
+                self.notional.amount()
+            )));
+        }
+        if let Some(upfront) = self.pricing_overrides.market_quotes.upfront_payment {
+            if upfront.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS Index '{}' upfront override currency {} must match notional currency {}",
+                    self.id,
+                    upfront.currency(),
+                    self.notional.currency()
+                )));
+            }
+        }
+        Ok(())
+    }
+
     /// Map this index to a synthetic single-name CDS for valuation reuse.
     ///
     /// The synthetic CDS notional reflects `notional × index_factor`, i.e.
@@ -545,6 +573,10 @@ impl CDSIndex {
 
 impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
     impl_instrument_base!(crate::pricer::InstrumentType::CDSIndex);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CDSIndex::validate(self)
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::HazardRate

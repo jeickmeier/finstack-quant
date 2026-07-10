@@ -49,20 +49,21 @@ fn market_with_recovery(
     };
 
     if hazard.par_spread_points().next().is_some() {
-        match recalibrate_hazard_with_recovery_and_doc_clause_and_valuation_convention(
+        let recalibrated = recalibrate_hazard_with_recovery_and_doc_clause_and_valuation_convention(
             hazard.as_ref(),
             new_recovery,
             market,
             Some(&discount_id),
             Some(market_doc_clause(&synthetic)),
             Some(synthetic.valuation_convention),
-        ) {
-            Ok(recalibrated) => Ok(market.clone().insert(recalibrated)),
-            // Recalibration failure (e.g. degenerate spreads under the new
-            // recovery) is non-fatal: fall back to the frozen-curve bump so
-            // the metric still produces a number.
-            Err(_) => frozen_curve_market(),
-        }
+        )
+        .map_err(|e| finstack_quant_core::Error::Calibration {
+            message: format!(
+                "CDS index Recovery01: recovery re-bootstrap failed for curve '{curve_id}' ({e}); refusing silent frozen-curve fallback"
+            ),
+            category: "recovery01_rebootstrap".to_string(),
+        })?;
+        Ok(market.clone().insert(recalibrated))
     } else {
         frozen_curve_market()
     }

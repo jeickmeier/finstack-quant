@@ -83,10 +83,9 @@ impl MetricCalculator for Carry01Calculator {
         fund_down.waterfall_spec = spec_down;
         let pv_down = fund_down.value(context.curves.as_ref(), as_of)?.amount();
 
-        // Carry01 = (PV_up - PV_down) / (2 * bump_size)
+        // Scenarios are ±1bp; return the PV change for one basis point.
         // Higher GP carry means less for LPs, so PV_up < PV_down typically
-        // Result is the derivative dPV/ds per unit GP share (Dv01 convention)
-        let carry01 = (pv_up - pv_down) / (2.0 * CARRY_BUMP);
+        let carry01 = (pv_up - pv_down) / 2.0;
 
         Ok(carry01)
     }

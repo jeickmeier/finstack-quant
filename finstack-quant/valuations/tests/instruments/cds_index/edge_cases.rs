@@ -26,7 +26,7 @@ const TEST_RECOVERY: f64 = 0.40;
 
 #[test]
 fn test_zero_notional() {
-    // Edge Case: Zero notional produces zero NPV
+    // Edge Case: Zero notional is rejected as invalid trade state.
     let start = date!(2025 - 01 - 01);
     let end = date!(2030 - 01 - 01);
     let as_of = start;
@@ -34,9 +34,8 @@ fn test_zero_notional() {
     let idx = standard_single_curve_index("CDX-ZERO", start, end, 0.0);
     let ctx = standard_market_context(as_of);
 
-    let npv = idx.value(&ctx, as_of).unwrap();
-
-    assert_eq!(npv.amount(), 0.0);
+    let err = idx.value(&ctx, as_of).expect_err("zero notional must fail");
+    assert!(err.to_string().contains("non-zero"));
 }
 
 #[test]
@@ -360,9 +359,8 @@ fn test_index_factor_greater_than_one() {
     let ctx = standard_market_context(as_of);
     let result = idx.value(&ctx, as_of);
 
-    assert!(result.is_ok(), "Index factor > 1.0 should still price");
-    let npv = result.unwrap();
-    assert!(npv.amount().is_finite(), "NPV should be finite");
+    let err = result.expect_err("index factor above one must fail");
+    assert!(err.to_string().contains("index_factor"));
 }
 
 #[test]

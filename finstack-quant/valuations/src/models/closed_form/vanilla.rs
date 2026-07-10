@@ -407,6 +407,74 @@ pub fn bs_greeks(
     }
 }
 
+/// Checked Black–Scholes / Garman–Kohlhagen Greeks for host boundaries.
+///
+/// Unlike the raw formula, this rejects non-finite or economically invalid
+/// inputs and verifies every returned sensitivity is finite.
+#[allow(clippy::too_many_arguments)]
+pub fn bs_greeks_checked(
+    spot: f64,
+    strike: f64,
+    r: f64,
+    q: f64,
+    sigma: f64,
+    t: f64,
+    option_type: OptionType,
+    theta_days_per_year: f64,
+) -> Result<BsGreeks> {
+    for (name, value) in [
+        ("spot", spot),
+        ("strike", strike),
+        ("r", r),
+        ("q", q),
+        ("sigma", sigma),
+        ("t", t),
+        ("theta_days_per_year", theta_days_per_year),
+    ] {
+        if !value.is_finite() {
+            return Err(Error::Validation(format!(
+                "Black-Scholes Greeks input '{name}' must be finite, got {value}"
+            )));
+        }
+    }
+    if spot <= 0.0 || strike <= 0.0 {
+        return Err(Error::Validation(format!(
+            "Black-Scholes Greeks require positive spot and strike, got spot={spot}, strike={strike}"
+        )));
+    }
+    if sigma <= 0.0 || t <= 0.0 || theta_days_per_year <= 0.0 {
+        return Err(Error::Validation(format!(
+            "Black-Scholes Greeks require positive sigma, t, and theta_days_per_year, got sigma={sigma}, t={t}, theta_days_per_year={theta_days_per_year}"
+        )));
+    }
+
+    let greeks = bs_greeks(
+        spot,
+        strike,
+        r,
+        q,
+        sigma,
+        t,
+        option_type,
+        theta_days_per_year,
+    );
+    for (name, value) in [
+        ("delta", greeks.delta),
+        ("gamma", greeks.gamma),
+        ("vega", greeks.vega),
+        ("theta", greeks.theta),
+        ("rho_r", greeks.rho_r),
+        ("rho_q", greeks.rho_q),
+    ] {
+        if !value.is_finite() {
+            return Err(Error::Validation(format!(
+                "Black-Scholes Greek '{name}' is non-finite for the supplied inputs"
+            )));
+        }
+    }
+    Ok(greeks)
+}
+
 /// Black-76 undiscounted call price (option on a forward).
 ///
 /// Returns `(forward - strike).max(0.0)` for degenerate inputs

@@ -494,6 +494,29 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         false
     }
 
+    /// Validate instrument-specific structural and economic invariants.
+    ///
+    /// The default implementation accepts the instrument. Types with domain
+    /// invariants that Serde cannot express (for example positive strikes,
+    /// distinct basis indices, or aligned reset schedules) override this
+    /// method. JSON, Python, WASM, and direct Rust pricing all call the same
+    /// hook through [`Instrument::validate_for_pricing`].
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        Ok(())
+    }
+
+    /// Validate the complete instrument boundary before pricing or exposing a
+    /// deserialized payload to a host language.
+    fn validate_for_pricing(&self) -> finstack_quant_core::Result<()> {
+        self.validate_invariants()?;
+        if let Some(overrides) = self.pricing_overrides() {
+            overrides.validate()?;
+        } else if let Some(overrides) = self.scenario_overrides() {
+            overrides.validate()?;
+        }
+        Ok(())
+    }
+
     // === Pricing Methods ===
 
     /// Compute the present value only (fast path, no metrics).
@@ -627,6 +650,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     ///
     /// Present value with scenario price shock applied (if any).
     fn value(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<Money> {
+        self.validate_for_pricing()?;
         let base = self.base_value(market, as_of)?;
         Ok(self
             .scenario_overrides()
@@ -643,6 +667,7 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
+        self.validate_for_pricing()?;
         Ok(self.base_value(market, as_of)?.amount())
     }
 

@@ -396,7 +396,7 @@ impl SequentialBootstrapper {
         // as true bracketed roots.
         let mut approximate_knot_times: Vec<f64> = Vec::new();
 
-        for (sorted_idx, sq) in sorted_quotes.into_iter().enumerate() {
+        for (sorted_idx, sq) in sorted_quotes.iter().enumerate() {
             validate_time_ordering(sq.time, last_time, sq.original_idx)?;
             let quote = &quotes[sq.original_idx];
             let time = sq.time;
@@ -427,6 +427,18 @@ impl SequentialBootstrapper {
         }
 
         let final_curve = target.build_curve_final(&knots)?;
+        // Later knots can move earlier interpolation segments for non-local
+        // schemes such as PCHIP and MonotoneConvex. Reprice every quote on the
+        // final curve instead of reporting the stale residual captured when
+        // each knot was first committed.
+        residuals = sorted_quotes
+            .iter()
+            .map(|sq| target.calculate_residual(&final_curve, &quotes[sq.original_idx]))
+            .collect::<Result<Vec<_>>>()?
+            .into_iter()
+            .enumerate()
+            .map(|(index, residual)| (format!("quote_{index:06}"), residual))
+            .collect();
         let mut report = CalibrationReport::for_type_with_tolerance(
             "generic_bootstrap",
             residuals,

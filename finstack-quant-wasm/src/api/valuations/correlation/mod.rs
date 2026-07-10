@@ -115,9 +115,10 @@ impl WasmCopula {
         default_threshold: f64,
         factor_realization: &[f64],
         correlation: f64,
-    ) -> f64 {
+    ) -> Result<f64, JsValue> {
         self.inner
-            .conditional_default_prob(default_threshold, factor_realization, correlation)
+            .conditional_default_prob_checked(default_threshold, factor_realization, correlation)
+            .map_err(to_js_err)
     }
 
     /// Number of systematic factors in the model.
@@ -423,7 +424,9 @@ mod tests {
         let pd = 0.05_f64;
         let threshold = standard_normal_inv_cdf(pd);
         let correlation = 0.3_f64;
-        let cond = copula.conditional_default_prob(threshold, &[0.0], correlation);
+        let cond = copula
+            .conditional_default_prob(threshold, &[0.0], correlation)
+            .expect("valid Gaussian copula inputs");
         assert!(cond > 0.0 && cond < 1.0);
     }
 

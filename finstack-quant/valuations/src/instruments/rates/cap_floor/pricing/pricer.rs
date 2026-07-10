@@ -91,7 +91,11 @@ pub(crate) fn price_cap_floor(
         }
 
         let fixing_date = cap_floor.option_fixing_date(&period);
-        let is_fixed_unpaid = fixing_date < as_of;
+        // A coupon is seasoned only after its accrual period has begun. On
+        // the contractual start date, a pre-start fixing lag may put the
+        // observation date before `as_of`, but the new trade is still priced
+        // from the live curve unless an observed fixing is supplied.
+        let is_fixed_unpaid = period.accrual_start < as_of && fixing_date < as_of;
         let t_fix = if is_fixed_unpaid {
             0.0
         } else {
@@ -109,7 +113,42 @@ pub(crate) fn price_cap_floor(
             t_fix.max(MIN_VOL_LOOKUP_TIME)
         };
 
-        let forward = if is_fixed_unpaid {
+        let forward = if cap_floor.uses_overnight_rfr_index() {
+            use crate::instruments::common_impl::pricing::swap_legs::{
+                compounded_forward_projection, compounded_spliced_projection,
+            };
+            let calendar_id = cap_floor.calendar_id.as_ref().map(|id| id.as_str());
+            if period.accrual_start <= as_of {
+                let fixing_series_id = cap_floor_fixing_series_id(&cap_floor.forward_curve_id);
+                let fixings = curves.get_series(&fixing_series_id).ok();
+                compounded_spliced_projection(
+                    fwd_curve.as_ref(),
+                    fixings,
+                    cap_floor.forward_curve_id.as_str(),
+                    period.accrual_start,
+                    period.accrual_end,
+                    as_of,
+                    period.accrual_year_fraction,
+                    0,
+                    calendar_id,
+                    None,
+                    None,
+                    false,
+                )?
+            } else {
+                compounded_forward_projection(
+                    fwd_curve.as_ref(),
+                    period.accrual_start,
+                    period.accrual_end,
+                    period.accrual_year_fraction,
+                    0,
+                    calendar_id,
+                    None,
+                    None,
+                    false,
+                )?
+            }
+        } else if is_fixed_unpaid {
             historical_cap_floor_fixing(curves, &cap_floor.forward_curve_id, fixing_date)?
         } else {
             rate_period_on_dates(fwd_curve.as_ref(), period.accrual_start, period.accrual_end)?

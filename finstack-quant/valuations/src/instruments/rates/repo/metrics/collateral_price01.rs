@@ -79,6 +79,7 @@ impl MetricCalculator for CollateralPrice01Calculator {
         // width is never degenerate; the helper's error path cannot trigger here.
         let collateral_price01 = if current_price.abs() > 1e-10 {
             central_diff_by_half_bump(pv_up, pv_down, COLLATERAL_PRICE_BUMP_PCT)?
+                * COLLATERAL_PRICE_BUMP_PCT
         } else {
             0.0
         };

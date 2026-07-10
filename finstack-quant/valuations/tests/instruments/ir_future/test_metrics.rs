@@ -386,8 +386,8 @@ fn test_metrics_with_very_short_tau() {
 
     let dv01 = *result.measures.get("dv01").unwrap();
 
-    // Short tau should give small DV01
-    assert!(dv01.abs() < 10.0, "Short tau should give small DV01");
+    // Futures DV01 is exchange tick economics, not face × remaining accrual.
+    assert!(dv01.is_finite() && dv01.abs() > 0.0);
 }
 
 #[test]

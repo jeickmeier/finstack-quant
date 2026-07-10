@@ -13,7 +13,7 @@ use finstack_quant_valuations::models::closed_form::implied_vol::{
     black76_implied_vol as black76_implied_vol_core, bs_implied_vol as bs_implied_vol_core,
 };
 use finstack_quant_valuations::models::closed_form::{
-    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks as bs_greeks_core,
+    arithmetic_asian_call_tw, arithmetic_asian_put_tw, bs_greeks_checked as bs_greeks_core,
     bs_price_checked, checked_closed_form_value, down_in_call, down_out_call,
     fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
     floating_strike_lookback_put, geometric_asian_call, geometric_asian_put, option_type_from_bool,
@@ -116,7 +116,8 @@ pub fn bs_greeks(
         t,
         option_type_from_bool(is_call),
         theta_days,
-    );
+    )
+    .map_err(to_js_err)?;
     let obj = js_sys::Object::new();
     js_sys::Reflect::set(&obj, &"delta".into(), &g.delta.into())?;
     js_sys::Reflect::set(&obj, &"gamma".into(), &g.gamma.into())?;
@@ -237,7 +238,7 @@ pub fn asian_option_price(
 ) -> Result<f64, JsValue> {
     let averaging = averaging.as_deref().unwrap_or("arithmetic");
     let is_call = is_call.unwrap_or(true);
-    Ok(match (averaging, is_call) {
+    let value = match (averaging, is_call) {
         ("arithmetic", true) => arithmetic_asian_call_tw(spot, strike, t, r, q, sigma, num_fixings),
         ("arithmetic", false) => arithmetic_asian_put_tw(spot, strike, t, r, q, sigma, num_fixings),
         ("geometric", true) => geometric_asian_call(spot, strike, t, r, q, sigma, num_fixings),
@@ -247,7 +248,8 @@ pub fn asian_option_price(
                 "unknown averaging '{averaging}'; expected 'arithmetic' or 'geometric'"
             )));
         }
-    })
+    };
+    checked_closed_form_value(value, "asian option price").map_err(to_js_err)
 }
 
 /// Conze-Viswanathan lookback option.
@@ -269,7 +271,7 @@ pub fn lookback_option_price(
 ) -> Result<f64, JsValue> {
     let strike_type = strike_type.as_deref().unwrap_or("fixed");
     let is_call = is_call.unwrap_or(true);
-    Ok(match (strike_type, is_call) {
+    let value = match (strike_type, is_call) {
         ("fixed", true) => fixed_strike_lookback_call(spot, strike, t, r, q, sigma, extremum),
         ("fixed", false) => fixed_strike_lookback_put(spot, strike, t, r, q, sigma, extremum),
         ("floating", true) => floating_strike_lookback_call(spot, t, r, q, sigma, extremum),
@@ -279,7 +281,8 @@ pub fn lookback_option_price(
                 "unknown strike_type '{strike_type}'; expected 'fixed' or 'floating'"
             )));
         }
-    })
+    };
+    checked_closed_form_value(value, "lookback option price").map_err(to_js_err)
 }
 
 /// Quanto option (FX-adjusted cross-currency) price in domestic currency.

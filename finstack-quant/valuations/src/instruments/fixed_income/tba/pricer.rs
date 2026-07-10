@@ -26,6 +26,12 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
 
     // Use provided pool factor or default to 1.0 (newly issued)
     let factor = tba.pool_factor.unwrap_or(defaults.default_pool_factor);
+    if !factor.is_finite() || !(0.0..=1.0).contains(&factor) || factor == 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "AgencyTba '{}' pool_factor must be finite and within (0, 1], got {}",
+            tba.id, factor
+        )));
+    }
     let maturity = settlement_date.add_months(term_months as i32);
 
     // Standard servicing and g-fee assumptions
@@ -45,11 +51,13 @@ pub(crate) fn create_assumed_pool(tba: &AgencyTba, _as_of: Date) -> Result<Agenc
         .pool_id(format!("{}-POOL", tba.id.as_str()).into())
         .agency(tba.agency)
         .pool_type(PoolType::Generic)
-        .original_face(tba.notional)
-        .current_face(Money::new(
-            tba.notional.amount() * factor,
+        // TBA notional is the current trade face being purchased. Recover the
+        // pool's original face from factor; do not scale down purchased face.
+        .original_face(Money::new(
+            tba.notional.amount() / factor,
             tba.notional.currency(),
         ))
+        .current_face(tba.notional)
         .current_factor(factor)
         .wac(wac)
         .pass_through_rate(tba.coupon)

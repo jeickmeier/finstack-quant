@@ -70,9 +70,8 @@ impl MetricCalculator for Nav01Calculator {
         }
         let pv_down = fund_down.value(context.curves.as_ref(), as_of)?.amount();
 
-        // NAV01 = (PV_up - PV_down) / (2 * bump_size)
-        // Result is the derivative dPV/dx per unit event scale (Dv01 convention)
-        let nav01 = (pv_up - pv_down) / (2.0 * NAV_BUMP_PCT);
+        // Scenarios are ±1%; return the PV change for a 1% NAV move.
+        let nav01 = (pv_up - pv_down) / 2.0;
 
         Ok(nav01)
     }

@@ -404,7 +404,10 @@ pub struct BondFuture {
     #[schemars(with = "String")]
     pub delivery_end: Date,
 
-    /// Quoted futures price (e.g., 125.50 for 125-16/32)
+    /// Contract/entry futures price (e.g., 125.50 for 125-16/32).
+    ///
+    /// `base_value` returns model-minus-contract value for a long position.
+    /// Current-settlement variation margin is a separate cash-P&L workflow.
     pub quoted_price: f64,
 
     /// Position side (Long or Short)
@@ -600,13 +603,26 @@ impl BondFuture {
 
         // Conversion factors validation
         for deliverable in &self.deliverable_basket {
-            if deliverable.conversion_factor <= 0.0 {
+            if !deliverable.conversion_factor.is_finite() || deliverable.conversion_factor <= 0.0 {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "conversion_factor must be positive for bond {}, got {}",
+                    "conversion_factor must be positive and finite for bond {}, got {}",
                     deliverable.bond_id.as_str(),
                     deliverable.conversion_factor
                 )));
             }
+        }
+
+        if !self.quoted_price.is_finite() || self.quoted_price < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "quoted_price must be finite and non-negative, got {}",
+                self.quoted_price
+            )));
+        }
+        if !self.notional.amount().is_finite() || self.notional.amount() == 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "bond future notional must be finite and non-zero, got {}",
+                self.notional.amount()
+            )));
         }
 
         Ok(())
@@ -1941,6 +1957,10 @@ mod tests {
 // Implement Instrument trait for BondFuture
 impl crate::instruments::common_impl::traits::Instrument for BondFuture {
     impl_instrument_base!(crate::pricer::InstrumentType::BondFuture);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        BondFuture::validate(self)
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::BondFutureCleanPriceProxy

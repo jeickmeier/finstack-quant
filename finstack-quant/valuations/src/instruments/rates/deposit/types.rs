@@ -384,10 +384,15 @@ impl Deposit {
     /// # Returns
     /// The effective start date after all adjustments.
     pub fn effective_start_date(&self) -> finstack_quant_core::Result<Date> {
-        let calendar: Option<&dyn HolidayCalendar> = self
-            .calendar_id
-            .as_deref()
-            .and_then(|id| CalendarRegistry::global().resolve_str(id));
+        let calendar: Option<&dyn HolidayCalendar> = match self.calendar_id.as_deref() {
+            Some(id) => Some(CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "Deposit '{}' references unknown calendar_id '{}'",
+                    self.id, id
+                ))
+            })?),
+            None => None,
+        };
 
         let bdc = self.bdc;
 
@@ -424,10 +429,15 @@ impl Deposit {
     /// # Returns
     /// The effective end date after all adjustments.
     pub fn effective_end_date(&self) -> finstack_quant_core::Result<Date> {
-        let calendar: Option<&dyn HolidayCalendar> = self
-            .calendar_id
-            .as_deref()
-            .and_then(|id| CalendarRegistry::global().resolve_str(id));
+        let calendar: Option<&dyn HolidayCalendar> = match self.calendar_id.as_deref() {
+            Some(id) => Some(CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "Deposit '{}' references unknown calendar_id '{}'",
+                    self.id, id
+                ))
+            })?),
+            None => None,
+        };
 
         let bdc = self.bdc;
 

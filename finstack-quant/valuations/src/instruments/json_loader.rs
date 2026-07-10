@@ -347,12 +347,7 @@ macro_rules! instrument_json_parse_tagged_match {
 }
 
 fn validate_loaded_instrument(instrument: &dyn Instrument) -> Result<()> {
-    if let Some(overrides) = instrument.pricing_overrides() {
-        overrides.validate()?;
-    } else if let Some(overrides) = instrument.scenario_overrides() {
-        overrides.validate()?;
-    }
-    Ok(())
+    instrument.validate_for_pricing()
 }
 
 #[cfg(test)]

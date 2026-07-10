@@ -55,8 +55,8 @@ const MIN_EFFECTIVE_BUMP: f64 = 1e-6;
 pub(crate) struct Recovery01Calculator;
 
 /// Price the CDS at a bumped recovery, recalibrating the hazard curve from
-/// par spreads when the curve carries them and falling back to a frozen-curve
-/// bump otherwise. Returns the bumped PV.
+/// par spreads when the curve carries them. Curves without calibration quotes
+/// use an explicitly frozen hazard curve. Returns the bumped PV.
 fn price_at_bumped_recovery(
     cds: &CreditDefaultSwap,
     base_market: &MarketContext,
@@ -86,22 +86,21 @@ fn price_at_bumped_recovery(
     };
 
     let market_for_pricing: MarketContext = if has_par_quotes {
-        match recalibrate_hazard_with_recovery_and_doc_clause_and_valuation_convention(
+        let recalibrated = recalibrate_hazard_with_recovery_and_doc_clause_and_valuation_convention(
             hazard.as_ref(),
             new_recovery,
             base_market,
             Some(&discount_id),
             Some(market_doc_clause(cds)),
             Some(cds.valuation_convention),
-        ) {
-            Ok(recalibrated) => base_market.clone().insert(recalibrated),
-            Err(_) => {
-                // Recalibration failure (e.g. degenerate spreads under the new
-                // recovery) is non-fatal: fall through to the frozen-curve
-                // bump so the metric still produces a number.
-                frozen_curve_market()?
-            }
-        }
+        )
+        .map_err(|e| finstack_quant_core::Error::Calibration {
+            message: format!(
+                "CDS Recovery01: recovery re-bootstrap failed for curve '{credit_id}' ({e}); refusing silent frozen-curve fallback"
+            ),
+            category: "recovery01_rebootstrap".to_string(),
+        })?;
+        base_market.clone().insert(recalibrated)
     } else {
         frozen_curve_market()?
     };

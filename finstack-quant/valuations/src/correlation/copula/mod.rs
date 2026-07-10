@@ -223,6 +223,54 @@ pub trait Copula: Send + Sync {
     /// [`Self::conditional_default_prob`].
     fn num_factors(&self) -> usize;
 
+    /// Checked conditional default probability for public/host boundaries.
+    ///
+    /// Concrete copulas retain their infallible hot-path implementation, while
+    /// this wrapper rejects factor-shape mistakes and non-finite inputs before
+    /// they can silently decondition a portfolio calculation.
+    fn conditional_default_prob_checked(
+        &self,
+        default_threshold: f64,
+        factor_realization: &[f64],
+        correlation: f64,
+    ) -> finstack_quant_core::Result<f64> {
+        let expected = self.num_factors();
+        if factor_realization.len() != expected {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{} expects exactly {} systematic factors, got {}",
+                self.model_name(),
+                expected,
+                factor_realization.len()
+            )));
+        }
+        if !default_threshold.is_finite()
+            || !correlation.is_finite()
+            || factor_realization.iter().any(|value| !value.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{} conditional default probability requires finite threshold, correlation, and factors",
+                self.model_name()
+            )));
+        }
+        if !(0.0..=1.0).contains(&correlation) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{} correlation must lie within [0, 1], got {}",
+                self.model_name(),
+                correlation
+            )));
+        }
+        let value =
+            self.conditional_default_prob(default_threshold, factor_realization, correlation);
+        if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "{} produced invalid conditional default probability {}",
+                self.model_name(),
+                value
+            )));
+        }
+        Ok(value)
+    }
+
     /// Model description for diagnostics.
     ///
     /// # Returns

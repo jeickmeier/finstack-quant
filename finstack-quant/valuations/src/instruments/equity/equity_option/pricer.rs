@@ -636,11 +636,11 @@ fn tree_finite_difference_greeks(
         let mut p_g_dn = params.clone();
         p_g_dn.spot = (p_g_dn.spot - h_g).max(1e-8);
         let price_g_dn = price_fn(&p_g_dn)?;
-        // Guard the (degenerate) case where the down-bump was clamped: fall
-        // back to the symmetric stencil radius actually used.
         let h_dn = params.spot - p_g_dn.spot;
-        let h_eff = 0.5 * (h_g + h_dn);
-        (price_g_up - 2.0 * base_price + price_g_dn) / (h_eff * h_eff)
+        // Non-uniform three-point second derivative. When the down bump is
+        // clamped, a symmetric stencil would leak the first derivative into
+        // gamma and can dominate the result.
+        2.0 * ((price_g_up - base_price) / h_g - (base_price - price_g_dn) / h_dn) / (h_g + h_dn)
     };
 
     // Vega (1% vol bump)
@@ -651,7 +651,8 @@ fn tree_finite_difference_greeks(
     let mut p_v_dn = params.clone();
     p_v_dn.volatility = (p_v_dn.volatility - h_v).max(1e-8);
     let price_v_dn = price_fn(&p_v_dn)?;
-    let vega_unit = (price_v_up - price_v_dn) / 2.0;
+    let actual_vol_width = p_v_up.volatility - p_v_dn.volatility;
+    let vega_unit = (price_v_up - price_v_dn) / actual_vol_width * h_v;
 
     // Rho (1% rate bump)
     let h_r = 0.01;

@@ -674,6 +674,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
 impl crate::instruments::common_impl::traits::Instrument for EquityOption {
     impl_instrument_base!(crate::pricer::InstrumentType::EquityOption);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        EquityOption::validate(self)
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<

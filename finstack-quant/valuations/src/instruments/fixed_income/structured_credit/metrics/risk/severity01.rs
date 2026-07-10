@@ -63,7 +63,7 @@ impl MetricCalculator for Severity01Calculator {
         // PV_up is with lower recovery (higher severity)
         // PV_down is with higher recovery (lower severity)
         let severity01 = if achieved_bump > 0.0 {
-            (pv_up - pv_down) / achieved_bump
+            (pv_up - pv_down) / achieved_bump * SEVERITY_BUMP
         } else {
             0.0
         };

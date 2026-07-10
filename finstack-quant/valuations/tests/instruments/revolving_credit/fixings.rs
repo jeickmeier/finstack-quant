@@ -112,9 +112,9 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     let fixing_series = ScalarTimeSeries::new(
         "FIXING:USD-SOFR-3M",
         vec![
-            (date!(2024 - 07 - 01), 0.053), // 5.3% fixing (vs 4% forward)
-            (date!(2024 - 10 - 01), 0.051), // 5.1% fixing (vs 4% forward)
-            (date!(2025 - 01 - 01), 0.049), // 4.9% fixing (this reset is also past)
+            (date!(2024 - 07 - 01), 0.053),
+            (date!(2024 - 10 - 01), 0.051),
+            (date!(2025 - 01 - 01), 0.049),
         ],
         None,
     )
@@ -122,12 +122,9 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
 
     // Build market with fixings
     let market_with_fixings = MarketContext::new()
-        .insert(disc_curve.clone())
-        .insert(fwd_curve.clone())
+        .insert(disc_curve)
+        .insert(fwd_curve)
         .insert_series(fixing_series);
-
-    // Build market without fixings
-    let market_without_fixings = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
     // Generate cashflows WITH fixings
     let engine_with = CashflowEngine::new(
@@ -143,19 +140,9 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     .unwrap();
     let schedule_with = engine_with.generate_deterministic().unwrap();
 
-    // Generate cashflows WITHOUT fixings (graceful degradation)
-    let engine_without =
-        CashflowEngine::new(&facility, Some(&market_without_fixings), as_of, None).unwrap();
-    let schedule_without = engine_without.generate_deterministic().unwrap();
-
-    // Both should succeed (graceful degradation)
     assert!(
         !schedule_with.schedule.flows.is_empty(),
         "Should generate cashflows with fixings"
-    );
-    assert!(
-        !schedule_without.schedule.flows.is_empty(),
-        "Should generate cashflows without fixings"
     );
 
     // Find the interest cashflows (FloatReset kind) and compare rates.
@@ -167,18 +154,6 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
         .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
         .collect();
 
-    let float_flows_without: Vec<_> = schedule_without
-        .schedule
-        .flows
-        .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
-        .collect();
-
-    assert_eq!(
-        float_flows_with.len(),
-        float_flows_without.len(),
-        "Same number of floating rate cashflows"
-    );
     assert!(
         !float_flows_with.is_empty(),
         "Should have at least one floating rate cashflow"
@@ -188,22 +163,6 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     // Fixings are 5.3%/5.1% + 200bp spread = 7.3%/7.1%
     // Forward is ~4% + 200bp spread = ~6%
     // So the fixing-based interest should be higher.
-    let total_interest_with: f64 = float_flows_with.iter().map(|cf| cf.amount.amount()).sum();
-
-    let total_interest_without: f64 = float_flows_without
-        .iter()
-        .map(|cf| cf.amount.amount())
-        .sum();
-
-    // With fixings (higher rates for past periods), total interest should be higher
-    assert!(
-        total_interest_with > total_interest_without,
-        "Fixing-based interest ({:.2}) should exceed forward-projected interest ({:.2}) \
-         because past fixings (5.3%/5.1%) are higher than the forward rate (4%)",
-        total_interest_with,
-        total_interest_without,
-    );
-
     // Verify the rate on a past-reset cashflow is consistent with the fixing.
     // First float cashflow pays on ~2025-01-01 (period: 2024-10-01 to 2025-01-01,
     // reset date 2024-10-01 with fixing 5.1%).
@@ -222,10 +181,9 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     }
 }
 
-/// When fixings are not provided for a seasoned facility, the engine should
-/// gracefully fall back to forward curve projection (backwards compatibility).
+/// Missing fixings for a seasoned facility are a hard market-data error.
 #[test]
-fn test_seasoned_facility_without_fixings_uses_forward_projection() {
+fn test_seasoned_facility_without_fixings_errors() {
     let commitment_date = date!(2024 - 07 - 01);
     let maturity_date = date!(2025 - 07 - 01);
     let as_of = date!(2025 - 01 - 15);
@@ -238,32 +196,12 @@ fn test_seasoned_facility_without_fixings_uses_forward_projection() {
     let disc_curve = build_flat_discount_curve(0.03, as_of, "USD-OIS");
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
-    // No fixings provided -- should not error, should use forward projection
+    // No fixings provided: a past reset is already economically locked.
     let engine = CashflowEngine::new(&facility, Some(&market), as_of, None).unwrap();
-    let schedule = engine.generate_deterministic().unwrap();
-
-    let float_flows: Vec<_> = schedule
-        .schedule
-        .flows
-        .iter()
-        .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
-        .collect();
-
-    assert!(
-        !float_flows.is_empty(),
-        "Should produce floating rate cashflows even without fixings"
-    );
-
-    // All rates should be close to forward rate + spread = ~4% + 2% = ~6%
-    for cf in &float_flows {
-        if let Some(rate) = cf.rate {
-            assert!(
-                (rate - 0.06).abs() < 0.005,
-                "Rate should be near forward + spread (6%), got {:.4}%",
-                rate * 100.0
-            );
-        }
-    }
+    let err = engine
+        .generate_deterministic()
+        .expect_err("seasoned facility must require historical fixings");
+    assert!(err.to_string().contains("FIXING:USD-SOFR-3M"));
 }
 
 /// Fixings with a floor: when the fixing rate is below the floor, the floor
@@ -456,27 +394,13 @@ fn test_pricer_integration_with_fixings() {
     .unwrap();
 
     let market_with = MarketContext::new()
-        .insert(disc_curve.clone())
-        .insert(fwd_curve.clone())
+        .insert(disc_curve)
+        .insert(fwd_curve)
         .insert_series(fixing_series);
-
-    let market_without = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
     // Price with fixings (higher past rates)
     let pv_with = facility.value(&market_with, as_of).unwrap();
 
-    // Price without fixings (using forward for past resets)
-    let pv_without = facility.value(&market_without, as_of).unwrap();
-
-    // Both should produce valid PV
+    // Complete historical fixings produce a valid PV.
     assert!(pv_with.amount().is_finite());
-    assert!(pv_without.amount().is_finite());
-
-    // With higher fixing rates, the lender receives more interest, so PV should be higher
-    assert!(
-        pv_with.amount() > pv_without.amount(),
-        "PV with higher fixings ({:.2}) should exceed PV with forward projection ({:.2})",
-        pv_with.amount(),
-        pv_without.amount(),
-    );
 }

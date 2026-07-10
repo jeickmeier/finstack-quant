@@ -490,6 +490,7 @@ impl CDSIndexPricer {
     where
         F: Fn(&CDSPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<f64>,
     {
+        index.validate()?;
         if as_of >= index.premium.end {
             return Ok(IndexResult {
                 total: 0.0,
@@ -554,6 +555,7 @@ impl CDSIndexPricer {
     where
         F: Fn(&CDSPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<Money>,
     {
+        index.validate()?;
         let currency = index.notional.currency();
         if as_of >= index.premium.end {
             return Ok(IndexResult {
@@ -719,18 +721,16 @@ impl CDSIndexPricer {
                 index.notional.currency(),
             );
             let id = format!("{}-{:03}", index.id, i + 1);
-            let cds = CreditDefaultSwap::new_isda(
-                id,
-                notional,
-                index.side,
-                index.convention,
-                index.premium.spread_bp,
-                index.premium.start,
-                index.premium.end,
-                con.credit.recovery_rate,
-                index.premium.discount_curve_id.to_owned(),
-                con.credit.credit_curve_id.to_owned(),
-            )?;
+            // Preserve the index's effective contractual schedule and
+            // protection terms. Aggregation mode must change only the hazard
+            // decomposition, not frequency/day-count/calendar/settlement.
+            let mut cds = index.to_synthetic_cds();
+            cds.id = id.into();
+            cds.notional = notional;
+            cds.protection.credit_curve_id = con.credit.credit_curve_id.to_owned();
+            cds.protection.recovery_rate = con.credit.recovery_rate;
+            // Index-level upfront is applied once after aggregation.
+            cds.pricing_overrides.market_quotes.upfront_payment = None;
             out.push(ResolvedConstituent {
                 cds,
                 credit_curve_id: con.credit.credit_curve_id.to_owned(),

@@ -200,10 +200,9 @@ impl BondFuturePricer {
     ///
     /// # Repo specials
     ///
-    /// Financing uses the CTD bond's `discount_curve_id`. A bond future's
-    /// dedicated `repo_curve_id` (repo specials) is a refinement not modelled
-    /// here; when none is configured the discount curve is the correct general
-    /// funding proxy.
+    /// This convenience entry point uses the CTD bond's discount curve as the
+    /// financing proxy. Position pricing calls the financing-aware helper and
+    /// uses the future's dedicated repo curve when configured.
     ///
     /// # Parameters
     ///
@@ -263,6 +262,24 @@ impl BondFuturePricer {
         as_of: Date,
         delivery_date: Date,
     ) -> Result<f64> {
+        Self::calculate_model_price_with_financing_curve(
+            ctd_bond,
+            conversion_factor,
+            market,
+            as_of,
+            delivery_date,
+            None,
+        )
+    }
+
+    fn calculate_model_price_with_financing_curve(
+        ctd_bond: &Bond,
+        conversion_factor: f64,
+        market: &MarketContext,
+        as_of: Date,
+        delivery_date: Date,
+        repo_curve_id: Option<&finstack_quant_core::types::CurveId>,
+    ) -> Result<f64> {
         use crate::cashflow::accrual::accrued_interest_amount;
         use finstack_quant_core::math::summation::NeumaierAccumulator;
 
@@ -276,7 +293,8 @@ impl BondFuturePricer {
         // Spot dirty price of the CTD (PV in currency at the valuation date).
         let spot_dirty = ctd_bond.value(market, as_of)?.amount();
 
-        let disc = market.get_discount(&ctd_bond.discount_curve_id)?;
+        let financing_curve_id = repo_curve_id.unwrap_or(&ctd_bond.discount_curve_id);
+        let disc = market.get_discount(financing_curve_id)?;
 
         // Present value of coupons/principal received strictly between today
         // and delivery — these are credited to the carry (the long forward
@@ -319,15 +337,14 @@ impl BondFuturePricer {
     /// Calculate the NPV (present value) of a bond future position.
     ///
     /// The NPV represents the mark-to-market value of the futures position,
-    /// calculated as the present value of the difference between the quoted
-    /// futures price and the theoretical model price.
+    /// calculated as the undiscounted model-to-contract value.
     ///
     /// # Formula
     ///
-    /// NPV = (Quoted_Price - Model_Price) × (Notional / 100) × Sign
+    /// NPV = (Model_Price - Contract_Price) × (Notional / 100) × Sign
     ///
     /// Where:
-    /// - Quoted_Price: Current market price of the futures contract
+    /// - Contract_Price: Entry/contract price stored in `quoted_price`
     /// - Model_Price: Theoretical fair value based on CTD bond
     /// - Notional: Total notional exposure (contract_size × num_contracts)
     /// - Sign: +1 for Long positions, -1 for Short positions
@@ -392,7 +409,7 @@ impl BondFuturePricer {
     ///     &market,
     ///     date!(2025-01-15),
     /// )?;
-    /// // For a long position with quoted > model price, NPV is positive
+    /// // For a long position with model > contract price, NPV is positive
     /// # let _ = npv;
     /// # Ok(())
     /// # }
@@ -406,16 +423,17 @@ impl BondFuturePricer {
     ) -> Result<Money> {
         // Calculate the theoretical model price, carrying the CTD forward to
         // the contract's delivery date.
-        let model_price = Self::calculate_model_price(
+        let model_price = Self::calculate_model_price_with_financing_curve(
             ctd_bond,
             conversion_factor,
             market,
             as_of,
             future.delivery_start,
+            future.repo_curve_id.as_ref(),
         )?;
 
         // Calculate price differential
-        let price_diff = future.quoted_price - model_price;
+        let price_diff = model_price - future.quoted_price;
 
         // Position sign: +1 for Long, -1 for Short
         let position_sign = match future.position {
@@ -1186,12 +1204,12 @@ mod tests {
         println!("\n=== NPV Manual Verification ===");
         println!("Quoted Price: {:.4}", quoted_price);
         println!("Model Price: {:.4}", model_price);
-        println!("Price Differential: {:.4}", quoted_price - model_price);
+        println!("Price Differential: {:.4}", model_price - quoted_price);
         println!("Conversion Factor: {:.4}", cf);
         println!("Notional: ${:.0}", notional);
 
-        // Manual NPV calculation (undiscounted — futures MTM convention)
-        let price_diff = quoted_price - model_price;
+        // Manual model-to-contract value (undiscounted futures convention).
+        let price_diff = model_price - quoted_price;
         let manual_npv = price_diff * (notional / 100.0) * 1.0; // 1.0 for Long
 
         println!("Manual NPV: ${:.2}", manual_npv);

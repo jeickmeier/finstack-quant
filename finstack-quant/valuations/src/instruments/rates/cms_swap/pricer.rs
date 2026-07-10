@@ -133,6 +133,10 @@ impl CmsSwapPricer {
                 ..
             } => {
                 let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
+                let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+                    forward_curve_id.as_str(),
+                );
+                let fixings = market.get_series(&fixing_series_id).ok();
                 let mut total_pv = 0.0;
                 let mut prev_date = inst
                     .effective_start_date()
@@ -144,8 +148,16 @@ impl CmsSwapPricer {
                         continue;
                     }
                     let accrual = accrual_fractions[i];
-                    let fwd_rate =
-                        rate_period_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?;
+                    let fwd_rate = if prev_date < as_of {
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            fixings,
+                            forward_curve_id.as_str(),
+                            prev_date,
+                            as_of,
+                        )?
+                    } else {
+                        rate_period_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?
+                    };
                     let df =
                         relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
                     total_pv += (fwd_rate + spread) * accrual * df * inst.notional.amount();

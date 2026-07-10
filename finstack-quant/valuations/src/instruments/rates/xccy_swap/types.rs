@@ -553,6 +553,20 @@ impl XccySwap {
                 "XccySwap payment lag must be non-negative".to_string(),
             ));
         }
+        if leg.reset_lag_days.is_some_and(|lag| lag < 0) {
+            return Err(finstack_quant_core::Error::Validation(
+                "XccySwap reset lag must be non-negative".to_string(),
+            ));
+        }
+        let calendar_resolves = leg.calendar_id.as_deref().is_some_and(|id| {
+            crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
+        });
+        if !calendar_resolves && !leg.allow_calendar_fallback {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "XccySwap '{}' leg {} requires a resolvable calendar_id; set allow_calendar_fallback=true to opt into weekends_only",
+                self.id, leg.currency
+            )));
+        }
         // Decimal is always finite; no NaN/infinity check required.
         Ok(())
     }
@@ -581,10 +595,23 @@ impl XccySwap {
                     reset_lag_days: leg.reset_lag_days.unwrap_or_default(),
                     dc: leg.day_count,
                     bdc: leg.bdc,
-                    calendar_id: leg
-                        .calendar_id
-                        .clone()
-                        .unwrap_or_else(|| "weekends_only".to_string()),
+                    calendar_id: match leg.calendar_id.as_deref() {
+                        Some(id)
+                            if crate::cashflow::builder::calendar::resolve_calendar_strict(id)
+                                .is_ok() =>
+                        {
+                            id.to_string()
+                        }
+                        _ if leg.allow_calendar_fallback => {
+                            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
+                        }
+                        _ => {
+                            return Err(finstack_quant_core::Error::Validation(format!(
+                                "XccySwap '{}' leg {} requires a resolvable calendar_id",
+                                self.id, leg.currency
+                            )))
+                        }
+                    },
                     fixing_calendar_id: None,
                     end_of_month: false,
                     payment_lag_days: leg.payment_lag_days,
@@ -642,16 +669,14 @@ impl XccySwap {
         Ok(schedule)
     }
 
-    /// Calculate the present value of a leg with per-cashflow FX conversion.
+    /// Calculate the present value of a leg and convert that PV at valuation-date spot.
     ///
     /// # Market-Standard FX Conversion
     ///
-    /// For cross-currency swaps, each cashflow should be converted to the reporting
-    /// currency using the FX rate applicable on the cashflow's payment date, not
-    /// the spot rate at `as_of`. This respects covered interest parity (CIP).
-    ///
-    /// If FxMatrix is not available or only provides spot rates, the conversion is
-    /// an approximation (documented in output).
+    /// Cashflows are first discounted on their own currency curve. The resulting
+    /// foreign-currency PV must therefore be converted at valuation-date spot.
+    /// Multiplying an already foreign-discounted amount by a payment-date forward
+    /// FX would count the foreign/domestic carry twice.
     ///
     /// # Returns
     ///
@@ -669,18 +694,16 @@ impl XccySwap {
         // Curves
         let disc = context.get_discount(&leg.discount_curve_id)?;
         let fwd = context.get_forward(&leg.forward_curve_id)?;
+        let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+            leg.forward_curve_id.as_str(),
+        );
+        let fixings = context.get_series(&fixing_series_id).ok();
         let fx = context.fx();
 
         let mut pv = NeumaierAccumulator::new();
 
-        // Helper to convert a single cashflow to reporting currency.
-        //
-        // Note: FxQuery uses payment_date for forward FX rate lookup per CIP conventions.
-        // If FxMatrix only contains spot rates, the conversion is an approximation.
-        // For long-dated cashflows (>1Y), this approximation can be material (>1% error
-        // depending on interest rate differentials).
-        let mut fx_approximation_warned = false;
-        let convert_cf = |amount: f64, payment_date: Date, fx_warned: &mut bool| -> Result<f64> {
+        // Convert an already-discounted leg-currency PV at valuation-date spot.
+        let convert_pv = |amount: f64| -> Result<f64> {
             if leg.currency == self.reporting_currency {
                 return Ok(amount);
             }
@@ -690,30 +713,8 @@ impl XccySwap {
                 })
             })?;
 
-            // Warn once if we're converting cashflows >1Y in the future, as spot FX
-            // approximation error grows with tenor (roughly proportional to rate differential × time).
-            let days_forward = (payment_date - as_of).whole_days();
-            if days_forward > 365 && !*fx_warned {
-                tracing::warn!(
-                    instrument_id = %self.id.as_str(),
-                    from_ccy = %leg.currency,
-                    to_ccy = %self.reporting_currency,
-                    payment_date = %payment_date,
-                    days_forward = days_forward,
-                    "XCCY swap FX conversion for cashflow >1Y forward. If FxMatrix provides \
-                     spot rates only, PV may have material approximation error. For accurate \
-                     pricing, provide forward FX rates consistent with covered interest parity."
-                );
-                *fx_warned = true;
-            }
-
-            // Use cashflow-date FX (default policy is CashflowDate)
             let rate = fx_matrix
-                .rate(FxQuery::new(
-                    leg.currency,
-                    self.reporting_currency,
-                    payment_date,
-                ))?
+                .rate(FxQuery::new(leg.currency, self.reporting_currency, as_of))?
                 .rate;
             Ok(amount * rate)
         };
@@ -728,7 +729,7 @@ impl XccySwap {
         {
             let df = robust_relative_df(disc.as_ref(), as_of, leg.start)?;
             let cf_leg_ccy = leg.side.initial_principal_sign() * leg.notional.amount() * df;
-            let cf_rep = convert_cf(cf_leg_ccy, leg.start, &mut fx_approximation_warned)?;
+            let cf_rep = convert_pv(cf_leg_ccy)?;
             pv.add(cf_rep);
         }
 
@@ -742,7 +743,7 @@ impl XccySwap {
         {
             let df = robust_relative_df(disc.as_ref(), as_of, leg.end)?;
             let cf_leg_ccy = leg.side.final_principal_sign() * leg.notional.amount() * df;
-            let cf_rep = convert_cf(cf_leg_ccy, leg.end, &mut fx_approximation_warned)?;
+            let cf_rep = convert_pv(cf_leg_ccy)?;
             pv.add(cf_rep);
         }
 
@@ -753,10 +754,13 @@ impl XccySwap {
                 frequency: leg.frequency,
                 stub: leg.stub,
                 bdc: leg.bdc,
-                calendar_id: leg
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                calendar_id: if leg.calendar_id.as_deref().is_some_and(|id| {
+                    crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
+                }) {
+                    leg.calendar_id.as_deref().unwrap_or_default()
+                } else {
+                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID
+                },
                 end_of_month: false,
                 day_count: leg.day_count,
                 payment_lag_days: leg.payment_lag_days,
@@ -777,9 +781,17 @@ impl XccySwap {
                 continue;
             }
 
-            // Forward rate using forward curve's time basis
-            let forward_rate =
-                rate_period_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)?;
+            let fixing_date = period.reset_date.unwrap_or(period.accrual_start);
+            let forward_rate = if fixing_date < as_of {
+                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                    fixings,
+                    leg.forward_curve_id.as_str(),
+                    fixing_date,
+                    as_of,
+                )?
+            } else {
+                rate_period_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)?
+            };
             if !forward_rate.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "Non-finite forward rate for period {} to {}",
@@ -810,12 +822,7 @@ impl XccySwap {
             let df = robust_relative_df(disc.as_ref(), as_of, period.payment_date)?;
             let cf_leg_ccy = coupon * df;
 
-            // Convert to reporting currency using cashflow-date FX
-            let cf_rep = convert_cf(
-                cf_leg_ccy,
-                period.payment_date,
-                &mut fx_approximation_warned,
-            )?;
+            let cf_rep = convert_pv(cf_leg_ccy)?;
             pv.add(cf_rep);
         }
 
@@ -825,6 +832,10 @@ impl XccySwap {
 
 impl crate::instruments::common_impl::traits::Instrument for XccySwap {
     impl_instrument_base!(crate::pricer::InstrumentType::XccySwap);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        XccySwap::validate(self)
+    }
 
     fn market_dependencies(
         &self,
@@ -841,6 +852,12 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         if self.leg2.currency != self.reporting_currency {
             deps.add_fx_pair(self.leg2.currency, self.reporting_currency);
         }
+        deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+            self.leg1.forward_curve_id.as_str(),
+        ));
+        deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
+            self.leg2.forward_curve_id.as_str(),
+        ));
         Ok(deps)
     }
 

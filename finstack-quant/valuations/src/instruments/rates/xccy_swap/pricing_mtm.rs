@@ -38,10 +38,16 @@ use finstack_quant_core::Result;
 fn build_xccy_mtm_periods(
     leg: &crate::instruments::rates::xccy_swap::XccySwapLeg,
 ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
-    let cal_id = leg
-        .calendar_id
-        .as_deref()
-        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+    let cal_id = match leg.calendar_id.as_deref() {
+        Some(id) if crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok() => id,
+        _ if leg.allow_calendar_fallback => crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+        _ => {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "XccySwap MtM leg {} requires a resolvable calendar_id",
+                leg.currency
+            )))
+        }
+    };
     build_periods(BuildPeriodsParams {
         start: leg.start,
         end: leg.end,
@@ -55,6 +61,15 @@ fn build_xccy_mtm_periods(
         reset_lag_days: leg.reset_lag_days,
         adjust_accrual_dates: false,
     })
+}
+
+fn require_positive_finite(value: f64, id: &str, label: &str) -> Result<()> {
+    if !value.is_finite() || value <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "XccySwap '{id}' requires a positive finite {label}, got {value}"
+        )));
+    }
+    Ok(())
 }
 
 /// Compute the PV of an MtM-resetting XCCY swap in reporting currency.
@@ -105,27 +120,15 @@ pub(crate) fn pv_mtm_reset(
 
     let mut pv = NeumaierAccumulator::new();
 
-    // Helper: convert a cashflow at `payment_date` to reporting currency.
-    //
-    // The FxQuery passes `payment_date` so providers with an FX term structure
-    // (e.g. one calibrated to FX forwards) can return a date-specific forward
-    // rate. The most commonly used provider in tests and basic calibration
-    // setups, `SimpleFxProvider`, is spot-only: it returns the same rate
-    // regardless of `payment_date`. With a spot-only provider, all in-period
-    // and rebalancing flows are converted at the same FX, which is internally
-    // consistent but ignores the CIP-implied forward-FX path. Callers that
-    // require date-aware conversion (e.g. for accurate forward-PV in highly
-    // term-structured FX markets) must inject a forward-aware provider.
-    let convert = |amount: f64,
-                   from_ccy: finstack_quant_core::currency::Currency,
-                   payment_date: Date|
-     -> Result<f64> {
+    // Every amount passed here is already discounted on its own currency
+    // curve, so convert the resulting PV at valuation-date spot. Forward FX
+    // belongs to the equivalent route where the undiscounted cashflow is
+    // converted first and then discounted on the reporting-currency curve.
+    let convert = |amount: f64, from_ccy: finstack_quant_core::currency::Currency| -> Result<f64> {
         if from_ccy == reporting_ccy {
             return Ok(amount);
         }
-        let rate = fx
-            .rate(FxQuery::new(from_ccy, reporting_ccy, payment_date))?
-            .rate;
+        let rate = fx.rate(FxQuery::new(from_ccy, reporting_ccy, as_of))?.rate;
         Ok(amount * rate)
     };
 
@@ -134,15 +137,40 @@ pub(crate) fn pv_mtm_reset(
     // per-period loop. Distinct from `n_c / spot_x_at_as_of` for forward-starting swaps.
     // Uses relative DFs from `as_of` so the CIP forward FX is anchored at the same time
     // as `spot_x_at_as_of`.
-    let n_r_initial = compute_resetting_notional(
-        n_c,
-        spot_x_at_as_of,
-        as_of,
-        constant_leg.start,
-        disc_c.as_ref(),
-        disc_r.as_ref(),
-        &swap.id,
-    )?;
+    let n_r_initial = if constant_leg.start <= as_of {
+        let historical_fx = fx
+            .rate(FxQuery::new(
+                resetting_leg.currency,
+                constant_leg.currency,
+                constant_leg.start,
+            ))?
+            .rate;
+        require_positive_finite(
+            historical_fx,
+            swap.id.as_str(),
+            "historical initial FX reset",
+        )?;
+        n_c / historical_fx
+    } else {
+        compute_resetting_notional(
+            n_c,
+            spot_x_at_as_of,
+            as_of,
+            constant_leg.start,
+            disc_c.as_ref(),
+            disc_r.as_ref(),
+            &swap.id,
+        )?
+    };
+
+    let fixing_id_c = finstack_quant_core::market_data::fixings::fixing_series_id(
+        constant_leg.forward_curve_id.as_str(),
+    );
+    let fixing_id_r = finstack_quant_core::market_data::fixings::fixing_series_id(
+        resetting_leg.forward_curve_id.as_str(),
+    );
+    let fixings_c = context.get_series(&fixing_id_c).ok();
+    let fixings_r = context.get_series(&fixing_id_r).ok();
 
     // Initial principal exchange at start. We use `initial_principal_sign` exactly as the
     // existing fixed-notional path does (`pv_leg_in_reporting_ccy`): a `Receive` leg's
@@ -153,10 +181,10 @@ pub(crate) fn pv_mtm_reset(
         let df_r0 = robust_relative_df(disc_r.as_ref(), as_of, resetting_leg.start)?;
 
         let cf_c = constant_leg.side.initial_principal_sign() * n_c * df_c0;
-        pv.add(convert(cf_c, constant_leg.currency, constant_leg.start)?);
+        pv.add(convert(cf_c, constant_leg.currency)?);
 
         let cf_r = resetting_leg.side.initial_principal_sign() * n_r_initial * df_r0;
-        pv.add(convert(cf_r, resetting_leg.currency, resetting_leg.start)?);
+        pv.add(convert(cf_r, resetting_leg.currency)?);
     }
 
     // Per-period loop. For each accrual period [T_j, T_{j+1}]:
@@ -182,6 +210,16 @@ pub(crate) fn pv_mtm_reset(
         // "absent" rather than a `NaN` sentinel that could silently propagate.
         let (n_r_j, df_r_at_period_start): (f64, Option<f64>) = if j == 0 {
             (n_r_initial, None)
+        } else if period.accrual_start <= as_of {
+            let historical_fx = fx
+                .rate(FxQuery::new(
+                    resetting_leg.currency,
+                    constant_leg.currency,
+                    period.accrual_start,
+                ))?
+                .rate;
+            require_positive_finite(historical_fx, swap.id.as_str(), "historical FX reset")?;
+            (n_c / historical_fx, None)
         } else {
             let (n, df) = compute_resetting_notional_and_df_r(
                 n_c,
@@ -213,28 +251,37 @@ pub(crate) fn pv_mtm_reset(
         // observation/fixing date, not the start of the projection window; using
         // it (when a fixing lag places reset_date < accrual_start) projects a
         // longer-than-index window and overstates the coupon on a steep curve.
-        let rate_c =
-            rate_period_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?;
+        let fixing_date_c = period.reset_date.unwrap_or(period.accrual_start);
+        let rate_c = if fixing_date_c < as_of {
+            finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                fixings_c,
+                constant_leg.forward_curve_id.as_str(),
+                fixing_date_c,
+                as_of,
+            )?
+        } else {
+            rate_period_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?
+        };
         let coupon_c = constant_leg.side.coupon_sign()
             * n_c
             * rate_c
             * period.accrual_year_fraction
             * df_c_pay;
-        pv.add(convert(
-            coupon_c,
-            constant_leg.currency,
-            period.payment_date,
-        )?);
+        pv.add(convert(coupon_c, constant_leg.currency)?);
 
         // 2. Resetting-leg floating coupon on N_j^R (notional captured at this period's start,
         //    NOT n_r_prev which is the prior period's notional). Includes the basis spread.
-        let rate_r = rate_period_on_dates(
-            fwd_r.as_ref(),
-            // Project over the accrual interval (index tenor), not from the
-            // observation date — see the constant-leg note above.
-            period.accrual_start,
-            period.accrual_end,
-        )?;
+        let fixing_date_r = period.reset_date.unwrap_or(period.accrual_start);
+        let rate_r = if fixing_date_r < as_of {
+            finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                fixings_r,
+                resetting_leg.forward_curve_id.as_str(),
+                fixing_date_r,
+                as_of,
+            )?
+        } else {
+            rate_period_on_dates(fwd_r.as_ref(), period.accrual_start, period.accrual_end)?
+        };
         let spread_decimal =
             decimal_to_f64(resetting_leg.spread_bp, "XccySwap resetting leg spread_bp")? / 10_000.0;
         let coupon_r = resetting_leg.side.coupon_sign()
@@ -242,11 +289,7 @@ pub(crate) fn pv_mtm_reset(
             * (rate_r + spread_decimal)
             * period.accrual_year_fraction
             * df_r_pay;
-        pv.add(convert(
-            coupon_r,
-            resetting_leg.currency,
-            period.payment_date,
-        )?);
+        pv.add(convert(coupon_r, resetting_leg.currency)?);
 
         // 3. Rebalancing on the resetting leg only, at the START of this period (T_j).
         //    Skip the very first period — no rebalancing before initial exchange.
@@ -273,35 +316,25 @@ pub(crate) fn pv_mtm_reset(
             })?;
             let delta_n_r = n_r_j - n_r_prev;
             let rebal_r = resetting_leg.side.initial_principal_sign() * delta_n_r * df_r_reset;
-            pv.add(convert(
-                rebal_r,
-                resetting_leg.currency,
-                period.accrual_start,
-            )?);
+            pv.add(convert(rebal_r, resetting_leg.currency)?);
         }
 
         n_r_prev = n_r_j;
     }
 
-    // Final principal exchange: constant leg receives N_C; resetting leg pays N_n^R = n_r_prev.
-    let df_c_end = robust_relative_df(disc_c.as_ref(), as_of, constant_leg.end)?;
-    let df_c_end = require_positive_df(df_c_end, &swap.id, "constant-leg", constant_leg.end)?;
-    let df_r_end = robust_relative_df(disc_r.as_ref(), as_of, resetting_leg.end)?;
-    let df_r_end = require_positive_df(df_r_end, &swap.id, "resetting-leg", resetting_leg.end)?;
+    // Final principal exchanges are settled once the leg end date has passed.
+    if constant_leg.end > as_of {
+        let df_c_end = robust_relative_df(disc_c.as_ref(), as_of, constant_leg.end)?;
+        let df_c_end = require_positive_df(df_c_end, &swap.id, "constant-leg", constant_leg.end)?;
+        let df_r_end = robust_relative_df(disc_r.as_ref(), as_of, resetting_leg.end)?;
+        let df_r_end = require_positive_df(df_r_end, &swap.id, "resetting-leg", resetting_leg.end)?;
 
-    let cf_c_final = constant_leg.side.final_principal_sign() * n_c * df_c_end;
-    pv.add(convert(
-        cf_c_final,
-        constant_leg.currency,
-        constant_leg.end,
-    )?);
+        let cf_c_final = constant_leg.side.final_principal_sign() * n_c * df_c_end;
+        pv.add(convert(cf_c_final, constant_leg.currency)?);
 
-    let cf_r_final = resetting_leg.side.final_principal_sign() * n_r_prev * df_r_end;
-    pv.add(convert(
-        cf_r_final,
-        resetting_leg.currency,
-        resetting_leg.end,
-    )?);
+        let cf_r_final = resetting_leg.side.final_principal_sign() * n_r_prev * df_r_end;
+        pv.add(convert(cf_r_final, resetting_leg.currency)?);
+    }
 
     Ok(Money::new(pv.total(), reporting_ccy))
 }

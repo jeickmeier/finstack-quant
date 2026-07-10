@@ -46,9 +46,10 @@ fn test_zero_face_value() {
 
     let future = create_standard_future(start, end).with_contract_specs(specs);
 
-    // Zero face value means zero contracts, so PV should be zero
-    let pv = future.value(&market, as_of).unwrap();
-    assert_eq!(pv.amount(), 0.0, "Zero face value should result in zero PV");
+    let err = future
+        .value(&market, as_of)
+        .expect_err("zero face value is not a valid exchange contract");
+    assert!(err.to_string().contains("face_value"));
 }
 
 #[test]

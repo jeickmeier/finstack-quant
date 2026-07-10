@@ -883,6 +883,26 @@ impl CreditDefaultSwap {
             }
         }
 
+        let currency = self.notional.currency();
+        if let Some((_, upfront)) = self.upfront {
+            if upfront.currency() != currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS upfront currency {} must match notional currency {}",
+                    upfront.currency(),
+                    currency
+                )));
+            }
+        }
+        if let Some(upfront) = self.pricing_overrides.market_quotes.upfront_payment {
+            if upfront.currency() != currency {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS upfront override currency {} must match notional currency {}",
+                    upfront.currency(),
+                    currency
+                )));
+            }
+        }
+
         // Note: Zero notional is allowed for testing scenarios
         // Note: Negative spreads are allowed (theoretically possible in unusual market conditions)
 
@@ -1021,6 +1041,10 @@ impl CreditDefaultSwap {
 
 impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::CDS);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CreditDefaultSwap::validate(self)
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::HazardRate

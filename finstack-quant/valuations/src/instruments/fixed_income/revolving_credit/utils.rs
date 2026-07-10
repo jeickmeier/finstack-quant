@@ -104,10 +104,9 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
                     .frequency(spec.reset_freq)
                     .stub_rule(facility.stub);
 
-            if let Some(cal) = resolve_facility_calendar(&facility.attributes) {
-                reset_builder =
-                    reset_builder.adjust_with(BusinessDayConvention::ModifiedFollowing, cal);
-            }
+            let cal =
+                crate::cashflow::builder::calendar::resolve_calendar_strict(&spec.calendar_id)?;
+            reset_builder = reset_builder.adjust_with(spec.bdc, cal);
 
             let reset_schedule = reset_builder.build()?;
             Ok(Some(reset_schedule.into_iter().collect()))
@@ -116,17 +115,49 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
     }
 }
 
+/// Convert a reset-effective date to its contractual fixing observation date.
+pub(super) fn floating_fixing_date(
+    spec: &crate::cashflow::builder::FloatingRateSpec,
+    reset_effective_date: Date,
+) -> Result<Date> {
+    if spec.reset_lag_days < 0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "RevolvingCredit reset_lag_days must be non-negative, got {}",
+            spec.reset_lag_days
+        )));
+    }
+    let calendar_id = spec
+        .fixing_calendar_id
+        .as_deref()
+        .unwrap_or(spec.calendar_id.as_str());
+    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
+    reset_effective_date.add_business_days(-spec.reset_lag_days, calendar)
+}
+
+/// Apply the floating coupon payment lag without shifting accrual boundaries.
+pub(super) fn floating_payment_date(
+    spec: &crate::cashflow::builder::FloatingRateSpec,
+    accrual_end: Date,
+) -> Result<Date> {
+    if spec.payment_lag_days < 0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "RevolvingCredit payment_lag_days must be non-negative, got {}",
+            spec.payment_lag_days
+        )));
+    }
+    crate::instruments::common_impl::pricing::swap_legs::add_payment_delay(
+        accrual_end,
+        spec.payment_lag_days,
+        Some(spec.calendar_id.as_str()),
+    )
+}
+
 /// Project floating rate for revolving credit facility using resolved curve.
 ///
 /// Optimized version that takes a resolved curve to avoid repeated lookups.
 ///
-/// **Convention note**: The `FloatingRateSpec` carries `reset_lag_days`,
-/// `payment_lag_days`, and `fixing_calendar_id` fields, but the current RCF
-/// implementation does **not** apply these to schedule or projection dates.
-/// Reset dates are derived from the facility's payment/reset schedule without
-/// lag adjustment. If your facility requires fixing-lag or payment-lag
-/// semantics (e.g., T-2 lookback for SOFR in arrears), these must be added
-/// to `build_reset_dates` and this projection function.
+/// Projection uses the reset-effective date. The separate contractual fixing
+/// observation date is derived with [`floating_fixing_date`].
 pub(super) fn project_floating_rate_with_curve(
     reset_date: finstack_quant_core::dates::Date,
     reset_freq: &finstack_quant_core::dates::Tenor,

@@ -307,7 +307,7 @@ impl InterestRateFuture {
 
     /// Calculates the present value of the interest rate future.
     ///
-    /// PV = (R_implied - R_model_adj) × FaceValue × tau(period_start, period_end) × contracts × position_sign
+    /// PV = (model_price - contract_price) / tick_size × tick_value × contracts × position_sign
     ///
     /// Calculates the raw present value of the interest rate future (f64)
     ///
@@ -328,9 +328,16 @@ impl InterestRateFuture {
     /// Futures are marked-to-market daily with variation margin, so no discounting is
     /// applied. The PV represents the current mark-to-market gain/loss versus the
     /// quoted entry price.
-    pub fn npv_raw(&self, context: &MarketContext) -> finstack_quant_core::Result<f64> {
+    pub fn npv_raw(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_core::dates::DayCountContext;
         let (fixing_date, period_start, period_end) = self.resolve_dates()?;
+        if as_of >= self.expiry {
+            return Ok(0.0);
+        }
 
         // Validate discount curve exists (required for curve dependencies, even though
         // futures don't discount due to daily margining)
@@ -342,34 +349,48 @@ impl InterestRateFuture {
         let fwd_dc = fwd.day_count();
         let fwd_base = fwd.base_date();
         let t_fixing = fwd_dc
-            .year_fraction(fwd_base, fixing_date, DayCountContext::default())?
+            .year_fraction(as_of, fixing_date, DayCountContext::default())?
             .max(0.0);
-        let t_start = fwd_dc
+        let t_start_remaining = fwd_dc
+            .year_fraction(as_of, period_start, DayCountContext::default())?
+            .max(0.0);
+        let t_end_remaining = fwd_dc
+            .year_fraction(as_of, period_end, DayCountContext::default())?
+            .max(t_start_remaining);
+        let t_start_curve = fwd_dc
             .year_fraction(fwd_base, period_start, DayCountContext::default())?
             .max(0.0);
-        let t_end = fwd_dc
+        let t_end_curve = fwd_dc
             .year_fraction(fwd_base, period_end, DayCountContext::default())?
-            .max(t_start);
+            .max(t_start_curve);
 
         // Forward rate over the period
-        let forward_rate = fwd.rate_period(t_start, t_end);
+        let forward_rate = fwd.rate_period(t_start_curve, t_end_curve);
 
         // Apply convexity adjustment policy
         let adjusted_rate = if let Some(ca) = self.contract_specs.convexity_adjustment {
             forward_rate + ca
         } else {
-            self.calculate_convexity_adjusted_rate(context, forward_rate, t_fixing, t_start, t_end)?
+            self.calculate_convexity_adjusted_rate(
+                context,
+                forward_rate,
+                t_fixing,
+                t_start_remaining,
+                t_end_remaining,
+            )?
         };
 
-        // Implied rate from price and accrual over the underlying period.
-        // The accrual uses the instrument's day count (contract convention).
-        let implied_rate = self.implied_rate().as_decimal();
-        let tau = self
-            .day_count
-            .year_fraction(period_start, period_end, DayCountContext::default())?
-            .max(0.0);
-        if tau == 0.0 {
-            return Ok(0.0);
+        if !self.contract_specs.tick_size.is_finite()
+            || self.contract_specs.tick_size <= 0.0
+            || !self.contract_specs.tick_value.is_finite()
+            || self.contract_specs.tick_value <= 0.0
+            || !self.contract_specs.face_value.is_finite()
+            || self.contract_specs.face_value <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "IR Future {} requires positive finite face_value, tick_size, and tick_value",
+                self.id
+            )));
         }
 
         // Position sign: Long benefits when implied > model (rates down → price up)
@@ -386,7 +407,10 @@ impl InterestRateFuture {
             0.0
         };
 
-        let pv_per_contract = (implied_rate - adjusted_rate) * self.contract_specs.face_value * tau;
+        let model_price = 100.0 * (1.0 - adjusted_rate);
+        let price_delta = model_price - self.quoted_price;
+        let pv_per_contract =
+            price_delta / self.contract_specs.tick_size * self.contract_specs.tick_value;
         let pv_total = sign * contracts_scale * pv_per_contract;
         Ok(pv_total)
     }
@@ -526,9 +550,9 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
-        _as_of: finstack_quant_core::dates::Date,
+        as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let pv = self.npv_raw(curves)?;
+        let pv = self.npv_raw(curves, as_of)?;
         Ok(finstack_quant_core::money::Money::new(
             pv,
             self.notional.currency(),
@@ -538,9 +562,9 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
     fn value_raw(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
-        _as_of: finstack_quant_core::dates::Date,
+        as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        self.npv_raw(curves)
+        self.npv_raw(curves, as_of)
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {

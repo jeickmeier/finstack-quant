@@ -315,6 +315,7 @@ impl AsianOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        inst.validate_realized_fixings(as_of)?;
         // Get time to maturity
         let t = inst
             .day_count
@@ -756,6 +757,7 @@ impl AsianOptionMcPricer {
             .day_count
             .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
 
+        inst.validate_realized_fixings(as_of)?;
         let (hist_sum, hist_prod_log, hist_count) = inst.accumulated_state(as_of);
 
         if t <= 0.0 {
@@ -1033,6 +1035,9 @@ impl Pricer for AsianOptionAnalyticalGeometricPricer {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
+        asian.validate_realized_fixings(as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
         let (sum, log_prod, count) = asian.accumulated_state(as_of);
         let total_fixings = asian.fixing_dates.len();
 
@@ -1186,6 +1191,9 @@ impl Pricer for AsianOptionSemiAnalyticalTwPricer {
         let sigma = bs_inputs.sigma;
         let t = bs_inputs.t;
 
+        asian.validate_realized_fixings(as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
         let (sum, _, count) = asian.accumulated_state(as_of);
         let total_fixings = asian.fixing_dates.len();
 
@@ -1631,7 +1639,7 @@ mod tests {
     }
 
     #[test]
-    fn mc_pricer_expired_without_fixings_falls_back_to_spot() {
+    fn mc_pricer_expired_without_fixings_errors() {
         let as_of = date(2025, 6, 30);
         let option = asian_option(
             AveragingMethod::Geometric,
@@ -1641,12 +1649,10 @@ mod tests {
             vec![date(2025, 3, 31), date(2025, 6, 30)],
         );
 
-        let pv = AsianOptionMcPricer::new()
+        let err = AsianOptionMcPricer::new()
             .price_internal(&option, &market(as_of, 80.0, 0.20, 0.05, 0.0), as_of)
-            .expect("expired MC price")
-            .amount();
-
-        assert!((pv - 20.0).abs() < 1e-12);
+            .expect_err("expired Asian option must require realized fixings");
+        assert!(err.to_string().contains("missing a realized fixing"));
     }
 
     #[test]
@@ -1689,7 +1695,7 @@ mod tests {
     }
 
     #[test]
-    fn analytical_geometric_expired_without_fixings_falls_back_to_spot() {
+    fn analytical_geometric_expired_without_fixings_errors() {
         let as_of = date(2025, 6, 30);
         let option = asian_option(
             AveragingMethod::Geometric,
@@ -1699,13 +1705,10 @@ mod tests {
             vec![date(2025, 3, 31), date(2025, 6, 30)],
         );
 
-        let pv = AsianOptionAnalyticalGeometricPricer::new()
+        let err = AsianOptionAnalyticalGeometricPricer::new()
             .price_dyn(&option, &market(as_of, 125.0, 0.20, 0.05, 0.0), as_of)
-            .expect("expired analytical price")
-            .value
-            .amount();
-
-        assert!((pv - 25.0).abs() < 1e-12);
+            .expect_err("expired Asian option must require realized fixings");
+        assert!(err.to_string().contains("missing a realized fixing"));
     }
 
     #[test]
@@ -1747,9 +1750,9 @@ mod tests {
         );
         option.past_fixings = fixing_dates
             .iter()
-            .take(2)
+            .take(3)
             .copied()
-            .zip([101.0, 103.0])
+            .zip([101.0, 103.0, 102.0])
             .collect();
 
         let err = AsianOptionAnalyticalGeometricPricer::new()
@@ -1914,7 +1917,7 @@ mod tests {
     }
 
     #[test]
-    fn mc_pricer_expired_without_fixings_uses_price_scalar_spot_fallback() {
+    fn mc_pricer_expired_without_fixings_rejects_price_scalar_fallback() {
         let as_of = date(2025, 6, 30);
         let option = asian_option(
             AveragingMethod::Arithmetic,
@@ -1929,12 +1932,10 @@ mod tests {
             MarketScalar::Price(Money::new(125.0, Currency::USD)),
         );
 
-        let pv = AsianOptionMcPricer::new()
+        let err = AsianOptionMcPricer::new()
             .price_internal(&option, &market, as_of)
-            .expect("expired MC price")
-            .amount();
-
-        assert!((pv - 25.0).abs() < 1e-12);
+            .expect_err("price scalar must not replace realized fixing history");
+        assert!(err.to_string().contains("missing a realized fixing"));
     }
 
     #[test]

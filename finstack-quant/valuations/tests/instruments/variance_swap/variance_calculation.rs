@@ -30,17 +30,18 @@ fn test_get_historical_prices_prefers_time_series_over_spot() {
 }
 
 #[test]
-fn test_get_historical_prices_falls_back_to_spot_scalar() {
+fn test_get_historical_prices_rejects_spot_only_for_seasoned_swap() {
     // Arrange
     let swap = sample_swap(PayReceive::Receive);
     let ctx = base_context(); // No series, just spot
 
     // Act
-    let extracted = swap.get_historical_prices(&ctx, swap.maturity).unwrap();
+    let err = swap
+        .get_historical_prices(&ctx, swap.maturity)
+        .expect_err("seasoned swap must not synthesize history from spot");
 
     // Assert
-    assert_eq!(extracted.len(), 1);
-    assert!((extracted[0] - 5_000.0).abs() < EPSILON);
+    assert!(err.to_string().contains("historical price data"));
 }
 
 #[test]

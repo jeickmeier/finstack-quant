@@ -377,9 +377,10 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         proj,
         disc_fallback,
         fixings,
-        projection_base_date: proj
-            .map(ForwardCurve::base_date)
-            .unwrap_or_else(|| disc.base_date()),
+        // Realized-versus-projected selection is a lifecycle decision and must
+        // use the valuation date. Curve coordinates below remain anchored to
+        // each curve's own base date.
+        projection_base_date: as_of,
         float: &float,
     };
 

@@ -310,9 +310,15 @@ impl<'a> CashflowEngine<'a> {
         for i in 0..(self.payment_dates.len() - 1) {
             let period_start = self.payment_dates[i];
             let period_end = self.payment_dates[i + 1];
+            let payment_date = match &self.facility.base_rate_spec {
+                BaseRateSpec::Floating(spec) => {
+                    super::utils::floating_payment_date(spec, period_end)?
+                }
+                BaseRateSpec::Fixed { .. } => period_end,
+            };
 
             // Apply as_of filtering for non-principal cashflows
-            if period_end <= self.as_of {
+            if payment_date <= self.as_of {
                 continue;
             }
 
@@ -385,7 +391,7 @@ impl<'a> CashflowEngine<'a> {
                 };
 
                 // Determine reset date for floating rates
-                let sub_reset_date = match &self.facility.base_rate_spec {
+                let sub_reset_effective_date = match &self.facility.base_rate_spec {
                     BaseRateSpec::Floating(_) => {
                         if let Some(ref reset_grid) = self.reset_dates {
                             reset_grid
@@ -402,7 +408,13 @@ impl<'a> CashflowEngine<'a> {
                 };
 
                 if reset_date_opt.is_none() {
-                    reset_date_opt = sub_reset_date;
+                    reset_date_opt = match (&self.facility.base_rate_spec, sub_reset_effective_date)
+                    {
+                        (BaseRateSpec::Floating(spec), Some(date)) => {
+                            Some(super::utils::floating_fixing_date(spec, date)?)
+                        }
+                        _ => None,
+                    };
                 }
 
                 // Calculate interest for this sub-period
@@ -415,45 +427,25 @@ impl<'a> CashflowEngine<'a> {
                     BaseRateSpec::Floating(spec) => {
                         let spread_bp_f64 = spec.spread_bp.to_f64().unwrap_or_default();
                         let floor_bp_f64 = spec.index_floor_bp.and_then(|d| d.to_f64());
-                        let reset_d = sub_reset_date.unwrap_or(period_start);
+                        let reset_effective = sub_reset_effective_date.unwrap_or(period_start);
+                        let fixing_date =
+                            super::utils::floating_fixing_date(spec, reset_effective)?;
 
-                        // For past resets, use historical fixings if available;
-                        // otherwise fall back to forward projection for backwards
-                        // compatibility.
-                        let coupon_rate = if reset_d < self.as_of {
-                            if let Some(fixing_rate) = self.fixing_series.and_then(|series| {
+                        let coupon_rate = if reset_effective < self.as_of {
+                            let fixing_rate =
                                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                                    Some(series),
+                                    self.fixing_series,
                                     spec.index_id.as_ref(),
-                                    reset_d,
+                                    fixing_date,
                                     self.as_of,
-                                )
-                                .ok()
-                            }) {
-                                // Apply floor (on index rate) and spread, mirroring
-                                // the convention in project_floating_rate.
-                                let mut index_rate = fixing_rate;
-                                if let Some(floor) = floor_bp_f64 {
-                                    index_rate = index_rate.max(floor * 1e-4);
-                                }
-                                index_rate + (spread_bp_f64 * 1e-4)
-                            } else {
-                                // Graceful degradation: no fixings available, use
-                                // forward projection (preserves existing behaviour).
-                                let fwd = fwd_curve.as_ref().ok_or_else(|| {
-                                    finstack_quant_core::Error::Validation(
-                                        "forward curve required for floating rate".into(),
-                                    )
-                                })?;
-                                super::utils::project_floating_rate_with_curve(
-                                    reset_d,
-                                    &spec.reset_freq,
-                                    spread_bp_f64,
-                                    floor_bp_f64,
-                                    fwd.as_ref(),
-                                    &self.facility.attributes,
-                                )?
+                                )?;
+                            // Apply floor (on index rate) and spread, mirroring
+                            // the convention in project_floating_rate.
+                            let mut index_rate = fixing_rate;
+                            if let Some(floor) = floor_bp_f64 {
+                                index_rate = index_rate.max(floor * 1e-4);
                             }
+                            index_rate + (spread_bp_f64 * 1e-4)
                         } else {
                             // Future reset: project from forward curve
                             let fwd = fwd_curve.as_ref().ok_or_else(|| {
@@ -462,7 +454,7 @@ impl<'a> CashflowEngine<'a> {
                                 )
                             })?;
                             super::utils::project_floating_rate_with_curve(
-                                reset_d,
+                                reset_effective,
                                 &spec.reset_freq,
                                 spread_bp_f64,
                                 floor_bp_f64,
@@ -536,7 +528,7 @@ impl<'a> CashflowEngine<'a> {
 
             if !rc.is_effectively_zero_money(total_interest.amount(), ccy) {
                 flows.push(CashFlow {
-                    date: period_end,
+                    date: payment_date,
                     reset_date: reset_date_opt,
                     amount: total_interest,
                     kind: match &self.facility.base_rate_spec {
@@ -550,7 +542,7 @@ impl<'a> CashflowEngine<'a> {
 
             if !rc.is_effectively_zero_money(total_commitment_fee.amount(), ccy) {
                 flows.push(CashFlow {
-                    date: period_end,
+                    date: payment_date,
                     reset_date: None,
                     amount: total_commitment_fee,
                     kind: CFKind::CommitmentFee,
@@ -561,7 +553,7 @@ impl<'a> CashflowEngine<'a> {
 
             if !rc.is_effectively_zero_money(total_usage_fee.amount(), ccy) {
                 flows.push(CashFlow {
-                    date: period_end,
+                    date: payment_date,
                     reset_date: None,
                     amount: total_usage_fee,
                     kind: CFKind::UsageFee,
@@ -572,7 +564,7 @@ impl<'a> CashflowEngine<'a> {
 
             if !rc.is_effectively_zero_money(total_facility_fee.amount(), ccy) {
                 flows.push(CashFlow {
-                    date: period_end,
+                    date: payment_date,
                     reset_date: None,
                     amount: total_facility_fee,
                     kind: CFKind::FacilityFee,

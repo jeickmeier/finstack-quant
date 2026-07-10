@@ -61,10 +61,11 @@ impl MetricCalculator for Conversion01Calculator {
 
         let pv_down = bond_down.value(context.curves.as_ref(), as_of)?.amount();
 
-        // Conversion01 = (PV_up - PV_down) / (2 * bump_size)
+        // The two scenarios are already ±1%; the standardized metric is the
+        // PV change for a 1% move, not the derivative per unit ratio/price.
         // For ratio: up = higher ratio = higher value, so PV_up > PV_down typically
         // For price: up = lower price = higher value, so PV_up > PV_down typically
-        let conversion01 = (pv_up - pv_down) / (2.0 * CONVERSION_BUMP_PCT);
+        let conversion01 = (pv_up - pv_down) / 2.0;
 
         Ok(conversion01)
     }

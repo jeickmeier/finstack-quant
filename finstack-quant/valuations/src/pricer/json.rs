@@ -421,6 +421,12 @@ mod tests {
         serde_json::to_string(&json).expect("serialize")
     }
 
+    fn equity_option_json_with_invalid_strike() -> String {
+        let mut option = EquityOption::example().expect("option");
+        option.strike = -100.0;
+        serde_json::to_string(&InstrumentJson::EquityOption(option)).expect("serialize")
+    }
+
     fn fx_spot_spec_value() -> Value {
         serde_json::json!({
             "id": "EURUSD-SPOT",
@@ -522,6 +528,28 @@ mod tests {
         };
         assert!(
             err.to_string().contains("NegativeValue") || err.to_string().contains("negative"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_instrument_json_rejects_domain_invariants() {
+        let err = validate_instrument_json(&equity_option_json_with_invalid_strike())
+            .expect_err("negative equity-option strike must be rejected");
+        assert!(
+            err.to_string().contains("strike") && err.to_string().contains("positive"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_boxed_instrument_json_rejects_domain_invariants() {
+        let Err(err) = parse_boxed_instrument_json(&equity_option_json_with_invalid_strike(), None)
+        else {
+            panic!("negative equity-option strike must be rejected")
+        };
+        assert!(
+            err.to_string().contains("strike") && err.to_string().contains("positive"),
             "unexpected error: {err}"
         );
     }

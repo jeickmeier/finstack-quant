@@ -147,9 +147,10 @@ impl PyCopula {
         default_threshold: f64,
         factor_realization: Vec<f64>,
         correlation: f64,
-    ) -> f64 {
+    ) -> PyResult<f64> {
         self.inner
-            .conditional_default_prob(default_threshold, &factor_realization, correlation)
+            .conditional_default_prob_checked(default_threshold, &factor_realization, correlation)
+            .map_err(display_to_py)
     }
 
     /// Number of systematic factors in the model.
@@ -660,8 +661,13 @@ impl PyLatentMultiFactor {
     /// Raises ``ValueError`` if the correlation matrix is invalid.
     #[new]
     #[pyo3(text_signature = "(num_factors, volatilities, correlations)")]
-    fn new(num_factors: usize, volatilities: Vec<f64>, correlations: Vec<f64>) -> PyResult<Self> {
-        LatentMultiFactor::new(num_factors, volatilities, correlations)
+    fn new(
+        py: Python<'_>,
+        num_factors: usize,
+        volatilities: Vec<f64>,
+        correlations: Vec<f64>,
+    ) -> PyResult<Self> {
+        py.detach(|| LatentMultiFactor::new(num_factors, volatilities, correlations))
             .map(|m| Self { inner: m })
             .map_err(display_to_py)
     }
@@ -849,8 +855,9 @@ fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> (f64, f64, f64, f6
 /// Raises ``ValueError`` if the matrix is invalid.
 #[pyfunction]
 #[pyo3(text_signature = "(matrix, n)")]
-fn validate_correlation_matrix(matrix: Vec<f64>, n: usize) -> PyResult<()> {
-    corr::validate_correlation_matrix(&matrix, n).map_err(display_to_py)
+fn validate_correlation_matrix(py: Python<'_>, matrix: Vec<f64>, n: usize) -> PyResult<()> {
+    py.detach(|| corr::validate_correlation_matrix(&matrix, n))
+        .map_err(display_to_py)
 }
 
 /// Nearest correlation matrix (Higham 2002) for a near-PSD input.

@@ -232,6 +232,52 @@ impl AsianOption {
 
         (sum, product_log, count)
     }
+
+    /// Validate that realized fixing history exactly covers every scheduled
+    /// observation on or before the valuation date.
+    pub fn validate_realized_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
+        let mut scheduled = std::collections::BTreeSet::new();
+        for date in &self.fixing_dates {
+            if !scheduled.insert(*date) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' has duplicate scheduled fixing date {}",
+                    self.id, date
+                )));
+            }
+        }
+
+        let mut observed = std::collections::BTreeSet::new();
+        for (date, value) in &self.past_fixings {
+            if !scheduled.contains(date) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' has a past fixing for {}, which is not a scheduled fixing date",
+                    self.id, date
+                )));
+            }
+            if !observed.insert(*date) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' has duplicate past fixing for {}",
+                    self.id, date
+                )));
+            }
+            if !value.is_finite() || *value <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' fixing on {} must be positive and finite, got {}",
+                    self.id, date, value
+                )));
+            }
+        }
+
+        for date in &self.fixing_dates {
+            if *date <= as_of && !observed.contains(date) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "AsianOption '{}' is missing a realized fixing for {} as of {}",
+                    self.id, date, as_of
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 impl crate::instruments::common_impl::traits::Instrument for AsianOption {
@@ -259,6 +305,7 @@ impl crate::instruments::common_impl::traits::Instrument for AsianOption {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        self.validate_realized_fixings(as_of)?;
         use crate::instruments::exotics::asian_option::pricer::{
             AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer,
         };

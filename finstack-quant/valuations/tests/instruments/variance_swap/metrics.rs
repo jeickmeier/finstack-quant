@@ -2,10 +2,20 @@
 
 use super::common::*;
 use finstack_quant_core::dates::Tenor;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::{realized_variance, RealizedVarMethod};
 use finstack_quant_valuations::instruments::equity::variance_swap::PayReceive;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
+
+/// Metric tests that value after inception use a complete realized history.
+fn base_context() -> MarketContext {
+    let swap = sample_swap(PayReceive::Receive);
+    add_series(
+        super::common::base_context(),
+        &price_series(&swap, 4_900.0, 5.0),
+    )
+}
 
 // ============================================================================
 // Basic Metrics Tests

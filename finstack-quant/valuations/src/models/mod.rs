@@ -24,13 +24,13 @@ pub mod volatility;
 pub use closed_form::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, barrier_call_continuous,
     barrier_put_continuous, black76_call, black76_implied_vol, black76_put, bs_call_delta,
-    bs_call_greeks, bs_call_rho, bs_call_theta, bs_gamma, bs_greeks, bs_implied_vol, bs_price,
-    bs_put_delta, bs_put_greeks, bs_put_rho, bs_put_theta, bs_vega, down_in_call, down_out_call,
-    fixed_strike_lookback_call, fixed_strike_lookback_put, floating_strike_lookback_call,
-    floating_strike_lookback_put, geometric_asian_call, geometric_asian_put,
-    heston_call_price_fourier, heston_put_price_fourier, quanto_call, quanto_drift_adjustment,
-    quanto_put, up_in_call, up_out_call, AsianGreeks, AsianPriceResult, BarrierType, BsGreeks,
-    HestonParams, ONE_PERCENT,
+    bs_call_greeks, bs_call_rho, bs_call_theta, bs_gamma, bs_greeks, bs_greeks_checked,
+    bs_implied_vol, bs_price, bs_put_delta, bs_put_greeks, bs_put_rho, bs_put_theta, bs_vega,
+    down_in_call, down_out_call, fixed_strike_lookback_call, fixed_strike_lookback_put,
+    floating_strike_lookback_call, floating_strike_lookback_put, geometric_asian_call,
+    geometric_asian_put, heston_call_price_fourier, heston_put_price_fourier, quanto_call,
+    quanto_drift_adjustment, quanto_put, up_in_call, up_out_call, AsianGreeks, AsianPriceResult,
+    BarrierType, BsGreeks, HestonParams, ONE_PERCENT,
 };
 pub use pde::{
     BlackScholesPde, BoundaryCondition, CraigSneydStepper, Grid1D, Grid2D, HestonPde, PdeProblem1D,
