@@ -141,6 +141,14 @@
               "format": "date",
               "type": "string"
             },
+            "expiry_fixing": {
+              "default": null,
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
             },

@@ -776,6 +776,9 @@ impl YoYInflationSwap {
         let mut pv = 0.0_f64;
 
         for (start, end, pay) in self.schedule()? {
+            if pay <= as_of {
+                continue;
+            }
             let accrual = self
                 .day_count
                 .year_fraction(start, end, DayCountContext::default())?;
@@ -835,6 +838,9 @@ impl YoYInflationSwap {
         let mut sum_annuity = 0.0_f64;
 
         for (start, end, pay) in self.schedule()? {
+            if pay <= as_of {
+                continue;
+            }
             let accrual = self
                 .day_count
                 .year_fraction(start, end, DayCountContext::default())?;
@@ -875,6 +881,9 @@ impl YoYInflationSwap {
         let fixed_rate = decimal_to_f64(self.fixed_rate, "YoYInflationSwap fixed_rate")?;
 
         for (start, end, pay) in self.schedule()? {
+            if pay <= as_of {
+                continue;
+            }
             let accrual = self
                 .day_count
                 .year_fraction(start, end, DayCountContext::default())?;

@@ -158,11 +158,22 @@ pub(crate) fn generate_cashflows(
             }
         }
         super::spec::AmortizationSpec::PercentPerPeriod { bp } => {
-            // Apply percentage to current outstanding balance, not original notional.
-            // This correctly compounds down as principal is repaid each period.
             let pct = f64::from(*bp) * 1e-4;
-            let mut running_balance = loan.notional_limit.amount();
+            // Replay actual funding, sweep, and repayment events chronologically.
+            // This is essential for delayed-draw facilities: undrawn commitment
+            // is not principal and must never be amortized.
+            let mut existing_events: Vec<(Date, f64)> = principal_events
+                .iter()
+                .map(|event| (event.date, event.delta.amount()))
+                .collect();
+            existing_events.sort_by_key(|(date, _)| *date);
+            let mut next_event = 0usize;
+            let mut running_balance = 0.0_f64;
             for d in coupon_dates.iter().copied().skip(1) {
+                while next_event < existing_events.len() && existing_events[next_event].0 <= d {
+                    running_balance = (running_balance + existing_events[next_event].1).max(0.0);
+                    next_event += 1;
+                }
                 let amort_amount = (running_balance * pct).min(running_balance);
                 let pay = Money::new(amort_amount, loan.currency);
                 principal_events.push(PrincipalEvent {

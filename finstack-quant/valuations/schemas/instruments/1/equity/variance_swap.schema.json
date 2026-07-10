@@ -66,13 +66,13 @@
             "amount": "1000000",
             "currency": "USD"
           },
+          "observation_bdc": "following",
+          "observation_calendar_id": "USNY",
+          "observation_end_of_month": false,
           "observation_freq": {
             "count": 1,
             "unit": "days"
           },
-          "observation_calendar_id": "USNY",
-          "observation_bdc": "following",
-          "observation_end_of_month": false,
           "open_series_id": null,
           "pricing_overrides": {
             "adaptive_bumps": false,

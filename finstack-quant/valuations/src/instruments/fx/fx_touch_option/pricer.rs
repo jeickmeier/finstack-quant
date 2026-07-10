@@ -46,6 +46,16 @@ impl FxTouchOptionCalculator {
             return Ok(Money::new(pv, inst.quote_currency));
         }
 
+        if inst.observed_touch == Some(true) {
+            let pv = match (inst.touch_type, inst.payout_timing) {
+                (TouchType::OneTouch, PayoutTiming::AtHit) | (TouchType::NoTouch, _) => 0.0,
+                (TouchType::OneTouch, PayoutTiming::AtExpiry) => {
+                    (-r_d * t).exp() * inst.payout_amount.amount()
+                }
+            };
+            return Ok(Money::new(pv, inst.quote_currency));
+        }
+
         let price = price_touch(
             inst,
             spot,

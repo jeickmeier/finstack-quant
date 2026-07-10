@@ -91,11 +91,10 @@ pub(crate) fn price_cap_floor(
         }
 
         let fixing_date = cap_floor.option_fixing_date(&period);
-        // A coupon is seasoned only after its accrual period has begun. On
-        // the contractual start date, a pre-start fixing lag may put the
-        // observation date before `as_of`, but the new trade is still priced
-        // from the live curve unless an observed fixing is supplied.
-        let is_fixed_unpaid = period.accrual_start < as_of && fixing_date < as_of;
+        // Once the contractual fixing date is before the valuation date the
+        // coupon is known, regardless of whether its accrual period has begun.
+        // Re-projecting a T-2 fixing at T-1 books phantom curve P&L.
+        let is_fixed_unpaid = fixing_date < as_of;
         let t_fix = if is_fixed_unpaid {
             0.0
         } else {

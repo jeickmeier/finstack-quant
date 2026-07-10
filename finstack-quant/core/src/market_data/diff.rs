@@ -40,7 +40,7 @@
 
 use super::context::MarketContext;
 use crate::currency::Currency;
-use crate::dates::{Date, DayCount, DayCountContext};
+use crate::dates::Date;
 use crate::Result;
 
 use serde::{Deserialize, Serialize};
@@ -348,13 +348,8 @@ pub fn measure_inflation_curve_shift(
     ))
 }
 
-/// Measure the annualized inflation-rate shift represented by two published
-/// index snapshots, in basis points.
-///
-/// The comparison uses a common anchor and the latest date present in either
-/// snapshot. `InflationIndex::value_on` deliberately carries the last published
-/// value forward, so a newly released print in `market_t1` is measured against
-/// the information set that was available in `market_t0`.
+/// Measure the change between the latest published index levels, in basis points.
+/// This is a level move, not an annualized growth rate over the full history.
 pub fn measure_inflation_index_shift(
     index_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -363,35 +358,22 @@ pub fn measure_inflation_index_shift(
     let index_id = index_id.as_ref();
     let index_t0 = market_t0.get_inflation_index(index_id)?;
     let index_t1 = market_t1.get_inflation_index(index_id)?;
-    let (first_t0, last_t0) = index_t0.date_range()?;
-    let (first_t1, last_t1) = index_t1.date_range()?;
-    let anchor = first_t0.max(first_t1);
-    let end = last_t0.max(last_t1);
-    if end <= anchor {
-        return Err(crate::InputError::TooFewPoints.into());
+    let (_, last_t0) = index_t0.date_range()?;
+    let (_, last_t1) = index_t1.date_range()?;
+    let level_t0 = index_t0.value_on(last_t0)?;
+    let level_t1 = index_t1.value_on(last_t1)?;
+    if !level_t0.is_finite() || !level_t1.is_finite() || level_t0 <= 0.0 || level_t1 <= 0.0 {
+        return Err(crate::InputError::Invalid.into());
     }
-    let t = DayCount::Act365F.year_fraction(anchor, end, DayCountContext::default())?;
-    if t <= 0.0 {
-        return Err(crate::InputError::InvalidDateRange.into());
-    }
-    let rate = |index: &super::scalars::InflationIndex| -> Result<f64> {
-        let base = index.value_on(anchor)?;
-        let terminal = index.value_on(end)?;
-        if !base.is_finite() || !terminal.is_finite() || base <= 0.0 || terminal <= 0.0 {
-            return Err(crate::InputError::Invalid.into());
-        }
-        Ok((terminal / base).powf(1.0 / t) - 1.0)
-    };
-    Ok((rate(index_t1.as_ref())? - rate(index_t0.as_ref())?) * 10_000.0)
+    Ok((level_t1 / level_t0 - 1.0) * 10_000.0)
 }
 
 /// Measure a declared inflation source, combining projected-curve and
 /// published-index shifts when both are present.
 ///
-/// A hybrid source has two independent information changes: movement in the
-/// projected zero-inflation curve and discrete publication of realized CPI.
-/// Both are expressed in basis-point-equivalent annualized inflation rates and
-/// are additive for first-order attribution.
+/// When a projected curve is available, use its parallel-rate move. Published
+/// index levels are used only for index-only sources; adding both would apply a
+/// single Inflation01 to two different risk factors.
 pub fn measure_inflation_source_shift(
     source_id: impl AsRef<str>,
     market_t0: &MarketContext,
@@ -402,13 +384,10 @@ pub fn measure_inflation_source_shift(
         && market_t1.get_inflation_curve(source_id).is_ok();
     let has_index = market_t0.get_inflation_index(source_id).is_ok()
         && market_t1.get_inflation_index(source_id).is_ok();
-    match (has_curve, has_index) {
-        (true, true) => Ok(
-            measure_inflation_curve_shift(source_id, market_t0, market_t1)?
-                + measure_inflation_index_shift(source_id, market_t0, market_t1)?,
-        ),
-        (_, false) => measure_inflation_curve_shift(source_id, market_t0, market_t1),
-        (false, true) => measure_inflation_index_shift(source_id, market_t0, market_t1),
+    if has_curve || !has_index {
+        measure_inflation_curve_shift(source_id, market_t0, market_t1)
+    } else {
+        measure_inflation_index_shift(source_id, market_t0, market_t1)
     }
 }
 

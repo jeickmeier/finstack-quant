@@ -57,25 +57,65 @@ pub struct PoolAsset {
     /// Optional override for Monthly Default Rate (MDR)
     #[serde(default)]
     pub mdr_override: Option<f64>,
+    /// Contractual periodic payment for level-pay assets. Required for exact
+    /// seasoned-loan amortization; when absent it is inferred once from the
+    /// current state and remaining contractual periods.
+    #[serde(default)]
+    pub contractual_payment: Option<Money>,
 }
 
 impl PoolAsset {
     /// Create new pool asset from existing bond
-    pub fn from_bond(bond: &Bond, industry: Option<String>) -> Self {
-        Self {
+    pub fn from_bond(bond: &Bond, industry: Option<String>) -> finstack_quant_core::Result<Self> {
+        fn economics(
+            spec: &crate::instruments::fixed_income::bond::CashflowSpec,
+        ) -> finstack_quant_core::Result<(f64, Option<f64>, Option<String>, DayCount)> {
+            match spec {
+                crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => Ok((
+                    spec.rate.to_f64().ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "bond fixed coupon cannot be represented as f64".into(),
+                        )
+                    })?,
+                    None,
+                    None,
+                    spec.dc,
+                )),
+                crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => {
+                    let spread_bps = spec.rate_spec.spread_bp.to_f64().ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "bond floating spread cannot be represented as f64".into(),
+                        )
+                    })?;
+                    Ok((
+                        spread_bps / BASIS_POINTS_DIVISOR,
+                        Some(spread_bps),
+                        Some(spec.rate_spec.index_id.as_str().to_string()),
+                        spec.rate_spec.dc,
+                    ))
+                }
+                crate::instruments::fixed_income::bond::CashflowSpec::Amortizing {
+                    base, ..
+                } => economics(base),
+                crate::instruments::fixed_income::bond::CashflowSpec::StepUp(_) => {
+                    Err(finstack_quant_core::Error::Validation(
+                        "PoolAsset cannot faithfully represent a step-up bond coupon schedule"
+                            .into(),
+                    ))
+                }
+            }
+        }
+
+        let (rate, spread_bps, index_id, day_count) = economics(&bond.cashflow_spec)?;
+        Ok(Self {
             id: bond.id.to_owned(),
             asset_type: AssetType::HighYieldBond {
                 industry: industry.clone(),
             },
             balance: bond.notional,
-            rate: match &bond.cashflow_spec {
-                crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => {
-                    spec.rate.to_f64().unwrap_or(0.0)
-                }
-                _ => 0.0,
-            },
-            spread_bps: None, // Bond doesn't track spread separately
-            index_id: None,
+            rate,
+            spread_bps,
+            index_id,
             maturity: bond.maturity,
             credit_quality: None,
             industry,
@@ -86,37 +126,13 @@ impl PoolAsset {
                 .pricing_overrides
                 .market_quotes
                 .quoted_clean_price
-                .map(|p| Money::new(p * bond.notional.amount(), bond.notional.currency())),
+                .map(|p| Money::new(p * bond.notional.amount() / 100.0, bond.notional.currency())),
             acquisition_date: Some(bond.issue_date),
-            day_count: match &bond.cashflow_spec {
-                crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => spec.dc,
-                crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => {
-                    spec.rate_spec.dc
-                }
-                crate::instruments::fixed_income::bond::CashflowSpec::StepUp(spec) => spec.dc,
-                // For amortizing, we look at the base spec
-                crate::instruments::fixed_income::bond::CashflowSpec::Amortizing {
-                    base, ..
-                } => {
-                    match base.as_ref() {
-                        crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) => {
-                            spec.dc
-                        }
-                        crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => {
-                            spec.rate_spec.dc
-                        }
-                        crate::instruments::fixed_income::bond::CashflowSpec::StepUp(spec) => {
-                            spec.dc
-                        }
-                        crate::instruments::fixed_income::bond::CashflowSpec::Amortizing {
-                            ..
-                        } => DayCount::Act360, // Fallback if not clear, though bond should have one
-                    }
-                }
-            },
+            day_count,
             smm_override: None,
             mdr_override: None,
-        }
+            contractual_payment: None,
+        })
     }
 
     /// Create a floating rate loan asset with explicit spread tracking
@@ -179,6 +195,7 @@ impl PoolAsset {
             day_count,
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         }
     }
 
@@ -229,6 +246,7 @@ impl PoolAsset {
             day_count,
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         }
     }
 
@@ -620,10 +638,14 @@ impl AssetPool {
     }
 
     /// Add asset from existing bond
-    pub fn add_bond(&mut self, bond: &Bond, industry: Option<String>) -> &mut Self {
-        let asset = PoolAsset::from_bond(bond, industry);
+    pub fn add_bond(
+        &mut self,
+        bond: &Bond,
+        industry: Option<String>,
+    ) -> finstack_quant_core::Result<&mut Self> {
+        let asset = PoolAsset::from_bond(bond, industry)?;
         self.assets.push(asset);
-        self
+        Ok(self)
     }
 
     /// Total pool balance
@@ -784,6 +806,14 @@ impl AssetPool {
                 expected: self.base_currency,
                 actual,
             });
+        }
+        if let Some(payment) = asset.contractual_payment {
+            if payment.currency() != self.base_currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.base_currency,
+                    actual: payment.currency(),
+                });
+            }
         }
         Ok(())
     }

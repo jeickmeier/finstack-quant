@@ -61,6 +61,7 @@ impl PoolState {
         let mut recovery_amounts = Vec::with_capacity(n);
         let mut smm_overrides = Vec::with_capacity(n);
         let mut mdr_overrides = Vec::with_capacity(n);
+        let mut level_payments = Vec::with_capacity(n);
 
         let mut is_amortizing = Vec::with_capacity(n);
 
@@ -76,6 +77,7 @@ impl PoolState {
             recovery_amounts.push(asset.recovery_amount.map(|m| m.amount()));
             smm_overrides.push(asset.smm_override);
             mdr_overrides.push(asset.mdr_override);
+            level_payments.push(asset.contractual_payment.map(|m| m.amount()));
             is_amortizing.push(asset.asset_type.is_amortizing());
         }
 
@@ -95,8 +97,6 @@ impl PoolState {
                 curve_indices.push(None);
             }
         }
-
-        let level_payments = vec![None; n];
 
         Self {
             ids,

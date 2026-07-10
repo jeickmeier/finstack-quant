@@ -137,6 +137,7 @@ fn test_margin_call_with_threshold() {
     let csa = CsaSpec {
         id: "TEST_CSA".to_string(),
         base_currency: Currency::USD,
+        calendar_id: "usny".to_string(),
         vm_params,
         im_params: None,
         eligible_collateral: Default::default(),
@@ -178,6 +179,7 @@ fn test_margin_call_exceeds_threshold() {
     let csa = CsaSpec {
         id: "TEST_CSA".to_string(),
         base_currency: Currency::USD,
+        calendar_id: "usny".to_string(),
         vm_params,
         im_params: None,
         eligible_collateral: Default::default(),

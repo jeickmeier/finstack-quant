@@ -491,6 +491,12 @@ impl PyCsaSpec {
         self.inner.base_currency.to_string()
     }
 
+    /// Contractual business-day calendar identifier.
+    #[getter]
+    fn calendar_id(&self) -> &str {
+        &self.inner.calendar_id
+    }
+
     /// Whether this CSA requires initial margin.
     #[getter]
     fn requires_im(&self) -> bool {

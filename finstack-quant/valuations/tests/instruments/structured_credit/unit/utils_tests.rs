@@ -190,6 +190,7 @@ fn test_reinvestment_manager_selects_cheapest_first() {
         acquisition_date: None,
         smm_override: None,
         mdr_override: None,
+        contractual_payment: None,
     };
 
     // Create assets at different prices

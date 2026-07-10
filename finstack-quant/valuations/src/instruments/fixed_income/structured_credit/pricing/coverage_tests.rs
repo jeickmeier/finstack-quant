@@ -250,13 +250,22 @@ impl CoverageTest {
                 })
             })?;
 
-        // Use full all-in rate (index + spread) when market context is available,
-        // falling back to spread-only when market data is absent.
+        // Use the contractual all-in rate when market context is available.
+        // Missing historical fixings must invalidate the coverage test rather
+        // than silently reverting to spread-only.
         let tranche_rate = if let Some(market) = context.market {
-            tranche
-                .coupon
-                .try_current_rate_with_index(context.as_of, market)
-                .unwrap_or_else(|_| tranche.coupon.current_rate(context.as_of))
+            if let Some(period_start) = context.period_start {
+                tranche.coupon.try_rate_for_period(
+                    period_start,
+                    context.as_of,
+                    context.as_of,
+                    market,
+                )?
+            } else {
+                tranche
+                    .coupon
+                    .try_current_rate_with_index(context.as_of, market)?
+            }
         } else {
             tranche.coupon.current_rate(context.as_of)
         };
@@ -293,9 +302,17 @@ impl CoverageTest {
             Money::new(0.0, interest_due.currency()),
             |acc, t| {
                 let rate = if let Some(market) = context.market {
-                    t.coupon
-                        .try_current_rate_with_index(context.as_of, market)
-                        .unwrap_or_else(|_| t.coupon.current_rate(context.as_of))
+                    if let Some(period_start) = context.period_start {
+                        t.coupon.try_rate_for_period(
+                            period_start,
+                            context.as_of,
+                            context.as_of,
+                            market,
+                        )?
+                    } else {
+                        t.coupon
+                            .try_current_rate_with_index(context.as_of, market)?
+                    }
                 } else {
                     t.coupon.current_rate(context.as_of)
                 };

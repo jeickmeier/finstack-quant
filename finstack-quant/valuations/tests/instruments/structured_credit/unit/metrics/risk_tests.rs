@@ -163,6 +163,7 @@ mod discount_margin_tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
@@ -193,7 +194,20 @@ mod discount_margin_tests {
             .knots([(0.25, 0.04), (1.0, 0.04), (2.5, 0.04)])
             .build()
             .unwrap();
-        MarketContext::new().insert(disc).insert(sofr)
+        MarketContext::new()
+            .insert(disc)
+            .insert(sofr)
+            .insert_series(
+                ScalarTimeSeries::new(
+                    "FIXING:SOFR-3M",
+                    vec![(
+                        Date::from_calendar_date(2023, Month::December, 28).unwrap(),
+                        0.04,
+                    )],
+                    None,
+                )
+                .unwrap(),
+            )
     }
 
     fn floating_spec() -> FloatingRateSpec {

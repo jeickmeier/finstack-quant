@@ -350,7 +350,7 @@ impl CDSPricer {
             inp.surv,
             inp.disc,
             self.config.protection_leg_substeps_per_year,
-        );
+        )?;
         let mut accrual_pv = 0.0;
 
         for window in boundaries.windows(2) {

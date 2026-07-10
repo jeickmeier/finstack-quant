@@ -160,18 +160,85 @@ impl TrancheCoupon {
         date: Date,
         context: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
+        let (period_end, as_of) = match self {
+            TrancheCoupon::Fixed { .. } => (date, date),
+            TrancheCoupon::Floating(spec) => {
+                let fwd = context.get_forward(spec.index_id.as_str())?;
+                (
+                    crate::instruments::fixed_income::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
+                        date,
+                        fwd.tenor(),
+                        fwd.day_count(),
+                    )?,
+                    fwd.base_date(),
+                )
+            }
+        };
+        self.try_rate_for_period(date, period_end, as_of, context)
+    }
+
+    /// Resolve the contractual coupon for an explicit accrual period.
+    pub fn try_rate_for_period(
+        &self,
+        accrual_start: Date,
+        accrual_end: Date,
+        as_of: Date,
+        context: &finstack_quant_core::market_data::context::MarketContext,
+    ) -> finstack_quant_core::Result<f64> {
         match self {
             TrancheCoupon::Fixed { rate } => Ok(*rate),
             TrancheCoupon::Floating(spec) => {
                 let fwd = context.get_forward(spec.index_id.as_str())?;
-                let tenor = fwd.tenor();
-                let period_end = crate::instruments::fixed_income::structured_credit::utils::rate_helpers::
-                    try_tenor_to_period_end(date, tenor, fwd.day_count())?;
-
                 let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+                let calendar_id = spec
+                    .fixing_calendar_id
+                    .as_deref()
+                    .unwrap_or(spec.calendar_id.as_str());
+                let canonical_calendar_id = if calendar_id == "weekends_only" {
+                    "weekends"
+                } else {
+                    calendar_id
+                };
+                let calendar = finstack_quant_core::dates::CalendarRegistry::global()
+                    .resolve_str(canonical_calendar_id)
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "structured-credit tranche fixing calendar '{}' is not registered",
+                            calendar_id
+                        ))
+                    })?;
+                let reset_date = finstack_quant_core::dates::DateExt::add_business_days(
+                    accrual_start,
+                    -spec.reset_lag_days,
+                    calendar,
+                )?;
+                if reset_date <= as_of {
+                    if spec.overnight_compounding.is_some() {
+                        return Err(finstack_quant_core::Error::Validation(
+                            "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
+                                .into(),
+                        ));
+                    }
+                    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+                        context,
+                        spec.index_id.as_str(),
+                    )?;
+                    let raw =
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            Some(fixings),
+                            spec.index_id.as_str(),
+                            reset_date,
+                            as_of,
+                        )?;
+                    return Ok(
+                        crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                            raw, &params,
+                        ),
+                    );
+                }
                 crate::cashflow::builder::project_floating_rate(
-                    date,
-                    period_end,
+                    accrual_start,
+                    accrual_end,
                     fwd.as_ref(),
                     &params,
                 )

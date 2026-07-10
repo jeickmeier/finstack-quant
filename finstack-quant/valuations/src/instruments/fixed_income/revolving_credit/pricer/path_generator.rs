@@ -152,7 +152,7 @@ pub fn generate_three_factor_paths(
     let disc_curve = market.get_discount(facility.discount_curve_id.as_str())?;
     let disc_dc = disc_curve.day_count();
     let base_date = disc_curve.base_date();
-    let t_start = disc_dc.year_fraction(
+    let t_start = disc_dc.signed_year_fraction(
         base_date,
         facility.commitment_date,
         DayCountContext::default(),

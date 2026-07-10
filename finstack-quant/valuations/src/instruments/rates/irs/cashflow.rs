@@ -34,17 +34,13 @@ fn default_rfr_calendar(currency: finstack_quant_core::currency::Currency) -> Op
     use finstack_quant_core::currency::Currency;
 
     match currency {
-        Currency::USD => Some("nyse"),
-        Currency::EUR => Some("target"),
-        Currency::GBP => Some("london"),
-        Currency::JPY => Some("tokyo"),
-        Currency::AUD => Some("sydney"),
-        Currency::CAD => Some("toronto"),
-        Currency::CHF => Some("zurich"),
-        Currency::SEK => Some("stockholm"),
-        Currency::NOK => Some("oslo"),
-        Currency::DKK => Some("copenhagen"),
-        Currency::NZD => Some("wellington"),
+        Currency::USD => Some("usny"),
+        Currency::EUR => Some("target2"),
+        Currency::GBP => Some("gblo"),
+        Currency::JPY => Some("jpto"),
+        Currency::AUD => Some("auce"),
+        Currency::CAD => Some("cato"),
+        Currency::CHF => Some("chzh"),
         _ => None,
     }
 }
@@ -107,16 +103,12 @@ fn rate_cutoff_days(compounding: FloatingLegCompounding) -> Option<i32> {
     }
 }
 
-fn shift_business_or_weekdays(
+fn shift_business_days(
     date: Date,
     days: i32,
-    cal: Option<&dyn finstack_quant_core::dates::HolidayCalendar>,
+    cal: &dyn finstack_quant_core::dates::HolidayCalendar,
 ) -> Result<Date> {
-    if let Some(cal) = cal {
-        date.add_business_days(days, cal)
-    } else {
-        Ok(date.add_weekdays(days))
-    }
+    date.add_business_days(days, cal)
 }
 
 fn is_irregular_fixed_period(
@@ -230,7 +222,7 @@ fn builder_overnight_method(
 
 fn resolve_compounded_fixing_calendar(
     irs: &InterestRateSwap,
-) -> Result<Option<&'static dyn finstack_quant_core::dates::HolidayCalendar>> {
+) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
     let float = irs.resolved_float_leg()?;
     let calendar_id = float
         .fixing_calendar_id
@@ -238,30 +230,37 @@ fn resolve_compounded_fixing_calendar(
         .or(float.calendar_id.as_deref());
 
     if let Some(id) = calendar_id {
-        return Ok(Some(
-            CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Fixing calendar '{}' not found in registry for compounded RFR swap '{}'. \
-                     Load the calendar or remove fixing_calendar_id to use weekday stepping.",
-                    id,
-                    irs.id.as_str()
-                ))
-            })?,
-        ));
+        return CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "Fixing calendar '{}' not found in registry for compounded RFR swap '{}'.",
+                id,
+                irs.id.as_str()
+            ))
+        });
     }
 
-    Ok(default_rfr_calendar(irs.notional.currency())
-        .and_then(|id| CalendarRegistry::global().resolve_str(id)))
+    let id = default_rfr_calendar(irs.notional.currency()).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "Compounded RFR swap '{}' requires an explicit fixing calendar for currency {}",
+            irs.id.as_str(),
+            irs.notional.currency()
+        ))
+    })?;
+    CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "Canonical fixing calendar '{id}' is not registered for compounded RFR swap '{}'",
+            irs.id.as_str()
+        ))
+    })
 }
 
 fn projected_overnight_rate(
     obs_start: Date,
     obs_end: Date,
-    dcf: f64,
     inputs: &OvernightProjectionInputs<'_>,
 ) -> Result<f64> {
     if obs_start < inputs.projection_base_date {
-        return finstack_quant_core::market_data::fixings::require_fixing_value(
+        return finstack_quant_core::market_data::fixings::require_fixing_value_exact(
             inputs.fixings,
             inputs.float.forward_curve_id.as_str(),
             obs_start,
@@ -307,17 +306,22 @@ fn projected_overnight_rate(
                 obs_start, obs_end, df_between
             )));
         }
+        let observation_dcf =
+            inputs
+                .float
+                .day_count
+                .year_fraction(obs_start, obs_end, DayCountContext::default())?;
         const MIN_DCF_THRESHOLD: f64 = 1e-8;
-        if dcf < MIN_DCF_THRESHOLD {
+        if observation_dcf < MIN_DCF_THRESHOLD {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Day-count fraction {:.2e} is below minimum threshold ({:.0e}). \
                  This may indicate calendar misconfiguration causing same-day observations \
                  or invalid date ordering ({} -> {}).",
-                dcf, MIN_DCF_THRESHOLD, obs_start, obs_end
+                observation_dcf, MIN_DCF_THRESHOLD, obs_start, obs_end
             )));
         }
         let comp = 1.0 / df_between;
-        return Ok((comp - 1.0) / dcf);
+        return Ok((comp - 1.0) / observation_dcf);
     }
 
     Err(finstack_quant_core::Error::Input(
@@ -396,15 +400,11 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         // business-day window — otherwise the inner loop can step onto weekends/holidays
         // and the observation-shift back-roll can collapse two adjacent steps onto the
         // same date (see `seek_business_day` semantics from a non-business day).
-        let (accrual_start, accrual_end) = if let Some(cal) = cal {
-            use finstack_quant_core::dates::adjust;
-            (
-                adjust(period.accrual_start, float.bdc, cal)?,
-                adjust(period.accrual_end, float.bdc, cal)?,
-            )
-        } else {
-            (period.accrual_start, period.accrual_end)
-        };
+        use finstack_quant_core::dates::adjust;
+        let (accrual_start, accrual_end) = (
+            adjust(period.accrual_start, float.bdc, cal)?,
+            adjust(period.accrual_end, float.bdc, cal)?,
+        );
         if accrual_end <= accrual_start {
             continue;
         }
@@ -453,8 +453,8 @@ pub(crate) fn projected_compounded_float_leg_schedule(
             )?
         } else {
             let cutoff = if let Some(days) = cutoff_days {
-                let lockout_start = shift_business_or_weekdays(accrual_end, -days, cal)?;
-                let lockout_ref_start = shift_business_or_weekdays(lockout_start, -1, cal)?;
+                let lockout_start = shift_business_days(accrual_end, -days, cal)?;
+                let lockout_ref_start = shift_business_days(lockout_start, -1, cal)?;
                 Some((lockout_start, lockout_ref_start, lockout_start))
             } else {
                 None
@@ -462,11 +462,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
             let mut acc = 1.0;
             let mut d = accrual_start;
             while d < accrual_end {
-                let next_d = if let Some(cal) = cal {
-                    d.add_business_days(1, cal)?
-                } else {
-                    d.add_weekdays(1)
-                };
+                let next_d = d.add_business_days(1, cal)?;
                 let step_end = if next_d > accrual_end {
                     accrual_end
                 } else {
@@ -475,17 +471,13 @@ pub(crate) fn projected_compounded_float_leg_schedule(
 
                 let mut obs_start = if total_shift == 0 {
                     d
-                } else if let Some(cal) = cal {
-                    d.add_business_days(total_shift, cal)?
                 } else {
-                    d.add_weekdays(total_shift)
+                    d.add_business_days(total_shift, cal)?
                 };
                 let mut obs_end = if total_shift == 0 {
                     step_end
-                } else if let Some(cal) = cal {
-                    step_end.add_business_days(total_shift, cal)?
                 } else {
-                    step_end.add_weekdays(total_shift)
+                    step_end.add_business_days(total_shift, cal)?
                 };
                 if let Some((lockout_start, lockout_ref_start, lockout_ref_end)) = cutoff {
                     if d >= lockout_start {
@@ -514,7 +506,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
                     )));
                 }
 
-                let r = projected_overnight_rate(obs_start, obs_end, dcf, &projection)?;
+                let r = projected_overnight_rate(obs_start, obs_end, &projection)?;
                 acc *= 1.0 + r * dcf;
                 d = step_end;
             }

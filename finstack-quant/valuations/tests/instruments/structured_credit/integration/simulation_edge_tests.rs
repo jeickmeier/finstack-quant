@@ -56,6 +56,7 @@ fn make_asset(id: &str, balance: f64, rate: f64, maturity: Date, is_defaulted: b
         day_count: DayCount::Act360,
         smm_override: None,
         mdr_override: None,
+        contractual_payment: None,
     }
 }
 

@@ -4,11 +4,9 @@
 //! threshold, MTA, and rounding rules.
 
 use crate::types::{CsaSpec, MarginCall, MarginTenor};
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{adjust, BusinessDayConvention, CalendarRegistry, Date, DateExt};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use time::Month;
 use tracing::{debug, warn};
 
 /// Variation margin calculation result.
@@ -93,69 +91,30 @@ pub struct VmCalculator {
 }
 
 impl VmCalculator {
-    fn default_calendar_id_for_currency(currency: Currency) -> &'static str {
-        match currency {
-            Currency::USD => "USNY",
-            Currency::EUR => "TARGET2",
-            Currency::GBP => "GBLO",
-            Currency::JPY => "JPTO",
-            Currency::CHF => "CHZU",
-            Currency::CAD => "CATO",
-            Currency::AUD => "AUSY",
-            _ => "weekends_only",
-        }
+    fn calendar_for_csa(&self) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
+        CalendarRegistry::global()
+            .resolve_str(&self.csa.calendar_id)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CSA '{}' calendar '{}' is not registered",
+                    self.csa.id, self.csa.calendar_id
+                ))
+            })
     }
 
-    fn calendar_for_csa(&self) -> Option<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
-        let cal_id = Self::default_calendar_id_for_currency(self.csa.base_currency);
-        CalendarRegistry::global().resolve_str(cal_id)
-    }
-
-    fn add_business_days(&self, date: Date, days: i32) -> Date {
+    fn add_business_days(&self, date: Date, days: i32) -> Result<Date> {
         if days == 0 {
-            return date;
+            return Ok(date);
         }
-        if let Some(cal) = self.calendar_for_csa() {
-            if let Ok(d) = date.add_business_days(days, cal) {
-                return d;
-            }
-        }
-        date.add_weekdays(days)
+        date.add_business_days(days, self.calendar_for_csa()?)
     }
 
-    fn adjust_to_business_day(&self, date: Date) -> Date {
-        if let Some(cal) = self.calendar_for_csa() {
-            return adjust(date, BusinessDayConvention::Following, cal).unwrap_or(date);
-        }
-        date
-    }
-
-    fn add_month_clamped(&self, date: Date) -> Date {
-        let (y, m, d) = date.to_calendar_date();
-        let (target_year, month) = match m {
-            Month::January => (y, Month::February),
-            Month::February => (y, Month::March),
-            Month::March => (y, Month::April),
-            Month::April => (y, Month::May),
-            Month::May => (y, Month::June),
-            Month::June => (y, Month::July),
-            Month::July => (y, Month::August),
-            Month::August => (y, Month::September),
-            Month::September => (y, Month::October),
-            Month::October => (y, Month::November),
-            Month::November => (y, Month::December),
-            Month::December => (y + 1, Month::January),
-        };
-        // d is in [1, 31] from `to_calendar_date`. Walk it down until
-        // the (year, month, day) triple is valid, e.g. Feb 30 → Feb 28.
-        for day in (1..=d).rev() {
-            if let Ok(candidate) = Date::from_calendar_date(target_year, month, day) {
-                return self.adjust_to_business_day(candidate);
-            }
-        }
-        // Every month has at least one valid day, so the loop above
-        // always returns. Reaching this point would indicate a logic bug.
-        unreachable!("no valid day found in {target_year}-{month}");
+    fn adjust_to_business_day(&self, date: Date) -> Result<Date> {
+        adjust(
+            date,
+            BusinessDayConvention::Following,
+            self.calendar_for_csa()?,
+        )
     }
 
     /// Create a new VM calculator with the given CSA specification.
@@ -309,39 +268,41 @@ impl VmCalculator {
     }
 
     /// Generate margin call dates based on frequency.
-    pub fn margin_call_dates(&self, start: Date, end: Date) -> Vec<Date> {
+    pub fn margin_call_dates(&self, start: Date, end: Date) -> Result<Vec<Date>> {
         let mut dates = Vec::new();
-        let adjusted_start = self.adjust_to_business_day(start);
+        let adjusted_start = self.adjust_to_business_day(start)?;
         if matches!(self.csa.vm_params.frequency, MarginTenor::OnDemand) {
-            let adjusted_end = self.adjust_to_business_day(end);
+            let adjusted_end = self.adjust_to_business_day(end)?;
             if adjusted_start > adjusted_end {
-                return dates;
+                return Ok(dates);
             }
             dates.push(adjusted_start);
             if adjusted_end != adjusted_start {
                 dates.push(adjusted_end);
             }
-            return dates;
+            return Ok(dates);
         }
         let mut current = adjusted_start;
 
         while current <= end {
             dates.push(current);
             current = match self.csa.vm_params.frequency {
-                MarginTenor::Daily => self.add_business_days(current, 1),
-                MarginTenor::Weekly => self.add_business_days(current, 5),
-                MarginTenor::Monthly => self.add_month_clamped(current),
+                MarginTenor::Daily => self.add_business_days(current, 1)?,
+                MarginTenor::Weekly => {
+                    self.adjust_to_business_day(current + time::Duration::weeks(1))?
+                }
+                MarginTenor::Monthly => self.adjust_to_business_day(current.add_months(1))?,
                 MarginTenor::OnDemand => break,
             };
         }
 
-        dates
+        Ok(dates)
     }
 
     /// Calculate settlement date based on lag.
     fn calculate_settlement_date(&self, call_date: Date) -> Result<Date> {
         let lag = self.csa.vm_params.settlement_lag as i32;
-        Ok(self.add_business_days(call_date, lag))
+        self.add_business_days(call_date, lag)
     }
 }
 
@@ -363,6 +324,7 @@ mod tests {
         CsaSpec {
             id: "TEST".to_string(),
             base_currency: Currency::USD,
+            calendar_id: "usny".to_string(),
             vm_params: VmParameters::with_threshold(
                 Money::new(1_000_000.0, Currency::USD),
                 Money::new(100_000.0, Currency::USD),
@@ -559,7 +521,7 @@ mod tests {
         let calc = VmCalculator::new(csa);
 
         let date = test_date(2025, 1, 15);
-        let dates = calc.margin_call_dates(date, date);
+        let dates = calc.margin_call_dates(date, date).expect("call dates");
 
         assert_eq!(dates, vec![date]);
     }
@@ -581,7 +543,9 @@ mod tests {
     fn daily_margin_call_dates_skip_weekends() {
         let csa = CsaSpec::usd_regulatory().expect("registry should load");
         let calc = VmCalculator::new(csa);
-        let dates = calc.margin_call_dates(test_date(2025, 1, 10), test_date(2025, 1, 14));
+        let dates = calc
+            .margin_call_dates(test_date(2025, 1, 10), test_date(2025, 1, 14))
+            .expect("call dates");
         assert_eq!(
             dates,
             vec![
@@ -590,5 +554,26 @@ mod tests {
                 test_date(2025, 1, 14)
             ]
         );
+    }
+
+    #[test]
+    fn weekly_calls_preserve_calendar_cadence_across_holidays() {
+        let mut csa = CsaSpec::usd_regulatory().expect("registry should load");
+        csa.vm_params.frequency = MarginTenor::Weekly;
+        let calc = VmCalculator::new(csa);
+        let dates = calc
+            .margin_call_dates(test_date(2025, 1, 17), test_date(2025, 1, 24))
+            .expect("weekly dates");
+        assert_eq!(dates, vec![test_date(2025, 1, 17), test_date(2025, 1, 24)]);
+    }
+
+    #[test]
+    fn invalid_contractual_calendar_is_an_error() {
+        let mut csa = CsaSpec::usd_regulatory().expect("registry should load");
+        csa.calendar_id = "missing-calendar".to_string();
+        let calc = VmCalculator::new(csa);
+        assert!(calc
+            .margin_call_dates(test_date(2025, 1, 17), test_date(2025, 1, 24))
+            .is_err());
     }
 }

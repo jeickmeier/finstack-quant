@@ -79,6 +79,16 @@ impl BarrierOptionHestonMcPricer {
         } else {
             0.0
         };
+        if inst.observed_barrier_breached == Some(true)
+            && matches!(
+                inst.barrier_type,
+                crate::instruments::exotics::barrier_option::types::BarrierType::UpAndOut
+                    | crate::instruments::exotics::barrier_option::types::BarrierType::DownAndOut
+            )
+            && inst.rebate_timing == crate::models::closed_form::barrier::RebateTiming::AtHit
+        {
+            return Ok((Money::new(0.0, inst.notional.currency()), 0.0));
+        }
 
         // Get spot
         let spot_scalar = market.get_price(&inst.spot_id)?;
@@ -126,7 +136,8 @@ impl BarrierOptionHestonMcPricer {
             sigma,
             &time_grid,
             inst.use_gobet_miri,
-        );
+        )
+        .with_observed_barrier_breached(inst.observed_barrier_breached.unwrap_or(false));
         if super::pricer::wants_at_hit_rebate(inst) {
             payoff = payoff.with_rebate_at_hit(r);
         }

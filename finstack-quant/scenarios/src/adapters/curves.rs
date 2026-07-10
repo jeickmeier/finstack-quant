@@ -16,7 +16,7 @@ use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::CurveStorage;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::calibration::bumps::{
-    bump_discount_curve_synthetic, bump_hazard_shift, bump_hazard_spreads, bump_inflation_rates,
+    bump_discount_curve_synthetic, bump_hazard_spreads, bump_inflation_rates,
     infer_currency_from_curve_id, infer_currency_from_discount_curve_id,
     observation_lag_from_curve, BumpRequest,
 };
@@ -352,33 +352,10 @@ pub(crate) fn curve_parallel_effects(
                 .map_err(|_| missing_market_err(curve_id.as_str()))?;
             let (discount_id, warning) =
                 resolve_discount_curve_id(ctx.market, discount_curve_id, Some(curve_id))?;
-            let mut fallback_warning: Option<Warning> = None;
-            let new_curve = match bump_hazard_spreads(
-                &base_curve,
-                ctx.market,
-                &bump_req,
-                Some(&discount_id),
-            ) {
-                Ok(c) => c,
-                Err(recalib_err) => {
-                    tracing::warn!(
-                        curve_id = %curve_id,
-                        error = %recalib_err,
-                        "Hazard curve recalibration failed; falling back to direct hazard-rate shift"
-                    );
-                    fallback_warning = Some(Warning::HazardRecalibrationFallback {
-                        curve_id: curve_id.as_str().to_string(),
-                        reason: recalib_err.to_string(),
-                        node: false,
-                    });
-                    bump_hazard_shift(&base_curve, &bump_req)?
-                }
-            };
+            let new_curve =
+                bump_hazard_spreads(&base_curve, ctx.market, &bump_req, Some(&discount_id))?;
 
             let mut effects = vec![ScenarioEffect::UpdateCurve(CurveStorage::from(new_curve))];
-            if let Some(w) = fallback_warning {
-                effects.push(ScenarioEffect::Warning(w));
-            }
             if let Some(w) = warning {
                 effects.push(ScenarioEffect::Warning(w));
             }
@@ -520,33 +497,10 @@ pub(crate) fn curve_node_effects(
             let (discount_id, warning) =
                 resolve_discount_curve_id(ctx.market, discount_curve_id, Some(curve_id))?;
 
-            let mut fallback_warning: Option<Warning> = None;
-            let new_curve = match bump_hazard_spreads(
-                &base_curve,
-                ctx.market,
-                &bump_req,
-                Some(&discount_id),
-            ) {
-                Ok(c) => c,
-                Err(recalib_err) => {
-                    tracing::warn!(
-                        curve_id = %curve_id,
-                        error = %recalib_err,
-                        "Hazard curve recalibration failed; falling back to direct hazard-rate shift"
-                    );
-                    fallback_warning = Some(Warning::HazardRecalibrationFallback {
-                        curve_id: curve_id.as_str().to_string(),
-                        reason: recalib_err.to_string(),
-                        node: true,
-                    });
-                    bump_hazard_shift(&base_curve, &bump_req)?
-                }
-            };
+            let new_curve =
+                bump_hazard_spreads(&base_curve, ctx.market, &bump_req, Some(&discount_id))?;
 
             let mut effects = vec![ScenarioEffect::UpdateCurve(CurveStorage::from(new_curve))];
-            if let Some(w) = fallback_warning {
-                effects.push(ScenarioEffect::Warning(w));
-            }
             effects.extend(result.warnings.into_iter().map(ScenarioEffect::Warning));
             if let Some(w) = warning {
                 effects.push(ScenarioEffect::Warning(w));

@@ -26,8 +26,9 @@ pub(crate) fn compute_pv(
     // Compute observation dates once per pricing call. Each branch below would
     // otherwise rebuild this 1-3 times via the helper functions.
     let obs_dates = observation_dates(inst)?;
+    let final_observation_date = obs_dates.last().copied().unwrap_or(inst.maturity);
 
-    if as_of >= inst.maturity {
+    if as_of >= final_observation_date {
         let realized_var = if inst.realized_var_method.requires_ohlc() {
             let (open, high, low, close) =
                 get_historical_ohlc_with_dates(inst, context, as_of, &obs_dates)?;
@@ -63,7 +64,7 @@ pub(crate) fn compute_pv(
         // on the curve's own time axis. Feeding `df()` an instrument-day-count
         // year fraction mis-discounts whenever the instrument and curve
         // day-counts differ or `as_of != base_date`.
-        let df = dom.df_between_dates(as_of, inst.maturity)?;
+        let df = dom.df_between_dates(as_of, final_observation_date)?;
         return Ok(undiscounted * df);
     }
 
@@ -71,7 +72,7 @@ pub(crate) fn compute_pv(
     let undiscounted = inst.payoff(expected_var);
     // Date-based discounting (see the pre-start branch above): `df_between_dates`
     // resolves the year fraction on the curve's own time axis.
-    let df = dom.df_between_dates(as_of, inst.maturity)?;
+    let df = dom.df_between_dates(as_of, final_observation_date)?;
     Ok(undiscounted * df)
 }
 
@@ -120,15 +121,21 @@ pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Da
 /// Observation-count fractions only coincide for perfectly uniform schedules
 /// and drift first-order near maturity for weekend-skipping daily schedules.
 pub(crate) fn time_elapsed_fraction(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {
+    let final_observation_date = observation_dates(inst)?
+        .last()
+        .copied()
+        .unwrap_or(inst.maturity);
     if as_of <= inst.start_date {
         return Ok(0.0);
     }
-    if as_of >= inst.maturity {
+    if as_of >= final_observation_date {
         return Ok(1.0);
     }
-    let total =
-        inst.day_count
-            .year_fraction(inst.start_date, inst.maturity, DayCountContext::default())?;
+    let total = inst.day_count.year_fraction(
+        inst.start_date,
+        final_observation_date,
+        DayCountContext::default(),
+    )?;
     if total <= 0.0 {
         return Ok(0.0);
     }
@@ -150,7 +157,7 @@ fn realized_fraction_by_observations_with_dates(
     if as_of <= inst.start_date {
         return 0.0;
     }
-    if as_of >= inst.maturity {
+    if as_of >= all.last().copied().unwrap_or(inst.maturity) {
         return 1.0;
     }
     let total = all.len() as f64;

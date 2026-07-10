@@ -172,6 +172,16 @@ impl BarrierOptionPayoff {
         }
     }
 
+    /// Seed the payoff with an externally observed historical barrier breach.
+    #[must_use]
+    pub fn with_observed_barrier_breached(mut self, breached: bool) -> Self {
+        self.barrier_hit = breached;
+        if breached {
+            self.hit_time = 0.0;
+        }
+        self
+    }
+
     /// Pay knock-out rebates at the hit time instead of at expiry.
     ///
     /// `rate` is the continuously compounded flat rate used to compound the

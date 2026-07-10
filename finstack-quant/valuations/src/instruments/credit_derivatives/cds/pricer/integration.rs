@@ -68,7 +68,7 @@ impl CDSPricer {
             surv,
             disc,
             self.config.protection_leg_substeps_per_year,
-        );
+        )?;
         let mut integral = 0.0;
 
         for window in boundaries.windows(2) {

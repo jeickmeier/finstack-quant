@@ -211,55 +211,33 @@ pub fn compute_exposure_profile(
     let mut epe = Vec::with_capacity(n);
     let mut ene = Vec::with_capacity(n);
 
-    let mut market_roll_failures: usize = 0;
-    let mut instrument_valuation_failures: usize = 0;
-    // Bail as soon as the failure count exceeds 50% of the requested
-    // grid; continuing past that point only allocates zeros that the
-    // post-loop check is going to reject anyway.
-    let max_market_roll_failures = n / 2;
-
     for &t in &config.time_grid {
         // Convert years to days using ACT/365F convention
         let days = years_to_days_act_365f(t);
         let future_date = as_of + time::Duration::days(days);
 
         // Roll market data forward (constant-curves assumption).
-        let Ok(rolled_market) = market.roll_forward(days) else {
-            // Market data can't be rolled this far; record zero exposure
-            // but track the failure for the quality check below.
-            market_roll_failures += 1;
-            if market_roll_failures > max_market_roll_failures {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "Exposure simulation aborted: market data roll failed for \
-                         {market_roll_failures} of {n} time points (>50%); check \
-                         market data coverage for the requested horizon"
-                )));
-            }
-            times.push(t);
-            mtm_values.push(0.0);
-            epe.push(0.0);
-            ene.push(0.0);
-            continue;
-        };
+        let rolled_market = market.roll_forward(days).map_err(|error| {
+            finstack_quant_core::Error::Validation(format!(
+                "XVA market roll failed at horizon {t} years: {error}"
+            ))
+        })?;
 
         // Value each instrument at the future date
         let mut values = Vec::with_capacity(instruments.len());
         for inst in instruments {
-            match inst.value(&rolled_market, future_date).and_then(|value| {
-                convert_to_reporting(value, reporting_currency, &rolled_market, future_date)
-            }) {
-                Ok(v) => values.push(v),
-                Err(e) => {
-                    tracing::debug!(
-                        instrument = inst.id(),
-                        horizon_years = t,
-                        error = %e,
-                        "instrument valuation failed at future horizon; treating as zero"
-                    );
-                    instrument_valuation_failures += 1;
-                    values.push(0.0);
-                }
-            }
+            let value = inst
+                .value(&rolled_market, future_date)
+                .and_then(|value| {
+                    convert_to_reporting(value, reporting_currency, &rolled_market, future_date)
+                })
+                .map_err(|error| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "XVA valuation failed for instrument '{}' at horizon {t} years: {error}",
+                        inst.id()
+                    ))
+                })?;
+            values.push(value);
         }
 
         // Apply close-out netting: net portfolio value
@@ -282,34 +260,12 @@ pub fn compute_exposure_profile(
         ene.push(negative_exposure);
     }
 
-    // The early-exit inside the loop already guarantees
-    // `market_roll_failures <= n / 2`. Any non-zero failure count is
-    // worth surfacing but does not by itself fail the simulation.
-    if market_roll_failures > 0 || instrument_valuation_failures > 0 {
-        tracing::warn!(
-            market_roll_failures,
-            instrument_valuation_failures,
-            total_time_points = n,
-            "XVA exposure simulation completed with failures"
-        );
-    }
-
-    let diagnostics = if market_roll_failures > 0 || instrument_valuation_failures > 0 {
-        Some(super::types::ExposureDiagnostics {
-            market_roll_failures,
-            valuation_failures: instrument_valuation_failures,
-            total_time_points: n,
-        })
-    } else {
-        None
-    };
-
     Ok(ExposureProfile {
         times,
         mtm_values,
         epe,
         ene,
-        diagnostics,
+        diagnostics: None,
     })
 }
 

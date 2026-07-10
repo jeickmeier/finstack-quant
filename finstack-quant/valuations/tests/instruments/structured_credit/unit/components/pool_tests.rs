@@ -765,6 +765,7 @@ fn test_pool_asset_type_classification() {
         acquisition_date: None,
         smm_override: None,
         mdr_override: None,
+        contractual_payment: None,
     };
 
     // Assert

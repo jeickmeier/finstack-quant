@@ -76,6 +76,8 @@ pub struct WaterfallContext<'a> {
     pub payment_date: Date,
     /// Start date of the accrual period.
     pub period_start: Date,
+    /// Valuation date used to distinguish known resets from future projections.
+    pub valuation_date: Date,
     /// Current pool balance at the start of the period.
     pub pool_balance: Money,
     /// Market context for rate lookups and discounting.
@@ -135,6 +137,7 @@ fn execute_waterfall_core(
         tranche_index,
         pool_balance: context.pool_balance,
         payment_date: context.payment_date,
+        valuation_date: context.valuation_date,
         market: context.market,
         tranche_balances: context.tranche_balances,
         deferred_interest: context.deferred_interest,
@@ -388,6 +391,8 @@ pub(crate) struct AllocationContext<'a> {
     pub(crate) pool_balance: Money,
     /// Payment date
     pub(crate) payment_date: Date,
+    /// Valuation date for fixing lifecycle decisions.
+    pub(crate) valuation_date: Date,
     /// Market context for rate lookups
     pub(crate) market: &'a MarketContext,
     /// Current tranche balances (overrides tranche.current_balance when present)
@@ -410,6 +415,7 @@ impl<'a> AllocationContext<'a> {
         tranches: &'a TrancheStructure,
         pool_balance: Money,
         payment_date: Date,
+        valuation_date: Date,
         market: &'a MarketContext,
         tranche_balances: Option<&'a HashMap<String, Money>>,
         deferred_interest: Option<&'a HashMap<String, Money>>,
@@ -427,6 +433,7 @@ impl<'a> AllocationContext<'a> {
             tranche_index,
             pool_balance,
             payment_date,
+            valuation_date,
             market,
             tranche_balances,
             deferred_interest,
@@ -500,6 +507,7 @@ fn allocate_sequential(
             ctx.pool_balance,
             period_start,
             ctx.payment_date,
+            ctx.valuation_date,
             ctx.market,
             ctx.reserve_balance,
             principal_paid_in_period,
@@ -614,6 +622,7 @@ fn allocate_pro_rata(
             ctx.pool_balance,
             period_start,
             ctx.payment_date,
+            ctx.valuation_date,
             ctx.market,
             ctx.reserve_balance,
             principal_paid_in_period,
@@ -994,6 +1003,7 @@ fn calculate_payment_amount(
     pool_balance: Money,
     period_start: Date,
     payment_date: Date,
+    valuation_date: Date,
     market: &MarketContext,
     reserve_balance: Money,
     principal_paid_in_period: &HashMap<String, Money>,
@@ -1035,9 +1045,12 @@ fn calculate_payment_amount(
                 .and_then(|b| b.get(tranche_id.as_str()))
                 .copied()
                 .unwrap_or(tranche.current_balance);
-            let rate = tranche
-                .coupon
-                .try_current_rate_with_index(payment_date, market)?;
+            let rate = tranche.coupon.try_rate_for_period(
+                period_start,
+                payment_date,
+                valuation_date,
+                market,
+            )?;
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
                 payment_date,
@@ -1071,7 +1084,7 @@ fn calculate_payment_amount(
             // Available-funds cap: the effective coupon cannot exceed `cap_rate`.
             let rate = tranche
                 .coupon
-                .try_current_rate_with_index(payment_date, market)?
+                .try_rate_for_period(period_start, payment_date, valuation_date, market)?
                 .min(*cap_rate);
             let accrual_fraction = tranche.day_count.year_fraction(
                 period_start,
@@ -1251,6 +1264,7 @@ mod ic_diversion_tests {
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override: None,
+                contractual_payment: None,
             });
         }
 
@@ -1340,6 +1354,7 @@ mod ic_diversion_tests {
             principal_collections: Money::new(19_900_000.0, currency),
             payment_date,
             period_start,
+            valuation_date: period_start,
             pool_balance: Money::new(500_000_000.0, currency),
             market: &market,
             tranche_balances: None,
@@ -1455,6 +1470,7 @@ mod ic_diversion_tests {
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override: None,
+                contractual_payment: None,
             });
         }
 
@@ -1543,6 +1559,7 @@ mod ic_diversion_tests {
             principal_collections: Money::new(20_000_000.0, currency),
             payment_date,
             period_start,
+            valuation_date: period_start,
             pool_balance: Money::new(118_000_000.0, currency),
             market: &market,
             tranche_balances: None,
@@ -1641,6 +1658,7 @@ mod ic_diversion_tests {
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override: None,
+                contractual_payment: None,
             });
         }
 
@@ -1723,6 +1741,7 @@ mod ic_diversion_tests {
             principal_collections: Money::new(9_000_000.0, currency),
             payment_date,
             period_start,
+            valuation_date: period_start,
             pool_balance: Money::new(20_000_000.0, currency),
             market: &market,
             tranche_balances: None,

@@ -199,13 +199,7 @@ impl TermLoanDiscountingPricer {
         // Compute settlement date using business-day conventions when calendar is available.
         let settlement_date = loan.settlement_date(as_of)?;
 
-        // Build full cashflow schedule
-        let mut schedule = generate_cashflows(loan, market, as_of)?;
-
-        // Post-process seasoned floating periods with their economically locked
-        // historical fixings. Missing past fixings are a market-data failure,
-        // not a signal to reproject the coupon from today's curve.
-        Self::apply_fixings(loan, market, as_of, &mut schedule)?;
+        let schedule = Self::pricing_schedule(loan, market, as_of)?;
 
         // Filter flows: exclude PIK (capitalized interest) and past flows from PV.
         // PIK increases outstanding and is repaid via principal redemption.
@@ -218,6 +212,17 @@ impl TermLoanDiscountingPricer {
             .collect();
 
         Ok((settlement_date, flows))
+    }
+
+    /// Canonical generated schedule with all economically known fixings applied.
+    pub(crate) fn pricing_schedule(
+        loan: &TermLoan,
+        market: &MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<crate::cashflow::builder::schedule::CashFlowSchedule> {
+        let mut schedule = generate_cashflows(loan, market, as_of)?;
+        Self::apply_fixings(loan, market, as_of, &mut schedule)?;
+        Ok(schedule)
     }
 
     /// Replace forward-projected rates with historical fixings for seasoned

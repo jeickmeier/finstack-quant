@@ -64,6 +64,7 @@ fn run_waterfall(
         principal_collections,
         payment_date,
         period_start,
+        valuation_date: period_start,
         pool_balance,
         market,
         tranche_balances: None,

@@ -54,6 +54,7 @@ fn create_bilateral_margin_spec() -> OtcMarginSpec {
     let csa = CsaSpec {
         id: "TEST_CSA".to_string(),
         base_currency: Currency::USD,
+        calendar_id: "usny".to_string(),
         vm_params,
         im_params: Some(im_params),
         eligible_collateral: Default::default(),
@@ -91,6 +92,7 @@ fn create_cleared_margin_spec() -> OtcMarginSpec {
     let csa = CsaSpec {
         id: "LCH_CSA".to_string(),
         base_currency: Currency::USD,
+        calendar_id: "usny".to_string(),
         vm_params,
         im_params: Some(im_params),
         eligible_collateral: Default::default(),

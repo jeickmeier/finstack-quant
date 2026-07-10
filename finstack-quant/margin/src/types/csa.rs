@@ -92,6 +92,7 @@ impl MarginCallTiming {
 ///     eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,
 ///     call_timing: MarginCallTiming::regulatory_standard()?,
 ///     collateral_curve_id: "USD-OIS".into(),
+///     calendar_id: "usny".into(),
 /// };
 /// # Ok(())
 /// # }
@@ -107,6 +108,9 @@ pub struct CsaSpec {
     /// All exposures and collateral values are converted to this currency
     /// for netting and comparison with thresholds.
     pub base_currency: Currency,
+
+    /// Contractual business-day calendar for calls and settlements.
+    pub calendar_id: String,
 
     /// Variation margin parameters.
     ///
@@ -207,6 +211,17 @@ impl CsaSpec {
         Ok(Self {
             id: id.to_string(),
             base_currency: currency,
+            calendar_id: match currency {
+                Currency::USD => "usny",
+                Currency::EUR => "target2",
+                Currency::GBP => "gblo",
+                Currency::JPY => "jpto",
+                Currency::CHF => "chzh",
+                Currency::CAD => "cato",
+                Currency::AUD => "auce",
+                _ => "weekends_only",
+            }
+            .to_string(),
             vm_params,
             im_params: Some(im_params),
             eligible_collateral,

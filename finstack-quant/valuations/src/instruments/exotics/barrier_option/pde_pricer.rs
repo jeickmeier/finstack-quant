@@ -202,6 +202,29 @@ impl BarrierOptionPdePricer {
             0.0
         };
 
+        if inst.observed_barrier_breached == Some(true) {
+            let unit = match inst.barrier_type {
+                BarrierType::UpAndIn | BarrierType::DownAndIn => {
+                    crate::models::closed_form::vanilla::bs_price(
+                        spot,
+                        inst.strike,
+                        r,
+                        q,
+                        sigma,
+                        t,
+                        inst.option_type,
+                    )
+                }
+                BarrierType::UpAndOut | BarrierType::DownAndOut => match inst.rebate_timing {
+                    crate::models::closed_form::barrier::RebateTiming::AtHit => 0.0,
+                    crate::models::closed_form::barrier::RebateTiming::AtExpiry => {
+                        inst.rebate.map_or(0.0, |rebate| rebate.amount() * df)
+                    }
+                },
+            };
+            return Ok(Money::new(unit * inst.notional.amount(), ccy));
+        }
+
         let barrier_level = inst.barrier.amount();
         let is_call = matches!(inst.option_type, crate::instruments::OptionType::Call);
         let is_knock_out = matches!(

@@ -114,5 +114,8 @@ pub use templates::{
     AssetClass, RegisteredTemplate, ScenarioSpecBuilder, Severity, TemplateMetadata,
     TemplateRegistry,
 };
-pub use utils::InterpolationResult;
+pub use utils::{
+    calculate_interpolation_weights, parse_period_to_days, parse_tenor_to_years,
+    InterpolationResult,
+};
 pub use warning::Warning;

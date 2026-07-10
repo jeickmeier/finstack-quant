@@ -111,6 +111,33 @@ impl BarrierOptionMcPricer {
             inst.strike,
         )?;
 
+        if inst.observed_barrier_breached == Some(true) {
+            use crate::instruments::exotics::barrier_option::types::BarrierType;
+            let unit = match inst.barrier_type {
+                BarrierType::UpAndIn | BarrierType::DownAndIn => {
+                    crate::models::closed_form::vanilla::bs_price(
+                        spot,
+                        inst.strike,
+                        r,
+                        q,
+                        sigma,
+                        t_vol,
+                        inst.option_type,
+                    )
+                }
+                BarrierType::UpAndOut | BarrierType::DownAndOut => match inst.rebate_timing {
+                    crate::models::closed_form::barrier::RebateTiming::AtHit => 0.0,
+                    crate::models::closed_form::barrier::RebateTiming::AtExpiry => inst
+                        .rebate
+                        .map_or(0.0, |rebate| rebate.amount() * discount_factor),
+                },
+            };
+            return Ok(Money::new(
+                unit * inst.notional.amount(),
+                inst.notional.currency(),
+            ));
+        }
+
         // Create GBM process
         let gbm_params = GbmParams::new(r, q, sigma)?;
         let process = GbmProcess::new(gbm_params);
@@ -495,6 +522,37 @@ impl Pricer for BarrierOptionAnalyticalPricer {
                     PricingErrorContext::default(),
                 )
             })?;
+            return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
+        }
+
+        if barrier_opt.observed_barrier_breached == Some(true) {
+            use crate::instruments::exotics::barrier_option::types::BarrierType;
+            let r = -df.ln() / t;
+            let unit = match barrier_opt.barrier_type {
+                BarrierType::UpAndIn | BarrierType::DownAndIn => {
+                    crate::models::closed_form::vanilla::bs_price(
+                        spot,
+                        barrier_opt.strike,
+                        r,
+                        q,
+                        sigma,
+                        t,
+                        barrier_opt.option_type,
+                    )
+                }
+                BarrierType::UpAndOut | BarrierType::DownAndOut => {
+                    match barrier_opt.rebate_timing {
+                        crate::models::closed_form::barrier::RebateTiming::AtHit => 0.0,
+                        crate::models::closed_form::barrier::RebateTiming::AtExpiry => barrier_opt
+                            .rebate
+                            .map_or(0.0, |rebate| rebate.amount() * df),
+                    }
+                }
+            };
+            let pv = Money::new(
+                unit * barrier_opt.notional.amount(),
+                barrier_opt.notional.currency(),
+            );
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
         }
 

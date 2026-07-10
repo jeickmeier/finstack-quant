@@ -74,6 +74,7 @@ fn create_test_pool(balance: f64, currency: Currency) -> AssetPool {
             acquisition_date: None,
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         };
         pool.assets.push(asset);
     }
@@ -153,6 +154,7 @@ fn run_waterfall(
         principal_collections,
         payment_date,
         period_start,
+        valuation_date: period_start,
         pool_balance,
         market,
         tranche_balances: None,

@@ -117,6 +117,7 @@ mod tests {
             day_count: finstack_quant_core::dates::DayCount::Act360,
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         };
 
         let b = PoolAsset {

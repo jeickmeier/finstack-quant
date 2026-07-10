@@ -7089,6 +7089,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency for margin calculations.\n\nAll exposures and collateral values are converted to this currency\nfor netting and comparison with thresholds."
         },
+        "calendar_id": {
+          "description": "Contractual business-day calendar for calls and settlements.",
+          "type": "string"
+        },
         "call_timing": {
           "$ref": "#/$defs/MarginCallTiming",
           "description": "Margin call timing parameters."
@@ -7124,6 +7128,7 @@
       "required": [
         "id",
         "base_currency",
+        "calendar_id",
         "vm_params",
         "eligible_collateral",
         "call_timing",
@@ -14231,6 +14236,18 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Current outstanding balance"
         },
+        "contractual_payment": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Contractual periodic payment for level-pay assets. Required for exact\nseasoned-loan amortization; when absent it is inferred once from the\ncurrent state and remaining contractual periods."
+        },
         "credit_quality": {
           "anyOf": [
             {
@@ -18607,6 +18624,14 @@
         "expiry": {
           "format": "date",
           "type": "string"
+        },
+        "expiry_fixing": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"

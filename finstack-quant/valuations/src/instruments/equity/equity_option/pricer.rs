@@ -197,7 +197,11 @@ pub(crate) fn reject_future_discrete_dividends_for_stochastic_vol(
     Ok(())
 }
 
-fn future_dividends(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64, f64)>> {
+fn future_dividends(
+    inst: &EquityOption,
+    disc_curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
+    as_of: Date,
+) -> Result<Vec<(f64, f64)>> {
     if inst.discrete_dividends.is_empty() {
         return Ok(Vec::new());
     }
@@ -207,7 +211,8 @@ fn future_dividends(inst: &EquityOption, as_of: Date) -> Result<Vec<(f64, f64)>>
         .filter(|(ex_date, _)| *ex_date > as_of && *ex_date <= inst.expiry)
         .map(|(ex_date, amount)| {
             let t_div = year_fraction(DayCount::Act365F, as_of, *ex_date)?;
-            Ok((t_div, *amount))
+            let df = disc_curve.df_between_dates(as_of, *ex_date)?;
+            Ok((t_div, *amount * df))
         })
         .collect::<finstack_quant_core::Result<Vec<_>>>()?
         .into_iter()
@@ -266,11 +271,12 @@ pub(crate) fn collect_inputs_extended(
     };
 
     // Check for discrete dividends — if present, adjust spot and zero out q
-    let future_divs = future_dividends(inst, as_of)?;
+    let future_divs = future_dividends(inst, disc_curve.as_ref(), as_of)?;
 
     let (spot, q) = if !future_divs.is_empty() {
         // Escrowed dividend model: adjust spot, set q=0
-        let s_adj = adjust_spot_for_discrete_dividends(raw_spot, r, &future_divs);
+        // Dividend amounts are already discounted with their own ex-date DFs.
+        let s_adj = adjust_spot_for_discrete_dividends(raw_spot, 0.0, &future_divs);
         (s_adj, 0.0)
     } else {
         // Continuous dividend yield from scalar id if provided
@@ -502,7 +508,8 @@ pub(crate) fn compute_greeks(
             // `greeks_unit.rho_r` and `vega` are already per-1%, while
             // `delta` and `∂S*/∂r` are per-unit).
             let rho_unit = {
-                let future_divs = future_dividends(inst, as_of)?;
+                let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
+                let future_divs = future_dividends(inst, disc_curve.as_ref(), as_of)?;
                 if future_divs.is_empty() {
                     greeks_unit.rho_r
                 } else {
@@ -511,7 +518,9 @@ pub(crate) fn compute_greeks(
                     let ds_star_dr = if spot <= 1e-8 {
                         0.0
                     } else {
-                        escrowed_spot_drho(r, &future_divs)
+                        // Entries already contain PV(D_i); under a parallel
+                        // continuously-compounded rate bump, dS*/dr = Σt_i PV(D_i).
+                        escrowed_spot_drho(0.0, &future_divs)
                     };
                     const ONE_PERCENT: f64 = 0.01;
                     greeks_unit.rho_r + greeks_unit.delta * ds_star_dr * ONE_PERCENT

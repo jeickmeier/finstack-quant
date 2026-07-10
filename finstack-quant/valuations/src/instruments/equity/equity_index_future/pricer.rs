@@ -134,8 +134,7 @@ pub(crate) fn fair_forward(
     };
 
     if !future.discrete_dividends.is_empty() {
-        let day_count = DayCount::Act365F;
-        let mut future_divs = Vec::new();
+        let mut pv_dividends = 0.0;
         for (div_date, amount) in &future.discrete_dividends {
             if *div_date <= as_of
                 || *div_date > future.expiry
@@ -144,18 +143,10 @@ pub(crate) fn fair_forward(
             {
                 continue;
             }
-            let t_div = day_count
-                .year_fraction(as_of, *div_date, DayCountContext::default())?
-                .max(0.0);
-            future_divs.push((t_div, *amount));
+            pv_dividends += amount * disc.df_between_dates(as_of, *div_date)?;
         }
-        let spot_adj =
-            crate::instruments::equity::equity_option::pricer::adjust_spot_for_discrete_dividends(
-                spot,
-                r,
-                &future_divs,
-            );
-        return Ok(spot_adj * (r * t).exp());
+        let expiry_df = disc.df_between_dates(as_of, future.expiry)?;
+        return Ok((spot - pv_dividends).max(1e-8) / expiry_df);
     }
 
     let q = resolve_dividend_yield(future, context)?;

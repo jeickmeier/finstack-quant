@@ -10,7 +10,6 @@
 //! - Apply `PricingOverrides::call_friction_cents` as an exercise threshold uplift
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows;
 use crate::instruments::fixed_income::term_loan::TermLoan;
 use crate::models::trees::two_factor_rates_credit::{RatesCreditConfig, RatesCreditTree};
 use crate::models::{
@@ -105,7 +104,8 @@ impl TermLoanValuator {
             amount * disc.df(event_time) / step_df
         };
 
-        let schedule = generate_cashflows(&loan, market, as_of)?;
+        let schedule =
+            super::discounting::TermLoanDiscountingPricer::pricing_schedule(&loan, market, as_of)?;
         let out_path = schedule.outstanding_by_date()?;
 
         // Helper: outstanding BEFORE a target date (pre-exercise).
@@ -472,18 +472,11 @@ impl TermLoanTreePricer {
 
         // Choose model: if hazard curve is available, use the rates+credit tree; otherwise short-rate.
         // Precedence mirrors TermLoan's `credit_curve_id` semantics.
-        let hazard_curve = if let Some(ref id) = loan.credit_curve_id {
-            market.get_hazard(id.as_str()).ok()
-        } else {
-            market
-                .get_hazard(loan.discount_curve_id.as_str())
-                .ok()
-                .or_else(|| {
-                    market
-                        .get_hazard(format!("{}-CREDIT", loan.discount_curve_id.as_str()))
-                        .ok()
-                })
-        };
+        let hazard_curve = loan
+            .credit_curve_id
+            .as_ref()
+            .map(|id| market.get_hazard(id.as_str()))
+            .transpose()?;
 
         let valuator =
             TermLoanValuator::new(loan.clone(), market, as_of, origin, time_to_maturity, steps)?;
@@ -543,9 +536,16 @@ impl TermLoanTreePricer {
             return Ok(0.0);
         }
 
-        // Target dirty price in currency.
-        let notional = loan.notional_limit.amount();
-        let dirty_target = clean_price_pct_of_par * notional / 100.0;
+        // Target dirty settlement amount using funded outstanding and accrued interest.
+        let quote_schedule =
+            super::discounting::TermLoanDiscountingPricer::pricing_schedule(loan, market, as_of)?;
+        let dirty_target = crate::instruments::fixed_income::term_loan::metrics::irr_helpers::quoted_dirty_from_clean_px(
+            loan,
+            &quote_schedule,
+            as_of,
+            clean_price_pct_of_par,
+        )?
+        .amount();
 
         let disc = market.get_discount(&loan.discount_curve_id)?;
         let dc_curve = disc.day_count();
@@ -577,18 +577,11 @@ impl TermLoanTreePricer {
         let vol = cfg.volatility;
 
         // Choose model based on hazard availability.
-        let hazard_curve = if let Some(ref id) = loan.credit_curve_id {
-            market.get_hazard(id.as_str()).ok()
-        } else {
-            market
-                .get_hazard(loan.discount_curve_id.as_str())
-                .ok()
-                .or_else(|| {
-                    market
-                        .get_hazard(format!("{}-CREDIT", loan.discount_curve_id.as_str()))
-                        .ok()
-                })
-        };
+        let hazard_curve = loan
+            .credit_curve_id
+            .as_ref()
+            .map(|id| market.get_hazard(id.as_str()))
+            .transpose()?;
 
         // Build valuator once.
         let valuator =
@@ -602,14 +595,8 @@ impl TermLoanTreePricer {
                 hazard_vol: vol,
                 ..Default::default()
             });
-            if tree
-                .calibrate(disc.as_ref(), hc.as_ref(), time_to_maturity)
-                .is_err()
-            {
-                None
-            } else {
-                Some(tree)
-            }
+            tree.calibrate(disc.as_ref(), hc.as_ref(), time_to_maturity)?;
+            Some(tree)
         } else {
             None
         };

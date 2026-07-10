@@ -67,6 +67,22 @@ impl FxBarrierOptionMcPricer {
         let (_, r_dom, r_for, sigma, discount_factor) =
             collect_fx_barrier_inputs(inst, curves, as_of)?;
 
+        if inst.observed_barrier_breached == Some(true) {
+            let per_unit = seasoned_breached_value_per_unit(
+                inst,
+                fx_spot,
+                r_dom,
+                r_for,
+                sigma,
+                t,
+                discount_factor,
+            );
+            return Ok(Money::new(
+                per_unit * inst.notional.amount(),
+                inst.quote_currency,
+            ));
+        }
+
         // For FX, drift is r_dom - r_for.
         // In GBM process param 'q' is subtracted from r to get drift (r-q).
         // So q should be r_for.
@@ -244,6 +260,36 @@ fn expired_barrier_value_per_unit(
     };
 
     Ok(intrinsic + rebate)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn seasoned_breached_value_per_unit(
+    inst: &FxBarrierOption,
+    spot: f64,
+    r_dom: f64,
+    r_for: f64,
+    sigma: f64,
+    t: f64,
+    discount_factor: f64,
+) -> f64 {
+    if barrier_is_knock_in(inst.barrier_type) {
+        crate::models::closed_form::vanilla::bs_price(
+            spot,
+            inst.strike,
+            r_dom,
+            r_for,
+            sigma,
+            t,
+            inst.option_type,
+        )
+    } else {
+        match inst.rebate_timing {
+            crate::models::closed_form::barrier::RebateTiming::AtHit => 0.0,
+            crate::models::closed_form::barrier::RebateTiming::AtExpiry => {
+                inst.rebate.unwrap_or(0.0) * discount_factor
+            }
+        }
+    }
 }
 
 /// Validate currency semantics and numeric bounds for FX barrier option.
@@ -491,13 +537,33 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             ));
         }
 
-        let (_, r_dom, r_for, sigma, _) = collect_fx_barrier_inputs(fx_barrier, market, as_of)
-            .map_err(|e| {
+        let (_, r_dom, r_for, sigma, discount_factor) =
+            collect_fx_barrier_inputs(fx_barrier, market, as_of).map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
                 )
             })?;
+
+        if fx_barrier.observed_barrier_breached == Some(true) {
+            let per_unit = seasoned_breached_value_per_unit(
+                fx_barrier,
+                fx_spot,
+                r_dom,
+                r_for,
+                sigma,
+                t,
+                discount_factor,
+            );
+            return Ok(ValuationResult::stamped(
+                fx_barrier.id(),
+                as_of,
+                Money::new(
+                    per_unit * fx_barrier.notional.amount(),
+                    fx_barrier.quote_currency,
+                ),
+            ));
+        }
 
         let analytical_barrier_type = map_barrier_type(fx_barrier.barrier_type);
 

@@ -347,6 +347,15 @@ impl ExposureProfile {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let n = self.times.len();
 
+        if self.diagnostics.as_ref().is_some_and(|diagnostics| {
+            diagnostics.market_roll_failures > 0 || diagnostics.valuation_failures > 0
+        }) {
+            return Err(finstack_quant_core::Error::Validation(
+                "ExposureProfile contains failed market rolls or instrument valuations and is not valid for XVA"
+                    .into(),
+            ));
+        }
+
         if self.mtm_values.len() != n || self.epe.len() != n || self.ene.len() != n {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "ExposureProfile: vector lengths must be equal \

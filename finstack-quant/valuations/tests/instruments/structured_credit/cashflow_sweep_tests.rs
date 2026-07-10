@@ -72,6 +72,7 @@ fn create_pool() -> AssetPool {
             acquisition_date: Some(as_of()),
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         });
     }
 

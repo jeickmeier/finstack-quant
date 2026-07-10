@@ -100,8 +100,12 @@ pub(crate) fn compute_pv(
 
     inst.validate_as_of(curves, as_of)?;
     let disc = curves.get_discount(inst.discount_curve_id.as_str())?;
+    let final_observation_date = observation_dates(inst)?
+        .last()
+        .copied()
+        .unwrap_or(inst.maturity);
 
-    if as_of >= inst.maturity {
+    if as_of >= final_observation_date {
         let realized_var = if inst.realized_var_method.requires_ohlc() {
             let (open, high, low, close) = get_historical_ohlc(inst, curves, as_of)?;
             if close.is_empty() {
@@ -135,7 +139,7 @@ pub(crate) fn compute_pv(
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
             as_of,
-            inst.maturity,
+            final_observation_date,
         )?;
         return Ok(undiscounted * df);
     }
@@ -149,7 +153,7 @@ pub(crate) fn compute_pv(
     let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
         disc.as_ref(),
         as_of,
-        inst.maturity,
+        final_observation_date,
     )?;
     Ok(undiscounted * df)
 }
@@ -173,10 +177,26 @@ pub(crate) fn seasoned_expected_variance(
     as_of: Date,
 ) -> Result<f64> {
     let forward = remaining_forward_variance(inst, curves, as_of)?;
-    let w = inst.time_elapsed_fraction(as_of);
-    let total_t =
-        inst.day_count
-            .year_fraction(inst.start_date, inst.maturity, Default::default())?;
+    let final_observation_date = observation_dates(inst)?
+        .last()
+        .copied()
+        .unwrap_or(inst.maturity);
+    let total_t = inst.day_count.year_fraction(
+        inst.start_date,
+        final_observation_date,
+        Default::default(),
+    )?;
+    let w = if as_of <= inst.start_date {
+        0.0
+    } else if as_of >= final_observation_date || total_t <= 0.0 {
+        1.0
+    } else {
+        (inst
+            .day_count
+            .year_fraction(inst.start_date, as_of, Default::default())?
+            / total_t)
+            .clamp(0.0, 1.0)
+    };
     let t_elapsed = w * total_t;
     let realized = seasoned_realized_variance(inst, curves, as_of, t_elapsed)?;
     Ok(realized * w + forward * (1.0 - w))
@@ -254,7 +274,7 @@ pub(crate) fn realized_fraction_by_observations(inst: &VarianceSwap, as_of: Date
     if as_of <= inst.start_date {
         return Ok(0.0);
     }
-    if as_of >= inst.maturity {
+    if as_of >= all.last().copied().unwrap_or(inst.maturity) {
         return Ok(1.0);
     }
     let total = all.len() as f64;
@@ -516,7 +536,8 @@ pub(crate) fn remaining_forward_variance(
                 t,
                 "variance-swap replication rate",
             )?;
-            let q = match context.get_price(format!("{}-DIVYIELD", inst.underlying_ticker)) {
+            let dividend_yield_id = format!("{}-DIVYIELD", inst.underlying_ticker);
+            let q = match context.get_price(&dividend_yield_id) {
                 Ok(finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v)) => *v,
                 Ok(finstack_quant_core::market_data::scalars::MarketScalar::Price(_)) => {
                     return Err(finstack_quant_core::Error::Validation(format!(
@@ -524,7 +545,12 @@ pub(crate) fn remaining_forward_variance(
                         inst.underlying_ticker
                     )));
                 }
-                Err(_) => 0.0,
+                Err(error) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "variance-swap dividend yield '{}' is required for surface replication: {}",
+                        dividend_yield_id, error
+                    )));
+                }
             };
             let fwd = spot / df_mat * (-q * t).exp();
             let strikes = surface.strikes();

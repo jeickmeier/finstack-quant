@@ -74,6 +74,7 @@ fn test_par_cds_parallel_shock() {
         .base_date(base_date)
         .recovery_rate(0.4)
         .knots(vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.025)])
+        .par_spreads(vec![(1.0, 120.0), (5.0, 150.0)])
         .build()
         .unwrap();
 
@@ -393,7 +394,8 @@ fn test_all_curve_types_in_one_scenario() {
     let hazard = HazardCurve::builder("CORP_BBB")
         .base_date(base_date)
         .recovery_rate(0.4)
-        .knots(vec![(0.0, 0.0), (1.0, 0.02)])
+        .knots(vec![(0.0, 0.0), (1.0, 0.02), (5.0, 0.025)])
+        .par_spreads(vec![(1.0, 120.0), (5.0, 150.0)])
         .build()
         .unwrap();
 

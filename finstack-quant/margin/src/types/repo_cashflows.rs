@@ -89,9 +89,9 @@ pub fn generate_margin_interest_cashflows(
     margin_balances: &[(Date, f64)],
     currency: finstack_quant_core::currency::Currency,
     day_count: finstack_quant_core::dates::DayCount,
-) -> Vec<CashFlow> {
+) -> finstack_quant_core::Result<Vec<CashFlow>> {
     if !spec.pays_margin_interest || spec.margin_interest_rate.is_none() {
-        return vec![];
+        return Ok(vec![]);
     }
 
     let rate = spec.margin_interest_rate.unwrap_or(0.0);
@@ -102,16 +102,11 @@ pub fn generate_margin_interest_cashflows(
     // configured day count (e.g., Act/365F for GBP repos).
     for window in margin_balances.windows(2) {
         if let [prev, curr] = window {
-            let year_fraction = day_count
-                .year_fraction(
-                    prev.0,
-                    curr.0,
-                    finstack_quant_core::dates::DayCountContext::default(),
-                )
-                .unwrap_or_else(|_| {
-                    // Fallback: use calendar days / 360 if day count calculation fails
-                    (curr.0 - prev.0).whole_days() as f64 / 360.0
-                });
+            let year_fraction = day_count.year_fraction(
+                prev.0,
+                curr.0,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
             let interest = prev.1 * rate * year_fraction;
 
             if interest.abs() > 0.01 {
@@ -128,7 +123,7 @@ pub fn generate_margin_interest_cashflows(
         }
     }
 
-    cashflows
+    Ok(cashflows)
 }
 
 /// Convert margin calls to cashflows.
@@ -269,7 +264,8 @@ mod tests {
             &margin_balances,
             Currency::USD,
             DayCount::Act360,
-        );
+        )
+        .expect("margin interest");
 
         // Interest = 2M * 5% * (7/360) ≈ 1944.44
         assert_eq!(cashflows.len(), 1);
@@ -294,13 +290,15 @@ mod tests {
             &margin_balances,
             Currency::USD,
             DayCount::Act360,
-        );
+        )
+        .expect("ACT/360 margin interest");
         let cf_365 = generate_margin_interest_cashflows(
             &spec,
             &margin_balances,
             Currency::USD,
             DayCount::Act365F,
-        );
+        )
+        .expect("ACT/365F margin interest");
 
         // Act/360 gives higher interest than Act/365F for same period
         assert!(cf_360[0].amount.amount() > cf_365[0].amount.amount());

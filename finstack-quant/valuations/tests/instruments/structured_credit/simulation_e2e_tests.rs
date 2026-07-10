@@ -82,6 +82,7 @@ fn single_asset_pool(balance: f64, rate: f64, maturity: Date) -> AssetPool {
         acquisition_date: Some(as_of()),
         smm_override: None,
         mdr_override: None,
+        contractual_payment: None,
     });
     pool
 }
@@ -952,6 +953,7 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
             acquisition_date: Some(as_of()),
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         });
     }
 

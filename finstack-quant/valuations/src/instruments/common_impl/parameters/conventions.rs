@@ -404,7 +404,7 @@ impl IRSConvention {
     /// Calendar identifier for this convention.
     pub fn calendar_id(&self) -> Option<String> {
         match self {
-            IRSConvention::USDStandard => Some("us".to_string()),
+            IRSConvention::USDStandard => Some("usny".to_string()),
             IRSConvention::EURStandard | IRSConvention::EURIborStandard => {
                 Some("target2".to_string())
             }

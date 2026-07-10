@@ -50,6 +50,7 @@ fn validate_exposure_profile_lengths(
     exposure_profile: &ExposureProfile,
     label: &str,
 ) -> finstack_quant_core::Result<usize> {
+    exposure_profile.validate()?;
     if exposure_profile.times.is_empty() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "{label}: exposure profile must not be empty"

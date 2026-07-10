@@ -317,7 +317,7 @@
     },
     "CsaSpec": {
       "type": "object",
-      "required": ["id", "base_currency", "vm_params", "eligible_collateral", "call_timing", "collateral_curve_id"],
+      "required": ["id", "base_currency", "calendar_id", "vm_params", "eligible_collateral", "call_timing", "collateral_curve_id"],
       "additionalProperties": false,
       "description": "Credit Support Annex specification (ISDA standard)",
       "properties": {
@@ -329,6 +329,10 @@
           "type": "string",
           "pattern": "^[A-Z]{3}$",
           "description": "Base currency for margin calculations"
+        },
+        "calendar_id": {
+          "type": "string",
+          "description": "Contractual business-day calendar for calls and settlements"
         },
         "vm_params": {
           "$ref": "#/definitions/VmParameters",

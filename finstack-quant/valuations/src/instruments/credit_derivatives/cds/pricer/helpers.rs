@@ -163,7 +163,7 @@ pub(super) fn isda_standard_model_boundaries(
     surv: &HazardCurve,
     disc: &DiscountCurve,
     sub_steps_per_year: f64,
-) -> Vec<f64> {
+) -> Result<Vec<f64>> {
     let mut boundaries = Vec::with_capacity(surv.len() + disc.knots().len() + 2);
     boundaries.push(t_start);
     boundaries.push(t_end);
@@ -172,12 +172,38 @@ pub(super) fn isda_standard_model_boundaries(
             .map(|(t, _)| t)
             .filter(|&t| t > t_start && t < t_end),
     );
-    boundaries.extend(
-        disc.knots()
-            .iter()
-            .copied()
-            .filter(|&t| t > t_start && t < t_end),
-    );
+    for &discount_time in disc.knots() {
+        if !discount_time.is_finite() || discount_time < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "CDS discount-curve knot times must be finite and non-negative".into(),
+            ));
+        }
+        let mut lo = 0_i64;
+        let mut hi = (discount_time * 400.0).ceil() as i64 + 366;
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            let date = disc.base_date() + Duration::days(mid);
+            let t = disc.day_count().year_fraction(
+                disc.base_date(),
+                date,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?;
+            if t < discount_time {
+                lo = mid + 1;
+            } else {
+                hi = mid;
+            }
+        }
+        let knot_date = disc.base_date() + Duration::days(lo);
+        let hazard_time = surv.day_count().signed_year_fraction(
+            surv.base_date(),
+            knot_date,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        if hazard_time > t_start && hazard_time < t_end {
+            boundaries.push(hazard_time);
+        }
+    }
     // Sub-step subdivision per DOCS 2057273 §3.
     let density = if sub_steps_per_year.is_finite() && sub_steps_per_year > 0.0 {
         sub_steps_per_year
@@ -196,16 +222,14 @@ pub(super) fn isda_standard_model_boundaries(
     }
     // Times come from finite year-fractions on the curve day-counts; NaN here
     // would indicate a corrupt curve and produce silently-wrong PV. Fail fast.
-    #[allow(clippy::expect_used)]
-    // NaN here implies corrupt curve data; loud failure beats silent drift
-    {
-        boundaries.sort_by(|a, b| {
-            a.partial_cmp(b)
-                .expect("hazard/discount knot times must be finite for ISDA boundary integration")
-        });
+    if !boundaries.iter().all(|t| t.is_finite()) {
+        return Err(finstack_quant_core::Error::Validation(
+            "CDS integration boundaries must be finite".into(),
+        ));
     }
+    boundaries.sort_by(f64::total_cmp);
     boundaries.dedup_by(|a, b| (*a - *b).abs() <= numerical::ZERO_TOLERANCE);
-    boundaries
+    Ok(boundaries)
 }
 
 /// Compute discount factor from as_of to date using curve's time axis.

@@ -972,6 +972,11 @@ class CsaSpec:
         ...
 
     @property
+    def calendar_id(self) -> str:
+        """Contractual business-day calendar identifier."""
+        ...
+
+    @property
     def requires_im(self) -> bool:
         """Whether this CSA requires initial margin.
 

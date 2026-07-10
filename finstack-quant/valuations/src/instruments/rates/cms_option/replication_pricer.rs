@@ -217,7 +217,7 @@ impl CmsReplicationPricer {
             }
 
             // Forward-starting swap parameters for this fixing
-            let swap_start = fixing_date;
+            let swap_start = inst.reference_swap_start(fixing_date)?;
             let swap_end = swap_start.add_months((inst.cms_tenor * 12.0).round() as i32);
 
             // F (forward swap rate). The market annuity A₀ is intentionally

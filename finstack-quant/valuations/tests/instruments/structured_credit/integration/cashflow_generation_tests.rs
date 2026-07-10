@@ -7,6 +7,7 @@ use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -59,6 +60,7 @@ fn create_test_pool() -> AssetPool {
                 acquisition_date: Some(test_date()),
                 smm_override: None,
                 mdr_override: None,
+                contractual_payment: None,
             };
         pool.assets.push(asset);
     }
@@ -132,6 +134,17 @@ fn create_test_market() -> MarketContext {
     MarketContext::new()
         .insert(discount_curve)
         .insert(forward_curve)
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:SOFR-3M",
+                vec![(
+                    Date::from_calendar_date(2025, Month::September, 29).unwrap(),
+                    0.05,
+                )],
+                None,
+            )
+            .unwrap(),
+        )
 }
 
 // ============================================================================

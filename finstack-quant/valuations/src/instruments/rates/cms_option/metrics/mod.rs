@@ -191,7 +191,7 @@ impl MetricCalculator for VannaCalculator {
             }
 
             // 1. Calculate Forward Swap Rate
-            let swap_start = fixing_date;
+            let swap_start = inst.reference_swap_start(fixing_date)?;
             let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
             let swap_end = swap_start.add_months(swap_tenor_months);
 

@@ -5,7 +5,7 @@ use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
 use crate::instruments::PricingOverrides;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{CalendarRegistry, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, Rate};
 use rust_decimal::prelude::ToPrimitive;
@@ -87,6 +87,41 @@ pub struct CmsOption {
 }
 
 impl CmsOption {
+    /// Effective date of the reference swap observed on `fixing_date`.
+    pub(crate) fn reference_swap_start(
+        &self,
+        fixing_date: Date,
+    ) -> finstack_quant_core::Result<Date> {
+        let convention = match (self.swap_convention, self.notional.currency()) {
+            (Some(convention), _) => convention,
+            (None, finstack_quant_core::currency::Currency::USD) => IRSConvention::USDStandard,
+            (None, finstack_quant_core::currency::Currency::EUR) => IRSConvention::EURStandard,
+            (None, finstack_quant_core::currency::Currency::GBP) => IRSConvention::GBPStandard,
+            (None, finstack_quant_core::currency::Currency::JPY) => IRSConvention::JPYStandard,
+            (None, currency) => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CMS option '{}' requires swap_convention for currency {}",
+                    self.id, currency
+                )))
+            }
+        };
+        let calendar_id = convention.calendar_id().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "CMS option '{}' convention has no reference calendar",
+                self.id
+            ))
+        })?;
+        let calendar = CalendarRegistry::global()
+            .resolve_str(&calendar_id)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CMS option '{}' reference calendar '{}' is not registered",
+                    self.id, calendar_id
+                ))
+            })?;
+        fixing_date.add_business_days(convention.reset_lag_days(), calendar)
+    }
+
     /// Validate CMS option schedule vectors.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         if self.fixing_dates.len() != self.payment_dates.len()
@@ -153,17 +188,17 @@ impl CmsOption {
             .unwrap_or(DayCount::Thirty360)
     }
 
-    /// Resolved float leg day count (explicit field > convention float > swap day count).
+    /// Resolved float leg day count (explicit field > convention float > ACT/360).
     pub fn resolved_swap_float_day_count(&self) -> DayCount {
         self.swap_float_day_count
             .or_else(|| self.swap_convention.map(|c| c.float_day_count()))
-            .unwrap_or_else(|| self.resolved_swap_day_count())
+            .unwrap_or(DayCount::Act360)
     }
 
     /// Create a CMS option from a schedule specification.
     ///
     /// Generates fixing and payment dates from `start_date`, `maturity`, and `frequency`
-    /// using standard market conventions (Modified Following BDC, weekends-only calendar).
+    /// using the calendar and reset lag from `swap_convention`.
     /// This is the preferred way to construct standard CMS cap/floor instruments.
     ///
     /// Swap convention fields (`swap_fixed_freq`, `swap_float_freq`, `swap_day_count`)
@@ -188,9 +223,15 @@ impl CmsOption {
         forward_curve_id: impl Into<CurveId>,
         vol_surface_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
-        use crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID;
         use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
         use finstack_quant_core::dates::{BusinessDayConvention, StubKind};
+
+        let calendar_id = swap_convention.calendar_id().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "CMS option convention has no reference calendar".to_string(),
+            )
+        })?;
+        let reset_lag_days = swap_convention.reset_lag_days();
 
         let periods = build_periods(BuildPeriodsParams {
             start: start_date,
@@ -198,11 +239,11 @@ impl CmsOption {
             frequency,
             stub: StubKind::ShortFront,
             bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: WEEKENDS_ONLY_ID,
+            calendar_id: &calendar_id,
             end_of_month: false,
             day_count,
             payment_lag_days: 0,
-            reset_lag_days: None,
+            reset_lag_days: Some(reset_lag_days),
             adjust_accrual_dates: false,
         })?;
 
@@ -212,7 +253,10 @@ impl CmsOption {
             ));
         }
 
-        let fixing_dates: Vec<Date> = periods.iter().map(|p| p.accrual_start).collect();
+        let fixing_dates: Vec<Date> = periods
+            .iter()
+            .map(|p| p.reset_date.unwrap_or(p.accrual_start))
+            .collect();
         let payment_dates: Vec<Date> = periods.iter().map(|p| p.payment_date).collect();
         let accrual_fractions: Vec<f64> = periods.iter().map(|p| p.accrual_year_fraction).collect();
 

@@ -1,4 +1,5 @@
 use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -171,7 +172,23 @@ fn oas_round_trip_near_zero_at_model_price() {
         .price_callable(&loan, &market, as_of)
         .unwrap()
         .amount();
-    let clean_pct = pv / loan.notional_limit.amount() * 100.0;
+    let settlement = loan.settlement_date(as_of).expect("settlement");
+    let schedule = loan
+        .cashflow_schedule(&market, as_of)
+        .expect("cashflow schedule");
+    let outstanding = schedule
+        .outstanding_by_date()
+        .expect("outstanding path")
+        .into_iter()
+        .rfind(|(date, _)| *date < settlement)
+        .map_or(loan.notional_limit.amount(), |(_, amount)| amount.amount());
+    let accrued = finstack_quant_cashflows::accrual::accrued_interest_amount(
+        &schedule,
+        settlement,
+        &loan.accrual_config(),
+    )
+    .expect("accrued interest");
+    let clean_pct = (pv - accrued) / outstanding * 100.0;
 
     let oas_bp = pricer
         .calculate_oas(&loan, &market, as_of, clean_pct)

@@ -113,6 +113,11 @@ pub struct VolatilityIndexOption {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<String>")]
     pub settlement_date: Option<Date>,
+    /// Observed volatility-index settlement fixing, required after expiry when
+    /// cash settlement occurs later than expiry.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_fixing: Option<f64>,
     /// Contract specifications.
     #[builder(default)]
     #[serde(default)]
@@ -192,6 +197,8 @@ struct VolatilityIndexOptionUnchecked {
     #[schemars(with = "Option<String>")]
     settlement_date: Option<Date>,
     #[serde(default)]
+    expiry_fixing: Option<f64>,
+    #[serde(default)]
     contract_specs: VolIndexOptionSpecs,
     day_count: DayCount,
     discount_curve_id: CurveId,
@@ -215,6 +222,7 @@ impl TryFrom<VolatilityIndexOptionUnchecked> for VolatilityIndexOption {
             exercise_style: value.exercise_style,
             expiry: value.expiry,
             settlement_date: value.settlement_date,
+            expiry_fixing: value.expiry_fixing,
             contract_specs: value.contract_specs,
             day_count: value.day_count,
             discount_curve_id: value.discount_curve_id,
@@ -229,6 +237,10 @@ impl TryFrom<VolatilityIndexOptionUnchecked> for VolatilityIndexOption {
 }
 
 impl VolatilityIndexOption {
+    /// Effective cash-settlement date.
+    pub fn effective_settlement_date(&self) -> Date {
+        self.settlement_date.unwrap_or(self.expiry)
+    }
     /// Create a canonical example VIX call option for testing.
     pub fn example() -> finstack_quant_core::Result<Self> {
         // SAFETY: All inputs are compile-time validated constants
@@ -284,6 +296,14 @@ impl VolatilityIndexOption {
                     settle, self.expiry
                 )));
             }
+        }
+        if self
+            .expiry_fixing
+            .is_some_and(|fixing| !fixing.is_finite() || fixing <= 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "VolatilityIndexOption expiry_fixing must be finite and positive".into(),
+            ));
         }
         Ok(())
     }

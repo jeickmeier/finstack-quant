@@ -664,21 +664,34 @@ fn live_afc_cap_rate(instrument: &StructuredCredit, state: &SimulationState) -> 
 fn tranche_period_interest_due(
     tranche: &Tranche,
     balance: f64,
-    period_start: Date,
-    pay_date: Date,
+    dates: TrancheAccrualDates,
     context: &MarketContext,
     afc_cap: f64,
     afc_capped: bool,
 ) -> Result<f64> {
-    let raw = tranche
-        .coupon
-        .try_current_rate_with_index(pay_date, context)?;
+    let raw =
+        tranche
+            .coupon
+            .try_rate_for_period(dates.start, dates.payment, dates.valuation, context)?;
     let rate = if afc_capped { raw.min(afc_cap) } else { raw };
     let accrual =
         tranche
             .day_count
-            .year_fraction(period_start, pay_date, DayCountContext::default())?;
+            .year_fraction(dates.start, dates.payment, DayCountContext::default())?;
     Ok(balance * rate * accrual)
+}
+
+#[derive(Clone, Copy)]
+struct TrancheAccrualDates {
+    start: Date,
+    payment: Date,
+    valuation: Date,
+}
+
+#[derive(Clone, Copy)]
+struct SimulationPeriod {
+    payment: Date,
+    valuation: Date,
 }
 
 /// Run full cashflow simulation for a structured credit instrument.
@@ -714,14 +727,6 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
             ));
         }
     };
-
-    // Initialize simulation state
-    let mut state = SimulationState::new(
-        pool,
-        tranches,
-        instrument.closing_date,
-        instrument.credit_model.recovery_spec.recovery_lag,
-    )?;
 
     // Concrete base waterfall. The available-funds cap is *not* baked here:
     // it is layered onto the per-period waterfall inside `simulate_period` using
@@ -770,11 +775,29 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     for date in &mut adjusted_schedule.dates {
         *date = adjust(*date, convention, calendar)?;
     }
+    let state_anchor = adjusted_schedule
+        .dates
+        .iter()
+        .copied()
+        .filter(|date| *date <= as_of)
+        .max()
+        .unwrap_or(instrument.closing_date);
     let schedule_dates: Vec<Date> = adjusted_schedule
         .dates
         .into_iter()
         .filter(|date| *date > as_of)
         .collect();
+
+    // Balances supplied on the instrument are current-state balances. Anchor
+    // the first projected accrual at the last contractual boundary, rather
+    // than replaying pool dynamics from closing on those current balances.
+    let mut state = SimulationState::new(
+        pool,
+        tranches,
+        instrument.closing_date,
+        state_anchor,
+        instrument.credit_model.recovery_spec.recovery_lag,
+    )?;
 
     // Simulate period-by-period
     for pay_date in schedule_dates {
@@ -861,9 +884,12 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
                     // Accrued interest for the stub period on the current
                     // (post-writedown) balance, using the tranche coupon and
                     // its own day-count convention.
-                    let coupon_rate = tranche
-                        .coupon
-                        .try_current_rate_with_index(pay_date, context)?;
+                    let coupon_rate = tranche.coupon.try_rate_for_period(
+                        cleanup_period_start,
+                        pay_date,
+                        as_of,
+                        context,
+                    )?;
                     let accrual_factor = tranche.day_count.year_fraction(
                         cleanup_period_start,
                         pay_date,
@@ -934,7 +960,10 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
             &mut state,
             instrument,
             &waterfall,
-            pay_date,
+            SimulationPeriod {
+                payment: pay_date,
+                valuation: as_of,
+            },
             context,
             months_per_period,
             source,
@@ -1690,6 +1719,7 @@ mod tests {
             acquisition_date: None,
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         });
         let tranche = Tranche::new(
             "A",
@@ -1704,7 +1734,7 @@ mod tests {
         let tranches = TrancheStructure::new(vec![tranche]).expect("structure");
 
         let market = MarketContext::new().insert(cc_discount_curve());
-        let mut state = SimulationState::new(&pool, &tranches, closing, 0).expect("state");
+        let mut state = SimulationState::new(&pool, &tranches, closing, closing, 0).expect("state");
 
         let months_per_period = 3.0_f64;
         let rates = PoolFlowRates {
@@ -1989,6 +2019,7 @@ mod tests {
                 acquisition_date: None,
                 smm_override: None,
                 mdr_override,
+                contractual_payment: None,
             });
             pool
         };
@@ -2007,7 +2038,8 @@ mod tests {
         };
 
         let one_period_interest = |pool: &AssetPool, tranches: &TrancheStructure| -> f64 {
-            let mut state = SimulationState::new(pool, tranches, closing, 0).expect("state");
+            let mut state =
+                SimulationState::new(pool, tranches, closing, closing, 0).expect("state");
             let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
                 state: &mut state,
                 pay_date: pay1,
@@ -2335,6 +2367,7 @@ impl<'a> SimulationState<'a> {
         pool: &'a AssetPool,
         tranches: &'a TrancheStructure,
         closing_date: Date,
+        state_date: Date,
         recovery_lag_months: u32,
     ) -> Result<Self> {
         let base_ccy = pool.base_currency();
@@ -2394,7 +2427,7 @@ impl<'a> SimulationState<'a> {
         let deferred_interest: HashMap<String, Money> = tranches
             .tranches
             .iter()
-            .map(|t| (t.id.to_string(), Money::new(0.0, base_ccy)))
+            .map(|t| (t.id.to_string(), t.deferred_interest))
             .collect();
 
         // Determine if reinvestment is initially active
@@ -2451,7 +2484,7 @@ impl<'a> SimulationState<'a> {
             tranche_balances,
             deferred_interest,
             results,
-            prev_date: Some(closing_date),
+            prev_date: Some(state_date),
             base_ccy,
             recovery_lag_months,
             pool,
@@ -2565,11 +2598,13 @@ fn simulate_period(
     state: &mut SimulationState,
     instrument: &StructuredCredit,
     waterfall: &Waterfall,
-    pay_date: Date,
+    period: SimulationPeriod,
     context: &MarketContext,
     months_per_period: f64,
     source: &mut (impl PoolFlowSource + ?Sized),
 ) -> Result<()> {
+    let pay_date = period.payment;
+    let as_of = period.valuation;
     // Seasoning for PSA/SDA ramps = collateral age, not deal age: the
     // pool's balance-weighted average loan age at closing (WALA, derived
     // from asset acquisition dates) plus the months elapsed since closing.
@@ -2900,8 +2935,11 @@ fn simulate_period(
             debt_interest_due += tranche_period_interest_due(
                 tranche,
                 bal,
-                period_start,
-                pay_date,
+                TrancheAccrualDates {
+                    start: period_start,
+                    payment: pay_date,
+                    valuation: as_of,
+                },
                 context,
                 live_afc_cap,
                 afc_capped,
@@ -3072,6 +3110,7 @@ fn simulate_period(
             principal_collections: principal_available_for_waterfall,
             payment_date: pay_date,
             period_start,
+            valuation_date: as_of,
             pool_balance: state.pool_outstanding,
             market: context,
             tranche_balances: Some(&state.tranche_balances),
@@ -3134,8 +3173,11 @@ fn simulate_period(
             tranche_period_interest_due(
                 tranche,
                 current_balance.amount(),
-                period_start,
-                pay_date,
+                TrancheAccrualDates {
+                    start: period_start,
+                    payment: pay_date,
+                    valuation: as_of,
+                },
                 context,
                 afc_cap,
                 afc_capped,
@@ -3767,11 +3809,12 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
             let level_payment = match state.pool_state.level_payments[i] {
                 Some(lp) => lp,
                 None => {
-                    let remaining_days = (state.pool_state.maturities[i] - request.pay_date)
-                        .whole_days()
-                        .max(1) as f64;
-                    let remaining_months = (remaining_days / 30.44).round().max(1.0);
-                    let remaining_periods_f64 = remaining_months / request.months_per_period;
+                    let months_per_period = request.months_per_period.round().max(1.0) as u32;
+                    let remaining_months = request
+                        .pay_date
+                        .months_until(state.pool_state.maturities[i]);
+                    let remaining_periods = remaining_months.div_ceil(months_per_period) + 1;
+                    let remaining_periods_f64 = f64::from(remaining_periods);
                     let denom = 1.0 - (1.0 + period_rate).powf(-remaining_periods_f64);
                     if !remaining_periods_f64.is_finite() || !denom.is_finite() {
                         return Err(finstack_quant_core::Error::Validation(format!(

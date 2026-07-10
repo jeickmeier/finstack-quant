@@ -95,6 +95,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency for margin calculations.\n\nAll exposures and collateral values are converted to this currency\nfor netting and comparison with thresholds."
         },
+        "calendar_id": {
+          "description": "Contractual business-day calendar for calls and settlements.",
+          "type": "string"
+        },
         "call_timing": {
           "$ref": "#/$defs/MarginCallTiming",
           "description": "Margin call timing parameters."
@@ -130,6 +134,7 @@
       "required": [
         "id",
         "base_currency",
+        "calendar_id",
         "vm_params",
         "eligible_collateral",
         "call_timing",

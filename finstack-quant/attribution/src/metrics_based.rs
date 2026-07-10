@@ -532,9 +532,9 @@ fn inflation_source_abs_shift_bp(
         }
     }
     if count == 0 {
-        index_abs
+        0.0
     } else {
-        total_abs / count as f64 + index_abs
+        total_abs / count as f64
     }
 }
 
@@ -1796,21 +1796,6 @@ pub fn attribute_pnl_metrics_based(
                         "Inflation attribution could not measure declared source '{}': {err}",
                         curve_id.as_str()
                     ));
-                }
-            }
-
-            if market_t0.get_inflation_curve(curve_id.as_str()).is_ok()
-                && market_t1.get_inflation_curve(curve_id.as_str()).is_ok()
-            {
-                if let Ok(index_shift_bp) =
-                    measure_inflation_index_shift(curve_id.as_str(), market_t0, market_t1)
-                {
-                    if index_shift_bp.abs() > f64::EPSILON {
-                        attribution.meta.notes.push(format!(
-                            "Inflation attribution for '{}' includes a discrete published-index shift of {index_shift_bp:.6} bp-equivalent in addition to the projected-curve move",
-                            curve_id.as_str()
-                        ));
-                    }
                 }
             }
         }

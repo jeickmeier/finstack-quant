@@ -76,6 +76,7 @@ fn build_pool(n_assets: usize, balance_each: f64) -> AssetPool {
             acquisition_date: Some(as_of()),
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         });
     }
     pool
@@ -584,6 +585,7 @@ mod excess_spread_tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
@@ -718,7 +720,20 @@ mod excess_spread_tests {
             .knots([(0.0, 0.02), (1.0, 0.05), (2.0, 0.08), (3.0, 0.10)])
             .build()
             .unwrap();
-        MarketContext::new().insert(disc).insert(sofr)
+        MarketContext::new()
+            .insert(disc)
+            .insert(sofr)
+            .insert_series(
+                ScalarTimeSeries::new(
+                    "FIXING:SOFR-3M",
+                    vec![(
+                        Date::from_calendar_date(2023, Month::December, 28).unwrap(),
+                        0.02,
+                    )],
+                    None,
+                )
+                .unwrap(),
+            )
     }
 
     fn floating_senior_spec() -> FloatingRateSpec {
@@ -1248,6 +1263,7 @@ mod shifting_interest_tests {
             day_count: DayCount::Thirty360,
             smm_override: None,
             mdr_override: None,
+            contractual_payment: None,
         });
         let tranches = TrancheStructure::new(vec![
             Tranche::new(

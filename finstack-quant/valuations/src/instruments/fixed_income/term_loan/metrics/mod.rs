@@ -66,7 +66,7 @@ mod all_in_rate;
 mod cs01;
 mod discount_margin;
 mod embedded_option_value;
-mod irr_helpers;
+pub(crate) mod irr_helpers;
 mod oas;
 mod oid_eir;
 mod ytc;
