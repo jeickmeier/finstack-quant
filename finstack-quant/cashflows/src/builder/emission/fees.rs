@@ -185,6 +185,7 @@ pub(in crate::builder) fn emit_fees_on(
                     frequency: Some(pf.freq),
                     bus_basis: None,
                     coupon_period: None,
+                    end_is_termination_date: false,
                 },
             )?;
 

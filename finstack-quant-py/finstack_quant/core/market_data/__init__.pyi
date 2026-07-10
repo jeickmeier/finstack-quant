@@ -839,7 +839,7 @@ class VolCube:
         ...
 
     def vol_clamped(self, expiry: float, tenor: float, strike: float) -> float:
-        """Implied volatility with clamped extrapolation at the grid edges."""
+        """Implied volatility with clamped extrapolation; non-finite inputs return NaN."""
         ...
 
     def vol_normal(self, expiry: float, tenor: float, strike: float) -> float:
@@ -873,8 +873,8 @@ class VolCube:
     def vol_normal_clamped(self, expiry: float, tenor: float, strike: float) -> float:
         """Normal (Bachelier) implied volatility with clamped extrapolation.
 
-        Never raises and never returns a non-finite or non-positive value;
-        degenerate expansions are floored to a small positive normal vol.
+        Degenerate finite expansions are floored to a small positive normal
+        vol. Non-finite inputs return NaN.
         """
         ...
 
@@ -956,6 +956,8 @@ class VolCube:
     def tenors(self) -> list[float]: ...
     @property
     def grid_shape(self) -> tuple[int, int]: ...
+    @property
+    def interpolation_mode(self) -> str: ...
     def __repr__(self) -> str: ...
 
 class VolatilityIndexCurve:
@@ -1161,6 +1163,17 @@ class FxMatrix:
         ValueError
             If a currency code is invalid or rate is non-finite.
         """
+        ...
+
+    def set_quote_on(
+        self,
+        base: Union[Currency, str],
+        quote: Union[Currency, str],
+        date: datetime.date,
+        policy: Union[FxConversionPolicy, str],
+        rate: float,
+    ) -> None:
+        """Set an authoritative quote scoped to one date and policy."""
         ...
 
     def rate(

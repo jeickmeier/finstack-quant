@@ -768,7 +768,12 @@ impl ForwardCurve {
             self.day_count
                 .year_fraction(self.base, new_base, DayCountContext::default())?;
 
-        let rolled_points = roll_knots(&self.knots, &self.forwards, dt_years);
+        // Preserve the live forward at the new origin. Merely shifting and
+        // dropping expired knots loses the interpolation segment containing
+        // `dt_years` and can materially change the rolled curve at t=0.
+        let mut rolled_points = Vec::with_capacity(self.knots.len() + 1);
+        rolled_points.push((0.0, self.rate(dt_years)));
+        rolled_points.extend(roll_knots(&self.knots, &self.forwards, dt_years));
 
         if rolled_points.len() < 2 {
             return Err(crate::error::InputError::TooFewPoints.into());
@@ -1089,18 +1094,46 @@ mod tests {
         // Roll 36 days => Act/360 year fraction = 36/360 = 0.1
         let rolled = curve.roll_forward(36).expect("roll_forward should succeed");
         let ks = rolled.knots();
-        assert_eq!(ks.len(), 2, "First knot should expire after rolling");
-        // Original knots were at 0.05, 0.15, 0.30
-        // After rolling 0.1 years: -0.05 (expired), 0.05, 0.20
-        assert!(
-            (ks[0] - 0.05).abs() < 1e-12,
-            "Expected 0.15 - 0.10 = 0.05, got {}",
-            ks[0]
+        assert_eq!(
+            ks.len(),
+            3,
+            "Rolled curve should contain a new-origin anchor and two future knots"
         );
+        // Original knots were at 0.05, 0.15, 0.30
+        // After rolling 0.1 years: anchor at 0, -0.05 (expired), 0.05, 0.20
+        assert!(ks[0].abs() < 1e-12, "Expected a zero-time anchor");
         assert!(
-            (ks[1] - 0.20).abs() < 1e-12,
-            "Expected 0.30 - 0.10 = 0.20, got {}",
+            (ks[1] - 0.05).abs() < 1e-12,
+            "Expected 0.15 - 0.10 = 0.05, got {}",
             ks[1]
         );
+        assert!(
+            (ks[2] - 0.20).abs() < 1e-12,
+            "Expected 0.30 - 0.10 = 0.20, got {}",
+            ks[2]
+        );
+    }
+
+    #[test]
+    fn roll_forward_preserves_shaped_linear_curve() {
+        let base =
+            Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date");
+        let curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.02), (1.0, 0.10), (2.0, 0.02)])
+            .interp(InterpStyle::Linear)
+            .build()
+            .expect("valid shaped forward curve");
+
+        let rolled = curve.roll_forward(180).expect("roll should succeed");
+        for t in [0.0, 0.25, 0.5, 1.0, 1.5] {
+            let expected = curve.rate(t + 0.5);
+            let actual = rolled.rate(t);
+            assert!(
+                (actual - expected).abs() < 1e-12,
+                "t={t}: rolled={actual}, original shifted={expected}"
+            );
+        }
     }
 }

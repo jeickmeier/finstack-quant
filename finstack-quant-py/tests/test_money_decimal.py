@@ -79,3 +79,11 @@ def test_int_input_still_works() -> None:
 def test_invalid_string_raises_type_error() -> None:
     with pytest.raises((TypeError, ValueError)):
         Money("not_a_number", "USD")  # type: ignore[arg-type]
+
+
+def test_decimal_ordering_and_repr_do_not_round_through_float() -> None:
+    lower = Money(Decimal("10000000000000000.1"), "USD")
+    higher = Money(Decimal("10000000000000000.2"), "USD")
+
+    assert lower < higher
+    assert repr(lower) == "Money(10000000000000000.1, 'USD')"

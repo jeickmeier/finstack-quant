@@ -210,12 +210,24 @@ impl VolCube {
     ) -> crate::Result<Self> {
         validate_axis(expiries)?;
         validate_axis(tenors)?;
+        if expiries.iter().any(|&value| value <= 0.0) || tenors.iter().any(|&value| value <= 0.0) {
+            return Err(InputError::NonPositiveValue.into());
+        }
         let n = expiries.len() * tenors.len();
         if params.len() != n || forwards.len() != n {
             return Err(InputError::DimensionMismatch.into());
         }
         if forwards.iter().any(|f| !f.is_finite()) {
             return Err(InputError::Invalid.into());
+        }
+        for params in params {
+            SabrParams::new_with_shift(
+                params.alpha,
+                params.beta,
+                params.rho,
+                params.nu,
+                params.shift,
+            )?;
         }
         Ok(Self {
             id: CurveId::new(id.as_ref()),
@@ -265,6 +277,12 @@ impl VolCube {
     pub fn forward_at(&self, exp_idx: usize, tenor_idx: usize) -> f64 {
         let n_tenors = self.tenors.len();
         self.forwards[exp_idx * n_tenors + tenor_idx]
+    }
+
+    /// Interpolation contract used between expiry pillars.
+    #[must_use]
+    pub fn interpolation_mode(&self) -> VolInterpolationMode {
+        self.interpolation_mode
     }
 
     /// Return a copy with the given interpolation mode.
@@ -399,6 +417,47 @@ impl VolCube {
         (params, fwd, exp_c)
     }
 
+    /// Evaluate a smile using total-variance interpolation between expiry
+    /// pillars. Tenor interpolation remains in SABR parameter space, matching
+    /// the cube's existing tenor contract.
+    fn total_variance_vol(
+        &self,
+        expiry: f64,
+        tenor: f64,
+        strike: f64,
+        normal: bool,
+    ) -> crate::Result<f64> {
+        let ie0 = locate_segment_unchecked(&self.expiries, expiry);
+        let ie1 = (ie0 + 1).min(self.expiries.len() - 1);
+        let e0 = self.expiries[ie0];
+        let e1 = self.expiries[ie1];
+
+        let evaluate = |pillar_expiry: f64| -> crate::Result<f64> {
+            let (params, forward, _) = self.interpolate_params_clamped(pillar_expiry, tenor);
+            if normal {
+                params.try_implied_vol_normal(forward, strike, pillar_expiry)
+            } else {
+                params.try_implied_vol_lognormal(forward, strike, pillar_expiry)
+            }
+        };
+
+        #[allow(clippy::float_cmp)]
+        if e0 == e1 || expiry == e0 {
+            return evaluate(expiry);
+        }
+
+        let vol0 = evaluate(e0)?;
+        let vol1 = evaluate(e1)?;
+        let weight = (expiry - e0) / (e1 - e0);
+        let total_variance = (1.0 - weight) * e0 * vol0 * vol0 + weight * e1 * vol1 * vol1;
+        if !total_variance.is_finite() || total_variance <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "VolCube total-variance interpolation produced {total_variance} at expiry {expiry}"
+            )));
+        }
+        Ok((total_variance / expiry).sqrt())
+    }
+
     /// Implied volatility with bounds checking.
     ///
     /// Returns `Err` if `expiry` or `tenor` falls outside the grid, or if the
@@ -410,19 +469,41 @@ impl VolCube {
         locate_segment(&self.expiries, expiry)?;
         locate_segment(&self.tenors, tenor)?;
 
-        let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-        params.try_implied_vol_lognormal(fwd, strike, exp_c)
+        if !strike.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
+        match self.interpolation_mode {
+            VolInterpolationMode::Vol => {
+                let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
+                params.try_implied_vol_lognormal(fwd, strike, exp_c)
+            }
+            VolInterpolationMode::TotalVariance => {
+                self.total_variance_vol(expiry, tenor, strike, false)
+            }
+        }
     }
 
     /// Implied volatility with clamped extrapolation.
     ///
-    /// Clamps expiry and tenor to the grid edges before interpolation. Never
-    /// panics and never returns a non-finite or non-positive value: a
-    /// degenerate expansion is floored to a small positive vol, matching the
-    /// `materialize_*` slice helpers.
+    /// Clamps finite expiry and tenor values to the grid edges before
+    /// interpolation. Degenerate finite expansions are floored to a small
+    /// positive vol, matching the `materialize_*` slice helpers. Non-finite
+    /// inputs propagate as `NaN` rather than being silently mapped to an edge.
     pub fn vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
-        let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-        let v = params.implied_vol_lognormal(fwd, strike, exp_c);
+        if !expiry.is_finite() || !tenor.is_finite() || !strike.is_finite() {
+            return f64::NAN;
+        }
+        let expiry = expiry.clamp(self.expiries[0], self.expiries[self.expiries.len() - 1]);
+        let tenor = tenor.clamp(self.tenors[0], self.tenors[self.tenors.len() - 1]);
+        let v = match self.interpolation_mode {
+            VolInterpolationMode::Vol => {
+                let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
+                params.implied_vol_lognormal(fwd, strike, exp_c)
+            }
+            VolInterpolationMode::TotalVariance => self
+                .total_variance_vol(expiry, tenor, strike, false)
+                .unwrap_or(f64::NAN),
+        };
         let mut floored = 0usize;
         let v = floor_sabr_vol(v, &mut floored);
         warn_sabr_vol_floored("VolCube::vol_clamped", &self.id, floored);
@@ -450,8 +531,18 @@ impl VolCube {
         locate_segment(&self.expiries, expiry)?;
         locate_segment(&self.tenors, tenor)?;
 
-        let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-        params.try_implied_vol_normal(fwd, strike, exp_c)
+        if !strike.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
+        match self.interpolation_mode {
+            VolInterpolationMode::Vol => {
+                let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
+                params.try_implied_vol_normal(fwd, strike, exp_c)
+            }
+            VolInterpolationMode::TotalVariance => {
+                self.total_variance_vol(expiry, tenor, strike, true)
+            }
+        }
     }
 
     /// Normal (Bachelier) implied volatility with clamped extrapolation.
@@ -460,10 +551,28 @@ impl VolCube {
     /// clamped to the grid edges, and a degenerate expansion is floored to a
     /// small positive **normal** vol of `1e-8 * max(|forward|, 1)` (absolute
     /// rate units, scaling with the forward level) with an aggregated warning.
-    /// Never panics and never returns a non-finite or non-positive value.
+    /// Non-finite inputs propagate as `NaN` rather than being silently mapped
+    /// to an edge.
     pub fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
-        let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-        let v = params.implied_vol_normal(fwd, strike, exp_c);
+        if !expiry.is_finite() || !tenor.is_finite() || !strike.is_finite() {
+            return f64::NAN;
+        }
+        let expiry = expiry.clamp(self.expiries[0], self.expiries[self.expiries.len() - 1]);
+        let tenor = tenor.clamp(self.tenors[0], self.tenors[self.tenors.len() - 1]);
+        let (v, fwd) = match self.interpolation_mode {
+            VolInterpolationMode::Vol => {
+                let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
+                (params.implied_vol_normal(fwd, strike, exp_c), fwd)
+            }
+            VolInterpolationMode::TotalVariance => {
+                let (_, fwd, _) = self.interpolate_params_clamped(expiry, tenor);
+                (
+                    self.total_variance_vol(expiry, tenor, strike, true)
+                        .unwrap_or(f64::NAN),
+                    fwd,
+                )
+            }
+        };
         let mut floored = 0usize;
         let v = floor_sabr_vol_normal(v, fwd, &mut floored);
         warn_sabr_vol_normal_floored("VolCube::vol_normal_clamped", &self.id, floored);
@@ -502,6 +611,7 @@ impl VolCube {
         warn_sabr_vol_floored("VolCube::materialize_tenor_slice", &self.id, floored);
 
         VolSurface::from_grid(self.id.as_str(), &self.expiries, strikes, &vols)
+            .map(|surface| surface.with_interpolation_mode(self.interpolation_mode))
     }
 
     /// Materialize a tenor slice as a **normal-vol** [`VolSurface`].
@@ -531,8 +641,11 @@ impl VolCube {
         }
         warn_sabr_vol_normal_floored("VolCube::materialize_tenor_slice_normal", &self.id, floored);
 
-        VolSurface::from_grid(self.id.as_str(), &self.expiries, strikes, &vols)
-            .map(|s| s.with_quote_type(VolQuoteType::Normal))
+        VolSurface::from_grid(self.id.as_str(), &self.expiries, strikes, &vols).map(|surface| {
+            surface
+                .with_quote_type(VolQuoteType::Normal)
+                .with_interpolation_mode(self.interpolation_mode)
+        })
     }
 
     /// Materialize an expiry slice as a [`VolSurface`].

@@ -130,7 +130,10 @@ impl GeneratorMatrix {
         p: &TransitionMatrix,
         round_trip_tol: f64,
     ) -> Result<Self, MigrationError> {
-        let q_data = matrix_log(&p.data)?;
+        // `matrix_log(P)` is the generator over the transition matrix's own
+        // horizon. GeneratorMatrix is annualized, so recover Q from
+        // P(h) = exp(Q * h) by dividing by h.
+        let q_data = matrix_log(&p.data)?.scale(1.0 / p.horizon());
 
         // Kreinin-Sidenius post-processing: clamp negative off-diagonals.
         // The total clamped mass is stamped on the result for policy
@@ -144,8 +147,9 @@ impl GeneratorMatrix {
             round_trip_error: 0.0,
         };
 
-        // Round-trip validation: ||exp(Q) - P||_inf < tol
-        let p_reconstructed = pade_expm(&gen.data)?;
+        // Round-trip validation at the source matrix horizon:
+        // ||exp(Q * h) - P(h)||_inf < tol.
+        let p_reconstructed = pade_expm(&gen.data.scale(p.horizon()))?;
         let inf_err = inf_norm_diff(&p_reconstructed, &p.data);
         if inf_err > round_trip_tol {
             return Err(MigrationError::RoundTripError {
@@ -390,6 +394,15 @@ pub(crate) fn validate_generator(
         let mut row_sum = 0.0;
         for j in 0..n {
             let v = m[(i, j)];
+            if !v.is_finite() {
+                return Err(MigrationError::EntryOutOfRange {
+                    row: i,
+                    col: j,
+                    value: v,
+                    min: if i == j { f64::NEG_INFINITY } else { 0.0 },
+                    max: if i == j { 0.0 } else { f64::INFINITY },
+                });
+            }
             if j != i && v < -1e-12 {
                 return Err(MigrationError::EntryOutOfRange {
                     row: i,

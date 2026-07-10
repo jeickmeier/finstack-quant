@@ -67,6 +67,7 @@ fn enrich_period(
         frequency: Some(params.frequency),
         bus_basis: None,
         coupon_period: regular.then_some((period.accrual_start, period.accrual_end)),
+        end_is_termination_date: period.accrual_end >= params.end,
     };
     period.accrual_year_fraction =
         params

@@ -532,6 +532,15 @@ pub fn cholesky_decomposition(
             actual: matrix.len(),
         });
     }
+    for (index, &value) in matrix.iter().enumerate() {
+        if !value.is_finite() {
+            return Err(CholeskyError::NonFiniteInput {
+                value,
+                row: index / n,
+                col: index % n,
+            });
+        }
+    }
 
     let mut l = vec![0.0; n * n];
 
@@ -587,6 +596,15 @@ pub fn cholesky_decomposition_into(
             expected: n,
             actual: matrix.len(),
         });
+    }
+    for (index, &value) in matrix.iter().enumerate() {
+        if !value.is_finite() {
+            return Err(CholeskyError::NonFiniteInput {
+                value,
+                row: index / n,
+                col: index % n,
+            });
+        }
     }
 
     l.fill(0.0);
@@ -1335,6 +1353,21 @@ mod tests {
             cholesky_decomposition_into(&indefinite, 2, &mut out),
             Err(CholeskyError::NotPositiveDefinite { .. })
         ));
+    }
+
+    #[test]
+    fn generic_cholesky_variants_reject_non_finite_entries() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                cholesky_decomposition(&[bad], 1),
+                Err(CholeskyError::NonFiniteInput { .. })
+            ));
+            let mut out = [0.0];
+            assert!(matches!(
+                cholesky_decomposition_into(&[bad], 1, &mut out),
+                Err(CholeskyError::NonFiniteInput { .. })
+            ));
+        }
     }
 
     #[test]

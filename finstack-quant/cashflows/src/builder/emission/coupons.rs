@@ -308,6 +308,10 @@ pub(crate) fn emit_fixed_coupons_on(
                     frequency: Some(spec.freq),
                     bus_basis: None,
                     coupon_period: (!is_stub).then_some((accrual_start, accrual_end)),
+                    end_is_termination_date: schedule
+                        .dates
+                        .last()
+                        .is_some_and(|&last| accrual_end == last),
                 },
             )?;
 
@@ -688,6 +692,10 @@ pub(crate) fn emit_float_coupons_on(
                     frequency: Some(spec.freq),
                     bus_basis: None,
                     coupon_period: (!is_stub).then_some((accrual_start, accrual_end)),
+                    end_is_termination_date: schedule
+                        .dates
+                        .last()
+                        .is_some_and(|&last| accrual_end == last),
                 },
             )?;
 

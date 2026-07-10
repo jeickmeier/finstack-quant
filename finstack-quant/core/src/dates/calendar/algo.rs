@@ -164,3 +164,48 @@ pub(crate) fn cny_date(year: i32) -> Option<Date> {
     cny_date_for_year(year)
         .and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
 }
+
+// -------------------------------------------------------------------------------------------------
+// Dragon Boat / Mid-Autumn (generated lookup, 1970-2150)
+// -------------------------------------------------------------------------------------------------
+
+// The generated table provides `dragon_boat_date_for_year`, `is_dragon_boat_date`,
+// `mid_autumn_date_for_year`, and `is_mid_autumn_date` helpers.
+include!("../../generated/festivals_generated.rs");
+
+/// Returns the Dragon Boat Festival (端午节) date for a given year, if available.
+///
+/// Celebrated on the 5th day of the 5th Chinese lunar month (typically late May
+/// to mid June). Uses a pre-computed lookup table for years 1970-2150.
+#[inline]
+pub(crate) fn dragon_boat_date(year: i32) -> Option<Date> {
+    dragon_boat_date_for_year(year)
+        .and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
+}
+
+/// Tests whether a given date is the Dragon Boat Festival.
+///
+/// Returns `false` for years outside the supported range (1970-2150).
+#[inline]
+pub(crate) fn is_dragon_boat(date: Date) -> bool {
+    is_dragon_boat_date(date.year(), date.month() as u8, date.day())
+}
+
+/// Returns the Mid-Autumn Festival (中秋节) date for a given year, if available.
+///
+/// Celebrated on the 15th day of the 8th Chinese lunar month (typically mid
+/// September to early October). Uses a pre-computed lookup table for years
+/// 1970-2150.
+#[inline]
+pub(crate) fn mid_autumn_date(year: i32) -> Option<Date> {
+    mid_autumn_date_for_year(year)
+        .and_then(|(m, d)| Date::from_calendar_date(year, Month::try_from(m).ok()?, d).ok())
+}
+
+/// Tests whether a given date is the Mid-Autumn Festival.
+///
+/// Returns `false` for years outside the supported range (1970-2150).
+#[inline]
+pub(crate) fn is_mid_autumn(date: Date) -> bool {
+    is_mid_autumn_date(date.year(), date.month() as u8, date.day())
+}

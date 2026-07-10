@@ -61,6 +61,10 @@ fn test_vol_cube_serde_roundtrips_interpolation_mode_and_grid_state() {
     );
 
     let roundtrip: VolCube = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        roundtrip.interpolation_mode(),
+        VolInterpolationMode::TotalVariance
+    );
     assert_eq!(roundtrip.id(), cube.id());
     assert_eq!(roundtrip.expiries(), cube.expiries());
     assert_eq!(roundtrip.tenors(), cube.tenors());
@@ -70,6 +74,57 @@ fn test_vol_cube_serde_roundtrips_interpolation_mode_and_grid_state() {
 
     let serialized = serde_json::to_value(roundtrip).unwrap();
     assert_eq!(serialized["interpolation_mode"], "total_variance");
+}
+
+#[test]
+fn total_variance_mode_changes_off_expiry_interpolation() {
+    let p0 = SabrParams::new(0.02, 0.5, -0.2, 0.3).unwrap();
+    let p1 = SabrParams::new(0.10, 0.5, -0.2, 0.3).unwrap();
+    let base = VolCube::from_grid("MODE", &[1.0, 5.0], &[5.0], &[p0, p1], &[0.03, 0.03]).unwrap();
+    let total_variance = base
+        .clone()
+        .with_interpolation_mode(VolInterpolationMode::TotalVariance);
+
+    let direct = base.vol(3.0, 5.0, 0.03).unwrap();
+    let interpolated = total_variance.vol(3.0, 5.0, 0.03).unwrap();
+    assert!(
+        (direct - interpolated).abs() > 1e-6,
+        "interpolation modes must not be behaviorally identical"
+    );
+
+    let v1 = total_variance.vol(1.0, 5.0, 0.03).unwrap();
+    let v5 = total_variance.vol(5.0, 5.0, 0.03).unwrap();
+    let expected = ((0.5 * 1.0 * v1 * v1 + 0.5 * 5.0 * v5 * v5) / 3.0).sqrt();
+    assert!((interpolated - expected).abs() < 1e-12);
+}
+
+#[test]
+fn vol_cube_revalidates_public_sabr_fields() {
+    let invalid = SabrParams {
+        alpha: 0.03,
+        beta: 0.5,
+        rho: -0.2,
+        nu: 0.4,
+        shift: Some(f64::NAN),
+    };
+    assert!(VolCube::from_grid("BAD", &[1.0], &[5.0], &[invalid], &[0.03]).is_err());
+    assert!(VolCube::from_grid(
+        "BAD-EXPIRY",
+        &[0.0],
+        &[5.0],
+        &[SabrParams::new(0.03, 0.5, -0.2, 0.4).unwrap()],
+        &[0.03],
+    )
+    .is_err());
+}
+
+#[test]
+fn vol_cube_clamped_queries_propagate_non_finite_coordinates() {
+    let p = SabrParams::new(0.03, 0.5, -0.2, 0.4).unwrap();
+    let cube = VolCube::from_grid("FINITE", &[1.0], &[5.0], &[p], &[0.03]).unwrap();
+    assert!(cube.vol_clamped(f64::NAN, 5.0, 0.03).is_nan());
+    assert!(cube.vol_clamped(1.0, f64::NAN, 0.03).is_nan());
+    assert!(cube.vol_clamped(1.0, 5.0, f64::NAN).is_nan());
 }
 
 #[test]

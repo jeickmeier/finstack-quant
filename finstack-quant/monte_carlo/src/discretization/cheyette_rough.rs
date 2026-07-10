@@ -144,7 +144,12 @@ impl Discretization<CheyetteRoughVolProcess> for CheyetteRoughEuler {
         let y_t = work[0];
         let sigma_base = p.sigma_base_value(t);
         let exponent = 0.5 * eta * y_t - 0.25 * eta * eta * t.powf(two_h);
-        let sigma_t = (sigma_base * exponent.exp()).max(0.0);
+        let raw_sigma = sigma_base * exponent.exp();
+        let sigma_t = if raw_sigma.is_finite() {
+            raw_sigma.max(0.0)
+        } else {
+            raw_sigma
+        };
 
         // Correlate the rate noise with the Volterra driver: dW·dW̃ = ρ dt,
         // so the correlated rate normal is built from the

@@ -417,17 +417,23 @@ pub fn standard_normal_inv_cdf(p: f64) -> f64 {
 /// This is a thin wrapper around `statrs::distribution::StudentsT::cdf`.
 #[inline]
 pub fn student_t_cdf(x: f64, df: f64) -> f64 {
-    debug_assert!(df > 0.0, "student_t_cdf requires df > 0, got {df}");
+    try_student_t_cdf(x, df).unwrap_or(f64::NAN)
+}
 
-    use statrs::distribution::{ContinuousCDF, StudentsT};
-    // StudentsT::new(location=0, scale=1, df) for standard t-distribution
-    match StudentsT::new(0.0, 1.0, df) {
-        Ok(dist) => dist.cdf(x),
-        Err(_) => {
-            // Fallback for invalid df (should not happen with df > 0)
-            norm_cdf(x)
-        }
+/// Fallible Student-t cumulative distribution function.
+///
+/// # Errors
+/// Returns a validation error when `df` is non-finite or not strictly positive.
+pub fn try_student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
+    if !df.is_finite() || df <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "student_t_cdf requires finite df > 0, got {df}"
+        )));
     }
+    use statrs::distribution::{ContinuousCDF, StudentsT};
+    StudentsT::new(0.0, 1.0, df)
+        .map(|dist| dist.cdf(x))
+        .map_err(|err| crate::Error::Validation(format!("invalid Student-t parameters: {err}")))
 }
 
 /// Inverse Student-t cumulative distribution function.
@@ -467,21 +473,32 @@ pub fn student_t_cdf(x: f64, df: f64) -> f64 {
 ///
 /// This is a thin wrapper around `statrs::distribution::StudentsT::inverse_cdf`.
 pub fn student_t_inv_cdf(p: f64, df: f64) -> f64 {
-    debug_assert!(df > 0.0, "student_t_inv_cdf requires df > 0, got {df}");
+    try_student_t_inv_cdf(p, df).unwrap_or(f64::NAN)
+}
+
+/// Fallible inverse Student-t cumulative distribution function.
+///
+/// # Errors
+/// Returns a validation error when `df` is non-finite or not strictly positive.
+pub fn try_student_t_inv_cdf(p: f64, df: f64) -> crate::Result<f64> {
+    if !df.is_finite() || df <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "student_t_inv_cdf requires finite df > 0, got {df}"
+        )));
+    }
     if p.is_nan() {
-        return f64::NAN;
+        return Ok(f64::NAN);
     }
     if p <= 0.0 {
-        return f64::NEG_INFINITY;
+        return Ok(f64::NEG_INFINITY);
     }
     if p >= 1.0 {
-        return f64::INFINITY;
+        return Ok(f64::INFINITY);
     }
     use statrs::distribution::{ContinuousCDF, StudentsT};
-    match StudentsT::new(0.0, 1.0, df) {
-        Ok(dist) => dist.inverse_cdf(p),
-        Err(_) => standard_normal_inv_cdf(p),
-    }
+    StudentsT::new(0.0, 1.0, df)
+        .map(|dist| dist.inverse_cdf(p))
+        .map_err(|err| crate::Error::Validation(format!("invalid Student-t parameters: {err}")))
 }
 
 #[cfg(test)]
@@ -514,6 +531,16 @@ mod tests {
                 f64::INFINITY,
                 "df={df}"
             );
+        }
+    }
+
+    #[test]
+    fn invalid_student_t_df_is_consistent_across_build_profiles() {
+        for df in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(student_t_cdf(1.0, df).is_nan());
+            assert!(student_t_inv_cdf(0.95, df).is_nan());
+            assert!(try_student_t_cdf(1.0, df).is_err());
+            assert!(try_student_t_inv_cdf(0.95, df).is_err());
         }
     }
 

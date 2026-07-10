@@ -311,6 +311,11 @@ fn core_daycount_dts_exposes_context_for_context_dependent_conventions() {
         "yearFractionWithContext(startEpochDays: number, endEpochDays: number, ctx: DayCountContext): number;",
     ));
     assert!(dts.contains("DayCountContext: DayCountContextConstructor;"));
+    let day_count_ctor = interface_block(&dts, "DayCountConstructor");
+    assert!(contains_signature(
+        day_count_ctor,
+        "thirtyE360Isda(): DayCount;"
+    ));
 }
 
 #[test]
@@ -501,6 +506,12 @@ fn core_market_data_dts_exposes_vol_cube_normal_vol_queries() {
         cube,
         "volNormalClamped(expiry: number, tenor: number, strike: number): number;"
     ));
+    assert!(contains_signature(
+        cube,
+        "readonly interpolationMode: string;"
+    ));
+    let constructor = interface_block(&dts, "VolCubeConstructor");
+    assert!(constructor.contains("interpolationMode?: string"));
 }
 
 #[test]
@@ -558,6 +569,16 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
     assert!(contains_signature(
         ctx,
         "withCouponPeriod(startEpochDays: number, endEpochDays: number): DayCountContext;"
+    ));
+    assert!(contains_signature(
+        ctx,
+        "withEndIsTerminationDate(value: boolean): DayCountContext;"
+    ));
+
+    let fx = interface_block(&dts, "FxMatrix ");
+    assert!(contains_signature(
+        fx,
+        "setQuoteOn(base: string, quote: string, date: string, policy: FxConversionPolicy, rate: number): void;"
     ));
 }
 

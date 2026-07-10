@@ -351,14 +351,11 @@ fn parse_sabr_dict(dict: &Bound<'_, PyDict>, idx: usize) -> PyResult<SabrParams>
     let rho = get("rho")?;
     let nu = get("nu")?;
 
-    let mut params = SabrParams::new(alpha, beta, rho, nu).map_err(core_to_py)?;
-
-    if let Some(shift_obj) = dict.get_item("shift")? {
-        let shift: f64 = shift_obj.extract()?;
-        params = params.with_shift(shift);
-    }
-
-    Ok(params)
+    let shift = dict
+        .get_item("shift")?
+        .map(|value| value.extract::<f64>())
+        .transpose()?;
+    SabrParams::new_with_shift(alpha, beta, rho, nu, shift).map_err(core_to_py)
 }
 
 #[pymethods]
@@ -414,7 +411,8 @@ impl PyVolCube {
         self.inner.vol(expiry, tenor, strike).map_err(core_to_py)
     }
 
-    /// Implied volatility with clamped extrapolation.
+    /// Implied volatility with clamped extrapolation. Non-finite inputs return
+    /// ``NaN`` rather than being silently mapped to a grid edge.
     #[pyo3(text_signature = "(self, expiry, tenor, strike)")]
     fn vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_clamped(expiry, tenor, strike)
@@ -443,8 +441,9 @@ impl PyVolCube {
     /// Normal (Bachelier) implied volatility with clamped extrapolation.
     ///
     /// Expiry and tenor are clamped to the grid edges; a degenerate expansion
-    /// is floored to a small positive normal vol (absolute rate units). Never
-    /// raises and never returns a non-finite or non-positive value.
+    /// is floored to a small positive normal vol (absolute rate units).
+    /// Non-finite inputs return ``NaN`` rather than being silently mapped to a
+    /// grid edge.
     #[pyo3(text_signature = "(self, expiry, tenor, strike)")]
     fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_normal_clamped(expiry, tenor, strike)
@@ -534,6 +533,15 @@ impl PyVolCube {
     #[getter]
     fn grid_shape(&self) -> (usize, usize) {
         self.inner.grid_shape()
+    }
+
+    /// Interpolation contract (``"vol"`` or ``"total_variance"``).
+    #[getter]
+    fn interpolation_mode(&self) -> &'static str {
+        match self.inner.interpolation_mode() {
+            VolInterpolationMode::Vol => "vol",
+            VolInterpolationMode::TotalVariance => "total_variance",
+        }
     }
 
     fn __repr__(&self) -> String {

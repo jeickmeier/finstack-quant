@@ -133,6 +133,7 @@ export interface DayCountConstructor {
   act365f(): DayCount;
   thirty360(): DayCount;
   thirtyE360(): DayCount;
+  thirtyE360Isda(): DayCount;
   actAct(): DayCount;
   actActIsma(): DayCount;
   bus252(): DayCount;
@@ -144,6 +145,7 @@ export interface DayCountContext {
   withBusBasis(busBasis: number): DayCountContext;
   /** Reference coupon period (epoch days) for Act/Act ICMA. */
   withCouponPeriod(startEpochDays: number, endEpochDays: number): DayCountContext;
+  withEndIsTerminationDate(value: boolean): DayCountContext;
 }
 
 export interface DayCountContextConstructor {
@@ -205,6 +207,7 @@ export interface ForwardCurveConstructor {
 
 export interface VolCube {
   readonly id: string;
+  readonly interpolationMode: string;
   vol(expiry: number, tenor: number, strike: number): number;
   volClamped(expiry: number, tenor: number, strike: number): number;
   /**
@@ -215,8 +218,8 @@ export interface VolCube {
    */
   volNormal(expiry: number, tenor: number, strike: number): number;
   /**
-   * Normal (Bachelier) implied vol with clamped extrapolation; never
-   * throws and never returns a non-finite or non-positive value.
+   * Normal (Bachelier) implied vol with clamped extrapolation. Non-finite
+   * inputs return NaN rather than being silently clamped to an edge.
    */
   volNormalClamped(expiry: number, tenor: number, strike: number): number;
 }
@@ -227,7 +230,8 @@ export interface VolCubeConstructor {
     expiries: number[],
     tenors: number[],
     paramsFlat: number[],
-    forwards: number[]
+    forwards: number[],
+    interpolationMode?: string
   ): VolCube;
 }
 
@@ -255,6 +259,7 @@ export interface FxRateResultConstructor {
 
 export interface FxMatrix {
   setQuote(base: string, quote: string, rate: number): void;
+  setQuoteOn(base: string, quote: string, date: string, policy: FxConversionPolicy, rate: number): void;
   rate(base: string, quote: string, date: string, policy?: FxConversionPolicy): FxRateResult;
 }
 

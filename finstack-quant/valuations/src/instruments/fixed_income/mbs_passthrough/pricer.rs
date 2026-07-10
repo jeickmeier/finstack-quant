@@ -5,10 +5,11 @@
 //!
 //! # SIFMA Settlement
 //!
-//! TBA-eligible agency MBS settle on SIFMA Good Delivery dates (third Wednesday
-//! of each month). The [`sifma_settlement_for_period`] helper derives the SIFMA
-//! settlement date for a given accrual period, useful for aligning TBA trade
-//! settlement and pool allocation.
+//! TBA-eligible agency MBS settle on published SIFMA Good Delivery dates. The
+//! [`sifma_settlement_for_period`] helper uses an exact embedded date when
+//! available and an explicitly approximate nth-weekday date for long-dated
+//! projected cash flows. Operational trade settlement must use the published
+//! calendar, not the projection estimate.
 
 use super::AgencyMbsPassthrough;
 use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule};
@@ -28,7 +29,7 @@ pub struct MbsCashflow {
     pub period_end: Date,
     /// Actual payment date (after delay)
     pub payment_date: Date,
-    /// SIFMA Good Delivery settlement date for this period.
+    /// SIFMA Good Delivery date, estimated outside published calendar coverage.
     pub sifma_date: Date,
     /// Scheduled principal payment
     pub scheduled_principal: f64,
@@ -48,14 +49,19 @@ pub struct MbsCashflow {
 
 /// Derive the SIFMA Good Delivery settlement date for a given accrual period.
 pub(crate) fn sifma_settlement_for_period(period_end: Date) -> Result<Date> {
-    finstack_quant_core::dates::sifma_settlement_date(period_end.month(), period_end.year())
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "No published SIFMA settlement date for {:02}/{}",
-                period_end.month() as u8,
-                period_end.year()
-            ))
-        })
+    use finstack_quant_core::dates::{
+        estimated_sifma_settlement_date_for_class, sifma_settlement_date, SifmaSettlementClass,
+    };
+
+    Ok(
+        sifma_settlement_date(period_end.month(), period_end.year()).unwrap_or_else(|| {
+            estimated_sifma_settlement_date_for_class(
+                period_end.month(),
+                period_end.year(),
+                SifmaSettlementClass::B,
+            )
+        }),
+    )
 }
 
 /// Generate projected cashflows for an agency MBS.

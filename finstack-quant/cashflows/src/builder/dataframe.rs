@@ -532,6 +532,7 @@ impl CashFlowSchedule {
             frequency: options.frequency,
             bus_basis: None,
             coupon_period: None,
+            end_is_termination_date: false,
         };
         let disc_dc_ctx = dc_ctx;
         let fwd_dc_ctx = dc_ctx;

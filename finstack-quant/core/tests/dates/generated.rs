@@ -3,7 +3,7 @@
 //! These tests validate that build-time generated calendars are exposed through the
 //! public `finstack_quant_core::dates` API (without relying on internal bitset helpers).
 
-use finstack_quant_core::dates::calendar::{TARGET2, USNY};
+use finstack_quant_core::dates::calendar::{SSE, TARGET2, USNY};
 use finstack_quant_core::dates::{CalendarRegistry, Date, HolidayCalendar};
 use time::Month;
 
@@ -20,6 +20,23 @@ fn generated_calendar_constants_exist_and_work() {
     // Weekends are never business days (trait default)
     let sat = make_date(2025, 1, 4);
     assert!(!USNY.is_business_day(sat));
+}
+
+#[test]
+fn sse_published_2024_2025_closures_are_embedded() {
+    for date in [
+        make_date(2024, 2, 9),
+        make_date(2024, 4, 5),
+        make_date(2024, 6, 10),
+        make_date(2024, 9, 16),
+        make_date(2024, 9, 17),
+        make_date(2025, 1, 28),
+        make_date(2025, 6, 2),
+        make_date(2025, 10, 8),
+    ] {
+        assert!(SSE.is_holiday(date), "missing SSE closure {date}");
+        assert!(!SSE.is_business_day(date), "SSE should be closed {date}");
+    }
 }
 
 #[test]

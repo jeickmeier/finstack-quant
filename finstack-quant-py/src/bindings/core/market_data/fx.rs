@@ -22,6 +22,18 @@ fn parse_fx_policy(s: &str) -> PyResult<FxConversionPolicy> {
         .map_err(|e| crate::errors::value_error(format!("Invalid FxConversionPolicy {s:?}: {e}")))
 }
 
+fn extract_fx_policy(value: &Bound<'_, PyAny>) -> PyResult<FxConversionPolicy> {
+    if let Ok(wrapper) = value.extract::<PyRef<'_, PyFxConversionPolicy>>() {
+        Ok(wrapper.inner)
+    } else if let Ok(s) = value.extract::<String>() {
+        parse_fx_policy(&s)
+    } else {
+        Err(crate::errors::value_error(
+            "policy must be FxConversionPolicy or str",
+        ))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // PyFxConversionPolicy
 // ---------------------------------------------------------------------------
@@ -184,6 +196,25 @@ impl PyFxMatrix {
         Ok(())
     }
 
+    /// Set an authoritative FX quote scoped to one date and policy.
+    #[pyo3(text_signature = "(self, base, quote, date, policy, rate)")]
+    fn set_quote_on(
+        &self,
+        base: &Bound<'_, PyAny>,
+        quote: &Bound<'_, PyAny>,
+        date: &Bound<'_, PyAny>,
+        policy: &Bound<'_, PyAny>,
+        rate: f64,
+    ) -> PyResult<()> {
+        let base_ccy = extract_currency(base)?;
+        let quote_ccy = extract_currency(quote)?;
+        let date = py_to_date(date)?;
+        let policy = extract_fx_policy(policy)?;
+        self.inner
+            .set_quote_on(base_ccy, quote_ccy, date, policy, rate)
+            .map_err(core_to_py)
+    }
+
     /// Look up an FX rate.
     ///
     /// Parameters
@@ -213,17 +244,7 @@ impl PyFxMatrix {
         let quote_ccy = extract_currency(quote)?;
         let d = py_to_date(date)?;
         let pol = match policy {
-            Some(p) => {
-                if let Ok(wrapper) = p.extract::<PyRef<'_, PyFxConversionPolicy>>() {
-                    wrapper.inner
-                } else if let Ok(s) = p.extract::<String>() {
-                    parse_fx_policy(&s)?
-                } else {
-                    return Err(crate::errors::value_error(
-                        "policy must be FxConversionPolicy or str",
-                    ));
-                }
-            }
+            Some(p) => extract_fx_policy(p)?,
             None => FxConversionPolicy::CashflowDate,
         };
 

@@ -96,7 +96,7 @@ impl TimeGrid {
     /// # }
     /// ```
     pub fn uniform(t_max: f64, num_steps: usize) -> Result<Self> {
-        if t_max <= 0.0 {
+        if !t_max.is_finite() || t_max <= 0.0 {
             return Err(crate::error::InputError::Invalid.into());
         }
         if num_steps == 0 {
@@ -428,6 +428,13 @@ mod tests {
                 t_max.to_bits(),
                 "t_max = {t_max}, n = {n}"
             );
+        }
+    }
+
+    #[test]
+    fn test_uniform_rejects_non_finite_horizons() {
+        for t_max in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(TimeGrid::uniform(t_max, 4).is_err());
         }
     }
 

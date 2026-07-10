@@ -1,5 +1,7 @@
 //! Python bindings for [`finstack_quant_core::money::Money`].
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 use finstack_quant_core::currency::Currency;
@@ -167,7 +169,7 @@ impl PyMoney {
     fn __repr__(&self) -> String {
         format!(
             "Money({}, '{}')",
-            self.inner.amount(),
+            self.inner.amount_decimal(),
             self.inner.currency()
         )
     }
@@ -177,11 +179,12 @@ impl PyMoney {
         self.inner.to_string()
     }
 
-    /// Hash combining the amount bits and currency numeric code.
+    /// Hash combining the exact Decimal amount and currency.
     fn __hash__(&self) -> isize {
-        let bits = self.inner.amount().to_bits() as i64;
-        let code = i64::from(self.inner.currency().numeric());
-        (bits.rotate_left(17) ^ code) as isize
+        let mut hasher = DefaultHasher::new();
+        self.inner.amount_decimal().hash(&mut hasher);
+        self.inner.currency().hash(&mut hasher);
+        hasher.finish() as isize
     }
 
     /// Rich comparison; ordering requires matching currencies.
@@ -203,11 +206,7 @@ impl PyMoney {
                         "cannot order Money values with different currencies",
                     ));
                 }
-                let ord = self
-                    .inner
-                    .amount()
-                    .partial_cmp(&rhs.inner.amount())
-                    .ok_or_else(|| crate::errors::value_error("non-comparable Money amounts"))?;
+                let ord = self.inner.amount_decimal().cmp(&rhs.inner.amount_decimal());
                 Ok(op.matches(ord).into_py_any(py)?)
             }
         }

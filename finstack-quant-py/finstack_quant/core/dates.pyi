@@ -80,6 +80,8 @@ class DayCount:
     """30/360 US (Bond Basis)."""
     THIRTY_E_360: DayCount
     """30E/360 (Eurobond Basis)."""
+    THIRTY_E_360_ISDA: DayCount
+    """30E/360 ISDA."""
     ACT_ACT: DayCount
     """Actual/Actual (ISDA)."""
     ACT_ACT_ISMA: DayCount
@@ -215,6 +217,7 @@ class DayCountContext:
         frequency: Optional[Tenor] = None,
         bus_basis: Optional[int] = None,
         coupon_period: Optional[tuple[datetime.date, datetime.date]] = None,
+        end_is_termination_date: bool = False,
     ) -> None:
         """Create a day-count context.
 
@@ -228,6 +231,8 @@ class DayCountContext:
             Custom business-day divisor.
         coupon_period : tuple[datetime.date, datetime.date] | None
             Reference coupon period ``(start, end)`` for ACT/ACT (ICMA).
+        end_is_termination_date : bool
+            Whether the accrual end is the instrument termination date.
         """
         ...
 
@@ -271,6 +276,11 @@ class DayCountContext:
         """
         ...
 
+    @property
+    def end_is_termination_date(self) -> bool:
+        """Whether the accrual end is the instrument termination date."""
+        ...
+
     def to_state(self) -> DayCountContextState:
         """Convert to a serializable state snapshot.
 
@@ -301,6 +311,7 @@ class DayCountContextState:
         frequency: Optional[Tenor] = None,
         bus_basis: Optional[int] = None,
         coupon_period: Optional[tuple[datetime.date, datetime.date]] = None,
+        end_is_termination_date: bool = False,
     ) -> None:
         """Create a context state.
 
@@ -314,6 +325,8 @@ class DayCountContextState:
             Custom business-day divisor.
         coupon_period : tuple[datetime.date, datetime.date] | None
             Reference coupon period ``(start, end)``.
+        end_is_termination_date : bool
+            Whether the accrual end is the instrument termination date.
         """
         ...
 
@@ -364,6 +377,11 @@ class DayCountContextState:
         -------
         tuple[datetime.date, datetime.date] | None
         """
+        ...
+
+    @property
+    def end_is_termination_date(self) -> bool:
+        """Whether the accrual end is the instrument termination date."""
         ...
 
     def __repr__(self) -> str: ...

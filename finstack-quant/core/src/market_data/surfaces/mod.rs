@@ -193,6 +193,10 @@ pub(crate) fn interp_linear_clamp(xs: &[f64], ys: &[f64], x: f64) -> f64 {
     debug_assert!(!xs.is_empty());
     debug_assert_eq!(xs.len(), ys.len());
 
+    if !x.is_finite() {
+        return f64::NAN;
+    }
+
     if x <= xs[0] {
         return ys[0];
     }

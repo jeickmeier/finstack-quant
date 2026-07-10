@@ -62,3 +62,27 @@ def test_materialize_normal_slices_return_vol_surfaces() -> None:
     assert tenor_slice.value_clamped(1.0, FORWARD) == pytest.approx(
         cube.vol_normal_clamped(1.0, 2.0, FORWARD), rel=1e-9
     )
+
+
+def test_interpolation_mode_is_exposed_and_changes_expiry_interpolation() -> None:
+    expiries = [1.0, 5.0]
+    tenors = [2.0, 10.0]
+    params = [
+        {"alpha": 0.15, "beta": 1.0, "rho": -0.2, "nu": 0.4},
+        {"alpha": 0.15, "beta": 1.0, "rho": -0.2, "nu": 0.4},
+        {"alpha": 0.35, "beta": 1.0, "rho": -0.2, "nu": 0.4},
+        {"alpha": 0.35, "beta": 1.0, "rho": -0.2, "nu": 0.4},
+    ]
+    forwards = [FORWARD] * 4
+    vol_cube = VolCube("VOL", expiries, tenors, params, forwards, "vol")
+    variance_cube = VolCube("VAR", expiries, tenors, params, forwards, "total_variance")
+
+    assert vol_cube.interpolation_mode == "vol"
+    assert variance_cube.interpolation_mode == "total_variance"
+    assert vol_cube.vol(3.0, 2.0, FORWARD) != pytest.approx(variance_cube.vol(3.0, 2.0, FORWARD))
+
+
+def test_non_finite_sabr_shift_is_rejected() -> None:
+    params = [{"alpha": 0.2, "beta": 1.0, "rho": -0.2, "nu": 0.4, "shift": math.inf}]
+    with pytest.raises(ValueError, match="shift"):
+        VolCube("BAD-SHIFT", [1.0], [2.0], params, [FORWARD])

@@ -166,7 +166,7 @@ impl MigrationSimulator {
     ///
     /// Returns [`MigrationError::InvalidHorizon`] if `horizon <= 0`.
     pub fn new(generator: GeneratorMatrix, horizon: f64) -> Result<Self, MigrationError> {
-        if horizon <= 0.0 {
+        if !horizon.is_finite() || horizon <= 0.0 {
             return Err(MigrationError::InvalidHorizon(horizon));
         }
         Ok(Self { generator, horizon })

@@ -270,6 +270,7 @@ fn actact_isma_requires_frequency() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
     assert!(
         dc.year_fraction(d(2025, 1, 1), d(2025, 7, 1), ctx_no_freq)
@@ -288,6 +289,7 @@ fn actact_isma_with_semi_annual_frequency() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
     let yf = dc
         .year_fraction(d(2025, 1, 1), d(2025, 7, 1), ctx_with_freq)
@@ -311,6 +313,7 @@ fn actact_isma_with_quarterly_frequency() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let yf = dc.year_fraction(d(2025, 1, 1), d(2025, 4, 1), ctx).unwrap();
@@ -350,6 +353,7 @@ fn actact_isma_golden_value_semi_annual_regular_period() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let yf = dc
@@ -376,6 +380,7 @@ fn actact_isma_golden_value_quarterly_regular_period() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let yf = dc
@@ -400,6 +405,7 @@ fn actact_isma_golden_value_annual_regular_period() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let yf = dc
@@ -431,6 +437,7 @@ fn actact_isma_stub_period_shorter_than_regular() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let yf = dc
@@ -468,6 +475,7 @@ fn actact_isda_no_frequency_required() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     // Should work without frequency
@@ -520,6 +528,7 @@ fn zero_length_period_all_conventions() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let conventions = [

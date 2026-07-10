@@ -62,6 +62,8 @@ mod serde_tests {
             Rule::ChineseNewYear,
             Rule::QingMing,
             Rule::BuddhasBirthday,
+            Rule::DragonBoat,
+            Rule::MidAutumn,
             // Japanese equinox rules
             Rule::VernalEquinoxJP,
             Rule::AutumnalEquinoxJP,
@@ -130,6 +132,8 @@ mod serde_tests {
                 (Rule::ChineseNewYear, Rule::ChineseNewYear)
                 | (Rule::QingMing, Rule::QingMing)
                 | (Rule::BuddhasBirthday, Rule::BuddhasBirthday)
+                | (Rule::DragonBoat, Rule::DragonBoat)
+                | (Rule::MidAutumn, Rule::MidAutumn)
                 | (Rule::VernalEquinoxJP, Rule::VernalEquinoxJP)
                 | (Rule::AutumnalEquinoxJP, Rule::AutumnalEquinoxJP) => {}
                 _ => panic!("Rule variant mismatch"),

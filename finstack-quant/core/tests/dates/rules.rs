@@ -554,6 +554,7 @@ fn span_len2_cross_year() {
     let rules: &[Rule] = &[Rule::Span {
         start: &DEC31,
         len: 2,
+        offset: 0,
     }];
 
     let dec31 = Date::from_calendar_date(2024, Month::December, 31).unwrap();
@@ -570,6 +571,7 @@ fn span_len3_cross_year() {
     let rules: &[Rule] = &[Rule::Span {
         start: &DEC31,
         len: 3,
+        offset: 0,
     }];
 
     let dec31 = Date::from_calendar_date(2024, Month::December, 31).unwrap();

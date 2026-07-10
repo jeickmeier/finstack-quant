@@ -86,7 +86,7 @@
 //!
 //! // Calculate year fraction with a calendar in context
 //! let yf = DayCount::Bus252
-//!     .year_fraction(start, end, DayCountContext { calendar: Some(&calendar), frequency: None, bus_basis: None, coupon_period: None })
+//!     .year_fraction(start, end, DayCountContext { calendar: Some(&calendar), ..DayCountContext::default() })
 //!     .expect("Year fraction calculation should succeed");
 //! ```
 //!
@@ -113,7 +113,7 @@
 //! // Returns year fractions: a full 6-month regular period = 0.5 years
 //! let freq = Tenor::semi_annual(); // Semi-annual
 //! let yf_isma = DayCount::ActActIsma
-//!     .year_fraction(start, end, DayCountContext { calendar: None, frequency: Some(freq), bus_basis: None, coupon_period: None })
+//!     .year_fraction(start, end, DayCountContext { frequency: Some(freq), ..DayCountContext::default() })
 //!     .expect("Year fraction calculation should succeed");
 //! // yf_isma ≈ 0.5 (one full semi-annual period in years)
 //! ```
@@ -149,6 +149,10 @@ pub struct DayCountContext<'a> {
     /// correct accrued interest calculations on mid-coupon dates or
     /// irregular first/last coupons.
     pub coupon_period: Option<(Date, Date)>,
+    /// Whether `end` is the instrument termination date.
+    ///
+    /// Required by 30E/360 ISDA for its end-of-February termination exception.
+    pub end_is_termination_date: bool,
 }
 
 impl<'a> std::fmt::Debug for DayCountContext<'a> {
@@ -158,6 +162,7 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
             .field("frequency", &self.frequency)
             .field("bus_basis", &self.bus_basis)
             .field("coupon_period", &self.coupon_period)
+            .field("end_is_termination_date", &self.end_is_termination_date)
             .finish()
     }
 }
@@ -178,12 +183,14 @@ pub struct DayCountContextState {
     /// serialized as two ISO dates.
     ///
     /// Previously this field was silently dropped on serialization, downgrading
-    /// exact ICMA accrual to the drifting frequency-only path on round-trip
-    /// . The `#[serde(default)]`
-    /// keeps the addition wire-compatible: payloads written before this field
-    /// existed deserialize with `None`.
+    /// exact ICMA accrual to the drifting frequency-only path on round-trip.
+    /// The `#[serde(default)]` keeps the addition wire-compatible: payloads
+    /// written before this field existed deserialize with `None`.
     #[serde(default)]
     pub coupon_period: Option<(Date, Date)>,
+    /// Whether the accrual end is the instrument termination date.
+    #[serde(default)]
+    pub end_is_termination_date: bool,
 }
 
 impl DayCountContextState {
@@ -198,6 +205,7 @@ impl DayCountContextState {
             frequency: self.frequency,
             bus_basis: self.bus_basis,
             coupon_period: self.coupon_period,
+            end_is_termination_date: self.end_is_termination_date,
         }
     }
 }
@@ -212,6 +220,7 @@ impl<'a> From<DayCountContext<'a>> for DayCountContextState {
             frequency: value.frequency,
             bus_basis: value.bus_basis,
             coupon_period: value.coupon_period,
+            end_is_termination_date: value.end_is_termination_date,
         }
     }
 }
@@ -482,10 +491,8 @@ pub enum DayCount {
     ///
     /// ISDA §4.16(h) keeps D₂ unadjusted when the period ends on the
     /// termination date and that date is the last day of February. Because
-    /// [`DayCountContext`] carries no termination flag, this enum variant
-    /// always applies the end-of-February rule (i.e. treats `end` as a
-    /// non-terminal coupon date). For the final period to maturity, use
-    /// [`days_30e_360_isda`] with `end_is_termination_date = true`.
+    /// Set [`DayCountContext::end_is_termination_date`] for the final period
+    /// to maturity; ordinary coupon periods leave it false.
     ///
     /// # Examples
     ///
@@ -761,7 +768,9 @@ impl DayCount {
             DayCount::ThirtyE360 => {
                 Ok(days_30_360(start, end, Thirty360Convention::European) as f64 / 360.0)
             }
-            DayCount::ThirtyE360Isda => Ok(f64::from(days_30e_360_isda(start, end, false)) / 360.0),
+            DayCount::ThirtyE360Isda => {
+                Ok(f64::from(days_30e_360_isda(start, end, ctx.end_is_termination_date)) / 360.0)
+            }
             DayCount::Nl365 => Ok(year_fraction_nl_365(start, end)),
             DayCount::ActAct => year_fraction_act_act_isda(start, end),
             DayCount::ActActIsma => year_fraction_act_act_isma_with_ctx(start, end, ctx),
@@ -1125,8 +1134,8 @@ fn is_last_day_of_month(date: Date) -> bool {
 /// The termination-date exception means the final accrual period of an
 /// instrument maturing on the last day of February keeps the actual day
 /// number (28/29); pass `end_is_termination_date = true` for that period.
-/// [`DayCount::ThirtyE360Isda`] always passes `false` because
-/// [`DayCountContext`] carries no termination flag.
+/// [`DayCount::ThirtyE360Isda`] receives this flag from
+/// [`DayCountContext::end_is_termination_date`].
 ///
 /// Precondition: `start <= end`. If violated, the returned value will be
 /// negative. This helper is panic-free and allocation-free.
@@ -1763,13 +1772,25 @@ mod tests {
         assert_eq!(days_30e_360_isda(start, end, false), 32);
         assert_eq!(days_30e_360_isda(start, end, true), 30);
 
-        // The enum variant routes through the non-termination form.
+        // The enum variant routes through context for the termination form.
         let start = date!(2011 - 08 - 31);
         let end = date!(2012 - 02 - 29);
         let yf = DayCount::ThirtyE360Isda
             .year_fraction(start, end, DayCountContext::default())
             .expect("should succeed");
         assert_eq!(yf, 180.0 / 360.0);
+
+        let terminal_yf = DayCount::ThirtyE360Isda
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    end_is_termination_date: true,
+                    ..DayCountContext::default()
+                },
+            )
+            .expect("termination-period day count should succeed");
+        assert_eq!(terminal_yf, 179.0 / 360.0);
     }
 
     #[test]

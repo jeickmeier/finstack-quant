@@ -462,6 +462,37 @@ mod term_structure_tests {
     }
 
     #[test]
+    fn non_finite_and_out_of_range_pds_fail_before_interpolation() {
+        for pd in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                PdTermStructureBuilder::new()
+                    .with_cumulative_pds(&[(1.0, pd)])
+                    .build(),
+                Err(PdCalibrationError::NonFiniteValue { .. })
+            ));
+        }
+        for pd in [-0.01, 1.01] {
+            assert!(matches!(
+                PdTermStructureBuilder::new()
+                    .with_cumulative_pds(&[(1.0, pd)])
+                    .build(),
+                Err(PdCalibrationError::ValueOutOfRange { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn non_finite_query_times_propagate_nan_without_panicking() {
+        let ts = PdTermStructureBuilder::new()
+            .with_cumulative_pds(&[(1.0, 0.01), (3.0, 0.03)])
+            .build()
+            .unwrap();
+        assert!(ts.cumulative_pd(f64::NAN).is_nan());
+        assert!(ts.hazard_rate(f64::NAN).is_nan());
+        assert!(ts.marginal_pd(1.0, f64::NAN).is_nan());
+    }
+
+    #[test]
     fn accessors() {
         let ts = PdTermStructureBuilder::new()
             .with_cumulative_pds(&[(1.0, 0.01), (3.0, 0.03)])

@@ -143,6 +143,7 @@ fn actact_isma_with_annual_frequency() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     // Full year with annual frequency should be 1.0
@@ -165,6 +166,7 @@ fn actact_isma_requires_frequency() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let result = dc.year_fraction(d(2025, 1, 1), d(2025, 7, 1), ctx_no_freq);
@@ -182,6 +184,7 @@ fn actact_isma_with_semi_annual_frequency() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     // 6-month period with semi-annual frequency
@@ -205,6 +208,7 @@ fn actact_isma_with_quarterly_frequency() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     // 3-month period with quarterly frequency
@@ -372,6 +376,7 @@ fn zero_length_period_all_conventions() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let conventions = [

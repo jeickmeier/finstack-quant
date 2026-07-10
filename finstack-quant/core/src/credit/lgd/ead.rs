@@ -81,6 +81,9 @@ impl EadCalculator {
     ///
     /// Returns an error if `drawn < 0` or `undrawn < 0`.
     pub fn new(drawn: f64, undrawn: f64, ccf: CreditConversionFactor) -> Result<Self> {
+        if !drawn.is_finite() || !undrawn.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
         if drawn < 0.0 || undrawn < 0.0 {
             return Err(InputError::NegativeValue.into());
         }
@@ -220,6 +223,10 @@ mod tests {
         assert!(EadCalculator::new(-1.0, 40.0, CreditConversionFactor::full_draw()).is_err());
         assert!(EadCalculator::new(60.0, -1.0, CreditConversionFactor::full_draw()).is_err());
         assert!(EadCalculator::term_loan(-1.0).is_err());
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(EadCalculator::new(bad, 40.0, CreditConversionFactor::full_draw()).is_err());
+            assert!(EadCalculator::new(60.0, bad, CreditConversionFactor::full_draw()).is_err());
+        }
     }
 
     #[test]

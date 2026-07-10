@@ -111,9 +111,10 @@ pub mod fx;
 pub use tenor::{Tenor, TenorUnit};
 
 pub use imm::{
-    imm_option_expiry, is_cds_date, is_imm_date, next_cds_date, next_equity_option_expiry,
-    next_imm, next_imm_option_expiry, next_sifma_settlement, prev_cds_date, sifma_settlement_date,
-    sifma_settlement_date_for_class, third_friday, third_wednesday, SifmaSettlementClass,
+    estimated_sifma_settlement_date_for_class, imm_option_expiry, is_cds_date, is_imm_date,
+    next_cds_date, next_equity_option_expiry, next_imm, next_imm_option_expiry,
+    next_sifma_settlement, prev_cds_date, sifma_settlement_date, sifma_settlement_date_for_class,
+    third_friday, third_wednesday, SifmaSettlementClass,
 };
 
 pub mod calendar;

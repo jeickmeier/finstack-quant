@@ -92,13 +92,13 @@ impl DownturnLgd {
         lgd_sensitivity: f64,
         stress_quantile: f64,
     ) -> Result<Self> {
-        if asset_correlation <= 0.0 || asset_correlation >= 1.0 {
+        if !asset_correlation.is_finite() || asset_correlation <= 0.0 || asset_correlation >= 1.0 {
             return Err(InputError::Invalid.into());
         }
-        if lgd_sensitivity < 0.0 {
+        if !lgd_sensitivity.is_finite() || lgd_sensitivity < 0.0 {
             return Err(InputError::NegativeValue.into());
         }
-        if stress_quantile <= 0.0 || stress_quantile >= 1.0 {
+        if !stress_quantile.is_finite() || stress_quantile <= 0.0 || stress_quantile >= 1.0 {
             return Err(InputError::Invalid.into());
         }
         Ok(Self {
@@ -116,10 +116,10 @@ impl DownturnLgd {
     ///
     /// Returns an error if `add_on < 0`, `floor < 0`, or `floor > 1`.
     pub fn regulatory_floor(add_on: f64, floor: f64) -> Result<Self> {
-        if add_on < 0.0 {
+        if !add_on.is_finite() || add_on < 0.0 {
             return Err(InputError::NegativeValue.into());
         }
-        if !(0.0..=1.0).contains(&floor) {
+        if !floor.is_finite() || !(0.0..=1.0).contains(&floor) {
             return Err(InputError::Invalid.into());
         }
         Ok(Self {
@@ -164,7 +164,7 @@ impl DownturnLgd {
     ///
     /// Returns an error if `base_lgd` is not in \[0, 1\].
     pub fn adjust(&self, base_lgd: f64) -> Result<f64> {
-        if !(0.0..=1.0).contains(&base_lgd) {
+        if !base_lgd.is_finite() || !(0.0..=1.0).contains(&base_lgd) {
             return Err(InputError::Invalid.into());
         }
         let adjusted = match self.method {
@@ -282,6 +282,13 @@ mod tests {
         // regulatory floor: floor out of range
         assert!(DownturnLgd::regulatory_floor(0.05, -0.1).is_err());
         assert!(DownturnLgd::regulatory_floor(0.05, 1.1).is_err());
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(DownturnLgd::frye_jacobs(bad, 0.4, 0.999).is_err());
+            assert!(DownturnLgd::frye_jacobs(0.15, bad, 0.999).is_err());
+            assert!(DownturnLgd::frye_jacobs(0.15, 0.4, bad).is_err());
+            assert!(DownturnLgd::regulatory_floor(bad, 0.25).is_err());
+            assert!(DownturnLgd::regulatory_floor(0.05, bad).is_err());
+        }
     }
 
     #[test]
@@ -289,6 +296,7 @@ mod tests {
         let dt = DownturnLgd::frye_jacobs(0.15, 0.4, 0.999).expect("valid");
         assert!(dt.adjust(-0.1).is_err());
         assert!(dt.adjust(1.1).is_err());
+        assert!(dt.adjust(f64::NAN).is_err());
     }
 
     #[test]

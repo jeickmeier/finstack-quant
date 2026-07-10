@@ -39,6 +39,64 @@ proptest! {
     }
 }
 
+#[test]
+fn to_forward_curve_uses_requested_simple_tenor() {
+    let rate = 0.05_f64;
+    let curve = DiscountCurve::builder("FLAT-CC")
+        .base_date(sample_base_date())
+        .knots([
+            (0.0, 1.0),
+            (1.0, (-rate).exp()),
+            (2.0, (-2.0 * rate).exp()),
+            (5.0, (-5.0 * rate).exp()),
+        ])
+        .interp(InterpStyle::LogLinear)
+        .build()
+        .unwrap();
+
+    for tenor in [0.25, 2.0] {
+        let forwards = curve
+            .to_forward_curve(format!("FWD-{tenor}"), tenor, None)
+            .unwrap();
+        let expected = ((rate * tenor).exp() - 1.0) / tenor;
+        for t in [0.0, 1.0, 2.0] {
+            assert!(
+                (forwards.rate(t) - expected).abs() < 1e-12,
+                "tenor={tenor}, t={t}: actual={}, expected={expected}",
+                forwards.rate(t)
+            );
+        }
+    }
+}
+
+#[test]
+fn to_forward_curve_rejects_invalid_tenor() {
+    let curve = sample_discount_curve("INVALID-TENOR");
+    for tenor in [0.0, -0.25, f64::NAN, f64::INFINITY] {
+        assert!(curve.to_forward_curve("INVALID", tenor, None).is_err());
+    }
+}
+
+#[test]
+fn date_discounting_supports_dates_before_curve_base() {
+    let base = sample_base_date();
+    let curve = DiscountCurve::builder("SPOT-BASED")
+        .base_date(base)
+        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.90)])
+        .build()
+        .unwrap();
+    let before = base - time::Duration::days(30);
+    let after = base + time::Duration::days(30);
+
+    let forward = curve.df_between_dates(before, after).unwrap();
+    let backward = curve.df_between_dates(after, before).unwrap();
+    assert!((forward * backward - 1.0).abs() < 1e-12);
+
+    let via_base = curve.df_between_dates(before, base).unwrap()
+        * curve.df_between_dates(base, after).unwrap();
+    assert!((forward - via_base).abs() < 1e-12);
+}
+
 // =============================================================================
 // Builder Validation Tests
 // =============================================================================

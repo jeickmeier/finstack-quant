@@ -283,14 +283,13 @@ impl BuilderInternal {
         buf.push(self.start);
         let mut i = 1;
         loop {
-            // Alignment with `end` is judged on the raw (un-snapped) roll so
-            // that `StubKind::None` still accepts schedules whose endpoints
-            // are not month-ends. Under the EOM convention the effective roll
-            // is the month-end snap, so an `end` anywhere in `(raw, snapped]`
-            // (e.g. the last business day of the roll month) is also aligned.
+            // StubKind::None requires exact contractual alignment with the raw
+            // tenor roll. EOM only adjusts intermediate generated dates; it
+            // must not turn an arbitrary maturity before month-end into an
+            // undeclared final stub.
             let raw = self.nth_tenor(self.start, i)?;
             let snapped = maybe_eom(self.eom, raw);
-            if raw == self.end || (raw < self.end && self.end <= snapped) {
+            if raw == self.end {
                 push_if_new(&mut buf, self.end);
                 check_anchor_count(buf.len())?;
                 break;

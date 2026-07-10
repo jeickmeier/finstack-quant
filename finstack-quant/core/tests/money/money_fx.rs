@@ -1,6 +1,8 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::fx::{FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxQuery};
+use finstack_quant_core::money::fx::{
+    FxConfig, FxConversionPolicy, FxMatrix, FxProvider, FxQuery, SimpleFxProvider,
+};
 use finstack_quant_core::money::Money;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -506,6 +508,43 @@ fn validate_triangular_accepts_consistent_quotes_and_rejects_bad_tolerance() {
         matrix.validate_triangular(f64::NAN),
         Err(finstack_quant_core::Error::Validation(_))
     ));
+}
+
+#[test]
+fn validate_triangular_handles_normal_market_quote_directions() {
+    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+    matrix
+        .set_quotes(&[
+            (Currency::EUR, Currency::USD, 1.10),
+            (Currency::USD, Currency::JPY, 150.0),
+            (Currency::EUR, Currency::JPY, 160.0),
+        ])
+        .expect("valid quotes");
+
+    matrix
+        .validate_triangular(5.0)
+        .expect_err("EUR/JPY should be compared with EUR/USD x USD/JPY");
+}
+
+#[test]
+fn validate_triangular_does_not_mix_dates() {
+    let matrix = FxMatrix::new(Arc::new(SimpleFxProvider::new()));
+    let jan = Date::from_calendar_date(2025, time::Month::January, 2).unwrap();
+    let feb = Date::from_calendar_date(2025, time::Month::February, 3).unwrap();
+    let mar = Date::from_calendar_date(2025, time::Month::March, 3).unwrap();
+    let policy = FxConversionPolicy::CashflowDate;
+
+    matrix
+        .set_quote_on(Currency::EUR, Currency::USD, jan, policy, 1.10)
+        .unwrap();
+    matrix
+        .set_quote_on(Currency::USD, Currency::JPY, feb, policy, 150.0)
+        .unwrap();
+    matrix
+        .set_quote_on(Currency::EUR, Currency::JPY, mar, policy, 160.0)
+        .unwrap();
+
+    assert!(matrix.validate_triangular(5.0).is_ok());
 }
 
 #[test]

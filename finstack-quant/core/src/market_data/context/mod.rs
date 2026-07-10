@@ -278,7 +278,7 @@ impl MarketContext {
         }
         let fx = self.fx_required()?;
         let rate = fx.rate(FxQuery::new(amount.currency(), target_ccy, as_of))?;
-        Ok(Money::new(amount.amount() * rate.rate, target_ccy))
+        amount.convert_at_rate(target_ccy, rate.rate)
     }
 
     /// Snapshot (clone) all stored volatility surfaces.
@@ -1913,6 +1913,27 @@ mod tests {
             .expect("EUR->USD should succeed");
         assert_eq!(usd.currency(), Currency::USD);
         assert!((usd.amount() - 1_100.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn convert_money_preserves_decimal_amount_precision() {
+        use core::str::FromStr;
+
+        let provider = SimpleFxProvider::new();
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 2.0)
+            .expect("valid rate");
+        let ctx = MarketContext::new().insert_fx(FxMatrix::new(Arc::new(provider)));
+        let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
+        let eur = Money::from_decimal(amount, Currency::EUR).expect("representable amount");
+
+        let usd = ctx
+            .convert_money(eur, Currency::USD, date!(2025 - 01 - 15))
+            .expect("EUR->USD should succeed");
+        assert_eq!(
+            usd.amount_decimal(),
+            rust_decimal::Decimal::from_str("20000000000000000.2").expect("valid decimal")
+        );
     }
 
     #[test]

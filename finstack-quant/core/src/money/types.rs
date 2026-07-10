@@ -29,8 +29,8 @@ use core::fmt;
 use core::ops::{AddAssign, Div, DivAssign, Mul, MulAssign, SubAssign};
 
 use super::rounding::{
-    amount_from_repr, repr_add, repr_div_f64, repr_mul_f64, repr_sub, round_f64, try_repr_div_f64,
-    try_repr_mul_f64, AmountRepr,
+    amount_from_repr, repr_add, repr_div_f64, repr_mul_f64, repr_sub, try_repr_div_f64,
+    try_repr_mul_f64, try_round_f64, AmountRepr,
 };
 
 /// Format an integer string (optionally prefixed by `-`) with thousands
@@ -210,8 +210,9 @@ impl Money {
     ///
     /// # Panics
     ///
-    /// Panics if `amount` is not finite (NaN or infinity). Use [`Money::try_new`]
-    /// for a fallible constructor.
+    /// Panics if `amount` is not finite (NaN or infinity) or cannot be
+    /// represented by the internal Decimal type. Use [`Money::try_new`] for a
+    /// fallible constructor.
     ///
     /// # Examples
     /// ```rust
@@ -230,7 +231,8 @@ impl Money {
     ///
     /// # Panics
     ///
-    /// Panics if `amount` is not finite (NaN or infinity). Use
+    /// Panics if `amount` is not finite (NaN or infinity) or cannot be
+    /// represented by the internal Decimal type. Use
     /// [`Money::try_new_with_config`] for a fallible constructor.
     pub fn new_with_config(amount: f64, currency: Currency, cfg: &FinstackConfig) -> Self {
         Self::new_impl(amount, currency, Some(cfg), "Money::new_with_config")
@@ -288,24 +290,34 @@ impl Money {
     }
 
     #[inline]
-    #[allow(clippy::expect_used)] // Caller contract: `amount` is already checked finite.
+    #[allow(clippy::expect_used)] // Infallible constructor contract is documented to panic.
     fn new_finite(amount: f64, currency: Currency, cfg: Option<&FinstackConfig>) -> Self {
+        Self::try_new_finite(amount, currency, cfg)
+            .expect("Money construction requires a representable amount")
+    }
+
+    #[inline]
+    fn try_new_finite(
+        amount: f64,
+        currency: Currency,
+        cfg: Option<&FinstackConfig>,
+    ) -> Result<Self, Error> {
         let rounded = if let Some(cfg) = cfg {
             let (dp, mode) = Self::ingest_rounding_params(currency, Some(cfg));
-            round_f64(amount, dp as i32, mode)
+            try_round_f64(amount, dp as i32, mode)?
         } else {
             // Shortest round-trip conversion (`Decimal::from_f64`) per the
             //  `0.1_f64`
             // ingests as `0.1`, not the 28-digit IEEE expansion that
-            // `from_f64_retain` would embed. `from_f64` only fails on
-            // non-finite inputs, which the caller contract already rejects.
+            // `from_f64_retain` would embed. `from_f64` can also fail when a
+            // finite f64 lies outside Decimal's representable range.
             <AmountRepr as rust_decimal::prelude::FromPrimitive>::from_f64(amount)
-                .expect("finite f64 amount must convert to Decimal")
+                .ok_or(InputError::ConversionOverflow)?
         };
-        Self {
+        Ok(Self {
             amount: rounded,
             currency,
-        }
+        })
     }
 
     #[inline]
@@ -324,7 +336,7 @@ impl Money {
             };
             return Err(Error::Input(InputError::NonFiniteValue { kind }));
         }
-        Ok(Self::new_finite(amount, currency, cfg))
+        Self::try_new_finite(amount, currency, cfg)
     }
 
     #[inline]
@@ -567,18 +579,27 @@ impl Money {
         if self.currency == to {
             return Ok(self);
         }
-        let rate = crate::money::fx::validate_fx_rate(
-            self.currency,
-            to,
-            provider.rate(self.currency, to, on, policy)?,
-        )?;
+        let rate = provider.rate(self.currency, to, on, policy)?;
+        self.convert_at_rate(to, rate)
+    }
+
+    /// Convert this amount using an already-resolved FX rate.
+    ///
+    /// The multiplication remains Decimal-backed and therefore preserves the
+    /// stored amount's precision. The supplied rate must be finite and strictly
+    /// positive. A same-currency conversion returns the input unchanged.
+    pub fn convert_at_rate(self, to: Currency, rate: f64) -> crate::Result<Self> {
+        if self.currency == to {
+            return Ok(self);
+        }
+        let rate = crate::money::fx::validate_fx_rate(self.currency, to, rate)?;
         // Retain full Decimal precision, consistent with `Money::new`. Rounding
         // to the destination minor units here would truncate sub-unit precision
         // mid-calculation, so the result of a chained computation would depend
         // on *where* a `convert` was inserted and could break serial≡parallel
         // determinism. Apply minor-unit rounding only at the reporting boundary
         // (e.g. via `format`), not on every conversion.
-        let new_amount = super::rounding::try_repr_mul_f64(self.amount, rate)?;
+        let new_amount = try_repr_mul_f64(self.amount, rate)?;
         Ok(Self {
             amount: new_amount,
             currency: to,
@@ -1099,6 +1120,31 @@ mod tests {
         let large = 1e15;
         let m = Money::try_new(large, Currency::USD).expect("Large finite value should succeed");
         assert_eq!(m.amount(), large);
+    }
+
+    #[test]
+    fn try_new_rejects_finite_values_outside_decimal_range() {
+        let result = Money::try_new(1e100, Currency::USD);
+        assert!(matches!(
+            result,
+            Err(crate::Error::Input(InputError::ConversionOverflow))
+        ));
+    }
+
+    #[test]
+    fn convert_at_rate_preserves_decimal_amount_precision() {
+        use core::str::FromStr;
+
+        let amount = rust_decimal::Decimal::from_str("10000000000000000.1").expect("valid decimal");
+        let eur = Money::from_decimal(amount, Currency::EUR).expect("representable amount");
+        let usd = eur
+            .convert_at_rate(Currency::USD, 2.0)
+            .expect("valid conversion");
+
+        assert_eq!(
+            usd.amount_decimal(),
+            rust_decimal::Decimal::from_str("20000000000000000.2").expect("valid decimal")
+        );
     }
 
     #[test]

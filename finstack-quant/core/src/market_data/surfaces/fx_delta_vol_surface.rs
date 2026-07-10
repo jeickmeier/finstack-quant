@@ -304,6 +304,9 @@ impl FxDeltaVolSurface {
         if expiry <= 0.0 || !expiry.is_finite() {
             return Err(InputError::NonPositiveValue.into());
         }
+        if !strike.is_finite() || strike <= 0.0 || !forward.is_finite() || forward <= 0.0 {
+            return Err(InputError::NonPositiveValue.into());
+        }
 
         // Step 1: Interpolate ATM, RR, BF to the requested expiry.
         let atm = interp_linear_clamp(&self.expiries, &self.atm_vols, expiry);
@@ -670,5 +673,12 @@ mod tests {
         let surface = sample_surface();
         assert!(surface.implied_vol(0.0, 1.10, 1.10, 0.05, 0.04).is_err());
         assert!(surface.implied_vol(-0.5, 1.10, 1.10, 0.05, 0.04).is_err());
+        assert!(surface
+            .implied_vol(1.0, f64::NAN, 1.10, 0.05, 0.04)
+            .is_err());
+        assert!(surface
+            .implied_vol(1.0, 1.10, f64::NAN, 0.05, 0.04)
+            .is_err());
+        assert!(surface.implied_vol(1.0, 1.10, 0.0, 0.05, 0.04).is_err());
     }
 }

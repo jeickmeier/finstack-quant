@@ -192,6 +192,16 @@ mod matrix_tests {
         let scale = two_state_scale();
         let err = TransitionMatrix::new(scale, &[1.0, 0.0, 0.0, 1.0], 0.0);
         assert!(matches!(err, Err(MigrationError::InvalidHorizon(_))));
+        for horizon in [f64::NAN, f64::INFINITY] {
+            assert!(matches!(
+                TransitionMatrix::new(two_state_scale(), &[1.0, 0.0, 0.0, 1.0], horizon),
+                Err(MigrationError::InvalidHorizon(_))
+            ));
+        }
+        assert!(matches!(
+            TransitionMatrix::new(two_state_scale(), &[f64::NAN, 0.0, 0.0, 1.0], 1.0),
+            Err(MigrationError::EntryOutOfRange { .. })
+        ));
     }
 
     #[test]
@@ -273,12 +283,46 @@ mod generator_tests {
     }
 
     #[test]
+    fn extraction_annualizes_non_unit_horizons() {
+        for horizon in [0.5_f64, 2.0] {
+            let annual_lambda = 0.20_f64;
+            let survival = (-annual_lambda * horizon).exp();
+            let scale = two_state_scale();
+            let p = TransitionMatrix::new(scale, &[survival, 1.0 - survival, 0.0, 1.0], horizon)
+                .unwrap();
+
+            let generator = GeneratorMatrix::from_transition_matrix(&p).unwrap();
+            assert!(
+                (generator.exit_rate("IG").unwrap() - annual_lambda).abs() < 1e-10,
+                "horizon={horizon}"
+            );
+
+            let reconstructed =
+                crate::credit::migration::projection::project(&generator, horizon).unwrap();
+            assert!(
+                (reconstructed.probability("IG", "D").unwrap() - (1.0 - survival)).abs() < 1e-10,
+                "horizon={horizon}"
+            );
+        }
+    }
+
+    #[test]
     fn direct_construction_and_accessors() {
         let scale = two_state_scale();
         let lambda = 0.05;
         let gen = GeneratorMatrix::new(scale, &[-lambda, lambda, 0.0, 0.0]).unwrap();
         assert!((gen.exit_rate("IG").unwrap() - lambda).abs() < 1e-12);
         assert!(gen.exit_rate("D").unwrap().abs() < 1e-12);
+    }
+
+    #[test]
+    fn direct_construction_rejects_non_finite_entries() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                GeneratorMatrix::new(two_state_scale(), &[value, 0.1, 0.0, 0.0]),
+                Err(MigrationError::EntryOutOfRange { .. })
+            ));
+        }
     }
 
     #[test]
@@ -461,6 +505,13 @@ mod simulation_tests {
     fn two_state_gen() -> GeneratorMatrix {
         let scale = RatingScale::custom(vec!["IG".to_string(), "D".to_string()]).unwrap();
         GeneratorMatrix::new(scale, &[-0.1, 0.1, 0.0, 0.0]).unwrap()
+    }
+
+    #[test]
+    fn simulator_rejects_non_finite_horizons() {
+        for horizon in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(MigrationSimulator::new(two_state_gen(), horizon).is_err());
+        }
     }
 
     #[test]

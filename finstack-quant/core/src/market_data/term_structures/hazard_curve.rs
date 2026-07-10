@@ -263,6 +263,13 @@ impl HazardCurve {
         if t <= 0.0 {
             return 1.0;
         }
+        if let Some(&last_t) = self.knots.last() {
+            if t > last_t {
+                let survival_at_last = self.interp.interp(last_t);
+                let tail_hazard = self.lambdas[self.lambdas.len() - 1];
+                return survival_at_last * (-tail_hazard * (t - last_t)).exp();
+            }
+        }
         self.interp.interp(t)
     }
 
@@ -305,11 +312,18 @@ impl HazardCurve {
             return self.lambdas[0];
         }
 
-        let mut idx = self.knots.partition_point(|&k| k < t);
-        if self.knots.first().is_some_and(|&k| k <= 1e-9) {
-            idx = idx.saturating_sub(1);
-        }
-        idx = idx.min(self.lambdas.len() - 1);
+        // Hazards are right-continuous at knot boundaries. For an explicit
+        // zero-time anchor, lambda_i applies from knot_i onward. Without an
+        // anchor, lambda_i applies up to knot_i and lambda_{i+1} immediately
+        // after it.
+        let idx = if self.knots.first().is_some_and(|&k| k <= 1e-9) {
+            self.knots.partition_point(|&k| k <= t).saturating_sub(1)
+        } else {
+            // Without an explicit zero anchor, lambda_i applies through its
+            // own end knot; the next segment starts immediately after it.
+            self.knots.partition_point(|&k| k < t)
+        };
+        let idx = idx.min(self.lambdas.len() - 1);
         self.lambdas[idx]
     }
 
@@ -640,8 +654,17 @@ impl HazardCurve {
             self.day_count
                 .year_fraction(self.base, new_base, DayCountContext::default())?;
 
-        // Shift knots and filter expired points using shared helper
-        let rolled_points = super::common::roll_knots(&self.knots, &self.lambdas, dt_years);
+        // Anchor the active post-roll hazard at the new origin, then retain
+        // future hazard changes. This preserves conditional survival rather
+        // than re-attributing the first surviving lambda to the whole front
+        // segment.
+        let mut rolled_points = Vec::with_capacity(self.knots.len() + 1);
+        rolled_points.push((0.0, self.hazard_rate(dt_years)));
+        rolled_points.extend(super::common::roll_knots(
+            &self.knots,
+            &self.lambdas,
+            dt_years,
+        ));
 
         if rolled_points.len() < 2 {
             return Err(crate::error::InputError::TooFewPoints.into());
@@ -1119,6 +1142,58 @@ mod tests {
     }
 
     #[test]
+    fn zero_anchored_tail_uses_last_hazard() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let curve = HazardCurve::builder("TAIL")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 0.01), (5.0, 0.02), (10.0, 0.03)])
+            .build()
+            .expect("valid hazard curve");
+
+        let implied_tail_hazard = -(curve.sp(11.0) / curve.sp(10.0)).ln();
+        assert!((implied_tail_hazard - 0.03).abs() < 1e-12);
+        assert!((curve.hazard_rate(10.0) - 0.03).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unanchored_hazard_changes_immediately_after_end_knot() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let curve = HazardCurve::builder("BOUNDARY")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(1.0, 0.01), (2.0, 0.02), (3.0, 0.03)])
+            .build()
+            .expect("valid hazard curve");
+
+        assert!((curve.hazard_rate(1.0) - 0.01).abs() < 1e-12);
+        assert!((curve.hazard_rate(1.0 + 1e-12) - 0.02).abs() < 1e-12);
+    }
+
+    #[test]
+    fn roll_forward_preserves_conditional_survival() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let curve = HazardCurve::builder("ROLL")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 0.01), (5.0, 0.02), (10.0, 0.03)])
+            .build()
+            .expect("valid hazard curve");
+
+        let rolled = curve
+            .roll_forward(365)
+            .expect("one-year roll should succeed");
+        for t in [0.5, 1.0, 4.0, 5.0, 8.0] {
+            let expected = curve.sp(t + 1.0) / curve.sp(1.0);
+            assert!(
+                (rolled.sp(t) - expected).abs() < 1e-12,
+                "t={t}: rolled={}, expected={expected}",
+                rolled.sp(t)
+            );
+        }
+    }
+
+    #[test]
     fn quoted_spread_interpolation_linear() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
         let hc = HazardCurve::builder("TEST")
@@ -1165,10 +1240,14 @@ mod tests {
 
         // Knots should be shifted
         let knots: Vec<f64> = rolled.knot_points().map(|(t, _)| t).collect();
-        assert_eq!(knots.len(), 2);
+        assert_eq!(knots.len(), 3);
+        assert!(
+            knots[0].abs() < 1e-12,
+            "rolled curve must be anchored at zero"
+        );
         // 1.5 - (183/365) = 1.5 - 0.50137 = 0.9986
         // 2.5 - (183/365) = 1.9986
-        assert!(knots[0] < 1.0 && knots[0] > 0.99);
+        assert!(knots[1] < 1.0 && knots[1] > 0.99);
     }
 
     #[test]

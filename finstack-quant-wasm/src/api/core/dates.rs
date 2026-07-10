@@ -19,6 +19,7 @@ pub struct DayCountContext {
     frequency: Option<RustTenor>,
     bus_basis: Option<u16>,
     coupon_period: Option<(time::Date, time::Date)>,
+    end_is_termination_date: bool,
 }
 
 impl DayCountContext {
@@ -41,6 +42,7 @@ impl DayCountContext {
             frequency: self.frequency,
             bus_basis: self.bus_basis,
             coupon_period: self.coupon_period,
+            end_is_termination_date: self.end_is_termination_date,
         })
     }
 }
@@ -95,6 +97,15 @@ impl DayCountContext {
         next.coupon_period = Some((start, end));
         Ok(next)
     }
+
+    /// Return a copy indicating whether the accrual end is the instrument's
+    /// termination date (required by 30E/360 ISDA February-end handling).
+    #[wasm_bindgen(js_name = withEndIsTerminationDate)]
+    pub fn with_end_is_termination_date(&self, value: bool) -> DayCountContext {
+        let mut next = self.clone();
+        next.end_is_termination_date = value;
+        next
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +122,7 @@ impl DayCountContext {
 /// - `act_365f` → `DayCount.act365f`
 /// - `30_360` → `DayCount.thirty360`
 /// - `30e_360` → `DayCount.thirtyE360`
+/// - `30e_360_isda` → `DayCount.thirtyE360Isda`
 /// - `act_act` (ISDA) → `DayCount.actAct`
 /// - `act_act_isma` (ICMA) → `DayCount.actActIsma`
 /// - `bus_252` → `DayCount.bus252`
@@ -175,6 +187,14 @@ impl DayCount {
     pub fn thirty_e360() -> DayCount {
         DayCount {
             inner: RustDayCount::ThirtyE360,
+        }
+    }
+
+    /// 30E/360 ISDA.
+    #[wasm_bindgen(js_name = thirtyE360Isda)]
+    pub fn thirty_e360_isda() -> DayCount {
+        DayCount {
+            inner: RustDayCount::ThirtyE360Isda,
         }
     }
 
@@ -467,12 +487,31 @@ mod tests {
         assert_eq!(dc.to_string(), "30_360");
         let dc = DayCount::thirty_e360();
         assert_eq!(dc.to_string(), "30e_360");
+        let dc = DayCount::thirty_e360_isda();
+        assert_eq!(dc.to_string(), "30e_360_isda");
         let dc = DayCount::act_act();
         assert_eq!(dc.to_string(), "act_act");
         let dc = DayCount::act_act_isma();
         assert_eq!(dc.to_string(), "act_act_isma");
         let dc = DayCount::bus252();
         assert_eq!(dc.to_string(), "bus_252");
+    }
+
+    #[test]
+    fn thirty_e_360_isda_uses_termination_context() {
+        let start = epoch(2025, 1, 31);
+        let end = epoch(2025, 2, 28);
+        let dc = DayCount::thirty_e360_isda();
+        let regular = dc
+            .year_fraction_with_context(start, end, &DayCountContext::new())
+            .expect("regular period");
+        let terminal_ctx = DayCountContext::new().with_end_is_termination_date(true);
+        let terminal = dc
+            .year_fraction_with_context(start, end, &terminal_ctx)
+            .expect("terminal period");
+
+        assert!((regular - 30.0 / 360.0).abs() < 1e-12);
+        assert!((terminal - 28.0 / 360.0).abs() < 1e-12);
     }
 
     #[test]

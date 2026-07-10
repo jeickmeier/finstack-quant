@@ -4,6 +4,8 @@ use finstack_quant_core::math::special_functions;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
 
+use crate::errors::core_to_py;
+
 // ---------------------------------------------------------------------------
 // Module-level functions
 // ---------------------------------------------------------------------------
@@ -56,8 +58,8 @@ fn ln_gamma(x: f64) -> f64 {
 /// Returns P(T ≤ x) where T ~ t(df).
 #[pyfunction]
 #[pyo3(text_signature = "(x, df)")]
-fn student_t_cdf(x: f64, df: f64) -> f64 {
-    special_functions::student_t_cdf(x, df)
+fn student_t_cdf(x: f64, df: f64) -> PyResult<f64> {
+    special_functions::try_student_t_cdf(x, df).map_err(core_to_py)
 }
 
 /// Inverse Student-t CDF (quantile function).
@@ -65,8 +67,8 @@ fn student_t_cdf(x: f64, df: f64) -> f64 {
 /// Returns x such that P(T ≤ x) = p where T ~ t(df).
 #[pyfunction]
 #[pyo3(text_signature = "(p, df)")]
-fn student_t_inv_cdf(p: f64, df: f64) -> f64 {
-    special_functions::student_t_inv_cdf(p, df)
+fn student_t_inv_cdf(p: f64, df: f64) -> PyResult<f64> {
+    special_functions::try_student_t_inv_cdf(p, df).map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------

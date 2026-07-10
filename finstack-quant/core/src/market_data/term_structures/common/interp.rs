@@ -75,7 +75,7 @@ pub(crate) fn year_fraction_to(base: Date, date: Date, day_count: DayCount) -> R
     if date == base {
         Ok(0.0)
     } else {
-        Ok(day_count.year_fraction(base, date, DayCountContext::default())?)
+        Ok(day_count.signed_year_fraction(base, date, DayCountContext::default())?)
     }
 }
 

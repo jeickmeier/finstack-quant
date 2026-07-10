@@ -289,6 +289,19 @@ pub enum Direction {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Rule {
+    /// Exact one-off calendar date.
+    ///
+    /// Used for exchange-announced closures and other dated exceptions that
+    /// cannot be represented safely by a recurring Gregorian rule.
+    ExactDate {
+        /// Calendar year.
+        year: i32,
+        /// Calendar month.
+        month: Month,
+        /// Day of month.
+        day: u8,
+    },
+
     /// Fixed calendar date with optional weekend observation.
     ///
     /// Examples: New Year's Day (Jan 1), Christmas (Dec 25), Independence Day (Jul 4).
@@ -355,10 +368,15 @@ pub enum Rule {
 
     /// Consecutive multi-day holiday period.
     ///
-    /// Examples: Golden Week (Japan), extended Christmas breaks.
+    /// Examples: Golden Week (Japan/China), extended Christmas breaks.
     ///
     /// Materializes `len` consecutive days starting from each date that
-    /// matches the `start` rule. Handles year boundaries correctly.
+    /// matches the `start` rule, shifted by `offset` calendar days. Handles year
+    /// boundaries correctly.
+    ///
+    /// The `offset` allows anchoring a span relative to a movable start rule —
+    /// e.g. China's Spring Festival break begins on Lunar New Year's **Eve**
+    /// (`start: ChineseNewYear`, `offset: -1`).
     ///
     /// # Note
     /// This variant cannot be serialized (contains `&'static Rule`).
@@ -369,6 +387,9 @@ pub enum Rule {
         start: &'static Rule,
         /// Number of consecutive days (including start day)
         len: u8,
+        /// Calendar-day shift applied to each start date before spanning
+        /// (0 = span begins on the start date; -1 = the day before).
+        offset: i16,
     },
 
     /// Chinese New Year (Spring Festival, 春节).
@@ -400,6 +421,28 @@ pub enum Rule {
     /// # Markets
     /// Public holiday in Hong Kong, Macau, and some other Asian markets.
     BuddhasBirthday,
+
+    /// Dragon Boat Festival (端午节, Duānwǔ).
+    ///
+    /// Celebrated on the 5th day of the 5th Chinese lunar month, typically
+    /// falling between late May and mid June. Uses a pre-computed lookup table
+    /// for years 1970-2150.
+    ///
+    /// # Markets
+    /// National statutory holiday in Mainland China (since 2008); also observed
+    /// in Hong Kong, Taiwan, and Macau.
+    DragonBoat,
+
+    /// Mid-Autumn Festival (中秋节, Zhōngqiū).
+    ///
+    /// Celebrated on the 15th day of the 8th Chinese lunar month, typically
+    /// falling between mid September and early October. Uses a pre-computed
+    /// lookup table for years 1970-2150.
+    ///
+    /// # Markets
+    /// National statutory holiday in Mainland China (since 2008); also observed
+    /// in Hong Kong, Taiwan, and Macau.
+    MidAutumn,
 
     /// Vernal Equinox Day (春分の日, Shunbun no Hi).
     ///
@@ -446,6 +489,42 @@ pub enum Rule {
         to_year: Option<i32>,
         /// The gated rule.
         inner: &'static Rule,
+    },
+
+    /// Mainland China single-day festival with the modern 3-day 连休 (bridge)
+    /// convention.
+    ///
+    /// Wraps a `festival` rule that materializes exactly one date per year (e.g.
+    /// [`QingMing`](Rule::QingMing), [`DragonBoat`](Rule::DragonBoat),
+    /// [`MidAutumn`](Rule::MidAutumn), or a fixed New Year's Day) and expands it
+    /// into the actual **weekday** market closures produced by joining the
+    /// festival to the adjacent weekend.
+    ///
+    /// This reflects the arrangement codified by the State Council's November
+    /// 2024 amendment (effective 2025-01-01), where each of New Year's Day,
+    /// Qingming, Dragon Boat, and Mid-Autumn forms a 3-day break "如逢周三则只在
+    /// 当日放假" (a single day when it falls on a Wednesday). It is an exact match
+    /// for the 2025+ regime and a close approximation for 2008-2024.
+    ///
+    /// Weekend days inside the block are intentionally **not** emitted (they are
+    /// already non-business days); only the festival day and any weekday
+    /// bridge/substitute days are produced:
+    ///
+    /// | Festival weekday | Weekday closures                      |
+    /// |------------------|---------------------------------------|
+    /// | Mon / Wed / Fri  | festival day only                     |
+    /// | Tue              | preceding Mon (bridge) + festival day |
+    /// | Thu              | festival day + following Fri (bridge) |
+    /// | Sat / Sun        | following Mon (substitute)            |
+    ///
+    /// # Note
+    /// Like [`Span`](Rule::Span) this variant contains `&'static Rule` and so is
+    /// not serializable; it is produced only by the compiled calendar
+    /// definitions.
+    #[serde(skip)]
+    ChinaBridge {
+        /// Single-day festival rule to expand into a bridged closure block.
+        festival: &'static Rule,
     },
 }
 
@@ -669,15 +748,48 @@ fn push_span_range<A: smallvec::Array<Item = Date>>(
     out: &mut smallvec::SmallVec<A>,
     starts: &[Date],
     len: u8,
+    offset: i16,
 ) {
     if len == 0 {
         return;
     }
     let span_days = len as i64;
     for &sd in starts {
+        let base = sd + Duration::days(offset as i64);
         for k in 0..span_days {
-            out.push(sd + Duration::days(k));
+            out.push(base + Duration::days(k));
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// China 连休 (bridge) block materialization helper
+// ---------------------------------------------------------------------------
+/// Push the **weekday** market closures for a single-day Chinese festival that
+/// falls on `festival`, joining it to the adjacent weekend per the modern 3-day
+/// 连休 convention (see [`Rule::ChinaBridge`]). Weekend days are not emitted.
+#[inline]
+fn push_china_bridge_block<A: smallvec::Array<Item = Date>>(
+    out: &mut smallvec::SmallVec<A>,
+    festival: Date,
+) {
+    match festival.weekday() {
+        // Wednesday: single day. Mon/Fri: the festival plus a same-side weekend
+        // that is already a non-business day, so only the festival is emitted.
+        Weekday::Monday | Weekday::Wednesday | Weekday::Friday => out.push(festival),
+        // Tuesday: bridge the preceding Monday.
+        Weekday::Tuesday => {
+            out.push(festival - Duration::days(1));
+            out.push(festival);
+        }
+        // Thursday: bridge the following Friday.
+        Weekday::Thursday => {
+            out.push(festival);
+            out.push(festival + Duration::days(1));
+        }
+        // Weekend: substitute the following Monday.
+        Weekday::Saturday => out.push(festival + Duration::days(2)),
+        Weekday::Sunday => out.push(festival + Duration::days(1)),
     }
 }
 
@@ -689,6 +801,9 @@ impl Rule {
     #[inline]
     pub fn applies(&self, date: Date) -> bool {
         match self {
+            Rule::ExactDate { year, month, day } => {
+                Date::from_calendar_date(*year, *month, *day).ok() == Some(date)
+            }
             Rule::Fixed {
                 month,
                 day,
@@ -742,24 +857,27 @@ impl Rule {
                 let target = easter_mon + Duration::days(*offset as i64);
                 target == date
             }
-            Rule::Span { start, len } => {
+            Rule::Span { start, len, offset } => {
                 // Pre-compute start dates for this and previous year, then range-check.
                 // Previous year is needed for spans that cross year boundaries.
                 let y = date.year();
                 let mut starts = smallvec::SmallVec::<[Date; 64]>::new();
                 start.materialize_year(y, &mut starts);
-                if *len > 1 {
+                if *len > 1 || *offset != 0 {
                     start.materialize_year(y - 1, &mut starts);
                 }
                 let span_days = *len as i64;
                 for sd in starts {
-                    if date >= sd && date < sd + Duration::days(span_days) {
+                    let base = sd + Duration::days(*offset as i64);
+                    if date >= base && date < base + Duration::days(span_days) {
                         return true;
                     }
                 }
                 false
             }
             Rule::ChineseNewYear => algo::is_cny(date),
+            Rule::DragonBoat => algo::is_dragon_boat(date),
+            Rule::MidAutumn => algo::is_mid_autumn(date),
             Rule::QingMing => {
                 date.month() == Month::April && date.day() == qing_ming_day(date.year())
             }
@@ -771,6 +889,21 @@ impl Rule {
                 to_year,
                 inner,
             } => year_in_effective_range(date.year(), *from_year, *to_year) && inner.applies(date),
+            Rule::ChinaBridge { festival } => {
+                // Compute the festival's bridge block for the current year and,
+                // when `date` is near a year boundary, the adjacent year (a
+                // Tuesday New Year's Day bridges back to the preceding Dec 31).
+                let mut block = smallvec::SmallVec::<[Date; 4]>::new();
+                let mut fdates = smallvec::SmallVec::<[Date; 2]>::new();
+                festival.materialize_year(date.year(), &mut fdates);
+                if date.month() == Month::December && date.day() >= 29 {
+                    festival.materialize_year(date.year() + 1, &mut fdates);
+                }
+                for fd in fdates {
+                    push_china_bridge_block(&mut block, fd);
+                }
+                block.contains(&date)
+            }
         }
     }
 }
@@ -784,6 +917,17 @@ impl Rule {
         out: &mut smallvec::SmallVec<A>,
     ) {
         match self {
+            Rule::ExactDate {
+                year: exact_year,
+                month,
+                day,
+            } => {
+                if year == *exact_year {
+                    if let Ok(date) = Date::from_calendar_date(year, *month, *day) {
+                        out.push(date);
+                    }
+                }
+            }
             Rule::Fixed {
                 month,
                 day,
@@ -815,17 +959,27 @@ impl Rule {
                 let em = algo::easter_monday(year);
                 out.push(em + Duration::days(*offset as i64));
             }
-            Rule::Span { start, len } => {
+            Rule::Span { start, len, offset } => {
                 let mut tmp = smallvec::SmallVec::<[Date; 64]>::new();
                 start.materialize_year(year, &mut tmp);
                 // Also materialize previous year starts for spans that may cross year boundaries
-                if *len > 1 {
+                if *len > 1 || *offset != 0 {
                     start.materialize_year(year - 1, &mut tmp);
                 }
-                push_span_range(out, &tmp, *len);
+                push_span_range(out, &tmp, *len, *offset);
             }
             Rule::ChineseNewYear => {
                 if let Some(d) = algo::cny_date(year) {
+                    out.push(d);
+                }
+            }
+            Rule::DragonBoat => {
+                if let Some(d) = algo::dragon_boat_date(year) {
+                    out.push(d);
+                }
+            }
+            Rule::MidAutumn => {
+                if let Some(d) = algo::mid_autumn_date(year) {
                     out.push(d);
                 }
             }
@@ -856,6 +1010,13 @@ impl Rule {
             } => {
                 if year_in_effective_range(year, *from_year, *to_year) {
                     inner.materialize_year(year, out);
+                }
+            }
+            Rule::ChinaBridge { festival } => {
+                let mut fdates = smallvec::SmallVec::<[Date; 2]>::new();
+                festival.materialize_year(year, &mut fdates);
+                for fd in fdates {
+                    push_china_bridge_block(out, fd);
                 }
             }
         }

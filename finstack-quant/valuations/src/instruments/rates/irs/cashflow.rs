@@ -143,6 +143,7 @@ fn is_irregular_fixed_period(
         frequency: Some(fixed.frequency),
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
     let expected_regular_accrual =
         fixed

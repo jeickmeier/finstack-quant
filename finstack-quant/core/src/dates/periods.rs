@@ -192,7 +192,7 @@ impl PeriodKind {
         config: FiscalConfig,
     ) -> crate::Result<(Date, Date)> {
         match self {
-            PeriodKind::Daily => daily_bounds(fiscal_year, index),
+            PeriodKind::Daily => fiscal_daily_bounds(fiscal_year, index, config),
             PeriodKind::Quarterly => fiscal_quarter_bounds(fiscal_year, index as u8, config),
             PeriodKind::Monthly => fiscal_month_bounds(fiscal_year, index as u8, config),
             PeriodKind::Weekly => fiscal_week_bounds(fiscal_year, index as u8, config),
@@ -702,6 +702,25 @@ fn annual_bounds(year: i32) -> crate::Result<(Date, Date)> {
 
 // Fiscal year bounds functions
 
+fn fiscal_daily_bounds(
+    fiscal_year: i32,
+    ordinal: u16,
+    config: FiscalConfig,
+) -> crate::Result<(Date, Date)> {
+    use time::Duration;
+
+    if ordinal == 0 {
+        return Err(crate::error::InputError::Invalid.into());
+    }
+    let fy_start = fiscal_year_start(fiscal_year, config)?;
+    let fy_end = fiscal_year_start(fiscal_year + 1, config)?;
+    let start = fy_start + Duration::days(i64::from(ordinal - 1));
+    if start >= fy_end {
+        return Err(crate::error::InputError::Invalid.into());
+    }
+    Ok((start, (start + Duration::days(1)).min(fy_end)))
+}
+
 fn fiscal_quarter_bounds(
     fiscal_year: i32,
     q: u8,
@@ -749,10 +768,14 @@ fn fiscal_week_bounds(
 
     // Calculate the start of the fiscal year
     let fy_start = fiscal_year_start(fiscal_year, config)?;
+    let fy_end = fiscal_year_start(fiscal_year + 1, config)?;
 
     // Calculate start and end dates for the week
     let start = fy_start + Duration::days(((w - 1) as i64) * 7);
-    let end = start + Duration::days(7);
+    if start >= fy_end {
+        return Err(crate::error::InputError::Invalid.into());
+    }
+    let end = (start + Duration::days(7)).min(fy_end);
 
     Ok((start, end))
 }
@@ -1117,6 +1140,18 @@ mod tests {
         let jp = FiscalConfig::japan();
         let ms = build_fiscal_periods("2025M01..M02", jp, None).expect("FY months");
         assert_eq!(ms.periods.len(), 2);
+    }
+
+    #[test]
+    fn fiscal_daily_and_weekly_bounds_stay_inside_fiscal_year() {
+        let cfg = FiscalConfig::us_federal();
+        let day = build_fiscal_periods("2025D001..D001", cfg, None).expect("fiscal day");
+        assert_eq!(day.periods[0].start, d(2024, Month::October, 1));
+        assert_eq!(day.periods[0].end, d(2024, Month::October, 2));
+
+        let week = build_fiscal_periods("2020W53..W53", cfg, None).expect("fiscal week 53");
+        assert_eq!(week.periods[0].start, d(2020, Month::September, 29));
+        assert_eq!(week.periods[0].end, d(2020, Month::October, 1));
     }
 
     #[test]

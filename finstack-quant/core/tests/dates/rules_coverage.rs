@@ -107,6 +107,7 @@ fn span_rule_cases() {
         let rule = Rule::Span {
             start: start_rule,
             len: case.len,
+            offset: 0,
         };
         assert_applies(&rule, case.hits, case.misses);
 
@@ -177,6 +178,102 @@ fn qing_ming_rules() {
             "Qing Ming should be April 4-6"
         );
     }
+}
+
+#[test]
+fn dragon_boat_rules() {
+    let rule = Rule::DragonBoat;
+    assert_applies(
+        &rule,
+        &[(2024, 6, 10), (2025, 5, 31), (2026, 6, 19)],
+        &[(2024, 6, 9), (2024, 6, 11)],
+    );
+    for year in 2020..2030 {
+        let out = materialize(&rule, year);
+        assert_eq!(out.len(), 1, "Dragon Boat should yield one date");
+        let date = out[0];
+        assert!(
+            matches!(date.month(), Month::May | Month::June),
+            "Dragon Boat should be May-Jun"
+        );
+        assert!(rule.applies(date));
+    }
+}
+
+#[test]
+fn mid_autumn_rules() {
+    let rule = Rule::MidAutumn;
+    assert_applies(
+        &rule,
+        &[(2024, 9, 17), (2025, 10, 6), (2026, 9, 25)],
+        &[(2024, 9, 16), (2024, 9, 18)],
+    );
+    for year in 2020..2030 {
+        let out = materialize(&rule, year);
+        assert_eq!(out.len(), 1, "Mid-Autumn should yield one date");
+        let date = out[0];
+        assert!(
+            matches!(date.month(), Month::September | Month::October),
+            "Mid-Autumn should be Sep-Oct"
+        );
+        assert!(rule.applies(date));
+    }
+}
+
+#[test]
+fn china_bridge_weekday_blocks() {
+    static QING_MING: Rule = Rule::QingMing;
+    static NEW_YEAR: Rule = Rule::fixed(Month::January, 1);
+
+    // Qingming 2024 = Thu Apr 4 -> festival + bridge Fri Apr 5.
+    let qm = Rule::ChinaBridge {
+        festival: &QING_MING,
+    };
+    assert_applies(
+        &qm,
+        &[(2024, 4, 4), (2024, 4, 5)],
+        &[(2024, 4, 3), (2024, 4, 6)],
+    );
+    // Qingming 2026 = Sat Apr 4 -> substitute Mon Apr 6 only (weekend not emitted).
+    assert_applies(
+        &qm,
+        &[(2026, 4, 6)],
+        &[(2026, 4, 4), (2026, 4, 5), (2026, 4, 7)],
+    );
+
+    let ny = Rule::ChinaBridge {
+        festival: &NEW_YEAR,
+    };
+    // Jan 1 2025 = Wed -> single day.
+    assert_applies(&ny, &[(2025, 1, 1)], &[(2024, 12, 31), (2025, 1, 2)]);
+    // Jan 1 2013 = Tue -> bridge the preceding Mon Dec 31 2012 (cross-year).
+    assert_applies(
+        &ny,
+        &[(2012, 12, 31), (2013, 1, 1)],
+        &[(2012, 12, 30), (2013, 1, 2)],
+    );
+    // Jan 1 2026 = Thu -> festival + bridge Fri Jan 2.
+    assert_applies(&ny, &[(2026, 1, 1), (2026, 1, 2)], &[(2026, 1, 3)]);
+}
+
+#[test]
+fn span_offset_shifts_start() {
+    // Spring-Festival-style: start at Lunar New Year, shift to the eve, span 3.
+    static CNY: Rule = Rule::ChineseNewYear;
+    let rule = Rule::Span {
+        start: &CNY,
+        len: 3,
+        offset: -1,
+    };
+    // CNY 2025 = Jan 29 -> eve Jan 28; span covers Jan 28, 29, 30.
+    assert_applies(
+        &rule,
+        &[(2025, 1, 28), (2025, 1, 29), (2025, 1, 30)],
+        &[(2025, 1, 27), (2025, 1, 31)],
+    );
+    let mats = materialize(&rule, 2025);
+    assert!(mats.contains(&make_date(2025, 1, 28)));
+    assert!(mats.contains(&make_date(2025, 1, 30)));
 }
 
 #[test]

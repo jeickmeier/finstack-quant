@@ -115,14 +115,7 @@ impl TryFrom<RawSabrParams> for SabrParams {
     type Error = crate::Error;
 
     fn try_from(raw: RawSabrParams) -> crate::Result<Self> {
-        let params = SabrParams::new(raw.alpha, raw.beta, raw.rho, raw.nu)?;
-        match raw.shift {
-            None => Ok(params),
-            Some(shift) if shift.is_finite() => Ok(params.with_shift(shift)),
-            Some(shift) => Err(crate::Error::Validation(format!(
-                "SABR shift must be finite, got {shift}"
-            ))),
-        }
+        SabrParams::new_with_shift(raw.alpha, raw.beta, raw.rho, raw.nu, raw.shift)
     }
 }
 
@@ -165,6 +158,20 @@ impl SabrParams {
     /// - `rho` not in `(-1, 1)`
     /// - `nu <= 0`
     pub fn new(alpha: f64, beta: f64, rho: f64, nu: f64) -> crate::Result<Self> {
+        Self::new_with_shift(alpha, beta, rho, nu, None)
+    }
+
+    /// Construct validated SABR parameters with an optional rate shift.
+    ///
+    /// This is the canonical constructor for deserialization and bindings so
+    /// that shift validation cannot drift across host languages.
+    pub fn new_with_shift(
+        alpha: f64,
+        beta: f64,
+        rho: f64,
+        nu: f64,
+        shift: Option<f64>,
+    ) -> crate::Result<Self> {
         if alpha <= 0.0 || !alpha.is_finite() {
             return Err(crate::Error::Validation(format!(
                 "SABR alpha must be positive, got {alpha}"
@@ -185,12 +192,18 @@ impl SabrParams {
                 "SABR nu (vol-of-vol) must be positive, got {nu}"
             )));
         }
+        if shift.is_some_and(|value| !value.is_finite()) {
+            return Err(crate::Error::Validation(format!(
+                "SABR shift must be finite, got {}",
+                shift.unwrap_or_default()
+            )));
+        }
         Ok(Self {
             alpha,
             beta,
             rho,
             nu,
-            shift: None,
+            shift,
         })
     }
 

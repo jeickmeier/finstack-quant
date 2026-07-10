@@ -6,7 +6,7 @@ use crate::utils::{date_to_iso, parse_iso_date, to_js_err};
 use finstack_quant_core::currency::Currency as RustCurrency;
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::surfaces::{
-    FxDeltaVolSurface as RustFxDeltaVolSurface, VolCube as RustVolCube,
+    FxDeltaVolSurface as RustFxDeltaVolSurface, VolCube as RustVolCube, VolInterpolationMode,
 };
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve as RustDiscountCurve, ForwardCurve as RustForwardCurve,
@@ -369,6 +369,24 @@ impl FxMatrix {
         Ok(())
     }
 
+    /// Set an authoritative quote scoped to one date and conversion policy.
+    #[wasm_bindgen(js_name = setQuoteOn)]
+    pub fn set_quote_on(
+        &self,
+        base: &str,
+        quote: &str,
+        date: &str,
+        policy: FxConversionPolicy,
+        rate: f64,
+    ) -> Result<(), JsValue> {
+        let base_ccy: RustCurrency = base.parse().map_err(to_js_err)?;
+        let quote_ccy: RustCurrency = quote.parse().map_err(to_js_err)?;
+        let d = parse_iso_date(date)?;
+        self.inner
+            .set_quote_on(base_ccy, quote_ccy, d, policy.inner, rate)
+            .map_err(to_js_err)
+    }
+
     /// Look up an FX rate.
     ///
     /// # Arguments
@@ -429,6 +447,7 @@ impl VolCube {
         tenors: &[f64],
         params_flat: &[f64],
         forwards: &[f64],
+        interpolation_mode: Option<String>,
     ) -> Result<VolCube, JsValue> {
         let n_nodes = expiries.len() * tenors.len();
         if params_flat.len() != n_nodes * 5 {
@@ -441,21 +460,30 @@ impl VolCube {
         let mut sabr_params = Vec::with_capacity(n_nodes);
         for i in 0..n_nodes {
             let base = i * 5;
-            let mut p = SabrParams::new(
+            let shift = params_flat[base + 4];
+            let shift = if shift.is_nan() { None } else { Some(shift) };
+            let p = SabrParams::new_with_shift(
                 params_flat[base],     // alpha
                 params_flat[base + 1], // beta
                 params_flat[base + 2], // rho
                 params_flat[base + 3], // nu
+                shift,
             )
             .map_err(to_js_err)?;
-            let shift = params_flat[base + 4];
-            if shift.is_finite() {
-                p = p.with_shift(shift);
-            }
             sabr_params.push(p);
         }
+        let mode = match interpolation_mode.as_deref().unwrap_or("vol") {
+            "vol" => VolInterpolationMode::Vol,
+            "total_variance" => VolInterpolationMode::TotalVariance,
+            other => {
+                return Err(JsValue::from_str(&format!(
+                    "invalid volatility interpolation mode {other:?}; expected 'vol' or 'total_variance'"
+                )))
+            }
+        };
         let cube = RustVolCube::from_grid(id, expiries, tenors, &sabr_params, forwards)
-            .map_err(to_js_err)?;
+            .map_err(to_js_err)?
+            .with_interpolation_mode(mode);
         Ok(Self {
             inner: Arc::new(cube),
         })
@@ -470,10 +498,20 @@ impl VolCube {
 
     /// Implied volatility with clamped extrapolation.
     ///
-    /// Clamps `expiry` and `tenor` to the grid edges before interpolation.
-    /// Never returns `Err`.
+    /// Clamps finite `expiry` and `tenor` values to the grid edges before
+    /// interpolation. Non-finite inputs return `NaN`.
     pub fn vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_clamped(expiry, tenor, strike)
+    }
+
+    /// Interpolation contract used across the expiry axis.
+    #[wasm_bindgen(getter, js_name = interpolationMode)]
+    pub fn interpolation_mode(&self) -> String {
+        match self.inner.interpolation_mode() {
+            VolInterpolationMode::Vol => "vol",
+            VolInterpolationMode::TotalVariance => "total_variance",
+        }
+        .to_string()
     }
 
     /// Normal (Bachelier) implied volatility at `(expiry, tenor, strike)`.
@@ -492,10 +530,9 @@ impl VolCube {
 
     /// Normal (Bachelier) implied volatility with clamped extrapolation.
     ///
-    /// Clamps `expiry` and `tenor` to the grid edges; a degenerate expansion
-    /// is floored to a small positive normal vol (absolute rate units).
-    /// Never returns `Err` and never returns a non-finite or non-positive
-    /// value.
+    /// Clamps finite `expiry` and `tenor` values to the grid edges; a
+    /// degenerate finite expansion is floored to a small positive normal vol
+    /// (absolute rate units). Non-finite inputs return `NaN`.
     pub fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_normal_clamped(expiry, tenor, strike)
     }

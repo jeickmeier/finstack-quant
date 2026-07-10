@@ -694,6 +694,7 @@ fn xirr_supports_contextual_day_counts_via_explicit_ctx() {
         calendar: None,
         bus_basis: None,
         coupon_period: None,
+        end_is_termination_date: false,
     };
 
     let result = xirr_with_daycount_ctx(&flows, DayCount::ActActIsma, ctx, None)

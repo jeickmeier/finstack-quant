@@ -56,7 +56,7 @@ impl TransitionMatrix {
     /// - [`MigrationError::NonAbsorbingDefault`] if the default state is not absorbing.
     /// - [`MigrationError::InvalidHorizon`] if `horizon <= 0`.
     pub fn new(scale: RatingScale, data: &[f64], horizon: f64) -> Result<Self, MigrationError> {
-        if horizon <= 0.0 {
+        if !horizon.is_finite() || horizon <= 0.0 {
             return Err(MigrationError::InvalidHorizon(horizon));
         }
         let n = scale.n_states();
@@ -177,6 +177,15 @@ pub(crate) fn validate_transition_matrix(
         let mut row_sum = 0.0;
         for j in 0..n {
             let v = m[(i, j)];
+            if !v.is_finite() {
+                return Err(MigrationError::EntryOutOfRange {
+                    row: i,
+                    col: j,
+                    value: v,
+                    min: 0.0,
+                    max: 1.0,
+                });
+            }
             if !(-1e-12..=1.0 + 1e-12).contains(&v) {
                 return Err(MigrationError::EntryOutOfRange {
                     row: i,

@@ -16,6 +16,11 @@ struct CalendarDef {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum RuleDef {
+    ExactDate {
+        year: i32,
+        month: MonthName,
+        day: u8,
+    },
     Fixed {
         month: MonthName,
         day: u8,
@@ -46,10 +51,25 @@ enum RuleDef {
     Span {
         start: Box<RuleDef>,
         len: u8,
+        #[serde(default)]
+        offset: i16,
+        #[serde(default)]
+        from_year: Option<i32>,
+        #[serde(default)]
+        to_year: Option<i32>,
     },
     ChineseNewYear,
     QingMing,
     BuddhasBirthday,
+    DragonBoat,
+    MidAutumn,
+    ChinaBridge {
+        festival: Box<RuleDef>,
+        #[serde(default)]
+        from_year: Option<i32>,
+        #[serde(default)]
+        to_year: Option<i32>,
+    },
     VernalEquinoxJp,
     AutumnalEquinoxJp,
 }
@@ -242,6 +262,12 @@ fn wrap_effective(inner: String, from_year: Option<i32>, to_year: Option<i32>) -
 impl RuleDef {
     fn to_rust_code(&self) -> String {
         match self {
+            RuleDef::ExactDate { year, month, day } => format!(
+                "Rule::ExactDate {{ year: {}, month: {}, day: {} }}",
+                year,
+                month.to_rust_code(),
+                day
+            ),
             RuleDef::Fixed {
                 month,
                 day,
@@ -292,16 +318,37 @@ impl RuleDef {
                     dir.to_rust_code()
                 )
             }
-            RuleDef::Span { start, len } => {
-                format!(
-                    "Rule::Span {{ start: &({}), len: {} }}",
+            RuleDef::Span {
+                start,
+                len,
+                offset,
+                from_year,
+                to_year,
+            } => {
+                let inner = format!(
+                    "Rule::Span {{ start: &({}), len: {}, offset: {} }}",
                     start.to_rust_code(),
-                    len
-                )
+                    len,
+                    offset
+                );
+                wrap_effective(inner, *from_year, *to_year)
             }
             RuleDef::ChineseNewYear => "Rule::ChineseNewYear".to_string(),
             RuleDef::QingMing => "Rule::QingMing".to_string(),
             RuleDef::BuddhasBirthday => "Rule::BuddhasBirthday".to_string(),
+            RuleDef::DragonBoat => "Rule::DragonBoat".to_string(),
+            RuleDef::MidAutumn => "Rule::MidAutumn".to_string(),
+            RuleDef::ChinaBridge {
+                festival,
+                from_year,
+                to_year,
+            } => {
+                let inner = format!(
+                    "Rule::ChinaBridge {{ festival: &({}) }}",
+                    festival.to_rust_code()
+                );
+                wrap_effective(inner, *from_year, *to_year)
+            }
             RuleDef::VernalEquinoxJp => "Rule::VernalEquinoxJP".to_string(),
             RuleDef::AutumnalEquinoxJp => "Rule::AutumnalEquinoxJP".to_string(),
         }

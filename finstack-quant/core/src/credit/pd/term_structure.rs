@@ -72,6 +72,9 @@ impl PdTermStructure {
     /// - For t >= last tenor: flat extrapolation of final hazard rate.
     #[must_use]
     pub fn cumulative_pd(&self, t: f64) -> f64 {
+        if !t.is_finite() {
+            return f64::NAN;
+        }
         if t <= 0.0 {
             return 0.0;
         }
@@ -125,6 +128,9 @@ impl PdTermStructure {
     /// Returns 0.0 if t2 <= t1 or survival at t1 is zero.
     #[must_use]
     pub fn marginal_pd(&self, t1: f64, t2: f64) -> f64 {
+        if !t1.is_finite() || !t2.is_finite() {
+            return f64::NAN;
+        }
         if t2 <= t1 {
             return 0.0;
         }
@@ -141,6 +147,9 @@ impl PdTermStructure {
     /// For t in [t_i, t_{i+1}]: h = -ln(S(t_{i+1})/S(t_i)) / (t_{i+1} - t_i)
     #[must_use]
     pub fn hazard_rate(&self, t: f64) -> f64 {
+        if !t.is_finite() {
+            return f64::NAN;
+        }
         if self.tenors.is_empty() {
             return 0.0;
         }
@@ -351,10 +360,22 @@ impl PdTermStructureBuilder {
             return Err(PdCalibrationError::EmptyTermStructure);
         }
 
-        // Validate tenors
-        for &(t, _) in &self.points {
+        // Validate tenors and cumulative probabilities before sorting or
+        // isotonic regression. NaN must never participate in ordering or
+        // clamping because both can turn it into plausible data.
+        for &(t, pd) in &self.points {
             if t <= 0.0 || !t.is_finite() {
                 return Err(PdCalibrationError::InvalidTenor { value: t });
+            }
+            if !pd.is_finite() {
+                return Err(PdCalibrationError::NonFiniteValue { value: pd });
+            }
+            if !(0.0..=1.0).contains(&pd) {
+                return Err(PdCalibrationError::ValueOutOfRange {
+                    value: pd,
+                    min: 0.0,
+                    max: 1.0,
+                });
             }
         }
 
@@ -376,11 +397,6 @@ impl PdTermStructureBuilder {
             }
             merged.push((sorted[i].0, sum_pd / count));
             i = j;
-        }
-
-        // Clamp PDs to [0, 1]
-        for point in &mut merged {
-            point.1 = point.1.clamp(0.0, 1.0);
         }
 
         // Enforce monotonicity via pool-adjacent-violators (isotonic regression)

@@ -59,6 +59,7 @@ fn daycount_ctx_state_roundtrip() {
         frequency: Some(Tenor::quarterly()),
         bus_basis: Some(260),
         coupon_period: None,
+        end_is_termination_date: false,
     };
     let registry = CalendarRegistry::global();
     let ctx = state.to_ctx(registry);

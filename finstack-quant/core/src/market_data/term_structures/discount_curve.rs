@@ -658,7 +658,7 @@ impl DiscountCurve {
         let t = if date == self.base {
             0.0
         } else {
-            dc.year_fraction(self.base, date, DayCountContext::default())?
+            dc.signed_year_fraction(self.base, date, DayCountContext::default())?
         };
         Ok(self.df(t))
     }
@@ -1220,17 +1220,15 @@ impl DiscountCurve {
 
     /// Create a forward curve from this discount curve.
     ///
-    /// For single-curve bootstrapping, this creates a forward curve from the
-    /// discount factors using the formula:
-    /// f(t) = -d/dt[ln(DF(t))] = -1/DF(t) * dDF/dt
-    ///
-    /// For discrete points, we use: f(t) ≈ (DF(t) - DF(t+dt)) / (dt * DF(t+dt))
+    /// For single-curve bootstrapping, this creates a fixed-tenor simple-rate
+    /// forward curve using:
+    /// `F(t, t+tau) = (DF(t) / DF(t+tau) - 1) / tau`.
     ///
     /// # Arguments
     ///
     /// * `forward_id` - Identifier for the resulting forward curve
     /// * `tenor_years` - Tenor of the forward rate in years
-    /// * `interp_style` - Optional interpolation style; defaults to `MonotoneConvex` if `None`
+    /// * `interp_style` - Optional interpolation style; defaults to `Linear` if `None`
     pub fn to_forward_curve(
         &self,
         forward_id: impl Into<CurveId>,
@@ -1239,10 +1237,15 @@ impl DiscountCurve {
     ) -> crate::Result<super::forward_curve::ForwardCurve> {
         use super::forward_curve::ForwardCurve;
 
-        // Default to the discount curve's own interpolation style
-        // (`MonotoneConvex`) so the derived forward curve is shape-consistent
-        // with its parent rather than defaulting to plain linear.
-        let style = interp_style.unwrap_or(InterpStyle::MonotoneConvex);
+        if !tenor_years.is_finite() || tenor_years <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "forward tenor must be finite and positive, got {tenor_years}"
+            )));
+        }
+
+        // Monotone-convex is a discount-factor interpolation strategy and must
+        // not be applied to already-derived forward-rate ordinates.
+        let style = interp_style.unwrap_or(InterpStyle::Linear);
 
         // Calculate forward rates at each knot point
         let mut forward_rates = Vec::with_capacity(self.knots.len());
@@ -1252,68 +1255,21 @@ impl DiscountCurve {
             return Err(crate::error::InputError::TooFewPoints.into());
         }
 
-        for i in 0..self.knots.len() {
-            let t = self.knots[i];
-            // Allow exact float comparison for well-known sentinel values (t=0, DF(0)=1).
-            #[allow(clippy::float_cmp)]
-            let forward_rate = if i == 0 {
-                // First point: use next point for forward difference
-                let t_next = self.knots[1];
-                let df = self.dfs[0];
-                let df_next = self.dfs[1];
-                let dt = t_next - t;
-
-                if dt > 0.0 && df_next > 0.0 && df > 0.0 {
-                    // Forward to the next point. When t = 0 and DF(0) = 1 this
-                    // reduces to -ln(DF_next)/t_next (the spot rate to the next
-                    // point), so no separate t=0 case is needed.
-                    (df / df_next).ln() / dt
-                } else if t > 0.0 && df > 0.0 {
-                    // Use spot rate
-                    (-df.ln()) / t
-                } else {
-                    return Err(crate::error::InputError::Invalid.into());
-                }
-            } else if i < self.knots.len() - 1 {
-                // Interior points: average of left and right segment forward rates
-                // to reduce bias from non-uniform knot spacing.
-                // f_left  = ln(DF_{i-1}/DF_i) / (t_i - t_{i-1})
-                // f_right = ln(DF_i/DF_{i+1}) / (t_{i+1} - t_i)
-                // f_i ≈ 0.5 * (f_left + f_right)
-                let t_prev = self.knots[i - 1];
-                let t_next = self.knots[i + 1];
-                let df_prev = self.dfs[i - 1];
-                let df_curr = self.dfs[i];
-                let df_next = self.dfs[i + 1];
-
-                let dt_left = t - t_prev;
-                let dt_right = t_next - t;
-                if dt_left > 0.0
-                    && dt_right > 0.0
-                    && df_prev > 0.0
-                    && df_curr > 0.0
-                    && df_next > 0.0
-                {
-                    let f_left = (df_prev / df_curr).ln() / dt_left;
-                    let f_right = (df_curr / df_next).ln() / dt_right;
-                    0.5 * (f_left + f_right)
-                } else {
-                    return Err(crate::error::InputError::Invalid.into());
-                }
-            } else {
-                // Last point: use backward difference
-                let t_prev = self.knots[i - 1];
-                let df = self.dfs[i];
-                let df_prev = self.dfs[i - 1];
-                let dt = t - t_prev;
-
-                if dt > 0.0 && df > 0.0 && df_prev > 0.0 {
-                    (df_prev / df).ln() / dt
-                } else {
-                    return Err(crate::error::InputError::Invalid.into());
-                }
-            };
-
+        for &t in self.knots.iter() {
+            let df_start = self.df(t);
+            let df_end = self.df(t + tenor_years);
+            if !df_start.is_finite() || !df_end.is_finite() || df_start <= 0.0 || df_end <= 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "cannot derive forward at t={t}: invalid discount factors \
+                     DF(t)={df_start}, DF(t+tenor)={df_end}"
+                )));
+            }
+            let forward_rate = (df_start / df_end - 1.0) / tenor_years;
+            if !forward_rate.is_finite() {
+                return Err(crate::Error::Validation(format!(
+                    "derived non-finite forward rate at t={t}"
+                )));
+            }
             forward_rates.push((t, forward_rate));
         }
 

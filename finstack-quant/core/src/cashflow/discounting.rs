@@ -316,7 +316,7 @@ pub fn npv_with_ctx<D: Discounting + ?Sized>(
 ///   slice is empty
 /// - Day count year fraction calculation fails
 /// - [`Error::CurrencyMismatch`](crate::Error::CurrencyMismatch): Mixed currencies
-/// - The discount factor at the valuation date is non-finite or non-positive
+/// - A discount factor is non-finite or non-positive
 pub fn npv_with_options<D: Discounting + ?Sized>(
     disc: &D,
     base: Date,
@@ -374,7 +374,12 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
         }
         let t = day_count.signed_year_fraction(curve_base, *d, ctx)?;
         let df = disc.df(t) / df_base;
-        let disc_amt = *amt * df;
+        if !df.is_finite() || df <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "npv: discount factor for cashflow date {d} is invalid: {df}"
+            )));
+        }
+        let disc_amt = amt.checked_mul_f64(df)?;
         total = total.checked_add(disc_amt)?;
     }
     Ok(total)
@@ -565,6 +570,7 @@ mod hardening_tests {
             frequency: None,
             bus_basis: None,
             coupon_period: None,
+            end_is_termination_date: false,
         };
 
         let pv = npv_with_ctx(&curve, base, Some(DayCount::Bus252), ctx, &flows)
@@ -683,6 +689,29 @@ mod tests {
         }
     }
 
+    struct InvalidFlowDfCurve {
+        id: CurveId,
+    }
+
+    impl TermStructure for InvalidFlowDfCurve {
+        fn id(&self) -> &CurveId {
+            &self.id
+        }
+    }
+
+    impl Discounting for InvalidFlowDfCurve {
+        fn base_date(&self) -> Date {
+            Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
+        }
+        fn df(&self, t: f64) -> f64 {
+            if t.abs() < f64::EPSILON {
+                1.0
+            } else {
+                f64::NAN
+            }
+        }
+    }
+
     impl Discounting for InvalidBaseDfCurve {
         fn base_date(&self) -> Date {
             Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
@@ -758,6 +787,34 @@ mod tests {
         assert!(
             err.to_string()
                 .contains("discount factor at the valuation date"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn npv_with_options_rejects_invalid_cashflow_discount_factor() {
+        let curve = InvalidFlowDfCurve {
+            id: CurveId::new("BAD-FLOW-DF"),
+        };
+        let base = curve.base_date();
+        let flows = vec![(
+            base + time::Duration::days(1),
+            Money::new(10.0, Currency::USD),
+        )];
+
+        let err = npv_with_options(
+            &curve,
+            base,
+            Some(DayCount::Act365F),
+            DayCountContext::default(),
+            NpvOptions::default(),
+            &flows,
+        )
+        .expect_err("non-finite cashflow discount factor should be rejected");
+
+        assert!(
+            err.to_string()
+                .contains("discount factor for cashflow date"),
             "unexpected error: {err}"
         );
     }

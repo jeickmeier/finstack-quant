@@ -10,6 +10,8 @@ use std::io;
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=data/iso_4217.csv");
     println!("cargo:rerun-if-changed=data/chinese_new_year.csv");
+    println!("cargo:rerun-if-changed=data/dragon_boat.csv");
+    println!("cargo:rerun-if-changed=data/mid_autumn.csv");
     println!("cargo:rerun-if-changed=data/calendars");
     println!("cargo:rerun-if-changed=build/currency_build.rs");
     println!("cargo:rerun-if-changed=build/generate_calendars.rs");

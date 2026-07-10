@@ -428,6 +428,20 @@ fn test_end_of_month_convention() {
 }
 
 #[test]
+fn stub_none_rejects_maturity_hidden_by_eom_snap() {
+    let result = ScheduleBuilder::new(make_date(2025, 1, 15), make_date(2025, 2, 20))
+        .unwrap()
+        .frequency(Tenor::monthly())
+        .stub_rule(StubKind::None)
+        .end_of_month(true)
+        .build();
+    assert!(
+        result.is_err(),
+        "EOM must not hide an undeclared final stub"
+    );
+}
+
+#[test]
 fn test_end_of_month_with_leap_year() {
     // Test EOM convention with leap year (intermediate snapping only)
     let start = make_date(2024, 1, 15); // 2024 is a leap year

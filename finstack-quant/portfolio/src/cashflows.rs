@@ -758,7 +758,11 @@ mod tests {
         let full = aggregate_full_cashflows(&portfolio, &build_test_market_at(as_of))
             .expect("agency cashflow aggregation");
 
-        assert!(!full.events.is_empty(), "agency provider should emit flows");
+        assert!(
+            !full.events.is_empty(),
+            "agency provider should emit flows, issues={:?}",
+            full.issues
+        );
         assert!(
             full.issues.is_empty(),
             "agency provider should not raise issues"

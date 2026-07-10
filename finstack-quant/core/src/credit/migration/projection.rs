@@ -55,7 +55,7 @@ use super::{
 /// assert!(p1.probability("AAA", "D").unwrap() > 0.0);
 /// ```
 pub fn project(generator: &GeneratorMatrix, t: f64) -> Result<TransitionMatrix, MigrationError> {
-    if t <= 0.0 {
+    if !t.is_finite() || t <= 0.0 {
         return Err(MigrationError::InvalidHorizon(t));
     }
     let a = generator.data.scale(t);

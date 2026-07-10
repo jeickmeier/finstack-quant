@@ -201,13 +201,13 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(23),
-                must_have: &[(2024, 2, 10), (2024, 5, 1), (2024, 10, 1)],
+                expected_count: Some(26),
+                must_have: &[(2024, 2, 10), (2024, 5, 1), (2024, 10, 1), (2024, 6, 10)],
             },
             YearCheck {
                 year: 2025,
-                expected_count: Some(23),
-                must_have: &[(2025, 1, 29), (2025, 5, 1), (2025, 10, 1)],
+                expected_count: Some(24),
+                must_have: &[(2025, 1, 29), (2025, 5, 1), (2025, 10, 1), (2025, 6, 2)],
             },
         ],
     },
@@ -217,13 +217,41 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: None,
-                must_have: &[(2024, 2, 10), (2024, 5, 1), (2024, 10, 1)],
+                expected_count: Some(26),
+                // Dragon Boat (6/10), Mid-Autumn (9/17), CNY eve (2/9) were
+                // previously missing / hardcoded.
+                must_have: &[
+                    (2024, 2, 9),
+                    (2024, 2, 10),
+                    (2024, 5, 1),
+                    (2024, 6, 10),
+                    (2024, 9, 17),
+                    (2024, 10, 1),
+                ],
             },
             YearCheck {
                 year: 2025,
-                expected_count: None,
-                must_have: &[(2025, 1, 29), (2025, 5, 1), (2025, 10, 1)],
+                expected_count: Some(24),
+                must_have: &[
+                    (2025, 1, 28),
+                    (2025, 1, 29),
+                    (2025, 5, 1),
+                    (2025, 6, 2),
+                    (2025, 10, 1),
+                    (2025, 10, 8),
+                ],
+            },
+            YearCheck {
+                year: 2026,
+                // 2026 is fully rule-generated (no exact_date needed).
+                expected_count: Some(25),
+                must_have: &[
+                    (2026, 2, 16),
+                    (2026, 4, 6),
+                    (2026, 6, 19),
+                    (2026, 9, 25),
+                    (2026, 10, 1),
+                ],
             },
         ],
     },
@@ -387,6 +415,129 @@ fn check_cny_dates(dates: &[(i32, u8, u8)]) {
             );
         }
     }
+}
+
+// ============================================
+// Mainland China (SSE / CNBE) closure notices
+// ============================================
+
+/// Every date SSE officially announced as closed for 2024-2026 must be a
+/// non-business day, and each post-holiday reopen weekday must be a business
+/// day. Ranges transcribed from the SSE 休市安排 notices (2023-12, 2024-12,
+/// 2025-12). CNBE mirrors the same national arrangement.
+#[test]
+fn sse_cnbe_match_official_closure_notices_2024_2026() {
+    // Inclusive (start, end) closed ranges per SSE notices.
+    type Ymd = (i32, u8, u8);
+    let closed: &[(Ymd, Ymd)] = &[
+        // 2024
+        ((2024, 1, 1), (2024, 1, 1)),
+        ((2024, 2, 9), (2024, 2, 17)),
+        ((2024, 4, 4), (2024, 4, 6)),
+        ((2024, 5, 1), (2024, 5, 5)),
+        ((2024, 6, 8), (2024, 6, 10)),
+        ((2024, 9, 15), (2024, 9, 17)),
+        ((2024, 10, 1), (2024, 10, 7)),
+        // 2025
+        ((2025, 1, 1), (2025, 1, 1)),
+        ((2025, 1, 28), (2025, 2, 4)),
+        ((2025, 4, 4), (2025, 4, 6)),
+        ((2025, 5, 1), (2025, 5, 5)),
+        ((2025, 5, 31), (2025, 6, 2)),
+        ((2025, 10, 1), (2025, 10, 8)),
+        // 2026
+        ((2026, 1, 1), (2026, 1, 3)),
+        ((2026, 2, 15), (2026, 2, 23)),
+        ((2026, 4, 4), (2026, 4, 6)),
+        ((2026, 5, 1), (2026, 5, 5)),
+        ((2026, 6, 19), (2026, 6, 21)),
+        ((2026, 9, 25), (2026, 9, 27)),
+        ((2026, 10, 1), (2026, 10, 7)),
+    ];
+
+    // Post-holiday reopen weekdays (business days again).
+    let reopen: &[Ymd] = &[
+        (2024, 1, 2),
+        (2024, 2, 19),
+        (2024, 5, 6),
+        (2025, 1, 2),
+        (2025, 2, 5),
+        (2025, 5, 6),
+        (2025, 6, 3),
+        (2026, 1, 5),
+        (2026, 2, 24),
+        (2026, 5, 6),
+        (2026, 6, 22),
+        (2026, 9, 28),
+        (2026, 10, 8),
+    ];
+
+    for cal in [&Sse as &dyn HolidayCalendar, &Cnbe] {
+        let id = cal.metadata().unwrap().id;
+        for &((sy, sm, sd), (ey, em, ed)) in closed {
+            let mut d = make_date(sy, sm, sd);
+            let end = make_date(ey, em, ed);
+            while d <= end {
+                assert!(
+                    !cal.is_business_day(d),
+                    "{id}: {d} should be closed (official holiday range)"
+                );
+                d += time::Duration::days(1);
+            }
+        }
+        for &(y, m, d) in reopen {
+            assert!(
+                cal.is_business_day(make_date(y, m, d)),
+                "{id}: {y}-{m:02}-{d:02} should be a business day (reopen)"
+            );
+        }
+    }
+}
+
+/// Regression guard for holidays that were previously missing entirely (Dragon
+/// Boat, Mid-Autumn) or only present as hardcoded single-year `exact_date`
+/// patches. These are now derived from lunar tables + the 连休 bridge rules.
+#[test]
+fn sse_lunar_festivals_and_bridges_present() {
+    // (date, note) — every one is a weekday, so is_holiday must be true.
+    let must_be_holiday: &[(i32, u8, u8)] = &[
+        (2024, 6, 10), // Dragon Boat (Mon)
+        (2024, 9, 16), // Mid-Autumn bridge (Mon)
+        (2024, 9, 17), // Mid-Autumn (Tue)
+        (2024, 2, 9),  // Spring Festival eve (Fri)
+        (2024, 4, 5),  // Qingming bridge (Fri)
+        (2025, 1, 28), // Spring Festival eve (Tue)
+        (2025, 6, 2),  // Dragon Boat substitute Monday
+        (2025, 10, 8), // National / Mid-Autumn merged 8th day
+        (2026, 6, 19), // Dragon Boat (Fri)
+        (2026, 9, 25), // Mid-Autumn (Fri)
+        (2026, 4, 6),  // Qingming substitute Monday
+        (2026, 1, 2),  // New Year bridge Friday
+        (2026, 2, 16), // Spring Festival eve (Mon)
+    ];
+    for &(y, m, d) in must_be_holiday {
+        assert!(
+            Sse.is_holiday(make_date(y, m, d)),
+            "SSE should mark {y}-{m:02}-{d:02} as a holiday"
+        );
+    }
+
+    // Dragon Boat and Mid-Autumn only became statutory in 2008; SSE traded on
+    // them before then. 2007 Dragon Boat = Jun 19, 2007 Mid-Autumn = Sep 25.
+    assert!(
+        Sse.is_business_day(make_date(2007, 6, 19)),
+        "Dragon Boat pre-dates its 2008 adoption"
+    );
+    assert!(
+        Sse.is_business_day(make_date(2007, 9, 25)),
+        "Mid-Autumn pre-dates its 2008 adoption"
+    );
+    // 2008 was the first year Dragon Boat was observed; it fell on Sunday
+    // Jun 8, so the market closure is the substitute Monday Jun 9.
+    assert!(
+        Sse.is_holiday(make_date(2008, 6, 9)),
+        "Dragon Boat 2008 substitute Monday"
+    );
 }
 
 #[test]

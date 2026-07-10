@@ -13,6 +13,7 @@ import pytest
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import (
     DayCount,
+    DayCountContext,
     PeriodId,
     build_periods,
 )
@@ -144,6 +145,14 @@ class TestCoreTypesParity:
         assert pos_zero == neg_zero
         assert hash(pos_zero) == hash(neg_zero)
 
+    def test_student_t_invalid_degrees_of_freedom_raises(self) -> None:
+        from finstack_quant.core.math import special_functions
+
+        with pytest.raises(ValueError, match="df"):
+            special_functions.student_t_cdf(0.0, 0.0)
+        with pytest.raises(ValueError, match="df"):
+            special_functions.student_t_inv_cdf(0.5, math.nan)
+
     def test_percentage_hash_matches_equality_for_signed_zero(self) -> None:
         pos_zero = Percentage(0.0)
         neg_zero = Percentage(-0.0)
@@ -172,6 +181,13 @@ class TestDayCountParity:
         start, end = date(2024, 1, 15), date(2024, 7, 15)
         yf = DayCount.THIRTY_360.year_fraction(start, end)
         assert yf == pytest.approx(180.0 / 360.0, abs=1e-10)
+
+    def test_thirty_e_360_isda_termination_context(self) -> None:
+        start, end = date(2025, 1, 31), date(2025, 2, 28)
+        regular = DayCount.THIRTY_E_360_ISDA.year_fraction(start, end)
+        terminal = DayCount.THIRTY_E_360_ISDA.year_fraction(start, end, DayCountContext(end_is_termination_date=True))
+        assert regular == pytest.approx(30.0 / 360.0)
+        assert terminal == pytest.approx(28.0 / 360.0)
 
     def test_calendar_days_static(self) -> None:
         """calendar_days is a static method returning signed day count."""
@@ -379,6 +395,17 @@ class TestFxMatrixParity:
         usd = Currency("USD")
         result = fx.rate(usd, usd, date(2024, 1, 1), FxConversionPolicy.CASHFLOW_DATE)
         assert result.rate == pytest.approx(1.0)
+
+    def test_date_scoped_quote_does_not_shadow_other_dates(self) -> None:
+        fx = FxMatrix()
+        eur, usd = Currency("EUR"), Currency("USD")
+        fixing_date = date(2024, 1, 2)
+        fx.set_quote_on(eur, usd, fixing_date, "cashflow_date", 1.10)
+
+        result = fx.rate(eur, usd, fixing_date, FxConversionPolicy.CASHFLOW_DATE)
+        assert result.rate == pytest.approx(1.10)
+        with pytest.raises(KeyError, match="FX"):
+            fx.rate(eur, usd, date(2024, 1, 3), FxConversionPolicy.CASHFLOW_DATE)
 
 
 class TestMarketContextParity:

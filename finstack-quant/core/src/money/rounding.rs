@@ -62,19 +62,6 @@ pub(crate) fn repr_div_f64(a: AmountRepr, rhs: f64) -> AmountRepr {
         .expect("Money division requires finite, non-zero, representable scalar")
 }
 
-/// Round `x` to `dp` decimal places using the supplied [`RoundingMode`].
-/// Converts f64 input to Decimal for proper rounding.
-///
-/// # Panics
-///
-/// Panics if `x` is not finite or cannot be represented as a Decimal.
-/// Use [`try_round_f64`] for explicit error handling at API boundaries.
-#[inline]
-#[allow(clippy::expect_used)] // Caller contract: `x` must be finite and representable.
-pub(crate) fn round_f64(x: f64, dp: i32, mode: RoundingMode) -> Decimal {
-    try_round_f64(x, dp, mode).expect("Money rounding requires finite, representable scalar")
-}
-
 /// Fallible multiplication by an `f64` scalar (no silent substitution).
 #[inline]
 pub(crate) fn try_repr_mul_f64(a: AmountRepr, rhs: f64) -> Result<AmountRepr, Error> {
@@ -153,6 +140,12 @@ pub(crate) fn try_round_f64(x: f64, dp: i32, mode: RoundingMode) -> Result<Decim
         return Err(InputError::ConversionOverflow.into());
     };
     Ok(round_decimal(decimal, dp, mode))
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+fn round_f64(x: f64, dp: i32, mode: RoundingMode) -> Decimal {
+    try_round_f64(x, dp, mode).expect("Money rounding requires finite, representable scalar")
 }
 
 /// Round a Decimal to `dp` decimal places using the supplied [`RoundingMode`].

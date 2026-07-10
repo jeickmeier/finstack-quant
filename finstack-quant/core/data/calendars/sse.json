@@ -2,10 +2,26 @@
   "id": "sse",
   "name": "Shanghai Stock Exchange (SSE) Holidays",
   "ignore_weekends": false,
+  "comment": "Rule-based mainland China exchange calendar. Single-day statutory festivals use the modern 3-day 连休 (china_bridge) convention codified by the State Council (Nov 2024, effective 2025). Dragon Boat, Mid-Autumn and Qingming became national holidays in 2008 (from_year gated). exact_date is reserved for genuine irregulars the rules cannot derive (e.g. 调休 that merges two holidays).",
   "rules": [
-    { "type": "span", "name": "Spring Festival (Chinese New Year) Holiday", "start": { "type": "chinese_new_year" }, "len": 7 },
-    { "type": "qing_ming", "name": "Qingming Festival" },
-    { "type": "span", "name": "Labour Day Holiday", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 5 },
-    { "type": "span", "name": "National Day Golden Week", "start": { "type": "fixed", "month": "october", "day": 1 }, "len": 7 }
+    { "type": "china_bridge", "name": "New Year's Day", "festival": { "type": "fixed", "month": "january", "day": 1 } },
+
+    { "type": "span", "name": "Spring Festival (7-day break from Lunar New Year, pre-2025)", "start": { "type": "chinese_new_year" }, "len": 7, "to_year": 2024 },
+    { "type": "span", "name": "Spring Festival (8-day break from Lunar New Year's Eve, 2025+)", "start": { "type": "chinese_new_year" }, "offset": -1, "len": 8, "from_year": 2025 },
+
+    { "type": "china_bridge", "name": "Qingming Festival", "festival": { "type": "qing_ming" }, "from_year": 2008 },
+
+    { "type": "span", "name": "Labour Day Golden Week (7 days, 2000-2007)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 7, "from_year": 2000, "to_year": 2007 },
+    { "type": "span", "name": "Labour Day (3 days, 2008-2019)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 3, "from_year": 2008, "to_year": 2019 },
+    { "type": "span", "name": "Labour Day (5 days, 2020+)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 5, "from_year": 2020 },
+
+    { "type": "china_bridge", "name": "Dragon Boat Festival", "festival": { "type": "dragon_boat" }, "from_year": 2008 },
+
+    { "type": "china_bridge", "name": "Mid-Autumn Festival", "festival": { "type": "mid_autumn" }, "from_year": 2008 },
+
+    { "type": "span", "name": "National Day Golden Week", "start": { "type": "fixed", "month": "october", "day": 1 }, "len": 7 },
+
+    { "type": "exact_date", "name": "Spring Festival Eve (2024 ad-hoc 调休, pre-codification)", "year": 2024, "month": "february", "day": 9 },
+    { "type": "exact_date", "name": "National Day / Mid-Autumn merged 8th day (2025)", "year": 2025, "month": "october", "day": 8 }
   ]
 }

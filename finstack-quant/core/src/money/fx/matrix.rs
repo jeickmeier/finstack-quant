@@ -34,6 +34,82 @@ struct ObservedQuote {
     triangulated: bool,
 }
 
+fn effective_snapshot_rate(
+    global: &HashMap<Pair, f64>,
+    pinned: &HashMap<Pair, f64>,
+    observed: &HashMap<Pair, f64>,
+    from: Currency,
+    to: Currency,
+) -> Option<f64> {
+    let direct = Pair(from, to);
+    let reverse = Pair(to, from);
+    global
+        .get(&direct)
+        .copied()
+        .or_else(|| pinned.get(&direct).copied())
+        .or_else(|| pinned.get(&reverse).map(|rate| 1.0 / rate))
+        .or_else(|| global.get(&reverse).map(|rate| 1.0 / rate))
+        .or_else(|| observed.get(&direct).copied())
+        .or_else(|| observed.get(&reverse).map(|rate| 1.0 / rate))
+}
+
+fn validate_fx_snapshot(
+    global: &HashMap<Pair, f64>,
+    pinned: &HashMap<Pair, f64>,
+    observed: &HashMap<Pair, f64>,
+    tolerance_bps: f64,
+    scope: &str,
+) -> crate::Result<()> {
+    let mut currencies = HashSet::default();
+    for pair in global.keys().chain(pinned.keys()).chain(observed.keys()) {
+        currencies.insert(pair.0);
+        currencies.insert(pair.1);
+    }
+    let mut currencies: Vec<_> = currencies.into_iter().collect();
+    currencies.sort();
+
+    // Check explicit two-way inconsistencies as well as three-currency cycles.
+    for (i, &a) in currencies.iter().enumerate() {
+        for &b in currencies.iter().skip(i + 1) {
+            let (Some(ab), Some(ba)) = (
+                effective_snapshot_rate(global, pinned, observed, a, b),
+                effective_snapshot_rate(global, pinned, observed, b, a),
+            ) else {
+                continue;
+            };
+            let product = ab * ba;
+            let deviation_bps = (product - 1.0).abs() * 10_000.0;
+            if deviation_bps > tolerance_bps {
+                return Err(crate::Error::Validation(format!(
+                    "reciprocal FX inconsistency in {scope} for {a}<->{b}: product {product:.12} ({deviation_bps:.6} bps)"
+                )));
+            }
+        }
+    }
+
+    for (i, &a) in currencies.iter().enumerate() {
+        for (j, &b) in currencies.iter().enumerate().skip(i + 1) {
+            for &c in currencies.iter().skip(j + 1) {
+                let (Some(ab), Some(bc), Some(ca)) = (
+                    effective_snapshot_rate(global, pinned, observed, a, b),
+                    effective_snapshot_rate(global, pinned, observed, b, c),
+                    effective_snapshot_rate(global, pinned, observed, c, a),
+                ) else {
+                    continue;
+                };
+                let product = ab * bc * ca;
+                let deviation_bps = (product - 1.0).abs() * 10_000.0;
+                if deviation_bps > tolerance_bps {
+                    return Err(crate::Error::Validation(format!(
+                        "triangular arbitrage detected in {scope} for {a}->{b}->{c}->{a}: cycle product {product:.12} ({deviation_bps:.6} bps)"
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Simplified FX matrix that stores quotes and computes cross rates on demand.
 ///
 /// Note: `FxMatrix` cannot be directly serialized due to the trait object
@@ -625,73 +701,57 @@ impl FxMatrix {
             )));
         }
 
-        let mut rates: HashMap<(Currency, Currency), f64> = HashMap::default();
-        let mut currencies: HashSet<Currency> = HashSet::default();
+        let global: HashMap<Pair, f64> = self.quotes.lock().clone();
+        validate_fx_snapshot(
+            &global,
+            &HashMap::default(),
+            &HashMap::default(),
+            tolerance_bps,
+            "global",
+        )?;
 
+        // Date/policy-sensitive quotes must only be compared within the same
+        // market snapshot. Combining observations from different dates creates
+        // false arbitrage signals in a moving FX market.
+        type Scope = (Date, FxConversionPolicy);
+        type ScopedRates = (HashMap<Pair, f64>, HashMap<Pair, f64>);
+        let mut scoped: HashMap<Scope, ScopedRates> = HashMap::default();
         {
-            let quotes = self.quotes.lock();
-            for (pair, &rate) in quotes.iter() {
-                if rate.is_finite() && rate > 0.0 {
-                    rates.entry((pair.0, pair.1)).or_insert(rate);
-                    currencies.insert(pair.0);
-                    currencies.insert(pair.1);
-                }
-            }
-        }
-
-        {
-            let quotes = self.observed_quotes.lock();
-            for (query, &quote) in quotes.iter() {
+            let observed = self.observed_quotes.lock();
+            for (query, quote) in observed.iter() {
                 if quote.rate.is_finite() && quote.rate > 0.0 {
-                    rates.entry((query.from, query.to)).or_insert(quote.rate);
-                    currencies.insert(query.from);
-                    currencies.insert(query.to);
+                    scoped
+                        .entry((query.on, query.policy))
+                        .or_default()
+                        .1
+                        .insert(Pair(query.from, query.to), quote.rate);
                 }
             }
         }
-
         {
-            let quotes = self.pinned_quotes.lock();
-            for (query, &rate) in quotes.iter() {
+            let pinned = self.pinned_quotes.lock();
+            for (query, &rate) in pinned.iter() {
                 if rate.is_finite() && rate > 0.0 {
-                    rates.entry((query.from, query.to)).or_insert(rate);
-                    currencies.insert(query.from);
-                    currencies.insert(query.to);
+                    scoped
+                        .entry((query.on, query.policy))
+                        .or_default()
+                        .0
+                        .insert(Pair(query.from, query.to), rate);
                 }
             }
         }
 
-        // Deterministic iteration order so a violating cycle is reported
-        // identically across runs .
-        let mut currencies: Vec<Currency> = currencies.into_iter().collect();
-        currencies.sort();
-        for &a in &currencies {
-            for &b in &currencies {
-                if a == b {
-                    continue;
-                }
-                for &c in &currencies {
-                    if a == c || b == c {
-                        continue;
-                    }
-
-                    let (Some(&ab), Some(&bc), Some(&ca)) =
-                        (rates.get(&(a, b)), rates.get(&(b, c)), rates.get(&(c, a)))
-                    else {
-                        continue;
-                    };
-
-                    let cycle_product = ab * bc * ca;
-                    let deviation_bps = (cycle_product - 1.0).abs() * 10_000.0;
-                    if deviation_bps > tolerance_bps {
-                        return Err(crate::Error::Validation(format!(
-                            "triangular arbitrage detected for {a}->{b}->{c}->{a}: cycle product {cycle_product:.12} ({deviation_bps:.6} bps)"
-                        )));
-                    }
-                }
-            }
+        let mut scopes: Vec<_> = scoped.into_iter().collect();
+        scopes.sort_by_key(|((date, policy), _)| (*date, *policy as u8));
+        for ((date, policy), (pinned, observed)) in scopes {
+            validate_fx_snapshot(
+                &global,
+                &pinned,
+                &observed,
+                tolerance_bps,
+                &format!("{date}/{policy}"),
+            )?;
         }
-
         Ok(())
     }
 

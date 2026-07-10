@@ -58,6 +58,11 @@ impl PyDayCount {
     const THIRTY_E_360: PyDayCount = PyDayCount {
         inner: DayCount::ThirtyE360,
     };
+    /// 30E/360 ISDA.
+    #[classattr]
+    const THIRTY_E_360_ISDA: PyDayCount = PyDayCount {
+        inner: DayCount::ThirtyE360Isda,
+    };
     /// Actual/Actual (ISDA).
     #[classattr]
     const ACT_ACT: PyDayCount = PyDayCount {
@@ -152,9 +157,10 @@ impl PyDayCount {
             DayCount::Act365L => 2,
             DayCount::Thirty360 => 3,
             DayCount::ThirtyE360 => 4,
-            DayCount::ActAct => 5,
-            DayCount::ActActIsma => 6,
-            DayCount::Bus252 => 7,
+            DayCount::ThirtyE360Isda => 5,
+            DayCount::ActAct => 6,
+            DayCount::ActActIsma => 7,
+            DayCount::Bus252 => 8,
             #[allow(unreachable_patterns)]
             _ => 255,
         }
@@ -185,6 +191,8 @@ pub struct PyDayCountContext {
         finstack_quant_core::dates::Date,
         finstack_quant_core::dates::Date,
     )>,
+    /// Whether the accrual end is the instrument termination date.
+    end_is_termination_date: bool,
 }
 
 impl PyDayCountContext {
@@ -208,6 +216,7 @@ impl PyDayCountContext {
             frequency: self.frequency,
             bus_basis: self.bus_basis,
             coupon_period: self.coupon_period,
+            end_is_termination_date: self.end_is_termination_date,
         })
     }
 }
@@ -220,12 +229,13 @@ impl PyDayCountContext {
     /// ``datetime.date`` giving the reference coupon period for
     /// ACT/ACT (ICMA).
     #[new]
-    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None, coupon_period=None))]
+    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None, coupon_period=None, end_is_termination_date=false))]
     fn new(
         calendar_id: Option<String>,
         frequency: Option<PyRef<PyTenor>>,
         bus_basis: Option<u16>,
         coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+        end_is_termination_date: bool,
     ) -> PyResult<Self> {
         let coupon_period = coupon_period
             .map(|(s, e)| Ok::<_, PyErr>((py_to_date(&s)?, py_to_date(&e)?)))
@@ -235,6 +245,7 @@ impl PyDayCountContext {
             frequency: frequency.map(|f| f.inner),
             bus_basis,
             coupon_period,
+            end_is_termination_date,
         })
     }
 
@@ -267,6 +278,12 @@ impl PyDayCountContext {
             .transpose()
     }
 
+    /// Whether the accrual end is the instrument termination date.
+    #[getter]
+    fn end_is_termination_date(&self) -> bool {
+        self.end_is_termination_date
+    }
+
     /// Convert to a serializable state snapshot.
     fn to_state(&self) -> PyDayCountContextState {
         PyDayCountContextState {
@@ -275,14 +292,19 @@ impl PyDayCountContext {
                 frequency: self.frequency,
                 bus_basis: self.bus_basis,
                 coupon_period: self.coupon_period,
+                end_is_termination_date: self.end_is_termination_date,
             },
         }
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "DayCountContext(calendar_id={:?}, frequency={:?}, bus_basis={:?}, coupon_period={:?})",
-            self.calendar_id, self.frequency, self.bus_basis, self.coupon_period,
+            "DayCountContext(calendar_id={:?}, frequency={:?}, bus_basis={:?}, coupon_period={:?}, end_is_termination_date={})",
+            self.calendar_id,
+            self.frequency,
+            self.bus_basis,
+            self.coupon_period,
+            self.end_is_termination_date,
         )
     }
 }
@@ -315,12 +337,13 @@ impl PyDayCountContextState {
     /// ``coupon_period`` is an optional ``(start, end)`` pair of
     /// ``datetime.date``.
     #[new]
-    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None, coupon_period=None))]
+    #[pyo3(signature = (calendar_id=None, frequency=None, bus_basis=None, coupon_period=None, end_is_termination_date=false))]
     fn new(
         calendar_id: Option<String>,
         frequency: Option<PyRef<PyTenor>>,
         bus_basis: Option<u16>,
         coupon_period: Option<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+        end_is_termination_date: bool,
     ) -> PyResult<Self> {
         let coupon_period = coupon_period
             .map(|(s, e)| Ok::<_, PyErr>((py_to_date(&s)?, py_to_date(&e)?)))
@@ -331,6 +354,7 @@ impl PyDayCountContextState {
                 frequency: frequency.map(|f| f.inner),
                 bus_basis,
                 coupon_period,
+                end_is_termination_date,
             },
         })
     }
@@ -342,6 +366,7 @@ impl PyDayCountContextState {
             frequency: self.inner.frequency,
             bus_basis: self.inner.bus_basis,
             coupon_period: self.inner.coupon_period,
+            end_is_termination_date: self.inner.end_is_termination_date,
         }
     }
 
@@ -375,11 +400,20 @@ impl PyDayCountContextState {
             .transpose()
     }
 
+    /// Whether the accrual end is the instrument termination date.
+    #[getter]
+    fn end_is_termination_date(&self) -> bool {
+        self.inner.end_is_termination_date
+    }
+
     fn __repr__(&self) -> String {
         format!(
-            "DayCountContextState(calendar_id={:?}, frequency={:?}, bus_basis={:?}, coupon_period={:?})",
-            self.inner.calendar_id, self.inner.frequency, self.inner.bus_basis,
+            "DayCountContextState(calendar_id={:?}, frequency={:?}, bus_basis={:?}, coupon_period={:?}, end_is_termination_date={})",
+            self.inner.calendar_id,
+            self.inner.frequency,
+            self.inner.bus_basis,
             self.inner.coupon_period,
+            self.inner.end_is_termination_date,
         )
     }
 }

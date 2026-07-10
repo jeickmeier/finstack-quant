@@ -125,7 +125,12 @@ impl Discretization<RoughBergomiProcess> for RoughBergomiEuler {
         let two_h = 2.0 * h;
         let y_t = work[0];
         let exponent = eta * y_t - 0.5 * eta * eta * t.powf(two_h);
-        let v_t = (params.xi.value(t) * exponent.exp()).max(0.0);
+        let raw_variance = params.xi.value(t) * exponent.exp();
+        let v_t = if raw_variance.is_finite() {
+            raw_variance.max(0.0)
+        } else {
+            raw_variance
+        };
 
         // Correlate spot noise with the Volterra driver. The Bayer-Friz-Gatheral
         // coupling is dW·dW̃ = ρ dt, so the correlated spot normal is built from

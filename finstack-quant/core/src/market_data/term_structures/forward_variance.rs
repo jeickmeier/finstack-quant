@@ -91,7 +91,7 @@ impl ForwardVarianceCurve {
     ///
     /// Returns an error if `v0` is not positive.
     pub fn flat(v0: f64) -> crate::Result<Self> {
-        if v0 <= 0.0 {
+        if !v0.is_finite() || v0 <= 0.0 {
             return Err(crate::Error::Validation(format!(
                 "ForwardVarianceCurve: flat variance must be positive, got {v0}"
             )));
@@ -127,7 +127,7 @@ impl ForwardVarianceCurve {
         let mut values = Vec::with_capacity(sorted.len());
 
         for (i, &(t, v)) in sorted.iter().enumerate() {
-            if t < 0.0 {
+            if !t.is_finite() || t < 0.0 {
                 return Err(crate::Error::Validation(format!(
                     "ForwardVarianceCurve: time must be >= 0, got {t} at index {i}"
                 )));
@@ -139,7 +139,7 @@ impl ForwardVarianceCurve {
                     times[i - 1]
                 )));
             }
-            if v <= 0.0 {
+            if !v.is_finite() || v <= 0.0 {
                 return Err(crate::Error::Validation(format!(
                     "ForwardVarianceCurve: forward variance must be positive, \
                      got {v} at time {t}"
@@ -158,6 +158,9 @@ impl ForwardVarianceCurve {
     /// boundaries.
     pub fn value(&self, t: f64) -> f64 {
         debug_assert!(!self.times.is_empty());
+        if !t.is_finite() {
+            return f64::NAN;
+        }
 
         let n = self.times.len();
 
@@ -195,6 +198,9 @@ impl ForwardVarianceCurve {
     /// boundaries.
     pub fn integrated_variance(&self, t: f64) -> f64 {
         debug_assert!(!self.times.is_empty());
+        if !t.is_finite() {
+            return f64::NAN;
+        }
 
         if t <= 0.0 {
             return 0.0;
@@ -340,5 +346,17 @@ mod tests {
     #[test]
     fn validation_rejects_negative_time() {
         assert!(ForwardVarianceCurve::from_points(&[(-1.0, 0.04)]).is_err());
+    }
+
+    #[test]
+    fn validation_rejects_non_finite_data_and_queries_propagate_nan() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(ForwardVarianceCurve::flat(value).is_err());
+            assert!(ForwardVarianceCurve::from_points(&[(value, 0.04)]).is_err());
+            assert!(ForwardVarianceCurve::from_points(&[(1.0, value)]).is_err());
+        }
+        let curve = ForwardVarianceCurve::flat(0.04).unwrap();
+        assert!(curve.value(f64::NAN).is_nan());
+        assert!(curve.integrated_variance(f64::INFINITY).is_nan());
     }
 }
