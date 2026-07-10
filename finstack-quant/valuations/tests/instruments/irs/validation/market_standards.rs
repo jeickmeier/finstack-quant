@@ -1452,7 +1452,9 @@ fn test_ois_identity_with_eom() {
             day_count: DayCount::Act360,
             bdc: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
-            stub: StubKind::None,
+            // Feb 29 to Aug 30 is not an integer number of quarterly tenors;
+            // preserve the contractual maturity with a final short stub.
+            stub: StubKind::ShortBack,
             start,
             end,
             par_method: None,
@@ -1468,7 +1470,8 @@ fn test_ois_identity_with_eom() {
             day_count: DayCount::Act360,
             bdc: BusinessDayConvention::ModifiedFollowing,
             calendar_id: None,
-            stub: StubKind::None,
+            // Keep both legs aligned on the same declared short-back stub.
+            stub: StubKind::ShortBack,
             reset_lag_days: 0,
             fixing_calendar_id: None,
             start,
