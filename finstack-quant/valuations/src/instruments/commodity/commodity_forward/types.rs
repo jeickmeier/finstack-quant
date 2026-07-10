@@ -308,31 +308,20 @@ impl CommodityForward {
             return price_curve.price_on_date(self.maturity);
         }
 
-        // Fallback: if we have a spot price and discount curve, use cost-of-carry model
-        // F = S × exp(r × T) where r is the implied carry rate
+        // Fallback: if a spot ID is configured, use exact curve carry. Missing
+        // configured market data is an error, not permission to substitute spot.
         if let Some(spot_id) = &self.spot_id {
-            if let Ok(spot_scalar) = market.get_price(spot_id) {
-                let spot = match spot_scalar {
-                    finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-                    finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                };
-
-                // Try to get discount curve for carry rate
-                // Use the curve's own day count for consistency with zero rate lookup
-                if let Ok(disc) = market.get_discount(self.discount_curve_id.as_str()) {
-                    use finstack_quant_core::dates::DayCountContext;
-                    let curve_dc = disc.day_count();
-                    let t = curve_dc
-                        .year_fraction(as_of, self.maturity, DayCountContext::default())
-                        .unwrap_or(0.0)
-                        .max(0.0);
-                    let rate = disc.zero(t);
-                    return Ok(spot * (rate * t).exp());
-                }
-
-                // If no discount curve, return spot as approximation
+            let spot_scalar = market.get_price(spot_id)?;
+            let spot = match spot_scalar {
+                finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
+                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
+            };
+            if self.maturity <= as_of {
                 return Ok(spot);
             }
+            let disc = market.get_discount(self.discount_curve_id.as_str())?;
+            let df = disc.df_between_dates(as_of, self.maturity)?;
+            return Ok(spot / df);
         }
 
         // If no PriceCurve and no spot, fail with a clear error

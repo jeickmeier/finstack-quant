@@ -770,6 +770,7 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
             .start_date(base)
             .maturity(maturity_2y())
             .observation_freq(Tenor::daily())
+            .observation_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(
                 finstack_quant_valuations::instruments::equity::variance_swap::PayReceive::Receive,

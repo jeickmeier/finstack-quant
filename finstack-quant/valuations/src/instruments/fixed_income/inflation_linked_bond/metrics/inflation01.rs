@@ -6,11 +6,11 @@
 //!
 //! # Methodology Note
 //!
-//! The bump is applied as a **uniform multiplicative CPI level scale** across all
-//! maturities via `BumpSpec::inflation_shift_pct`. This is **not** equivalent to a
-//! parallel 1bp shift in zero-coupon inflation rates (which would produce
-//! `I(t) → I(t) × exp(Δπ × t)`). For most practical purposes the difference is
-//! small for near-term cashflows but can diverge for long-dated linkers.
+//! The bump is applied as a parallel shift to zero-coupon inflation rates. For a
+//! hybrid historical-index/projected-curve source, only the projected curve is
+//! shocked. For an index-only source, observations through `as_of` are treated as
+//! published fixings and remain unchanged; only later observations explicitly
+//! present in the index are treated as forecasts and shocked.
 //!
 //! # Formula
 //!
@@ -24,14 +24,15 @@
 //! consistent with the DV01/CS01 convention throughout the workspace.
 //!
 //! # Note
-//! For bonds backed by inflation indices, this bumps the underlying inflation curve
-//! (which drives projected CPI). For index-based sources, we bump the curve that's
-//! implicitly constructed from the index.
+//! An index-only source with no observations after `as_of` has zero projected
+//! inflation sensitivity. Production linkers should normally provide both a
+//! published index and a projected inflation curve.
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
 
 /// Standard inflation curve bump: 1bp (0.0001)
@@ -40,30 +41,45 @@ const INFLATION_BUMP_BP: f64 = 0.0001;
 /// Inflation01 calculator for inflation-linked bonds.
 pub(crate) struct Inflation01Calculator;
 
+pub(super) fn bumped_inflation_market(
+    market: &MarketContext,
+    bond: &InflationLinkedBond,
+    as_of: finstack_quant_core::dates::Date,
+    spec: BumpSpec,
+) -> Result<MarketContext> {
+    if market
+        .get_inflation_curve(bond.inflation_index_id.as_str())
+        .is_ok()
+    {
+        return market.bump([MarketBump::Curve {
+            id: bond.inflation_index_id.clone(),
+            spec,
+        }]);
+    }
+
+    let index = market.get_inflation_index(bond.inflation_index_id.as_str())?;
+    let bumped = index.apply_projection_bump(as_of, spec)?;
+    Ok(market
+        .clone()
+        .insert_inflation_index(bond.inflation_index_id.clone(), bumped))
+}
+
 impl MetricCalculator for Inflation01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let bond: &InflationLinkedBond = context.instrument_as()?;
         let as_of = context.as_of;
         let _base_pv = context.base_value.amount();
 
-        // Check if we have an inflation curve (preferred) or index
-        let inflation_curve_id = &bond.inflation_index_id;
-
         // Use MarketContext::bump() API to bump the inflation curve
         // Bump by 1bp using parallel shift
         let bump_spec = BumpSpec::inflation_shift_pct(INFLATION_BUMP_BP * 100.0); // Convert bp to percent
-        let curves_up = context.curves.as_ref().bump([MarketBump::Curve {
-            id: inflation_curve_id.clone(),
-            spec: bump_spec,
-        }])?;
+        let curves_up = bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec)?;
         let pv_up = bond.value(&curves_up, as_of)?.amount();
 
         // Bump down
         let bump_spec_down = BumpSpec::inflation_shift_pct(-INFLATION_BUMP_BP * 100.0);
-        let curves_down = context.curves.as_ref().bump([MarketBump::Curve {
-            id: inflation_curve_id.clone(),
-            spec: bump_spec_down,
-        }])?;
+        let curves_down =
+            bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec_down)?;
         let pv_down = bond.value(&curves_down, as_of)?.amount();
 
         // Inflation01 = (PV_up − PV_down) / 2
@@ -261,13 +277,14 @@ mod tests {
                 PricingOptions::default(),
             )
             .expect("hybrid index/curve Inflation01");
+        let hybrid_inflation01 = hybrid
+            .measures
+            .get(MetricId::Inflation01.as_str())
+            .copied()
+            .expect("hybrid Inflation01");
         assert!(
-            hybrid
-                .measures
-                .get(MetricId::Inflation01.as_str())
-                .copied()
-                .expect("hybrid Inflation01")
-                > 0.0
+            hybrid_inflation01.abs() < 1e-12,
+            "the published index covers every required RefCPI anchor, so the unused projection curve must have zero Inflation01"
         );
     }
 }

@@ -31,9 +31,7 @@ pub(crate) fn compute_upfront_fee_pv(
     };
 
     if commitment_date > as_of {
-        let df = disc_curve
-            .df_between_dates(as_of, commitment_date)
-            .unwrap_or(1.0);
+        let df = disc_curve.df_between_dates(as_of, commitment_date)?;
         Ok(upfront_fee.amount() * df)
     } else {
         Ok(0.0)

@@ -235,10 +235,13 @@ impl CommodityOption {
 
     fn collect_inputs(&self, market: &MarketContext, as_of: Date) -> Result<CommodityOptionInputs> {
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let curve_dc = disc.day_count();
-        let t_rate = curve_dc.year_fraction(as_of, self.expiry, DayCountContext::default())?;
-        let r = disc.zero(t_rate.max(0.0));
         let t = self.time_to_expiry(as_of)?;
+        let df = disc.df_between_dates(as_of, self.expiry)?;
+        let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
+            df,
+            t,
+            "commodity-option model rate",
+        )?;
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
             &self.pricing_overrides.market_quotes,
@@ -249,8 +252,6 @@ impl CommodityOption {
         )?;
 
         let forward = self.forward_price(market, as_of)?;
-        let df = disc.df_between_dates(as_of, self.expiry)?;
-
         let spot = if let Some(spot) = self.spot_price(market)? {
             spot
         } else {
@@ -313,8 +314,11 @@ impl CommodityOption {
                 .year_fraction(as_of, self.expiry, DayCountContext::default())?
                 .max(0.0);
             let disc = market.get_discount(self.discount_curve_id.as_str())?;
-            let r = disc.zero(t);
-            return Ok(spot * (r * t).exp());
+            if t <= 0.0 {
+                return Ok(spot);
+            }
+            let df = disc.df_between_dates(as_of, self.expiry)?;
+            return Ok(spot / df);
         }
 
         // 4. No PriceCurve and no spot - error with helpful message

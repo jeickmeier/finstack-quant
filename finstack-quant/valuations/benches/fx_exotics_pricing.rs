@@ -267,6 +267,8 @@ fn make_variance_swap(as_of: Date, tenor_years: i32) -> FxVarianceSwap {
         .start_date(as_of)
         .maturity(maturity)
         .observation_freq(Tenor::daily())
+        .base_calendar_id("TARGET2".to_string())
+        .quote_calendar_id("USNY".to_string())
         .realized_var_method(RealizedVarMethod::CloseToClose)
         .side(PayReceive::Receive)
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))

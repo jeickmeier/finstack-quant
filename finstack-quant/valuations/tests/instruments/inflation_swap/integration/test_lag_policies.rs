@@ -66,11 +66,12 @@ fn test_lag_override_vs_index_lag() {
     let pv_idx_lag = swap_idx_lag.value(&ctx, as_of).unwrap().amount();
     let pv_no_lag = swap_no_lag.value(&ctx, as_of).unwrap().amount();
 
-    // With positive inflation, longer lag reduces projected CPI at maturity
-    // For Pay (receiving inflation), lower CPI means lower PV
+    // The override must change both reference CPI anchors. There is no general
+    // directional PV ordering: lagging both numerator and denominator can move
+    // the ratio either way depending on realized history and curve shape.
     assert!(
-        pv_no_lag >= pv_idx_lag,
-        "No lag should give higher/equal PV than 3M lag for Pay: {} vs {}",
+        (pv_no_lag - pv_idx_lag).abs() > 1e-6,
+        "No-lag override must produce a distinct valuation from the index's 3M lag: {} vs {}",
         pv_no_lag,
         pv_idx_lag
     );

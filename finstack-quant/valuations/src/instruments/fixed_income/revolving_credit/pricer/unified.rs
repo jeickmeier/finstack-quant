@@ -234,13 +234,21 @@ impl RevolvingCreditPricer {
         // Anchor PV at `as_of` (not the curve base date) so that rolling the
         // valuation date forward shortens the discount path and produces
         // non-zero theta from the time-value of accruing fees/interest.
+        if survival_probs.len() != path_schedule.schedule.flows.len() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "survival probability count {} does not match cashflow count {}",
+                survival_probs.len(),
+                path_schedule.schedule.flows.len()
+            )));
+        }
+
         let mut total_pv = 0.0;
-        for (i, cf) in path_schedule.schedule.flows.iter().enumerate() {
+        for (cf, survival_uncond) in path_schedule.schedule.flows.iter().zip(&survival_probs) {
             if cf.date < as_of {
                 continue;
             }
             let df = df_asof_to(cf.date)?;
-            let survival = survival_probs.get(i).copied().unwrap_or(1.0) / sp_as_of;
+            let survival = *survival_uncond / sp_as_of;
             total_pv += cf.amount.amount() * df * survival;
         }
 
@@ -289,8 +297,8 @@ impl RevolvingCreditPricer {
                     // Default probability conditional on survival to as_of.
                     let prob_default = ((prev_sp - curr_sp) / sp_as_of).max(0.0);
 
-                    let df_prev = df_asof_to(prev_date).unwrap_or(1.0);
-                    let df_curr = df_asof_to(curr_date).unwrap_or(1.0);
+                    let df_prev = df_asof_to(prev_date)?;
+                    let df_curr = df_asof_to(curr_date)?;
                     let df_avg = (df_prev + df_curr) / 2.0;
                     let exposure_avg = (prev_exposure + curr_exposure) / 2.0;
 
@@ -458,9 +466,10 @@ impl RevolvingCreditPricer {
             &mc_config_to_use
         };
 
-        // Generate cashflow engine (fixings not used for stochastic paths —
-        // the MC short-rate process drives floating rate dynamics)
-        let engine = CashflowEngine::new(facility, Some(market), as_of, None)?;
+        // Historical fixings remain contractual in stochastic valuation. The
+        // short-rate process drives only reset dates that have not fixed yet.
+        let fixings = resolve_fixings(facility, market);
+        let engine = CashflowEngine::new(facility, Some(market), as_of, fixings)?;
         let payment_dates = super::super::utils::build_payment_dates(facility, false)?;
 
         // Generate 3-factor paths (simulation starts at as_of for seasoned facilities)
@@ -670,7 +679,7 @@ impl RevolvingCreditPricer {
                         facility.day_count,
                         &path_data.time_points,
                         &path_data.utilization_path,
-                    );
+                    )?;
                     Ok(util * commitment)
                 })
                 .collect()
@@ -741,30 +750,35 @@ impl RevolvingCreditPricer {
         day_count: DayCount,
         time_points: &[f64],
         utilization_path: &[f64],
-    ) -> f64 {
-        let t = day_count
-            .year_fraction(
-                commitment_date,
-                date,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )
-            .unwrap_or(0.0);
+    ) -> Result<f64> {
+        if time_points.len() != utilization_path.len() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "utilization path length {} does not match time-grid length {}",
+                utilization_path.len(),
+                time_points.len()
+            )));
+        }
 
         if time_points.is_empty() || utilization_path.is_empty() {
-            return 0.0;
+            return Ok(0.0);
         }
+        let t = day_count.year_fraction(
+            commitment_date,
+            date,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
         if t <= time_points[0] {
-            return utilization_path[0].clamp(0.0, 1.0);
+            return Ok(utilization_path[0].clamp(0.0, 1.0));
         }
         let n = time_points.len();
         if t >= time_points[n - 1] {
-            return utilization_path[n - 1].clamp(0.0, 1.0);
+            return Ok(utilization_path[n - 1].clamp(0.0, 1.0));
         }
         let idx = time_points.partition_point(|&tp| tp <= t);
         let i = idx.saturating_sub(1);
         let alpha = (t - time_points[i]) / (time_points[i + 1] - time_points[i]).max(1e-12);
         let util = utilization_path[i] + alpha * (utilization_path[i + 1] - utilization_path[i]);
-        util.clamp(0.0, 1.0)
+        Ok(util.clamp(0.0, 1.0))
     }
 }
 

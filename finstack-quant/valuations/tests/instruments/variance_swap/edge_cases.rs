@@ -94,10 +94,16 @@ fn test_valuation_with_negative_rates() {
             .interp(finstack_quant_core::math::interp::InterpStyle::Linear) // MonotoneConvex doesn't work for increasing DFs
             .build()
             .unwrap();
-    let ctx = MarketContext::new().insert(disc_curve).insert_price(
-        UNDERLYING_ID,
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(5_000.0),
-    );
+    let ctx = MarketContext::new()
+        .insert(disc_curve)
+        .insert_price(
+            UNDERLYING_ID,
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(5_000.0),
+        )
+        .insert_price(
+            format!("{}_IMPL_VOL", UNDERLYING_ID),
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(0.20),
+        );
     let as_of = curve_base;
 
     // Act
@@ -282,7 +288,7 @@ fn test_observation_dates_with_very_high_frequency() {
     swap.observation_freq = Tenor::daily();
 
     // Act
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Assert
     assert!(!dates.is_empty());
@@ -315,10 +321,10 @@ fn test_valuation_with_missing_discount_curve_fails_gracefully() {
 }
 
 #[test]
-fn test_metrics_with_missing_implied_vol_falls_back_to_strike() {
+fn test_metrics_with_missing_implied_vol_returns_error() {
     // Arrange
     let swap = sample_swap(PayReceive::Receive);
-    let ctx = base_context(); // No implied vol
+    let ctx = base_context_without_vol();
     let as_of = date(2024, 12, 1);
 
     // Act
@@ -330,10 +336,7 @@ fn test_metrics_with_missing_implied_vol_falls_back_to_strike() {
     );
 
     // Assert
-    assert!(result.is_ok());
-    let ev = result.unwrap().measures[MetricId::ExpectedVariance.as_str()];
-    // Should fallback to strike variance
-    assert!((ev - swap.strike_variance).abs() < LOOSE_EPSILON);
+    assert!(result.is_err());
 }
 
 #[test]

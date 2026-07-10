@@ -239,9 +239,9 @@ impl ForwardCdsContext {
 
         let t_expiry = option.time_to_expiry(as_of)?;
         let df_to_expiry = DiscountCurve::df_between_dates(disc, as_of, option.expiry)?;
-        let sp_asof_raw = surv.sp_on_date(as_of).unwrap_or(1.0);
+        let sp_asof_raw = surv.sp_on_date(as_of)?;
         let sp_asof = sp_asof_raw.clamp(numerical::ZERO_TOLERANCE, 1.0);
-        let sp_expiry_raw = surv.sp_on_date(option.expiry).unwrap_or(1.0);
+        let sp_expiry_raw = surv.sp_on_date(option.expiry)?;
         let sp_expiry = sp_expiry_raw.clamp(0.0, 1.0);
         // Survival probabilities should be monotonically non-increasing on a
         // valid hazard curve. A `sp(expiry) > sp(as_of)` is a curve-data
@@ -291,7 +291,7 @@ impl ForwardCdsContext {
                 )));
             }
             let fwd_df = df_pay / df_to_expiry;
-            let sp_pay_uncond = surv.sp_on_date(*pay_date).unwrap_or(1.0).clamp(0.0, 1.0);
+            let sp_pay_uncond = surv.sp_on_date(*pay_date)?.clamp(0.0, 1.0);
             let sp_pay_cond = (sp_pay_uncond / sp_asof).clamp(0.0, 1.0);
             times_from_expiry.push(t_e_to_pay);
             accrual_factors.push(*accrual);
@@ -323,8 +323,7 @@ impl ForwardCdsContext {
                 pcd,
                 option.expiry,
                 finstack_quant_core::dates::DayCountContext::default(),
-            )
-            .unwrap_or(0.0)
+            )?
         };
 
         // Bootstrapped forward par spread and clean forward RPV01 — the
@@ -461,15 +460,14 @@ impl ForwardCdsContext {
                 0.0
             } else {
                 let sp_start = surv
-                    .sp_on_date(fep_start)
-                    .unwrap_or(1.0)
+                    .sp_on_date(fep_start)?
                     .clamp(numerical::ZERO_TOLERANCE, 1.0);
                 // Match the CDS protection-leg convention used for the
                 // underlying CDSO default leg: protection includes the legal
                 // expiry date, so the survival ratio is measured through
                 // expiry + 1 calendar day.
                 let fep_end = option.expiry + time::Duration::days(1);
-                let sp_end = surv.sp_on_date(fep_end).unwrap_or(1.0).clamp(0.0, 1.0);
+                let sp_end = surv.sp_on_date(fep_end)?.clamp(0.0, 1.0);
                 lgd * (1.0 - (sp_end / sp_start).clamp(0.0, 1.0))
             }
         } else {

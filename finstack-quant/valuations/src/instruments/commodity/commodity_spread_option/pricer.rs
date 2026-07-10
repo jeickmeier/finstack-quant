@@ -70,7 +70,7 @@ pub(crate) fn compute_pv(
         return Ok(Money::new(intrinsic * inst.notional * df, inst.currency));
     }
 
-    let unit_price = kirk_price(inst, market, as_of, f1, f2, t, df)?;
+    let unit_price = kirk_price(inst, market, f1, f2, t, df)?;
 
     Ok(Money::new(unit_price * inst.notional, inst.currency))
 }
@@ -81,23 +81,11 @@ pub(crate) fn compute_pv(
 fn kirk_price(
     inst: &CommoditySpreadOption,
     market: &MarketContext,
-    as_of: Date,
     f1: f64,
     f2: f64,
     t: f64,
     df: f64,
 ) -> finstack_quant_core::Result<f64> {
-    let disc = market.get_discount(inst.discount_curve_id.as_str())?;
-    let curve_dc = disc.day_count();
-    let t_rate = curve_dc
-        .year_fraction(
-            as_of,
-            inst.expiry,
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?
-        .max(0.0);
-    let _r = disc.zero(t_rate);
-
     // Get vols from surfaces
     let surface1 = market.get_surface(inst.leg1_vol_surface_id.as_str())?;
     let sigma1 = surface1.value_clamped(t, f1);

@@ -28,13 +28,10 @@ impl MetricCalculator for VarianceVegaCalculator {
         // `time_elapsed_fraction` to stay consistent with `compute_pv` (W-32),
         // not an observation-count fraction.
         let remaining_fraction = 1.0 - swap.time_elapsed_fraction(context.as_of);
-        let t = swap
-            .day_count
-            .year_fraction(context.as_of, swap.maturity, Default::default())?;
         let disc = context
             .curves
             .get_discount(swap.discount_curve_id.as_str())?;
-        let df = disc.df(t);
+        let df = disc.df_between_dates(context.as_of, swap.maturity)?;
         Ok(df * swap.notional.amount() * remaining_fraction * swap.side.sign())
     }
 }

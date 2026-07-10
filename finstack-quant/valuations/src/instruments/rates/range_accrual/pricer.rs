@@ -115,16 +115,20 @@ impl RangeAccrualMcPricer {
             .day_count
             .year_fraction(as_of, final_date, DayCountContext::default())?;
 
-        // Count future observations only
-        let future_obs_count = inst
+        // Convert observation dates once and propagate day-count failures. In
+        // particular, Business/252 requires calendar context and must not be
+        // silently reclassified as a past observation.
+        let observation_times = inst
             .observation_dates
             .iter()
-            .filter(|&&date| {
+            .map(|&date| {
                 inst.day_count
                     .year_fraction(as_of, date, DayCountContext::default())
-                    .unwrap_or(0.0)
-                    > 0.0
             })
+            .collect::<Result<Vec<_>>>()?;
+        let future_obs_count = observation_times
+            .iter()
+            .filter(|&&t_obs| t_obs > 0.0)
             .count();
 
         // If no future observations, return value based on past fixings only
@@ -133,20 +137,17 @@ impl RangeAccrualMcPricer {
         }
 
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
-        let r = disc_curve.zero(t);
         let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
+        let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
+            discount_factor,
+            t,
+            "range-accrual Monte Carlo drift",
+        )?;
 
-        let mut q = if let Some(div_id) = &inst.div_yield_id {
-            match curves.get_price(div_id.as_str()) {
-                Ok(ms) => match ms {
-                    finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                    finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => 0.0,
-                },
-                Err(_) => 0.0,
-            }
-        } else {
-            0.0
-        };
+        let mut q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+            curves,
+            inst.div_yield_id.as_ref(),
+        )?;
 
         let vol_surface = curves.get_surface(inst.vol_surface_id.as_str())?;
         // FLAT-VOL APPROXIMATION (audit item 9 — see the struct-level doc):
@@ -173,21 +174,10 @@ impl RangeAccrualMcPricer {
         let steps_per_year = self.config.steps_per_year;
         let num_steps = ((t * steps_per_year).round() as usize).max(self.config.min_steps);
 
-        // Map only future observation dates to times (filter out past observations)
-        let observation_times: Vec<f64> = inst
-            .observation_dates
-            .iter()
-            .filter_map(|&date| {
-                let t_obs = inst
-                    .day_count
-                    .year_fraction(as_of, date, DayCountContext::default())
-                    .unwrap_or(0.0);
-                if t_obs > 0.0 {
-                    Some(t_obs)
-                } else {
-                    None
-                }
-            })
+        // Filter out past observations; conversion errors were propagated above.
+        let observation_times: Vec<f64> = observation_times
+            .into_iter()
+            .filter(|&t_obs| t_obs > 0.0)
             .collect();
 
         // Create payoff with effective bounds and historical fixing info
@@ -357,17 +347,10 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
     let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
-    let q_yield = if let Some(div_id) = &inst.div_yield_id {
-        match curves.get_price(div_id.as_str()) {
-            Ok(ms) => match ms {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => 0.0,
-            },
-            Err(_) => 0.0,
-        }
-    } else {
-        0.0
-    };
+    let q_yield = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+        curves,
+        inst.div_yield_id.as_ref(),
+    )?;
 
     let vol_surface = curves.get_surface(inst.vol_surface_id.as_str())?;
 
@@ -395,7 +378,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
         }
 
         future_obs_count += 1;
-        let r_obs = disc_curve.zero(t_obs);
+        let df_obs = disc_curve.df_between_dates(as_of, date)?;
 
         // Quanto drift adjustment specific to this horizon
         let mut drift_adj = 0.0;
@@ -408,8 +391,10 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
             drift_adj = quanto.correlation * sig_s * sig_fx;
         }
 
-        // Forward Price F = S * exp((r - q - drift_adj) * t)
-        let forward = initial_spot * ((r_obs - q_yield - drift_adj) * t_obs).exp();
+        // Exact curve carry on the model/volatility clock. Writing the forward
+        // as S/DF avoids annualizing a curve-native zero rate on `t_obs` when
+        // the curve and instrument day counts differ.
+        let forward = initial_spot / df_obs * (-(q_yield + drift_adj) * t_obs).exp();
 
         // Digital Call Probability P(S_t > K) via finite-width call spread.
         //
@@ -560,7 +545,7 @@ mod tests {
     }
 
     #[test]
-    fn analytic_range_accrual_treats_missing_or_price_dividend_scalar_as_zero_yield() {
+    fn configured_dividend_yield_must_exist_and_be_unitless() {
         let as_of = date(2024, 1, 1);
         let inst = RangeAccrual::example();
         let base_market = market(as_of);
@@ -590,14 +575,12 @@ mod tests {
             MarketScalar::Price(Money::new(2.0, Currency::USD)),
         );
 
-        let pv_missing = npv_analytic(&inst, &no_div_market, as_of).expect("missing div pv");
-        let pv_price = npv_analytic(&inst, &price_div_market, as_of).expect("price div pv");
+        assert!(npv_analytic(&inst, &no_div_market, as_of).is_err());
+        assert!(npv_analytic(&inst, &price_div_market, as_of).is_err());
         let mut no_div_inst = inst;
         no_div_inst.div_yield_id = None;
-        let pv_explicit_none =
-            npv_analytic(&no_div_inst, &base_market, as_of).expect("none div pv");
-
-        assert!((pv_missing.amount() - pv_explicit_none.amount()).abs() < 1e-12);
-        assert!((pv_price.amount() - pv_explicit_none.amount()).abs() < 1e-12);
+        let pv_explicit_none = npv_analytic(&no_div_inst, &base_market, as_of)
+            .expect("explicitly absent dividend yield is zero carry");
+        assert!(pv_explicit_none.amount().is_finite());
     }
 }

@@ -10,7 +10,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::revolving_credit::cashflow_engine::CashflowEngine;
+use finstack_quant_valuations::instruments::fixed_income::revolving_credit::cashflow_engine::{
+    CashflowEngine, ThreeFactorPathData,
+};
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::{
     BaseRateSpec, DrawRepaySpec, RevolvingCredit, RevolvingCreditFees,
 };
@@ -439,4 +441,44 @@ fn test_pricer_integration_with_fixings() {
 
     // Complete historical fixings produce a valid PV.
     assert!(pv_with.amount().is_finite());
+}
+
+#[test]
+fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
+    let commitment_date = date!(2025 - 01 - 01);
+    let maturity_date = date!(2025 - 07 - 01);
+    let as_of = date!(2025 - 01 - 15);
+    let facility = build_seasoned_floating_facility(commitment_date, maturity_date);
+
+    let coupon_rate = |fixing: f64| {
+        let payment_dates = vec![commitment_date, date!(2025 - 04 - 01), maturity_date];
+        let path = ThreeFactorPathData {
+            utilization_path: vec![0.5; 3],
+            short_rate_path: vec![0.01; 3],
+            credit_spread_path: vec![0.0; 3],
+            time_points: vec![0.0, 0.25, 0.5],
+            payment_dates,
+            stochastic_rates: true,
+        };
+        let market = MarketContext::new().insert_series(
+            ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(commitment_date, fixing)], None)
+                .expect("fixing series"),
+        );
+        let fixings =
+            finstack_quant_core::market_data::fixings::get_fixing_series(&market, "USD-SOFR-3M")
+                .ok();
+        CashflowEngine::new(&facility, Some(&market), as_of, fixings)
+            .expect("stochastic engine")
+            .generate_stochastic_path(path)
+            .expect("stochastic cashflows")
+            .schedule
+            .flows
+            .iter()
+            .find(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
+            .and_then(|flow| flow.rate)
+            .expect("current-period coupon")
+    };
+
+    assert!((coupon_rate(0.01) - 0.03).abs() < 1e-12);
+    assert!((coupon_rate(0.08) - 0.10).abs() < 1e-12);
 }

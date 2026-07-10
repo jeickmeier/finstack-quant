@@ -14,8 +14,10 @@ use crate::constants::numerical::ZERO_TOLERANCE;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
+use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::Result;
+
+use super::inflation01::bumped_inflation_market;
 
 /// Standard inflation curve bump: 1bp (0.0001)
 const INFLATION_BUMP_BP: f64 = 0.0001;
@@ -34,23 +36,16 @@ impl MetricCalculator for InflationConvexityCalculator {
         // Bump size: 1bp for numerical convexity
         let bump_bp = INFLATION_BUMP_BP;
 
-        // Get the inflation index/curve ID
-        let inflation_curve_id = &bond.inflation_index_id;
-
         // Create bumped curves (up)
         let bump_spec_up = BumpSpec::inflation_shift_pct(bump_bp * 100.0); // Convert bp to percent
-        let curves_up = context.curves.bump([MarketBump::Curve {
-            id: inflation_curve_id.clone(),
-            spec: bump_spec_up,
-        }])?;
+        let curves_up =
+            bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec_up)?;
         let pv_up = bond.value(&curves_up, as_of)?.amount();
 
         // Create bumped curves (down)
         let bump_spec_down = BumpSpec::inflation_shift_pct(-bump_bp * 100.0);
-        let curves_down = context.curves.bump([MarketBump::Curve {
-            id: inflation_curve_id.clone(),
-            spec: bump_spec_down,
-        }])?;
+        let curves_down =
+            bumped_inflation_market(context.curves.as_ref(), bond, as_of, bump_spec_down)?;
         let pv_down = bond.value(&curves_down, as_of)?.amount();
 
         if base_pv.abs() < ZERO_TOLERANCE {

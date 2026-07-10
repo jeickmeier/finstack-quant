@@ -1,7 +1,7 @@
 //! Variance swap type definitions.
 
 use finstack_quant_core::{
-    dates::{Date, DayCount, Tenor},
+    dates::{BusinessDayConvention, Date, DayCount, Tenor},
     market_data::context::MarketContext,
     math::stats::RealizedVarMethod,
     money::Money,
@@ -18,6 +18,10 @@ use crate::{
 };
 
 pub use crate::instruments::common_impl::parameters::PayReceive;
+
+fn default_observation_bdc() -> BusinessDayConvention {
+    BusinessDayConvention::Following
+}
 
 /// Variance swap instrument.
 ///
@@ -89,6 +93,16 @@ pub struct VarianceSwap {
     pub maturity: Date,
     /// Observation frequency
     pub observation_freq: Tenor,
+    /// Exchange/fixing calendar used for every realized-variance observation.
+    pub observation_calendar_id: String,
+    /// Business-day convention applied to observation dates.
+    #[serde(default = "default_observation_bdc")]
+    #[builder(default = BusinessDayConvention::Following)]
+    pub observation_bdc: BusinessDayConvention,
+    /// Preserve month-end rolls for month/year observation frequencies.
+    #[serde(default)]
+    #[builder(default)]
+    pub observation_end_of_month: bool,
     /// Method for calculating realized variance (defaults to CloseToClose)
     #[serde(default)]
     #[builder(default)]
@@ -201,6 +215,9 @@ impl VarianceSwap {
             .start_date(date!(2024 - 01 - 01))
             .maturity(date!(2025 - 01 - 01))
             .observation_freq(finstack_quant_core::dates::Tenor::daily())
+            .observation_calendar_id("USNY".to_string())
+            .observation_bdc(BusinessDayConvention::Following)
+            .observation_end_of_month(false)
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -253,7 +270,7 @@ impl VarianceSwap {
     /// `attributes.meta["observation_calendar_id"]` (or `calendar_id`),
     /// defaulting to weekends-only. Non-business start and maturity dates are
     /// adjusted following and preceding, respectively.
-    pub fn observation_dates(&self) -> Vec<Date> {
+    pub fn observation_dates(&self) -> Result<Vec<Date>> {
         pricer::observation_dates(self)
     }
 
@@ -297,7 +314,7 @@ impl VarianceSwap {
     }
 
     /// Calculate realized fraction based on observation counts (sampling-based weight).
-    pub fn realized_fraction_by_observations(&self, as_of: Date) -> f64 {
+    pub fn realized_fraction_by_observations(&self, as_of: Date) -> Result<f64> {
         pricer::realized_fraction_by_observations(self, as_of)
     }
 

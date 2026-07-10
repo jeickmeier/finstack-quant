@@ -43,7 +43,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+    use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -72,6 +72,7 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_freq(Tenor::daily())
+            .observation_calendar_id("USNY".to_string())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -81,9 +82,10 @@ mod tests {
             .expect("expected-variance swap");
 
         // Non-trivial close path on every past (weekday) observation so realized
-        // variance differs from the forward variance (= strike, no vol surface).
+        // variance differs from the scalar-vol forward variance.
         let obs: Vec<_> = swap
             .observation_dates()
+            .expect("observation schedule")
             .into_iter()
             .filter(|&d| d <= as_of)
             .enumerate()
@@ -95,7 +97,10 @@ mod tests {
             .knots([(0.0, 1.0), (1.0, 0.96)])
             .build()
             .expect("discount curve");
-        let market = MarketContext::new().insert(disc).insert_series(series);
+        let market = MarketContext::new()
+            .insert(disc)
+            .insert_series(series)
+            .insert_price("SPX_IMPL_VOL", MarketScalar::Unitless(0.20));
 
         // Everything that borrows `market` must be evaluated before it is moved
         // into the `MetricContext`.

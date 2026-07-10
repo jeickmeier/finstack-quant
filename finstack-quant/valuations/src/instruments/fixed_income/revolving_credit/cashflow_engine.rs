@@ -701,13 +701,39 @@ impl<'a> CashflowEngine<'a> {
             let drawn_balance = self.facility.commitment_amount * avg_utilization;
             let undrawn_balance = self.facility.commitment_amount * (1.0 - avg_utilization);
 
-            // Calculate period interest using path's short rate
-            let interest_rate = match &self.facility.base_rate_spec {
-                BaseRateSpec::Fixed { rate } => *rate,
+            // Contractual fixings override the simulated short rate once the
+            // fixing date has passed. Future reset dates remain stochastic.
+            let (interest_rate, fixing_date) = match &self.facility.base_rate_spec {
+                BaseRateSpec::Fixed { rate } => (*rate, None),
                 BaseRateSpec::Floating(spec) => {
                     let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
-                    crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                        short_rate, &params,
+                    let reset_effective = self
+                        .reset_dates
+                        .as_ref()
+                        .and_then(|dates| {
+                            dates
+                                .iter()
+                                .rev()
+                                .find(|&&date| date <= period_start)
+                                .copied()
+                        })
+                        .unwrap_or(period_start);
+                    let fixing_date = super::utils::floating_fixing_date(spec, reset_effective)?;
+                    let base_rate = if fixing_date < self.as_of {
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            self.fixing_series,
+                            spec.index_id.as_ref(),
+                            fixing_date,
+                            self.as_of,
+                        )?
+                    } else {
+                        short_rate
+                    };
+                    (
+                        crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                            base_rate, &params,
+                        ),
+                        Some(fixing_date),
                     )
                 }
             };
@@ -723,7 +749,7 @@ impl<'a> CashflowEngine<'a> {
             if payment_date > self.as_of && !rc.is_effectively_zero_money(interest.amount(), ccy) {
                 flows.push(CashFlow {
                     date: payment_date,
-                    reset_date: None,
+                    reset_date: fixing_date,
                     amount: interest,
                     kind: match &self.facility.base_rate_spec {
                         BaseRateSpec::Fixed { .. } => CFKind::Fixed,

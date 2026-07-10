@@ -444,6 +444,134 @@ fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
         .expect("EUR resetting coupon");
 
     assert!((resetting_coupon.rate.expect("coupon rate") - 0.0775).abs() < 1e-12);
+
+    let constant_coupon = schedule
+        .flows
+        .iter()
+        .find(|flow| {
+            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+                && flow.amount.currency() == Currency::USD
+        })
+        .expect("USD constant coupon");
+    assert!((constant_coupon.rate.expect("coupon rate") - 0.02).abs() < 1e-12);
+}
+
+#[test]
+fn seasoned_mtm_schedule_requires_constant_leg_fixing() {
+    use finstack_quant_cashflows::CashflowProvider;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+
+    let as_of = Date::from_calendar_date(2025, Month::February, 3).expect("as of");
+    let reset_date = base_date();
+    let context = build_market_context()
+        .insert_series(
+            ScalarTimeSeries::new("FIXING:EUR-EURIBOR-3M", vec![(reset_date, 0.08)], None)
+                .expect("EUR fixing"),
+        )
+        .insert_series(
+            ScalarTimeSeries::new(
+                "FIXING:FX-EUR-USD",
+                vec![(reset_date, SPOT_USD_PER_EUR)],
+                None,
+            )
+            .expect("FX reset fixing"),
+        );
+    let swap = build_swap(
+        NotionalExchange::MtmResetting {
+            resetting_side: ResettingSide::Leg1,
+        },
+        Decimal::ZERO,
+    );
+
+    let error = swap
+        .cashflow_schedule(&context, as_of)
+        .expect_err("seasoned constant leg needs its exact contractual fixing");
+    assert!(error.to_string().contains("USD-SOFR-3M"));
+}
+
+#[test]
+fn mtm_constant_leg_spread_changes_pv_and_schedule_rate() {
+    use finstack_quant_cashflows::CashflowProvider;
+
+    let context = build_market_context();
+    let as_of = base_date();
+    let zero_spread = build_swap(
+        NotionalExchange::MtmResetting {
+            resetting_side: ResettingSide::Leg2,
+        },
+        Decimal::ZERO,
+    );
+    let positive_spread = build_swap(
+        NotionalExchange::MtmResetting {
+            resetting_side: ResettingSide::Leg2,
+        },
+        Decimal::from(25),
+    );
+
+    let pv_zero = zero_spread
+        .base_value(&context, as_of)
+        .expect("zero-spread PV");
+    let pv_positive = positive_spread
+        .base_value(&context, as_of)
+        .expect("positive-spread PV");
+    assert!(
+        pv_positive.amount() > pv_zero.amount(),
+        "positive spread on the received constant leg must increase PV"
+    );
+
+    let schedule = positive_spread
+        .cashflow_schedule(&context, as_of)
+        .expect("MtM schedule");
+    let constant_coupon = schedule
+        .flows
+        .iter()
+        .find(|flow| {
+            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+                && flow.amount.currency() == Currency::EUR
+        })
+        .expect("EUR constant coupon");
+    assert!(
+        (constant_coupon.rate.expect("coupon rate") - (EUR_ZERO + 0.0025)).abs() < 1e-12,
+        "constant-leg all-in rate must include its contractual spread"
+    );
+}
+
+#[test]
+fn mtm_schedule_applies_leg_specific_coupon_frequencies() {
+    use finstack_quant_cashflows::CashflowProvider;
+
+    let context = build_market_context();
+    let as_of = base_date();
+    let mut swap = build_swap(
+        NotionalExchange::MtmResetting {
+            resetting_side: ResettingSide::Leg1,
+        },
+        Decimal::ZERO,
+    );
+    swap.leg2.frequency = Tenor::semi_annual();
+    swap.validate().expect("leg-specific schedules are valid");
+
+    let schedule = swap
+        .cashflow_schedule(&context, as_of)
+        .expect("leg-specific MtM schedule");
+    let eur_coupons = schedule
+        .flows
+        .iter()
+        .filter(|flow| {
+            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+                && flow.amount.currency() == Currency::EUR
+        })
+        .count();
+    let usd_coupons = schedule
+        .flows
+        .iter()
+        .filter(|flow| {
+            flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
+                && flow.amount.currency() == Currency::USD
+        })
+        .count();
+    assert_eq!(eur_coupons, 20);
+    assert_eq!(usd_coupons, 10);
 }
 
 /// Direction-2 CIP invariance: swap the rate ordering (USD at 1%, EUR at 2%) so the forward FX

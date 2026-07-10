@@ -24,6 +24,7 @@ fn test_builder_creates_valid_swap_with_all_required_fields() {
         .start_date(start)
         .maturity(end)
         .observation_freq(Tenor::daily())
+        .observation_calendar_id("USNY".to_string())
         .realized_var_method(RealizedVarMethod::CloseToClose)
         .side(PayReceive::Receive)
         .discount_curve_id(CurveId::new(DISC_ID))
@@ -84,7 +85,7 @@ fn test_different_observation_frequencies_are_supported() {
     for freq in frequencies {
         let mut swap = sample_swap(PayReceive::Receive);
         swap.observation_freq = freq;
-        let dates = swap.observation_dates();
+        let dates = swap.observation_dates().expect("observation schedule");
         assert!(!dates.is_empty());
         assert!(dates.len() >= 2); // At minimum start and end
     }

@@ -24,7 +24,7 @@ use std::sync::Arc;
 /// Register all ILB metrics with the registry
 pub(crate) fn register_ilb_metrics(registry: &mut MetricRegistry) {
     use crate::pricer::InstrumentType;
-    // Custom metric: Inflation01 (inflation curve sensitivity per 1bp)
+    // Custom metric: projected inflation-rate sensitivity per 1bp.
     registry.register_metric(
         MetricId::Inflation01,
         Arc::new(Inflation01Calculator),

@@ -14,6 +14,7 @@ use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
+use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::money::Money;
@@ -79,32 +80,41 @@ impl BermudanSwaptionLmmPricer {
                     PricingErrorContext::default(),
                 )
             })?;
-        let swap_end_yf =
-            year_fraction(swaption.day_count, as_of, swaption.swap_end).map_err(|e| {
+        // Build the underlying tenor schedule with calendar-month arithmetic.
+        // Incrementing a floating year fraction drifts on irregular months and
+        // cannot represent non-month tenors faithfully.
+        let mut tenor_dates = vec![swaption.swap_start];
+        let mut current = swaption.swap_start;
+        while current < swaption.swap_end {
+            let next = swaption
+                .fixed_freq
+                .add_to_date(current, None, BusinessDayConvention::Unadjusted)
+                .map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        format!("LMM tenor schedule construction failed: {e}"),
+                        PricingErrorContext::default(),
+                    )
+                })?;
+            if next <= current {
+                return Err(PricingError::model_failure_with_context(
+                    "LMM fixed-leg frequency must advance the tenor schedule".to_string(),
+                    PricingErrorContext::default(),
+                ));
+            }
+            current = next.min(swaption.swap_end);
+            tenor_dates.push(current);
+        }
+
+        let tenors: Vec<f64> = tenor_dates
+            .iter()
+            .map(|&date| year_fraction(swaption.day_count, as_of, date))
+            .collect::<finstack_quant_core::Result<Vec<_>>>()
+            .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
                 )
             })?;
-
-        // Determine the accrual period from the fixed leg frequency
-        let tenor_months = swaption.fixed_freq.months().unwrap_or(6) as f64;
-        let period = tenor_months / 12.0;
-        if period <= 0.0 {
-            return Err(PricingError::model_failure_with_context(
-                "Fixed leg frequency must be positive".to_string(),
-                PricingErrorContext::default(),
-            ));
-        }
-
-        // Build tenor schedule from swap_start to swap_end
-        let mut tenors: Vec<f64> = Vec::new();
-        let mut t = swap_start_yf;
-        while t < swap_end_yf - 1e-10 {
-            tenors.push(t);
-            t += period;
-        }
-        tenors.push(swap_end_yf);
 
         let num_forwards = tenors.len() - 1;
         if num_forwards == 0 {
@@ -114,34 +124,54 @@ impl BermudanSwaptionLmmPricer {
             ));
         }
 
-        // Accrual factors: tau_i = T_{i+1} - T_i
-        let accrual_factors: Vec<f64> = tenors.windows(2).map(|w| w[1] - w[0]).collect();
+        // Contractual accrual factors may differ from model-time differences.
+        let accrual_factors: Vec<f64> = tenor_dates
+            .windows(2)
+            .map(|dates| year_fraction(swaption.day_count, dates[0], dates[1]))
+            .collect::<finstack_quant_core::Result<Vec<_>>>()
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         // Bootstrap forward rates from discount factors:
         //   F_i = (DF(T_i) / DF(T_{i+1}) - 1) / tau_i
         let mut initial_forwards: Vec<f64> = Vec::with_capacity(num_forwards);
-        let mut forward_fallback_count = 0_usize;
         for i in 0..num_forwards {
-            let df_start = disc.df(tenors[i]);
-            let df_end = disc.df(tenors[i + 1]);
+            let df_start = disc.df_between_dates(as_of, tenor_dates[i]).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            let df_end = disc
+                .df_between_dates(as_of, tenor_dates[i + 1])
+                .map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
             let tau = accrual_factors[i];
-            let fwd = if df_end > 1e-15 && tau > 1e-15 {
-                (df_start / df_end - 1.0) / tau
-            } else {
-                forward_fallback_count += 1;
-                0.03 // fallback
-            };
+            if !df_start.is_finite()
+                || !df_end.is_finite()
+                || df_start <= 0.0
+                || df_end <= 0.0
+                || !tau.is_finite()
+                || tau <= 0.0
+            {
+                return Err(PricingError::model_failure_with_context(
+                    format!(
+                        "LMM forward bootstrap has invalid inputs in period {i}: \
+                         df_start={df_start}, df_end={df_end}, accrual={tau}"
+                    ),
+                    PricingErrorContext::default(),
+                ));
+            }
+            let fwd = (df_start / df_end - 1.0) / tau;
             initial_forwards.push(fwd);
-        }
-        if forward_fallback_count > 0 {
-            tracing::warn!(
-                swaption_id = swaption.id.as_str(),
-                discount_curve_id = swaption.discount_curve_id.as_str(),
-                forward_fallback_count,
-                "LMM forward bootstrap: degenerate discount factors or accruals; \
-                 substituted a flat 3% forward for the affected periods. Check \
-                 market data quality."
-            );
         }
 
         // Displacement (shifted-lognormal shift). A small positive shift is
@@ -437,8 +467,14 @@ impl Pricer for BermudanSwaptionLmmPricer {
         let currency = swaption.notional.currency();
 
         // Terminal discount factor P(0, T_N) for the last tenor
-        let t_terminal = lmm_params.tenors.last().copied().unwrap_or(ttm);
-        let df_terminal = disc.df(t_terminal);
+        let df_terminal = disc
+            .df_between_dates(as_of, swaption.swap_end)
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         // Price via LSMC with LMM dynamics
         let estimate = price_bermudan_lmm(

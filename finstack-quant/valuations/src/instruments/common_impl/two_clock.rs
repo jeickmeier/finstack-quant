@@ -9,16 +9,13 @@
 //! ```text
 //! let t_vol = inst.day_count.year_fraction(as_of, expiry)?;
 //! let df = disc_curve.df_between_dates(as_of, expiry)?;
-//! let r_eff = -df.ln() / t_vol;   // WRONG when day counts differ
+//! let r_model = -df.ln() / t_vol;
 //! ```
 //!
-//! The resulting `r_eff` is then used as the drift in a GBM / Heston /
-//! barrier simulation. This is only correct when the instrument's
-//! day-count convention (the basis the vol surface was calibrated on)
-//! matches the discount curve's own day-count convention. When they
-//! differ — e.g. ACT/365F on the vol surface and ACT/360 on the curve
-//! — `r_eff` carries a small but nonzero bias that breaks
-//! bump-and-reval consistency with the curve.
+//! The resulting rate is used as the drift in a GBM / Heston / barrier
+//! simulation whose time horizon is `t_vol`. Consequently it must satisfy
+//! `exp(-r_model * t_vol) = df`. Dividing by a year fraction on any other
+//! clock breaks the forward/discount-factor identity when day counts differ.
 //!
 //! # The two-clock convention
 //!
@@ -28,21 +25,17 @@
 //!   count. Drives the time grid for MC simulation and vol-surface
 //!   lookups (so that `σ²·t_vol` stays consistent with how the surface
 //!   was stripped).
-//! * `t_disc` — year fraction on the **discount curve's** day count.
-//!   Used *only* to compute the effective drift rate
-//!   `r_disc = -ln(df) / t_disc` for the simulated process.
 //! * `df` — the exact discount factor read from the curve. Applied
 //!   directly to the final payoff, never back-computed from a rate.
 //!
-//! With this split, the final price is bump-and-reval-consistent: a
-//! parallel shift of the curve moves `df` exactly as the curve's own
-//! accrual logic expects, and the drift tracks.
+//! The model-clock drift is therefore `r_model = -ln(df) / t_vol`, while the
+//! exact `df` discounts the payoff. This keeps both the simulated forward and
+//! final discounting consistent with the same curve observation.
 //!
 //! # Migration status
 //!
-//! [`TwoClockParams`] is the landing helper for the migration. Some
-//! pricers still compute `r_eff = -ln(DF)/t_vol` inline; these will be
-//! migrated one pricer at a time.
+//! [`TwoClockParams`] centralizes this invariant for pricers that need both
+//! curve-native and model-native time coordinates.
 //!
 //! # References
 //!
@@ -63,10 +56,6 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 /// loop without indirection.
 #[derive(Debug, Clone, Copy)]
 pub struct TwoClockParams {
-    /// Year fraction from `as_of` to `expiry` on the **discount curve's**
-    /// day-count convention. Used to compute the drift rate
-    /// `r_disc = -ln(df) / t_disc`.
-    pub t_disc: f64,
     /// Year fraction from `as_of` to `expiry` on the **instrument's**
     /// (vol-surface) day-count convention. Drives the MC time grid and
     /// vol-surface lookups.
@@ -78,38 +67,39 @@ pub struct TwoClockParams {
 impl TwoClockParams {
     /// Construct from the curve + instrument day-count + dates.
     ///
-    /// Returns both year fractions (on their respective day counts) and
-    /// the exact discount factor from the curve.
+    /// Returns the model/volatility year fraction and the exact discount
+    /// factor from the curve.
     ///
     /// # Errors
     ///
-    /// Returns an error if either day-count computation or the
-    /// discount factor lookup fails.
+    /// Returns an error if the day-count computation or discount-factor
+    /// lookup fails, or if the resulting DF is non-positive/non-finite.
     pub fn from_curve_and_instrument(
         disc_curve: &DiscountCurve,
         instrument_day_count: DayCount,
         as_of: Date,
         expiry: Date,
     ) -> finstack_quant_core::Result<Self> {
-        let t_disc =
-            disc_curve
-                .day_count()
-                .year_fraction(as_of, expiry, DayCountContext::default())?;
         let t_vol =
             instrument_day_count.year_fraction(as_of, expiry, DayCountContext::default())?;
         let df = disc_curve.df_between_dates(as_of, expiry)?;
-        Ok(Self { t_disc, t_vol, df })
+        if !df.is_finite() || df <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "discount factor must be finite and positive, got {df}"
+            )));
+        }
+        Ok(Self { t_vol, df })
     }
 
-    /// Drift rate consistent with the curve's own day-count convention.
+    /// Drift rate annualized on the stochastic model's time clock.
     ///
-    /// Returns `0.0` for non-positive `t_disc` or non-positive `df` —
-    /// both degenerate inputs are handled as "no drift" rather than
-    /// producing a non-finite rate.
+    /// For a positive model horizon this exactly satisfies
+    /// `exp(-r_model * t_vol) = df`. A non-positive horizon represents an
+    /// expired instrument and returns zero; constructors reject invalid DFs.
     #[inline]
-    pub fn r_disc(&self) -> f64 {
-        if self.t_disc > 0.0 && self.df > 0.0 {
-            -self.df.ln() / self.t_disc
+    pub fn r_model(&self) -> f64 {
+        if self.t_vol > 0.0 {
+            -self.df.ln() / self.t_vol
         } else {
             0.0
         }
@@ -120,21 +110,23 @@ impl TwoClockParams {
 mod tests {
     use super::*;
 
-    /// Non-positive clocks / DFs return 0.0 (defensive defaults).
+    /// A non-positive model horizon is an expired contract with no drift.
     #[test]
-    fn degenerate_inputs_return_zero_rate() {
+    fn expired_model_clock_returns_zero_rate() {
         let p_zero_t = TwoClockParams {
-            t_disc: 0.0,
             t_vol: 0.0,
             df: 0.95,
         };
-        assert_eq!(p_zero_t.r_disc(), 0.0);
+        assert_eq!(p_zero_t.r_model(), 0.0);
+    }
 
-        let p_zero_df = TwoClockParams {
-            t_disc: 1.0,
+    #[test]
+    fn model_rate_reproduces_exact_discount_factor() {
+        let p = TwoClockParams {
             t_vol: 1.0,
-            df: 0.0,
+            df: 0.951_229_424_500_714,
         };
-        assert_eq!(p_zero_df.r_disc(), 0.0);
+        let recovered_df = (-p.r_model() * p.t_vol).exp();
+        assert!((recovered_df - p.df).abs() < 1e-14);
     }
 }

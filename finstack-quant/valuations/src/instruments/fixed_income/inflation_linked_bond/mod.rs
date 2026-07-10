@@ -73,7 +73,8 @@
 //!
 //! - **Real yield**: Yield over inflation
 //! - **Breakeven inflation**: Implied average inflation
-//! - **Inflation01**: Sensitivity to 1bp CPI change
+//! - **Inflation01**: PV change for a 1bp parallel projected inflation-rate shift;
+//!   published CPI fixings are immutable
 //!
 //! # References
 //!

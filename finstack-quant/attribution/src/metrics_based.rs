@@ -82,11 +82,13 @@ use super::types::*;
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+#[cfg(test)]
+use finstack_quant_core::market_data::diff::measure_inflation_curve_shift;
 use finstack_quant_core::market_data::diff::{
     measure_credit_curve_shift, measure_discount_curve_shift, measure_fx_shift,
-    measure_inflation_curve_shift, measure_per_tenor_credit_curve_shift,
-    measure_scalar_absolute_shift, measure_scalar_shift, measure_vol_surface_shift,
-    TenorSamplingMethod,
+    measure_inflation_index_shift, measure_inflation_source_shift,
+    measure_per_tenor_credit_curve_shift, measure_scalar_absolute_shift, measure_scalar_shift,
+    measure_vol_surface_shift, TenorSamplingMethod,
 };
 #[cfg(test)]
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -495,17 +497,20 @@ fn credit_curve_abs_shift_bp(
 /// tenor grid. Counterpart of [`discount_curve_abs_shift_bp`] for inflation.
 ///
 /// Returns `0.0` if either side's curve is missing.
-fn inflation_curve_abs_shift_bp(
+fn inflation_source_abs_shift_bp(
     curve_id: &str,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
 ) -> f64 {
     use finstack_quant_core::market_data::diff::STANDARD_TENORS;
+    let index_abs = measure_inflation_index_shift(curve_id, market_t0, market_t1)
+        .map(f64::abs)
+        .unwrap_or(0.0);
     let (Ok(c0), Ok(c1)) = (
         market_t0.get_inflation_curve(curve_id),
         market_t1.get_inflation_curve(curve_id),
     ) else {
-        return 0.0;
+        return index_abs;
     };
     let mut total_abs = 0.0;
     let mut count = 0usize;
@@ -527,9 +532,9 @@ fn inflation_curve_abs_shift_bp(
         }
     }
     if count == 0 {
-        0.0
+        index_abs
     } else {
-        total_abs / count as f64
+        total_abs / count as f64 + index_abs
     }
 }
 
@@ -1777,13 +1782,46 @@ pub fn attribute_pnl_metrics_based(
 
         let mut total_shift = 0.0;
         let mut curve_count = 0;
+        let mut measurement_failed = false;
 
         for curve_id in curve_ids {
-            if let Ok(shift_bp) =
-                measure_inflation_curve_shift(curve_id.as_str(), market_t0, market_t1)
+            match measure_inflation_source_shift(curve_id.as_str(), market_t0, market_t1) {
+                Ok(shift_bp) => {
+                    total_shift += shift_bp;
+                    curve_count += 1;
+                }
+                Err(err) => {
+                    measurement_failed = true;
+                    attribution.meta.notes.push(format!(
+                        "Inflation attribution could not measure declared source '{}': {err}",
+                        curve_id.as_str()
+                    ));
+                }
+            }
+
+            if market_t0.get_inflation_curve(curve_id.as_str()).is_ok()
+                && market_t1.get_inflation_curve(curve_id.as_str()).is_ok()
             {
-                total_shift += shift_bp;
-                curve_count += 1;
+                if let Ok(index_shift_bp) =
+                    measure_inflation_index_shift(curve_id.as_str(), market_t0, market_t1)
+                {
+                    if index_shift_bp.abs() > f64::EPSILON {
+                        attribution.meta.notes.push(format!(
+                            "Inflation attribution for '{}' includes a discrete published-index shift of {index_shift_bp:.6} bp-equivalent in addition to the projected-curve move",
+                            curve_id.as_str()
+                        ));
+                    }
+                }
+            }
+        }
+
+        if measurement_failed || curve_ids.is_empty() {
+            non_finite_detected = true;
+            if curve_ids.is_empty() {
+                attribution.meta.notes.push(
+                    "Inflation01 was supplied but the instrument declared no inflation source"
+                        .to_string(),
+                );
             }
         }
 
@@ -1832,7 +1870,7 @@ pub fn attribute_pnl_metrics_based(
             let mut total_abs = 0.0;
             let mut abs_count = 0usize;
             for curve_id in curve_ids {
-                let v = inflation_curve_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
+                let v = inflation_source_abs_shift_bp(curve_id.as_str(), market_t0, market_t1);
                 if v > 0.0 {
                     total_abs += v;
                     abs_count += 1;
@@ -2253,6 +2291,63 @@ mod tests {
         .expect("inflation attribution");
 
         assert!((attribution.inflation_curves_pnl.amount() - 100.0 * expected_shift).abs() < 1e-9);
+    }
+
+    #[test]
+    fn inflation_attribution_supports_index_only_sources() {
+        use finstack_quant_core::market_data::scalars::InflationIndex;
+
+        let as_of_t0 = date!(2025 - 12 - 15);
+        let as_of_t1 = date!(2026 - 01 - 15);
+        let instrument: Arc<dyn Instrument> = Arc::new(
+            TestInstrument::new("TEST-INFLATION-INDEX", Money::new(100_000.0, Currency::USD))
+                .with_inflation_curves(&["US-CPI"]),
+        );
+        let index = |include_new_print: bool| {
+            let mut observations = vec![
+                (date!(2025 - 01 - 01), 100.0),
+                (date!(2025 - 12 - 01), 110.0),
+            ];
+            if include_new_print {
+                observations.push((date!(2026 - 01 - 01), 112.0));
+            }
+            InflationIndex::new("US-CPI", observations, Currency::USD).expect("inflation index")
+        };
+        let market_t0 = MarketContext::new().insert_inflation_index("US-CPI", index(false));
+        let market_t1 = MarketContext::new().insert_inflation_index("US-CPI", index(true));
+
+        let mut measures = IndexMap::new();
+        measures.insert(MetricId::Inflation01, 100.0);
+        let meta = finstack_quant_core::config::results_meta(&FinstackConfig::default());
+        let val_t0 = ValuationResult::stamped_with_meta(
+            "TEST-INFLATION-INDEX",
+            as_of_t0,
+            Money::new(100_000.0, Currency::USD),
+            meta.clone(),
+        )
+        .with_measures(measures);
+        let val_t1 = ValuationResult::stamped_with_meta(
+            "TEST-INFLATION-INDEX",
+            as_of_t1,
+            Money::new(100_100.0, Currency::USD),
+            meta,
+        );
+
+        let expected_shift =
+            measure_inflation_index_shift("US-CPI", &market_t0, &market_t1).expect("index shift");
+        let attribution = attribute_pnl_metrics_based(
+            &instrument,
+            &market_t0,
+            &market_t1,
+            &val_t0,
+            &val_t1,
+            as_of_t0,
+            as_of_t1,
+        )
+        .expect("index-only inflation attribution");
+
+        assert!((attribution.inflation_curves_pnl.amount() - 100.0 * expected_shift).abs() < 1e-9);
+        assert!(attribution.inflation_curves_pnl.amount() > 0.0);
     }
 
     #[test]

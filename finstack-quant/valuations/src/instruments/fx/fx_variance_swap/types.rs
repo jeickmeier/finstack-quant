@@ -8,7 +8,7 @@ use crate::instruments::common_impl::traits::CurveDependencies;
 use crate::instruments::common_impl::traits::Instrument as InstrumentTrait;
 use crate::instruments::common_impl::traits::InstrumentCurves;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::RealizedVarMethod;
 use finstack_quant_core::money::fx::FxQuery;
@@ -17,6 +17,10 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 
 pub use crate::instruments::common_impl::parameters::PayReceive;
+
+fn default_observation_bdc() -> BusinessDayConvention {
+    BusinessDayConvention::Following
+}
 
 /// FX variance swap instrument.
 ///
@@ -52,6 +56,18 @@ pub struct FxVarianceSwap {
     pub maturity: Date,
     /// Observation frequency
     pub observation_freq: Tenor,
+    /// Base-currency calendar used in the joint observation calendar.
+    pub base_calendar_id: String,
+    /// Quote-currency calendar used in the joint observation calendar.
+    pub quote_calendar_id: String,
+    /// Business-day convention applied to observation dates.
+    #[serde(default = "default_observation_bdc")]
+    #[builder(default = BusinessDayConvention::Following)]
+    pub observation_bdc: BusinessDayConvention,
+    /// Preserve month-end rolls for month/year observation frequencies.
+    #[serde(default)]
+    #[builder(default)]
+    pub observation_end_of_month: bool,
     /// Method for calculating realized variance (defaults to CloseToClose)
     #[serde(default)]
     #[builder(default)]
@@ -112,6 +128,10 @@ impl FxVarianceSwap {
                 Date::from_calendar_date(2025, Month::January, 2).expect("Valid example date"),
             )
             .observation_freq(Tenor::daily())
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
+            .observation_bdc(BusinessDayConvention::Following)
+            .observation_end_of_month(false)
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -184,7 +204,7 @@ impl FxVarianceSwap {
     ///
     /// For other frequencies (weekly, monthly), contractual calendar dates are included and
     /// the caller should ensure alignment with market data.
-    pub fn observation_dates(&self) -> Vec<Date> {
+    pub fn observation_dates(&self) -> Result<Vec<Date>> {
         pricer::observation_dates(self)
     }
 
@@ -210,7 +230,7 @@ impl FxVarianceSwap {
     }
 
     /// Calculate realized fraction based on observation counts.
-    pub fn realized_fraction_by_observations(&self, as_of: Date) -> f64 {
+    pub fn realized_fraction_by_observations(&self, as_of: Date) -> Result<f64> {
         pricer::realized_fraction_by_observations(self, as_of)
     }
 
@@ -363,6 +383,8 @@ mod tests {
             .start_date(date(2025, Month::January, 6)) // Monday
             .maturity(date(2025, Month::January, 10)) // Friday
             .observation_freq(Tenor::new(1, TenorUnit::Days))
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -373,7 +395,7 @@ mod tests {
             .build()
             .expect("should build");
 
-        let dates = swap.observation_dates();
+        let dates = swap.observation_dates().expect("observation schedule");
 
         // Should be exactly 5 weekdays (Mon-Fri)
         assert_eq!(
@@ -405,6 +427,8 @@ mod tests {
             .start_date(date(2025, Month::January, 2))
             .maturity(date(2025, Month::December, 31))
             .observation_freq(Tenor::new(1, TenorUnit::Days))
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -415,17 +439,17 @@ mod tests {
             .build()
             .expect("should build");
 
-        let dates = swap.observation_dates();
+        let dates = swap.observation_dates().expect("observation schedule");
         let annualization = swap.annualization_factor();
 
         // Daily observations should use 252 annualization
         assert_eq!(annualization, 252.0);
 
-        // The number of observations should be close to 252 for a full year
-        // (allowing for start/end date positioning and maturity inclusion)
+        // A joint TARGET2/USNY schedule is smaller than the 252-day
+        // annualization convention because either market's holidays are excluded.
         assert!(
-            dates.len() >= 250 && dates.len() <= 260,
-            "Daily observations for ~1 year should be close to 252: got {}",
+            dates.len() >= 240 && dates.len() <= 252,
+            "Daily joint-calendar observations should be plausible: got {}",
             dates.len()
         );
     }
@@ -442,6 +466,8 @@ mod tests {
             .start_date(date(2025, Month::January, 4)) // Saturday
             .maturity(date(2025, Month::January, 25)) // Saturday
             .observation_freq(Tenor::new(1, TenorUnit::Weeks))
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -452,7 +478,7 @@ mod tests {
             .build()
             .expect("should build");
 
-        let dates = swap.observation_dates();
+        let dates = swap.observation_dates().expect("observation schedule");
         let annualization = swap.annualization_factor();
 
         // Weekly should use 52 annualization
@@ -466,10 +492,16 @@ mod tests {
     fn test_fx_variance_swap_realized_fraction_monotonic() {
         let swap = FxVarianceSwap::example();
 
-        let start_frac = swap.realized_fraction_by_observations(swap.start_date);
+        let start_frac = swap
+            .realized_fraction_by_observations(swap.start_date)
+            .expect("start fraction");
         let mid_date = swap.start_date + time::Duration::days(90);
-        let mid_frac = swap.realized_fraction_by_observations(mid_date);
-        let end_frac = swap.realized_fraction_by_observations(swap.maturity);
+        let mid_frac = swap
+            .realized_fraction_by_observations(mid_date)
+            .expect("mid fraction");
+        let end_frac = swap
+            .realized_fraction_by_observations(swap.maturity)
+            .expect("end fraction");
 
         assert_eq!(start_frac, 0.0, "Should be 0 at start");
         assert!(

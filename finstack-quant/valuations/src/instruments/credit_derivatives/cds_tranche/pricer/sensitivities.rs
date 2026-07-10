@@ -835,14 +835,11 @@ impl CDSTranchePricer {
         };
 
         // Calculate the accrual fraction from last payment to as_of
-        let accrual_fraction = tranche
-            .day_count
-            .year_fraction(
-                last_payment,
-                as_of,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )
-            .unwrap_or(0.0);
+        let accrual_fraction = tranche.day_count.year_fraction(
+            last_payment,
+            as_of,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
 
         if accrual_fraction <= 0.0 {
             return Ok(0.0);

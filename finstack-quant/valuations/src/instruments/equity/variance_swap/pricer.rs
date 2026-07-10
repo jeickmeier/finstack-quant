@@ -182,12 +182,16 @@ pub(crate) fn seasoned_expected_variance(
     Ok(realized * w + forward * (1.0 - w))
 }
 
-pub(crate) fn observation_dates(inst: &VarianceSwap) -> Vec<Date> {
+pub(crate) fn observation_dates(inst: &VarianceSwap) -> Result<Vec<Date>> {
     crate::instruments::common_impl::pricing::variance_observations::variance_observation_dates(
         inst.start_date,
         inst.maturity,
         inst.observation_freq,
-        &inst.attributes,
+        inst.observation_bdc,
+        inst.observation_end_of_month,
+        crate::instruments::common_impl::pricing::variance_observations::VarianceCalendar::Single(
+            &inst.observation_calendar_id,
+        ),
     )
 }
 
@@ -242,20 +246,20 @@ pub(crate) fn annualization_factor_with_policy(
     tdy_override
 }
 
-pub(crate) fn realized_fraction_by_observations(inst: &VarianceSwap, as_of: Date) -> f64 {
-    let all = observation_dates(inst);
+pub(crate) fn realized_fraction_by_observations(inst: &VarianceSwap, as_of: Date) -> Result<f64> {
+    let all = observation_dates(inst)?;
     if all.is_empty() {
-        return 0.0;
+        return Ok(0.0);
     }
     if as_of <= inst.start_date {
-        return 0.0;
+        return Ok(0.0);
     }
     if as_of >= inst.maturity {
-        return 1.0;
+        return Ok(1.0);
     }
     let total = all.len() as f64;
     let realized = all.iter().filter(|&&d| d <= as_of).count() as f64;
-    (realized / total).clamp(0.0, 1.0)
+    Ok((realized / total).clamp(0.0, 1.0))
 }
 
 pub(crate) fn get_historical_prices(
@@ -267,14 +271,17 @@ pub(crate) fn get_historical_prices(
         .close_series_id
         .as_deref()
         .unwrap_or(&inst.underlying_ticker);
-    let past_dates: Vec<Date> = observation_dates(inst)
+    let past_dates: Vec<Date> = observation_dates(inst)?
         .into_iter()
         .filter(|&d| d <= as_of)
         .collect();
 
     if let Ok(series) = context.get_series(close_id) {
         if past_dates.len() >= 2 {
-            return series.values_on(&past_dates);
+            return past_dates
+                .iter()
+                .map(|&date| series.value_on_exact(date))
+                .collect();
         }
     }
     if past_dates.len() >= 2 {
@@ -336,7 +343,7 @@ pub(crate) fn get_historical_ohlc(
         ))
     })?;
 
-    let dates: Vec<Date> = observation_dates(inst)
+    let dates: Vec<Date> = observation_dates(inst)?
         .into_iter()
         .filter(|&d| d <= as_of)
         .collect();
@@ -345,10 +352,17 @@ pub(crate) fn get_historical_ohlc(
         return Ok((vec![], vec![], vec![], vec![]));
     }
 
-    let open_vals = context.get_series(open_id)?.values_on(&dates)?;
-    let high_vals = context.get_series(high_id)?.values_on(&dates)?;
-    let low_vals = context.get_series(low_id)?.values_on(&dates)?;
-    let close_vals = context.get_series(default_close)?.values_on(&dates)?;
+    let exact_values = |id: &str| -> Result<Vec<f64>> {
+        let series = context.get_series(id)?;
+        dates
+            .iter()
+            .map(|&date| series.value_on_exact(date))
+            .collect()
+    };
+    let open_vals = exact_values(open_id)?;
+    let high_vals = exact_values(high_id)?;
+    let low_vals = exact_values(low_id)?;
+    let close_vals = exact_values(default_close)?;
 
     Ok((open_vals, high_vals, low_vals, close_vals))
 }
@@ -465,10 +479,9 @@ pub(crate) fn seasoned_realized_variance(
 ///    Used when Carr-Madan can't replicate (e.g. sparse strikes); logged at WARN.
 /// 3. **Scalar implied vol** under key `{ticker}_IMPL_VOL`. Crude — squared
 ///    to a flat variance; logged at WARN.
-/// 4. **Strike variance from the contract itself** (`inst.strike_variance`).
-///    This is a last-resort sentinel that prices the swap at zero (mark-to-market
-///    equals strike). Logged at WARN with the instrument id so it's visible
-///    in production logs.
+///
+/// If none of these market inputs exists, pricing fails. Substituting the
+/// contract strike variance would manufacture a plausible zero mark.
 pub(crate) fn remaining_forward_variance(
     inst: &VarianceSwap,
     context: &MarketContext,
@@ -484,71 +497,76 @@ pub(crate) fn remaining_forward_variance(
         &format!("{}_IMPL_VOL", inst.underlying_ticker),
     ] {
         if let Ok(surface) = context.get_surface(sid) {
-            if let Ok(disc) = context.get_discount(&inst.discount_curve_id) {
-                if let Ok(spot_scalar) = context.get_price(&inst.underlying_ticker) {
-                    let spot = match spot_scalar {
-                        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                        finstack_quant_core::market_data::scalars::MarketScalar::Price(p) => {
-                            p.amount()
-                        }
-                    };
-                    // Date-based zero rate over [as_of, maturity]: avoids the
-                    // axis bias of `disc.zero(t)` when curve base != as_of.
-                    let df_mat =
-                        crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-                            disc.as_ref(),
-                            as_of,
-                            inst.maturity,
-                        )?;
-                    let r = -df_mat.ln() / t.max(1e-8);
-                    let q = context
-                        .get_price(format!("{}-DIVYIELD", inst.underlying_ticker))
-                        .ok()
-                        .and_then(|s| match s {
-                            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(
-                                v,
-                            ) => Some(*v),
-                            finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
-                                None
-                            }
-                        })
-                        .unwrap_or(0.0);
-                    let fwd = spot * ((r - q) * t).exp();
-                    let strikes = surface.strikes();
-                    if t > 0.0 {
-                        let vol_fn = |t_exp: f64, k: f64| surface.value_clamped(t_exp, k);
-                        let bs_fn = |k: f64, v: f64, opt: OptionType| -> f64 {
-                            bs_price(spot, k, r, q, v, t, opt)
-                        };
-                        if let Some(variance) =
-                            carr_madan_forward_variance(strikes, fwd, r, t, vol_fn, bs_fn)
-                        {
-                            return Ok(variance);
-                        }
-                    }
-                    if let Some(fallback_variance) =
-                        smile_convexity_adjusted_variance(&surface, t.max(1e-8), fwd)
-                    {
-                        let vol_atm = surface.value_clamped(t.max(1e-8), fwd);
-                        tracing::warn!(
-                            instrument_id = %inst.id,
-                            surface_id = %sid,
-                            vol_atm = vol_atm,
-                            fallback_variance = fallback_variance,
-                            "VarianceSwap forward variance: Carr-Madan replication failed; \
-                             falling back to ATM variance plus local smile convexity (level 2/4)"
-                        );
-                        return Ok(fallback_variance);
-                    }
+            let disc = context.get_discount(&inst.discount_curve_id)?;
+            let spot_scalar = context.get_price(&inst.underlying_ticker)?;
+            let spot = match spot_scalar {
+                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
+                finstack_quant_core::market_data::scalars::MarketScalar::Price(p) => p.amount(),
+            };
+            // Date-based zero rate over [as_of, maturity]: avoids the
+            // axis bias of `disc.zero(t)` when curve base != as_of.
+            let df_mat =
+                crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+                    disc.as_ref(),
+                    as_of,
+                    inst.maturity,
+                )?;
+            let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
+                df_mat,
+                t,
+                "variance-swap replication rate",
+            )?;
+            let q = match context.get_price(format!("{}-DIVYIELD", inst.underlying_ticker)) {
+                Ok(finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v)) => *v,
+                Ok(finstack_quant_core::market_data::scalars::MarketScalar::Price(_)) => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "variance-swap dividend yield '{}-DIVYIELD' must be unitless",
+                        inst.underlying_ticker
+                    )));
+                }
+                Err(_) => 0.0,
+            };
+            let fwd = spot / df_mat * (-q * t).exp();
+            let strikes = surface.strikes();
+            if t > 0.0 {
+                let vol_fn = |t_exp: f64, k: f64| surface.value_clamped(t_exp, k);
+                let bs_fn =
+                    |k: f64, v: f64, opt: OptionType| -> f64 { bs_price(spot, k, r, q, v, t, opt) };
+                if let Some(variance) =
+                    carr_madan_forward_variance(strikes, fwd, r, t, vol_fn, bs_fn)
+                {
+                    return Ok(variance);
                 }
             }
+            if let Some(fallback_variance) =
+                smile_convexity_adjusted_variance(&surface, t.max(1e-8), fwd)
+            {
+                let vol_atm = surface.value_clamped(t.max(1e-8), fwd);
+                tracing::warn!(
+                    instrument_id = %inst.id,
+                    surface_id = %sid,
+                    vol_atm = vol_atm,
+                    fallback_variance = fallback_variance,
+                    "VarianceSwap forward variance: Carr-Madan replication failed; \
+                     falling back to ATM variance plus local smile convexity"
+                );
+                return Ok(fallback_variance);
+            }
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "variance-swap surface '{sid}' could not produce a finite forward variance"
+            )));
         }
     }
 
     if let Ok(scalar) = context.get_price(format!("{}_IMPL_VOL", inst.underlying_ticker)) {
         let vol = match scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(p) => p.amount(),
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(_) => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "variance-swap implied volatility '{}_IMPL_VOL' must be unitless",
+                    inst.underlying_ticker
+                )));
+            }
         };
         let fallback_variance = vol * vol;
         tracing::warn!(
@@ -562,20 +580,13 @@ pub(crate) fn remaining_forward_variance(
         );
         Ok(fallback_variance)
     } else {
-        // Level 4/4: no surface and no scalar implied vol. Marking to the
-        // contract strike makes the swap mark to ~zero, which is easily mistaken
-        // for a real flat mark. Log at ERROR (not WARN) so the degraded mark is
-        // still visible when WARN-level logs are filtered out in production.
-        tracing::error!(
-            instrument_id = %inst.id,
-            ticker = %inst.underlying_ticker,
-            strike_variance = inst.strike_variance,
-            "VarianceSwap forward variance: no surface or scalar implied vol found; \
-             falling back to contract strike_variance (level 4/4 — swap marks to zero). \
-             Supply a vol surface or {ticker}_IMPL_VOL to obtain a real mark.",
-            ticker = inst.underlying_ticker.as_str()
-        );
-        Ok(inst.strike_variance)
+        Err(finstack_quant_core::InputError::NotFound {
+            id: format!(
+                "variance-swap volatility for '{}': supply a vol surface or '{}_IMPL_VOL'",
+                inst.underlying_ticker, inst.underlying_ticker
+            ),
+        }
+        .into())
     }
 }
 
@@ -585,6 +596,7 @@ mod tests {
     use crate::instruments::common_impl::traits::Instrument;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use time::macros::date;
@@ -595,7 +607,9 @@ mod tests {
             .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
             .build()
             .expect("curve");
-        MarketContext::new().insert(curve)
+        MarketContext::new()
+            .insert(curve)
+            .insert_price("SPX_IMPL_VOL", MarketScalar::Unitless(0.20))
     }
 
     #[test]
@@ -611,6 +625,22 @@ mod tests {
         let via_instrument = swap.value(&market, as_of).expect("instrument pv");
 
         assert_eq!(via_pricer, via_instrument);
+    }
+
+    #[test]
+    fn missing_forward_volatility_is_a_pricing_error() {
+        let swap = VarianceSwap::example().expect("example swap");
+        let as_of = date!(2023 - 12 - 31);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (1.0, (-0.03_f64).exp())])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+
+        let err = remaining_forward_variance(&swap, &market, as_of)
+            .expect_err("missing volatility must not manufacture a zero mark");
+        assert!(err.to_string().contains("volatility"));
     }
 
     /// Regression: when the swap has accrued past observations but no
@@ -663,6 +693,7 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_freq(Tenor::daily())
+            .observation_calendar_id("USNY".to_string())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -673,7 +704,8 @@ mod tests {
 
         // The count fraction must genuinely diverge from the time fraction;
         // otherwise the test would not distinguish the two weightings.
-        let count_w = realized_fraction_by_observations(&swap, as_of);
+        let count_w =
+            realized_fraction_by_observations(&swap, as_of).expect("observation fraction");
         let time_w = swap.time_elapsed_fraction(as_of);
         assert!(
             (count_w - time_w).abs() > 1e-4,
@@ -681,9 +713,10 @@ mod tests {
         );
 
         // Close series on every past observation date with a non-trivial
-        // return path so realized variance != forward variance (= strike, as
-        // no vol surface is supplied).
+        // return path so realized variance differs from the scalar-vol forward
+        // variance supplied by `build_market`.
         let past: Vec<Date> = observation_dates(&swap)
+            .expect("observation schedule")
             .into_iter()
             .filter(|&d| d <= as_of)
             .collect();
@@ -765,6 +798,7 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_freq(Tenor::daily())
+            .observation_calendar_id("USNY".to_string())
             .realized_var_method(finstack_quant_core::math::stats::RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -774,6 +808,7 @@ mod tests {
             .expect("w33 swap");
 
         let past: Vec<Date> = observation_dates(&swap)
+            .expect("observation schedule")
             .into_iter()
             .filter(|&d| d <= as_of)
             .collect();
@@ -858,7 +893,7 @@ mod tests {
         swap.start_date = date!(2025 - 01 - 03); // Friday
         swap.maturity = date!(2025 - 01 - 15);
         swap.observation_freq = Tenor::new(2, TenorUnit::Days);
-        let dates = observation_dates(&swap);
+        let dates = observation_dates(&swap).expect("observation schedule");
         assert_eq!(dates[0], date!(2025 - 01 - 03));
         assert_eq!(dates[1], date!(2025 - 01 - 07));
         assert!(dates

@@ -7,7 +7,10 @@ use crate::metrics::risk::MarketHistory;
 use crate::metrics::{standard_registry, MetricContext, MetricId};
 use finstack_quant_core::config::{results_meta_now, FinstackConfig};
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-use finstack_quant_core::market_data::{context::MarketContext, scalars::MarketScalar};
+use finstack_quant_core::market_data::{
+    context::MarketContext,
+    scalars::{InflationIndex, InflationInterpolation, MarketScalar},
+};
 use finstack_quant_core::money::Money;
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -1189,4 +1192,130 @@ pub(crate) fn resolve_inflation_lag(
         return index.lag();
     }
     InflationLag::None
+}
+
+/// Resolve a realized CPI/RPI value from a supplied index history.
+///
+/// Historical observations are contractual fixings: once the effective fixing
+/// date is on or before `as_of`, missing coverage must be surfaced rather than
+/// silently replaced with a curve projection or an indefinitely stale value.
+/// Step interpolation may carry the published level through the remainder of
+/// its calendar month; linear interpolation requires a published right anchor.
+///
+/// The index is cloned with the instrument's effective lag so a contract-level
+/// lag override is honored without mutating shared market data.
+pub(crate) fn realized_inflation_index_value(
+    index: &InflationIndex,
+    unlagged_date: Date,
+    effective_date: Date,
+    effective_lag: InflationLag,
+) -> finstack_quant_core::Result<f64> {
+    let (first, last) = index.date_range()?;
+    let is_covered = if effective_date < first {
+        false
+    } else {
+        match index.interpolation {
+            InflationInterpolation::Step => {
+                (effective_date.year(), effective_date.month()) <= (last.year(), last.month())
+            }
+            #[allow(unreachable_patterns)]
+            _ => effective_date <= last,
+        }
+    };
+
+    if !is_covered {
+        return Err(finstack_quant_core::InputError::NotFound {
+            id: format!(
+                "inflation index '{}' fixing coverage for {} (available {} through {})",
+                index.id, effective_date, first, last
+            ),
+        }
+        .into());
+    }
+
+    index
+        .clone()
+        .with_lag(effective_lag)
+        .value_on(unlagged_date)
+}
+
+#[cfg(test)]
+mod realized_inflation_index_tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+    use time::macros::date;
+
+    fn step_index() -> InflationIndex {
+        InflationIndex::new(
+            "US-CPI",
+            vec![
+                (date!(2025 - 01 - 01), 300.0),
+                (date!(2025 - 02 - 01), 301.0),
+            ],
+            Currency::USD,
+        )
+        .expect("valid index")
+        .with_lag(InflationLag::Months(3))
+    }
+
+    #[test]
+    fn rejects_historical_dates_outside_published_coverage() {
+        let index = step_index();
+        for effective_date in [date!(2024 - 12 - 15), date!(2025 - 03 - 01)] {
+            let result = realized_inflation_index_value(
+                &index,
+                effective_date,
+                effective_date,
+                InflationLag::None,
+            );
+            assert!(result.is_err(), "{effective_date} must require a fixing");
+        }
+    }
+
+    #[test]
+    fn step_interpolation_carries_only_within_last_published_month() {
+        let index = step_index();
+        let value = realized_inflation_index_value(
+            &index,
+            date!(2025 - 02 - 20),
+            date!(2025 - 02 - 20),
+            InflationLag::None,
+        )
+        .expect("same-month step fixing is covered");
+        assert_eq!(value, 301.0);
+    }
+
+    #[test]
+    fn contract_lag_override_replaces_index_default_lag() {
+        let index = step_index();
+        let value = realized_inflation_index_value(
+            &index,
+            date!(2025 - 02 - 15),
+            date!(2025 - 02 - 15),
+            InflationLag::None,
+        )
+        .expect("explicit no-lag override should use February fixing");
+        assert_eq!(value, 301.0);
+    }
+
+    #[test]
+    fn linear_interpolation_requires_a_published_right_anchor() {
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![(date!(2025 - 01 - 01), 300.0)],
+            Currency::USD,
+        )
+        .expect("valid index")
+        .with_interpolation(InflationInterpolation::Linear);
+        let result = realized_inflation_index_value(
+            &index,
+            date!(2025 - 01 - 15),
+            date!(2025 - 01 - 15),
+            InflationLag::None,
+        );
+        assert!(
+            result.is_err(),
+            "linear interpolation needs the next anchor"
+        );
+    }
 }

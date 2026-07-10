@@ -228,9 +228,9 @@ pub(crate) fn collect_inputs_extended(
     // OIS curve), the vol surface uses ACT/365F (the equity-vol market
     // standard). The two clocks must be kept separate:
     //
-    //  - `t_rate` (curve clock): the ONLY argument used to read the discount
-    //    factor `df` off the curve. The curve's `df(·)` is parameterised by
-    //    *its own* clock, so it must be queried with `t_rate`, never `t_vol`.
+    //  - `t_rate` (curve clock): retained for curve-native reporting and
+    //    downstream diagnostics. The economic DF is read date-to-date so a
+    //    seasoned curve is correctly rebased at `as_of`.
     //  - `t_vol` (ACT/365F): the time-to-expiry that drives the whole
     //    Black–Scholes calculation — `d1`/`d2`, the carry term `(r−q)·t_vol`
     //    and the discount term `e^{−r·t_vol}`.
@@ -249,9 +249,8 @@ pub(crate) fn collect_inputs_extended(
     // Using `r = −ln(df)/t_rate` here would instead make `e^{−r·t_vol} ≠ df`
     // whenever the clocks differ, mispricing both the discount and the carry.
     let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
-    let curve_dc = disc_curve.day_count();
-    let t_rate = year_fraction(curve_dc, as_of, inst.expiry)?;
-    let df = disc_curve.df(t_rate);
+    let t_rate = year_fraction(disc_curve.day_count(), as_of, inst.expiry)?;
+    let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
 
     // Vol time uses ACT/365F (equity market standard for vol surfaces)
     // This is consistent with how equity volatility is quoted in the market

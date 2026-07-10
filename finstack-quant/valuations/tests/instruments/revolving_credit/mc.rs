@@ -423,7 +423,17 @@ fn test_mc_stochastic_floating_rate_index_cap() {
 
     let disc_curve = build_flat_discount_curve(0.03, val_date, "USD-OIS");
 
-    let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
+    let market = MarketContext::new()
+        .insert(disc_curve)
+        .insert(fwd_curve)
+        .insert_series(
+            finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
+                "FIXING:USD-SOFR-3M",
+                vec![(date!(2024 - 12 - 30), 0.08)],
+                None,
+            )
+            .expect("valuation-date contractual fixing"),
+        );
 
     // Helper to build a floating rate spec with optional index cap
     let make_float_spec = |all_in_cap_bp: Option<Decimal>| -> FloatingRateSpec {

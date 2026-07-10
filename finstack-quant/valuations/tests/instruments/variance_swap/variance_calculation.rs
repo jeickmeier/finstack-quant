@@ -152,7 +152,7 @@ fn test_partial_realized_variance_matches_manual_calculation() {
     let realized = swap.partial_realized_variance(&ctx, as_of).unwrap();
 
     // Manual calculation
-    let obs_dates = swap.observation_dates();
+    let obs_dates = swap.observation_dates().expect("observation schedule");
     let used_prices: Vec<f64> = obs_dates
         .iter()
         .filter(|d| **d >= swap.start_date && **d <= as_of)
@@ -180,7 +180,7 @@ fn test_partial_realized_variance_uses_policy_annualization() {
     let realized = swap.partial_realized_variance(&ctx, as_of).unwrap();
 
     // Assert - should be using 260.0 instead of 252.0
-    let obs_dates = swap.observation_dates();
+    let obs_dates = swap.observation_dates().expect("observation schedule");
     let used_prices: Vec<f64> = obs_dates
         .iter()
         .filter(|d| **d >= swap.start_date && **d <= as_of)
@@ -213,18 +213,16 @@ fn test_partial_realized_variance_is_always_non_negative() {
 // ============================================================================
 
 #[test]
-fn test_remaining_forward_variance_falls_back_to_strike() {
+fn test_remaining_forward_variance_requires_market_volatility() {
     // Arrange
     let swap = sample_swap(PayReceive::Receive);
-    let ctx = base_context(); // No implied vol
+    let ctx = base_context_without_vol();
 
     // Act
-    let forward = swap
-        .remaining_forward_variance(&ctx, swap.start_date)
-        .unwrap();
+    let result = swap.remaining_forward_variance(&ctx, swap.start_date);
 
     // Assert
-    assert!((forward - swap.strike_variance).abs() < EPSILON);
+    assert!(result.is_err());
 }
 
 #[test]
@@ -311,7 +309,7 @@ fn test_expected_variance_mid_period_is_weighted_blend() {
     swap.observation_freq = Tenor::weekly();
     let prices = price_series(&swap, 4_950.0, 10.0);
     let ctx = add_series(base_context(), &prices);
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     let as_of = dates[dates.len() / 2];
 
     // Act
@@ -333,7 +331,7 @@ fn test_expected_variance_transitions_smoothly() {
     swap.observation_freq = Tenor::weekly();
     let prices = price_series(&swap, 5_000.0, 5.0);
     let _ctx = add_series(base_context(), &prices);
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Act - compute at multiple points
     let mut prev_weight = 0.0;
@@ -358,7 +356,7 @@ fn add_ohlc_series(
 ) -> MarketContext {
     use finstack_quant_core::market_data::scalars::{ScalarTimeSeries, SeriesInterpolation};
 
-    let obs_dates = swap.observation_dates();
+    let obs_dates = swap.observation_dates().expect("observation schedule");
     let open_prices: Vec<(Date, f64)> = obs_dates
         .iter()
         .enumerate()
@@ -403,6 +401,7 @@ fn ohlc_swap(method: RealizedVarMethod) -> VarianceSwap {
         .start_date(start)
         .maturity(end)
         .observation_freq(Tenor::daily())
+        .observation_calendar_id("USNY".to_string())
         .realized_var_method(method)
         .open_series_id("SPX-OPEN".to_string())
         .high_series_id("SPX-HIGH".to_string())
@@ -470,6 +469,7 @@ fn test_ohlc_missing_series_id_returns_error() {
         .start_date(start)
         .maturity(end)
         .observation_freq(Tenor::daily())
+        .observation_calendar_id("USNY".to_string())
         .realized_var_method(RealizedVarMethod::Parkinson)
         // Intentionally omit open/high/low series IDs
         .side(PayReceive::Receive)

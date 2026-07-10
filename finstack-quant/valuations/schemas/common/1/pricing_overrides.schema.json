@@ -1637,7 +1637,7 @@
           "type": "null"
         }
       ],
-      "description": "PV adjustment at valuation date (for CDS, CDSIndex, convertibles).\n\nThis is an **already-discounted** adjustment to the net present value.\nIt is added directly to the NPV without further discounting.\n\n# Sign Convention\n\n- Positive value: increases NPV (e.g., premium received)\n- Negative value: decreases NPV (e.g., premium paid)\n\n# Relationship to CDS Dated Upfront\n\nFor CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:\n- **`upfront_payment`**: PV adjustment at `as_of`, added directly\n- **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date\n\nBoth can be set simultaneously without double-counting."
+      "description": "PV adjustment at valuation date (primarily credit-instrument upfront quotes).\n\nThis is an **already-discounted** adjustment to the net present value.\nIt is added directly to the NPV without further discounting.\n\n# Sign Convention\n\nFor CDS, CDS index, and CDS tranche instruments, a positive amount is\npaid by the protection buyer: it decreases buyer NPV and increases\nseller NPV. Other instrument families may treat the amount as an\nexplicitly signed PV adjustment and document that convention locally.\n\n# Relationship to CDS Dated Upfront\n\nFor CDS, this is distinct from `CreditDefaultSwap.upfront: Option<(Date, Money)>`:\n- **`upfront_payment`**: PV adjustment at `as_of`, added directly\n- **`CreditDefaultSwap.upfront`**: Dated cashflow, discounted from payment date\n\nBoth can be set simultaneously without double-counting."
     },
     "use_gobet_miri": {
       "default": false,

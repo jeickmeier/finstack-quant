@@ -189,6 +189,7 @@ fn test_realized_variance_matches_series_calculation() {
     let swap = sample_swap(PayReceive::Receive);
     let prices: Vec<(finstack_quant_core::dates::Date, f64)> = swap
         .observation_dates()
+        .expect("observation schedule")
         .into_iter()
         .map(|d| (d, 4_900.0 + (d.ordinal() as f64 % 30.0)))
         .collect();
@@ -259,6 +260,7 @@ fn test_expected_variance_blends_realized_and_forward_mid_period() {
     swap.observation_freq = Tenor::weekly();
     let prices: Vec<(finstack_quant_core::dates::Date, f64)> = swap
         .observation_dates()
+        .expect("observation schedule")
         .into_iter()
         .map(|d| (d, 4_950.0 + (d.ordinal() as f64 % 20.0)))
         .collect();
@@ -323,11 +325,11 @@ fn test_vega_matches_formula() {
     // codebase's vega-notional convention — not the forward implied vol, so the
     // vega / variance-vega chain-rule identity closes with a single σ.
     let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
-    let t = swap
-        .day_count
-        .year_fraction(as_of, swap.maturity, Default::default())
+    let df = ctx
+        .get_discount(DISC_ID)
+        .unwrap()
+        .df_between_dates(as_of, swap.maturity)
         .unwrap();
-    let df = ctx.get_discount(DISC_ID).unwrap().df(t);
     let strike_vol = swap.strike_variance.sqrt();
     let expected = df
         * 2.0
@@ -431,11 +433,11 @@ fn test_variance_vega_matches_formula() {
     // Variance vega uses the day-count `time_elapsed_fraction` (W-32) to stay
     // consistent with `compute_pv`, not an observation-count weight.
     let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
-    let t = swap
-        .day_count
-        .year_fraction(as_of, swap.maturity, Default::default())
+    let df = ctx
+        .get_discount(DISC_ID)
+        .unwrap()
+        .df_between_dates(as_of, swap.maturity)
         .unwrap();
-    let df = ctx.get_discount(DISC_ID).unwrap().df(t);
     let expected = df * swap.notional.amount() * remaining_fraction * swap.side.sign();
 
     assert!((var_vega - expected).abs() < LOOSE_EPSILON);
@@ -447,7 +449,7 @@ fn test_vega_decreases_as_maturity_approaches() {
     let mut swap = sample_swap(PayReceive::Receive);
     swap.observation_freq = Tenor::weekly();
     let ctx = add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.25);
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Act
     let vegas: Vec<f64> = dates
@@ -639,7 +641,7 @@ fn test_all_metrics_mid_period() {
         add_unitless(base_context(), format!("{}_IMPL_VOL", UNDERLYING_ID), 0.23),
         &prices,
     );
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     let as_of = dates[dates.len() / 2];
 
     // Act

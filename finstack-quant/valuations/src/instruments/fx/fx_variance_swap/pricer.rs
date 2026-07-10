@@ -25,7 +25,7 @@ pub(crate) fn compute_pv(
 
     // Compute observation dates once per pricing call. Each branch below would
     // otherwise rebuild this 1-3 times via the helper functions.
-    let obs_dates = observation_dates(inst);
+    let obs_dates = observation_dates(inst)?;
 
     if as_of >= inst.maturity {
         let realized_var = if inst.realized_var_method.requires_ohlc() {
@@ -75,12 +75,17 @@ pub(crate) fn compute_pv(
     Ok(undiscounted * df)
 }
 
-pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Vec<Date> {
+pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Result<Vec<Date>> {
     crate::instruments::common_impl::pricing::variance_observations::variance_observation_dates(
         inst.start_date,
         inst.maturity,
         inst.observation_freq,
-        &inst.attributes,
+        inst.observation_bdc,
+        inst.observation_end_of_month,
+        crate::instruments::common_impl::pricing::variance_observations::VarianceCalendar::Joint {
+            base: &inst.base_calendar_id,
+            quote: &inst.quote_calendar_id,
+        },
     )
 }
 
@@ -98,8 +103,12 @@ pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
     252.0
 }
 
-pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Date) -> f64 {
-    realized_fraction_by_observations_with_dates(inst, as_of, &observation_dates(inst))
+pub(crate) fn realized_fraction_by_observations(inst: &FxVarianceSwap, as_of: Date) -> Result<f64> {
+    Ok(realized_fraction_by_observations_with_dates(
+        inst,
+        as_of,
+        &observation_dates(inst)?,
+    ))
 }
 
 /// Fraction of the observation period elapsed at `as_of`, measured by the
@@ -154,7 +163,7 @@ pub(crate) fn get_historical_prices(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Vec<f64>> {
-    get_historical_prices_with_dates(inst, context, as_of, &observation_dates(inst))
+    get_historical_prices_with_dates(inst, context, as_of, &observation_dates(inst)?)
 }
 
 fn get_historical_prices_with_dates(
@@ -170,7 +179,10 @@ fn get_historical_prices_with_dates(
     if let Ok(series) = context.get_series(&close_id_owned) {
         let dates: Vec<Date> = obs_dates.iter().copied().filter(|&d| d <= as_of).collect();
         if dates.len() >= 2 {
-            return series.values_on(&dates);
+            return dates
+                .iter()
+                .map(|&date| series.value_on_exact(date))
+                .collect();
         }
     }
 
@@ -230,10 +242,17 @@ fn get_historical_ohlc_with_dates(
         return Ok((vec![], vec![], vec![], vec![]));
     }
 
-    let open_vals = context.get_series(open_id)?.values_on(&dates)?;
-    let high_vals = context.get_series(high_id)?.values_on(&dates)?;
-    let low_vals = context.get_series(low_id)?.values_on(&dates)?;
-    let close_vals = context.get_series(&default_close)?.values_on(&dates)?;
+    let exact_values = |id: &str| -> Result<Vec<f64>> {
+        let series = context.get_series(id)?;
+        dates
+            .iter()
+            .map(|&date| series.value_on_exact(date))
+            .collect()
+    };
+    let open_vals = exact_values(open_id)?;
+    let high_vals = exact_values(high_id)?;
+    let low_vals = exact_values(low_id)?;
+    let close_vals = exact_values(&default_close)?;
 
     Ok((open_vals, high_vals, low_vals, close_vals))
 }
@@ -243,7 +262,7 @@ pub(crate) fn partial_realized_variance(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    partial_realized_variance_with_dates(inst, context, as_of, &observation_dates(inst))
+    partial_realized_variance_with_dates(inst, context, as_of, &observation_dates(inst)?)
 }
 
 fn partial_realized_variance_with_dates(
@@ -339,7 +358,7 @@ pub(crate) fn seasoned_expected_variance(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    seasoned_expected_variance_with_dates(inst, context, as_of, &observation_dates(inst))
+    seasoned_expected_variance_with_dates(inst, context, as_of, &observation_dates(inst)?)
 }
 
 fn seasoned_expected_variance_with_dates(
@@ -474,6 +493,7 @@ mod tests {
         let swap = FxVarianceSwap::example();
         let as_of = date!(2025 - 01 - 02);
         let observations = observation_dates(&swap)
+            .expect("observation schedule")
             .into_iter()
             .map(|date| (date, 1.10))
             .collect();
@@ -495,7 +515,7 @@ mod tests {
         swap.maturity = date!(2025 - 01 - 15);
         swap.observation_freq = Tenor::new(2, TenorUnit::Days);
 
-        let dates = observation_dates(&swap);
+        let dates = observation_dates(&swap).expect("observation schedule");
         assert_eq!(annualization_factor(&swap), 126.0);
         assert_eq!(dates[0], date!(2025 - 01 - 03));
         assert_eq!(dates[1], date!(2025 - 01 - 07));
@@ -534,6 +554,8 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_freq(Tenor::daily())
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -544,7 +566,8 @@ mod tests {
             .build()
             .expect("seasoned fx swap");
 
-        let count_w = realized_fraction_by_observations(&swap, as_of);
+        let count_w =
+            realized_fraction_by_observations(&swap, as_of).expect("observation fraction");
         let time_w = time_elapsed_fraction(&swap, as_of).expect("time fraction");
         assert!(
             (count_w - time_w).abs() > 1e-4,
@@ -554,6 +577,7 @@ mod tests {
         // Close series over every past observation date with a non-trivial
         // return path so realized variance != forward variance.
         let past: Vec<Date> = observation_dates(&swap)
+            .expect("observation schedule")
             .into_iter()
             .filter(|&d| d <= as_of)
             .collect();
@@ -583,9 +607,14 @@ mod tests {
             .year_fraction(swap.start_date, swap.maturity, DayCountContext::default())
             .expect("total yf");
         let t_elapsed = time_w * total_t;
-        let realized =
-            seasoned_realized_variance(&swap, &market, as_of, t_elapsed, &observation_dates(&swap))
-                .expect("realized");
+        let realized = seasoned_realized_variance(
+            &swap,
+            &market,
+            as_of,
+            t_elapsed,
+            &observation_dates(&swap).expect("observation schedule"),
+        )
+        .expect("realized");
         let forward = remaining_forward_variance(&swap, &market, as_of).expect("forward");
         let expected_var = realized * time_w + forward * (1.0 - time_w);
         let dom = market.get_discount("USD-OIS").expect("curve");
@@ -710,6 +739,8 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_freq(Tenor::daily())
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -860,6 +891,8 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_freq(Tenor::daily())
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

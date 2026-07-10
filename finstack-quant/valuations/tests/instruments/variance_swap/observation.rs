@@ -14,7 +14,7 @@ fn test_observation_dates_includes_start_and_maturity() {
     let swap = sample_swap(PayReceive::Receive);
 
     // Act
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Assert
     assert!(!dates.is_empty());
@@ -28,7 +28,7 @@ fn test_observation_dates_are_monotonically_increasing() {
     let swap = sample_swap(PayReceive::Receive);
 
     // Act
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Assert
     assert!(dates.len() >= 2);
@@ -44,7 +44,7 @@ fn test_observation_dates_daily_frequency_generates_many_dates() {
     swap.observation_freq = Tenor::daily();
 
     // Act
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Assert
     // 3 months ~= 90 days
@@ -61,7 +61,7 @@ fn test_observation_dates_weekly_frequency() {
     swap.observation_freq = Tenor::weekly();
 
     // Act
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Assert
     // 3 months ~= 13 weeks
@@ -75,7 +75,7 @@ fn test_observation_dates_monthly_frequency() {
     swap.observation_freq = Tenor::monthly();
 
     // Act
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Assert
     // Start to end is 3 months => 4 dates (start + 3 months)
@@ -89,11 +89,24 @@ fn test_observation_dates_quarterly_frequency() {
     swap.observation_freq = Tenor::quarterly();
 
     // Act
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Assert
     // Start to end is 3 months => at least start and end
     assert!(dates.len() >= 2);
+}
+
+#[test]
+fn test_realized_variance_rejects_missing_exact_observation() {
+    let swap = sample_swap(PayReceive::Receive);
+    let dates = swap.observation_dates().expect("observation schedule");
+    let as_of = dates[2];
+    let context = add_series(base_context(), &[(dates[0], 5_000.0), (dates[2], 5_010.0)]);
+
+    let error = swap
+        .partial_realized_variance(&context, as_of)
+        .expect_err("missing contractual observation must not be carried forward");
+    assert!(error.to_string().contains(&dates[1].to_string()));
 }
 
 // ============================================================================
@@ -368,7 +381,7 @@ fn test_realized_fraction_by_observations_increases_with_time() {
     // Arrange
     let mut swap = sample_swap(PayReceive::Receive);
     swap.observation_freq = Tenor::weekly();
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     let mid_idx = dates.len() / 2;
     let mid_date = dates[mid_idx];
 
@@ -387,7 +400,7 @@ fn test_realized_fraction_by_observations_matches_observation_count() {
     // Arrange
     let mut swap = sample_swap(PayReceive::Receive);
     swap.observation_freq = Tenor::weekly();
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     let as_of = dates[dates.len() / 2];
 
     // Act

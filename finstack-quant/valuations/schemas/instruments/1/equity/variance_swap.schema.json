@@ -70,6 +70,9 @@
             "count": 1,
             "unit": "days"
           },
+          "observation_calendar_id": "USNY",
+          "observation_bdc": "following",
+          "observation_end_of_month": false,
           "open_series_id": null,
           "pricing_overrides": {
             "adaptive_bumps": false,
@@ -160,6 +163,20 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
               "description": "Variance notional (in variance units)"
             },
+            "observation_bdc": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+              "default": "following",
+              "description": "Business-day convention applied to observation dates."
+            },
+            "observation_calendar_id": {
+              "description": "Exchange/fixing calendar used for every realized-variance observation.",
+              "type": "string"
+            },
+            "observation_end_of_month": {
+              "default": false,
+              "description": "Preserve month-end rolls for month/year observation frequencies.",
+              "type": "boolean"
+            },
             "observation_freq": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
               "description": "Observation frequency"
@@ -229,6 +246,7 @@
             "start_date",
             "maturity",
             "observation_freq",
+            "observation_calendar_id",
             "side",
             "discount_curve_id",
             "day_count",

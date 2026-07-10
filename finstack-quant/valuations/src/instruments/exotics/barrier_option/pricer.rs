@@ -70,11 +70,9 @@ impl BarrierOptionMcPricer {
         // Get discount curve
         let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
 
-        // Two-clock plumbing: t_vol drives the vol surface / MC time
-        // grid; t_disc + df drive the drift rate and final discounting.
-        // Keeping these separate makes the pricer bump-and-reval-
-        // consistent with the curve's own day-count convention when it
-        // differs from the vol surface basis.
+        // Two-clock plumbing: t_vol drives the vol surface / MC time grid,
+        // while the exact curve DF drives both model-clock drift and final
+        // discounting.
         let clocks = TwoClockParams::from_curve_and_instrument(
             &disc_curve,
             inst.day_count,
@@ -88,8 +86,8 @@ impl BarrierOptionMcPricer {
         }
 
         let discount_factor = clocks.df;
-        // Drift rate on the discount curve's clock.
-        let r = clocks.r_disc();
+        // Drift annualized on the same clock used by the simulated process.
+        let r = clocks.r_model();
 
         // Get spot
         let spot_scalar = curves.get_price(&inst.spot_id)?;
@@ -208,7 +206,7 @@ impl BarrierOptionMcPricer {
         }
 
         let discount_factor = clocks.df;
-        let r = clocks.r_disc();
+        let r = clocks.r_model();
 
         // Spot and dividend yield
         let spot_scalar = curves.get_price(&inst.spot_id)?;
@@ -873,17 +871,14 @@ mod tests {
         );
     }
 
-    /// Two-clock migration witness: when the discount curve's day-
-    /// count differs from the instrument's (vol-surface) day-count,
-    /// the MC pricer must use the curve's clock for the drift rate
-    /// rather than the vol-surface clock. We exercise this by pricing
-    /// the same barrier option against two curves that share a
-    /// discount factor at expiry but differ in day-count, and assert
-    /// the prices differ measurably. A single-clock `r_eff =
-    /// -ln(DF)/t_vol` would collapse the two cases to the same price.
+    /// Curves with different native day-count conventions but the same exact
+    /// expiry DF must produce the same MC price. The stochastic process evolves
+    /// on the instrument/volatility clock, so its rate must satisfy
+    /// `exp(-r_model * t_vol) = DF`; using `-ln(DF) / t_disc` would create a
+    /// spurious price difference.
 
     #[test]
-    fn two_clock_migration_drift_respects_curve_day_count() {
+    fn model_clock_drift_is_invariant_to_curve_day_count_for_same_df() {
         use finstack_quant_monte_carlo::pricer::path_dependent::PathDependentPricerConfig;
 
         let as_of = date(2024, 1, 1);
@@ -892,21 +887,25 @@ mod tests {
         let strike = 100.0;
         let barrier = 75.0;
         let vol = 0.25;
-        let rate_365 = 0.05;
+        let rate = 0.05;
         let div_yield = 0.0;
 
-        // Curve A: Act/365F, such that DF ≈ exp(-0.05 · 1.0) at t=1yr.
-        // Curve B: Act/360, with knots anchored in Act/360 years. On
-        // the Act/360 clock, 1 calendar year maps to 365/360 years, so
-        // the same DF 0.9512 at `5.0` Act/360-years implies a slightly
-        // different continuously-compounded rate relative to calendar
-        // time.
-        let df_at_5y_365 = (-rate_365 * 5.0_f64).exp();
+        let t_365 = DayCount::Act365F
+            .year_fraction(as_of, expiry, DayCountContext::default())
+            .expect("Act/365F year fraction");
+        let t_360 = DayCount::Act360
+            .year_fraction(as_of, expiry, DayCountContext::default())
+            .expect("Act/360 year fraction");
+        let df_at_expiry = (-rate * t_365).exp();
+
+        // Put the common expiry DF at the expiry's native year-fraction knot
+        // on each curve. The curves therefore differ only in their coordinate
+        // system, not in the economic discount factor supplied to the pricer.
         let market_365 = {
             let disc = DiscountCurve::builder("USD_DISC")
                 .base_date(as_of)
                 .day_count(DayCount::Act365F)
-                .knots([(0.0, 1.0), (5.0, df_at_5y_365)])
+                .knots([(0.0, 1.0), (t_365, df_at_expiry)])
                 .build()
                 .expect("disc curve 365");
             let surface = VolSurface::builder("SPX_VOL")
@@ -928,7 +927,7 @@ mod tests {
             let disc = DiscountCurve::builder("USD_DISC")
                 .base_date(as_of)
                 .day_count(DayCount::Act360)
-                .knots([(0.0, 1.0), (5.0, df_at_5y_365)])
+                .knots([(0.0, 1.0), (t_360, df_at_expiry)])
                 .build()
                 .expect("disc curve 360");
             let surface = VolSurface::builder("SPX_VOL")
@@ -972,21 +971,13 @@ mod tests {
         assert!(pv_365.is_finite() && pv_365 > 0.0);
         assert!(pv_360.is_finite() && pv_360 > 0.0);
 
-        // The DF at t=1cy is different between the two curves (same
-        // knot placement in year-fraction units maps to different
-        // calendar DF interpolants), AND the drift rate also differs
-        // because it's now computed on the curve's own clock. A price
-        // gap of > 1e-6 is the migration witness — pre-migration the
-        // drift would have been identical once the DF was read, so
-        // the gap below would be driven only by the DF and would be
-        // markedly smaller.
+        // Identical DF, model clock, vol, spot, and random seed imply identical
+        // simulated paths and discounted payoffs.
         let gap = (pv_365 - pv_360).abs();
         assert!(
-            gap > 1e-6,
-            "pre-migration pricing would be nearly identical across curve \
-             day-counts when DFs agree at the knots; two-clock plumbing \
-             must now yield measurably different prices: pv_365={pv_365} \
-             pv_360={pv_360}"
+            gap < 1e-12,
+            "curve-coordinate choice changed the price despite identical expiry DFs: \
+             pv_365={pv_365}, pv_360={pv_360}, gap={gap}"
         );
     }
 

@@ -55,6 +55,7 @@
       "instrument": {
         "spec": {
           "attributes": {},
+          "base_calendar_id": "TARGET2",
           "base_currency": "EUR",
           "close_series_id": null,
           "day_count": "Act365F",
@@ -72,6 +73,8 @@
             "count": 1,
             "unit": "days"
           },
+          "observation_bdc": "following",
+          "observation_end_of_month": false,
           "open_series_id": null,
           "pricing_overrides": {
             "adaptive_bumps": false,
@@ -94,6 +97,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
+          "quote_calendar_id": "USNY",
           "quote_currency": "USD",
           "realized_var_method": "CloseToClose",
           "side": "receive",
@@ -118,6 +122,10 @@
             "attributes": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
               "description": "Attributes for scenario selection and tagging"
+            },
+            "base_calendar_id": {
+              "description": "Base-currency calendar used in the joint observation calendar.",
+              "type": "string"
             },
             "base_currency": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -172,6 +180,16 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
               "description": "Variance notional (in quote currency units)"
             },
+            "observation_bdc": {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+              "default": "following",
+              "description": "Business-day convention applied to observation dates."
+            },
+            "observation_end_of_month": {
+              "default": false,
+              "description": "Preserve month-end rolls for month/year observation frequencies.",
+              "type": "boolean"
+            },
             "observation_freq": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
               "description": "Observation frequency"
@@ -208,6 +226,10 @@
                 "ytm_bump_decimal": null
               },
               "description": "Attributes for scenario selection"
+            },
+            "quote_calendar_id": {
+              "description": "Quote-currency calendar used in the joint observation calendar.",
+              "type": "string"
             },
             "quote_currency": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -253,6 +275,8 @@
             "start_date",
             "maturity",
             "observation_freq",
+            "base_calendar_id",
+            "quote_calendar_id",
             "side",
             "domestic_discount_curve_id",
             "foreign_discount_curve_id",

@@ -98,7 +98,7 @@ fn test_npv_mid_period_blends_realized_and_forward_components() {
     swap.observation_freq = Tenor::weekly();
     let prices = price_series(&swap, 4_950.0, 10.0);
     let ctx = add_series(base_context(), &prices);
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     let as_of = dates[dates.len() / 2];
 
     // Act
@@ -151,7 +151,7 @@ fn test_npv_mid_period_with_high_realized_vol_increases_value_for_receive() {
     swap.observation_freq = Tenor::weekly();
     let prices = price_series(&swap, 5_000.0, 50.0); // High volatility moves
     let ctx = add_series(base_context(), &prices);
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     let as_of = dates[dates.len() / 3];
 
     // Act
@@ -172,7 +172,7 @@ fn test_npv_mid_period_discounting_reduces_value() {
     swap.observation_freq = Tenor::weekly();
     let prices = price_series(&swap, 5_000.0, 10.0);
     let ctx = add_series(base_context(), &prices);
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     let as_of = dates[dates.len() / 2];
 
     // Act
@@ -201,7 +201,7 @@ fn test_npv_mid_period_with_different_frequencies() {
         swap.observation_freq = freq;
         let prices = price_series(&swap, 5_000.0, 5.0);
         let ctx = add_series(base_context(), &prices);
-        let dates = swap.observation_dates();
+        let dates = swap.observation_dates().expect("observation schedule");
         let as_of = dates[dates.len() / 2];
 
         // Act
@@ -220,7 +220,7 @@ fn test_daily_observation_dates_skip_weekends() {
     swap.maturity = date!(2025 - 01 - 08); // Wednesday
     swap.observation_freq = Tenor::daily();
 
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
     assert!(
         dates
             .iter()
@@ -374,7 +374,7 @@ fn test_npv_converges_as_maturity_approaches() {
     swap.observation_freq = Tenor::weekly();
     let prices = price_series(&swap, 5_000.0, 5.0);
     let ctx = add_series(base_context(), &prices);
-    let dates = swap.observation_dates();
+    let dates = swap.observation_dates().expect("observation schedule");
 
     // Act - compute PV approaching maturity
     let late_dates = &dates[dates.len() - 5..];

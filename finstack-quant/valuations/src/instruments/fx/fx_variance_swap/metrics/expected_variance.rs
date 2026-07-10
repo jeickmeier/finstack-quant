@@ -85,6 +85,8 @@ mod tests {
             .start_date(start)
             .maturity(maturity)
             .observation_freq(Tenor::daily())
+            .base_calendar_id("TARGET2".to_string())
+            .quote_calendar_id("USNY".to_string())
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -95,7 +97,9 @@ mod tests {
             .build()
             .expect("seasoned fx swap");
 
-        let count_w = swap.realized_fraction_by_observations(as_of);
+        let count_w = swap
+            .realized_fraction_by_observations(as_of)
+            .expect("observation fraction");
         let time_w = swap.time_elapsed_fraction(as_of).expect("time fraction");
         assert!(
             (count_w - time_w).abs() > 1e-4,
@@ -104,6 +108,7 @@ mod tests {
 
         let past: Vec<_> = swap
             .observation_dates()
+            .expect("observation schedule")
             .into_iter()
             .filter(|&d| d <= as_of)
             .collect();

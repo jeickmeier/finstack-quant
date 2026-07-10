@@ -40,7 +40,7 @@
 
 use super::context::MarketContext;
 use crate::currency::Currency;
-use crate::dates::Date;
+use crate::dates::{Date, DayCount, DayCountContext};
 use crate::Result;
 
 use serde::{Deserialize, Serialize};
@@ -348,6 +348,70 @@ pub fn measure_inflation_curve_shift(
     ))
 }
 
+/// Measure the annualized inflation-rate shift represented by two published
+/// index snapshots, in basis points.
+///
+/// The comparison uses a common anchor and the latest date present in either
+/// snapshot. `InflationIndex::value_on` deliberately carries the last published
+/// value forward, so a newly released print in `market_t1` is measured against
+/// the information set that was available in `market_t0`.
+pub fn measure_inflation_index_shift(
+    index_id: impl AsRef<str>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let index_id = index_id.as_ref();
+    let index_t0 = market_t0.get_inflation_index(index_id)?;
+    let index_t1 = market_t1.get_inflation_index(index_id)?;
+    let (first_t0, last_t0) = index_t0.date_range()?;
+    let (first_t1, last_t1) = index_t1.date_range()?;
+    let anchor = first_t0.max(first_t1);
+    let end = last_t0.max(last_t1);
+    if end <= anchor {
+        return Err(crate::InputError::TooFewPoints.into());
+    }
+    let t = DayCount::Act365F.year_fraction(anchor, end, DayCountContext::default())?;
+    if t <= 0.0 {
+        return Err(crate::InputError::InvalidDateRange.into());
+    }
+    let rate = |index: &super::scalars::InflationIndex| -> Result<f64> {
+        let base = index.value_on(anchor)?;
+        let terminal = index.value_on(end)?;
+        if !base.is_finite() || !terminal.is_finite() || base <= 0.0 || terminal <= 0.0 {
+            return Err(crate::InputError::Invalid.into());
+        }
+        Ok((terminal / base).powf(1.0 / t) - 1.0)
+    };
+    Ok((rate(index_t1.as_ref())? - rate(index_t0.as_ref())?) * 10_000.0)
+}
+
+/// Measure a declared inflation source, combining projected-curve and
+/// published-index shifts when both are present.
+///
+/// A hybrid source has two independent information changes: movement in the
+/// projected zero-inflation curve and discrete publication of realized CPI.
+/// Both are expressed in basis-point-equivalent annualized inflation rates and
+/// are additive for first-order attribution.
+pub fn measure_inflation_source_shift(
+    source_id: impl AsRef<str>,
+    market_t0: &MarketContext,
+    market_t1: &MarketContext,
+) -> Result<f64> {
+    let source_id = source_id.as_ref();
+    let has_curve = market_t0.get_inflation_curve(source_id).is_ok()
+        && market_t1.get_inflation_curve(source_id).is_ok();
+    let has_index = market_t0.get_inflation_index(source_id).is_ok()
+        && market_t1.get_inflation_index(source_id).is_ok();
+    match (has_curve, has_index) {
+        (true, true) => Ok(
+            measure_inflation_curve_shift(source_id, market_t0, market_t1)?
+                + measure_inflation_index_shift(source_id, market_t0, market_t1)?,
+        ),
+        (_, false) => measure_inflation_curve_shift(source_id, market_t0, market_t1),
+        (false, true) => measure_inflation_index_shift(source_id, market_t0, market_t1),
+    }
+}
+
 // -----------------------------------------------------------------------------
 // Surface Shift Measurements
 // -----------------------------------------------------------------------------
@@ -634,13 +698,82 @@ pub fn measure_scalar_absolute_shift(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::currency::Currency;
     use crate::dates::Date;
-    use crate::market_data::term_structures::{DiscountCurve, HazardCurve};
+    use crate::market_data::scalars::InflationIndex;
+    use crate::market_data::term_structures::{DiscountCurve, HazardCurve, InflationCurve};
     use crate::math::interp::InterpStyle;
     use time::Month;
 
     fn sample_date() -> Date {
         Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date")
+    }
+
+    #[test]
+    fn inflation_index_shift_measures_newly_published_print() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let prior_end = Date::from_calendar_date(2025, Month::December, 1).expect("date");
+        let new_end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let index_t0 = InflationIndex::new(
+            "US-CPI",
+            vec![(start, 100.0), (prior_end, 110.0)],
+            Currency::USD,
+        )
+        .expect("t0 index");
+        let index_t1 = InflationIndex::new(
+            "US-CPI",
+            vec![(start, 100.0), (prior_end, 110.0), (new_end, 112.0)],
+            Currency::USD,
+        )
+        .expect("t1 index");
+        let market_t0 = MarketContext::new().insert_inflation_index("US-CPI", index_t0);
+        let market_t1 = MarketContext::new().insert_inflation_index("US-CPI", index_t1);
+
+        let shift = measure_inflation_source_shift("US-CPI", &market_t0, &market_t1)
+            .expect("published-print shift");
+        assert!(
+            shift > 0.0,
+            "a higher newly published CPI print must be measured"
+        );
+    }
+
+    #[test]
+    fn hybrid_inflation_source_includes_discrete_print_shift() {
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+        let prior_end = Date::from_calendar_date(2025, Month::December, 1).expect("date");
+        let new_end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+        let curve = || {
+            InflationCurve::builder("US-CPI")
+                .base_date(start)
+                .base_cpi(100.0)
+                .knots([(0.0, 100.0), (5.0, 110.0)])
+                .build()
+                .expect("inflation curve")
+        };
+        let index_t0 = InflationIndex::new(
+            "US-CPI",
+            vec![(start, 100.0), (prior_end, 110.0)],
+            Currency::USD,
+        )
+        .expect("t0 index");
+        let index_t1 = InflationIndex::new(
+            "US-CPI",
+            vec![(start, 100.0), (prior_end, 110.0), (new_end, 112.0)],
+            Currency::USD,
+        )
+        .expect("t1 index");
+        let market_t0 = MarketContext::new()
+            .insert(curve())
+            .insert_inflation_index("US-CPI", index_t0);
+        let market_t1 = MarketContext::new()
+            .insert(curve())
+            .insert_inflation_index("US-CPI", index_t1);
+
+        let index_shift =
+            measure_inflation_index_shift("US-CPI", &market_t0, &market_t1).expect("index shift");
+        let source_shift =
+            measure_inflation_source_shift("US-CPI", &market_t0, &market_t1).expect("hybrid shift");
+        assert!((source_shift - index_shift).abs() < 1e-12);
     }
 
     #[test]

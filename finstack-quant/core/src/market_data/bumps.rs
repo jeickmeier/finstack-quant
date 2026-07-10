@@ -685,12 +685,25 @@ impl Bumpable for InflationCurve {
             .indexation_lag_months(self.indexation_lag_months())
             .knots(bumped_points)
             .interp(self.interp_style())
+            .extrapolation(self.extrapolation())
             .build()
     }
 }
 
-impl Bumpable for InflationIndex {
-    fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+impl InflationIndex {
+    /// Apply a parallel zero-inflation-rate bump only to observations strictly
+    /// after `published_through`.
+    ///
+    /// Published CPI observations are contractual fixings and must remain
+    /// immutable under market-risk shocks. The last observation on or before
+    /// `published_through` anchors the projected CPI path; later observations
+    /// are treated as forecasts and receive the same zero-rate bump semantics as
+    /// [`InflationCurve`].
+    pub fn apply_projection_bump(
+        &self,
+        published_through: Date,
+        spec: BumpSpec,
+    ) -> crate::Result<Self> {
         spec.validate_parallel("InflationIndex")?;
         let (shift, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
@@ -701,8 +714,19 @@ impl Bumpable for InflationIndex {
         })?;
 
         let observations = self.observations();
-        let Some(&(anchor_date, anchor_cpi)) = observations.first() else {
-            return Err(crate::error::InputError::TooFewPoints.into());
+        let Some((anchor_date, anchor_cpi)) = observations
+            .iter()
+            .rev()
+            .find(|(date, _)| *date <= published_through)
+            .copied()
+        else {
+            return Err(crate::error::InputError::NotFound {
+                id: format!(
+                    "inflation index '{}' observation on or before {}",
+                    self.id, published_through
+                ),
+            }
+            .into());
         };
         if !anchor_cpi.is_finite() || anchor_cpi <= 0.0 {
             return Err(crate::error::InputError::Invalid.into());
@@ -710,6 +734,10 @@ impl Bumpable for InflationIndex {
 
         let mut bumped = Vec::with_capacity(observations.len());
         for (date, cpi) in observations {
+            if date <= published_through {
+                bumped.push((date, cpi));
+                continue;
+            }
             let t =
                 DayCount::Act365F.year_fraction(anchor_date, date, DayCountContext::default())?;
             if t <= 0.0 {

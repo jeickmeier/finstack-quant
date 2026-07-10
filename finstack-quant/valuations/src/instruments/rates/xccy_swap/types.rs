@@ -426,18 +426,10 @@ impl XccySwap {
     /// when [`NotionalExchange::MtmResetting`] is configured:
     ///
     /// - The two legs must have different currencies (`partition_legs` guard).
-    /// - Both legs must share the same coupon frequency so reset dates are unambiguous.
     /// - Both legs must share the same start and end dates (schedule alignment).
     ///
-    /// **BDC alignment is not explicitly checked.** The MtM-reset pricer builds a
-    /// single shared period schedule from the *constant* leg's BDC/stub/calendar
-    /// and prices both legs against it; if the resetting leg were configured with
-    /// a divergent BDC the user would silently see the constant leg's roll
-    /// convention applied to both. Callers must ensure both legs share the same
-    /// `bdc`, `stub`, `calendar_id`, and `payment_lag_days` when using
-    /// `MtmResetting`. The common case (matched conventions for a USD-EUR
-    /// MtM-reset basis swap) is unaffected; the silent override only matters if
-    /// a caller deliberately mismatches these fields.
+    /// Frequency, day count, calendar, BDC, stub, payment lag, and reset lag are
+    /// leg-specific and are applied independently by the MtM pricer.
     ///
     /// FX-matrix reachability requires a runtime `MarketContext` and is therefore
     /// checked separately by `validate_fx_reachable` at the start of
@@ -447,20 +439,12 @@ impl XccySwap {
         self.validate_leg(&self.leg1)?;
         self.validate_leg(&self.leg2)?;
 
-        // Additional validation when MtM-resetting is configured: the two legs must
-        // share the same accrual schedule so the reset dates are unambiguous, and the
-        // resetting side must point to a valid leg.
+        // MtM notional exchanges require aligned contractual start/end dates;
+        // coupon schedules remain leg-specific.
         if let NotionalExchange::MtmResetting { resetting_side } = &self.notional_exchange {
             // Confirm resetting_side resolves and yields different currencies.
             self.partition_legs(*resetting_side)?;
 
-            if self.leg1.frequency != self.leg2.frequency {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "XccySwap '{}': MtmResetting requires both legs to share the same coupon \
-                     frequency, got leg1={:?} leg2={:?}",
-                    self.id, self.leg1.frequency, self.leg2.frequency
-                )));
-            }
             if self.leg1.start != self.leg2.start || self.leg1.end != self.leg2.end {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "XccySwap '{}': MtmResetting requires both legs to share start and end \
@@ -893,11 +877,8 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         self.validate_fx_reachable(market)?;
 
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
-            // Run the full `validate()` here (in addition to the per-leg checks already
-            // performed above) so the MtM-specific structural guards — frequency
-            // alignment, schedule alignment, and the `partition_legs` currency check —
-            // fire before the per-period math. These checks have no equivalent in the
-            // fixed-notional path.
+            // Run the full `validate()` so MtM-specific notional-exchange
+            // alignment and currency checks fire before per-period math.
             self.validate()?;
             return crate::instruments::rates::xccy_swap::pricing_mtm::pv_mtm_reset(
                 self,
@@ -940,24 +921,15 @@ impl CashflowProvider for XccySwap {
         // PV cashflow stream but emits records instead of summing.
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
             self.validate()?;
-            let (constant_leg, _resetting_leg) = self.partition_legs(resetting_side)?;
-            let mut constant_coupons = self.leg_coupon_schedule(constant_leg, market)?;
-            let constant_principals = self.leg_principal_schedule(constant_leg, anchor)?;
-            let resetting_schedule =
-                crate::instruments::rates::xccy_swap::pricing_mtm::mtm_resetting_leg_schedule(
+            let mut schedule =
+                crate::instruments::rates::xccy_swap::pricing_mtm::mtm_cashflow_schedule(
                     self,
                     resetting_side,
                     market,
                     as_of,
                 )?;
-
-            constant_coupons.flows.extend(constant_principals.flows);
-            constant_coupons.flows.extend(resetting_schedule.flows);
-            constant_coupons
-                .flows
-                .sort_by(|lhs, rhs| lhs.date.cmp(&rhs.date));
-            constant_coupons.notional = Notional::par(0.0, self.reporting_currency);
-            return Ok(constant_coupons.normalize_public(
+            schedule.notional = Notional::par(0.0, self.reporting_currency);
+            return Ok(schedule.normalize_public(
                 as_of,
                 crate::cashflow::builder::CashflowRepresentation::Projected,
             ));
@@ -1391,7 +1363,7 @@ mod tests {
     }
 
     #[test]
-    fn validate_rejects_mtm_reset_with_mismatched_frequencies() {
+    fn validate_accepts_mtm_reset_with_leg_specific_frequencies() {
         use finstack_quant_core::money::Money;
 
         let start = Date::from_calendar_date(2025, time::Month::January, 2).expect("valid date");
@@ -1429,14 +1401,8 @@ mod tests {
             },
         );
 
-        let err = swap
-            .validate()
-            .expect_err("mismatched frequencies must be rejected");
-        let msg = err.to_string();
-        assert!(
-            msg.contains("MtmResetting") && msg.contains("frequency"),
-            "expected MtM-reset frequency-mismatch error, got: {msg}"
-        );
+        swap.validate()
+            .expect("each MtM leg owns its coupon frequency");
     }
 
     #[test]

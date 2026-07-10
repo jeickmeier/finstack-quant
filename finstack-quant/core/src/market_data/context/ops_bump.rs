@@ -292,13 +292,6 @@ impl MarketContext {
                 continue;
             }
 
-            if let Some(original) = self.inflation_indices.get(cid).cloned() {
-                let bumped = original.apply_bump(bump_spec)?;
-                Arc::make_mut(&mut self.inflation_indices)
-                    .insert(curve_id.clone(), Arc::new(bumped));
-                continue;
-            }
-
             if let Some(original) = self.surfaces.get(cid).cloned() {
                 let bumped = original.apply_bump(bump_spec)?;
                 Arc::make_mut(&mut self.surfaces).insert(curve_id.clone(), Arc::new(bumped));
@@ -342,7 +335,7 @@ mod tests {
     use crate::market_data::scalars::{InflationIndex, MarketScalar};
     use crate::market_data::surfaces::VolSurface;
     use crate::market_data::term_structures::{DiscountCurve, InflationCurve};
-    use crate::math::interp::InterpStyle;
+    use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
     use time::Month;
 
     fn as_of() -> Date {
@@ -359,13 +352,17 @@ mod tests {
     }
 
     #[test]
-    fn generic_curve_bump_supports_inflation_index_sources() {
+    fn projection_bump_preserves_published_inflation_index_history() {
         let index = InflationIndex::new(
             "US-CPI",
             vec![
                 (
                     Date::from_calendar_date(2024, Month::January, 1).expect("date"),
                     300.0,
+                ),
+                (
+                    Date::from_calendar_date(2024, Month::May, 1).expect("date"),
+                    302.0,
                 ),
                 (
                     Date::from_calendar_date(2025, Month::January, 1).expect("date"),
@@ -375,15 +372,22 @@ mod tests {
             Currency::USD,
         )
         .expect("inflation index");
-        let context = MarketContext::new().insert_inflation_index("US-CPI", index);
-
-        let bumped = context
-            .bump([MarketBump::Curve {
-                id: CurveId::new("US-CPI"),
-                spec: BumpSpec::inflation_shift_pct(0.01),
-            }])
-            .expect("index bump");
-        let bumped_index = bumped.get_inflation_index("US-CPI").expect("bumped index");
+        let cutoff = Date::from_calendar_date(2024, Month::June, 1).expect("date");
+        let bumped_index = index
+            .apply_projection_bump(cutoff, BumpSpec::inflation_shift_pct(0.01))
+            .expect("index projection bump");
+        assert_eq!(
+            bumped_index
+                .value_on(Date::from_calendar_date(2024, Month::January, 1).expect("date"))
+                .expect("published CPI"),
+            300.0
+        );
+        assert_eq!(
+            bumped_index
+                .value_on(Date::from_calendar_date(2024, Month::May, 1).expect("date"))
+                .expect("published CPI"),
+            302.0
+        );
         let end = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         assert!(bumped_index.value_on(end).expect("CPI") > 306.0);
     }
@@ -429,6 +433,32 @@ mod tests {
                 .value_on(as_of() + time::Duration::days(365))
                 .expect("CPI"),
             306.0
+        );
+    }
+
+    #[test]
+    fn inflation_curve_bump_preserves_extrapolation_policy() {
+        let curve = InflationCurve::builder("US-CPI")
+            .base_date(as_of())
+            .base_cpi(300.0)
+            .knots([(0.0, 300.0), (1.0, 306.0)])
+            .extrapolation(ExtrapolationPolicy::FlatZero)
+            .build()
+            .expect("inflation curve");
+        let bumped = MarketContext::new()
+            .insert(curve)
+            .bump([MarketBump::Curve {
+                id: CurveId::new("US-CPI"),
+                spec: BumpSpec::inflation_shift_pct(0.01),
+            }])
+            .expect("inflation curve bump");
+
+        assert_eq!(
+            bumped
+                .get_inflation_curve("US-CPI")
+                .expect("bumped curve")
+                .extrapolation(),
+            ExtrapolationPolicy::FlatZero
         );
     }
 

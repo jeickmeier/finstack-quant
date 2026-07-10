@@ -510,7 +510,7 @@ impl TermLoanTreePricer {
             });
             tree.calibrate(&loan.discount_curve_id, disc.as_ref(), time_to_maturity)?;
 
-            let initial_rate = tree.rate_at_node(0, 0).unwrap_or_else(|_| disc.zero(0.0));
+            let initial_rate = tree.rate_at_node(0, 0)?;
             let mut vars = HashMap::<&'static str, f64>::default();
             vars.insert(short_rate_keys::SHORT_RATE, initial_rate);
             vars.insert(short_rate_keys::OAS, 0.0);
@@ -633,7 +633,7 @@ impl TermLoanTreePricer {
                         "TermLoan OAS short-rate tree calibration failed: {e}"
                     ))
                 })?;
-            let initial_rate = tree.rate_at_node(0, 0).unwrap_or_else(|_| disc.zero(0.0));
+            let initial_rate = tree.rate_at_node(0, 0)?;
             Some((tree, initial_rate))
         };
 

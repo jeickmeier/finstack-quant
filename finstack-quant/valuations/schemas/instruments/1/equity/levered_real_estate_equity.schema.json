@@ -2650,7 +2650,7 @@
           "description": "Attributes for scenario selection and tagging"
         },
         "quoted_price": {
-          "description": "Quoted futures price (e.g., 125.50 for 125-16/32)",
+          "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",
           "format": "double",
           "type": "number"
         },
@@ -7688,7 +7688,7 @@
     },
     "DollarRoll": {
       "additionalProperties": false,
-      "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations::instruments::fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0324-0424\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .notional(Money::new(10_000_000.0, Currency::USD))\n    .front_settlement_year(2024)\n    .front_settlement_month(3)\n    .back_settlement_year(2024)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```",
+      "description": "Dollar roll - simultaneous sale and purchase of TBAs for different months.\n\nA dollar roll involves:\n1. Selling TBA for near-month settlement\n2. Buying TBA for far-month settlement\n\nThe price difference between the two legs represents the \"drop\" and\nimplies a financing rate.\n\n# Financing and Carry\n\nDollar rolls are used for:\n- **Financing**: Implied repo rate is often cheaper than repo\n- **Carry trades**: Profit from drop vs. expected prepayment\n- **Roll specialness**: When roll drops exceed fair value\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::dollar_roll::DollarRoll;\nuse finstack_quant_valuations::instruments::fixed_income::tba::TbaTerm;\nuse finstack_quant_valuations::instruments::fixed_income::mbs_passthrough::AgencyProgram;\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse finstack_quant_core::types::{CurveId, InstrumentId};\n\nlet roll = DollarRoll::builder()\n    .id(InstrumentId::new(\"FN30-4.0-ROLL-0326-0426\"))\n    .agency(AgencyProgram::Fnma)\n    .coupon(0.04)\n    .term(TbaTerm::ThirtyYear)\n    .notional(Money::new(10_000_000.0, Currency::USD))\n    .front_settlement_year(2026)\n    .front_settlement_month(3)\n    .back_settlement_year(2026)\n    .back_settlement_month(4)\n    .front_price(98.5)\n    .back_price(98.0)\n    .discount_curve_id(CurveId::new(\"USD-OIS\"))\n    .build()\n    .expect(\"Valid dollar roll\");\n```",
       "properties": {
         "agency": {
           "$ref": "#/$defs/AgencyProgram",
@@ -10518,6 +10518,10 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
           "description": "Attributes for scenario selection and tagging"
         },
+        "base_calendar_id": {
+          "description": "Base-currency calendar used in the joint observation calendar.",
+          "type": "string"
+        },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
           "description": "Base currency (foreign)"
@@ -10571,6 +10575,16 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Variance notional (in quote currency units)"
         },
+        "observation_bdc": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "following",
+          "description": "Business-day convention applied to observation dates."
+        },
+        "observation_end_of_month": {
+          "default": false,
+          "description": "Preserve month-end rolls for month/year observation frequencies.",
+          "type": "boolean"
+        },
         "observation_freq": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Observation frequency"
@@ -10607,6 +10621,10 @@
             "ytm_bump_decimal": null
           },
           "description": "Attributes for scenario selection"
+        },
+        "quote_calendar_id": {
+          "description": "Quote-currency calendar used in the joint observation calendar.",
+          "type": "string"
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -10652,6 +10670,8 @@
         "start_date",
         "maturity",
         "observation_freq",
+        "base_calendar_id",
+        "quote_calendar_id",
         "side",
         "domestic_discount_curve_id",
         "foreign_discount_curve_id",
@@ -14971,7 +14991,7 @@
       ]
     },
     "RateSpec": {
-      "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::{DayCount, BusinessDayConvention, Tenor};\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    index_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bps spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    reset_freq: Tenor::quarterly(),\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
+      "description": "Rate specification for term loans.\n\n Defines whether the loan uses fixed or floating rate interest, with full\nsupport for floating rate features including floors, caps, and leverage.\n\n# Variants\n\n- [`Fixed`](RateSpec::Fixed): Constant rate specified in basis points\n- [`Floating`](RateSpec::Floating): Index-based rate with spread and optional limits\n\n# Examples\n\nFixed rate loan:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\n\nlet fixed_rate = RateSpec::Fixed { rate_bp: 600 };  // 6% fixed\n```\n\nFloating rate with floor:\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;\nuse finstack_quant_cashflows::builder::FloatingRateSpec;\nuse finstack_quant_core::dates::{DayCount, BusinessDayConvention, Tenor};\nuse finstack_quant_core::types::CurveId;\nuse rust_decimal_macros::dec;\n\nlet floating = RateSpec::Floating(FloatingRateSpec {\n    index_id: CurveId::new(\"USD-SOFR-3M\"),\n    spread_bp: dec!(300),     // +300 bps spread\n    gearing: dec!(1),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0)),  // 0% floor\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: Default::default(),\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n});\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -18125,7 +18145,7 @@
     },
     "TrsScheduleSpec": {
       "additionalProperties": false,
-      "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        freq: Tenor::quarterly(),\n        dc: DayCount::Act360,\n        bdc: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n    },\n);\n```",
+      "description": "Schedule specification for TRS payment periods.\n\nDefines the payment schedule and frequency for both legs of the TRS.\nThis is shared between equity and fixed income TRS instruments.\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::TrsScheduleSpec;\nuse finstack_quant_cashflows::builder::ScheduleParams;\nuse finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};\n\nlet schedule = TrsScheduleSpec::from_params(\n    Date::from_calendar_date(2024, time::Month::January, 1).unwrap(),\n    Date::from_calendar_date(2025, time::Month::January, 1).unwrap(),\n    ScheduleParams {\n        freq: Tenor::quarterly(),\n        dc: DayCount::Act360,\n        bdc: BusinessDayConvention::Following,\n        calendar_id: \"weekends_only\".to_string(),\n        stub: StubKind::None,\n        end_of_month: false,\n        payment_lag_days: 0,\n        adjust_accrual_dates: false,\n    },\n);\n```",
       "properties": {
         "end": {
           "description": "End date for the TRS leg.",
@@ -18285,6 +18305,20 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Variance notional (in variance units)"
         },
+        "observation_bdc": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
+          "default": "following",
+          "description": "Business-day convention applied to observation dates."
+        },
+        "observation_calendar_id": {
+          "description": "Exchange/fixing calendar used for every realized-variance observation.",
+          "type": "string"
+        },
+        "observation_end_of_month": {
+          "default": false,
+          "description": "Preserve month-end rolls for month/year observation frequencies.",
+          "type": "boolean"
+        },
         "observation_freq": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
           "description": "Observation frequency"
@@ -18354,6 +18388,7 @@
         "start_date",
         "maturity",
         "observation_freq",
+        "observation_calendar_id",
         "side",
         "discount_curve_id",
         "day_count",

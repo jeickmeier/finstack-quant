@@ -1665,7 +1665,7 @@
               "description": "Attributes for scenario selection and tagging"
             },
             "quoted_price": {
-              "description": "Quoted futures price (e.g., 125.50 for 125-16/32)",
+              "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",
               "format": "double",
               "type": "number"
             },

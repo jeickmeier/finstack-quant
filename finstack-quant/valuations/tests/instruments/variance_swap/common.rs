@@ -39,6 +39,7 @@ pub fn sample_swap(side: PayReceive) -> VarianceSwap {
         .start_date(start)
         .maturity(end)
         .observation_freq(Tenor::daily())
+        .observation_calendar_id("USNY".to_string())
         .realized_var_method(RealizedVarMethod::CloseToClose)
         .side(side)
         .discount_curve_id(CurveId::new(DISC_ID))
@@ -48,8 +49,9 @@ pub fn sample_swap(side: PayReceive) -> VarianceSwap {
         .unwrap()
 }
 
-/// Build a base market context with discount curve and spot price.
-pub fn base_context() -> MarketContext {
+/// Build a market context with discount curve and spot, but no forward
+/// volatility input. Use only in missing-market-data tests.
+pub fn base_context_without_vol() -> MarketContext {
     // Use an earlier base date to allow pre-start valuations
     // Swap starts 2025-01-02, so use 2024-12-01 as curve base
     let curve_base = date(2024, 12, 1);
@@ -67,6 +69,15 @@ pub fn base_context() -> MarketContext {
     MarketContext::new()
         .insert(disc_curve)
         .insert_price(UNDERLYING_ID, MarketScalar::Unitless(5_000.0))
+}
+
+/// Build a complete base market context with a scalar 20% implied vol.
+pub fn base_context() -> MarketContext {
+    add_unitless(
+        base_context_without_vol(),
+        format!("{}_IMPL_VOL", UNDERLYING_ID),
+        0.20,
+    )
 }
 
 /// Add a time series to the market context.
@@ -103,6 +114,7 @@ pub fn sample_surface() -> VolSurface {
 /// Generate price series for a swap's observation dates.
 pub fn price_series(swap: &VarianceSwap, base: f64, step: f64) -> Vec<(Date, f64)> {
     swap.observation_dates()
+        .expect("observation schedule")
         .into_iter()
         .enumerate()
         .map(|(i, d)| (d, base + step * i as f64))
@@ -111,7 +123,7 @@ pub fn price_series(swap: &VarianceSwap, base: f64, step: f64) -> Vec<(Date, f64
 
 /// Calculate observation-based weight for realized variance blending.
 pub fn observation_weight(swap: &VarianceSwap, as_of: Date) -> f64 {
-    let all = swap.observation_dates();
+    let all = swap.observation_dates().expect("observation schedule");
     if all.is_empty() {
         return 0.0;
     }

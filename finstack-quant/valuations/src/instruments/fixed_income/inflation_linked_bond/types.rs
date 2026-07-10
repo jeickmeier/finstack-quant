@@ -207,16 +207,43 @@ impl InflationSource {
             Self::Index(index) => bond.index_ratio(date, index.as_ref()),
             Self::Curve(curve) => bond.index_ratio_from_curve(date, curve.as_ref()),
             Self::Hybrid { index, curve } => {
-                let reference_date = match bond.lag {
-                    InflationLag::Months(months) => date.add_months(-(i32::from(months))),
-                    InflationLag::Days(days) => date - Duration::days(i64::from(days)),
-                    _ => date,
+                let expected_interp = bond.validate_index_conventions(index.as_ref())?;
+                let (first_published, last_published) = index.date_range()?;
+                let cpi_on = |reference_date: Date| -> Result<f64> {
+                    if reference_date < first_published {
+                        return Err(finstack_quant_core::InputError::NotFound {
+                            id: format!(
+                                "inflation index '{}' observation on or before {}",
+                                index.id, reference_date
+                            ),
+                        }
+                        .into());
+                    }
+                    if reference_date <= last_published {
+                        index.value_on(reference_date)
+                    } else {
+                        curve.cpi_on_date(reference_date)
+                    }
                 };
-                if reference_date <= curve.base_date() {
-                    bond.index_ratio(date, index.as_ref())
-                } else {
-                    bond.index_ratio_from_curve(date, curve.as_ref())
+
+                let current_index = match bond.lag {
+                    InflationLag::Months(months)
+                        if expected_interp == InflationInterpolation::Linear =>
+                    {
+                        let (anchor0, anchor1, weight) =
+                            InflationLinkedBond::ref_cpi_anchors(date, months.into())?;
+                        let cpi0 = cpi_on(anchor0)?;
+                        let cpi1 = cpi_on(anchor1)?;
+                        cpi0 + weight * (cpi1 - cpi0)
+                    }
+                    InflationLag::Months(months) => cpi_on(date.add_months(-(i32::from(months))))?,
+                    InflationLag::Days(days) => cpi_on(date - Duration::days(i64::from(days)))?,
+                    _ => cpi_on(date)?,
+                };
+                if bond.base_index <= 0.0 {
+                    return Err(finstack_quant_core::InputError::NonPositiveValue.into());
                 }
+                Ok(current_index / bond.base_index)
             }
         }
     }
@@ -624,6 +651,31 @@ impl InflationLinkedBond {
     /// `InflationIndex::value_on`. The provided index **must** have
     /// `lag == InflationLag::None` to avoid double-lagging.
     pub fn index_ratio(&self, date: Date, inflation_index: &InflationIndex) -> Result<f64> {
+        let expected_interp = self.validate_index_conventions(inflation_index)?;
+
+        let current_index = match self.lag {
+            // Months-lag with daily interpolation follows the official RefCPI
+            // formula: anchor on first-of-month CPI(m−L)/CPI(m−L+1) and weight
+            // by (day−1)/D(settlement month). A generic calendar shift +
+            // interpolation mis-weights month-end settlements (day clamping).
+            InflationLag::Months(m) if expected_interp == InflationInterpolation::Linear => {
+                inflation_index.ref_cpi_months_lag(date, m.into())?
+            }
+            InflationLag::Months(m) => inflation_index.value_on(date.add_months(-(m as i32)))?,
+            InflationLag::Days(d) => inflation_index.value_on(date - Duration::days(d as i64))?,
+            _ => inflation_index.value_on(date)?,
+        };
+
+        if self.base_index <= 0.0 {
+            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
+        }
+        Ok(current_index / self.base_index)
+    }
+
+    fn validate_index_conventions(
+        &self,
+        inflation_index: &InflationIndex,
+    ) -> Result<InflationInterpolation> {
         if !matches!(inflation_index.lag(), InflationLag::None) {
             return Err(finstack_quant_core::Error::Validation(
                 "InflationIndex must have lag=None when used with InflationLinkedBond \
@@ -670,23 +722,7 @@ impl InflationLinkedBond {
             )));
         }
 
-        let current_index = match self.lag {
-            // Months-lag with daily interpolation follows the official RefCPI
-            // formula: anchor on first-of-month CPI(m−L)/CPI(m−L+1) and weight
-            // by (day−1)/D(settlement month). A generic calendar shift +
-            // interpolation mis-weights month-end settlements (day clamping).
-            InflationLag::Months(m) if expected_interp == InflationInterpolation::Linear => {
-                inflation_index.ref_cpi_months_lag(date, m.into())?
-            }
-            InflationLag::Months(m) => inflation_index.value_on(date.add_months(-(m as i32)))?,
-            InflationLag::Days(d) => inflation_index.value_on(date - Duration::days(d as i64))?,
-            _ => inflation_index.value_on(date)?,
-        };
-
-        if self.base_index <= 0.0 {
-            return Err(finstack_quant_core::InputError::NonPositiveValue.into());
-        }
-        Ok(current_index / self.base_index)
+        Ok(expected_interp)
     }
 
     /// Calculate the raw index ratio using an inflation term structure.
@@ -1528,6 +1564,40 @@ mod tests {
             pricing_overrides: crate::instruments::PricingOverrides::default(),
             attributes: Attributes::new(),
         }
+    }
+
+    #[test]
+    fn hybrid_ref_cpi_resolves_published_and_projected_anchors_independently() {
+        use finstack_quant_core::market_data::scalars::{InflationIndex, InflationInterpolation};
+
+        let mut bond = sample_bond(DeflationProtection::None);
+        bond.lag = InflationLag::Months(3);
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![
+                (d(2025, Month::January, 1), 100.0),
+                (d(2025, Month::February, 1), 105.0),
+                (d(2025, Month::March, 1), 110.0),
+            ],
+            Currency::USD,
+        )
+        .expect("published CPI")
+        .with_interpolation(InflationInterpolation::Linear);
+        let curve = InflationCurve::builder("US-CPI")
+            .base_date(d(2025, Month::March, 1))
+            .base_cpi(110.0)
+            .knots([(0.0, 110.0), (31.0 / 365.0, 120.0)])
+            .build()
+            .expect("projected CPI");
+        let market = MarketContext::new()
+            .insert(curve)
+            .insert_inflation_index("US-CPI", index);
+
+        let ratio = bond
+            .index_ratio_from_market(d(2025, Month::June, 15), &market)
+            .expect("hybrid RefCPI");
+        let expected = (110.0 + (14.0 / 30.0) * (120.0 - 110.0)) / bond.base_index;
+        assert!((ratio - expected).abs() < 1e-12);
     }
 
     #[test]

@@ -182,12 +182,17 @@ impl InflationSwap {
         lagged_date: Date,
     ) -> finstack_quant_core::Result<f64> {
         // Once the lagged fixing date is on or before the valuation date, prefer the
-        // realized index history. Otherwise fall back to the curve for projected CPI.
+        // realized index history. If a history is supplied, lookup failures (most
+        // importantly dates before the first observation) are data errors and must
+        // not be hidden by projecting a historical value from the curve.
         if lagged_date <= discount_base {
             if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-                if let Ok(value) = index.value_on(unlagged_date) {
-                    return Ok(value);
-                }
+                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
+                    index.as_ref(),
+                    unlagged_date,
+                    lagged_date,
+                    self.effective_lag(curves),
+                );
             }
         }
 
@@ -702,9 +707,12 @@ impl YoYInflationSwap {
         // fixing series that extends past as_of would introduce look-ahead bias.
         if lagged_date <= as_of {
             if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-                if let Ok(value) = index.value_on(date) {
-                    return Ok(value);
-                }
+                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
+                    index.as_ref(),
+                    date,
+                    lagged_date,
+                    lag,
+                );
             }
         }
 

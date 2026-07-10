@@ -48,13 +48,10 @@ impl MetricCalculator for VegaCalculator {
         let remaining_fraction = 1.0 - swap.time_elapsed_fraction(context.as_of);
 
         // Discount factor to maturity
-        let t = swap
-            .day_count
-            .year_fraction(context.as_of, swap.maturity, Default::default())?;
         let disc = context
             .curves
             .get_discount(swap.discount_curve_id.as_str())?;
-        let df = disc.df(t);
+        let df = disc.df_between_dates(context.as_of, swap.maturity)?;
 
         // Vega per 1% vol move: DF * 2 * Notional * σ_K * 0.01 * remaining_fraction.
         // Derivation: PV = N * (σ² - K²) * DF * remaining_fraction

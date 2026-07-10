@@ -967,6 +967,9 @@
           "count": 1,
           "unit": "days"
         },
+        "observation_calendar_id": "USNY",
+        "observation_bdc": "following",
+        "observation_end_of_month": false,
         "pricing_overrides": {},
         "realized_var_method": "CloseToClose",
         "side": "receive",
@@ -2554,6 +2557,7 @@
     "FxVarianceSwap": {
       "spec": {
         "attributes": {},
+        "base_calendar_id": "TARGET2",
         "base_currency": "EUR",
         "close_series_id": null,
         "day_count": "Act365F",
@@ -2571,6 +2575,8 @@
           "count": 1,
           "unit": "days"
         },
+        "observation_bdc": "following",
+        "observation_end_of_month": false,
         "open_series_id": null,
         "pricing_overrides": {
           "adaptive_bumps": false,
@@ -2594,6 +2600,7 @@
           "ytm_bump_decimal": null
         },
         "quote_currency": "USD",
+        "quote_calendar_id": "USNY",
         "realized_var_method": "CloseToClose",
         "side": "receive",
         "spot_id": "EURUSD",
