@@ -22,11 +22,11 @@ use finstack_quant_valuations::instruments::RatesCurveKind;
 /// a second abstraction layer.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MarketFactorKey {
-    /// A rate curve identified by curve ID and kind (discount / forward / credit).
+    /// A curve-like factor identified by ID and kind.
     Curve {
         /// Curve identifier matching [`CurveId`] in market data.
         id: CurveId,
-        /// Curve kind (discount, forward, credit).
+        /// Curve kind (discount, forward, credit, or inflation).
         kind: RatesCurveKind,
     },
     /// Equity, commodity, or other spot price identifier.
@@ -354,6 +354,27 @@ mod tests {
         assert_eq!(curve_count, 2, "discount + forward for USD");
         assert_eq!(spot_count, 1, "SPX deduplicated");
         assert_eq!(keys.len(), 3, "2 curves + 1 spot");
+    }
+
+    #[test]
+    fn flatten_preserves_inflation_curve_kind() {
+        let mut deps = MarketDependencies::new();
+        deps.add_curves(
+            InstrumentCurves::builder()
+                .inflation("US-CPI".into())
+                .build()
+                .expect("valid curves"),
+        );
+
+        let keys = flatten_dependencies(&deps);
+        assert!(keys.contains(&MarketFactorKey::curve(
+            "US-CPI".into(),
+            RatesCurveKind::Inflation,
+        )));
+        assert!(!keys.contains(&MarketFactorKey::curve(
+            "US-CPI".into(),
+            RatesCurveKind::Forward,
+        )));
     }
 
     #[test]

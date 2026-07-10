@@ -307,8 +307,8 @@ where
                         missing_curves.push(curve_id.as_str().to_string());
                     }
                 }
-                RatesCurveKind::Credit => {
-                    // Skip credit curves for DV01
+                RatesCurveKind::Credit | RatesCurveKind::Inflation => {
+                    // Credit and inflation factors have dedicated sensitivities.
                 }
             }
         }

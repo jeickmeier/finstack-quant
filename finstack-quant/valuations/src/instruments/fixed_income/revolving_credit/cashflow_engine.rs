@@ -22,7 +22,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-use rust_decimal::prelude::ToPrimitive;
 
 use crate::cashflow::builder::{
     emit_revolving_credit_fees, CashFlowSchedule, Notional, RevolvingFeeEmissionConfig,
@@ -425,8 +424,7 @@ impl<'a> CashflowEngine<'a> {
                         *rate
                     }
                     BaseRateSpec::Floating(spec) => {
-                        let spread_bp_f64 = spec.spread_bp.to_f64().unwrap_or_default();
-                        let floor_bp_f64 = spec.index_floor_bp.and_then(|d| d.to_f64());
+                        let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
                         let reset_effective = sub_reset_effective_date.unwrap_or(period_start);
                         let fixing_date =
                             super::utils::floating_fixing_date(spec, reset_effective)?;
@@ -439,13 +437,10 @@ impl<'a> CashflowEngine<'a> {
                                     fixing_date,
                                     self.as_of,
                                 )?;
-                            // Apply floor (on index rate) and spread, mirroring
-                            // the convention in project_floating_rate.
-                            let mut index_rate = fixing_rate;
-                            if let Some(floor) = floor_bp_f64 {
-                                index_rate = index_rate.max(floor * 1e-4);
-                            }
-                            index_rate + (spread_bp_f64 * 1e-4)
+                            crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                                fixing_rate,
+                                &params,
+                            )
                         } else {
                             // Future reset: project from forward curve
                             let fwd = fwd_curve.as_ref().ok_or_else(|| {
@@ -455,9 +450,7 @@ impl<'a> CashflowEngine<'a> {
                             })?;
                             super::utils::project_floating_rate_with_curve(
                                 reset_effective,
-                                &spec.reset_freq,
-                                spread_bp_f64,
-                                floor_bp_f64,
+                                spec,
                                 fwd.as_ref(),
                                 &self.facility.attributes,
                             )?
@@ -688,11 +681,12 @@ impl<'a> CashflowEngine<'a> {
         for i in 0..(path.payment_dates.len() - 1) {
             let period_start = path.payment_dates[i];
             let period_end = path.payment_dates[i + 1];
-
-            // Skip past cashflows
-            if period_end <= self.as_of {
-                continue;
-            }
+            let payment_date = match &self.facility.base_rate_spec {
+                BaseRateSpec::Floating(spec) => {
+                    super::utils::floating_payment_date(spec, period_end)?
+                }
+                BaseRateSpec::Fixed { .. } => period_end,
+            };
 
             // Get path values at this step (step function - use period start)
             let utilization_start = path.utilization_path[i].clamp(0.0, 1.0);
@@ -711,20 +705,10 @@ impl<'a> CashflowEngine<'a> {
             let interest_rate = match &self.facility.base_rate_spec {
                 BaseRateSpec::Fixed { rate } => *rate,
                 BaseRateSpec::Floating(spec) => {
-                    let spread_bp_f64 = spec.spread_bp.to_f64().unwrap_or_default();
-                    // Floor and cap apply to the index rate (short_rate) BEFORE adding
-                    // spread, matching ISDA floating rate convention and the deterministic
-                    // engine's use of index_floor_bp / index_cap_bp in project_floating_rate.
-                    let mut index_rate = short_rate;
-                    if let Some(floor) = spec.index_floor_bp {
-                        let floor_f64 = floor.to_f64().unwrap_or(0.0);
-                        index_rate = index_rate.max(floor_f64 * 1e-4);
-                    }
-                    if let Some(cap) = spec.index_cap_bp {
-                        let cap_f64 = cap.to_f64().unwrap_or(f64::MAX);
-                        index_rate = index_rate.min(cap_f64 * 1e-4);
-                    }
-                    index_rate + (spread_bp_f64 * 1e-4)
+                    let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
+                    crate::cashflow::builder::rate_helpers::calculate_floating_rate(
+                        short_rate, &params,
+                    )
                 }
             };
 
@@ -736,9 +720,9 @@ impl<'a> CashflowEngine<'a> {
             let interest = drawn_balance * (interest_rate * dt);
 
             // Add interest cashflows if non-zero
-            if !rc.is_effectively_zero_money(interest.amount(), ccy) {
+            if payment_date > self.as_of && !rc.is_effectively_zero_money(interest.amount(), ccy) {
                 flows.push(CashFlow {
-                    date: period_end,
+                    date: payment_date,
                     reset_date: None,
                     amount: interest,
                     kind: match &self.facility.base_rate_spec {
@@ -754,25 +738,29 @@ impl<'a> CashflowEngine<'a> {
             // Use average utilization for fee tier determination to match the interest
             // calculation above and avoid tier-boundary artifacts.
             let avg_util = (utilization_start + utilization_end) / 2.0;
-            emit_revolving_credit_fees(
-                &mut flows,
-                &RevolvingFeeEmissionConfig {
-                    payment_date: period_end,
-                    drawn_balance: drawn_balance.amount(),
-                    undrawn_balance: undrawn_balance.amount(),
-                    commitment_amount: self.facility.commitment_amount.amount(),
-                    commitment_fee_bp: self.facility.fees.commitment_fee_bps(avg_util),
-                    usage_fee_bp: self.facility.fees.usage_fee_bps(avg_util),
-                    facility_fee_bp: self.facility.fees.facility_fee_bp,
-                    year_fraction: dt,
-                    currency: ccy,
-                },
-            )?;
+            if payment_date > self.as_of {
+                emit_revolving_credit_fees(
+                    &mut flows,
+                    &RevolvingFeeEmissionConfig {
+                        payment_date,
+                        drawn_balance: drawn_balance.amount(),
+                        undrawn_balance: undrawn_balance.amount(),
+                        commitment_amount: self.facility.commitment_amount.amount(),
+                        commitment_fee_bp: self.facility.fees.commitment_fee_bps(avg_util),
+                        usage_fee_bp: self.facility.fees.usage_fee_bps(avg_util),
+                        facility_fee_bp: self.facility.fees.facility_fee_bp,
+                        year_fraction: dt,
+                        currency: ccy,
+                    },
+                )?;
+            }
 
             // Handle principal flows from utilization changes
             // At period_end, utilization changes from start to end value for use in the next period
             let utilization_change = utilization_end - prev_utilization;
-            if utilization_change.abs() > super::UTILIZATION_CHANGE_THRESHOLD {
+            if period_end > self.as_of
+                && utilization_change.abs() > super::UTILIZATION_CHANGE_THRESHOLD
+            {
                 let principal_change = self.facility.commitment_amount * utilization_change;
                 // Draw (increase) is negative for lender, repay (decrease) is positive
                 flows.push(CashFlow {

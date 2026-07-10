@@ -220,15 +220,17 @@ pub struct MarketQuoteOverrides {
     #[serde(alias = "quoted_spread_bp", skip_serializing_if = "Option::is_none")]
     pub cds_quote_bp: Option<f64>,
 
-    /// PV adjustment at valuation date (for CDS, CDSIndex, convertibles).
+    /// PV adjustment at valuation date (primarily credit-instrument upfront quotes).
     ///
     /// This is an **already-discounted** adjustment to the net present value.
     /// It is added directly to the NPV without further discounting.
     ///
     /// # Sign Convention
     ///
-    /// - Positive value: increases NPV (e.g., premium received)
-    /// - Negative value: decreases NPV (e.g., premium paid)
+    /// For CDS, CDS index, and CDS tranche instruments, a positive amount is
+    /// paid by the protection buyer: it decreases buyer NPV and increases
+    /// seller NPV. Other instrument families may treat the amount as an
+    /// explicitly signed PV adjustment and document that convention locally.
     ///
     /// # Relationship to CDS Dated Upfront
     ///

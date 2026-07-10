@@ -30,6 +30,6 @@ pub(crate) struct ConvexityAdjustmentCalculator;
 impl MetricCalculator for ConvexityAdjustmentCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let future: &InterestRateFuture = context.instrument_as()?;
-        future.convexity_adjustment(&context.curves)
+        future.convexity_adjustment(&context.curves, context.as_of)
     }
 }

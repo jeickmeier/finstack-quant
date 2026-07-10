@@ -858,6 +858,15 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         deps.add_series_id(finstack_quant_core::market_data::fixings::fixing_series_id(
             self.leg2.forward_curve_id.as_str(),
         ));
+        if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
+            let (constant_leg, resetting_leg) = self.partition_legs(resetting_side)?;
+            deps.add_series_id(
+                crate::instruments::rates::xccy_swap::pricing_mtm::mtm_fx_fixing_series_id(
+                    resetting_leg.currency,
+                    constant_leg.currency,
+                ),
+            );
+        }
         Ok(deps)
     }
 

@@ -46,7 +46,7 @@ const WRITEDOWN_EPS: f64 = 1.0;
 /// # Returns
 ///
 /// The break-even constant CDR in decimal (e.g. `0.167` = 16.7%). Returns
-/// [`MAX_CDR`] when the tranche is loss-remote across the whole search range,
+/// `1.0` when the tranche is loss-remote across the whole search range,
 /// and `0.0` when it is already impaired at zero defaults.
 ///
 /// # Errors

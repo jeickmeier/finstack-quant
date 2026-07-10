@@ -171,6 +171,45 @@ fn test_model_creation() {
 }
 
 #[test]
+fn upfront_override_uses_protection_side_and_survives_wipeout() {
+    let market = sample_market_context();
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let upfront = Money::new(125_000.0, Currency::USD);
+    let pricer = CDSTranchePricer::new();
+
+    let mut seller = sample_tranche();
+    let seller_base = pricer
+        .price_tranche(&seller, &market, as_of)
+        .expect("seller base");
+    seller.pricing_overrides.market_quotes.upfront_payment = Some(upfront);
+    let seller_with = pricer
+        .price_tranche(&seller, &market, as_of)
+        .expect("seller upfront");
+    assert!((seller_with.amount() - seller_base.amount() - upfront.amount()).abs() < 1e-9);
+
+    let mut buyer = seller;
+    buyer.side = TrancheSide::BuyProtection;
+    buyer.pricing_overrides.market_quotes.upfront_payment = None;
+    let buyer_base = pricer
+        .price_tranche(&buyer, &market, as_of)
+        .expect("buyer base");
+    buyer.pricing_overrides.market_quotes.upfront_payment = Some(upfront);
+    let buyer_with = pricer
+        .price_tranche(&buyer, &market, as_of)
+        .expect("buyer upfront");
+    assert!((buyer_with.amount() - buyer_base.amount() + upfront.amount()).abs() < 1e-9);
+
+    buyer.accumulated_loss = buyer.detach_pct / 100.0;
+    assert_eq!(
+        pricer
+            .price_tranche(&buyer, &market, as_of)
+            .expect("wiped-out upfront")
+            .amount(),
+        -upfront.amount()
+    );
+}
+
+#[test]
 fn projected_schedule_contains_premium_and_default_rows() {
     let tranche = sample_tranche();
     let market = sample_market_context();

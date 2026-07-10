@@ -296,8 +296,8 @@ fn test_zero_volatility_option_limits() {
 }
 
 #[test]
-fn test_zero_notional_handling() {
-    // Options with zero notional should handle gracefully
+fn test_zero_notional_is_rejected() {
+    // EquityOption's canonical invariant rejects zero economic exposure.
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
 
@@ -322,40 +322,10 @@ fn test_zero_notional_handling() {
     };
 
     let market = create_option_market(as_of, 100.0, 0.25, 0.05);
-    let registry = standard_registry();
-    let pv = option.value(&market, as_of).unwrap();
-
-    assert!(
-        pv.amount().abs() < 1e-10,
-        "PV should be near zero for zero notional, got {}",
-        pv.amount()
-    );
-
-    let mut context = MetricContext::new(
-        Arc::new(option),
-        Arc::new(market),
-        as_of,
-        pv,
-        MetricContext::default_config(),
-    );
-
-    let metrics = registry
-        .compute(&[MetricId::Delta, MetricId::Gamma], &mut context)
-        .unwrap();
-    if let Some(&delta) = metrics.get(&MetricId::Delta) {
-        assert!(
-            delta.abs() < 1e-6,
-            "Delta should be near zero for zero notional, got {}",
-            delta
-        );
-    }
-    if let Some(&gamma) = metrics.get(&MetricId::Gamma) {
-        assert!(
-            gamma.abs() < 1e-6,
-            "Gamma should be near zero for zero notional, got {}",
-            gamma
-        );
-    }
+    let err = option
+        .value(&market, as_of)
+        .expect_err("zero-notional equity option must fail validation");
+    assert!(err.to_string().contains("notional must be non-zero"));
 }
 
 #[test]

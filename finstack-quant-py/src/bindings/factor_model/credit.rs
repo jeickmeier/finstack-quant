@@ -178,7 +178,7 @@ impl PyCreditFactorModel {
 /// Example:
 ///     >>> import json
 ///     >>> from finstack_quant.factor_model.credit import CreditCalibrator
-///     >>> cal = CreditCalibrator(json.dumps(config))
+///     >>> cal = CreditCalibrator(json.dumps(config))  # doctest: +SKIP
 ///     >>> model = cal.calibrate(json.dumps(inputs))  # doctest: +SKIP
 #[pyclass(
     name = "CreditCalibrator",
@@ -578,7 +578,7 @@ fn decompose_period(
 ///
 /// Example:
 ///     >>> from finstack_quant.factor_model.credit import FactorCovarianceForecast
-///     >>> fcf = FactorCovarianceForecast(model)
+///     >>> fcf = FactorCovarianceForecast(model)  # doctest: +SKIP
 ///     >>> cov_json = fcf.covariance_at("one_step")  # doctest: +SKIP
 #[pyclass(
     name = "FactorCovarianceForecast",

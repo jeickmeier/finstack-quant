@@ -806,13 +806,13 @@ pub enum TenorMatchMode {
 /// calendars and business-day adjustment rules. Use
 /// [`TimeRollMode::CalendarDays`] when the tenor should be added without a
 /// business-day adjustment. [`TimeRollMode::Approximate`] uses fixed day-count
-/// approximations aligned with [`crate::utils::parse_period_to_days`].
+/// approximations aligned with the internal period-to-day conversion.
 ///
 /// # Non-additivity of `Approximate`
 ///
 /// [`TimeRollMode::Approximate`] is **not additive across composed rolls**.
-/// Month periods use [`crate::utils::parse_period_to_days`], which rounds
-/// `months * 365 / 12` independently for each operation. For example, `6M`
+/// Month periods round `months * 365 / 12` independently for each operation.
+/// For example, `6M`
 /// resolves to 183 days, so two `6M` approximate rolls produce 366 days while
 /// one `12M` or `1Y` roll resolves to 365 days. For chained horizons or
 /// scenario composition prefer

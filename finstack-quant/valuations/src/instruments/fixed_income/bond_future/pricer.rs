@@ -334,6 +334,24 @@ impl BondFuturePricer {
         Ok(forward_clean_percent / conversion_factor)
     }
 
+    /// Calculate the model price using the financing convention declared by a future.
+    pub(crate) fn calculate_model_price_for_future(
+        future: &super::BondFuture,
+        ctd_bond: &Bond,
+        conversion_factor: f64,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<f64> {
+        Self::calculate_model_price_with_financing_curve(
+            ctd_bond,
+            conversion_factor,
+            market,
+            as_of,
+            future.delivery_start,
+            future.repo_curve_id.as_ref(),
+        )
+    }
+
     /// Calculate the NPV (present value) of a bond future position.
     ///
     /// The NPV represents the mark-to-market value of the futures position,
@@ -423,13 +441,12 @@ impl BondFuturePricer {
     ) -> Result<Money> {
         // Calculate the theoretical model price, carrying the CTD forward to
         // the contract's delivery date.
-        let model_price = Self::calculate_model_price_with_financing_curve(
+        let model_price = Self::calculate_model_price_for_future(
+            future,
             ctd_bond,
             conversion_factor,
             market,
             as_of,
-            future.delivery_start,
-            future.repo_curve_id.as_ref(),
         )?;
 
         // Calculate price differential
@@ -1111,6 +1128,50 @@ mod tests {
         // Note: We can't assert positive without knowing exact model price,
         //       but we can verify the calculation mechanics work
         println!("NPV calculation successful for long position");
+    }
+
+    #[test]
+    fn future_model_price_and_npv_share_special_repo_curve() {
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+        let as_of = date!(2025 - 01 - 15);
+        let mut future =
+            create_test_bond_future(1_000_000.0, 120.0, Position::Long, date!(2025 - 03 - 20));
+        future.repo_curve_id = Some(CurveId::new("USD-SPECIAL-REPO"));
+        let bond = create_test_bond(
+            100_000.0,
+            0.05,
+            date!(2020 - 01 - 15),
+            date!(2030 - 01 - 15),
+        );
+        let market = create_test_market(0.06).insert(
+            DiscountCurve::builder("USD-SPECIAL-REPO")
+                .base_date(as_of)
+                .knots(vec![(0.0, 1.0), (1.0, (-0.02_f64).exp())])
+                .build()
+                .expect("repo curve"),
+        );
+        let cf = 0.8234;
+
+        let model =
+            BondFuturePricer::calculate_model_price_for_future(&future, &bond, cf, &market, as_of)
+                .expect("future-aware model price");
+        let fallback = BondFuturePricer::calculate_model_price(
+            &bond,
+            cf,
+            &market,
+            as_of,
+            future.delivery_start,
+        )
+        .expect("discount-curve fallback");
+        let npv = BondFuturePricer::calculate_npv(&future, &bond, cf, &market, as_of).expect("npv");
+        let implied_model = future.quoted_price + npv.amount() * 100.0 / future.notional.amount();
+
+        assert!((model - implied_model).abs() < 1e-10);
+        assert!(
+            (model - fallback).abs() > 1e-6,
+            "special repo must affect carry"
+        );
     }
 
     #[test]

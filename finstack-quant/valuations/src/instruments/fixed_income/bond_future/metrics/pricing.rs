@@ -18,12 +18,12 @@ impl MetricCalculator for FuturesPriceCalculator {
             ))
         })?;
         let conversion_factor = ctd_conversion_factor(future)?;
-        BondFuturePricer::calculate_model_price(
+        BondFuturePricer::calculate_model_price_for_future(
+            future,
             ctd,
             conversion_factor,
             &context.curves,
             context.as_of,
-            future.delivery_start,
         )
     }
 }

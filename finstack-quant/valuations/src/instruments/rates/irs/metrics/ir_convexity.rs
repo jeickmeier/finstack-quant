@@ -48,7 +48,7 @@ impl MetricCalculator for IrConvexityCalculator {
             let exists = match kind {
                 RatesCurveKind::Discount => context.curves.get_discount(curve_id.as_str()).is_ok(),
                 RatesCurveKind::Forward => context.curves.get_forward(curve_id.as_str()).is_ok(),
-                RatesCurveKind::Credit => false,
+                RatesCurveKind::Credit | RatesCurveKind::Inflation => false,
             };
             if !exists {
                 continue;

@@ -150,19 +150,31 @@ impl CDSTranchePricer {
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        // Check if tranche is already wiped out
-        if tranche.accumulated_loss >= tranche.detach_pct / 100.0 {
-            return Ok(Money::new(0.0, tranche.notional.currency()));
-        }
-
         let discount_curve = market_ctx.get_discount(tranche.discount_curve_id.as_ref())?;
-        let rows = self.project_discountable_rows(tranche, market_ctx, as_of)?;
+        let wiped_out = tranche.accumulated_loss >= tranche.detach_pct / 100.0;
+        let mut net_pv = if wiped_out {
+            // A wiped-out tranche has no remaining premium/protection legs, but
+            // a separately contracted upfront can still be due.
+            if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
+                let premium_sign = match tranche.side {
+                    TrancheSide::BuyProtection => -1.0,
+                    TrancheSide::SellProtection => 1.0,
+                };
+                amount.amount() * premium_sign * discount_curve.df_between_dates(as_of, date)?
+            } else {
+                0.0
+            }
+        } else {
+            let rows = self.project_discountable_rows(tranche, market_ctx, as_of)?;
+            self.discount_projected_rows(&rows, discount_curve.as_ref(), as_of)?
+        };
 
-        if rows.is_empty() {
-            return Ok(Money::new(0.0, tranche.notional.currency()));
+        if let Some(upfront) = tranche.pricing_overrides.market_quotes.upfront_payment {
+            net_pv += match tranche.side {
+                TrancheSide::BuyProtection => -upfront.amount(),
+                TrancheSide::SellProtection => upfront.amount(),
+            };
         }
-
-        let net_pv = self.discount_projected_rows(&rows, discount_curve.as_ref(), as_of)?;
 
         Ok(Money::new(net_pv, tranche.notional.currency()))
     }

@@ -95,6 +95,9 @@ impl MarketDependencies {
         for id in curves.credit_curves {
             push_unique_curve(&mut self.curves.credit_curves, id);
         }
+        for id in curves.inflation_curves {
+            push_unique_curve(&mut self.curves.inflation_curves, id);
+        }
     }
 
     /// Merge equity dependencies into this set.

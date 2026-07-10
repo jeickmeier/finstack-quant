@@ -661,7 +661,7 @@ impl crate::instruments::common_impl::traits::CurveDependencies for InflationCap
     {
         crate::instruments::common_impl::traits::InstrumentCurves::builder()
             .discount(self.discount_curve_id.clone())
-            .forward(self.inflation_index_id.clone())
+            .inflation(self.inflation_index_id.clone())
             .build()
     }
 }

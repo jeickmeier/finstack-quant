@@ -38,7 +38,7 @@
 //!
 //! # Quick Start
 //!
-//! [`CorporateAnalysisBuilder`] evaluates a model once and optionally adds DCF
+//! [`analysis::CorporateAnalysisBuilder`] evaluates a model once and optionally adds DCF
 //! equity valuation and per-instrument credit context:
 //!
 //! ```no_run

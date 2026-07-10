@@ -277,6 +277,7 @@ impl InterestRateFuture {
     pub(crate) fn convexity_adjustment(
         &self,
         context: &MarketContext,
+        as_of: Date,
     ) -> finstack_quant_core::Result<f64> {
         use finstack_quant_core::dates::DayCountContext;
         if let Some(adjustment) = self.contract_specs.convexity_adjustment {
@@ -285,17 +286,23 @@ impl InterestRateFuture {
         let (fixing_date, period_start, period_end) = self.resolve_dates()?;
         let fwd = context.get_forward(&self.forward_curve_id)?;
         let fwd_dc = fwd.day_count();
-        let fwd_base = fwd.base_date();
         let t_fixing = fwd_dc
-            .year_fraction(fwd_base, fixing_date, DayCountContext::default())?
+            .year_fraction(as_of, fixing_date, DayCountContext::default())?
             .max(0.0);
         let t_start = fwd_dc
-            .year_fraction(fwd_base, period_start, DayCountContext::default())?
+            .year_fraction(as_of, period_start, DayCountContext::default())?
             .max(0.0);
         let t_end = fwd_dc
-            .year_fraction(fwd_base, period_end, DayCountContext::default())?
+            .year_fraction(as_of, period_end, DayCountContext::default())?
             .max(t_start);
-        let forward_rate = fwd.rate_period(t_start, t_end);
+        let fwd_base = fwd.base_date();
+        let t_start_curve = fwd_dc
+            .year_fraction(fwd_base, period_start, DayCountContext::default())?
+            .max(0.0);
+        let t_end_curve = fwd_dc
+            .year_fraction(fwd_base, period_end, DayCountContext::default())?
+            .max(t_start_curve);
+        let forward_rate = fwd.rate_period(t_start_curve, t_end_curve);
         Ok(self.calculate_convexity_adjusted_rate(
             context,
             forward_rate,
@@ -701,5 +708,74 @@ mod tests {
         assert_eq!(specs.tick_value, conventions.tick_value);
         assert_eq!(specs.delivery_months, conventions.delivery_months);
         assert_eq!(specs.convexity_adjustment, conventions.convexity_adjustment);
+    }
+
+    #[test]
+    fn convexity_adjustment_rolls_with_valuation_date_not_curve_base() {
+        use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+        use finstack_quant_core::prelude::VolSurface;
+
+        let curve_base = date!(2025 - 01 - 02);
+        let later_as_of = date!(2025 - 02 - 03);
+        let mut future = InterestRateFuture::example().expect("example future");
+        future.contract_specs.convexity_adjustment = None;
+        future.vol_surface_id = Some(CurveId::new("USD-SR3-NORMAL-VOL"));
+
+        let normal_vol = 0.01;
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(curve_base)
+                    .knots(vec![(0.0, 1.0), (2.0, (-0.03_f64 * 2.0).exp())])
+                    .build()
+                    .expect("discount curve"),
+            )
+            .insert(
+                ForwardCurve::builder("USD-SOFR-3M", 0.25)
+                    .base_date(curve_base)
+                    .knots(vec![(0.0, 0.04), (2.0, 0.04)])
+                    .build()
+                    .expect("forward curve"),
+            )
+            .insert_surface(
+                VolSurface::builder("USD-SR3-NORMAL-VOL")
+                    .expiries(&[0.1, 0.25, 0.5, 1.0])
+                    .strikes(&[0.0, 0.04, 0.10])
+                    .row(&[normal_vol; 3])
+                    .row(&[normal_vol; 3])
+                    .row(&[normal_vol; 3])
+                    .row(&[normal_vol; 3])
+                    .build()
+                    .expect("vol surface"),
+            );
+
+        let base_adjustment = future
+            .convexity_adjustment(&market, curve_base)
+            .expect("base adjustment");
+        let later_adjustment = future
+            .convexity_adjustment(&market, later_as_of)
+            .expect("rolled adjustment");
+
+        assert!(later_adjustment < base_adjustment);
+        let (_, period_start, period_end) = future.resolve_dates().expect("dates");
+        let t1 = future
+            .day_count
+            .year_fraction(
+                later_as_of,
+                period_start,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )
+            .expect("t1")
+            .max(0.0);
+        let t2 = future
+            .day_count
+            .year_fraction(
+                later_as_of,
+                period_end,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )
+            .expect("t2")
+            .max(t1);
+        assert!((later_adjustment - 0.5 * normal_vol * normal_vol * t1 * t2).abs() < 1e-12);
     }
 }

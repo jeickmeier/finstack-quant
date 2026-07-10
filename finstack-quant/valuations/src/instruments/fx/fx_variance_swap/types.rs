@@ -438,7 +438,7 @@ mod tests {
             .strike_variance(0.01)
             .start_date(date(2025, Month::January, 4)) // Saturday
             .maturity(date(2025, Month::January, 25)) // Saturday
-            .observation_freq(Tenor::new(7, TenorUnit::Days)) // Weekly
+            .observation_freq(Tenor::new(1, TenorUnit::Weeks))
             .realized_var_method(RealizedVarMethod::CloseToClose)
             .side(PayReceive::Receive)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

@@ -1223,7 +1223,7 @@ impl crate::instruments::common_impl::traits::CurveDependencies for InflationLin
             .discount(self.discount_curve_id.clone())
             // Inflation term structures share the dependency registry's
             // projection/forward category (as do inflation swaps).
-            .forward(self.inflation_index_id.clone())
+            .inflation(self.inflation_index_id.clone())
             .build()
     }
 }

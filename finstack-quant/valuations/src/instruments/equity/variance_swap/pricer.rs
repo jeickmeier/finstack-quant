@@ -183,7 +183,7 @@ pub(crate) fn seasoned_expected_variance(
 }
 
 pub(crate) fn observation_dates(inst: &VarianceSwap) -> Vec<Date> {
-    use finstack_quant_core::dates::DateExt;
+    use finstack_quant_core::dates::{DateExt, TenorUnit};
 
     let mut dates = Vec::new();
     let mut current = inst.start_date;
@@ -196,7 +196,14 @@ pub(crate) fn observation_dates(inst: &VarianceSwap) -> Vec<Date> {
                 break;
             }
         }
-    } else if let Some(days_step) = inst.observation_freq.days() {
+    } else if inst.observation_freq.unit == TenorUnit::Weeks {
+        let days_step = i64::from(inst.observation_freq.count) * 7;
+        while current <= inst.maturity {
+            dates.push(current);
+            current += time::Duration::days(days_step);
+        }
+    } else if inst.observation_freq.unit == TenorUnit::Days {
+        let business_step = inst.observation_freq.count;
         while current <= inst.maturity {
             if !matches!(
                 current.weekday(),
@@ -204,9 +211,15 @@ pub(crate) fn observation_dates(inst: &VarianceSwap) -> Vec<Date> {
             ) {
                 dates.push(current);
             }
-            current += time::Duration::days(days_step as i64);
-            if current > inst.maturity {
-                break;
+            let mut advanced = 0;
+            while advanced < business_step {
+                current += time::Duration::days(1);
+                if !matches!(
+                    current.weekday(),
+                    time::Weekday::Saturday | time::Weekday::Sunday
+                ) {
+                    advanced += 1;
+                }
             }
         }
     } else {
@@ -227,22 +240,15 @@ pub(crate) fn observation_dates(inst: &VarianceSwap) -> Vec<Date> {
 }
 
 pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
+    use finstack_quant_core::dates::TenorUnit;
     const TRADING_DAYS_PER_YEAR: f64 = 252.0;
 
     if let Some(months) = inst.observation_freq.months() {
         12.0 / months as f64
-    } else if let Some(days) = inst.observation_freq.days() {
-        match days {
-            1 => TRADING_DAYS_PER_YEAR,
-            // Weekly/bi-weekly schedules step in *calendar* days, so the
-            // observation count per year is 52 / 26 — not 252/7 (= 36) which
-            // mixes a trading-day basis with a calendar-day step and
-            // understates realized variance ~31% (matches the FX sibling).
-            7 => 52.0,
-            14 => 26.0,
-            // Multi-day schedules step in calendar days.
-            _ => 365.25 / days as f64,
-        }
+    } else if inst.observation_freq.unit == TenorUnit::Weeks {
+        52.0 / f64::from(inst.observation_freq.count)
+    } else if inst.observation_freq.unit == TenorUnit::Days {
+        TRADING_DAYS_PER_YEAR / f64::from(inst.observation_freq.count)
     } else {
         TRADING_DAYS_PER_YEAR
     }
@@ -275,15 +281,11 @@ pub(crate) fn annualization_factor_with_policy(
     if let Some(months) = inst.observation_freq.months() {
         return 12.0 / months as f64;
     }
-    if let Some(days) = inst.observation_freq.days() {
-        return match days {
-            1 => tdy_override,
-            // Calendar-day steps: 52 weekly / 26 bi-weekly observations per
-            // year regardless of the trading-days-per-year policy override.
-            7 => 52.0,
-            14 => 26.0,
-            _ => 365.25 / days as f64,
-        };
+    if inst.observation_freq.unit == finstack_quant_core::dates::TenorUnit::Weeks {
+        return 52.0 / f64::from(inst.observation_freq.count);
+    }
+    if inst.observation_freq.unit == finstack_quant_core::dates::TenorUnit::Days {
+        return tdy_override / f64::from(inst.observation_freq.count);
     }
     tdy_override
 }
@@ -876,10 +878,8 @@ mod tests {
         );
     }
 
-    /// Weekly/bi-weekly observation schedules step in calendar days, so the
-    /// annualization factor must be the calendar observation count per year
-    /// (52 / 26), matching the FX variance-swap sibling — not 252/7 (= 36) or
-    /// 252/14 (= 18), which understate realized variance ~31%.
+    /// Week tenors step in calendar weeks; day tenors step in business-day
+    /// observations. Their annualization bases must preserve that distinction.
     #[test]
     fn weekly_and_biweekly_annualization_uses_calendar_observation_counts() {
         use finstack_quant_core::dates::{Tenor, TenorUnit};
@@ -899,9 +899,19 @@ mod tests {
         // override in this market context).
         let market = MarketContext::new();
         swap.observation_freq = Tenor::new(7, TenorUnit::Days);
-        assert_eq!(annualization_factor_with_policy(&swap, &market), 52.0);
+        assert_eq!(annualization_factor_with_policy(&swap, &market), 36.0);
         swap.observation_freq = Tenor::new(14, TenorUnit::Days);
-        assert_eq!(annualization_factor_with_policy(&swap, &market), 26.0);
+        assert_eq!(annualization_factor_with_policy(&swap, &market), 18.0);
+
+        swap.start_date = date!(2025 - 01 - 03); // Friday
+        swap.maturity = date!(2025 - 01 - 15);
+        swap.observation_freq = Tenor::new(2, TenorUnit::Days);
+        let dates = observation_dates(&swap);
+        assert_eq!(dates[0], date!(2025 - 01 - 03));
+        assert_eq!(dates[1], date!(2025 - 01 - 07));
+        assert!(dates
+            .iter()
+            .all(|d| !matches!(d.weekday(), time::Weekday::Saturday | time::Weekday::Sunday)));
     }
 
     #[test]

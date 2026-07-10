@@ -145,11 +145,9 @@ pub(super) fn floating_payment_date(
             spec.payment_lag_days
         )));
     }
-    crate::instruments::common_impl::pricing::swap_legs::add_payment_delay(
-        accrual_end,
-        spec.payment_lag_days,
-        Some(spec.calendar_id.as_str()),
-    )
+    let calendar =
+        crate::cashflow::builder::calendar::resolve_calendar_strict(spec.calendar_id.as_str())?;
+    accrual_end.add_business_days(spec.payment_lag_days, calendar)
 }
 
 /// Project floating rate for revolving credit facility using resolved curve.
@@ -160,25 +158,13 @@ pub(super) fn floating_payment_date(
 /// observation date is derived with [`floating_fixing_date`].
 pub(super) fn project_floating_rate_with_curve(
     reset_date: finstack_quant_core::dates::Date,
-    reset_freq: &finstack_quant_core::dates::Tenor,
-    spread_bp: f64,
-    index_floor_bp: Option<f64>,
+    spec: &crate::cashflow::builder::FloatingRateSpec,
     fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
     attrs: &Attributes,
 ) -> Result<f64> {
     // Compute reset period end using facility calendar
-    let reset_end = compute_reset_period_end(reset_date, reset_freq, attrs)?;
-
-    // Build params (revolving credit doesn't use caps or gearing)
-    let params = crate::cashflow::builder::FloatingRateParams {
-        spread_bp,
-        gearing: 1.0,
-        gearing_includes_spread: true,
-        index_floor_bp,
-        index_cap_bp: None,
-        all_in_floor_bp: None,
-        all_in_cap_bp: None,
-    };
+    let reset_end = compute_reset_period_end(reset_date, &spec.reset_freq, attrs)?;
+    let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
 
     // Delegate to centralized projection
     crate::cashflow::builder::project_floating_rate(reset_date, reset_end, fwd, &params)
@@ -437,6 +423,54 @@ mod tests {
         assert!(reset_dates.is_some());
         let dates = reset_dates.expect("Reset dates should exist for floating rate");
         assert!(dates.len() >= 2);
+    }
+
+    #[test]
+    fn floating_projection_applies_full_coupon_economics() {
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        use rust_decimal::Decimal;
+
+        let reset = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+        let spec = crate::cashflow::builder::FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
+            spread_bp: Decimal::from(100),
+            gearing: Decimal::new(5, 1),
+            gearing_includes_spread: false,
+            index_floor_bp: None,
+            index_cap_bp: None,
+            all_in_floor_bp: None,
+            all_in_cap_bp: Some(Decimal::from(200)),
+            overnight_index_constraints: Default::default(),
+            reset_freq: Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 0,
+            dc: DayCount::Act360,
+            bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
+            calendar_id: "weekends_only".to_string(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+            payment_lag_days: 2,
+            overnight_compounding: None,
+            overnight_basis: None,
+            fallback: Default::default(),
+        };
+        let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(reset)
+            .knots(vec![(0.0, 0.03), (1.0, 0.03)])
+            .build()
+            .expect("forward curve");
+
+        let rate = project_floating_rate_with_curve(reset, &spec, &forward, &Attributes::new())
+            .expect("projected coupon");
+        assert!((rate - 0.02).abs() < 1e-12, "all-in cap must bind: {rate}");
+        assert_eq!(
+            floating_payment_date(
+                &spec,
+                Date::from_calendar_date(2025, Month::January, 3).expect("date")
+            )
+            .expect("lagged date"),
+            Date::from_calendar_date(2025, Month::January, 7).expect("date")
+        );
     }
 
     #[test]

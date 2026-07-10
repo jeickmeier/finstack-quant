@@ -569,7 +569,7 @@ impl crate::instruments::common_impl::traits::CurveDependencies for InflationSwa
     {
         crate::instruments::common_impl::traits::InstrumentCurves::builder()
             .discount(self.discount_curve_id.clone())
-            .forward(self.inflation_index_id.clone())
+            .inflation(self.inflation_index_id.clone())
             .build()
     }
 }
@@ -981,7 +981,7 @@ impl crate::instruments::common_impl::traits::CurveDependencies for YoYInflation
     {
         crate::instruments::common_impl::traits::InstrumentCurves::builder()
             .discount(self.discount_curve_id.clone())
-            .forward(self.inflation_index_id.clone())
+            .inflation(self.inflation_index_id.clone())
             .build()
     }
 }

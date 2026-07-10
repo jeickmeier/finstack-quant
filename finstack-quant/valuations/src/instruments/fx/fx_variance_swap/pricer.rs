@@ -76,6 +76,7 @@ pub(crate) fn compute_pv(
 }
 
 pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Vec<Date> {
+    use finstack_quant_core::dates::TenorUnit;
     let mut dates = Vec::new();
     let mut current = inst.start_date;
 
@@ -87,22 +88,27 @@ pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Vec<Date> {
                 break;
             }
         }
-    } else if let Some(days_step) = inst.observation_freq.days() {
-        if days_step == 1 {
-            while current <= inst.maturity {
+    } else if inst.observation_freq.unit == TenorUnit::Weeks {
+        let days_step = i64::from(inst.observation_freq.count) * 7;
+        while current <= inst.maturity {
+            dates.push(current);
+            current += time::Duration::days(days_step);
+        }
+    } else if inst.observation_freq.unit == TenorUnit::Days {
+        let business_step = inst.observation_freq.count;
+        while current <= inst.maturity {
+            if current.weekday() != time::Weekday::Saturday
+                && current.weekday() != time::Weekday::Sunday
+            {
+                dates.push(current);
+            }
+            let mut advanced = 0;
+            while advanced < business_step {
+                current += time::Duration::days(1);
                 if current.weekday() != time::Weekday::Saturday
                     && current.weekday() != time::Weekday::Sunday
                 {
-                    dates.push(current);
-                }
-                current += time::Duration::days(1);
-            }
-        } else {
-            while current <= inst.maturity {
-                dates.push(current);
-                current += time::Duration::days(days_step as i64);
-                if current > inst.maturity {
-                    break;
+                    advanced += 1;
                 }
             }
         }
@@ -126,18 +132,15 @@ pub(crate) fn observation_dates(inst: &FxVarianceSwap) -> Vec<Date> {
 }
 
 pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
+    use finstack_quant_core::dates::TenorUnit;
     if let Some(months) = inst.observation_freq.months() {
         return 12.0 / months as f64;
     }
-    if let Some(days) = inst.observation_freq.days() {
-        // Restored after a `clippy --fix` pass corrupted these arms (dropped
-        // `7 => 52.0`, rewrote `14 => 26.0` as `4 => 26.0`).
-        return match days {
-            1 => 252.0,
-            7 => 52.0,
-            14 => 26.0,
-            _ => 365.25 / days as f64,
-        };
+    if inst.observation_freq.unit == TenorUnit::Weeks {
+        return 52.0 / f64::from(inst.observation_freq.count);
+    }
+    if inst.observation_freq.unit == TenorUnit::Days {
+        return 252.0 / f64::from(inst.observation_freq.count);
     }
     252.0
 }
@@ -528,6 +531,27 @@ mod tests {
         let via_instrument = swap.value(&market, as_of).expect("instrument pv");
 
         assert_eq!(via_pricer, via_instrument);
+    }
+
+    #[test]
+    fn multi_day_tenor_steps_in_business_observations() {
+        use finstack_quant_core::dates::{Tenor, TenorUnit};
+
+        let mut swap = FxVarianceSwap::example();
+        swap.start_date = date!(2025 - 01 - 03); // Friday
+        swap.maturity = date!(2025 - 01 - 15);
+        swap.observation_freq = Tenor::new(2, TenorUnit::Days);
+
+        let dates = observation_dates(&swap);
+        assert_eq!(annualization_factor(&swap), 126.0);
+        assert_eq!(dates[0], date!(2025 - 01 - 03));
+        assert_eq!(dates[1], date!(2025 - 01 - 07));
+        assert!(dates
+            .iter()
+            .all(|d| !matches!(d.weekday(), time::Weekday::Saturday | time::Weekday::Sunday)));
+
+        swap.observation_freq = Tenor::new(2, TenorUnit::Weeks);
+        assert_eq!(annualization_factor(&swap), 26.0);
     }
 
     /// W-32: the FX seasoned MTM must blend realized and forward variance by

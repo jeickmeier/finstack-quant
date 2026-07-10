@@ -47,6 +47,8 @@ pub struct InstrumentCurves {
     pub forward_curves: SmallVec<[CurveId; 2]>,
     /// Credit/hazard curves used by the instrument.
     pub credit_curves: SmallVec<[CurveId; 2]>,
+    /// Inflation curves or published inflation indices used by the instrument.
+    pub inflation_curves: SmallVec<[CurveId; 2]>,
 }
 
 impl InstrumentCurves {
@@ -76,6 +78,11 @@ impl InstrumentCurves {
                     .iter()
                     .map(|c| (c.clone(), RatesCurveKind::Credit)),
             )
+            .chain(
+                self.inflation_curves
+                    .iter()
+                    .map(|c| (c.clone(), RatesCurveKind::Inflation)),
+            )
     }
 
     /// Check if any curves are defined.
@@ -83,11 +90,15 @@ impl InstrumentCurves {
         self.discount_curves.is_empty()
             && self.forward_curves.is_empty()
             && self.credit_curves.is_empty()
+            && self.inflation_curves.is_empty()
     }
 
     /// Total number of curves.
     pub fn len(&self) -> usize {
-        self.discount_curves.len() + self.forward_curves.len() + self.credit_curves.len()
+        self.discount_curves.len()
+            + self.forward_curves.len()
+            + self.credit_curves.len()
+            + self.inflation_curves.len()
     }
 }
 
@@ -122,6 +133,14 @@ impl InstrumentCurvesBuilder {
         self
     }
 
+    /// Add an inflation curve or published inflation index (duplicates are ignored).
+    pub fn inflation(mut self, curve_id: CurveId) -> Self {
+        if !self.curves.inflation_curves.contains(&curve_id) {
+            self.curves.inflation_curves.push(curve_id);
+        }
+        self
+    }
+
     /// Build the final curve collection.
     pub fn build(self) -> finstack_quant_core::Result<InstrumentCurves> {
         Ok(self.curves)
@@ -147,6 +166,8 @@ pub enum RatesCurveKind {
     Forward,
     /// Credit/hazard curve (used for credit risk calculations).
     Credit,
+    /// Inflation curve or published inflation index.
+    Inflation,
 }
 
 impl core::fmt::Display for RatesCurveKind {
@@ -155,6 +176,7 @@ impl core::fmt::Display for RatesCurveKind {
             Self::Discount => write!(f, "discount"),
             Self::Forward => write!(f, "forward"),
             Self::Credit => write!(f, "credit"),
+            Self::Inflation => write!(f, "inflation"),
         }
     }
 }
@@ -168,8 +190,9 @@ impl core::str::FromStr for RatesCurveKind {
             "discount" => Ok(Self::Discount),
             "forward" => Ok(Self::Forward),
             "credit" => Ok(Self::Credit),
+            "inflation" => Ok(Self::Inflation),
             other => Err(format!(
-                "Unknown curve kind: '{}'. Valid: discount, forward, credit",
+                "Unknown curve kind: '{}'. Valid: discount, forward, credit, inflation",
                 other
             )),
         }
