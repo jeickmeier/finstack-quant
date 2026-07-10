@@ -472,6 +472,12 @@ pub(crate) fn curve_node_effects(
                     base_curve.tenor(),
                 )
                 .base_date(base_curve.base_date())
+                .reset_lag(base_curve.reset_lag())
+                .day_count(base_curve.day_count())
+                .interp(base_curve.interp_style())
+                .extrapolation(base_curve.extrapolation())
+                .rate_calibration_opt(base_curve.rate_calibration().cloned())
+                .fx_policy_opt(base_curve.fx_policy().map(ToOwned::to_owned))
                 .knots(bumped_points)
                 .build()?;
 
@@ -643,6 +649,8 @@ pub(crate) fn vol_index_parallel_effects(
         .base_date(base_curve.base_date())
         .day_count(base_curve.day_count())
         .spot_level(base_curve.spot_level() + points)
+        .interp(base_curve.interp_style())
+        .extrapolation(base_curve.extrapolation())
         .knots(bumped_points)
         .build()?;
 
@@ -697,6 +705,8 @@ pub(crate) fn vol_index_node_effects(
         .base_date(base_curve.base_date())
         .day_count(base_curve.day_count())
         .spot_level(base_curve.spot_level())
+        .interp(base_curve.interp_style())
+        .extrapolation(base_curve.extrapolation())
         .knots(bumped_points)
         .build()?;
 
@@ -708,8 +718,10 @@ mod tests {
     use super::*;
     use crate::engine::ScenarioEngine;
     use crate::spec::{OperationSpec, ScenarioSpec};
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::VolatilityIndexCurve;
+    use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
     use finstack_quant_statements::FinancialModelSpec;
     use time::macros::date;
 
@@ -753,6 +765,80 @@ mod tests {
             .expect("vol index should exist");
         assert!((updated.spot_level() - 19.5).abs() < 1.0e-12);
         assert!((updated.forward_level(0.25) - 21.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn curve_shocks_preserve_forward_and_vol_index_metadata() {
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+        let as_of = date!(2025 - 01 - 01);
+        let forward = ForwardCurve::builder("USD-SOFR", 0.25)
+            .base_date(as_of)
+            .reset_lag(5)
+            .day_count(DayCount::Act365F)
+            .interp(InterpStyle::CubicHermite)
+            .extrapolation(ExtrapolationPolicy::None)
+            .fx_policy("preserve-me")
+            .knots([(0.0, 0.02), (0.25, 0.021), (0.5, 0.022)])
+            .build()
+            .expect("forward curve should build");
+        let vol = VolatilityIndexCurve::builder("VIX")
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .spot_level(18.0)
+            .interp(InterpStyle::LogLinear)
+            .extrapolation(ExtrapolationPolicy::FlatForward)
+            .knots([(0.0, 18.0), (0.25, 20.0), (0.5, 22.0)])
+            .build()
+            .expect("vol-index curve should build");
+        let mut market = MarketContext::new().insert(forward).insert(vol);
+        let mut model = FinancialModelSpec::new("demo", vec![]);
+        let scenario = ScenarioSpec {
+            id: "metadata".into(),
+            name: None,
+            description: None,
+            operations: vec![
+                OperationSpec::CurveNodeBp {
+                    curve_kind: CurveKind::Forward,
+                    curve_id: "USD-SOFR".into(),
+                    discount_curve_id: None,
+                    nodes: vec![("3M".into(), 1.0)],
+                    match_mode: TenorMatchMode::Exact,
+                },
+                OperationSpec::VolIndexNodePts {
+                    curve_id: "VIX".into(),
+                    nodes: vec![("3M".into(), 1.0)],
+                    match_mode: TenorMatchMode::Exact,
+                },
+            ],
+            priority: 0,
+            resolution_mode: Default::default(),
+        };
+        let engine = ScenarioEngine::new();
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: Some(&mut model),
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of,
+        };
+        engine.apply(&scenario, &mut ctx).expect("should apply");
+
+        let updated_forward = market.get_forward("USD-SOFR").expect("forward exists");
+        assert_eq!(updated_forward.reset_lag(), 5);
+        assert_eq!(updated_forward.day_count(), DayCount::Act365F);
+        assert_eq!(updated_forward.interp_style(), InterpStyle::CubicHermite);
+        assert_eq!(updated_forward.extrapolation(), ExtrapolationPolicy::None);
+        assert_eq!(updated_forward.fx_policy(), Some("preserve-me"));
+
+        let updated_vol = market.get_vol_index_curve("VIX").expect("vol exists");
+        assert_eq!(updated_vol.day_count(), DayCount::Act360);
+        assert_eq!(updated_vol.interp_style(), InterpStyle::LogLinear);
+        assert_eq!(
+            updated_vol.extrapolation(),
+            ExtrapolationPolicy::FlatForward
+        );
     }
 
     #[test]

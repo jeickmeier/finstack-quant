@@ -160,10 +160,9 @@ pub(super) fn project_floating_rate_with_curve(
     reset_date: finstack_quant_core::dates::Date,
     spec: &crate::cashflow::builder::FloatingRateSpec,
     fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
-    attrs: &Attributes,
+    _attrs: &Attributes,
 ) -> Result<f64> {
-    // Compute reset period end using facility calendar
-    let reset_end = compute_reset_period_end(reset_date, &spec.reset_freq, attrs)?;
+    let reset_end = compute_reset_period_end(reset_date, spec)?;
     let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
 
     // Delegate to centralized projection
@@ -237,9 +236,9 @@ pub(super) fn apply_draw_repay_event(
 /// Returns an error if calendar adjustment fails.
 pub(super) fn compute_reset_period_end(
     reset_date: Date,
-    reset_freq: &finstack_quant_core::dates::Tenor,
-    attrs: &Attributes,
+    spec: &crate::cashflow::builder::FloatingRateSpec,
 ) -> Result<Date> {
+    let reset_freq = spec.index_tenor.as_ref().unwrap_or(&spec.reset_freq);
     // Compute unadjusted end date based on frequency
     use finstack_quant_core::dates::TenorUnit;
     let mut reset_end = match reset_freq.unit {
@@ -249,14 +248,11 @@ pub(super) fn compute_reset_period_end(
         TenorUnit::Days => reset_date + time::Duration::days(reset_freq.count as i64),
     };
 
-    // Apply calendar adjustment if configured
-    if let Some(cal) = resolve_facility_calendar(attrs) {
-        reset_end = finstack_quant_core::dates::adjust(
-            reset_end,
-            BusinessDayConvention::ModifiedFollowing,
-            cal,
-        )?;
+    if spec.end_of_month && reset_date == reset_date.end_of_month() {
+        reset_end = reset_end.end_of_month();
     }
+    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(&spec.calendar_id)?;
+    reset_end = finstack_quant_core::dates::adjust(reset_end, spec.bdc, calendar)?;
 
     Ok(reset_end)
 }
@@ -268,7 +264,34 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};
     use finstack_quant_core::money::Money;
+    use rust_decimal::Decimal;
     use time::Month;
+
+    fn reset_spec(tenor: Tenor, calendar_id: &str) -> crate::cashflow::builder::FloatingRateSpec {
+        crate::cashflow::builder::FloatingRateSpec {
+            index_id: "TEST-INDEX".into(),
+            spread_bp: Decimal::ZERO,
+            gearing: Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            index_cap_bp: None,
+            all_in_floor_bp: None,
+            all_in_cap_bp: None,
+            overnight_index_constraints: Default::default(),
+            reset_freq: tenor,
+            index_tenor: None,
+            reset_lag_days: 0,
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::ModifiedFollowing,
+            calendar_id: calendar_id.to_string(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            overnight_compounding: None,
+            overnight_basis: None,
+            fallback: Default::default(),
+        }
+    }
 
     fn create_test_facility(
         start: Date,
@@ -508,17 +531,15 @@ mod tests {
     fn test_compute_reset_period_end_monthly() {
         let reset_date =
             Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
-        let attrs = Attributes::new();
-
-        let reset_end = compute_reset_period_end(
-            reset_date,
-            &finstack_quant_core::dates::Tenor::new(
+        let spec = reset_spec(
+            finstack_quant_core::dates::Tenor::new(
                 3,
                 finstack_quant_core::dates::TenorUnit::Months,
             ),
-            &attrs,
-        )
-        .expect("Reset period end calculation should succeed");
+            "weekends_only",
+        );
+        let reset_end = compute_reset_period_end(reset_date, &spec)
+            .expect("Reset period end calculation should succeed");
 
         // 3 months from Jan 15 should be Apr 15
         let expected = Date::from_calendar_date(2025, Month::April, 15).expect("Valid test date");
@@ -529,17 +550,12 @@ mod tests {
     fn test_compute_reset_period_end_daily() {
         let reset_date =
             Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
-        let attrs = Attributes::new();
-
-        let reset_end = compute_reset_period_end(
-            reset_date,
-            &finstack_quant_core::dates::Tenor::new(
-                90,
-                finstack_quant_core::dates::TenorUnit::Days,
-            ),
-            &attrs,
-        )
-        .expect("Reset period end calculation should succeed");
+        let spec = reset_spec(
+            finstack_quant_core::dates::Tenor::new(90, finstack_quant_core::dates::TenorUnit::Days),
+            "weekends_only",
+        );
+        let reset_end = compute_reset_period_end(reset_date, &spec)
+            .expect("Reset period end calculation should succeed");
 
         // 90 days from Jan 15
         let expected = reset_date + time::Duration::days(90);
@@ -550,29 +566,18 @@ mod tests {
     fn test_compute_reset_period_end_with_calendar() {
         let reset_date =
             Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
-        // Test mechanism - calendar adjustment is calendar-dependent
-        let attrs_no_cal = Attributes::new();
-        let attrs_with_cal = Attributes::new().with_meta("calendar_id", "WMR");
+        let tenor = finstack_quant_core::dates::Tenor::new(
+            1,
+            finstack_quant_core::dates::TenorUnit::Months,
+        );
+        let weekends_spec = reset_spec(tenor, "weekends_only");
+        let wmr_spec = reset_spec(tenor, "USNY");
 
-        let end_no_cal = compute_reset_period_end(
-            reset_date,
-            &finstack_quant_core::dates::Tenor::new(
-                1,
-                finstack_quant_core::dates::TenorUnit::Months,
-            ),
-            &attrs_no_cal,
-        )
-        .expect("Reset period end calculation should succeed");
+        let end_no_cal = compute_reset_period_end(reset_date, &weekends_spec)
+            .expect("Reset period end calculation should succeed");
 
-        let end_with_cal = compute_reset_period_end(
-            reset_date,
-            &finstack_quant_core::dates::Tenor::new(
-                1,
-                finstack_quant_core::dates::TenorUnit::Months,
-            ),
-            &attrs_with_cal,
-        )
-        .expect("Reset period end calculation should succeed");
+        let end_with_cal = compute_reset_period_end(reset_date, &wmr_spec)
+            .expect("Reset period end calculation should succeed");
 
         // Both should succeed (calendar adjustment may or may not change date)
         assert!(end_no_cal.year() == 2025);

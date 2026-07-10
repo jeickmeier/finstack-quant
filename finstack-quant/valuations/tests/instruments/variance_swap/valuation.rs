@@ -306,7 +306,7 @@ fn test_npv_at_maturity_without_prices_errors() {
 // ============================================================================
 
 #[test]
-fn test_npv_after_maturity_uses_final_realized_variance() {
+fn test_npv_after_settlement_is_zero() {
     // Arrange
     let swap = sample_swap(PayReceive::Receive);
     let prices = price_series(&swap, 5_000.0, 3.0);
@@ -317,15 +317,7 @@ fn test_npv_after_maturity_uses_final_realized_variance() {
     let pv = swap.value(&ctx, post_maturity).unwrap();
 
     // Assert
-    let realized = realized_variance(
-        &prices.iter().map(|(_, p)| *p).collect::<Vec<_>>(),
-        RealizedVarMethod::CloseToClose,
-        252.0,
-    )
-    .expect("CloseToClose should succeed");
-    let expected = swap.payoff(realized);
-
-    assert!((pv.amount() - expected.amount()).abs() < LOOSE_EPSILON);
+    assert!(pv.amount().abs() < LOOSE_EPSILON);
 }
 
 // ============================================================================

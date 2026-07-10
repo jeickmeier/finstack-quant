@@ -623,6 +623,23 @@ pub(crate) fn lognormal_to_normal_vol(
     sigma_ln * effective_forward * correction
 }
 
+/// Numerical Jacobian of the normal-volatility conversion with respect to the
+/// original lognormal quote.
+pub(crate) fn lognormal_to_normal_vol_jacobian(
+    sigma_ln: f64,
+    forward: f64,
+    strike: f64,
+    time_to_expiry: f64,
+    shift: Option<f64>,
+) -> f64 {
+    let bump = (sigma_ln.abs() * 1.0e-5).max(1.0e-7);
+    let lower = (sigma_ln - bump).max(0.0);
+    let upper = sigma_ln + bump;
+    let normal_upper = lognormal_to_normal_vol(upper, forward, strike, time_to_expiry, shift);
+    let normal_lower = lognormal_to_normal_vol(lower, forward, strike, time_to_expiry, shift);
+    (normal_upper - normal_lower) / (upper - lower)
+}
+
 crate::impl_empty_cashflow_provider!(
     BermudanSwaption,
     crate::cashflow::builder::CashflowRepresentation::Placeholder

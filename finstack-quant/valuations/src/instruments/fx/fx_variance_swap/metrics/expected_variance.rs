@@ -12,7 +12,7 @@ impl MetricCalculator for ExpectedVarianceCalculator {
         let swap = context.instrument_as::<FxVarianceSwap>()?;
         let as_of = context.as_of;
 
-        if as_of >= swap.maturity {
+        if as_of >= swap.final_observation_date()? {
             return swap.partial_realized_variance(&context.curves, as_of);
         }
 

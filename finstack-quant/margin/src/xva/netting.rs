@@ -102,12 +102,27 @@ pub fn apply_netting(instrument_values: &[f64]) -> f64 {
 /// ```
 #[inline]
 pub fn apply_collateral(gross_exposure: f64, csa: &CsaTerms) -> f64 {
+    apply_collateral_with_independent_amount(gross_exposure, csa, csa.independent_amount)
+}
+
+/// Apply variation-margin terms without a counterparty-posted independent amount.
+#[inline]
+pub(crate) fn apply_variation_margin(gross_exposure: f64, csa: &CsaTerms) -> f64 {
+    apply_collateral_with_independent_amount(gross_exposure, csa, 0.0)
+}
+
+#[inline]
+fn apply_collateral_with_independent_amount(
+    gross_exposure: f64,
+    csa: &CsaTerms,
+    independent_amount: f64,
+) -> f64 {
     let unsecured_exposure = if gross_exposure > csa.threshold + csa.mta {
         csa.threshold + csa.mta
     } else {
         gross_exposure
     };
-    (unsecured_exposure - csa.independent_amount).max(0.0)
+    (unsecured_exposure - independent_amount).max(0.0)
 }
 
 #[cfg(test)]
@@ -201,6 +216,13 @@ mod tests {
         let csa = make_csa(10.0, 1.0, 5.0);
         // Residual exposure = threshold + MTA = 11; net = max(11 - 5, 0) = 6.
         assert!((apply_collateral(20.0, &csa) - 6.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn counterparty_independent_amount_does_not_reduce_negative_exposure() {
+        let csa = make_csa(10.0, 1.0, 5.0);
+        assert!((apply_collateral(20.0, &csa) - 6.0).abs() < 1e-12);
+        assert!((apply_variation_margin(20.0, &csa) - 11.0).abs() < 1e-12);
     }
 
     #[test]

@@ -124,6 +124,42 @@ pub struct SaCcrNettingSetConfig {
 }
 
 impl SaCcrNettingSetConfig {
+    /// Validate collateral and margin-agreement inputs.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        for (name, value) in [
+            ("collateral", self.collateral),
+            ("threshold", self.threshold),
+            ("mta", self.mta),
+            ("nica", self.nica),
+        ] {
+            if !value.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "SA-CCR netting set '{}': {name} must be finite, got {value}",
+                    self.netting_set_id
+                )));
+            }
+        }
+        if self.threshold < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "SA-CCR netting set '{}': threshold must be non-negative",
+                self.netting_set_id
+            )));
+        }
+        if self.mta < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "SA-CCR netting set '{}': MTA must be non-negative",
+                self.netting_set_id
+            )));
+        }
+        if self.is_margined && self.mpor_days == 0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "SA-CCR netting set '{}': margined MPOR must be positive",
+                self.netting_set_id
+            )));
+        }
+        Ok(())
+    }
+
     /// Create an unmargined netting set configuration.
     #[must_use]
     pub fn unmargined(netting_set_id: NettingSetId, collateral: f64, as_of: Date) -> Self {

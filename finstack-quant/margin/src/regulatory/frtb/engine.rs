@@ -18,10 +18,10 @@ use finstack_quant_core::Result;
 /// FRTB Sensitivity-Based Approach engine.
 ///
 /// Computes the standardized market risk capital charge per BCBS d457.
-/// The engine carries a revision-tagged [`super::params::FrtbParams`]
-/// bundle so audit logs can match a result to its regulatory vintage;
-/// charge-calculation helpers currently read the `pub const` tables in
-/// [`super::params`] directly.
+/// The engine carries the exact D457 [`super::params::FrtbParams`]
+/// bundle so audit logs can match a result to its regulatory vintage.
+/// Alternate bundles fail at build time until every charge helper is
+/// parameterized, preventing a result from carrying a false revision tag.
 #[derive(Debug)]
 pub struct FrtbSbaEngine {
     /// Which correlation scenarios to evaluate (default: all three).
@@ -61,6 +61,7 @@ impl FrtbSbaEngine {
     /// Evaluates delta, vega, and curvature charges under each configured
     /// correlation scenario, takes the maximum, then adds DRC and RRAO.
     pub fn calculate(&self, sensitivities: &FrtbSensitivities) -> Result<FrtbSbaResult> {
+        sensitivities.validate()?;
         let mut scenario_charges: HashMap<CorrelationScenario, f64> = HashMap::default();
         let mut best_scenario = CorrelationScenario::Medium;
         let mut max_sba_charge = f64::NEG_INFINITY;
@@ -154,7 +155,10 @@ impl FrtbSbaEngineBuilder {
         self
     }
 
-    /// Override the FRTB parameter set (default: d457). Validated at `build()`.
+    /// Supply an FRTB parameter set (default: exact D457).
+    ///
+    /// Alternate/custom bundles currently fail at `build()` rather than being
+    /// silently ignored by the D457 calculation helpers.
     #[must_use]
     pub fn params(mut self, params: super::params::FrtbParams) -> Self {
         self.params = Some(params);
@@ -187,6 +191,12 @@ impl FrtbSbaEngineBuilder {
 
         let params = self.params.unwrap_or_else(super::params::FrtbParams::d457);
         params.validate()?;
+        if params != super::params::FrtbParams::d457() {
+            return Err(finstack_quant_core::Error::Validation(
+                "FRTB calculation currently supports only the exact BCBS D457 parameter bundle; alternate/custom bundles are rejected until all charge helpers are parameterized"
+                    .into(),
+            ));
+        }
 
         Ok(FrtbSbaEngine {
             scenarios,
@@ -231,6 +241,17 @@ mod tests {
         assert!(err.to_string().contains("risk class"));
     }
 
+    #[test]
+    fn builder_rejects_parameter_bundle_that_calculation_cannot_honor() {
+        let mut params = super::super::params::FrtbParams::d457();
+        params.girr.delta_risk_weights_pct[0].1 *= 2.0;
+        let err = FrtbSbaEngine::builder()
+            .params(params)
+            .build()
+            .expect_err("unsupported alternate parameters");
+        assert!(err.to_string().contains("only the exact BCBS D457"));
+    }
+
     // -----------------------------------------------------------------------
     // FRTB delta: single GIRR factor
     // -----------------------------------------------------------------------
@@ -259,6 +280,23 @@ mod tests {
                 .contains_key(&FrtbRiskClass::Girr),
             "GIRR should be in delta breakdown"
         );
+    }
+
+    #[test]
+    fn calculate_rejects_unknown_labels_buckets_and_non_finite_values() {
+        let engine = FrtbSbaEngine::builder().build().expect("build");
+
+        let mut unknown_tenor = FrtbSensitivities::new(Currency::USD);
+        unknown_tenor.add_girr_delta(Currency::USD, "0.25y", 100.0);
+        assert!(engine.calculate(&unknown_tenor).is_err());
+
+        let mut unknown_bucket = FrtbSensitivities::new(Currency::USD);
+        unknown_bucket.add_equity_delta("ACME", 99, 100.0);
+        assert!(engine.calculate(&unknown_bucket).is_err());
+
+        let mut non_finite = FrtbSensitivities::new(Currency::USD);
+        non_finite.add_girr_delta(Currency::USD, "5Y", f64::NAN);
+        assert!(engine.calculate(&non_finite).is_err());
     }
 
     // -----------------------------------------------------------------------

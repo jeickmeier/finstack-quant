@@ -59,6 +59,7 @@ impl SaCcrEngine {
         config: &SaCcrNettingSetConfig,
         trades: &[SaCcrTrade],
     ) -> Result<EadResult> {
+        config.validate()?;
         for trade in trades {
             trade.validate()?;
         }
@@ -130,9 +131,9 @@ impl SaCcrEngineBuilder {
     /// Returns an error if alpha is less than 1.0.
     pub fn build(self) -> Result<SaCcrEngine> {
         let alpha = self.alpha.unwrap_or(1.4);
-        if alpha < 1.0 {
+        if !alpha.is_finite() || alpha < 1.0 {
             return Err(finstack_quant_core::Error::Validation(
-                "SA-CCR alpha must be >= 1.0".into(),
+                "SA-CCR alpha must be finite and >= 1.0".into(),
             ));
         }
         Ok(SaCcrEngine {
@@ -226,6 +227,23 @@ mod tests {
             .build()
             .expect_err("low alpha");
         assert!(err.to_string().contains("alpha"));
+    }
+
+    #[test]
+    fn builder_rejects_non_finite_alpha() {
+        assert!(SaCcrEngine::builder().alpha(f64::NAN).build().is_err());
+        assert!(SaCcrEngine::builder().alpha(f64::INFINITY).build().is_err());
+    }
+
+    #[test]
+    fn calculate_rejects_invalid_margin_configuration() {
+        let engine = SaCcrEngine::builder().build().expect("build");
+        let mut config = margined_config(0.0, 0.0, 0.0, 0.0);
+        config.mpor_days = 0;
+        assert!(engine.calculate_ead(&config, &[]).is_err());
+        config.mpor_days = 10;
+        config.mta = f64::NAN;
+        assert!(engine.calculate_ead(&config, &[]).is_err());
     }
 
     // -----------------------------------------------------------------------

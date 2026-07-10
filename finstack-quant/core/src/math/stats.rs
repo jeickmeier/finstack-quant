@@ -456,6 +456,19 @@ pub fn realized_variance(
     method: RealizedVarMethod,
     annualization_factor: f64,
 ) -> crate::Result<f64> {
+    if !annualization_factor.is_finite() || annualization_factor <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "realized_variance: annualization_factor must be positive and finite, got {annualization_factor}"
+        )));
+    }
+    if prices
+        .iter()
+        .any(|price| !price.is_finite() || *price <= 0.0)
+    {
+        return Err(crate::Error::Validation(
+            "realized_variance: prices must be finite and positive".into(),
+        ));
+    }
     if prices.len() < 2 {
         return Ok(0.0);
     }
@@ -465,7 +478,7 @@ pub fn realized_variance(
             let returns = log_returns(prices);
             let var = returns.iter().map(|r| r * r).sum::<f64>() / returns.len() as f64
                 * annualization_factor;
-            if var.is_nan() {
+            if !var.is_finite() || var < 0.0 {
                 return Err(crate::Error::Validation(
                     "realized_variance: non-positive or non-finite prices produce undefined log returns".into(),
                 ));
@@ -521,11 +534,37 @@ pub fn realized_variance_ohlc(
             n
         )));
     }
+    if !annualization_factor.is_finite() || annualization_factor <= 0.0 {
+        return Err(crate::Error::Validation(format!(
+            "realized_variance_ohlc: annualization_factor must be positive and finite, got {annualization_factor}"
+        )));
+    }
+    for i in 0..n {
+        let (o, h, l, c) = (open[i], high[i], low[i], close[i]);
+        if !o.is_finite()
+            || !h.is_finite()
+            || !l.is_finite()
+            || !c.is_finite()
+            || o <= 0.0
+            || h <= 0.0
+            || l <= 0.0
+            || c <= 0.0
+        {
+            return Err(crate::Error::Validation(format!(
+                "realized_variance_ohlc: bar {i} must contain finite positive OHLC values"
+            )));
+        }
+        if l > o.min(c) || h < o.max(c) || l > h {
+            return Err(crate::Error::Validation(format!(
+                "realized_variance_ohlc: bar {i} violates low <= min(open, close) <= max(open, close) <= high"
+            )));
+        }
+    }
     if n < 2 {
         return Ok(0.0);
     }
 
-    match method {
+    let result = match method {
         RealizedVarMethod::CloseToClose => realized_variance(close, method, annualization_factor),
         RealizedVarMethod::Parkinson => {
             // Parkinson (1980) high-low range estimator
@@ -662,7 +701,13 @@ pub fn realized_variance_ohlc(
 
             Ok((var_overnight + k * var_open_close + (1.0 - k) * var_rs) * annualization_factor)
         }
+    }?;
+    if !result.is_finite() || result < -1.0e-14 {
+        return Err(crate::Error::Validation(format!(
+            "realized_variance_ohlc produced invalid variance {result}"
+        )));
     }
+    Ok(result.max(0.0))
 }
 
 // ====== Online (Streaming) Statistics ======
@@ -1388,5 +1433,52 @@ mod tests {
     #[test]
     fn realized_var_method_from_str_unknown() {
         assert!("garbage".parse::<super::RealizedVarMethod>().is_err());
+    }
+
+    #[test]
+    fn realized_variance_rejects_invalid_ohlc_and_annualization() {
+        use super::{realized_variance, realized_variance_ohlc, RealizedVarMethod};
+
+        let open = [100.0, 101.0];
+        let high = [102.0, 103.0];
+        let low = [99.0, 100.0];
+        let close = [101.0, 102.0];
+        assert!(realized_variance_ohlc(
+            &open,
+            &high,
+            &[0.0, 100.0],
+            &close,
+            RealizedVarMethod::Parkinson,
+            252.0,
+        )
+        .is_err());
+        assert!(realized_variance_ohlc(
+            &[f64::NAN, 101.0],
+            &high,
+            &low,
+            &close,
+            RealizedVarMethod::GarmanKlass,
+            252.0,
+        )
+        .is_err());
+        assert!(realized_variance_ohlc(
+            &open,
+            &[98.0, 103.0],
+            &low,
+            &close,
+            RealizedVarMethod::RogersSatchell,
+            252.0,
+        )
+        .is_err());
+        assert!(realized_variance_ohlc(
+            &open,
+            &high,
+            &low,
+            &close,
+            RealizedVarMethod::YangZhang,
+            f64::INFINITY,
+        )
+        .is_err());
+        assert!(realized_variance(&close, RealizedVarMethod::CloseToClose, -1.0).is_err());
     }
 }

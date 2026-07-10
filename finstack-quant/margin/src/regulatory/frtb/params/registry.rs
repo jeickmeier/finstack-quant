@@ -3,14 +3,10 @@
 //! [`FrtbParams`] bundles the non-trivially-parameterised FRTB inputs
 //! into one serializable, revision-tagged struct.
 //! [`FrtbParams::d457`] returns defaults matching the sibling `pub
-//! const` tables; [`FrtbParams::from_json_overlay`] layers a JSON
-//! overlay on top of those defaults to produce alternate parameter
-//! sets (e.g. d554) without recompiling. [`FrtbParams::validate`] runs
-//! range checks so malformed overlays fail at load time.
-//!
-//! The charge-calculation helpers still read the `pub const` tables
-//! directly; the engine stores and validates a tagged bundle so audit
-//! logs can record the parameter vintage alongside the result.
+//! const` tables; [`FrtbParams::from_json_overlay`] can prepare and
+//! validate candidate future parameter sets. The calculation engine
+//! currently accepts only the exact D457 bundle and fails closed for
+//! alternate revisions so results can never carry a false vintage tag.
 
 use serde::{Deserialize, Serialize};
 
@@ -45,7 +41,7 @@ impl FrtbRevision {
 }
 
 /// GIRR (General Interest Rate Risk) parameter bundle.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GirrParams {
     /// Delta risk weights by tenor label, in percent.
     pub delta_risk_weights_pct: Vec<(String, f64)>,
@@ -70,7 +66,7 @@ pub struct GirrParams {
 }
 
 /// Equity parameter bundle.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EquityParams {
     /// Risk weights by bucket id (1..=13).
     pub risk_weights: Vec<(u8, f64)>,
@@ -86,7 +82,7 @@ pub struct EquityParams {
 
 /// Commodity parameter bundle (headline scalars only — full bucket
 /// tables remain in [`super::commodity`]).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CommodityParams {
     /// Vega risk weight.
     pub vega_risk_weight: f64,
@@ -100,7 +96,7 @@ pub struct CommodityParams {
 /// so DRC parameters travel with [`FrtbParams`] for audit-trail tagging
 /// and so a JSON overlay can substitute alternate weights (e.g. d554)
 /// without recompiling.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DrcParams {
     /// Risk weights by rating bucket id (1=AAA … 9=Defaulted).
     pub risk_weights: Vec<(u8, f64)>,
@@ -114,7 +110,7 @@ pub struct DrcParams {
 }
 
 /// FX parameter bundle.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FxParams {
     /// Delta risk weight.
     pub delta_risk_weight: f64,
@@ -138,7 +134,7 @@ pub struct FxParams {
 /// regulatory revision that changes the stress multipliers (e.g. d554
 /// may soften the high-correlation scenario) can be tested without a
 /// recompile.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CorrelationScenarioParams {
     /// Linear coefficient in `rho_low = a·rho + b`. Default `a = 2.0`.
     pub low_linear_coefficient: f64,
@@ -160,7 +156,7 @@ impl Default for CorrelationScenarioParams {
 }
 
 /// Complete FRTB parameter bundle.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FrtbParams {
     /// Revision identifier for audit trails.
     pub revision: FrtbRevision,

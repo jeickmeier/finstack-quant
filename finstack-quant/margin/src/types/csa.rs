@@ -219,7 +219,7 @@ impl CsaSpec {
                 Currency::CHF => "chzh",
                 Currency::CAD => "cato",
                 Currency::AUD => "auce",
-                _ => "weekends_only",
+                _ => "weekends",
             }
             .to_string(),
             vm_params,
@@ -246,6 +246,31 @@ impl CsaSpec {
     #[must_use]
     pub fn im_threshold(&self) -> Option<&finstack_quant_core::money::Money> {
         self.im_params.as_ref().map(|p| &p.threshold)
+    }
+
+    /// Validate CSA identifiers and the contractual holiday calendar.
+    pub fn validate(&self) -> Result<()> {
+        if self.id.trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CSA id must not be empty".into(),
+            ));
+        }
+        if finstack_quant_core::dates::CalendarRegistry::global()
+            .resolve_str(&self.calendar_id)
+            .is_none()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CSA '{}' calendar '{}' is not registered",
+                self.id, self.calendar_id
+            )));
+        }
+        if self.collateral_curve_id.as_str().trim().is_empty() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CSA '{}' collateral curve id must not be empty",
+                self.id
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -287,5 +312,13 @@ mod tests {
         let timing = MarginCallTiming::default();
         assert_eq!(timing.notification_deadline_hours, 13);
         assert_eq!(timing.dispute_resolution_days, 2);
+    }
+
+    #[test]
+    fn unmapped_currency_uses_registered_weekends_calendar() {
+        let csa = CsaSpec::regulatory_for_currency(Currency::NZD, "NZD-CSA", "NZD-OIS")
+            .expect("registry should load");
+        assert_eq!(csa.calendar_id, "weekends");
+        csa.validate().expect("fallback calendar should resolve");
     }
 }

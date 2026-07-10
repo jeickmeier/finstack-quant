@@ -88,9 +88,14 @@ pub struct VarianceSwap {
     /// Start date of observation period
     #[schemars(with = "String")]
     pub start_date: Date,
-    /// Maturity/settlement date
+    /// Contractual end of the observation period.
     #[schemars(with = "String")]
     pub maturity: Date,
+    /// Optional cash-settlement date. Defaults to the adjusted final observation date.
+    #[serde(default)]
+    #[builder(optional)]
+    #[schemars(with = "Option<String>")]
+    pub settlement_date: Option<Date>,
     /// Observation frequency
     pub observation_freq: Tenor,
     /// Exchange/fixing calendar used for every realized-variance observation.
@@ -246,7 +251,32 @@ impl VarianceSwap {
             )));
         }
 
+        let final_observation = self.final_observation_date()?;
+        let settlement = self.effective_settlement_date()?;
+        if settlement < final_observation {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VarianceSwap '{}' settlement date ({settlement}) precedes final observation ({final_observation})",
+                self.id
+            )));
+        }
+
         Ok(())
+    }
+
+    /// Adjusted final observation/fixing date.
+    pub fn final_observation_date(&self) -> Result<Date> {
+        Ok(self
+            .observation_dates()?
+            .last()
+            .copied()
+            .unwrap_or(self.maturity))
+    }
+
+    /// Cash-settlement date, defaulting to the final adjusted observation.
+    pub fn effective_settlement_date(&self) -> Result<Date> {
+        Ok(self
+            .settlement_date
+            .unwrap_or(self.final_observation_date()?))
     }
 
     /// Get the discount curve ID for this variance swap.
@@ -293,14 +323,15 @@ impl VarianceSwap {
         if as_of <= self.start_date {
             return 0.0;
         }
-        if as_of >= self.maturity {
+        let final_observation = self.final_observation_date().unwrap_or(self.maturity);
+        if as_of >= final_observation {
             return 1.0;
         }
 
         // Use day-count to compute precise fractions rather than raw day counts
         let total = self
             .day_count
-            .year_fraction(self.start_date, self.maturity, Default::default())
+            .year_fraction(self.start_date, final_observation, Default::default())
             .unwrap_or(0.0);
         if total <= 0.0 {
             return 0.0;
@@ -366,7 +397,7 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
     }
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
-        Some(self.maturity)
+        self.effective_settlement_date().ok()
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {

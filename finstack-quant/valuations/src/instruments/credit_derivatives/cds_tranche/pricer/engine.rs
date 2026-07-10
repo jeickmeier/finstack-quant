@@ -254,6 +254,14 @@ impl CDSTranchePricer {
         let mut prev_el_fraction = self.calculate_prior_tranche_loss(tranche);
         let mut prev_wd_fraction =
             self.calculate_prior_tranche_writedown(tranche, _index_data_arc.recovery_rate);
+        let full_schedule = self.generate_full_payment_schedule(tranche, valuation_date)?;
+        let first_period_start = payment_dates.first().and_then(|first_payment| {
+            full_schedule
+                .iter()
+                .copied()
+                .filter(|date| date < first_payment)
+                .max()
+        });
 
         // Hazard-axis payment times, used ONLY for survival quantities
         // (within-period default timing). Discounting uses the discount
@@ -273,36 +281,13 @@ impl CDSTranchePricer {
             let outstanding_notional =
                 tranche_notional * (1.0 - prev_el_fraction - prev_wd_fraction).max(0.0);
             let period_start = if i == 0 {
-                let months = tranche.frequency.months().ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "CDS tranche premium frequency must be month-based".into(),
-                    )
-                })?;
-                let months_i32 = i32::try_from(months).map_err(|_| {
-                    finstack_quant_core::Error::Validation(
-                        "CDS tranche premium frequency is too large".into(),
-                    )
-                })?;
-                let unadjusted =
-                    finstack_quant_core::dates::DateExt::add_months(payment_date, -months_i32);
-                let previous_boundary = if let Some(calendar) = tranche
-                    .calendar_id
-                    .as_deref()
-                    .and_then(finstack_quant_core::dates::calendar::calendar_by_id)
-                {
-                    finstack_quant_core::dates::adjust(unadjusted, tranche.bdc, calendar)?
-                } else {
-                    unadjusted
-                };
                 let effective = tranche
                     .contractual_effective_date(valuation_date)
                     .unwrap_or(valuation_date);
-                let first_period_end =
-                    finstack_quant_core::dates::DateExt::add_months(effective, months_i32);
-                if valuation_date < first_period_end {
+                if tranche.effective_date.is_some() {
                     effective
                 } else {
-                    previous_boundary.max(effective)
+                    first_period_start.unwrap_or(effective).max(effective)
                 }
             } else {
                 payment_dates[i - 1]

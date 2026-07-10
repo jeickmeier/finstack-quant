@@ -58,9 +58,9 @@ impl MetricCalculator for ZSpreadCalculator {
                 })
             })?;
 
-        // Get notional to convert price to currency
-        let base_npv = context.base_value.amount();
-        let target_value = base_npv * (dirty_price / 100.0);
+        // Convert price points back to currency using original notional.
+        let notional = crate::instruments::fixed_income::structured_credit::metrics::pricing::prices::get_original_notional(context)?;
+        let target_value = notional * (dirty_price / 100.0);
 
         // Get cashflows
         let flows = context.cashflows.as_ref().ok_or_else(|| {

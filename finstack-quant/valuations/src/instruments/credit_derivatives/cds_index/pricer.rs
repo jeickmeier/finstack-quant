@@ -254,7 +254,7 @@ impl CDSIndexPricer {
                 let denom_per_unit =
                     pricer.par_spread_denominator(&cds, disc.as_ref(), surv.as_ref(), as_of)?;
                 let denominator = denom_per_unit * cds.notional.amount();
-                if denominator.abs() < credit::PAR_SPREAD_DENOM_TOLERANCE {
+                if denominator <= credit::PAR_SPREAD_DENOM_TOLERANCE {
                     return Err(Error::Validation(
                         "CDS Index par spread denominator near zero. This may indicate \
                          zero survival probability or expired protection."
@@ -290,12 +290,12 @@ impl CDSIndexPricer {
                     // Guard per-constituent division: if the local denominator is near zero
                     // (e.g., for a near-defaulted name with negligible survival probability),
                     // report NaN rather than propagating Inf which corrupts aggregation.
-                    let constituent_spread_bp =
-                        if local_denom.abs() < credit::PAR_SPREAD_DENOM_TOLERANCE {
-                            f64::NAN
-                        } else {
-                            prot_pv.amount() / local_denom * BASIS_POINTS_PER_UNIT
-                        };
+                    let constituent_spread_bp = if local_denom <= credit::PAR_SPREAD_DENOM_TOLERANCE
+                    {
+                        f64::NAN
+                    } else {
+                        prot_pv.amount() / local_denom * BASIS_POINTS_PER_UNIT
+                    };
                     constituents_spread_bp.push(ConstituentResult {
                         credit_curve_id: position.credit_curve_id,
                         recovery_rate: position.recovery_rate,
@@ -304,7 +304,7 @@ impl CDSIndexPricer {
                         value: constituent_spread_bp,
                     });
                 }
-                if denominator.abs() < credit::PAR_SPREAD_DENOM_TOLERANCE {
+                if denominator <= credit::PAR_SPREAD_DENOM_TOLERANCE {
                     return Err(Error::Validation(
                         "CDS Index par spread denominator near zero (risky annuity sum ≈ 0). \
                          This may indicate zero survival probability across all constituents."

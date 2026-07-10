@@ -124,7 +124,7 @@ impl PyFrtbSensitivities {
         serde_json::to_string_pretty(&self.inner).map_err(display_to_py)
     }
 
-    /// Add a GIRR delta sensitivity (currency per 1bp).
+    /// Add a GIRR delta sensitivity (currency P&L per 1 percentage-point move).
     #[pyo3(signature = (tenor, amount, currency = None))]
     fn add_girr_delta(&mut self, tenor: &str, amount: f64, currency: Option<&str>) -> PyResult<()> {
         let ccy = self.currency_or_base(currency)?;

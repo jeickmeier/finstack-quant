@@ -82,6 +82,42 @@ pub struct RangeAccrualMcPricer {
     config: PathDependentPricerConfig,
 }
 
+fn validate_historical_observations(inst: &RangeAccrual, as_of: Date) -> Result<()> {
+    let expected = inst
+        .observation_dates
+        .iter()
+        .filter(|&&date| date <= as_of)
+        .count();
+    if expected == 0 {
+        return Ok(());
+    }
+    let in_range = inst.past_fixings_in_range.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "RangeAccrual '{}' requires past_fixings_in_range for {expected} historical observations",
+            inst.id
+        ))
+    })?;
+    let total = inst.total_past_observations.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(format!(
+            "RangeAccrual '{}' requires total_past_observations for {expected} historical observations",
+            inst.id
+        ))
+    })?;
+    if total != expected {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "RangeAccrual '{}' historical observation count mismatch: supplied {total}, expected {expected}",
+            inst.id
+        )));
+    }
+    if in_range > total {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "RangeAccrual '{}' past_fixings_in_range ({in_range}) exceeds total historical observations ({total})",
+            inst.id
+        )));
+    }
+    Ok(())
+}
+
 impl RangeAccrualMcPricer {
     /// Create a new range accrual MC pricer with default config.
     pub fn new() -> Self {
@@ -104,6 +140,7 @@ impl RangeAccrualMcPricer {
         if final_date <= as_of {
             return Ok(Money::new(0.0, inst.notional.currency()));
         }
+        validate_historical_observations(inst, as_of)?;
 
         let observation_times = inst
             .observation_dates
@@ -233,7 +270,10 @@ fn compute_known_value(
                 .df_between_dates(as_of, payment_date)?;
             Ok(Money::new(fv * discount_factor, inst.notional.currency()))
         }
-        _ => Ok(Money::new(0.0, inst.notional.currency())),
+        _ => Err(finstack_quant_core::Error::Validation(format!(
+            "RangeAccrual '{}' is fully observed but historical fixing counts are missing or invalid",
+            inst.id
+        ))),
     }
 }
 
@@ -342,6 +382,7 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     if final_date <= as_of {
         return Ok(Money::new(0.0, inst.notional.currency()));
     }
+    validate_historical_observations(inst, as_of)?;
 
     let has_future_observations =
         inst.observation_dates

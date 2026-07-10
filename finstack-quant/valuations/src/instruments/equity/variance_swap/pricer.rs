@@ -100,10 +100,12 @@ pub(crate) fn compute_pv(
 
     inst.validate_as_of(curves, as_of)?;
     let disc = curves.get_discount(inst.discount_curve_id.as_str())?;
-    let final_observation_date = observation_dates(inst)?
-        .last()
-        .copied()
-        .unwrap_or(inst.maturity);
+    let final_observation_date = inst.final_observation_date()?;
+    let settlement_date = inst.effective_settlement_date()?;
+
+    if as_of > settlement_date {
+        return Ok(Money::new(0.0, inst.notional.currency()));
+    }
 
     if as_of >= final_observation_date {
         let realized_var = if inst.realized_var_method.requires_ohlc() {
@@ -130,7 +132,12 @@ pub(crate) fn compute_pv(
                 annualization_factor_with_policy(inst, curves),
             )?
         };
-        return Ok(inst.payoff(realized_var));
+        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
+            disc.as_ref(),
+            as_of,
+            settlement_date,
+        )?;
+        return Ok(inst.payoff(realized_var) * df);
     }
 
     if as_of < inst.start_date {
@@ -139,7 +146,7 @@ pub(crate) fn compute_pv(
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
             as_of,
-            final_observation_date,
+            settlement_date,
         )?;
         return Ok(undiscounted * df);
     }
@@ -153,7 +160,7 @@ pub(crate) fn compute_pv(
     let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
         disc.as_ref(),
         as_of,
-        final_observation_date,
+        settlement_date,
     )?;
     Ok(undiscounted * df)
 }
@@ -507,9 +514,10 @@ pub(crate) fn remaining_forward_variance(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
+    let final_observation_date = inst.final_observation_date()?;
     let t = inst
         .day_count
-        .year_fraction(as_of, inst.maturity, Default::default())?;
+        .year_fraction(as_of, final_observation_date, Default::default())?;
 
     for sid in [
         inst.underlying_ticker.as_str(),
@@ -529,7 +537,7 @@ pub(crate) fn remaining_forward_variance(
                 crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
                     disc.as_ref(),
                     as_of,
-                    inst.maturity,
+                    final_observation_date,
                 )?;
             let r = crate::instruments::common_impl::helpers::zero_rate_from_df(
                 df_mat,

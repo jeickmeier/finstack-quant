@@ -295,6 +295,16 @@ impl CDSTranchePricer {
         tranche: &CDSTranche,
         as_of: Date,
     ) -> Result<Vec<Date>> {
+        let dates = self.generate_full_payment_schedule(tranche, as_of)?;
+        Ok(dates.into_iter().filter(|&date| date > as_of).collect())
+    }
+
+    /// Generate the complete contractual schedule before valuation-date filtering.
+    pub(super) fn generate_full_payment_schedule(
+        &self,
+        tranche: &CDSTranche,
+        as_of: Date,
+    ) -> Result<Vec<Date>> {
         let start_date = tranche.contractual_effective_date(as_of).unwrap_or(as_of);
 
         let dates = if self.params.use_isda_coupon_dates || tranche.standard_imm_dates {
@@ -343,10 +353,7 @@ impl CDSTranchePricer {
             .dates
         };
 
-        // Filter out dates before as_of (in case effective_date < as_of)
-        let payment_dates: Vec<Date> = dates.into_iter().filter(|&date| date > as_of).collect();
-
-        Ok(payment_dates)
+        Ok(dates)
     }
 
     /// Calculate upfront amount for the tranche.

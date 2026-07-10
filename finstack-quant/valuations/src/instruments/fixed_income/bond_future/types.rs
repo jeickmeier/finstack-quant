@@ -2014,6 +2014,10 @@ Provide it at construction time via BondFutureBuilder::ctd_bond(...) or by using
         Some(self.delivery_start)
     }
 
+    fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
+        Some(self.delivery_end)
+    }
+
     fn pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {

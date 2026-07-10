@@ -282,18 +282,37 @@ impl VmCalculator {
             }
             return Ok(dates);
         }
-        let mut current = adjusted_start;
+        if matches!(self.csa.vm_params.frequency, MarginTenor::Daily) {
+            let mut current = adjusted_start;
+            while current <= end {
+                dates.push(current);
+                current = self.add_business_days(current, 1)?;
+            }
+            return Ok(dates);
+        }
 
-        while current <= end {
-            dates.push(current);
-            current = match self.csa.vm_params.frequency {
-                MarginTenor::Daily => self.add_business_days(current, 1)?,
-                MarginTenor::Weekly => {
-                    self.adjust_to_business_day(current + time::Duration::weeks(1))?
-                }
-                MarginTenor::Monthly => self.adjust_to_business_day(current.add_months(1))?,
-                MarginTenor::OnDemand => break,
+        // Weekly/monthly contracts retain their unadjusted roll anchor. If a
+        // holiday moves one call date, the adjustment must not permanently
+        // move every later contractual date.
+        let mut period = 0_i32;
+        loop {
+            let contractual = match self.csa.vm_params.frequency {
+                MarginTenor::Weekly => start + time::Duration::weeks(i64::from(period)),
+                MarginTenor::Monthly => start.add_months(period),
+                MarginTenor::Daily | MarginTenor::OnDemand => return Ok(dates),
             };
+            if contractual > end {
+                break;
+            }
+            let adjusted = self.adjust_to_business_day(contractual)?;
+            if dates.last().copied() != Some(adjusted) {
+                dates.push(adjusted);
+            }
+            period = period.checked_add(1).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "margin-call schedule period overflow".into(),
+                )
+            })?;
         }
 
         Ok(dates)
@@ -562,9 +581,34 @@ mod tests {
         csa.vm_params.frequency = MarginTenor::Weekly;
         let calc = VmCalculator::new(csa);
         let dates = calc
-            .margin_call_dates(test_date(2025, 1, 17), test_date(2025, 1, 24))
+            .margin_call_dates(test_date(2025, 6, 27), test_date(2025, 7, 11))
             .expect("weekly dates");
-        assert_eq!(dates, vec![test_date(2025, 1, 17), test_date(2025, 1, 24)]);
+        assert_eq!(
+            dates,
+            vec![
+                test_date(2025, 6, 27),
+                test_date(2025, 7, 7),  // Independence Day rolls following.
+                test_date(2025, 7, 11), // Subsequent call keeps Friday anchor.
+            ]
+        );
+    }
+
+    #[test]
+    fn monthly_calls_preserve_end_of_month_anchor() {
+        let mut csa = CsaSpec::usd_regulatory().expect("registry should load");
+        csa.vm_params.frequency = MarginTenor::Monthly;
+        let calc = VmCalculator::new(csa);
+        let dates = calc
+            .margin_call_dates(test_date(2025, 1, 31), test_date(2025, 3, 31))
+            .expect("monthly dates");
+        assert_eq!(
+            dates,
+            vec![
+                test_date(2025, 1, 31),
+                test_date(2025, 2, 28),
+                test_date(2025, 3, 31),
+            ]
+        );
     }
 
     #[test]

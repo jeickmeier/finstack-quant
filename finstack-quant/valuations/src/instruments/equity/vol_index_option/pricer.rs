@@ -8,6 +8,27 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::norm_cdf;
 use finstack_quant_core::money::Money;
 
+fn resolved_index_forward(
+    option: &VolatilityIndexOption,
+    context: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    if as_of >= option.expiry {
+        if let Some(fixing) = option.expiry_fixing {
+            return Ok(fixing);
+        }
+        if as_of > option.expiry {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VolatilityIndexOption '{}' requires expiry_fixing between expiry and settlement",
+                option.id
+            )));
+        }
+    }
+    context
+        .get_vol_index_curve(&option.vol_index_curve_id)?
+        .forward_level_on_date(option.expiry)
+}
+
 pub(crate) fn compute_pv(
     option: &VolatilityIndexOption,
     context: &MarketContext,
@@ -29,25 +50,13 @@ pub(crate) fn compute_pv_raw(
     if as_of > settlement_date {
         return Ok(0.0);
     }
-    let vol_curve = context.get_vol_index_curve(&option.vol_index_curve_id)?;
     let t = option
         .day_count
         .year_fraction(as_of, option.expiry, DayCountContext::default())?
         .max(0.0);
 
     if t <= 0.0 {
-        let forward = if as_of > option.expiry {
-            option.expiry_fixing.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "VolatilityIndexOption '{}' requires expiry_fixing between expiry and settlement",
-                    option.id
-                ))
-            })?
-        } else {
-            option
-                .expiry_fixing
-                .unwrap_or_else(|| vol_curve.spot_level())
-        };
+        let forward = resolved_index_forward(option, context, as_of)?;
         let intrinsic = match option.option_type {
             OptionType::Call => (forward - option.strike).max(0.0),
             OptionType::Put => (option.strike - forward).max(0.0),
@@ -57,7 +66,7 @@ pub(crate) fn compute_pv_raw(
     }
 
     let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
-    let forward = vol_curve.forward_level(t);
+    let forward = resolved_index_forward(option, context, as_of)?;
     let vol_of_vol = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, settlement_date)?;
     // The vol index is √(forward variance), so Black-76 on the index forward is
@@ -118,12 +127,7 @@ pub(crate) fn forward_vol(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let vol_curve = context.get_vol_index_curve(&option.vol_index_curve_id)?;
-    let t = option
-        .day_count
-        .year_fraction(as_of, option.expiry, DayCountContext::default())?
-        .max(0.0);
-    Ok(vol_curve.forward_level(t))
+    resolved_index_forward(option, context, as_of)
 }
 
 pub(crate) fn delta(
@@ -131,7 +135,6 @@ pub(crate) fn delta(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let vol_curve = context.get_vol_index_curve(&option.vol_index_curve_id)?;
     let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
@@ -140,7 +143,7 @@ pub(crate) fn delta(
         .max(0.0);
 
     if t <= 0.0 {
-        let forward = vol_curve.spot_level();
+        let forward = resolved_index_forward(option, context, as_of)?;
         // Expiry-edge delta per index point: ±1 when ITM (put ITM → −1),
         // zero otherwise — the t → 0 limit of the Black-76 branch below.
         // Scale by multiplier × num_contracts × df exactly like the t > 0
@@ -172,7 +175,7 @@ pub(crate) fn delta(
             * df);
     }
 
-    let forward = vol_curve.forward_level(t);
+    let forward = resolved_index_forward(option, context, as_of)?;
     let sigma = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
     let d1 = d1_black76(forward, option.strike, sigma, t);
@@ -188,7 +191,6 @@ pub(crate) fn gamma(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let vol_curve = context.get_vol_index_curve(&option.vol_index_curve_id)?;
     let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
@@ -198,7 +200,7 @@ pub(crate) fn gamma(
     if t <= 0.0 {
         return Ok(0.0);
     }
-    let forward = vol_curve.forward_level(t);
+    let forward = resolved_index_forward(option, context, as_of)?;
     let sigma = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
     let d1 = d1_black76(forward, option.strike, sigma, t);
@@ -212,7 +214,6 @@ pub(crate) fn vega(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let vol_curve = context.get_vol_index_curve(&option.vol_index_curve_id)?;
     let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
@@ -222,7 +223,7 @@ pub(crate) fn vega(
     if t <= 0.0 {
         return Ok(0.0);
     }
-    let forward = vol_curve.forward_level(t);
+    let forward = resolved_index_forward(option, context, as_of)?;
     let sigma = vol_surface.value_clamped(t, option.strike);
     let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
     let d1 = d1_black76(forward, option.strike, sigma, t);
@@ -236,34 +237,11 @@ pub(crate) fn theta(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let vol_curve = context.get_vol_index_curve(&option.vol_index_curve_id)?;
-    let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
-    let disc = context.get_discount(&option.discount_curve_id)?;
-    let t = option
-        .day_count
-        .year_fraction(as_of, option.expiry, DayCountContext::default())?
-        .max(0.0);
-    if t <= 0.0 {
+    if as_of > option.effective_settlement_date() {
         return Ok(0.0);
     }
-    let forward = vol_curve.forward_level(t);
-    let sigma = vol_surface.value_clamped(t, option.strike);
-    let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
-    let r = -df.ln() / t;
-    let d1 = d1_black76(forward, option.strike, sigma, t);
-    let n_prime_d1 = (-0.5 * d1 * d1).exp() / (2.0 * std::f64::consts::PI).sqrt();
-
-    // PV(t) = df(t)·black(t), with df = e^{-r·t}. The (negative) time
-    // derivative — i.e. theta as time-to-expiry t shrinks — is
-    //   -∂PV/∂t = df·(-∂black/∂t) + r·df·black.
-    // `time_decay` is the discounted Black decay term df·(-∂black/∂t); the
-    // carry term must be built from the *discounted* PV (r·df·black), NOT the
-    // undiscounted Black forward price. Each term carries exactly one `df`.
-    let time_decay = -forward * n_prime_d1 * sigma / (2.0 * t.sqrt()) * df;
-    let discounted_pv = black_price(option, forward, sigma, t) * df;
-    let carry_cost = r * discounted_pv;
-    let theta_per_day = (time_decay + carry_cost) / 365.0;
-    Ok(theta_per_day * option.contract_specs.multiplier * option.num_contracts())
+    let next_day = as_of + time::Duration::days(1);
+    Ok(compute_pv_raw(option, context, next_day)? - compute_pv_raw(option, context, as_of)?)
 }
 
 pub(crate) fn intrinsic_value(
@@ -276,7 +254,10 @@ pub(crate) fn intrinsic_value(
         OptionType::Call => (forward - option.strike).max(0.0),
         OptionType::Put => (option.strike - forward).max(0.0),
     };
-    Ok(intrinsic * option.contract_specs.multiplier * option.num_contracts())
+    let df = context
+        .get_discount(&option.discount_curve_id)?
+        .df_between_dates(as_of, option.effective_settlement_date())?;
+    Ok(intrinsic * option.contract_specs.multiplier * option.num_contracts() * df)
 }
 
 pub(crate) fn time_value(
@@ -416,6 +397,8 @@ mod tests {
         let mut put = sample_option();
         put.option_type = OptionType::Put;
 
+        put.expiry_fixing = Some(18.0);
+
         let d = delta(&put, &market, expiry).expect("expired put delta");
         // df(expiry, expiry) = 1, so the expected delta is the full
         // per-point scale with a negative sign.
@@ -427,7 +410,8 @@ mod tests {
         );
 
         // The ITM-put scenario makes the call OTM: delta must be exactly 0.
-        let call = sample_option();
+        let mut call = sample_option();
+        call.expiry_fixing = Some(18.0);
         let d_call = delta(&call, &market, expiry).expect("expired call delta");
         assert!(
             d_call.abs() < 1e-12,
@@ -444,9 +428,9 @@ mod tests {
 
         let mut put = sample_option();
         put.option_type = OptionType::Put;
+        put.expiry_fixing = Some(18.0);
 
         let pv = compute_pv_raw(&put, &market, expiry).expect("expired put pv");
-        // Spot 18.0, strike 20.0 → intrinsic 2.0 per point; df = 1 at expiry.
         let expected = 2.0 * put.contract_specs.multiplier * put.num_contracts();
         assert!(
             (pv - expected).abs() < 1e-9,

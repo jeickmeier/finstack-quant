@@ -266,16 +266,14 @@ impl InflationCapFloor {
         // date is on or before the valuation date. Reading later entries from a
         // fixing series that extends past as_of would introduce look-ahead bias.
         if lagged_date <= as_of {
-            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-                let value =
-                    crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                        index.as_ref(),
-                        date,
-                        lagged_date,
-                        self.effective_lag(curves),
-                    )?;
-                return Self::validate_cpi_value(value, date);
-            }
+            let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
+            let value = crate::instruments::common_impl::helpers::realized_inflation_index_value(
+                index.as_ref(),
+                date,
+                lagged_date,
+                self.effective_lag(curves),
+            )?;
+            return Self::validate_cpi_value(value, date);
         }
 
         // Fall back to curve projection with lag adjustment, honoring the

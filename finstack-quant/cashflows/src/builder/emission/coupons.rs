@@ -7,7 +7,7 @@
 use crate::primitives::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, Tenor};
-use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value};
+use finstack_quant_core::market_data::fixings::{fixing_series_id, require_fixing_value_exact};
 use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
@@ -130,9 +130,10 @@ fn pre_base_observation_error(obs_date: Date, fwd: &ForwardCurve) -> finstack_qu
 /// date: realized fixings before it and projected forwards after it. Both
 /// carry the same `(rate, days)` weighting in the compounding product.
 ///
-/// - `obs_date < curve base`: realized fixing, resolved from the
-///   `FIXING:{index_id}` series via LOCF (step interpolation — correct for
-///   overnight RFR fixings, which carry over non-publication days). Errors via
+/// - `obs_date < curve base`: realized fixing, resolved exactly from the
+///   `FIXING:{index_id}` series. Weekend/holiday carry is represented by the
+///   observation day weight, so a missing business-day publication is an
+///   error rather than permission to reuse an arbitrarily old rate. Errors via
 ///   [`pre_base_observation_error`] when no series is provided; both errors
 ///   route through the spec's fallback policy upstream.
 /// - `obs_date == curve base`: a published same-day fixing (exact-date match)
@@ -151,7 +152,7 @@ fn observed_overnight_rate(
     let fwd_base = fwd.base_date();
     if obs_date < fwd_base {
         return match fixings {
-            Some(series) => require_fixing_value(Some(series), index_id, obs_date, fwd_base),
+            Some(series) => require_fixing_value_exact(Some(series), index_id, obs_date, fwd_base),
             None => Err(pre_base_observation_error(obs_date, fwd)),
         };
     }

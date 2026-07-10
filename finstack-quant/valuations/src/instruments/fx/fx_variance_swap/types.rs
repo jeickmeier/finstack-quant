@@ -51,9 +51,14 @@ pub struct FxVarianceSwap {
     /// Start date of observation period
     #[schemars(with = "String")]
     pub start_date: Date,
-    /// Maturity/settlement date
+    /// Contractual end of the observation period.
     #[schemars(with = "String")]
     pub maturity: Date,
+    /// Optional cash-settlement date. Defaults to the adjusted final observation date.
+    #[serde(default)]
+    #[builder(optional)]
+    #[schemars(with = "Option<String>")]
+    pub settlement_date: Option<Date>,
     /// Observation frequency
     pub observation_freq: Tenor,
     /// Base-currency calendar used in the joint observation calendar.
@@ -154,7 +159,31 @@ impl FxVarianceSwap {
                 as_of, dom_base, for_base
             )));
         }
+        let final_observation = self.final_observation_date()?;
+        let settlement = self.effective_settlement_date()?;
+        if settlement < final_observation {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxVarianceSwap '{}' settlement date ({settlement}) precedes final observation ({final_observation})",
+                self.id
+            )));
+        }
         Ok(())
+    }
+
+    /// Adjusted final observation/fixing date.
+    pub fn final_observation_date(&self) -> Result<Date> {
+        Ok(self
+            .observation_dates()?
+            .last()
+            .copied()
+            .unwrap_or(self.maturity))
+    }
+
+    /// Cash-settlement date, defaulting to the final adjusted observation.
+    pub fn effective_settlement_date(&self) -> Result<Date> {
+        Ok(self
+            .settlement_date
+            .unwrap_or(self.final_observation_date()?))
     }
 
     pub(crate) fn series_id(&self) -> String {
@@ -265,6 +294,10 @@ impl FxVarianceSwap {
 
 impl InstrumentTrait for FxVarianceSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::FxVarianceSwap);
+
+    fn expiry(&self) -> Option<Date> {
+        self.effective_settlement_date().ok()
+    }
 
     fn market_dependencies(
         &self,

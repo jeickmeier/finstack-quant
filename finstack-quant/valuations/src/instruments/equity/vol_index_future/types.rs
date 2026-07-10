@@ -110,6 +110,10 @@ pub struct VolatilityIndexFuture {
     /// of the index is computed on this date (same day as `expiry` for VIX).
     #[schemars(with = "String")]
     pub settlement_date: Date,
+    /// Final settlement/SOQ fixing in index points.
+    #[serde(default)]
+    #[builder(optional)]
+    pub settlement_fixing: Option<f64>,
     /// Quoted future price (index points, e.g., 21.50).
     pub quoted_price: f64,
     /// Position side (Long or Short).
@@ -222,8 +226,12 @@ impl VolatilityIndexFuture {
     }
 
     /// Calculate the raw present value as f64.
-    pub fn npv_raw(&self, context: &MarketContext) -> finstack_quant_core::Result<f64> {
-        pricer::compute_pv_raw(self, context)
+    pub fn npv_raw(
+        &self,
+        context: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<f64> {
+        pricer::compute_pv_raw(self, context, as_of)
     }
 
     /// Get the forward volatility level at settlement.
@@ -249,17 +257,51 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
     fn base_value(
         &self,
         curves: &MarketContext,
-        _as_of: Date,
+        as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        pricer::compute_pv(self, curves)
+        pricer::compute_pv(self, curves, as_of)
     }
 
-    fn value_raw(&self, curves: &MarketContext, _as_of: Date) -> finstack_quant_core::Result<f64> {
-        pricer::compute_pv_raw(self, curves)
+    fn value_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        pricer::compute_pv_raw(self, curves, as_of)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
         None
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.settlement_date)
+    }
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        if self.expiry > self.settlement_date {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VolatilityIndexFuture '{}' expiry must not follow settlement",
+                self.id
+            )));
+        }
+        if !self.quoted_price.is_finite() || self.quoted_price <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VolatilityIndexFuture '{}' quoted_price must be positive and finite",
+                self.id
+            )));
+        }
+        if !self.contract_specs.multiplier.is_finite() || self.contract_specs.multiplier <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "VolatilityIndexFuture '{}' multiplier must be positive and finite",
+                self.id
+            )));
+        }
+        if let Some(fixing) = self.settlement_fixing {
+            if !fixing.is_finite() || fixing <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "VolatilityIndexFuture '{}' settlement_fixing must be positive and finite",
+                    self.id
+                )));
+            }
+        }
+        Ok(())
     }
 
     fn pricing_overrides_mut(

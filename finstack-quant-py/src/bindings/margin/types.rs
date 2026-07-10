@@ -471,6 +471,7 @@ impl PyCsaSpec {
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         let inner: fm::CsaSpec = serde_json::from_str(json).map_err(display_to_py)?;
+        inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 

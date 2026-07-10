@@ -176,7 +176,6 @@ impl InflationSwap {
     fn cpi_value_at_lagged_date(
         &self,
         curves: &MarketContext,
-        inflation_curve: &finstack_quant_core::market_data::term_structures::InflationCurve,
         discount_base: Date,
         unlagged_date: Date,
         lagged_date: Date,
@@ -186,17 +185,17 @@ impl InflationSwap {
         // importantly dates before the first observation) are data errors and must
         // not be hidden by projecting a historical value from the curve.
         if lagged_date <= discount_base {
-            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                    index.as_ref(),
-                    unlagged_date,
-                    lagged_date,
-                    self.effective_lag(curves),
-                );
-            }
+            let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
+            return crate::instruments::common_impl::helpers::realized_inflation_index_value(
+                index.as_ref(),
+                unlagged_date,
+                lagged_date,
+                self.effective_lag(curves),
+            );
         }
 
-        Self::curve_cpi_value(inflation_curve, discount_base, lagged_date)
+        let inflation_curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
+        Self::curve_cpi_value(inflation_curve.as_ref(), discount_base, lagged_date)
     }
 
     /// Calculate the projected index ratio I(T_mat - Lag) / I(T_start - Lag).
@@ -215,7 +214,6 @@ impl InflationSwap {
         curves: &MarketContext,
         discount_base: Date,
     ) -> finstack_quant_core::Result<f64> {
-        let inflation_curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
         let default_lag = self.effective_lag(curves);
         let lagged_start = self.apply_lag(self.start_date, default_lag);
         let lagged_maturity = self.apply_lag(self.maturity, default_lag);
@@ -223,26 +221,15 @@ impl InflationSwap {
         let i_start = if let Some(base) = self.base_cpi {
             base
         } else {
-            self.cpi_value_at_lagged_date(
-                curves,
-                inflation_curve.as_ref(),
-                discount_base,
-                self.start_date,
-                lagged_start,
-            )?
+            self.cpi_value_at_lagged_date(curves, discount_base, self.start_date, lagged_start)?
         };
 
         if i_start <= 0.0 {
             return Err(finstack_quant_core::InputError::NonPositiveValue.into());
         }
 
-        let i_maturity_projected = self.cpi_value_at_lagged_date(
-            curves,
-            inflation_curve.as_ref(),
-            discount_base,
-            self.maturity,
-            lagged_maturity,
-        )?;
+        let i_maturity_projected =
+            self.cpi_value_at_lagged_date(curves, discount_base, self.maturity, lagged_maturity)?;
 
         Ok(i_maturity_projected / i_start)
     }
@@ -285,16 +272,22 @@ impl InflationSwap {
     /// Get the adjusted payment date based on business day convention and calendar.
     ///
     /// If no calendar is specified, returns the unadjusted date.
-    fn adjusted_payment_date(&self, date: Date) -> Date {
+    fn adjusted_payment_date(&self, date: Date) -> finstack_quant_core::Result<Date> {
         let bdc = self.bdc;
         if let Some(ref cal_id) = self.calendar_id {
             use finstack_quant_core::dates::CalendarRegistry;
-            if let Some(cal) = CalendarRegistry::global().resolve_str(cal_id) {
-                return finstack_quant_core::dates::adjust(date, bdc, cal).unwrap_or(date);
-            }
+            let cal = CalendarRegistry::global()
+                .resolve_str(cal_id)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "InflationSwap '{}' calendar '{}' is not registered",
+                        self.id, cal_id
+                    ))
+                })?;
+            return finstack_quant_core::dates::adjust(date, bdc, cal);
         }
         // No calendar specified - return unadjusted (common for inflation swaps)
-        date
+        Ok(date)
     }
 
     /// Calculate PV of the fixed leg (real rate leg).
@@ -326,7 +319,7 @@ impl InflationSwap {
 
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
-        let payment_date = self.adjusted_payment_date(self.maturity);
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
             as_of,
@@ -369,7 +362,7 @@ impl InflationSwap {
 
         // Date-based DF from as_of to payment: correct when the curve base
         // date differs from as_of.
-        let payment_date = self.adjusted_payment_date(self.maturity);
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
             disc.as_ref(),
             as_of,
@@ -428,7 +421,7 @@ impl InflationSwap {
     /// perspective, used by finite-difference metrics (convexity, gamma)
     /// where Money quantization noise would be amplified by tiny bump sizes.
     pub fn npv_raw(&self, curves: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
-        let payment_date = self.adjusted_payment_date(self.maturity);
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
         if as_of >= payment_date {
             return Ok(0.0);
         }
@@ -474,7 +467,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        let payment_date = self.adjusted_payment_date(self.maturity);
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
         if as_of >= payment_date {
             return Ok(finstack_quant_core::money::Money::new(
                 0.0,
@@ -529,7 +522,7 @@ impl CashflowProvider for InflationSwap {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let payment_date = self.adjusted_payment_date(self.maturity);
+        let payment_date = self.adjusted_payment_date(self.maturity)?;
         let anchor = if as_of < payment_date {
             as_of
         } else {
@@ -706,14 +699,13 @@ impl YoYInflationSwap {
         // date is on or before the valuation date. Reading later entries from a
         // fixing series that extends past as_of would introduce look-ahead bias.
         if lagged_date <= as_of {
-            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
-                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                    index.as_ref(),
-                    date,
-                    lagged_date,
-                    lag,
-                );
-            }
+            let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
+            return crate::instruments::common_impl::helpers::realized_inflation_index_value(
+                index.as_ref(),
+                date,
+                lagged_date,
+                lag,
+            );
         }
 
         let curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
@@ -1009,6 +1001,7 @@ mod tests {
     use crate::cashflow::CashflowProvider;
     use crate::instruments::common_impl::traits::Instrument;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::scalars::InflationIndex;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use time::Month;
 
@@ -1031,6 +1024,18 @@ mod tests {
             .knots([(0.0, 1.0), (2.0, 1.0)])
             .build()
             .expect("discount curve should build")
+    }
+
+    fn flat_historical_index() -> InflationIndex {
+        InflationIndex::new(
+            "US-CPI",
+            vec![
+                (d(2020, Month::January, 1), 100.0),
+                (d(2030, Month::January, 1), 100.0),
+            ],
+            Currency::USD,
+        )
+        .expect("inflation index should build")
     }
 
     fn sample_swap(start_date: Date, maturity: Date) -> InflationSwap {
@@ -1060,13 +1065,13 @@ mod tests {
         let inflation_curve = sample_inflation_curve(curve_base);
         let market = MarketContext::new()
             .insert(sample_discount_curve(discount_base))
-            .insert(inflation_curve.clone());
+            .insert(inflation_curve.clone())
+            .insert_inflation_index("US-CPI", flat_historical_index());
 
         let ratio = swap
             .projected_index_ratio(&market, discount_base)
             .expect("ratio should compute");
-        let expected = inflation_curve.cpi_on_date(maturity).expect("maturity CPI")
-            / inflation_curve.cpi_on_date(start).expect("start CPI");
+        let expected = inflation_curve.cpi_on_date(maturity).expect("maturity CPI") / 100.0;
 
         assert!(
             (ratio - expected).abs() < 1e-10,
@@ -1085,7 +1090,16 @@ mod tests {
 
         let market = MarketContext::new()
             .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(d(2024, Month::January, 1)));
+            .insert(sample_inflation_curve(d(2024, Month::January, 1)))
+            .insert_inflation_index(
+                "US-CPI",
+                InflationIndex::new(
+                    "US-CPI",
+                    vec![(start, 100.0), (maturity, 110.0)],
+                    Currency::USD,
+                )
+                .expect("inflation index should build"),
+            );
 
         let pv = swap.value(&market, as_of).expect("value should compute");
         assert!(
@@ -1100,7 +1114,8 @@ mod tests {
         let maturity = d(2027, Month::January, 1);
         let market = MarketContext::new()
             .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(as_of));
+            .insert(sample_inflation_curve(as_of))
+            .insert_inflation_index("US-CPI", flat_historical_index());
         let swap = InflationSwap::builder()
             .id(InstrumentId::new("INFL-CF"))
             .notional(Money::new(1_000_000.0, Currency::USD))
@@ -1154,7 +1169,10 @@ mod tests {
             .knots([(0.0, 100.0), (3.0, 100.0)])
             .build()
             .expect("inflation curve should build");
-        let market = MarketContext::new().insert(disc.clone()).insert(infl);
+        let market = MarketContext::new()
+            .insert(disc.clone())
+            .insert(infl)
+            .insert_inflation_index("US-CPI", flat_historical_index());
 
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-REBASE"))
@@ -1200,8 +1218,6 @@ mod tests {
     /// (look-ahead bias): pricing must match the curve-projection PV.
     #[test]
     fn yoy_cpi_value_ignores_fixings_after_as_of() {
-        use finstack_quant_core::market_data::scalars::InflationIndex;
-
         let as_of = d(2025, Month::January, 1);
         let maturity = d(2026, Month::January, 1);
 
@@ -1215,7 +1231,8 @@ mod tests {
 
         let market_no_index = MarketContext::new()
             .insert(disc.clone())
-            .insert(infl.clone());
+            .insert(infl.clone())
+            .insert_inflation_index("US-CPI", flat_historical_index());
 
         // Index with a *future* fixing wildly different from the curve.
         let index = InflationIndex::new(
@@ -1264,7 +1281,8 @@ mod tests {
         let as_of = d(2025, Month::January, 1);
         let market = MarketContext::new()
             .insert(sample_discount_curve(as_of))
-            .insert(sample_inflation_curve(as_of));
+            .insert(sample_inflation_curve(as_of))
+            .insert_inflation_index("US-CPI", flat_historical_index());
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-CF"))
             .notional(Money::new(1_000_000.0, Currency::USD))

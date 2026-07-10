@@ -72,6 +72,7 @@ mod tests {
     use crate::metrics::MetricId;
     use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::InflationIndex;
     use finstack_quant_core::market_data::surfaces::VolSurface;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
     use finstack_quant_core::types::CurveId;
@@ -100,9 +101,19 @@ mod tests {
             .row(&[vol, vol, vol, vol, vol])
             .build()
             .expect("vol surface");
+        let index = InflationIndex::new(
+            "US-CPI",
+            vec![
+                (date!(2000 - 01 - 01), 100.0),
+                (date!(2035 - 01 - 01), 100.0),
+            ],
+            finstack_quant_core::currency::Currency::USD,
+        )
+        .expect("inflation index");
         MarketContext::new()
             .insert(discount)
             .insert(inflation)
+            .insert_inflation_index("US-CPI", index)
             .insert_surface(vol_surface)
     }
 

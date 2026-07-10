@@ -2029,16 +2029,16 @@ fn test_fully_seasoned_overnight_coupon_from_fixings_only() {
     );
 }
 
-/// LOCF: a missing mid-window business-day fixing resolves from the prior
-/// observation (step interpolation), per overnight RFR publication
-/// conventions.
+/// A missing historical business-day fixing is rejected. Weekend and holiday
+/// carry is encoded by observation weights, not by carrying across publication
+/// gaps on dates where the benchmark should have fixed.
 #[test]
-fn test_seasoned_overnight_coupon_locf_fills_missing_fixing() {
+fn test_seasoned_overnight_coupon_rejects_missing_business_day_fixing() {
     let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
     let maturity = Date::from_calendar_date(2025, Month::June, 16).unwrap();
     let curve_base = maturity;
 
-    // 2025-06-11 is intentionally absent: LOCF must carry 06-10's 0.026.
+    // 2025-06-11 is intentionally absent.
     let fixings = [
         (
             Date::from_calendar_date(2025, Month::June, 2).unwrap(),
@@ -2079,33 +2079,16 @@ fn test_seasoned_overnight_coupon_locf_fills_missing_fixing() {
     ];
     let market = make_market_with_fixings(curve_base, 0.09, &fixings);
 
-    let rate = build_single_overnight_coupon(
+    let err = build_single_overnight_coupon(
         OvernightCompoundingMethod::CompoundedInArrears,
         issue,
         maturity,
         &market,
     )
-    .expect("missing mid-window fixing resolves via LOCF");
-
-    let expected = expected_compounded(
-        &[
-            (0.020, 1),
-            (0.021, 1),
-            (0.022, 1),
-            (0.023, 1),
-            (0.024, 3),
-            (0.025, 1),
-            (0.026, 1),
-            (0.026, 1), // 06-11 carried forward from 06-10
-            (0.028, 1),
-            (0.029, 3),
-        ],
-        14,
-    );
+    .expect_err("missing historical business-day fixing must fail");
     assert!(
-        (rate - expected).abs() < RATE_TOLERANCE,
-        "LOCF should carry the prior fixing onto the missing business day: \
-         got {rate:.12}, expected {expected:.12}"
+        err.to_string().contains("2025-06-11"),
+        "error should identify the missing fixing date: {err}"
     );
 }
 

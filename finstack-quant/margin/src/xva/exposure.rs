@@ -248,7 +248,10 @@ pub fn compute_exposure_profile(
         let (positive_exposure, negative_exposure) = if let Some(ref csa) = netting_set.csa {
             (
                 apply_collateral(net_positive_exposure, csa),
-                apply_collateral(net_negative_exposure, csa),
+                // `independent_amount` is documented as collateral posted by
+                // the counterparty. It reduces EPE, but cannot also represent
+                // independent collateral posted by the bank for ENE/DVA.
+                super::netting::apply_variation_margin(net_negative_exposure, csa),
             )
         } else {
             (net_positive_exposure, net_negative_exposure)

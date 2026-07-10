@@ -131,20 +131,18 @@ pub fn score_portfolio_liquidity(
             return PositionLiquidityOutcome::Unscored(pos.position_id.clone());
         };
 
-        let pv = valuation
-            .get_position_value(pos.position_id.as_str())
-            .map(|v| v.value_base.amount().abs())
-            .unwrap_or(0.0);
-
-        // Position quantity in shares/contracts
-        let position_shares = if profile.mid > 0.0 {
-            pv / profile.mid
-        } else {
-            0.0
+        let Some(position_value) = valuation.get_position_value(pos.position_id.as_str()) else {
+            return PositionLiquidityOutcome::Unscored(pos.position_id.clone());
         };
+        let pv = position_value.value_base.amount().abs();
+
+        // ADV is expressed in instrument units. Use the canonical unit-aware
+        // position multiplier rather than reconstructing units from a
+        // base-currency PV and a potentially native-currency market price.
+        let position_units = pos.scale_factor().abs();
 
         let dtl = days_to_liquidate(
-            position_shares,
+            position_units,
             profile.avg_daily_volume,
             config.participation_rate,
         );
@@ -152,7 +150,7 @@ pub fn score_portfolio_liquidity(
         let tier = classify_tier(dtl, &config.tier_thresholds);
 
         let pct_adv = if profile.avg_daily_volume > 0.0 {
-            position_shares / profile.avg_daily_volume * 100.0
+            position_units / profile.avg_daily_volume * 100.0
         } else {
             f64::INFINITY
         };
@@ -418,5 +416,57 @@ mod tests {
             report.most_concentrated_position,
             Some(PositionId::new("STUCK"))
         );
+    }
+
+    #[test]
+    fn scoring_uses_position_units_and_rejects_missing_valuation() {
+        let as_of = date!(2024 - 01 - 01);
+        let mut valued = test_position("VALUED", "VALUED_INST");
+        valued.quantity = 1_000.0;
+        let missing = test_position("MISSING", "MISSING_INST");
+        let portfolio = Portfolio::builder("P")
+            .base_ccy(Currency::USD)
+            .as_of(as_of)
+            .entity(Entity::new("E"))
+            .position(valued)
+            .position(missing)
+            .build()
+            .expect("portfolio should build");
+        let valuation = PortfolioValuation {
+            as_of,
+            position_values: [(
+                PositionId::new("VALUED"),
+                synthetic_position_value("VALUED", 120_000.0),
+            )]
+            .into_iter()
+            .collect(),
+            total_base_ccy: Money::new(120_000.0, Currency::USD),
+            by_entity: IndexMap::new(),
+            degraded_positions: Vec::new(),
+            fx_collapse_policy: FxConversionPolicy::CashflowDate,
+        };
+        let profiles = [
+            (
+                "VALUED_INST".to_string(),
+                LiquidityProfile::new("VALUED_INST", 100.0, 99.0, 101.0, 10_000.0, 10.0, 0.0)
+                    .expect("profile should build"),
+            ),
+            (
+                "MISSING_INST".to_string(),
+                LiquidityProfile::new("MISSING_INST", 100.0, 99.0, 101.0, 10_000.0, 10.0, 0.0)
+                    .expect("profile should build"),
+            ),
+        ]
+        .into_iter()
+        .collect();
+        let config = LiquidityConfig {
+            participation_rate: 1.0,
+            ..LiquidityConfig::default()
+        };
+
+        let report = score_portfolio_liquidity(&portfolio, &valuation, &profiles, &config);
+        assert_eq!(report.position_scores.len(), 1);
+        assert!((report.position_scores[0].days_to_liquidate - 0.1).abs() < 1.0e-12);
+        assert_eq!(report.unscored_positions, vec![PositionId::new("MISSING")]);
     }
 }

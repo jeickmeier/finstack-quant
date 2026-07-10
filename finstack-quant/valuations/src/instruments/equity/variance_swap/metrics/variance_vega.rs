@@ -31,7 +31,7 @@ impl MetricCalculator for VarianceVegaCalculator {
         let disc = context
             .curves
             .get_discount(swap.discount_curve_id.as_str())?;
-        let df = disc.df_between_dates(context.as_of, swap.maturity)?;
+        let df = disc.df_between_dates(context.as_of, swap.effective_settlement_date()?)?;
         Ok(df * swap.notional.amount() * remaining_fraction * swap.side.sign())
     }
 }

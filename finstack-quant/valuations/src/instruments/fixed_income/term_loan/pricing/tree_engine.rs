@@ -109,10 +109,16 @@ impl TermLoanValuator {
         let out_path = schedule.outstanding_by_date()?;
 
         // Helper: outstanding BEFORE a target date (pre-exercise).
-        // Initialise with the loan's initial notional so that calls at or before the
-        // first outstanding entry still see the correct starting balance.
+        // Initialise with the schedule's actually funded balance. The facility
+        // limit includes undrawn DDTL commitment and is not current principal.
+        let initial_funded = out_path
+            .iter()
+            .take_while(|(date, _)| *date <= origin)
+            .map(|(_, amount)| amount.amount())
+            .last()
+            .unwrap_or_else(|| schedule.notional.initial.amount());
         let outstanding_before = |target: Date| -> f64 {
-            let mut last = loan.notional_limit.amount();
+            let mut last = initial_funded;
             for (d, amt) in &out_path {
                 if *d < target {
                     last = amt.amount();
@@ -187,18 +193,16 @@ impl TermLoanValuator {
                         is_exercise,
                     );
                 }
-                // Principal repayment / redemption (positive to holder only;
-                // negative notionals are funding legs and excluded).
+                // Signed principal cashflows: positive repayments/redemption
+                // and negative future DDTL funding legs.
                 CFKind::Amortization | CFKind::Notional => {
-                    if cf.amount.amount() > 0.0 {
-                        book(
-                            &mut principal_vec,
-                            cf.amount.amount(),
-                            t,
-                            raw_clamped,
-                            is_exercise,
-                        );
-                    }
+                    book(
+                        &mut principal_vec,
+                        cf.amount.amount(),
+                        t,
+                        raw_clamped,
+                        is_exercise,
+                    );
                 }
                 _ => {}
             }

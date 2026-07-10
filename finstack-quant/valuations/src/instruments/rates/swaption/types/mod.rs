@@ -21,4 +21,4 @@ pub use definitions::{
 };
 pub use swaption::{GreekInputs, Swaption};
 
-pub(crate) use bermudan::lognormal_to_normal_vol;
+pub(crate) use bermudan::{lognormal_to_normal_vol, lognormal_to_normal_vol_jacobian};

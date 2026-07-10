@@ -184,8 +184,7 @@ fn test_lag_in_days_vs_months() {
 }
 
 #[test]
-fn test_no_index_fallback_to_curve() {
-    // Test that swap works even without inflation index (uses curve directly)
+fn test_historical_observation_requires_index() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
@@ -209,8 +208,8 @@ fn test_no_index_fallback_to_curve() {
         .build()
         .unwrap();
 
-    let pv = swap.value(&ctx, as_of).unwrap();
-
-    // Should work and produce reasonable PV
-    assert!(pv.amount().is_finite());
+    let err = swap
+        .value(&ctx, as_of)
+        .expect_err("historical CPI must not be projected from a curve");
+    assert!(err.to_string().contains("US-CPI-U"));
 }

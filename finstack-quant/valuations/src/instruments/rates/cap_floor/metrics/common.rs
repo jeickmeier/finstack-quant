@@ -6,7 +6,9 @@
 use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
 use crate::instruments::rates::cap_floor::pricing::{black, normal};
 use crate::instruments::rates::cap_floor::CapFloor;
-use crate::instruments::rates::swaption::types::lognormal_to_normal_vol;
+use crate::instruments::rates::swaption::types::{
+    lognormal_to_normal_vol, lognormal_to_normal_vol_jacobian,
+};
 use crate::metrics::MetricContext;
 
 const MIN_EFFECTIVE_FIXING_TIME: f64 = 1e-6;
@@ -69,7 +71,8 @@ pub(crate) fn lognormal_vega_with_fallback(strike: f64, forward: f64, sigma: f64
         black::vega_per_pct(strike, forward, sigma, t)
     } else {
         let normal_vol = lognormal_to_normal_vol(sigma, forward, strike, t, None);
-        normal::vega_per_pct(strike, forward, normal_vol, t)
+        let jacobian = lognormal_to_normal_vol_jacobian(sigma, forward, strike, t, None);
+        normal::vega_per_pct(strike, forward, normal_vol, t) * jacobian
     }
 }
 

@@ -368,8 +368,7 @@ pub fn measure_inflation_index_shift(
     Ok((level_t1 / level_t0 - 1.0) * 10_000.0)
 }
 
-/// Measure a declared inflation source, combining projected-curve and
-/// published-index shifts when both are present.
+/// Measure a declared inflation source using one canonical risk factor.
 ///
 /// When a projected curve is available, use its parallel-rate move. Published
 /// index levels are used only for index-only sources; adding both would apply a
@@ -717,7 +716,7 @@ mod tests {
     }
 
     #[test]
-    fn hybrid_inflation_source_includes_discrete_print_shift() {
+    fn hybrid_inflation_source_prefers_projected_curve_shift() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let prior_end = Date::from_calendar_date(2025, Month::December, 1).expect("date");
         let new_end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
@@ -748,11 +747,9 @@ mod tests {
             .insert(curve())
             .insert_inflation_index("US-CPI", index_t1);
 
-        let index_shift =
-            measure_inflation_index_shift("US-CPI", &market_t0, &market_t1).expect("index shift");
         let source_shift =
             measure_inflation_source_shift("US-CPI", &market_t0, &market_t1).expect("hybrid shift");
-        assert!((source_shift - index_shift).abs() < 1e-12);
+        assert!(source_shift.abs() < 1e-12);
     }
 
     #[test]

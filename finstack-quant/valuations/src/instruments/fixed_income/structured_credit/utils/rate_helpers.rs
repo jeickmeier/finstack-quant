@@ -99,8 +99,7 @@ fn try_asset_fixing(
 /// using calendar-aware month addition based on the index tenor.
 ///
 /// When `date < as_of` and a fixing series exists in `MarketContext`, the
-/// historical fixing rate is used instead of the forward projection.
-/// Missing fixings for past dates gracefully fall back to forward projection.
+/// historical fixing rate is required instead of forward projection.
 pub(crate) fn tranche_all_in_rate(
     coupon: &TrancheCoupon,
     date: Date,
@@ -204,16 +203,16 @@ pub(crate) fn try_tranche_all_in_rate(
 
             // Seasoned path: try historical fixings for dates before valuation
             if date < as_of {
-                if let Some(fixing_rate) = try_fixing_with_adjustments(
+                let series = fixings::get_fixing_series(market, spec.index_id.as_str())?;
+                let raw = fixings::require_fixing_value_exact(
+                    Some(series),
                     spec.index_id.as_str(),
                     date,
                     as_of,
-                    &params,
-                    market,
-                ) {
-                    return Ok(fixing_rate);
-                }
-                // Fall through to forward projection if fixings unavailable
+                )?;
+                return Ok(
+                    crate::cashflow::builder::rate_helpers::calculate_floating_rate(raw, &params),
+                );
             }
 
             let fwd = market.get_forward(spec.index_id.as_str())?;
@@ -237,8 +236,7 @@ pub(crate) fn try_tranche_all_in_rate(
 /// to ensure consistency with how the curve was calibrated.
 ///
 /// When `date < as_of` and a fixing series exists in `MarketContext`, the
-/// historical fixing rate is used instead of the forward projection.
-/// Missing fixings for past dates gracefully fall back to forward projection.
+/// historical fixing rate is required instead of forward projection.
 pub(crate) fn asset_all_in_rate(
     index_id: Option<&str>,
     spread_bps: Option<f64>,
@@ -298,10 +296,9 @@ pub(crate) fn try_asset_all_in_rate(
 
     // Seasoned path: try historical fixings for dates before valuation
     if date < as_of {
-        if let Some(fixing) = try_asset_fixing(idx, date, as_of, market) {
-            return Ok(fixing + spread);
-        }
-        // Fall through to forward projection if fixings unavailable
+        let series = fixings::get_fixing_series(market, idx)?;
+        let fixing = fixings::require_fixing_value_exact(Some(series), idx, date, as_of)?;
+        return Ok(fixing + spread);
     }
 
     let fwd = market.get_forward(idx)?;
@@ -376,8 +373,8 @@ mod tests {
         );
     }
 
-    /// Far-future as_of ensures no dates are "in the past", preserving original forward-only behavior.
-    const FAR_FUTURE: Date = date!(2099 - 01 - 01);
+    /// Pre-fixing valuation date keeps test cashflows on the forward-projection path.
+    const FAR_FUTURE: Date = date!(2024 - 01 - 01);
 
     #[test]
     fn tranche_all_in_rate_handles_fixed_and_missing_forward_cases() {

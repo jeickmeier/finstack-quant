@@ -290,11 +290,11 @@ impl TermLoanDiscountingPricer {
 
         // Build outstanding path for notional lookup at each flow date.
         let outstanding_path = schedule.outstanding_by_date()?;
-        // Helper: find outstanding notional at a given date using the path.
-        let notional_at = |target: finstack_quant_core::dates::Date| -> f64 {
-            let mut last = 0.0_f64;
+        // Helper: find outstanding notional immediately before a payment date.
+        let notional_before = |target: finstack_quant_core::dates::Date| -> f64 {
+            let mut last = schedule.notional.initial.amount();
             for (d, amt) in &outstanding_path {
-                if *d <= target {
+                if *d < target {
                     last = amt.amount();
                 } else {
                     break;
@@ -323,9 +323,16 @@ impl TermLoanDiscountingPricer {
                 raw_fixing, &params,
             );
 
-            // Recalculate coupon amount: notional * all_in_rate * accrual_factor.
-            let notional = notional_at(flow.date);
-            let new_amount = notional * all_in_rate * flow.accrual_factor;
+            // Preserve the builder's accrual notional by rescaling the already
+            // projected coupon. This also preserves any intra-period balance
+            // segmentation. Fall back to the pre-payment balance only when the
+            // original projected rate is effectively zero.
+            let new_amount = match flow.rate {
+                Some(old_rate) if old_rate.is_finite() && old_rate.abs() > 1.0e-14 => {
+                    flow.amount.amount() * all_in_rate / old_rate
+                }
+                _ => notional_before(flow.date) * all_in_rate * flow.accrual_factor,
+            };
 
             flow.rate = Some(all_in_rate);
             flow.amount = Money::new(new_amount, flow.amount.currency());

@@ -60,7 +60,7 @@ impl MetricCalculator for VegaCalculator {
         let normal_by_model = matches!(option.vol_model, VolatilityModel::Normal);
         let normal_by_negative_rate = inputs.forward <= 0.0 || strike <= 0.0;
         let use_normal = normal_by_model || normal_by_negative_rate;
-        let vega_raw = if use_normal {
+        let (vega_raw, quote_axis_jacobian) = if use_normal {
             use crate::models::volatility::normal::d_bachelier;
             // For the negative-rate fallback `inputs.sigma` is a lognormal vol;
             // convert it to a normal vol so the Bachelier d-value — and hence
@@ -79,14 +79,44 @@ impl MetricCalculator for VegaCalculator {
                 )
             };
             let d = d_bachelier(inputs.forward, strike, normal_sigma, inputs.time_to_expiry);
-            finstack_quant_core::math::norm_pdf(d) * inputs.time_to_expiry.sqrt()
+            let jacobian = if normal_by_model {
+                1.0
+            } else {
+                let bump = (inputs.sigma.abs() * 1.0e-5).max(1.0e-7);
+                let lower = (inputs.sigma - bump).max(0.0);
+                let upper = inputs.sigma + bump;
+                let normal_upper = super::resolved_normal_sigma(
+                    option,
+                    inputs.forward,
+                    strike,
+                    upper,
+                    inputs.time_to_expiry,
+                );
+                let normal_lower = super::resolved_normal_sigma(
+                    option,
+                    inputs.forward,
+                    strike,
+                    lower,
+                    inputs.time_to_expiry,
+                );
+                (normal_upper - normal_lower) / (upper - lower)
+            };
+            (
+                finstack_quant_core::math::norm_pdf(d) * inputs.time_to_expiry.sqrt(),
+                jacobian,
+            )
         } else {
             use crate::models::d1_black76;
             let d1 = d1_black76(inputs.forward, strike, inputs.sigma, inputs.time_to_expiry);
-            inputs.forward * finstack_quant_core::math::norm_pdf(d1) * inputs.time_to_expiry.sqrt()
+            (
+                inputs.forward
+                    * finstack_quant_core::math::norm_pdf(d1)
+                    * inputs.time_to_expiry.sqrt(),
+                1.0,
+            )
         };
 
-        let vega = vega_raw / super::config::VOL_PCT_SCALE;
+        let vega = vega_raw * quote_axis_jacobian / super::config::VOL_PCT_SCALE;
         // Scale by notional and annuity for cash vega
         Ok(vega * option.notional.amount() * inputs.annuity)
     }

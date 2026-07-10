@@ -97,7 +97,7 @@ impl MetricCalculator for CleanPriceCalculator {
 /// balance for tranche-level). Using `base_value` as a fallback produces
 /// self-referential prices (dirty price ≈ 100% always) and silently wrong
 /// Z-spread / CS01 / duration values.
-fn get_original_notional(context: &MetricContext) -> Result<f64> {
+pub(crate) fn get_original_notional(context: &MetricContext) -> Result<f64> {
     context
         .notional
         .map(|n| n.amount())

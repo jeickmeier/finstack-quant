@@ -1,15 +1,18 @@
 //! Volatility index future pricer implementation.
 
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::vol_index_future::VolatilityIndexFuture;
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 pub(crate) fn compute_pv(
     future: &VolatilityIndexFuture,
     context: &MarketContext,
+    as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
     Ok(Money::new(
-        compute_pv_raw(future, context)?,
+        compute_pv_raw(future, context, as_of)?,
         future.notional.currency(),
     ))
 }
@@ -17,8 +20,22 @@ pub(crate) fn compute_pv(
 pub(crate) fn compute_pv_raw(
     future: &VolatilityIndexFuture,
     context: &MarketContext,
+    as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let forward_vol = forward_vol(future, context)?;
+    future.validate_invariants()?;
+    if as_of > future.settlement_date {
+        return Ok(0.0);
+    }
+    let forward_vol = if as_of == future.settlement_date {
+        future.settlement_fixing.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "VolatilityIndexFuture '{}' requires settlement_fixing on settlement date",
+                future.id
+            ))
+        })?
+    } else {
+        forward_vol(future, context)?
+    };
     let sign = match future.position {
         crate::instruments::rates::ir_future::Position::Long => 1.0,
         crate::instruments::rates::ir_future::Position::Short => -1.0,
@@ -103,7 +120,7 @@ mod tests {
         let future = sample_future();
         let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-        let via_pricer = compute_pv(&future, &market).expect("pricer pv");
+        let via_pricer = compute_pv(&future, &market, as_of).expect("pricer pv");
         let via_instrument = future.value(&market, as_of).expect("instrument pv");
 
         assert_eq!(via_pricer, via_instrument);

@@ -3620,14 +3620,14 @@ class FrtbSensitivities:
         ...
 
     def add_girr_delta(self, tenor: str, amount: float, currency: str | None = None) -> None:
-        """Add a GIRR delta sensitivity (currency per 1bp).
+        """Add a GIRR delta sensitivity (currency P&L per 1 percentage-point move).
 
         Parameters
         ----------
         tenor : str
             GIRR tenor bucket, such as ``"5Y"``.
         amount : float
-            Signed sensitivity amount per 1bp move.
+            Signed sensitivity amount per 1 percentage-point move (``100 * DV01``).
         currency : str, optional
             Currency code; defaults to the base currency.
         """

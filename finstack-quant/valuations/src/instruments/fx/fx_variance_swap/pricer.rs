@@ -26,7 +26,12 @@ pub(crate) fn compute_pv(
     // Compute observation dates once per pricing call. Each branch below would
     // otherwise rebuild this 1-3 times via the helper functions.
     let obs_dates = observation_dates(inst)?;
-    let final_observation_date = obs_dates.last().copied().unwrap_or(inst.maturity);
+    let final_observation_date = inst.final_observation_date()?;
+    let settlement_date = inst.effective_settlement_date()?;
+
+    if as_of > settlement_date {
+        return Ok(Money::new(0.0, inst.notional.currency()));
+    }
 
     if as_of >= final_observation_date {
         let realized_var = if inst.realized_var_method.requires_ohlc() {
@@ -54,7 +59,8 @@ pub(crate) fn compute_pv(
                 annualization_factor(inst),
             )?
         };
-        return Ok(inst.payoff(realized_var));
+        let df = dom.df_between_dates(as_of, settlement_date)?;
+        return Ok(inst.payoff(realized_var) * df);
     }
 
     if as_of < inst.start_date {
@@ -64,7 +70,7 @@ pub(crate) fn compute_pv(
         // on the curve's own time axis. Feeding `df()` an instrument-day-count
         // year fraction mis-discounts whenever the instrument and curve
         // day-counts differ or `as_of != base_date`.
-        let df = dom.df_between_dates(as_of, final_observation_date)?;
+        let df = dom.df_between_dates(as_of, settlement_date)?;
         return Ok(undiscounted * df);
     }
 
@@ -72,7 +78,7 @@ pub(crate) fn compute_pv(
     let undiscounted = inst.payoff(expected_var);
     // Date-based discounting (see the pre-start branch above): `df_between_dates`
     // resolves the year fraction on the curve's own time axis.
-    let df = dom.df_between_dates(as_of, final_observation_date)?;
+    let df = dom.df_between_dates(as_of, settlement_date)?;
     Ok(undiscounted * df)
 }
 
@@ -375,9 +381,11 @@ fn seasoned_expected_variance_with_dates(
     obs_dates: &[Date],
 ) -> Result<f64> {
     let w = time_elapsed_fraction(inst, as_of)?;
-    let total_t =
-        inst.day_count
-            .year_fraction(inst.start_date, inst.maturity, DayCountContext::default())?;
+    let total_t = inst.day_count.year_fraction(
+        inst.start_date,
+        inst.final_observation_date()?,
+        DayCountContext::default(),
+    )?;
     let t_elapsed = w * total_t;
     let realized = seasoned_realized_variance(inst, context, as_of, t_elapsed, obs_dates)?;
     let forward = remaining_forward_variance(inst, context, as_of)?;
@@ -389,9 +397,10 @@ pub(crate) fn remaining_forward_variance(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<f64> {
-    let t = inst
-        .day_count
-        .year_fraction(as_of, inst.maturity, DayCountContext::default())?;
+    let final_observation_date = inst.final_observation_date()?;
+    let t =
+        inst.day_count
+            .year_fraction(as_of, final_observation_date, DayCountContext::default())?;
     if t <= 0.0 {
         return Ok(0.0);
     }
@@ -412,8 +421,8 @@ pub(crate) fn remaining_forward_variance(
     // this gives the wrong rate and therefore the wrong GK forward.  The terminal-PV
     // discount in this same function was already corrected to use `df_between_dates`
     // (see lines 66, 83); this aligns the forward-recovery path with that fix.
-    let df_dom = dom.df_between_dates(as_of, inst.maturity)?;
-    let df_for = for_curve.df_between_dates(as_of, inst.maturity)?;
+    let df_dom = dom.df_between_dates(as_of, final_observation_date)?;
+    let df_for = for_curve.df_between_dates(as_of, final_observation_date)?;
 
     let r_d = zero_rate_from_df(df_dom, t, "FxVarianceSwap domestic discount")?;
     let r_f = zero_rate_from_df(df_for, t, "FxVarianceSwap foreign discount")?;

@@ -12,11 +12,12 @@ impl MetricCalculator for TimeToMaturityCalculator {
         let swap = context.instrument_as::<VarianceSwap>()?;
         let as_of = context.as_of;
 
-        if as_of >= swap.maturity {
+        let final_observation = swap.final_observation_date()?;
+        if as_of >= final_observation {
             return Ok(0.0);
         }
 
         swap.day_count
-            .year_fraction(as_of, swap.maturity, Default::default())
+            .year_fraction(as_of, final_observation, Default::default())
     }
 }

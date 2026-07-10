@@ -439,6 +439,9 @@ impl BondFuturePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        if as_of > future.delivery_end {
+            return Ok(Money::new(0.0, future.notional.currency()));
+        }
         // Calculate the theoretical model price, carrying the CTD forward to
         // the contract's delivery date.
         let model_price = Self::calculate_model_price_for_future(

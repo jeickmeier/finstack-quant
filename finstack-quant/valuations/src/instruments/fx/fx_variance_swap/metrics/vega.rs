@@ -29,7 +29,7 @@ impl MetricCalculator for VegaCalculator {
         let disc = context
             .curves
             .get_discount(swap.domestic_discount_curve_id.as_str())?;
-        let df = disc.df_between_dates(context.as_of, swap.maturity)?;
+        let df = disc.df_between_dates(context.as_of, swap.effective_settlement_date()?)?;
 
         let vega = df * 2.0 * swap.notional.amount() * current_vol * 0.01 * remaining_fraction;
         Ok(vega * swap.side.sign())

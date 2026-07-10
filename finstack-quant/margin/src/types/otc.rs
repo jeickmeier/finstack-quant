@@ -147,7 +147,7 @@ impl OtcMarginSpec {
                 Currency::CHF => "chzh",
                 Currency::CAD => "cato",
                 Currency::AUD => "auce",
-                _ => "weekends_only",
+                _ => "weekends",
             }
             .to_string(),
             vm_params,

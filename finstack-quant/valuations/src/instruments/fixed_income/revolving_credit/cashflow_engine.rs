@@ -781,16 +781,19 @@ impl<'a> CashflowEngine<'a> {
                 )?;
             }
 
-            // Handle principal flows from utilization changes
-            // At period_end, utilization changes from start to end value for use in the next period
+            // Handle principal flows from utilization changes. Interest uses
+            // average start/end utilization, so book the matching funding leg
+            // at the period midpoint rather than deferring it to period end.
             let utilization_change = utilization_end - prev_utilization;
-            if period_end > self.as_of
+            let principal_date =
+                period_start + time::Duration::days((period_end - period_start).whole_days() / 2);
+            if principal_date > self.as_of
                 && utilization_change.abs() > super::UTILIZATION_CHANGE_THRESHOLD
             {
                 let principal_change = self.facility.commitment_amount * utilization_change;
                 // Draw (increase) is negative for lender, repay (decrease) is positive
                 flows.push(CashFlow {
-                    date: period_end,
+                    date: principal_date,
                     reset_date: None,
                     amount: principal_change * -1.0,
                     kind: CFKind::Notional,
