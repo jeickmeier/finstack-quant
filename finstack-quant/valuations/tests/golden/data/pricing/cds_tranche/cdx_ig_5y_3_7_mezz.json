@@ -6,11 +6,11 @@
     "description": "Synthetic CDX IG 5Y 3-7 percent mezzanine tranche.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved. Re-baselined 2026-06-09 after intentional tranche pricer corrections (2026-06-09 quant review Majors 4-6): accrual-on-default complement fix ((1-f)*dEL), discount-curve-axis relative discounting from as_of, and senior-side recovery amortization of the detachment. Formula self-test goldens track the canonical calculation; tolerance contract unchanged.",
+    "source_detail": "Finstack Quant canonical credit pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved verbatim in initial_market; pricing tolerance contract preserved. Re-baselined 2026-06-09 after intentional tranche pricer corrections (2026-06-09 quant review Majors 4-6): accrual-on-default complement fix ((1-f)*dEL), discount-curve-axis relative discounting from as_of, and senior-side recovery amortization of the detachment. Formula self-test goldens track the canonical calculation; tolerance contract unchanged. Re-baselined 2026-07-11 after the seasoned premium-accrual boundary correction.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-05-18",
+    "last_reviewed_on": "2026-07-11",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -276,7 +276,7 @@
     "par_spread": 547.116731873908,
     "spread_dv01": -4140.909870544099,
     "dv01": -580.285728658782,
-    "cs01": 27975.398847605335
+    "cs01": 27975.433264238993
   },
   "tolerances": {
     "npv": {

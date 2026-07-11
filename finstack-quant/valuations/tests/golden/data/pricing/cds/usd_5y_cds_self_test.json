@@ -6,11 +6,11 @@
     "description": "Self-test fixture for single-name USD CDS pricing with two-step calibration. Pay-protection 5Y CDS at 100bp running spread on a synthetic ACME-CORP issuer, 10MM USD notional, ISDA NA convention. Exercises both the discount step (USD-OIS, with ois_compounding override) and the hazard step (ACME-HZD from 5 CDS par-spread quotes 1Y-10Y, against the calibrated discount curve). Closes the hazard calibration coverage gap on a single-name CDS instrument (the only prior hazard-step coverage was via CDX IG 46 / cds_option).",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Self-test fixture: 5 CDS par-spread quotes (1Y/3Y/5Y/7Y/10Y, 60-150 bp rising term structure) calibrate the ACME-HZD hazard curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibrate + CDS pricer round-trip. Round-trip stability: re-running the pipeline must reproduce these values within solver tolerance. Guards regressions in the hazard-step bootstrap, the CDS pricing kernel (premium leg + protection-leg integration), and the new two-step rates+credit calibration plumbing.",
+    "source_detail": "Self-test fixture: 5 CDS par-spread quotes (1Y/3Y/5Y/7Y/10Y, 60-150 bp rising term structure) calibrate the ACME-HZD hazard curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibrate + CDS pricer round-trip. Round-trip stability: re-running the pipeline must reproduce these values within solver tolerance. Guards regressions in the hazard-step bootstrap, the CDS pricing kernel (premium leg + protection-leg integration), and the new two-step rates+credit calibration plumbing. Re-baselined 2026-07-11 after deterministic bootstrap and cashflow refinements; no external benchmark source is asserted.",
     "captured_by": "claude",
     "captured_on": "2026-05-09",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-07-11",
     "review_interval_months": 12,
     "regen_command": "uv run pytest finstack-quant-py/tests/golden/test_pricing_cds.py -v -k self_test",
     "screenshots": []
@@ -383,9 +383,9 @@
     }
   },
   "expected": {
-    "npv": 38800.84804454475,
-    "dv01": -10.656592398416,
-    "cs01": 4337.206909633183
+    "npv": 38800.92439439382,
+    "dv01": -10.657352983548,
+    "cs01": 4337.204481053639
   },
   "tolerances": {
     "npv": {

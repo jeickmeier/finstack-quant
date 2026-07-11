@@ -6,11 +6,11 @@
     "description": "Synthetic ATM 3Y convertible bond with flat equity vol and dividend yield.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): two-step calibration (term_loan pattern). USD-OIS + USD-SOFR-3M calibrated; USD-CORP, USD-TREASURY, hazard curves, equity data preserved in initial_market. Expected outputs recaptured from Finstack.",
+    "source_detail": "Finstack Quant canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): two-step calibration (term_loan pattern). USD-OIS + USD-SOFR-3M calibrated; USD-CORP, USD-TREASURY, hazard curves, equity data preserved in initial_market. Expected outputs recaptured from Finstack. Re-baselined 2026-07-11 after intentional convertible lattice corrections to date-aligned forward discounting and coupon entitlement handling.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-07-11",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -587,10 +587,10 @@
     }
   },
   "expected": {
-    "npv": 906935.6121183528,
-    "clean_price": 906935.6121183528,
+    "npv": 906936.280911957,
+    "clean_price": 906936.280911957,
     "dv01": 0.0,
-    "cs01": -265.2694733448443
+    "cs01": -265.268466486479
   },
   "tolerances": {
     "npv": {

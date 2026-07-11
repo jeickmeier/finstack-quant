@@ -6,11 +6,11 @@
     "description": "Synthetic UST 10Y front-month bond future with embedded CTD bond.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture.",
+    "source_detail": "Finstack Quant canonical pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after the intentional futures MTM convention correction from contract-minus-model to model-minus-contract; NPV and DV01 signs now match the documented long-position convention.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-06-16",
+    "last_reviewed_on": "2026-07-11",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -207,10 +207,10 @@
     }
   },
   "expected": {
-    "npv": -1343.184174487533,
+    "npv": 1343.184174487533,
     "futures_price": 119.63431841744875,
     "conversion_factor": 0.8234,
-    "dv01": -17.554689026866527
+    "dv01": 17.554689026866527
   },
   "tolerances": {
     "npv": {

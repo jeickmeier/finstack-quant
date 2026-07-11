@@ -8,7 +8,7 @@
 
 ## Methodology & References
 
-- PV formula: `(ImpliedRate - ModelRateAdjusted) × FaceValue × τ × contracts × position_sign`, with τ from instrument day-count.
+- PV formula: `(ModelPrice - ContractPrice) / TickSize × TickValue × contracts × position_sign`.
 - Model rate uses forward curve projection; convexity adjustment derived from vol surface when provided or taken from contract specs.
 - Deterministic curves; aligns with Eurodollar/IBOR-style futures pricing conventions.
 
