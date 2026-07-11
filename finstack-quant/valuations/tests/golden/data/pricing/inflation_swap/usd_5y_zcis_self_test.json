@@ -6,11 +6,11 @@
     "description": "Self-test fixture for zero-coupon inflation swap pricing with two-step calibration. Receive-fixed at 2.20% against US-CPI ZCIS for 5Y, 10MM USD notional. Exercises both the discount step (USD-OIS, with ois_compounding override) and the inflation step (US-CPI from 6 ZCIS quotes, against the calibrated discount curve). Closes the inflation calibration step coverage gap (plan \u00a718 follow-up #1).",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the new `inflation` step kind's plumbing through engine::execute_with_diagnostics.",
+    "source_detail": "Self-test fixture: 6 ZCIS quotes (1Y-10Y, ~2.0-2.4% rising) calibrate the US-CPI inflation curve against a SOFR OIS-bootstrapped discount curve. Expected outputs captured from Finstack Quant's own calibration + pricing pipeline. Round-trip stability: re-running calibrate + price_instrument_with_metrics must reproduce these values within solver tolerance. Guards regressions in the inflation-step bootstrap, the inflation-swap pricing kernel, and the new `inflation` step kind's plumbing through engine::execute_with_diagnostics. Re-baselined 2026-07-11 after deterministic bootstrap refinements; no external benchmark source is asserted.",
     "captured_by": "claude",
     "captured_on": "2026-05-09",
     "last_reviewed_by": "claude",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-07-11",
     "review_interval_months": 12,
     "regen_command": "uv run pytest finstack-quant-py/tests/golden/test_pricing_inflation_swap.py -v -k self_test",
     "screenshots": []
@@ -334,8 +334,8 @@
     }
   },
   "expected": {
-    "npv": -91501.4714497153,
-    "dv01": 45.77580653056066
+    "npv": -91501.4603405339,
+    "dv01": 45.775800972944
   },
   "tolerances": {
     "npv": {

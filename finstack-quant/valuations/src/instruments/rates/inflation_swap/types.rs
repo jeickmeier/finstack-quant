@@ -1092,6 +1092,35 @@ mod tests {
     }
 
     #[test]
+    fn yoy_swap_prices_with_curve_only_market() {
+        let as_of = d(2025, Month::January, 1);
+        let market = MarketContext::new()
+            .insert(sample_discount_curve(as_of))
+            .insert(sample_inflation_curve(as_of));
+        let swap = YoYInflationSwap::builder()
+            .id(InstrumentId::new("YOY-CURVE-ONLY"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .start_date(as_of)
+            .maturity(d(2027, Month::January, 1))
+            .fixed_rate(Decimal::try_from(0.02).expect("valid decimal"))
+            .frequency(Tenor::annual())
+            .inflation_index_id(CurveId::new("US-CPI"))
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .day_count(DayCount::Act365F)
+            .side(PayReceive::Pay)
+            .lag_override(InflationLag::None)
+            .attributes(Attributes::new())
+            .build()
+            .expect("yoy swap should build");
+
+        let pv = swap
+            .npv_raw(&market, as_of)
+            .expect("curve-only market should price");
+
+        assert!(pv.is_finite());
+    }
+
+    #[test]
     fn matured_but_unpaid_swap_retains_value_until_adjusted_payment_date() {
         let start = d(2024, Month::January, 15);
         let maturity = d(2025, Month::January, 18);
