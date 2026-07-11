@@ -293,6 +293,12 @@ pub(crate) fn emit_fixed_coupons_on(
             let accrual_start = period.accrual_start;
             let accrual_end = period.accrual_end;
             let is_stub = schedule.first_last.contains(&d);
+            let is_termination_date = schedule
+                .prev
+                .values()
+                .map(|period| period.accrual_end)
+                .max()
+                .is_some_and(|last| accrual_end == last);
             let base_out = *outstanding_after
                 .get(&accrual_start)
                 .unwrap_or(&outstanding_fallback);
@@ -309,10 +315,7 @@ pub(crate) fn emit_fixed_coupons_on(
                     frequency: Some(spec.freq),
                     bus_basis: None,
                     coupon_period: (!is_stub).then_some((accrual_start, accrual_end)),
-                    end_is_termination_date: schedule
-                        .dates
-                        .last()
-                        .is_some_and(|&last| accrual_end == last),
+                    end_is_termination_date: is_termination_date,
                 },
             )?;
 
@@ -464,6 +467,22 @@ fn sample_overnight_rates_with_lookback(
             // observations resolve from historical fixings (or error through
             // the spec's fallback policy when no series is provided).
             let obs_date = current.add_business_days(-lookback_i32, input.calendar)?;
+            if pre_first_fixing_days > 0 {
+                // Leading non-business days use the preceding business-day
+                // fixing instead of the following Monday fixing.
+                let preceding_obs =
+                    current.add_business_days(-(lookback_i32 + 1), input.calendar)?;
+                let leading_rate = observed_overnight_rate(
+                    preceding_obs,
+                    pre_first_fixing_days,
+                    input.fwd,
+                    input.overnight_basis,
+                    input.fixings,
+                    input.index_id,
+                )?;
+                daily_rates.push((leading_rate, pre_first_fixing_days));
+                pre_first_fixing_days = 0;
+            }
             let rate = observed_overnight_rate(
                 obs_date,
                 days,
@@ -472,9 +491,7 @@ fn sample_overnight_rates_with_lookback(
                 input.fixings,
                 input.index_id,
             )?;
-            let total = days + pre_first_fixing_days;
-            pre_first_fixing_days = 0;
-            daily_rates.push((rate, total));
+            daily_rates.push((rate, days));
         } else if daily_rates.is_empty() {
             pre_first_fixing_days += days;
         } else if let Some(last) = daily_rates.last_mut() {
@@ -539,24 +556,26 @@ fn sample_overnight_rates(
             // from the `FIXING:{index_id}` series; without a series the error routes through the spec's
             // fallback policy. T+0 prefers a published fixing, else projects
             // from t = 0; later dates project the overnight forward.
+            if pre_first_fixing_days > 0 {
+                let preceding = current.add_business_days(-1, calendar)?;
+                let leading_rate = observed_overnight_rate(
+                    preceding,
+                    pre_first_fixing_days,
+                    fwd,
+                    overnight_basis,
+                    fixings,
+                    index_id,
+                )?;
+                daily_rates.push((leading_rate, pre_first_fixing_days));
+                pre_first_fixing_days = 0;
+            }
             let rate =
                 observed_overnight_rate(current, days, fwd, overnight_basis, fixings, index_id)?;
-            // Assign any pre-period non-business days to this first fixing.
-            let total = days + pre_first_fixing_days;
-            pre_first_fixing_days = 0;
-            daily_rates.push((rate, total));
+            daily_rates.push((rate, days));
         } else if daily_rates.is_empty() {
             // Non-business day before the first fixing: accumulate to assign
             // to the first fixing's weight once we encounter it.
             //
-            // CONVENTION DEVIATION: ISDA 2021 §7.1(g) weights each calendar
-            // day with the rate of the *preceding* business day; days before
-            // the window's first fixing would therefore take the fixing from
-            // before the window start. That pre-window fixing is not sampled
-            // here, so these days are weighted with the *following* (first)
-            // fixing instead — a forward assignment affecting at most the
-            // opening weekend/holiday of a window that starts on a
-            // non-business day.
             pre_first_fixing_days += days;
         } else if let Some(last) = daily_rates.last_mut() {
             // Non-business day after a fixing: add to the preceding fixing.
@@ -676,6 +695,12 @@ pub(crate) fn emit_float_coupons_on(
             let accrual_start = period.accrual_start;
             let accrual_end = period.accrual_end;
             let is_stub = schedule.first_last.contains(&d);
+            let is_termination_date = schedule
+                .prev
+                .values()
+                .map(|period| period.accrual_end)
+                .max()
+                .is_some_and(|last| accrual_end == last);
             let base_out = *outstanding_after
                 .get(&accrual_start)
                 .unwrap_or(&outstanding_fallback);
@@ -693,10 +718,7 @@ pub(crate) fn emit_float_coupons_on(
                     frequency: Some(spec.freq),
                     bus_basis: None,
                     coupon_period: (!is_stub).then_some((accrual_start, accrual_end)),
-                    end_is_termination_date: schedule
-                        .dates
-                        .last()
-                        .is_some_and(|&last| accrual_end == last),
+                    end_is_termination_date: is_termination_date,
                 },
             )?;
 
@@ -887,9 +909,11 @@ pub(crate) fn emit_float_coupons_on(
                 // rate only: gearing/spread/floors/caps apply on top exactly
                 // as for projected rates. Without a series, the projection
                 // errors and routes through the fallback policy.
-                let projected = if reset_date < fwd.base_date() && resolved_fixing.is_some() {
+                let projected = if reset_date < fwd.base_date()
+                    || (reset_date == fwd.base_date() && resolved_fixing.is_some())
+                {
                     params.validate().and_then(|()| {
-                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                        require_fixing_value_exact(
                             resolved_fixing.as_ref(),
                             spec.rate_spec.index_id.as_str(),
                             reset_date,

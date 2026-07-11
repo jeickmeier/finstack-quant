@@ -160,6 +160,7 @@ impl Bond {
     /// bond.validate()?; // Validates all parameters
     /// ```
     pub fn validate(&self) -> Result<()> {
+        self.pricing_overrides.validate()?;
         // Validate date ordering
         validation::validate_date_range_strict_with(
             self.issue_date,

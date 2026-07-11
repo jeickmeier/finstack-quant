@@ -39,7 +39,9 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     ------
     ValueError
         If ``spec_json`` (or ``market_json`` when supplied) fails schema or
-        semantic validation, or required market data is missing for floaters.
+        semantic validation.
+    KeyError
+        If required market data or a fixing series is missing.
 
     Examples
     --------
@@ -133,9 +135,9 @@ def dated_flows_json(schedule_json: str) -> str:
     Returns
     -------
     str
-        JSON array of ``{date, amount}`` objects where ``amount`` is
-        ``{amount, currency}``. ``CFKind`` and accrual metadata are omitted;
-        parse the full schedule JSON when flow classification is required.
+        JSON array of settlement cash entries. ``PIK`` and
+        ``DefaultedNotional`` state rows are omitted; parse the full schedule
+        JSON when flow classification is required.
 
     Raises
     ------
@@ -167,12 +169,14 @@ def accrued_interest_json(schedule_json: str, as_of: str, config_json: str | Non
         computes from the canonical schedule and crosses the binding boundary as
         ``f64``; for large notionals, compare with an absolute tolerance scaled
         to the schedule notional rather than expecting decimal-string equality.
+        Returns ``0.0`` when ``as_of`` is outside all coupon periods.
 
     Raises
     ------
     ValueError
-        If the schedule JSON is invalid or ``as_of`` falls outside the
-        accrual window implied by the schedule.
+        If the schedule JSON or accrual configuration is invalid.
+    KeyError
+        If an ex-coupon calendar is unknown.
 
     Examples
     --------
@@ -203,7 +207,8 @@ def bond_from_cashflows_json(
         ``"USD-OIS"``).
     quoted_clean : float, optional
         Clean quoted price as a percent of par (e.g. ``99.5`` for 99.5% of par).
-        When supplied, calibrates yield on construction.
+        When supplied, it is a price-driving override; it does not calibrate
+        yield during construction.
 
     Returns
     -------

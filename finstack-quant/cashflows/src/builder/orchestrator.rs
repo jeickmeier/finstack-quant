@@ -96,8 +96,34 @@ fn validate_core_inputs(
         id: "maturity date (call principal() first)".into(),
     })?;
 
+    if issue >= maturity {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "issue date {} must be strictly before maturity date {}",
+            issue, maturity
+        )));
+    }
+
     // Validate notional and amortization spec (e.g., total amortization <= notional)
     notional.validate()?;
+
+    let out_of_range = match &notional.amort {
+        AmortizationSpec::StepRemaining { schedule } => schedule
+            .iter()
+            .find(|(date, _)| *date < issue || *date > maturity)
+            .map(|(date, _)| *date),
+        AmortizationSpec::CustomPrincipal { items } => items
+            .iter()
+            .find(|(date, _)| *date < issue || *date > maturity)
+            .map(|(date, _)| *date),
+        _ => None,
+    };
+    if let Some(date) = out_of_range {
+        return Err(InputError::DateOutOfRange {
+            date,
+            range: (issue, maturity),
+        }
+        .into());
+    }
 
     Ok((notional, issue, maturity))
 }
@@ -570,6 +596,7 @@ impl CompiledCashFlowPlan {
             &self.fixed_schedules,
             &self.float_schedules,
             Some(self.issue),
+            Some(self.maturity),
         );
         debug!(flows = flows.len(), "cashflow schedule: project complete");
         Ok(CashFlowSchedule {

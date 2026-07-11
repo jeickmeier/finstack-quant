@@ -763,6 +763,16 @@ impl Survival for HazardCurve {
     fn sp(&self, t: f64) -> f64 {
         self.sp(t)
     }
+
+    #[inline]
+    fn base_date(&self) -> Option<Date> {
+        Some(self.base_date())
+    }
+
+    #[inline]
+    fn day_count(&self) -> DayCount {
+        self.day_count()
+    }
 }
 
 impl TermStructure for HazardCurve {

@@ -713,18 +713,10 @@ mod computation {
             },
         );
 
-        let schedule = builder.build_with_curves(None).unwrap();
-        let amortization_amount: f64 = schedule
-            .flows
-            .iter()
-            .filter(|cf| cf.date == pay_date && cf.kind == CFKind::Amortization)
-            .map(|cf| cf.amount.amount())
-            .sum();
-
-        assert!(
-            (amortization_amount - 100_000.0).abs() < 1e-9,
-            "negative custom principal entries should not offset positive repayments"
-        );
+        let err = builder
+            .build_with_curves(None)
+            .expect_err("negative custom principal entries must be rejected");
+        assert!(err.to_string().contains("non-negative"));
     }
 
     /// Maturity classification: StepRemaining emits only the scheduled

@@ -1514,8 +1514,9 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     let maturity = Date::from_calendar_date(2025, Month::April, 8).unwrap();
     let init = Money::new(1_000_000.0, Currency::USD);
 
+    let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
     let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
-        .base_date(saturday)
+        .base_date(friday)
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.05), (1.0, 0.05)])
         .interp(InterpStyle::Linear)
@@ -1702,12 +1703,12 @@ fn test_seasoned_coupon_before_curve_base_errors_by_default() {
         .expect_err("strictly-past observation with Error fallback must fail");
     let msg = err.to_string();
     assert!(
-        msg.contains("USD-SOFR-3M") && msg.contains("before"),
-        "error should name the index and the pre-base date: {msg}"
+        msg.contains("USD-SOFR-3M") && msg.contains("requires fixings"),
+        "error should name the index and require its historical fixing: {msg}"
     );
     assert!(
-        msg.contains("historical fixings"),
-        "error should explain the historical-fixings limitation: {msg}"
+        msg.contains("ScalarTimeSeries"),
+        "error should identify the required fixing series: {msg}"
     );
 }
 

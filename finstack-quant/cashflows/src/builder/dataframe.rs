@@ -17,6 +17,7 @@ use crate::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::traits::Survival;
 use finstack_quant_core::money::Money;
 
 // =============================================================================
@@ -123,7 +124,7 @@ fn compute_notional_columns(
 fn compute_floating_decomposition(
     cf: &finstack_quant_core::cashflow::CashFlow,
     fwd: Option<&std::sync::Arc<finstack_quant_core::market_data::term_structures::ForwardCurve>>,
-    base: Date,
+    _base: Date,
     period_start: Date,
     dc_ctx: DayCountContext<'_>,
 ) -> finstack_quant_core::Result<(Option<f64>, Option<f64>)> {
@@ -138,17 +139,22 @@ fn compute_floating_decomposition(
         return Ok((None, None));
     };
 
-    // Compute reset time using forward curve's day count
+    // Compute reset and payment times from the forward curve's own base.
     let reset_t = if let Some(reset_date) = cf.reset_date {
-        compute_discount_time(reset_date, base, fwd.day_count(), dc_ctx)?
+        fwd.day_count()
+            .signed_year_fraction(fwd.base_date(), reset_date, dc_ctx)?
     } else {
-        // Fallback to period start if no explicit reset date. Use the signed
-        // helper so a historical period_start yields a negative time instead
-        // of a day-count error or mis-signed year fraction.
-        compute_discount_time(period_start, base, fwd.day_count(), dc_ctx)?
+        fwd.day_count()
+            .signed_year_fraction(fwd.base_date(), period_start, dc_ctx)?
     };
-
-    let base_rate = fwd.rate(reset_t);
+    let end_t = fwd
+        .day_count()
+        .signed_year_fraction(fwd.base_date(), cf.date, dc_ctx)?;
+    let base_rate = if end_t > reset_t {
+        fwd.rate_period(reset_t, end_t)
+    } else {
+        fwd.rate(reset_t)
+    };
     let spread = cf.rate.map(|rate| rate - base_rate);
 
     Ok((Some(base_rate), spread))
@@ -568,7 +574,13 @@ impl CashFlowSchedule {
                 CFKind::PIK => {
                     outstanding = outstanding.checked_add(cf.amount)?;
                 }
-                CFKind::Notional if !is_initial_funding => {
+                CFKind::Notional
+                | CFKind::RevolvingDraw
+                | CFKind::RevolvingRepayment
+                | CFKind::PrePayment
+                | CFKind::DefaultedNotional
+                    if !is_initial_funding =>
+                {
                     // Draws are negative, repays are positive from lender perspective
                     outstanding = outstanding.checked_sub(cf.amount)?;
                 }
@@ -619,14 +631,12 @@ impl CashFlowSchedule {
             out.days.push((cf.date - period.start).whole_days());
 
             // Discount factor using configured discounting basis
-            let dc_for_discounting = options.discount_day_count.unwrap_or(dc);
-            let t = compute_discount_time(cf.date, base, dc_for_discounting, disc_dc_ctx)?;
-            let df = disc_arc.df(t);
+            let df = disc_arc.df_between_dates(base, cf.date)?;
             // Fail loudly on non-finite curve output instead of silently
             // pushing NaN PVs (consistent with `npv`'s validation).
             if !df.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(
-                    "discount curve '{discount_curve_id}' returned non-finite df ({df}) at t={t} (date {})",
+                    "discount curve '{discount_curve_id}' returned non-finite df ({df}) (date {})",
                     cf.date
                 )));
             }
@@ -634,10 +644,27 @@ impl CashFlowSchedule {
 
             // Survival probability
             if let (Some(h), Some(spv)) = (hazard_arc_opt.as_ref(), out.survival_probs.as_mut()) {
-                let sp = h.sp(t);
+                let sp = if let Some(h_base) = Survival::base_date(h.as_ref()) {
+                    let h_dc = h.day_count();
+                    let t =
+                        h_dc.signed_year_fraction(h_base, cf.date, DayCountContext::default())?;
+                    let t_base =
+                        h_dc.signed_year_fraction(h_base, base, DayCountContext::default())?;
+                    let sp_base = h.sp(t_base);
+                    if !sp_base.is_finite() || sp_base <= 0.0 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "hazard curve returned invalid survival at as_of {}: {}",
+                            base, sp_base
+                        )));
+                    }
+                    h.sp(t) / sp_base
+                } else {
+                    let t = compute_discount_time(cf.date, base, dc, disc_dc_ctx)?;
+                    h.sp(t)
+                };
                 if !sp.is_finite() {
                     return Err(finstack_quant_core::Error::Validation(format!(
-                        "hazard curve returned non-finite sp ({sp}) at t={t} (date {})",
+                        "hazard curve returned non-finite sp ({sp}) (date {})",
                         cf.date
                     )));
                 }

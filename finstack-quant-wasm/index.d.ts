@@ -33,6 +33,16 @@
 //   - name: 'CalibrationEnvelopeError'
 //   - cause: structured EnvelopeError payload (object with `kind` etc.)
 // Standard try/catch exposes both via `e.name` and `e.cause`.
+
+export type {
+  AccrualConfigJson,
+  CashFlowJson,
+  CashFlowMetaJson,
+  CashFlowScheduleJson,
+  DatedFlowJson,
+  MoneyJson,
+  NotionalJson,
+} from "./types/generated/CashflowSchedule";
 //
 // WASM ownership: classes with a `free(): void` method own wasm heap memory.
 // Call `free()` when a long-lived handle is no longer needed, especially for
@@ -1264,9 +1274,7 @@ export declare const margin: MarginNamespace;
  * JSON bridge to the Rust `finstack-quant-cashflows` crate.
  *
  * All methods accept and return JSON strings that mirror the canonical Rust
- * serde model. Refer to `src/api/cashflows/mod.rs` for parameter and return-shape
- * details; the docstrings there are kept in sync with the underlying Rust
- * implementation.
+ * serde model. Cashflow JSON types are exported from `./types`.
  */
 export interface CashflowsNamespace {
   /**
@@ -1311,9 +1319,8 @@ export interface CashflowsNamespace {
    * Extract dated flows from a cashflow schedule.
    *
    * @param scheduleJson JSON-encoded `CashFlowSchedule`.
-   * @returns            JSON array of `{date, amount}` entries, where `amount`
-   *                     is itself `{amount, currency}`. `CFKind` and accrual
-   *                     metadata are intentionally omitted.
+   * @returns            JSON array of settlement cash entries. PIK and
+   *                     DefaultedNotional state rows are omitted.
    * @throws             If the schedule JSON is malformed.
    */
   datedFlowsJson(scheduleJson: string): string;
@@ -1342,7 +1349,8 @@ export interface CashflowsNamespace {
    * @param instrumentId    Identifier for the Bond instrument.
    * @param scheduleJson    JSON-encoded `CashFlowSchedule`.
    * @param discountCurveId Identifier of the discount curve used for pricing.
-   * @param quotedClean     Optional clean quoted price used to calibrate yield on construction.
+   * @param quotedClean     Optional clean price as percentage of par; this is
+   *                        a price-driving override, not yield calibration.
    * @returns               JSON-encoded tagged `InstrumentJson::Bond`.
    * @throws                If the schedule JSON is malformed or bond construction fails.
    */

@@ -177,6 +177,12 @@ pub(in crate::builder) fn emit_fees_on(
         if let Some(period) = pf.prev.get(&d) {
             // Use proper DayCountContext with calendar and frequency so that
             // conventions like Bus/252 and Act/Act ISMA compute correctly.
+            let is_termination_date = pf
+                .prev
+                .values()
+                .map(|p| p.accrual_end)
+                .max()
+                .is_some_and(|last| period.accrual_end == last);
             let yf = pf.dc.year_fraction(
                 period.accrual_start,
                 period.accrual_end,
@@ -185,7 +191,7 @@ pub(in crate::builder) fn emit_fees_on(
                     frequency: Some(pf.freq),
                     bus_basis: None,
                     coupon_period: None,
-                    end_is_termination_date: false,
+                    end_is_termination_date: is_termination_date,
                 },
             )?;
 

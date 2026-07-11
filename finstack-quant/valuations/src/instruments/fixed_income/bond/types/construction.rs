@@ -470,6 +470,7 @@ impl Bond {
         discount_curve_id: impl Into<CurveId>,
         quoted_clean: Option<f64>,
     ) -> finstack_quant_core::Result<Self> {
+        schedule.validate()?;
         // Extract parameters from the schedule
         let notional = schedule.notional.initial;
 
@@ -478,11 +479,19 @@ impl Bond {
         if dates.len() < 2 {
             return Err(finstack_quant_core::InputError::TooFewPoints.into());
         }
-        let issue = dates[0];
-        let maturity = dates
-            .last()
-            .copied()
-            .ok_or(finstack_quant_core::InputError::TooFewPoints)?;
+        let issue = schedule.meta.issue_date.unwrap_or(dates[0]);
+        let maturity = schedule.meta.maturity_date.unwrap_or(
+            dates
+                .last()
+                .copied()
+                .ok_or(finstack_quant_core::InputError::TooFewPoints)?,
+        );
+        if issue >= maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "custom bond issue date {} must be before maturity date {}",
+                issue, maturity
+            )));
+        }
 
         // Infer a representative coupon frequency from the schedule's coupon dates.
         //
@@ -562,6 +571,7 @@ impl Bond {
         } else {
             PricingOverrides::default()
         };
+        pricing_overrides.validate()?;
 
         Self::builder()
             .id(id.into())

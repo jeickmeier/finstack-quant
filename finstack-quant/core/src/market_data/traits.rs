@@ -378,6 +378,16 @@ pub trait Survival: TermStructure + Send + Sync {
     /// The probability of survival (no default) from time 0 to time `t`,
     /// a value in the range `(0, 1]`.
     fn sp(&self, t: f64) -> f64;
+
+    /// Optional curve base date for date-based conditional survival.
+    fn base_date(&self) -> Option<Date> {
+        None
+    }
+
+    /// Day-count convention used by the curve when a base date is available.
+    fn day_count(&self) -> DayCount {
+        DayCount::Act365F
+    }
 }
 
 /// Minimal trait for term structure polymorphism where needed.

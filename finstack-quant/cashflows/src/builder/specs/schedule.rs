@@ -291,7 +291,7 @@ impl ScheduleParams {
     ///
     /// let params = ScheduleParams::usd_treasury();
     /// assert_eq!(params.freq, Tenor::semi_annual());
-    /// assert_eq!(params.dc, DayCount::ActAct);
+    /// assert_eq!(params.dc, DayCount::ActActIsma);
     /// assert_eq!(params.bdc, BusinessDayConvention::Following);
     /// assert_eq!(params.calendar_id, "usny");
     /// ```
@@ -303,7 +303,7 @@ impl ScheduleParams {
     pub fn usd_treasury() -> Self {
         Self::preset(
             Tenor::semi_annual(),
-            DayCount::ActAct,
+            DayCount::ActActIsma,
             BusinessDayConvention::Following,
             "usny",
         )
@@ -370,7 +370,7 @@ impl ScheduleParams {
     ///
     /// let params = ScheduleParams::eur_gov_bond();
     /// assert_eq!(params.freq, Tenor::annual());
-    /// assert_eq!(params.dc, DayCount::ActAct);
+    /// assert_eq!(params.dc, DayCount::ActActIsma);
     /// assert_eq!(params.bdc, BusinessDayConvention::Following);
     /// assert_eq!(params.calendar_id, "target2");
     /// ```
@@ -382,7 +382,7 @@ impl ScheduleParams {
     pub fn eur_gov_bond() -> Self {
         Self::preset(
             Tenor::annual(),
-            DayCount::ActAct,
+            DayCount::ActActIsma,
             BusinessDayConvention::Following,
             "target2",
         )

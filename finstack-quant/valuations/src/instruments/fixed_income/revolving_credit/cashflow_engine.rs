@@ -643,6 +643,9 @@ impl<'a> CashflowEngine<'a> {
                 // eliminates the inverse day count approximation (±1-2 day error) used
                 // by the accrual engine when issue_date is absent.
                 issue_date: Some(self.facility.commitment_date),
+                maturity_date: None,
+                accrual_periods: Vec::new(),
+                accrual_day_counts: Vec::new(),
             },
         })
     }
@@ -848,6 +851,9 @@ impl<'a> CashflowEngine<'a> {
                 // eliminates the inverse day count approximation (±1-2 day error) used
                 // by the accrual engine when issue_date is absent.
                 issue_date: Some(self.facility.commitment_date),
+                maturity_date: None,
+                accrual_periods: Vec::new(),
+                accrual_day_counts: Vec::new(),
             },
         })
     }

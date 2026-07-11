@@ -682,6 +682,22 @@ pub struct StepUpCouponSpec {
 }
 
 impl StepUpCouponSpec {
+    /// Validate step dates and rates before compilation.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        for (window, current) in self
+            .step_schedule
+            .windows(2)
+            .zip(self.step_schedule.iter().skip(1))
+        {
+            if window[0].0 >= current.0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "StepUp step_schedule dates must be strictly increasing".into(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Extract the schedule-generation conventions shared by every step
     /// window as a standalone [`ScheduleParams`]. The compiler then derives
     /// per-rate `FixedCouponSpec` windows from the `step_schedule`.

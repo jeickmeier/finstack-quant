@@ -16,7 +16,9 @@ use wasm_bindgen::JsValue;
 /// errors let JS clients pattern-match on `err.name` and reliably read
 /// `err.message` rather than parsing ad-hoc strings.
 pub fn to_js_err(e: impl std::fmt::Display) -> JsValue {
-    js_value_from_message(e.to_string())
+    let message = e.to_string();
+    let kind = classify_error_message(&message);
+    structured_js_error("FinstackError", &message, Some(kind), None)
 }
 
 /// Convert an error with a `source()` chain into a structured `JsValue` error.
@@ -82,6 +84,26 @@ fn js_value_from_message(msg: String) -> JsValue {
     {
         let _ = msg;
         JsValue::NULL
+    }
+}
+
+fn classify_error_message(message: &str) -> &'static str {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("not found")
+        || lower.contains("missing curve")
+        || lower.contains("missing fixing")
+        || lower.contains("required fixing")
+        || lower.contains("requires fixings")
+    {
+        "not_found"
+    } else if lower.contains("validation")
+        || lower.contains("invalid")
+        || lower.contains("malformed")
+        || lower.contains("must ")
+    {
+        "validation"
+    } else {
+        "computation"
     }
 }
 

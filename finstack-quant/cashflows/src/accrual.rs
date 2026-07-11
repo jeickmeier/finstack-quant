@@ -288,6 +288,17 @@ pub fn accrued_interest_amount(
     as_of: Date,
     cfg: &AccrualConfig,
 ) -> finstack_quant_core::Result<f64> {
+    schedule.validate()?;
+    let expected_currency = schedule.notional.initial.currency();
+    for flow in &schedule.flows {
+        if is_coupon_kind(flow.kind, cfg.include_pik) && flow.amount.currency() != expected_currency
+        {
+            return Err(finstack_quant_core::Error::CurrencyMismatch {
+                expected: expected_currency,
+                actual: flow.amount.currency(),
+            });
+        }
+    }
     let periods = build_coupon_periods(schedule, cfg)?;
     if periods.is_empty() {
         return Ok(0.0);
@@ -311,6 +322,12 @@ pub fn accrued_interest_amount(
 #[derive(Debug, Clone)]
 struct CouponBucket {
     date: Date,
+    accrual_start: Option<Date>,
+    accrual_end: Option<Date>,
+    /// Day-count convention attached to the underlying coupon flow(s).
+    /// `None` means metadata was absent or same-date flows used conflicting
+    /// conventions, so the schedule representative convention is used.
+    accrual_day_count: Option<DayCount>,
     cash_amount: f64,
     pik_amount: f64,
     /// Accrual year fraction as reported by the builder.
@@ -396,6 +413,8 @@ fn build_coupon_periods(
     // Cash and PIK coupon flows are grouped by payment date.
     for &i in &coupon_idx {
         let cf = &schedule.flows[i];
+        let true_period = schedule.meta.accrual_periods.get(i).copied().flatten();
+        let flow_day_count = schedule.meta.accrual_day_counts.get(i).copied().flatten();
 
         let cf_af = if cf.accrual_factor > 0.0 {
             if !cf.accrual_factor.is_finite() {
@@ -421,6 +440,21 @@ fn build_coupon_periods(
                     last.pik_amount += cf.amount.amount();
                 } else {
                     last.cash_amount += cf.amount.amount();
+                    if last.accrual_start.is_none() {
+                        last.accrual_start = true_period.map(|(start, _)| start);
+                    }
+                    if last.accrual_end.is_none() {
+                        last.accrual_end = true_period.map(|(_, end)| end);
+                    }
+                    if let Some(flow_dc) = flow_day_count {
+                        match last.accrual_day_count {
+                            None => last.accrual_day_count = Some(flow_dc),
+                            Some(existing) if existing != flow_dc => {
+                                last.accrual_day_count = None;
+                            }
+                            _ => {}
+                        }
+                    }
                     if last.accrual_factor.is_none() {
                         last.accrual_factor = cf_af;
                     }
@@ -435,6 +469,9 @@ fn build_coupon_periods(
         buckets.push(if cf.kind == CFKind::PIK {
             CouponBucket {
                 date: cf.date,
+                accrual_start: true_period.map(|(start, _)| start),
+                accrual_end: true_period.map(|(_, end)| end),
+                accrual_day_count: flow_day_count,
                 cash_amount: 0.0,
                 pik_amount: cf.amount.amount(),
                 accrual_factor: None,
@@ -443,6 +480,9 @@ fn build_coupon_periods(
         } else {
             CouponBucket {
                 date: cf.date,
+                accrual_start: true_period.map(|(start, _)| start),
+                accrual_end: true_period.map(|(_, end)| end),
+                accrual_day_count: flow_day_count,
                 cash_amount: cf.amount.amount(),
                 pik_amount: 0.0,
                 accrual_factor: cf_af,
@@ -455,8 +495,6 @@ fn build_coupon_periods(
         return Ok(Vec::new());
     }
 
-    let dc = schedule.day_count;
-
     // Derive the start of the first coupon period: `meta.issue_date` is
     // required. Inferring it from flow dates or via the legacy inverse
     // day-count approximation is intentionally not supported.
@@ -467,13 +505,13 @@ fn build_coupon_periods(
 
     let mut periods = Vec::with_capacity(buckets.len());
     for bucket in buckets {
-        let start = prev;
-        let end = bucket.date;
+        let start = bucket.accrual_start.unwrap_or(prev);
+        let end = bucket.accrual_end.unwrap_or(bucket.date);
         if start < end {
             periods.push(CouponPeriod {
                 start,
                 end,
-                dc,
+                dc: bucket.accrual_day_count.unwrap_or(schedule.day_count),
                 bucket,
             });
             prev = end;
@@ -1125,6 +1163,9 @@ mod tests {
             dc: DayCount::Thirty360,
             bucket: CouponBucket {
                 date: make_date(2025, 7, 1),
+                accrual_start: None,
+                accrual_end: None,
+                accrual_day_count: None,
                 cash_amount: f64::NAN,
                 pik_amount: 0.0,
                 accrual_factor: Some(0.5),

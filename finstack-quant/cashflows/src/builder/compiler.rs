@@ -663,6 +663,11 @@ pub(super) fn compute_coupon_schedules(
                 initial_rate,
                 step_schedule,
             } => {
+                if step_schedule.windows(2).any(|w| w[0].0 >= w[1].0) {
+                    return Err(finstack_quant_core::Error::Validation(
+                        "StepUp coupon schedule requires finite rates and strictly increasing effective dates".into(),
+                    ));
+                }
                 fixed_schedules.extend(compile_step_up_schedules(StepUpCompileInput {
                     split,
                     initial_rate: *initial_rate,

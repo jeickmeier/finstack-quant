@@ -5,8 +5,9 @@
 //! types as the canonical schema.
 
 use crate::accrual::{accrued_interest_amount, AccrualConfig};
+use crate::builder::schedule::sort_schedule_with_metadata;
 use crate::builder::{CashFlowSchedule, FeeSpec, FixedCouponSpec, FloatingCouponSpec, Notional};
-use crate::primitives::CFKind;
+use crate::primitives::{is_cash_settlement_kind, CFKind};
 use finstack_quant_core::config::{rounding_context_from, FinstackConfig, RoundingContext};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -307,9 +308,16 @@ pub fn build_cashflow_schedule_envelope_json(
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
-    let schedule = parse_schedule(schedule_json)?;
-    validate_schedule_economic_invariants(&schedule)?;
+    let mut schedule = parse_schedule(schedule_json)?;
+    validate_cashflow_schedule(&mut schedule)?;
     serialize_json(&schedule, "cashflow schedule")
+}
+
+/// Validate and canonicalize an in-memory schedule for all public consumers.
+pub fn validate_cashflow_schedule(schedule: &mut CashFlowSchedule) -> Result<()> {
+    sort_schedule_with_metadata(schedule);
+    schedule.validate()?;
+    validate_schedule_economic_invariants(schedule)
 }
 
 /// Validate a stamped schedule envelope JSON payload and return canonical JSON.
@@ -319,16 +327,17 @@ pub fn validate_cashflow_schedule_envelope_json(envelope_json: &str) -> Result<S
             Error::Validation(format!("invalid cashflow schedule envelope JSON: {err}"))
         })?;
     envelope.validate_schema_version()?;
-    validate_schedule_economic_invariants(&envelope.schedule)?;
+    let mut envelope = envelope;
+    validate_cashflow_schedule(&mut envelope.schedule)?;
     serialize_json(&envelope, "cashflow schedule envelope")
 }
 
 /// Extract dated amounts from a schedule JSON payload.
 ///
 /// The returned JSON is an array of [`DatedFlowJson`] values. Each entry
-/// contains the cashflow date and currency-tagged amount; it intentionally
-/// omits `CFKind` and accrual metadata for callers that only need dated cash
-/// amounts.
+/// contains the cashflow date and currency-tagged amount. Non-cash state rows
+/// (`PIK` and `DefaultedNotional`) are excluded so the result is safe to sum
+/// as dated settlement cash.
 ///
 /// # Arguments
 ///
@@ -365,10 +374,12 @@ pub fn validate_cashflow_schedule_envelope_json(envelope_json: &str) -> Result<S
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
-    let schedule = parse_schedule(schedule_json)?;
+    let mut schedule = parse_schedule(schedule_json)?;
+    validate_cashflow_schedule(&mut schedule)?;
     let flows: Vec<DatedFlowJson> = schedule
         .flows
         .iter()
+        .filter(|flow| is_cash_settlement_kind(flow.kind))
         .map(|flow| DatedFlowJson {
             date: flow.date,
             amount: flow.amount,
@@ -433,7 +444,8 @@ pub fn accrued_interest_json(
     as_of: &str,
     config_json: Option<&str>,
 ) -> Result<f64> {
-    let schedule = parse_schedule(schedule_json)?;
+    let mut schedule = parse_schedule(schedule_json)?;
+    validate_cashflow_schedule(&mut schedule)?;
     let as_of = parse_iso_date(as_of)?;
     let config = match config_json {
         Some(json) => serde_json::from_str::<AccrualConfig>(json)

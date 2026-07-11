@@ -134,6 +134,14 @@
 /// Cash-flow primitives (`CashFlow`, `CFKind`).
 pub mod primitives {
     pub use finstack_quant_core::cashflow::{CFKind, CashFlow};
+
+    /// Returns whether a classified flow represents a cash settlement.
+    ///
+    /// PIK is a capitalization event and `DefaultedNotional` is a write-down;
+    /// neither should be emitted by APIs whose contract is dated cash.
+    pub(crate) fn is_cash_settlement_kind(kind: CFKind) -> bool {
+        !matches!(kind, CFKind::PIK | CFKind::DefaultedNotional)
+    }
 }
 
 /// Currency-preserving aggregation utilities for cashflows.
@@ -159,9 +167,9 @@ pub use accrual::{accrued_interest_amount, AccrualConfig, AccrualMethod, ExCoupo
 pub use builder::CashFlowBuilder;
 pub use json::{
     accrued_interest_json, build_cashflow_schedule_envelope_json, build_cashflow_schedule_json,
-    dated_flows_json, validate_cashflow_schedule_envelope_json, validate_cashflow_schedule_json,
-    CashflowScheduleBuildSpec, CashflowScheduleEnvelope, DatedFlowJson, PrincipalEventSpec,
-    CASHFLOW_SCHEDULE_SCHEMA_VERSION,
+    dated_flows_json, validate_cashflow_schedule, validate_cashflow_schedule_envelope_json,
+    validate_cashflow_schedule_json, CashflowScheduleBuildSpec, CashflowScheduleEnvelope,
+    DatedFlowJson, PrincipalEventSpec, CASHFLOW_SCHEDULE_SCHEMA_VERSION,
 };
 pub use traits::{
     schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider, ScheduleBuildOpts,

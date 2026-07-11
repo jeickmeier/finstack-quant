@@ -114,9 +114,8 @@ fn validate_cashflow_schedule_envelope_json(
 /// Returns
 /// -------
 /// str
-///     JSON array of `{date, amount}` entries, where `amount` is itself
-///     `{amount, currency}`. `CFKind` and accrual metadata are intentionally
-///     omitted; parse the full schedule JSON if you need flow classification.
+///     JSON array of settlement cash entries. Non-cash PIK and default-write-down
+///     rows are omitted; parse the full schedule JSON when classifications are needed.
 #[pyfunction]
 #[pyo3(text_signature = "(schedule_json)")]
 fn dated_flows_json(py: Python<'_>, schedule_json: &str) -> PyResult<String> {
@@ -176,7 +175,7 @@ fn accrued_interest_json(
 /// discount_curve_id : str
 ///     Identifier of the discount curve used for pricing.
 /// quoted_clean : float, optional
-///     Clean quoted price used to calibrate yield on construction.
+///     Clean quoted price as a percentage of par; this pins price-driven valuation.
 ///
 /// Returns
 /// -------
@@ -223,6 +222,19 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         &m
     )?)?;
     m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
+
+    for name in [
+        "accrued_interest_json",
+        "bond_from_cashflows_json",
+        "build_cashflow_schedule_envelope_json",
+        "build_cashflow_schedule_json",
+        "dated_flows_json",
+        "validate_cashflow_schedule_envelope_json",
+        "validate_cashflow_schedule_json",
+    ] {
+        m.getattr(name)?
+            .setattr("__module__", "finstack_quant.cashflows")?;
+    }
 
     let all = PyList::new(
         py,

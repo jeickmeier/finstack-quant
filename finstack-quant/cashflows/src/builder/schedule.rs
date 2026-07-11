@@ -4,7 +4,7 @@
 //! deriving schedule metadata. Downstream pricing/risk code consumes this shape.
 
 use crate::builder::Notional;
-use crate::primitives::{CFKind, CashFlow};
+use crate::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
 use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, PeriodId};
@@ -69,21 +69,23 @@ pub fn kind_rank(kind: CFKind) -> u8 {
 /// already-sorted schedules, and the stable sort's run detection handles those
 /// pre-sorted runs in near-linear time (an unstable sort re-partitions them).
 pub fn sort_flows(flows: &mut [CashFlow]) {
-    flows.sort_by(|a, b| {
-        a.date
-            .cmp(&b.date)
-            .then_with(|| kind_rank(a.kind).cmp(&kind_rank(b.kind)))
-            .then_with(|| a.amount.currency().cmp(&b.amount.currency()))
-            .then_with(|| a.amount.amount().total_cmp(&b.amount.amount()))
-            .then_with(|| a.reset_date.cmp(&b.reset_date))
-            .then_with(|| a.accrual_factor.total_cmp(&b.accrual_factor))
-            .then_with(|| match (a.rate, b.rate) {
-                (None, None) => std::cmp::Ordering::Equal,
-                (None, Some(_)) => std::cmp::Ordering::Less,
-                (Some(_), None) => std::cmp::Ordering::Greater,
-                (Some(x), Some(y)) => x.total_cmp(&y),
-            })
-    });
+    flows.sort_by(compare_flows);
+}
+
+fn compare_flows(a: &CashFlow, b: &CashFlow) -> std::cmp::Ordering {
+    a.date
+        .cmp(&b.date)
+        .then_with(|| kind_rank(a.kind).cmp(&kind_rank(b.kind)))
+        .then_with(|| a.amount.currency().cmp(&b.amount.currency()))
+        .then_with(|| a.amount.amount().total_cmp(&b.amount.amount()))
+        .then_with(|| a.reset_date.cmp(&b.reset_date))
+        .then_with(|| a.accrual_factor.total_cmp(&b.accrual_factor))
+        .then_with(|| match (a.rate, b.rate) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (Some(x), Some(y)) => x.total_cmp(&y),
+        })
 }
 
 pub(crate) fn finalize_flows(
@@ -91,6 +93,7 @@ pub(crate) fn finalize_flows(
     fixed: &[FixedSchedule],
     floating: &[FloatSchedule],
     issue_date: Option<Date>,
+    maturity_date: Option<Date>,
 ) -> (Vec<CashFlow>, CashFlowMeta, DayCount) {
     sort_flows(&mut flows);
 
@@ -105,10 +108,50 @@ pub(crate) fn finalize_flows(
         .collect();
     cals.sort_unstable();
     cals.dedup();
+    let accrual_periods = flows
+        .iter()
+        .map(|cf| {
+            fixed
+                .iter()
+                .find_map(|schedule| {
+                    schedule
+                        .prev
+                        .get(&cf.date)
+                        .map(|p| (p.accrual_start, p.accrual_end))
+                })
+                .or_else(|| {
+                    floating.iter().find_map(|schedule| {
+                        schedule
+                            .prev
+                            .get(&cf.date)
+                            .map(|p| (p.accrual_start, p.accrual_end))
+                    })
+                })
+        })
+        .collect();
+    let accrual_day_counts = flows
+        .iter()
+        .map(|cf| {
+            fixed
+                .iter()
+                .find_map(|schedule| schedule.prev.get(&cf.date).map(|_| schedule.spec.dc))
+                .or_else(|| {
+                    floating.iter().find_map(|schedule| {
+                        schedule
+                            .prev
+                            .get(&cf.date)
+                            .map(|_| schedule.spec.rate_spec.dc)
+                    })
+                })
+        })
+        .collect();
     let meta = CashFlowMeta {
         calendar_ids: cals,
         facility_limit: None,
         issue_date,
+        maturity_date,
+        accrual_periods,
+        accrual_day_counts,
         representation: CashflowRepresentation::default(),
     };
 
@@ -147,7 +190,8 @@ pub enum CashflowRepresentation {
     NoResidual,
 }
 
-/// Metadata for cashflow schedules (calendar IDs, facility limits, issue date).
+/// Metadata for cashflow schedules (calendar IDs, facility limits, contract dates,
+/// and true accrual periods).
 ///
 /// Tracks referenced calendar IDs, optional facility limits, and the instrument's
 /// issue date for use by downstream engines (e.g., accrual calculation).
@@ -169,6 +213,21 @@ pub struct CashFlowMeta {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<String>")]
     pub issue_date: Option<Date>,
+    /// Contractual maturity date, distinct from an adjusted final payment date.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub maturity_date: Option<Date>,
+    /// Contractual accrual periods aligned with the sorted flow vector.
+    #[serde(default)]
+    #[schemars(with = "Vec<Option<(String, String)>>")]
+    pub accrual_periods: Vec<Option<(Date, Date)>>,
+    /// Per-flow day-count conventions aligned with the sorted flow vector.
+    ///
+    /// This preserves heterogeneous legs and avoids applying the schedule's
+    /// representative day count to every coupon during accrual calculation.
+    #[serde(default)]
+    #[schemars(with = "Vec<Option<String>>")]
+    pub accrual_day_counts: Vec<Option<DayCount>>,
 }
 
 /// Cashflow schedule output from the composable builder.
@@ -202,18 +261,23 @@ impl Discountable for CashFlowSchedule {
         // then compute the discounted sum.
 
         let mut ccy = None;
+        let mut has_future_cash = false;
 
-        // First pass: determine currency and validate non-empty.
-        // Stop at the first non-DefaultedNotional flow; the currency is
-        // representative for the whole schedule.
+        // First pass: determine currency from eligible future cashflows.
+        // Historical and non-cash state rows must not determine the result's
+        // currency or cause an otherwise empty future schedule to fail.
         for cf in &self.flows {
-            if cf.kind == CFKind::DefaultedNotional {
+            if cf.date <= base || !is_cash_settlement_kind(cf.kind) {
                 continue;
             }
+            has_future_cash = true;
             ccy = Some(cf.amount.currency());
             break;
         }
 
+        if !has_future_cash {
+            return Money::try_new(0.0, self.notional.initial.currency());
+        }
         let Some(ccy) = ccy else {
             return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
         };
@@ -237,7 +301,7 @@ impl Discountable for CashFlowSchedule {
         let inv_df_base = 1.0 / df_base;
         let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::default();
         for cf in &self.flows {
-            if cf.kind == CFKind::DefaultedNotional {
+            if cf.date <= base || !is_cash_settlement_kind(cf.kind) {
                 continue;
             }
             if cf.amount.currency() != ccy {
@@ -258,18 +322,19 @@ impl Discountable for CashFlowSchedule {
 impl CashFlowSchedule {
     /// Internal raw constructor for already-classified flows.
     pub(crate) fn from_parts(
-        mut flows: Vec<CashFlow>,
+        flows: Vec<CashFlow>,
         notional: Notional,
         day_count: DayCount,
         meta: CashFlowMeta,
     ) -> Self {
-        sort_flows(&mut flows);
-        Self {
+        let mut schedule = Self {
             flows,
             notional,
             day_count,
             meta,
-        }
+        };
+        sort_schedule_with_metadata(&mut schedule);
+        schedule
     }
 
     /// Create a new cashflow builder (standard Rust pattern).
@@ -319,6 +384,31 @@ impl CashFlowSchedule {
     /// Returns the list of dates for all flows in schedule order.
     pub fn dates(&self) -> Vec<Date> {
         self.flows.iter().map(|cf| cf.date).collect()
+    }
+
+    /// Validate all schedule-level and per-flow invariants.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.notional.validate()?;
+        for flow in &self.flows {
+            flow.validate()?;
+        }
+        if self.flows.windows(2).any(|w| w[0].date > w[1].date) {
+            return Err(finstack_quant_core::Error::Validation(
+                "cashflow schedule flows must be sorted by date".into(),
+            ));
+        }
+        for (name, len) in [
+            ("accrual_periods", self.meta.accrual_periods.len()),
+            ("accrual_day_counts", self.meta.accrual_day_counts.len()),
+        ] {
+            if len != 0 && len != self.flows.len() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "cashflow schedule metadata '{name}' has {len} entries for {} flows",
+                    self.flows.len()
+                )));
+            }
+        }
+        Ok(())
     }
 
     /// Internal future-flow filtering step for composed schedule normalization.
@@ -594,6 +684,63 @@ impl CashFlowSchedule {
     }
 }
 
+/// Sort a schedule while preserving metadata vectors aligned to its flow rows.
+///
+/// JSON payloads and composed schedules may carry true accrual boundaries and
+/// per-flow day-count conventions. Sorting only `flows` would silently attach
+/// those values to a different payment row.
+pub(crate) fn sort_schedule_with_metadata(schedule: &mut CashFlowSchedule) {
+    let period_aligned = schedule.meta.accrual_periods.len() == schedule.flows.len();
+    let day_count_aligned = schedule.meta.accrual_day_counts.len() == schedule.flows.len();
+
+    // A caller may have edited the flow list of an older JSON payload without
+    // updating newly introduced metadata vectors. Do not attach stale entries
+    // to different rows; discard the partial vector and retain an explicit
+    // per-flow `None` placeholder instead.
+    if !period_aligned && !schedule.meta.accrual_periods.is_empty() {
+        schedule.meta.accrual_periods = vec![None; schedule.flows.len()];
+    }
+    if !day_count_aligned && !schedule.meta.accrual_day_counts.is_empty() {
+        schedule.meta.accrual_day_counts = vec![None; schedule.flows.len()];
+    }
+
+    if !period_aligned && !day_count_aligned {
+        sort_flows(&mut schedule.flows);
+        return;
+    }
+
+    let mut records: Vec<_> = schedule
+        .flows
+        .drain(..)
+        .enumerate()
+        .map(|(idx, flow)| {
+            (
+                flow,
+                period_aligned.then(|| schedule.meta.accrual_periods[idx]),
+                day_count_aligned.then(|| schedule.meta.accrual_day_counts[idx]),
+            )
+        })
+        .collect();
+    records.sort_by(|a, b| compare_flows(&a.0, &b.0));
+
+    schedule.flows = Vec::with_capacity(records.len());
+    if period_aligned {
+        schedule.meta.accrual_periods = Vec::with_capacity(records.len());
+    }
+    if day_count_aligned {
+        schedule.meta.accrual_day_counts = Vec::with_capacity(records.len());
+    }
+    for (flow, period, day_count) in records {
+        schedule.flows.push(flow);
+        if period_aligned {
+            schedule.meta.accrual_periods.push(period.flatten());
+        }
+        if day_count_aligned {
+            schedule.meta.accrual_day_counts.push(day_count.flatten());
+        }
+    }
+}
+
 fn merge_matching<T: Copy + PartialEq>(current: &mut Option<T>, value: T, fallback: T) {
     *current = Some(match *current {
         None => value,
@@ -649,10 +796,13 @@ where
     I: IntoIterator<Item = CashFlowSchedule>,
 {
     let expected_ccy = notional.initial.currency();
-    let mut flows = Vec::new();
+    let mut flow_records = Vec::new();
     let mut calendar_ids = Vec::new();
     let mut facility_limit: Option<Option<Money>> = None;
     let mut issue_date: Option<Option<Date>> = None;
+    let mut maturity_date: Option<Option<Date>> = None;
+    let mut accrual_periods: Vec<Option<(Date, Date)>> = Vec::new();
+    let mut accrual_day_counts: Vec<Option<DayCount>> = Vec::new();
     let mut representation: Option<CashflowRepresentation> = None;
 
     for schedule in schedules {
@@ -672,14 +822,37 @@ where
             schedule.meta.representation,
             CashflowRepresentation::default(),
         );
-        flows.extend(schedule.flows);
-        calendar_ids.extend(schedule.meta.calendar_ids);
-        merge_matching_option(&mut facility_limit, schedule.meta.facility_limit);
-        merge_matching_option(&mut issue_date, schedule.meta.issue_date);
+        let flow_len = schedule.flows.len();
+        let periods_aligned = schedule.meta.accrual_periods.len() == flow_len;
+        let day_counts_aligned = schedule.meta.accrual_day_counts.len() == flow_len;
+        let schedule_flows = schedule.flows;
+        let schedule_meta = schedule.meta;
+        for (idx, flow) in schedule_flows.into_iter().enumerate() {
+            flow_records.push((
+                flow,
+                periods_aligned.then(|| schedule_meta.accrual_periods[idx]),
+                day_counts_aligned.then(|| schedule_meta.accrual_day_counts[idx]),
+            ));
+        }
+        calendar_ids.extend(schedule_meta.calendar_ids);
+        merge_matching_option(&mut facility_limit, schedule_meta.facility_limit);
+        merge_matching_option(&mut issue_date, schedule_meta.issue_date);
+        merge_matching_option(&mut maturity_date, schedule_meta.maturity_date);
     }
 
     calendar_ids.sort_unstable();
     calendar_ids.dedup();
+
+    // Keep per-flow metadata attached while applying the canonical flow order.
+    // Sorting the flow vector and metadata vectors independently would silently
+    // assign the wrong accrual boundaries/conventions after a merge.
+    flow_records.sort_by(|a, b| compare_flows(&a.0, &b.0));
+    let mut flows = Vec::with_capacity(flow_records.len());
+    for (flow, period, day_count) in flow_records {
+        flows.push(flow);
+        accrual_periods.push(period.flatten());
+        accrual_day_counts.push(day_count.flatten());
+    }
 
     Ok(CashFlowSchedule::from_parts(
         flows,
@@ -690,6 +863,9 @@ where
             calendar_ids,
             facility_limit: facility_limit.unwrap_or(None),
             issue_date: issue_date.unwrap_or(None),
+            maturity_date: maturity_date.unwrap_or(None),
+            accrual_periods,
+            accrual_day_counts,
         },
     ))
 }
@@ -757,21 +933,21 @@ fn apply_flow_to_outstanding(
         CFKind::PIK => {
             *outstanding = outstanding.checked_add(cf.amount)?;
         }
-        CFKind::Notional if include_notional && !is_initial_funding => {
+        CFKind::Notional | CFKind::RevolvingDraw | CFKind::RevolvingRepayment
+            if include_notional && !is_initial_funding =>
+        {
             // Draws negative, repays positive -> subtract to apply sign
             *outstanding = outstanding.checked_sub(cf.amount)?;
         }
         _ => {}
     }
-    // Negative replayed balances are permitted (warn-only); the builder
-    // validates over-repayment at construction time.
     if outstanding.amount() < -NEGATIVE_BALANCE_EPSILON {
-        tracing::warn!(
-            date = %cf.date,
-            kind = ?cf.kind,
-            balance = outstanding.amount(),
-            "replayed outstanding balance went negative"
-        );
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "replayed outstanding balance became negative ({}) after {:?} on {}",
+            outstanding.amount(),
+            cf.kind,
+            cf.date
+        )));
     }
     Ok(())
 }
@@ -1027,6 +1203,9 @@ mod tests {
                 calendar_ids: vec!["nyc".to_string()],
                 facility_limit: None,
                 issue_date: Some(d1),
+                maturity_date: None,
+                accrual_periods: vec![Some((d1, d2))],
+                accrual_day_counts: vec![Some(DayCount::Thirty360)],
             },
         );
         let right = CashFlowSchedule::from_parts(
@@ -1038,6 +1217,9 @@ mod tests {
                 calendar_ids: vec!["lon".to_string(), "nyc".to_string()],
                 facility_limit: None,
                 issue_date: Some(d1),
+                maturity_date: None,
+                accrual_periods: vec![Some((d1, d2))],
+                accrual_day_counts: vec![Some(DayCount::Act360)],
             },
         );
 
@@ -1059,6 +1241,10 @@ mod tests {
             vec!["lon".to_string(), "nyc".to_string()]
         );
         assert_eq!(merged.meta.issue_date, Some(d1));
+        assert_eq!(
+            merged.meta.accrual_day_counts,
+            vec![Some(DayCount::Act360), Some(DayCount::Thirty360)]
+        );
     }
 
     #[test]

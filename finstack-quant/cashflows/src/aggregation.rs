@@ -30,6 +30,7 @@ use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, Period
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 
+use crate::primitives::is_cash_settlement_kind;
 use indexmap::IndexMap;
 
 // =============================================================================
@@ -114,6 +115,14 @@ fn iter_by_period<'a, T: HasDate>(
 /// start date, overlap (a period starts before the previous period ends), or
 /// share a `PeriodId`.
 pub(crate) fn validate_periods(periods: &[Period]) -> finstack_quant_core::Result<()> {
+    for p in periods {
+        if p.start >= p.end {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "aggregation period '{}' must have start {} strictly before end {}",
+                p.id, p.start, p.end
+            )));
+        }
+    }
     for w in periods.windows(2) {
         if w[1].start < w[0].start {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -429,7 +438,7 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
     pv_by_period_generic(sorted, periods, disc, hazard, &date_ctx, |cf, df, sp| {
         let ccy = cf.amount.currency();
         // Historical flows (date <= base) carry zero PV by convention.
-        if cf.kind == CFKind::DefaultedNotional || cf.date <= base {
+        if !is_cash_settlement_kind(cf.kind) || cf.date <= base {
             return (ccy, 0.0);
         }
         (ccy, cf.amount.amount() * df * sp)
@@ -510,7 +519,7 @@ pub(crate) fn credit_adjusted_period_pv(
 ) -> f64 {
     // Historical flows (date <= valuation base) carry zero PV by convention,
     // matching the DataFrame export and the plain PV path.
-    if cf.kind == CFKind::DefaultedNotional || cf.date <= base {
+    if !is_cash_settlement_kind(cf.kind) || cf.date <= base {
         return 0.0;
     }
 
@@ -576,25 +585,46 @@ fn time_discount_survival(
     hazard: Option<&dyn Survival>,
     ctx: &DateContext<'_>,
 ) -> finstack_quant_core::Result<(f64, f64, f64)> {
-    // Compute year fraction from base to cashflow date - propagate errors
-    let t = if d == ctx.base {
-        0.0
-    } else if d > ctx.base {
-        ctx.dc.year_fraction(ctx.base, d, ctx.dc_ctx)?
-    } else {
-        -ctx.dc.year_fraction(d, ctx.base, ctx.dc_ctx)?
-    };
+    // Curve lookup times are measured from each curve's own base. Relative
+    // discounting and conditional survival are then taken from the valuation
+    // date, so changing `as_of` does not silently change the curve origin.
+    let t =
+        disc.day_count()
+            .signed_year_fraction(disc.base_date(), d, DayCountContext::default())?;
+    let df = disc.df_between_dates(ctx.base, d).map_err(|err| {
+        finstack_quant_core::Error::Validation(format!(
+            "non-finite or invalid relative discount factor at {d}: {err}"
+        ))
+    })?;
 
-    // Get discount factor
-    let df = disc.df(t);
+    let sp = if let Some(h) = hazard {
+        if let Some(h_base) = h.base_date() {
+            let h_dc = h.day_count();
+            let t_d = h_dc.signed_year_fraction(h_base, d, DayCountContext::default())?;
+            let t_asof = h_dc.signed_year_fraction(h_base, ctx.base, DayCountContext::default())?;
+            let sp_d = h.sp(t_d);
+            let sp_asof = h.sp(t_asof);
+            if !sp_asof.is_finite() || sp_asof <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "survival curve returned invalid base survival ({sp_asof}) at {}",
+                    ctx.base
+                )));
+            }
+            sp_d / sp_asof
+        } else {
+            let t_h = ctx
+                .dc
+                .signed_year_fraction(ctx.base, d, DayCountContext::default())?;
+            h.sp(t_h)
+        }
+    } else {
+        1.0
+    };
     if !df.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "discount curve returned non-finite df ({df}) at t={t} (date {d})"
+            "discount curve returned non-finite relative df ({df}) at t={t} (date {d})"
         )));
     }
-
-    // Get survival probability if hazard curve provided
-    let sp = hazard.map(|h| h.sp(t)).unwrap_or(1.0);
     if !sp.is_finite() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "survival curve returned non-finite sp ({sp}) at t={t} (date {d})"
@@ -775,6 +805,27 @@ fn precompute_integrated_pv(
     // advances once per distinct principal date, never within a date group
     // (a same-date second principal flow must not see a zero-width interval).
     let mut current_principal_date: Option<Date> = None;
+    let mut principal_by_date: std::collections::BTreeMap<Date, f64> =
+        std::collections::BTreeMap::new();
+    for cf in sorted {
+        if matches!(
+            cf.kind,
+            CFKind::Amortization
+                | CFKind::Notional
+                | CFKind::PrePayment
+                | CFKind::RevolvingRepayment
+        ) && cf.amount.amount() > 0.0
+        {
+            *principal_by_date.entry(cf.date).or_default() += cf.amount.amount();
+        }
+    }
+    let mut principal_exposure_by_date: std::collections::BTreeMap<Date, f64> =
+        std::collections::BTreeMap::new();
+    let mut cumulative_exposure = 0.0;
+    for (&date, &amount) in principal_by_date.iter().rev() {
+        cumulative_exposure += amount;
+        principal_exposure_by_date.insert(date, cumulative_exposure);
+    }
     for cf in sorted {
         let ccy = cf.amount.currency();
 
@@ -800,7 +851,10 @@ fn precompute_integrated_pv(
 
         let is_principal = matches!(
             cf.kind,
-            CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
+            CFKind::Amortization
+                | CFKind::Notional
+                | CFKind::PrePayment
+                | CFKind::RevolvingRepayment
         );
 
         if is_principal && current_principal_date != Some(cf.date) {
@@ -820,7 +874,12 @@ fn precompute_integrated_pv(
                 let (t_prev, _df_prev, sp_prev) =
                     time_discount_survival(prev_principal, disc, Some(hazard), date_ctx)?;
                 let t_mid = 0.5 * (t_prev + t_next);
-                let df_mid = disc.df(t_mid);
+                let t_asof = disc.day_count().signed_year_fraction(
+                    disc.base_date(),
+                    date_ctx.base,
+                    date_ctx.dc_ctx,
+                )?;
+                let df_mid = disc.df_between_times(t_asof, t_mid)?;
                 if !df_mid.is_finite() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "discount curve returned non-finite df ({df_mid}) at midpoint t={t_mid}"
@@ -830,7 +889,17 @@ fn precompute_integrated_pv(
                 // d_sp can go slightly negative from curve noise; clamp to avoid
                 // sign inversion (recovery is a non-negative cashflow expectation).
                 let d_sp_pos = d_sp.max(0.0);
-                pv += r * cf.amount.amount() * df_mid * d_sp_pos;
+                let group_total = principal_by_date
+                    .get(&cf.date)
+                    .copied()
+                    .unwrap_or(cf.amount.amount())
+                    .max(f64::MIN_POSITIVE);
+                let exposure = principal_exposure_by_date
+                    .get(&cf.date)
+                    .copied()
+                    .unwrap_or(cf.amount.amount());
+                let allocated_exposure = exposure * (cf.amount.amount() / group_total);
+                pv += r * allocated_exposure * df_mid * d_sp_pos;
             }
         }
 

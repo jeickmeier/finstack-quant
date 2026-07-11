@@ -314,10 +314,12 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
         .npv(&curve, curve.base_date(), Some(schedule.day_count))
         .unwrap();
 
-    // PV with flat curve DF=1.0 should equal sum of coupon amounts (no discounting)
+    // PV with flat curve DF=1.0 should equal only strictly-future cashflows;
+    // the issue-date funding exchange is already settled at the valuation date.
     let expected = schedule
         .flows
         .iter()
+        .filter(|cf| cf.date > issue)
         .fold(0.0, |sum, cf| sum + cf.amount.amount());
     assert!(
         (pv.amount() - expected).abs() < financial_tolerance(init.amount()),

@@ -17,6 +17,7 @@ The current package exposes these top-level namespaces:
 - `scenarios`
 - `statements`
 - `statements_analytics`
+- `cashflows`
 - `valuations` (includes nested `valuations.correlation`)
 
 These namespaces are assembled in `index.js` from the files under `exports/`,
@@ -29,7 +30,7 @@ while the Rust binding implementations live under `src/api/`.
 - `exports/`: per-domain JavaScript namespace shims.
 - `src/api/`: Rust bindings grouped by workspace domain.
 - `tests/`: wasm integration coverage for analytics, margin, Monte Carlo,
-  portfolio, scenarios, statements, statements analytics, and valuations.
+  portfolio, scenarios, statements, statements analytics, cashflows, and valuations.
 - `pkg/` and `pkg-node/`: generated web and Node.js build output.
 
 ## Type Declaration Strategy

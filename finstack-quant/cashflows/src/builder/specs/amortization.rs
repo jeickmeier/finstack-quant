@@ -99,6 +99,17 @@ impl Notional {
     ///
     /// Returns an error if any validation rule is violated.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !self.initial.amount().is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "initial notional must be finite".into(),
+            ));
+        }
+        if self.initial.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "initial notional must be strictly positive; got {}",
+                self.initial.amount()
+            )));
+        }
         let currency = self.initial.currency();
 
         match &self.amort {
@@ -162,6 +173,14 @@ impl Notional {
                         }
                     }
 
+                    if remaining.amount() < 0.0 || remaining.amount() > self.initial.amount() {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "StepRemaining target {} must lie in [0, initial {}]",
+                            remaining.amount(),
+                            self.initial.amount()
+                        )));
+                    }
+
                     prev_date = Some(*date);
                     prev_amount = Some(remaining.amount());
                 }
@@ -190,6 +209,12 @@ impl Notional {
                             "CustomPrincipal currency ({}) must match initial currency ({})",
                             amount.currency(),
                             currency
+                        )));
+                    }
+                    if !amount.amount().is_finite() || amount.amount() < 0.0 {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "CustomPrincipal amounts must be finite and non-negative; got {}",
+                            amount.amount()
                         )));
                     }
                     // Track total amortization (positive amounts reduce outstanding)

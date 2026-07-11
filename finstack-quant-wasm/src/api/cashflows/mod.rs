@@ -61,9 +61,9 @@ pub fn validate_cashflow_schedule_envelope_json(envelope_json: &str) -> Result<S
 /// Extract dated flows from a cashflow schedule JSON string.
 ///
 /// @param schedule_json - JSON-encoded `CashFlowSchedule`.
-/// @returns JSON array of `{date, amount}` entries, where `amount` is itself
-///   `{amount, currency}`. `CFKind` and accrual metadata are intentionally
-///   omitted; parse the full schedule JSON if you need flow classification.
+/// @returns JSON array of settlement cash entries. PIK and
+///   `DefaultedNotional` state rows are omitted; parse the full schedule JSON
+///   when flow classification is required.
 /// @throws If the schedule JSON is malformed.
 #[wasm_bindgen(js_name = datedFlowsJson)]
 pub fn dated_flows_json(schedule_json: &str) -> Result<String, JsValue> {
@@ -100,7 +100,8 @@ pub fn accrued_interest_json(
 /// @param instrument_id - Identifier for the Bond instrument.
 /// @param schedule_json - JSON-encoded `CashFlowSchedule`.
 /// @param discount_curve_id - Identifier of the discount curve used for pricing.
-/// @param quoted_clean - Optional clean quoted price used to calibrate yield on construction.
+/// @param quoted_clean - Optional clean price as percentage of par; this is a
+///   price-driving override, not yield calibration.
 /// @returns JSON-encoded tagged `InstrumentJson::Bond`.
 /// @throws If the schedule JSON is malformed or bond construction fails.
 #[wasm_bindgen(js_name = bondFromCashflowsJson)]

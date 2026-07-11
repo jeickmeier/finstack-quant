@@ -7,7 +7,7 @@
 
 use crate::builder::schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use crate::builder::Notional;
-use crate::primitives::{CFKind, CashFlow};
+use crate::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
 pub use crate::DatedFlows;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -149,6 +149,7 @@ pub trait CashflowProvider: Send + Sync {
         Ok(schedule
             .flows
             .iter()
+            .filter(|cf| is_cash_settlement_kind(cf.kind))
             .map(|cf| (cf.date, cf.amount))
             .collect())
     }
@@ -476,6 +477,9 @@ mod tests {
             calendar_ids: vec!["weekends_only".to_string()],
             facility_limit: Some(Money::new(500.0, Currency::USD)),
             issue_date: Some(date),
+            maturity_date: None,
+            accrual_periods: Vec::new(),
+            accrual_day_counts: Vec::new(),
         };
 
         let schedule = schedule_from_classified_flows(

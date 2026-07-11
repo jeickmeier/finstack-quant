@@ -162,6 +162,12 @@ impl<'a> DateProcessor<'a> {
                     rate: None,
                 });
                 state.outstanding += f64_to_decimal(ev.delta.amount())?;
+                if state.outstanding < Decimal::ZERO {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "principal event on {} would make outstanding balance negative ({})",
+                        d, state.outstanding
+                    )));
+                }
             }
         }
         Ok(())

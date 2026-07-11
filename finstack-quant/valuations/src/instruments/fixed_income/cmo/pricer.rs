@@ -272,6 +272,9 @@ pub(crate) fn build_reference_tranche_schedule(
                 calendar_ids: Vec::new(),
                 facility_limit: None,
                 issue_date: Some(cmo.issue_date),
+                maturity_date: None,
+                accrual_periods: Vec::new(),
+                accrual_day_counts: Vec::new(),
             }),
             ..Default::default()
         },
