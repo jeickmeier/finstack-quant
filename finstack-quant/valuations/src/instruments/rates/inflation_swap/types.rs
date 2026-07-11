@@ -191,13 +191,14 @@ impl InflationSwap {
         // importantly dates before the first observation) are data errors and must
         // not be hidden by projecting a historical value from the curve.
         if lagged_date <= discount_base {
-            let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
-            return crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                index.as_ref(),
-                unlagged_date,
-                lagged_date,
-                self.effective_lag(curves),
-            );
+            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
+                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
+                    index.as_ref(),
+                    unlagged_date,
+                    lagged_date,
+                    self.effective_lag(curves),
+                );
+            }
         }
 
         let inflation_curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
@@ -709,13 +710,14 @@ impl YoYInflationSwap {
         // date is on or before the valuation date. Reading later entries from a
         // fixing series that extends past as_of would introduce look-ahead bias.
         if lagged_date <= as_of {
-            let index = curves.get_inflation_index(self.inflation_index_id.as_str())?;
-            return crate::instruments::common_impl::helpers::realized_inflation_index_value(
-                index.as_ref(),
-                date,
-                lagged_date,
-                lag,
-            );
+            if let Ok(index) = curves.get_inflation_index(self.inflation_index_id.as_str()) {
+                return crate::instruments::common_impl::helpers::realized_inflation_index_value(
+                    index.as_ref(),
+                    date,
+                    lagged_date,
+                    lag,
+                );
+            }
         }
 
         let curve = curves.get_inflation_curve(self.inflation_index_id.as_str())?;
