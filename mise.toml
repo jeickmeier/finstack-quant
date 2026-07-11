@@ -62,6 +62,14 @@ mise run python-build -- --release &&
 uv run pytest finstack-quant-py/tests/golden -v
 """
 
+[tasks.goldens-quantlib-generate]
+description = "Regenerate committed native QuantLib golden fixtures"
+run = "uv run python -m scripts.golden.quantlib.generate --product all"
+
+[tasks.goldens-quantlib-check]
+description = "Check native QuantLib golden fixtures for generator drift"
+run = "uv run python -m scripts.golden.quantlib.generate --product all --check"
+
 [tasks.all-fmt]
 description = "Format + auto-fix Rust, Python, and WASM code (mutating)"
 depends = ["rust-fmt", "python-fmt", "wasm-fmt"]

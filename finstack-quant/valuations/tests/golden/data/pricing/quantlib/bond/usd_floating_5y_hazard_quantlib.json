@@ -1,0 +1,181 @@
+{
+  "expected": {
+    "cs01": -0.04289969859171805,
+    "dv01": 0.00041525621801952184,
+    "npv": 96.86683309830727
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "cashflow_spec": {
+          "Floating": {
+            "coupon_type": "Cash",
+            "freq": {
+              "count": 3,
+              "unit": "months"
+            },
+            "rate_spec": {
+              "all_in_cap_bp": null,
+              "all_in_floor_bp": null,
+              "bdc": "following",
+              "calendar_id": "weekends_only",
+              "dc": "Act360",
+              "end_of_month": false,
+              "fixing_calendar_id": "weekends_only",
+              "gearing": "1",
+              "gearing_includes_spread": true,
+              "index_cap_bp": null,
+              "index_floor_bp": null,
+              "index_id": "USD-SOFR-3M",
+              "payment_lag_days": 0,
+              "reset_freq": {
+                "count": 3,
+                "unit": "months"
+              },
+              "reset_lag_days": 2,
+              "spread_bp": "100"
+            },
+            "stub": "ShortFront"
+          }
+        },
+        "credit_curve_id": "USD-CREDIT",
+        "discount_curve_id": "USD-OIS",
+        "ex_coupon_days": 0,
+        "id": "USD-FLOATING-5Y-HAZARD-QUANTLIB",
+        "issue_date": "2026-05-06",
+        "maturity": "2031-05-06",
+        "notional": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "settlement_days": 2
+      },
+      "type": "bond"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Thirty360",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "Act360",
+          "extrapolation": "flat_forward",
+          "id": "USD-SOFR-3M",
+          "interp_style": "linear",
+          "knot_points": [
+            [
+              0.0,
+              0.043
+            ],
+            [
+              30.0,
+              0.043
+            ]
+          ],
+          "rate_calibration": null,
+          "reset_lag": 2,
+          "tenor": 0.25,
+          "type": "forward"
+        },
+        {
+          "base": "2026-04-30",
+          "currency": "USD",
+          "day_count": "Act365F",
+          "fx_policy": null,
+          "id": "USD-CREDIT",
+          "issuer": null,
+          "knot_points": [
+            [
+              0.0,
+              0.02
+            ],
+            [
+              30.0,
+              0.02
+            ]
+          ],
+          "par_interp": "Linear",
+          "par_points": [],
+          "recovery_rate": 0.0,
+          "seniority": null,
+          "survival_interp": "log_linear",
+          "type": "hazard"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "inflation_indices": [],
+      "prices": {},
+      "series": [],
+      "surfaces": [],
+      "version": 2,
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib native five-year USD floating-rate hazard bond with zero recovery.",
+    "domain": "fixed_income.bond",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "usd_floating_5y_hazard_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product floating_hazard_bond",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; deterministic flat-curve native instrument benchmark.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "cs01": {
+      "rel": 0.005,
+      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100, parallel DV01 within 0.5%, and CS01 within 0.5%; zero recovery isolates survival weighting."
+    },
+    "dv01": {
+      "rel": 0.005,
+      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100, parallel DV01 within 0.5%, and CS01 within 0.5%; zero recovery isolates survival weighting."
+    },
+    "npv": {
+      "abs": 0.01,
+      "tolerance_reason": "Credit floater validation target: price within 0.01 per 100, parallel DV01 within 0.5%, and CS01 within 0.5%; zero recovery isolates survival weighting."
+    }
+  }
+}

@@ -1,0 +1,114 @@
+{
+  "expected": {
+    "dv01": -0.08710645862191058,
+    "npv": 107.84154226031318
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "cashflow_spec": {
+          "Fixed": {
+            "bdc": "following",
+            "calendar_id": "weekends_only",
+            "coupon_type": "Cash",
+            "dc": "Thirty360",
+            "freq": {
+              "count": 6,
+              "unit": "months"
+            },
+            "rate": "0.05",
+            "stub": "ShortFront"
+          }
+        },
+        "credit_curve_id": null,
+        "discount_curve_id": "USD-OIS",
+        "ex_coupon_days": 0,
+        "id": "USD-FIXED-10Y-RISK-FREE-QUANTLIB",
+        "issue_date": "2026-04-30",
+        "maturity": "2036-04-30",
+        "notional": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "settlement_days": 2
+      },
+      "type": "bond"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Thirty360",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "inflation_indices": [],
+      "prices": {},
+      "series": [],
+      "surfaces": [],
+      "version": 2,
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib native ten-year USD fixed-rate risk-free bond.",
+    "domain": "fixed_income.bond",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "usd_fixed_10y_risk_free_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fixed_risk_free_bond",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; deterministic flat-curve native instrument benchmark.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "dv01": {
+      "rel": 0.001,
+      "tolerance_reason": "Independent vanilla-bond validation target: price within 0.02 per 100 notional and DV01 within 0.1% under matched schedule and curve conventions."
+    },
+    "npv": {
+      "abs": 0.02,
+      "tolerance_reason": "Independent vanilla-bond validation target: price within 0.02 per 100 notional and DV01 within 0.1% under matched schedule and curve conventions."
+    }
+  }
+}

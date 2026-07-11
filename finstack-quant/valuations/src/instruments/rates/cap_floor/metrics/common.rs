@@ -117,8 +117,7 @@ where
             continue;
         }
 
-        let fixing_t = option
-            .day_count
+        let fixing_t = finstack_quant_core::dates::DayCount::Act365F
             .year_fraction(context.as_of, fixing_date, dc_ctx)?
             .max(MIN_EFFECTIVE_FIXING_TIME);
 

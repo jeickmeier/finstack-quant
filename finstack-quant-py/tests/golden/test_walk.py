@@ -7,7 +7,7 @@ import re
 
 import pytest
 
-from .conftest import DATA_ROOTS, WORKSPACE_ROOT, validate_fixture
+from .conftest import DATA_ROOTS, WORKSPACE_ROOT, discover_fixtures, validate_fixture
 from .schema import GoldenFixture
 
 VALUATION_DATA_ROOT = WORKSPACE_ROOT / "finstack-quant/valuations/tests/golden/data"
@@ -42,13 +42,7 @@ def test_python_discovery_covers_all_golden_json_fixtures() -> None:
     declared_roots = _declared_python_fixture_roots()
     discovered: set[str] = set()
     for root in declared_roots:
-        root_path = VALUATION_DATA_ROOT / root
-        if root_path.exists():
-            discovered.update(
-                str(path.relative_to(VALUATION_DATA_ROOT))
-                for path in root_path.rglob("*.json")
-                if "screenshots" not in path.parts
-            )
+        discovered.update(discover_fixtures(root))
 
     all_fixtures = {
         str(path.relative_to(VALUATION_DATA_ROOT))

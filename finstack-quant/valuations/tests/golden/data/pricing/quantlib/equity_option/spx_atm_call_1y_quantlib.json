@@ -1,0 +1,152 @@
+{
+  "expected": {
+    "delta": 56.77895986922658,
+    "gamma": 1.9164976492052073,
+    "npv": 873.9487911610385,
+    "rho": 0.4803947195761618,
+    "vega": 38.32995298410414
+  },
+  "instrument": {
+    "spec": {
+      "attributes": {
+        "meta": {},
+        "tags": [
+          "golden",
+          "quantlib"
+        ]
+      },
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIVYIELD",
+      "expiry": "2027-04-30",
+      "id": "SPX-ATM-CALL-1Y-QUANTLIB",
+      "notional": {
+        "amount": "100.0",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "spot_id": "SPX-SPOT",
+      "strike": 100.0,
+      "underlying_ticker": "SPX",
+      "vol_surface_id": "SPX-VOL-QL"
+    },
+    "type": "equity_option"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "inflation_indices": [],
+      "prices": {
+        "SPX-DIVYIELD": {
+          "unitless": 0.02
+        },
+        "SPX-SPOT": {
+          "price": {
+            "amount": "100.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "SPX-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "strikes": [
+            0.5,
+            1.0,
+            2.0
+          ],
+          "vols_row_major": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ]
+        }
+      ],
+      "version": 2,
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib native one-year ATM European equity call.",
+    "domain": "equity.equity_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "spx_atm_call_1y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product european_equity_option",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; deterministic flat-curve native instrument benchmark.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "black76",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "delta": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib AnalyticEuropeanEngine and Finstack use the same Black-Scholes-Merton closed form; tolerance permits only floating-point and date-clock residuals."
+    },
+    "gamma": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib AnalyticEuropeanEngine and Finstack use the same Black-Scholes-Merton closed form; tolerance permits only floating-point and date-clock residuals."
+    },
+    "npv": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib AnalyticEuropeanEngine and Finstack use the same Black-Scholes-Merton closed form; tolerance permits only floating-point and date-clock residuals."
+    },
+    "rho": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib AnalyticEuropeanEngine and Finstack use the same Black-Scholes-Merton closed form; tolerance permits only floating-point and date-clock residuals."
+    },
+    "vega": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib AnalyticEuropeanEngine and Finstack use the same Black-Scholes-Merton closed form; tolerance permits only floating-point and date-clock residuals."
+    }
+  }
+}

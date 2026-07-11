@@ -1,0 +1,143 @@
+{
+  "expected": {
+    "convexity_adjustment": 0.0,
+    "dv01": -250.0,
+    "futures_price": 95.7,
+    "implied_forward": 0.04299999999999997,
+    "npv": 0.0
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "contract_specs": {
+          "convexity_adjustment": 0.0,
+          "delivery_months": 3,
+          "face_value": 1000000.0,
+          "tick_size": 0.0025,
+          "tick_value": 6.25
+        },
+        "day_count": "Act360",
+        "discount_curve_id": "USD-OIS",
+        "expiry": "2026-06-17",
+        "fixing_date": "2026-06-17",
+        "forward_curve_id": "USD-SOFR-3M",
+        "id": "SOFR-3M-QUARTERLY-QUANTLIB",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "period_end": "2026-09-18",
+        "period_start": "2026-06-19",
+        "position": "long",
+        "quoted_price": 95.7,
+        "vol_surface_id": null
+      },
+      "type": "interest_rate_future"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "base": "2026-04-30",
+          "day_count": "Act360",
+          "extrapolation": "flat_forward",
+          "id": "USD-SOFR-3M",
+          "interp_style": "linear",
+          "knot_points": [
+            [
+              0.0,
+              0.043
+            ],
+            [
+              30.0,
+              0.043
+            ]
+          ],
+          "rate_calibration": null,
+          "reset_lag": 2,
+          "tenor": 0.25,
+          "type": "forward"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "inflation_indices": [],
+      "prices": {},
+      "series": [],
+      "surfaces": [],
+      "version": 2,
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib native quarterly SOFR future helper with CME SR3 tick economics.",
+    "domain": "rates.ir_future",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "sofr_3m_quarterly_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product sofr_future",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; deterministic flat-curve native instrument benchmark.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "convexity_adjustment": {
+      "abs": 1e-12,
+      "tolerance_reason": "At-market QuantLib SofrFutureRateHelper quote with explicit zero convexity adjustment."
+    },
+    "dv01": {
+      "abs": 1e-09
+    },
+    "futures_price": {
+      "abs": 1e-12
+    },
+    "implied_forward": {
+      "abs": 1e-12
+    },
+    "npv": {
+      "abs": 1e-09
+    }
+  }
+}

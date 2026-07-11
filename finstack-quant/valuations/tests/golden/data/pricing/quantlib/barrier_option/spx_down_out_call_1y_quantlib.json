@@ -1,0 +1,140 @@
+{
+  "expected": {
+    "npv": 9.22509769221584
+  },
+  "instrument": {
+    "spec": {
+      "attributes": {
+        "meta": {},
+        "tags": [
+          "golden",
+          "quantlib"
+        ]
+      },
+      "barrier": {
+        "amount": "80.0",
+        "currency": "USD"
+      },
+      "barrier_type": "down_and_out",
+      "day_count": "Act365F",
+      "discount_curve_id": "USD-OIS",
+      "div_yield_id": "SPX-DIVYIELD",
+      "expiry": "2027-04-30",
+      "id": "SPX-DOWN-OUT-CALL-1Y-QUANTLIB",
+      "notional": {
+        "amount": "1",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "rebate": null,
+      "spot_id": "SPX-SPOT",
+      "strike": 100.0,
+      "underlying_ticker": "SPX",
+      "use_gobet_miri": false,
+      "vol_surface_id": "SPX-BARRIER-VOL-QL"
+    },
+    "type": "barrier_option"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "inflation_indices": [],
+      "prices": {
+        "SPX-DIVYIELD": {
+          "unitless": 0.01
+        },
+        "SPX-SPOT": {
+          "price": {
+            "amount": "100.0",
+            "currency": "USD"
+          }
+        }
+      },
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "SPX-BARRIER-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "strikes": [
+            50.0,
+            100.0,
+            150.0
+          ],
+          "vols_row_major": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ]
+        }
+      ],
+      "version": 2,
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib native one-year continuous down-and-out equity call.",
+    "domain": "exotics.barrier_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "spx_down_out_call_1y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product barrier_option",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; deterministic flat-curve native instrument benchmark.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "barrier_bs_continuous",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "npv": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib AnalyticBarrierEngine and Finstack use the continuous-monitoring Reiner-Rubinstein closed form with zero rebate."
+    }
+  }
+}

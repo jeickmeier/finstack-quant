@@ -1282,7 +1282,7 @@ mod tests {
     /// `1/365.25`"). On `cdx_ig_46_payer_atm_jun26` the pure-T-shift
     /// formulation is empirically closer to the CDSO screen than the
     /// alternative as-of-shift; see the Phase 5b remediation note in
-    /// `tests/golden/data/pricing/cds_option/cdx_ig_46_payer_atm_jun26.json`.
+    /// `tests/golden/data/pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json`.
     #[test]
     fn theta_uses_pure_t_shift_with_365_25_denominator() {
         let as_of = date!(2025 - 01 - 01);

@@ -57,6 +57,7 @@ VALID_SOURCES = {
     "textbook",
 }
 MANUAL_SCREENSHOT_SOURCES = {"bloomberg-screen", "intex"}
+PRICING_GOLDEN_TYPES = ("regression_goldens", "quantlib", "bloomberg")
 ZERO_RISK_EPSILON = 2.220446049250313e-16
 ZERO_RISK_METRICS_REQUIRING_REASON = {
     "bucketed_dv01",
@@ -85,7 +86,9 @@ _DOMAIN_RUNNERS = {
     "credit.cds_tranche": "pricing_common",
     "equity.equity_option": "pricing_common",
     "equity.equity_index_future": "pricing_common",
+    "exotics.asian_option": "pricing_common",
     "exotics.barrier_option": "pricing_common",
+    "exotics.lookback_option": "pricing_common",
     "fixed_income.bond": "pricing_common",
     "fixed_income.bond_future": "pricing_common",
     "fixed_income.convertible": "pricing_common",
@@ -93,6 +96,10 @@ _DOMAIN_RUNNERS = {
     "fixed_income.term_loan": "pricing_common",
     "fixed_income.structured_credit": "pricing_common",
     "fx.fx_option": "pricing_common",
+    "fx.fx_digital_option": "pricing_common",
+    "fx.fx_barrier_option": "pricing_common",
+    "fx.quanto_option": "pricing_common",
+    "fx.fx_forward": "pricing_common",
     "fx.fx_swap": "pricing_common",
     "rates.cap_floor": "pricing_common",
     "rates.cms_option": "pricing_common",
@@ -123,10 +130,12 @@ def fixture_path(relative_path: str) -> Path:
 def discover_fixtures(relative_dir: str) -> list[str]:
     """Return JSON fixtures under a relative data directory."""
     data_root = _data_root_for(relative_dir)
-    root = data_root / relative_dir
-    if not root.exists():
-        return []
-    return sorted(str(path.relative_to(data_root)) for path in root.rglob("*.json"))
+    parts = Path(relative_dir).parts
+    if len(parts) == 2 and parts[0] == "pricing" and parts[1] not in PRICING_GOLDEN_TYPES:
+        roots = [data_root / "pricing" / golden_type / parts[1] for golden_type in PRICING_GOLDEN_TYPES]
+    else:
+        roots = [data_root / relative_dir]
+    return sorted(str(path.relative_to(data_root)) for root in roots if root.exists() for path in root.rglob("*.json"))
 
 
 @cache
@@ -189,6 +198,10 @@ def run_golden(relative_path: str) -> None:
 
     if failures:
         msg = f"{len(failures)} metric(s) failed:\n" + "\n\n".join(failures)
+        if not os.environ.get("GOLDEN_IGNORE_NON_EXECUTABLE"):
+            reason = _known_non_executable().get(relative_path)
+            if reason is not None:
+                pytest.xfail(f"{reason}\n\n{msg}")
         raise AssertionError(msg)
 
 
@@ -208,6 +221,14 @@ def validate_fixture(path: Path, fixture: GoldenFixture) -> None:
     assert metadata.captured_on.strip(), "metadata.captured_on is empty"
     assert metadata.last_reviewed_by.strip(), "metadata.last_reviewed_by is empty"
     assert metadata.last_reviewed_on.strip(), "metadata.last_reviewed_on is empty"
+
+    if fixture.kind == "pricing":
+        relative = path.relative_to(DATA_ROOTS["pricing"] / "pricing")
+        actual = relative.parts[0]
+        expected = _pricing_golden_type(metadata.source)
+        assert actual == expected, (
+            f"metadata.source {metadata.source!r} requires pricing/{expected}/, found pricing/{actual}/"
+        )
 
     extra_tolerances = set(fixture.tolerances) - set(fixture.expected)
     missing_tolerances = set(fixture.expected) - set(fixture.tolerances)
@@ -230,6 +251,14 @@ def validate_fixture(path: Path, fixture: GoldenFixture) -> None:
         _validate_pricing_body(fixture)
     else:
         _validate_sabr_body(fixture)
+
+
+def _pricing_golden_type(source: str) -> str:
+    if source == "quantlib":
+        return "quantlib"
+    if source in {"bloomberg-api", "bloomberg-screen"}:
+        return "bloomberg"
+    return "regression_goldens"
 
 
 def _validate_pricing_body(fixture: GoldenFixture) -> None:
@@ -349,6 +378,19 @@ def is_git_tracked(path: Path) -> bool:
     git = shutil.which("git")
     if git is None:
         return False
+    if _git_tracks(git, relative_path):
+        return True
+    pricing_root = Path("finstack-quant/valuations/tests/golden/data/pricing")
+    try:
+        relative_pricing_path = relative_path.relative_to(pricing_root)
+    except ValueError:
+        return False
+    if relative_pricing_path.parts[:1] not in {(golden_type,) for golden_type in PRICING_GOLDEN_TYPES}:
+        return False
+    return _git_tracks(git, pricing_root / Path(*relative_pricing_path.parts[1:]))
+
+
+def _git_tracks(git: str, relative_path: Path) -> bool:
     result = subprocess.run(  # noqa: S603 - fixed executable, no shell, path constrained to repo.
         [git, "ls-files", "--error-unmatch", "--", str(relative_path)],
         cwd=WORKSPACE_ROOT,

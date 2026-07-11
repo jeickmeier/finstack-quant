@@ -1,0 +1,210 @@
+{
+  "expected": {
+    "npv": 81.84076455808031
+  },
+  "instrument": {
+    "spec": {
+      "attributes": {
+        "meta": {},
+        "tags": [
+          "golden",
+          "quantlib"
+        ]
+      },
+      "base_currency": "JPY",
+      "correlation": -0.25,
+      "day_count": "Act365F",
+      "div_yield_id": "NKY-DIVYIELD",
+      "domestic_discount_curve_id": "USD-OIS",
+      "equity_strike": {
+        "amount": "100.0",
+        "currency": "JPY"
+      },
+      "expiry": "2027-04-30",
+      "foreign_discount_curve_id": "JPY-OIS",
+      "fx_rate_id": "JPYUSD-SPOT",
+      "fx_vol_id": "JPYUSD-VOL-QL",
+      "id": "NKY-USD-QUANTO-CALL-1Y-QUANTLIB",
+      "notional": {
+        "amount": "1000",
+        "currency": "USD"
+      },
+      "option_type": "call",
+      "payoff_fx_rate": 0.01,
+      "quote_currency": "USD",
+      "spot_id": "NKY-SPOT",
+      "underlying_quantity": 1000.0,
+      "underlying_ticker": "NKY",
+      "vol_surface_id": "NKY-VOL-QL"
+    },
+    "type": "quanto_option"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        },
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "extrapolation": "flat_forward",
+          "id": "JPY-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.7408182206817179
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": {
+        "config": {
+          "cache_capacity": 256,
+          "enable_triangulation": true,
+          "pivot_currency": "USD"
+        },
+        "pinned_quotes": [],
+        "quotes": [
+          [
+            "JPY",
+            "USD",
+            0.01
+          ]
+        ]
+      },
+      "fx_delta_vol_surfaces": [],
+      "inflation_indices": [],
+      "prices": {
+        "JPYUSD-SPOT": {
+          "unitless": 0.01
+        },
+        "NKY-DIVYIELD": {
+          "unitless": 0.005
+        },
+        "NKY-SPOT": {
+          "price": {
+            "amount": "100.0",
+            "currency": "JPY"
+          }
+        }
+      },
+      "series": [],
+      "surfaces": [
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "NKY-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "strikes": [
+            50.0,
+            100.0,
+            150.0
+          ],
+          "vols_row_major": [
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2,
+            0.2
+          ]
+        },
+        {
+          "expiries": [
+            0.25,
+            1.0,
+            2.0
+          ],
+          "id": "JPYUSD-VOL-QL",
+          "interpolation_mode": "vol",
+          "quote_type": "black_lognormal",
+          "secondary_axis": "strike",
+          "strikes": [
+            0.005,
+            0.01,
+            0.02
+          ],
+          "vols_row_major": [
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1
+          ]
+        }
+      ],
+      "version": 2,
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib native one-year fixed-conversion Nikkei USD quanto call.",
+    "domain": "fx.quanto_option",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "nky_usd_quanto_call_1y_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product quanto_option",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; deterministic flat-curve native instrument benchmark.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "quanto_bs",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "npv": {
+      "abs": 1e-07,
+      "tolerance_reason": "QuantLib QuantoEuropeanEngine and Finstack use the same fixed-conversion Black-Scholes quanto drift adjustment under matched FX direction and correlation."
+    }
+  }
+}

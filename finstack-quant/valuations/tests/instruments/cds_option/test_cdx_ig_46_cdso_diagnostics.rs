@@ -46,7 +46,8 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_option::pric
 const DIAG_G_DAYS_IN_YEAR: f64 = 365.0;
 const DIAG_THETA_DAYS_IN_YEAR: f64 = 365.25;
 
-const FIXTURE: &str = "tests/golden/data/pricing/cds_option/cdx_ig_46_payer_atm_jun26.json";
+const FIXTURE: &str =
+    "tests/golden/data/pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json";
 
 const BBG_NPV: f64 = 118_781.76;
 const BBG_PAR_BP: f64 = 55.2848;
@@ -634,7 +635,7 @@ fn calibrate_lognormal_mean_to_target_at(
 
 fn cdx_fixture_internal() -> (CDSOption, MarketContext) {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests/golden/data/pricing/cds_option/cdx_ig_46_payer_atm_jun26.json");
+        .join("tests/golden/data/pricing/bloomberg/cds_option/cdx_ig_46_payer_atm_jun26.json");
     let raw = fs::read_to_string(path).expect("read cdx fixture");
     let fixture: Value = serde_json::from_str(&raw).expect("parse fixture");
     let option: CDSOption = serde_json::from_value(fixture_instrument_spec(&fixture).clone())

@@ -17,8 +17,8 @@ from .tolerance import compare
 
 
 def test_fixture_path_pricing() -> None:
-    path = fixture_path("pricing/irs/foo.json")
-    assert path.parts[-3:] == ("pricing", "irs", "foo.json")
+    path = fixture_path("pricing/quantlib/irs/foo.json")
+    assert path.parts[-4:] == ("pricing", "quantlib", "irs", "foo.json")
     assert "valuations" in str(path)
 
 
@@ -34,6 +34,13 @@ def test_fixture_path_unknown_domain_raises() -> None:
 
 def test_discover_fixtures_empty_dir() -> None:
     assert discover_fixtures("pricing/nonexistent") == []
+
+
+def test_discover_pricing_product_across_golden_types() -> None:
+    fixtures = discover_fixtures("pricing/fra")
+
+    assert "pricing/bloomberg/fra/usd_fra_3x6.json" in fixtures
+    assert "pricing/quantlib/fra/usd_fra_3x6_quantlib.json" in fixtures
 
 
 def test_abs_or_rel_tolerances_allow_either_by_default() -> None:
@@ -98,7 +105,7 @@ def test_pricing_validation_allows_dynamic_metric_keys_from_requested_base_metri
 
 
 def test_manual_screenshot_paths_must_stay_under_screenshots_directory() -> None:
-    path = DATA_ROOTS["pricing"] / "pricing/cap_floor/usd_cap_5y_atm_black.json"
+    path = DATA_ROOTS["pricing"] / "pricing/bloomberg/cap_floor/usd_cap_5y_atm_black.json"
     fixture = GoldenFixture.from_path(path)
     fixture.metadata.screenshots[0].path = "../cap_floor/usd_cap_5y_atm_black.json"
 
@@ -107,7 +114,7 @@ def test_manual_screenshot_paths_must_stay_under_screenshots_directory() -> None
 
 
 def test_pricing_validation_rejects_inconsistent_swaption_underlying_tenor() -> None:
-    path = DATA_ROOTS["pricing"] / "pricing/swaption/usd_swaption_normal_vol_self_test.json"
+    path = DATA_ROOTS["pricing"] / "pricing/regression_goldens/swaption/usd_swaption_normal_vol_self_test.json"
     fixture = GoldenFixture.from_path(path)
     fixture.body = deepcopy(fixture.body)
     spec = fixture.body["instrument"]["instrument"]["spec"]
@@ -130,7 +137,7 @@ def test_sabr_strike_keys_must_match_expected() -> None:
 
 
 def _deposit_fixture() -> tuple[object, GoldenFixture]:
-    path = DATA_ROOTS["pricing"] / "pricing/deposit/usd_deposit_3m.json"
+    path = DATA_ROOTS["pricing"] / "pricing/quantlib/deposit/usd_deposit_3m.json"
     fixture = GoldenFixture.from_path(path)
     fixture.body = deepcopy(fixture.body)
     return path, fixture

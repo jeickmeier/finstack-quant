@@ -1,0 +1,126 @@
+{
+  "expected": {
+    "deposit_par_rate": 0.03985001083863061,
+    "dv01": -249.38681957870722,
+    "npv": 10002877.927119438
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "calendar_id": null,
+        "day_count": "Act360",
+        "discount_curve_id": "USD-OIS",
+        "id": "USD-DEP-3M-GOLDEN",
+        "maturity": "2026-07-30",
+        "notional": {
+          "amount": "10000000",
+          "currency": "USD"
+        },
+        "quote_rate": "0.041",
+        "spot_lag_days": 0,
+        "start_date": "2026-04-30"
+      },
+      "type": "deposit"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "envelope": {
+      "market_data": [],
+      "plan": {
+        "description": "Pre-built synthetic-pillar USD-OIS curve; no calibration steps required.",
+        "id": "usd_deposit_3m",
+        "quote_sets": {},
+        "settings": {
+          "fx": {
+            "cache_capacity": 256,
+            "enable_triangulation": true,
+            "pivot_currency": "USD"
+          }
+        },
+        "steps": []
+      },
+      "prior_market": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Act365F",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "kind": "discount_curve",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              0.25,
+              0.99
+            ],
+            [
+              0.5,
+              0.9802
+            ],
+            [
+              1.0,
+              0.9608
+            ],
+            [
+              2.0,
+              0.9231
+            ],
+            [
+              5.0,
+              0.8187
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null
+        }
+      ],
+      "schema": "finstack_quant.calibration"
+    },
+    "kind": "envelope"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib-parity USD 3M money-market deposit on a committed discount curve.",
+    "domain": "rates.deposit",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "usd_deposit_3m",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product deposit",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; Actual/365F log-linear discount interpolation, Actual/360 deposit accrual, and holder-view settlement-date flow exclusion.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "deposit_par_rate": {
+      "abs": 1e-12,
+      "tolerance_reason": "QuantLib Actual/365F time, Actual/360 accrual, and LogLinearInterpolation on the committed synthetic discount-curve pillars."
+    },
+    "dv01": {
+      "abs": 1e-06,
+      "tolerance_reason": "QuantLib Actual/365F time, Actual/360 accrual, and LogLinearInterpolation on the committed synthetic discount-curve pillars. Central 1bp continuous-rate bump."
+    },
+    "npv": {
+      "abs": 1e-06,
+      "tolerance_reason": "QuantLib Actual/365F time, Actual/360 accrual, and LogLinearInterpolation on the committed synthetic discount-curve pillars. NPV excludes the valuation-date initial flow."
+    }
+  }
+}

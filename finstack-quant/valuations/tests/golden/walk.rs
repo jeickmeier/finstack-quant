@@ -139,6 +139,8 @@ pub(crate) fn validate_fixture(path: &Path) -> Result<(), String> {
         ));
     }
 
+    validate_pricing_golden_type(path, &fixture)?;
+
     validate_non_empty("metadata.name", &fixture.metadata.name)?;
     validate_non_empty("metadata.domain", &fixture.metadata.domain)?;
     validate_non_empty("metadata.description", &fixture.metadata.description)?;
@@ -188,6 +190,38 @@ pub(crate) fn validate_fixture(path: &Path) -> Result<(), String> {
 
     validate_screenshot_paths(path, &fixture)?;
 
+    Ok(())
+}
+
+fn validate_pricing_golden_type(path: &Path, fixture: &GoldenFixture) -> Result<(), String> {
+    if !matches!(fixture.body, Body::Pricing(_)) {
+        return Ok(());
+    }
+
+    let relative = path
+        .strip_prefix(data_root().join("pricing"))
+        .map_err(|_| "pricing fixture must live under data/pricing".to_string())?;
+    let actual = relative
+        .components()
+        .next()
+        .and_then(|component| match component {
+            Component::Normal(value) => value.to_str(),
+            _ => None,
+        })
+        .ok_or("pricing fixture is missing its golden type directory")?;
+    let expected = match fixture.metadata.source.as_str() {
+        "quantlib" => "quantlib",
+        "bloomberg-api" | "bloomberg-screen" => "bloomberg",
+        "formula" | "textbook" | "intex" => "regression_goldens",
+        source => return Err(format!("metadata.source '{source}' is not recognized")),
+    };
+
+    if actual != expected {
+        return Err(format!(
+            "metadata.source '{}' requires pricing/{expected}/, found pricing/{actual}/",
+            fixture.metadata.source
+        ));
+    }
     Ok(())
 }
 
@@ -527,12 +561,27 @@ fn metric_base(metric: &str) -> &str {
 }
 
 fn is_git_tracked(path: &Path) -> bool {
+    git_tracks(path) || legacy_pricing_path(path).is_some_and(|legacy| git_tracks(&legacy))
+}
+
+fn git_tracks(path: &Path) -> bool {
     Command::new("git")
         .arg("ls-files")
         .arg("--error-unmatch")
         .arg(path)
         .output()
         .is_ok_and(|output| output.status.success())
+}
+
+fn legacy_pricing_path(path: &Path) -> Option<PathBuf> {
+    let pricing_root = data_root().join("pricing");
+    let relative = path.strip_prefix(&pricing_root).ok()?;
+    let mut components = relative.components();
+    let golden_type = components.next()?.as_os_str().to_str()?;
+    if !matches!(golden_type, "regression_goldens" | "quantlib" | "bloomberg") {
+        return None;
+    }
+    Some(pricing_root.join(components.as_path()))
 }
 
 fn fixture_relative_path(path: &Path) -> Result<String, String> {
@@ -547,9 +596,10 @@ fn fixture_relative_path(path: &Path) -> Result<String, String> {
 mod tests {
     use super::*;
 
-    const CAP_FLOOR_FIXTURE: &str = "pricing/cap_floor/usd_cap_5y_atm_black.json";
-    const DEPOSIT_FIXTURE: &str = "pricing/deposit/usd_deposit_3m.json";
-    const SWAPTION_FIXTURE: &str = "pricing/swaption/usd_swaption_normal_vol_self_test.json";
+    const CAP_FLOOR_FIXTURE: &str = "pricing/bloomberg/cap_floor/usd_cap_5y_atm_black.json";
+    const DEPOSIT_FIXTURE: &str = "pricing/quantlib/deposit/usd_deposit_3m.json";
+    const SWAPTION_FIXTURE: &str =
+        "pricing/regression_goldens/swaption/usd_swaption_normal_vol_self_test.json";
 
     #[test]
     fn pricing_body_rejects_invalid_instrument() {
@@ -670,9 +720,9 @@ fn pricing_fixture_discovery_uses_existing_json_files() {
         .map(|path| fixture_relative_path(path).expect("pricing fixture should be under data root"))
         .collect::<BTreeSet<_>>();
 
-    assert!(relatives.contains("pricing/cds/cds_5y_par_spread.json"));
-    assert!(relatives.contains("pricing/irs/usd_sofr_5y_receive_fixed_swpm.json"));
-    assert!(!relatives.contains("pricing/cds/cds_5y_running_upfront.json"));
+    assert!(relatives.contains("pricing/bloomberg/cds/cds_5y_par_spread.json"));
+    assert!(relatives.contains("pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json"));
+    assert!(!relatives.contains("pricing/bloomberg/cds/cds_5y_running_upfront.json"));
 }
 
 #[test]

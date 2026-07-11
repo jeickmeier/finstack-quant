@@ -27,7 +27,11 @@ fn is_pricing_domain(domain: &str) -> bool {
             | "credit.cds_option"
             | "credit.cds_tranche"
             | "fx.fx_swap"
+            | "fx.fx_forward"
             | "fx.fx_option"
+            | "fx.fx_digital_option"
+            | "fx.fx_barrier_option"
+            | "fx.quanto_option"
             | "rates.cap_floor"
             | "rates.deposit"
             | "rates.fra"
@@ -36,6 +40,7 @@ fn is_pricing_domain(domain: &str) -> bool {
             | "rates.inflation_swap"
             | "rates.swaption"
             | "exotics.barrier_option"
+            | "exotics.asian_option"
             | "exotics.lookback_option"
             | "rates.cms_option"
             | "rates.cms_swap"
@@ -220,8 +225,8 @@ mod tests {
     #[test]
     fn run_golden_at_path_writes_comparison_csv() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path =
-            Path::new(manifest_dir).join("tests/golden/data/pricing/deposit/usd_deposit_3m.json");
+        let fixture_path = Path::new(manifest_dir)
+            .join("tests/golden/data/pricing/quantlib/deposit/usd_deposit_3m.json");
         let report_path =
             Path::new(manifest_dir).join("../../target/golden-reports/golden-comparisons.csv");
 
@@ -229,7 +234,7 @@ mod tests {
 
         let csv = std::fs::read_to_string(&report_path).expect("CSV report should exist");
         assert!(csv.contains("runner,fixture,metric,actual,expected,abs_diff,rel_diff,abs_tolerance,rel_tolerance,passed,tolerance_reason"));
-        assert!(csv.contains("rust,pricing/deposit/usd_deposit_3m.json,npv,"));
+        assert!(csv.contains("rust,pricing/quantlib/deposit/usd_deposit_3m.json,npv,"));
         assert!(csv.contains(",true,"));
     }
 

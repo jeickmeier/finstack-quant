@@ -1174,7 +1174,7 @@ mod tests {
     fn load_bloomberg_fixture() -> GoldenV2PricingFixture {
         serde_json::from_str(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/tests/golden/data/pricing/irs/usd_sofr_5y_receive_fixed_swpm.json"
+            "/tests/golden/data/pricing/bloomberg/irs/usd_sofr_5y_receive_fixed_swpm.json"
         )))
         .expect("fixture parses")
     }

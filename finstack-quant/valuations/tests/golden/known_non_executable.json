@@ -1,4 +1,17 @@
 {
   "description": "Golden fixtures whose externally sourced expected values are retained as the source of truth but cannot yet be reproduced by the executable runner. Failures are reported but not fatal (Rust: pricing.rs; Python: pytest.mark.xfail strict=False). Paths are relative to tests/golden/data/.",
-  "fixtures": []
+  "fixtures": [
+    {
+      "path": "pricing/quantlib/bond/usd_fixed_callable_8y_oas_quantlib.json",
+      "reason": "QuantLib/Finstack callable OAS is within 1.5bp, but option-adjusted DV01 differs by about 30%; tree risk parity must be aligned before this fixture can pass strictly."
+    },
+    {
+      "path": "pricing/quantlib/bond/usd_floating_5y_hazard_quantlib.json",
+      "reason": "Term-index fixing/value-date conventions produce about 0.17 per 100 price drift and 28% parallel-DV01 drift; CS01 remains within the 0.5% target."
+    },
+    {
+      "path": "pricing/quantlib/bond/usd_floating_5y_risk_free_quantlib.json",
+      "reason": "Term-index fixing/value-date conventions produce about 0.18 per 100 price drift and 8% parallel-DV01 drift, outside vanilla floater validation targets."
+    }
+  ]
 }

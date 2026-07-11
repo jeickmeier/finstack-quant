@@ -1,0 +1,132 @@
+{
+  "expected": {
+    "dv01": -0.04847875623235609,
+    "oas": 0.0125
+  },
+  "instrument": {
+    "instrument": {
+      "spec": {
+        "attributes": {
+          "meta": {},
+          "tags": [
+            "golden",
+            "quantlib"
+          ]
+        },
+        "call_put": {
+          "calls": [
+            {
+              "end_date": "2030-04-30",
+              "price_pct_of_par": 100.0,
+              "start_date": "2030-04-30"
+            }
+          ],
+          "puts": []
+        },
+        "cashflow_spec": {
+          "Fixed": {
+            "bdc": "following",
+            "calendar_id": "weekends_only",
+            "coupon_type": "Cash",
+            "dc": "Thirty360",
+            "freq": {
+              "count": 6,
+              "unit": "months"
+            },
+            "rate": "0.055",
+            "stub": "ShortFront"
+          }
+        },
+        "credit_curve_id": null,
+        "discount_curve_id": "USD-OIS",
+        "ex_coupon_days": 0,
+        "id": "USD-FIXED-CALLABLE-8Y-OAS-QUANTLIB",
+        "issue_date": "2026-04-30",
+        "maturity": "2034-04-30",
+        "notional": {
+          "amount": "100",
+          "currency": "USD"
+        },
+        "pricing_overrides": {
+          "implied_volatility": 0.01,
+          "mean_reversion": 0.03,
+          "oas_quote_compounding": "continuous",
+          "quoted_clean_price": 98.72972501905866,
+          "tree_discount_curve_id": "USD-OIS",
+          "tree_steps": 200
+        },
+        "settlement_days": 2
+      },
+      "type": "bond"
+    },
+    "schema": "finstack_quant.instrument/1"
+  },
+  "kind": "pricing",
+  "market": {
+    "data": {
+      "collateral": {},
+      "credit_indices": [],
+      "curves": [
+        {
+          "allow_non_monotonic": false,
+          "base": "2026-04-30",
+          "day_count": "Thirty360",
+          "extrapolation": "flat_forward",
+          "id": "USD-OIS",
+          "interp_style": "log_linear",
+          "knot_points": [
+            [
+              0.0,
+              1.0
+            ],
+            [
+              30.0,
+              0.30119421191220214
+            ]
+          ],
+          "min_forward_rate": null,
+          "min_forward_tenor": 1e-06,
+          "rate_calibration": null,
+          "type": "discount"
+        }
+      ],
+      "dividends": [],
+      "fx": null,
+      "fx_delta_vol_surfaces": [],
+      "inflation_indices": [],
+      "prices": {},
+      "series": [],
+      "surfaces": [],
+      "version": 2,
+      "vol_cubes": []
+    },
+    "kind": "snapshot"
+  },
+  "metadata": {
+    "captured_by": "finstack-quant",
+    "captured_on": "2026-07-11",
+    "description": "QuantLib native eight-year USD callable fixed-rate bond OAS recovery.",
+    "domain": "fixed_income.bond",
+    "last_reviewed_by": "finstack-quant",
+    "last_reviewed_on": "2026-07-11",
+    "name": "usd_fixed_callable_8y_oas_quantlib",
+    "regen_command": "uv run python -m scripts.golden.quantlib.generate --product fixed_callable_oas_bond",
+    "review_interval_months": 6,
+    "screenshots": [],
+    "source": "quantlib",
+    "source_detail": "QuantLib 1.42.1; deterministic flat-curve native instrument benchmark.",
+    "valuation_date": "2026-04-30"
+  },
+  "model": "discounting",
+  "schema_version": "finstack_quant.golden/2",
+  "tolerances": {
+    "dv01": {
+      "rel": 0.05,
+      "tolerance_reason": "Independent callable-bond validation target across 200-step Hull-White trees: OAS within 1.5bp and option-adjusted DV01 within 5%."
+    },
+    "oas": {
+      "abs": 0.00015,
+      "tolerance_reason": "Independent callable-bond validation target across 200-step Hull-White trees: OAS within 1.5bp and option-adjusted DV01 within 5%."
+    }
+  }
+}
