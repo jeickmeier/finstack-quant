@@ -314,11 +314,6 @@ class special_functions:
         float
             Probability in ``[0, 1]``.
 
-        Raises
-        ------
-        ValueError
-            If ``df`` is non-finite or not positive.
-
         Examples
         --------
         >>> from finstack_quant.core.math import special_functions
@@ -473,8 +468,8 @@ class special_functions:
         Raises
         ------
         ValueError
-            If ``df`` is non-finite or not positive, or ``p`` is outside
-            ``[0, 1]``.
+            If ``df`` is non-finite or not positive. Probabilities at or beyond
+            the domain edges saturate to negative or positive infinity.
 
         Examples
         --------

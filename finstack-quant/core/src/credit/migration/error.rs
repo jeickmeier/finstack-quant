@@ -107,6 +107,19 @@ pub enum MigrationError {
     #[error("horizon must be positive, got {0}")]
     InvalidHorizon(f64),
 
+    /// State index lies outside the rating scale.
+    #[error("state index {state} is out of range for {n_states} states")]
+    InvalidState {
+        /// Supplied state index.
+        state: usize,
+        /// Number of states in the scale.
+        n_states: usize,
+    },
+
+    /// A simulation batch requires at least one path per state.
+    #[error("paths per state must be positive")]
+    InvalidPathCount,
+
     /// Label could not be resolved to a Moody's WARF factor.
     #[error("no WARF factor for label '{label}'")]
     NoWarfFactor {

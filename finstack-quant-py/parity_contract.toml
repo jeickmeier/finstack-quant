@@ -72,6 +72,64 @@ public = [
     "MarketContext",
 ]
 
+# Symbol-level contracts for every exposed core submodule. These are checked
+# against both runtime attributes and each module's explicit `__all__`.
+[crates.core.module_symbols.config]
+python_package = "finstack_quant.core.config"
+public = ["RoundingMode", "ToleranceConfig", "FinstackConfig"]
+
+[crates.core.module_symbols.types]
+python_package = "finstack_quant.core.types"
+public = ["Rate", "Bps", "Percentage", "CreditRating", "CurveId", "InstrumentId", "Attributes"]
+
+[crates.core.module_symbols.currency]
+python_package = "finstack_quant.core.currency"
+public = ["Currency"]
+allow_additional = true # ISO-4217 code constants are generated from the Rust registry.
+
+[crates.core.module_symbols.money]
+python_package = "finstack_quant.core.money"
+public = ["Money"]
+
+[crates.core.module_symbols.math]
+python_package = "finstack_quant.core.math"
+public = ["count_consecutive", "linalg", "stats", "special_functions", "summation"]
+
+[crates.core.module_symbols.dates]
+python_package = "finstack_quant.core.dates"
+public = [
+    "DayCount", "DayCountContext", "DayCountContextState", "Thirty360Convention",
+    "TenorUnit", "Tenor",
+    "PeriodKind", "PeriodId", "Period", "PeriodPlan", "FiscalConfig",
+    "build_periods", "build_fiscal_periods",
+    "BusinessDayConvention", "CalendarMetadata", "HolidayCalendar", "adjust", "available_calendars",
+    "StubKind", "ScheduleErrorPolicy", "Schedule", "ScheduleBuilder",
+    "SifmaSettlementClass", "sifma_settlement_date", "sifma_settlement_date_for_class",
+    "estimated_sifma_settlement_date_for_class", "next_sifma_settlement",
+    "create_date", "days_since_epoch", "date_from_epoch_days",
+]
+
+[crates.core.module_symbols.market_data]
+python_package = "finstack_quant.core.market_data"
+public = [
+    "curves", "fx", "context", "dtsm", "arbitrage",
+    "BaseCorrelationCurve", "CreditIndexData", "DiscountCurve", "ForwardCurve",
+    "FxDeltaVolSurface", "HazardCurve", "InflationCurve", "PriceCurve", "VolSurface",
+    "VolCube", "VolatilityIndexCurve", "FxConversionPolicy", "FxRateResult", "FxMatrix",
+    "MarketContext",
+]
+
+[crates.core.module_symbols.credit]
+python_package = "finstack_quant.core.credit"
+public = ["scoring", "pd", "lgd", "migration"]
+
+[crates.core.module_symbols.rating_scales]
+python_package = "finstack_quant.core.rating_scales"
+public = [
+    "UnknownScalePolicy", "RatingLevel", "ScorecardScale", "RatingScaleRegistry",
+    "embedded_registry", "registry_from_config", "RATING_SCALES_EXTENSION_KEY",
+]
+
 # ---------------------------------------------------------------------------
 # finstack-quant-factor-model  →  finstack_quant.factor_model
 # ---------------------------------------------------------------------------
@@ -1278,6 +1336,17 @@ python_only_market_data = [
     "VolSurface",
     "VolatilityIndexCurve",
     "MarketContext",
+]
+
+# Published SIFMA operational calendars remain Python/server-side. Browser
+# callers may use the generic date primitives but do not receive embedded TBA
+# settlement tables until a concrete browser workflow requires them.
+python_only_dates = [
+    "SifmaSettlementClass",
+    "sifma_settlement_date",
+    "sifma_settlement_date_for_class",
+    "estimated_sifma_settlement_date_for_class",
+    "next_sifma_settlement",
 ]
 
 # Method-level gaps on types that *are* partially exposed in WASM.

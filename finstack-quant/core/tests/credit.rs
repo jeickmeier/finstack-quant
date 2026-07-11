@@ -90,8 +90,8 @@ fn migration_empirical_matrix_is_reproducible_for_same_seed() {
     let mut rng1 = Pcg64::seed_from_u64(12345);
     let mut rng2 = Pcg64::seed_from_u64(12345);
 
-    let first = simulator.empirical_matrix(1_000, &mut rng1);
-    let second = simulator.empirical_matrix(1_000, &mut rng2);
+    let first = simulator.empirical_matrix(1_000, &mut rng1).unwrap();
+    let second = simulator.empirical_matrix(1_000, &mut rng2).unwrap();
 
     for i in 0..first.n_states() {
         for j in 0..first.n_states() {

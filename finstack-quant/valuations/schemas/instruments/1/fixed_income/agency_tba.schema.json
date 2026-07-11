@@ -35,22 +35,22 @@
       "oneOf": [
         {
           "const": "a",
-          "description": "Class A: GNMA single-family 30-year.",
+          "description": "Class A: Conventional 30-year (FNMA/FHLMC UMBS).",
           "type": "string"
         },
         {
           "const": "b",
-          "description": "Class B: Conventional 30-year (FNMA/FHLMC UMBS). Most common for dollar rolls.",
+          "description": "Class B: Fixed-rate 15-year agency MBS.",
           "type": "string"
         },
         {
           "const": "c",
-          "description": "Class C: GNMA multi-family, ARMs, and other GNMA products.",
+          "description": "Class C: GNMA single-family 30-year.",
           "type": "string"
         },
         {
           "const": "d",
-          "description": "Class D: Conventional 15-year and 20-year (FNMA/FHLMC).",
+          "description": "Class D: Balloons, ARMs, multifamily, and other non-standard products.",
           "type": "string"
         }
       ]

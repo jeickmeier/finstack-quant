@@ -50,6 +50,10 @@ test('core.Money amount and lossless amountDecimal', () => {
   assert.equal(m.amount, 1234.56);
   assert.equal(typeof m.amountDecimal(), 'string');
   assert.equal(m.amountDecimal(), '1234.56');
+  const eur = new core.Currency('EUR');
+  const converted = m.convertAtRate(eur, 0.9);
+  assert.equal(converted.currency.code, 'EUR');
+  assert.equal(converted.amount, 1111.104);
 });
 
 test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
@@ -66,10 +70,14 @@ test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
 
 test('core.FxMatrix rate returns FxRateResult with rate/triangulated getters', () => {
   const fx = new core.FxMatrix();
-  fx.setQuote('EUR', 'USD', 1.1);
-  const result = fx.rate('EUR', 'USD', '2025-01-15');
+  const policy = core.FxConversionPolicy.cashflowDate();
+  fx.setQuoteOn('EUR', 'USD', '2025-01-15', policy, 1.1);
+  const result = fx.rate('EUR', 'USD', '2025-01-15', policy);
   assert.equal(typeof result.rate, 'number');
   assert.equal(result.rate, 1.1);
   assert.equal(typeof result.triangulated, 'boolean');
   assert.equal(result.triangulated, false);
+  const reused = fx.rate('EUR', 'USD', '2025-01-15', policy);
+  assert.equal(reused.rate, 1.1);
+  assert.match(policy.toString(), /cashflow/i);
 });

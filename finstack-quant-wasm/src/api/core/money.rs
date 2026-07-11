@@ -83,6 +83,15 @@ impl Money {
         }
     }
 
+    /// Convert using an already-resolved positive FX rate.
+    #[wasm_bindgen(js_name = convertAtRate)]
+    pub fn convert_at_rate(&self, target: &Currency, rate: f64) -> Result<Money, JsValue> {
+        self.inner
+            .convert_at_rate(target.inner, rate)
+            .map(|inner| Money { inner })
+            .map_err(to_js_err)
+    }
+
     /// Add two amounts.
     ///
     /// @param other - Another `Money` value.

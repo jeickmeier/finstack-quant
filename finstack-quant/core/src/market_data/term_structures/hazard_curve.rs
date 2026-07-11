@@ -579,11 +579,12 @@ impl HazardCurve {
         }
 
         let shift = spread / (1.0 - recovery);
-        for lambda in self.lambdas.iter_mut() {
+        let mut bumped = self.clone();
+        for lambda in bumped.lambdas.iter_mut() {
             let shifted = *lambda + shift;
-            if shifted < 0.0 {
+            if !shifted.is_finite() || shifted < 0.0 {
                 return Err(crate::error::InputError::UnsupportedBump {
-                    reason: "negative hazard rate after bump".to_string(),
+                    reason: "non-finite or negative hazard rate after bump".to_string(),
                 }
                 .into());
             }
@@ -593,9 +594,11 @@ impl HazardCurve {
         // hazards; keeping them would make `cds_quote_bp` report stale quotes.
         // Clear them so `cds_quote_bp` falls back to the hazard-based
         // approximation λ·(1−R)·1e4, which reflects the bumped curve.
-        self.par_tenors = Box::new([]);
-        self.par_spreads_bp = Box::new([]);
-        self.rebuild_interp()
+        bumped.par_tenors = Box::new([]);
+        bumped.par_spreads_bp = Box::new([]);
+        bumped.rebuild_interp()?;
+        *self = bumped;
+        Ok(())
     }
 
     /// Create a new curve with hazard rates shifted by a constant amount.
@@ -1377,6 +1380,32 @@ mod tests {
             (quote - 70.0).abs() < 1e-9,
             "fallback quote must reflect bumped hazards, got {quote}"
         );
+    }
+
+    #[test]
+    fn failed_bump_in_place_is_atomic() {
+        use crate::market_data::bumps::BumpSpec;
+
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let original = HazardCurve::builder("ATOMIC")
+            .base_date(base)
+            .recovery_rate(0.40)
+            .knots([(1.0, 0.010), (5.0, 0.001)])
+            .build()
+            .expect("valid hazard curve");
+        let mut attempted = original.clone();
+
+        attempted
+            .bump_in_place(&BumpSpec::parallel_bp(-30.0))
+            .expect_err("second hazard node would become negative");
+
+        assert_eq!(
+            attempted.knot_points().collect::<Vec<_>>(),
+            original.knot_points().collect::<Vec<_>>()
+        );
+        for t in [0.5, 1.0, 3.0, 5.0] {
+            assert_eq!(attempted.sp(t), original.sp(t));
+        }
     }
 
     #[test]

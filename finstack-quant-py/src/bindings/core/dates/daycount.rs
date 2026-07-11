@@ -238,7 +238,14 @@ impl PyDayCountContext {
         end_is_termination_date: bool,
     ) -> PyResult<Self> {
         let coupon_period = coupon_period
-            .map(|(s, e)| Ok::<_, PyErr>((py_to_date(&s)?, py_to_date(&e)?)))
+            .map(|(s, e)| {
+                let start = py_to_date(&s)?;
+                let end = py_to_date(&e)?;
+                DayCountContext::default()
+                    .with_coupon_period(start, end)
+                    .map(|_| (start, end))
+                    .map_err(core_to_py)
+            })
             .transpose()?;
         Ok(Self {
             calendar_id,

@@ -70,7 +70,8 @@ fn realized_variance_close_to_close_rejects_invalid_prices() {
         let err = realized_variance(&prices, RealizedVarMethod::CloseToClose, 252.0)
             .expect_err("invalid close prices should be rejected");
         assert!(
-            err.to_string().contains("undefined log returns"),
+            err.to_string()
+                .contains("prices must be finite and positive"),
             "unexpected error: {err}"
         );
     }

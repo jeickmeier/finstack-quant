@@ -298,14 +298,14 @@ pub fn next_equity_option_expiry(date: Date) -> Date {
 #[serde(rename_all = "snake_case")]
 #[derive(Default)]
 pub enum SifmaSettlementClass {
-    /// Class A: GNMA single-family 30-year.
-    A,
-    /// Class B: Conventional 30-year (FNMA/FHLMC UMBS). Most common for dollar rolls.
+    /// Class A: Conventional 30-year (FNMA/FHLMC UMBS).
     #[default]
+    A,
+    /// Class B: Fixed-rate 15-year agency MBS.
     B,
-    /// Class C: GNMA multi-family, ARMs, and other GNMA products.
+    /// Class C: GNMA single-family 30-year.
     C,
-    /// Class D: Conventional 15-year and 20-year (FNMA/FHLMC).
+    /// Class D: Balloons, ARMs, multifamily, and other non-standard products.
     D,
 }
 
@@ -315,10 +315,10 @@ impl SifmaSettlementClass {
         let agency_upper = agency.to_uppercase();
         let is_gnma = agency_upper.contains("GNMA") || agency_upper.contains("GN");
         match (is_gnma, term_years) {
-            (true, 30) => Self::A,
-            (true, _) => Self::C,
-            (false, 30) => Self::B,
-            (false, _) => Self::D,
+            (true, 30) => Self::C,
+            (_, 15) => Self::B,
+            (false, 30) => Self::A,
+            _ => Self::D,
         }
     }
 }
@@ -417,7 +417,7 @@ pub fn sifma_settlement_date_for_class(
 
 /// Return the **SIFMA TBA settlement date** for the given `month` and `year`.
 ///
-/// Defaults to **Class B** (conventional 30-year UMBS). For other settlement
+/// Defaults to **Class A** (conventional 30-year UMBS). For other settlement
 /// classes, use [`sifma_settlement_date_for_class`].
 ///
 /// # Example
@@ -428,20 +428,20 @@ pub fn sifma_settlement_date_for_class(
 /// let settle = sifma_settlement_date(Month::March, 2027);
 /// assert_eq!(
 ///     settle,
-///     Some(Date::from_calendar_date(2027, Month::March, 15).expect("Valid date"))
+///     Some(Date::from_calendar_date(2027, Month::March, 11).expect("Valid date"))
 /// );
 /// ```
 #[must_use]
 pub fn sifma_settlement_date(month: Month, year: i32) -> Option<Date> {
-    sifma_settlement_date_for_class(month, year, SifmaSettlementClass::B)
+    sifma_settlement_date_for_class(month, year, SifmaSettlementClass::A)
 }
 
-/// Return the **next SIFMA TBA settlement date** (Class B)
+/// Return the **next SIFMA TBA settlement date** (Class A)
 /// **strictly after** `date`.
 ///
 /// Scans the embedded published calendar for the current month and up to 13
 /// months forward. Returns `None` if a required month is outside the embedded
-/// Class B coverage.
+/// Class A coverage.
 ///
 /// # Example
 /// ```rust
@@ -450,7 +450,7 @@ pub fn sifma_settlement_date(month: Month, year: i32) -> Option<Date> {
 ///
 /// let start = Date::from_calendar_date(2027, Month::March, 16).expect("Valid date");
 /// let next = next_sifma_settlement(start);
-/// assert_eq!(next, Some(Date::from_calendar_date(2027, Month::April, 15).expect("Valid date")));
+/// assert_eq!(next, Some(Date::from_calendar_date(2027, Month::April, 13).expect("Valid date")));
 /// ```
 #[must_use]
 pub fn next_sifma_settlement(date: Date) -> Option<Date> {
@@ -460,7 +460,7 @@ pub fn next_sifma_settlement(date: Date) -> Option<Date> {
     // Check current month and up to 13 months forward
     for _ in 0..14 {
         let settle =
-            sifma_settlement_date_for_class(current_month, current_year, SifmaSettlementClass::B)?;
+            sifma_settlement_date_for_class(current_month, current_year, SifmaSettlementClass::A)?;
 
         if settle > date {
             return Some(settle);
@@ -759,14 +759,14 @@ mod tests {
     }
 
     #[test]
-    fn sifma_default_class_is_b() {
-        assert_eq!(SifmaSettlementClass::default(), SifmaSettlementClass::B);
+    fn sifma_default_class_is_a() {
+        assert_eq!(SifmaSettlementClass::default(), SifmaSettlementClass::A);
     }
 
     #[test]
-    fn sifma_default_is_class_b() {
+    fn sifma_default_is_class_a() {
         let old = sifma_settlement_date(Month::January, 2026);
-        let new = sifma_settlement_date_for_class(Month::January, 2026, SifmaSettlementClass::B);
+        let new = sifma_settlement_date_for_class(Month::January, 2026, SifmaSettlementClass::A);
         assert_eq!(old, new);
     }
 
@@ -774,19 +774,23 @@ mod tests {
     fn sifma_from_agency_term() {
         assert_eq!(
             SifmaSettlementClass::from_agency_term("Fnma", 30),
-            SifmaSettlementClass::B
-        );
-        assert_eq!(
-            SifmaSettlementClass::from_agency_term("Gnma", 30),
             SifmaSettlementClass::A
         );
         assert_eq!(
+            SifmaSettlementClass::from_agency_term("Gnma", 30),
+            SifmaSettlementClass::C
+        );
+        assert_eq!(
             SifmaSettlementClass::from_agency_term("Fnma", 15),
-            SifmaSettlementClass::D
+            SifmaSettlementClass::B
         );
         assert_eq!(
             SifmaSettlementClass::from_agency_term("GnmaII", 15),
-            SifmaSettlementClass::C
+            SifmaSettlementClass::B
+        );
+        assert_eq!(
+            SifmaSettlementClass::from_agency_term("Fnma", 20),
+            SifmaSettlementClass::D
         );
     }
 

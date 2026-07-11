@@ -376,7 +376,7 @@ impl FxMatrix {
         base: &str,
         quote: &str,
         date: &str,
-        policy: FxConversionPolicy,
+        policy: &FxConversionPolicy,
         rate: f64,
     ) -> Result<(), JsValue> {
         let base_ccy: RustCurrency = base.parse().map_err(to_js_err)?;
@@ -393,22 +393,39 @@ impl FxMatrix {
     /// * `base` - Base (from) currency ISO code.
     /// * `quote` - Quote (to) currency ISO code.
     /// * `date` - ISO date string.
-    /// * `policy` - Conversion policy (default cashflow-date semantics).
+    /// * `policy` - Reusable conversion policy handle.
     pub fn rate(
         &self,
         base: &str,
         quote: &str,
         date: &str,
-        policy: Option<FxConversionPolicy>,
+        policy: &FxConversionPolicy,
     ) -> Result<FxRateResult, JsValue> {
         let base_ccy: RustCurrency = base.parse().map_err(to_js_err)?;
         let quote_ccy: RustCurrency = quote.parse().map_err(to_js_err)?;
         let d = parse_iso_date(date)?;
-        let pol = policy.map_or(RustFxConversionPolicy::CashflowDate, |value| value.inner);
-
-        let query = FxQuery::with_policy(base_ccy, quote_ccy, d, pol);
+        let query = FxQuery::with_policy(base_ccy, quote_ccy, d, policy.inner);
         let result = self.inner.rate(query).map_err(to_js_err)?;
         Ok(FxRateResult { inner: result })
+    }
+
+    /// Look up an FX rate using cashflow-date conversion semantics.
+    #[wasm_bindgen(js_name = rateDefault)]
+    pub fn rate_default(
+        &self,
+        base: &str,
+        quote: &str,
+        date: &str,
+    ) -> Result<FxRateResult, JsValue> {
+        let base_ccy: RustCurrency = base.parse().map_err(to_js_err)?;
+        let quote_ccy: RustCurrency = quote.parse().map_err(to_js_err)?;
+        let d = parse_iso_date(date)?;
+        let query =
+            FxQuery::with_policy(base_ccy, quote_ccy, d, RustFxConversionPolicy::CashflowDate);
+        self.inner
+            .rate(query)
+            .map(|inner| FxRateResult { inner })
+            .map_err(to_js_err)
     }
 }
 
@@ -775,7 +792,7 @@ mod tests {
     fn fx_matrix_quote_and_rate() {
         let m = FxMatrix::new();
         m.set_quote("USD", "EUR", 0.92).expect("set quote");
-        let r = m.rate("USD", "EUR", "2024-01-15", None).expect("fx rate");
+        let r = m.rate_default("USD", "EUR", "2024-01-15").expect("fx rate");
         assert!((r.rate() - 0.92).abs() < 1e-9);
         assert!(!r.triangulated());
     }

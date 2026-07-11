@@ -178,6 +178,15 @@
               "format": "date",
               "type": "string"
             },
+            "settlement_fixing": {
+              "default": null,
+              "description": "Final settlement/SOQ fixing in index points.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "vol_index_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Volatility index forward curve identifier."

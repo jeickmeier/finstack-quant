@@ -563,6 +563,10 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
     // Money exposes the lossless decimal-string accessor.
     let money = interface_block(&dts, "Money ");
     assert!(contains_signature(money, "amountDecimal(): string;"));
+    assert!(contains_signature(
+        money,
+        "convertAtRate(target: Currency, rate: number): Money;"
+    ));
 
     // DayCountContext exposes the coupon-period builder.
     let ctx = interface_block(&dts, "DayCountContext ");
@@ -579,6 +583,25 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
     assert!(contains_signature(
         fx,
         "setQuoteOn(base: string, quote: string, date: string, policy: FxConversionPolicy, rate: number): void;"
+    ));
+    assert!(contains_signature(
+        fx,
+        "rate(base: string, quote: string, date: string, policy: FxConversionPolicy): FxRateResult;"
+    ));
+    assert!(contains_signature(
+        fx,
+        "rateDefault(base: string, quote: string, date: string): FxRateResult;"
+    ));
+
+    let day_count = interface_block(&dts, "DayCount ");
+    assert!(contains_signature(
+        day_count,
+        "signedYearFraction(startEpochDays: number, endEpochDays: number): number;"
+    ));
+    let day_count_constructor = interface_block(&dts, "DayCountConstructor ");
+    assert!(contains_signature(
+        day_count_constructor,
+        "act365l(): DayCount;"
     ));
 }
 

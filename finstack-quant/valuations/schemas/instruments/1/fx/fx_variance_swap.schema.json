@@ -172,7 +172,7 @@
               ]
             },
             "maturity": {
-              "description": "Maturity/settlement date",
+              "description": "Contractual end of the observation period.",
               "format": "date",
               "type": "string"
             },
@@ -239,6 +239,15 @@
               "$ref": "#/$defs/RealizedVarMethod",
               "default": "CloseToClose",
               "description": "Method for calculating realized variance (defaults to CloseToClose)"
+            },
+            "settlement_date": {
+              "default": null,
+              "description": "Optional cash-settlement date. Defaults to the adjusted final observation date.",
+              "format": "date",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "side": {
               "$ref": "#/$defs/PayReceive",

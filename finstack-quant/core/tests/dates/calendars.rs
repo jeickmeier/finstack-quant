@@ -201,7 +201,7 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(26),
+                expected_count: Some(27),
                 must_have: &[(2024, 2, 10), (2024, 5, 1), (2024, 10, 1), (2024, 6, 10)],
             },
             YearCheck {
@@ -217,7 +217,7 @@ const CASES: &[CalendarCase] = &[
         checks: &[
             YearCheck {
                 year: 2024,
-                expected_count: Some(26),
+                expected_count: Some(27),
                 // Dragon Boat (6/10), Mid-Autumn (9/17), CNY eve (2/9) were
                 // previously missing / hardcoded.
                 must_have: &[
@@ -244,7 +244,7 @@ const CASES: &[CalendarCase] = &[
             YearCheck {
                 year: 2026,
                 // 2026 is fully rule-generated (no exact_date needed).
-                expected_count: Some(25),
+                expected_count: Some(26),
                 must_have: &[
                     (2026, 2, 16),
                     (2026, 4, 6),
@@ -538,6 +538,26 @@ fn sse_lunar_festivals_and_bridges_present() {
         Sse.is_holiday(make_date(2008, 6, 9)),
         "Dragon Boat 2008 substitute Monday"
     );
+}
+
+#[test]
+fn mainland_calendars_use_published_2022_closure_boundaries() {
+    for (name, calendar) in [
+        ("sse", &Sse as &dyn HolidayCalendar),
+        ("cnbe", &Cnbe as &dyn HolidayCalendar),
+    ] {
+        assert!(
+            calendar.is_holiday(make_date(2022, 1, 31)),
+            "{name} must close on the first published Spring Festival day"
+        );
+        assert!(
+            calendar.is_business_day(make_date(2022, 2, 7)),
+            "{name} must reopen after the published Spring Festival closure"
+        );
+        assert!(calendar.is_holiday(make_date(2022, 4, 30)));
+        assert!(calendar.is_holiday(make_date(2022, 5, 4)));
+        assert!(calendar.is_business_day(make_date(2022, 5, 5)));
+    }
 }
 
 #[test]

@@ -520,7 +520,7 @@ mod simulation_tests {
         let sim = MigrationSimulator::new(gen, 10.0).unwrap();
         let mut rng = Pcg64::seed_from_u64(42);
         // Start from D (index 1), which is absorbing.
-        let paths = sim.simulate(1, 100, &mut rng);
+        let paths = sim.simulate(1, 100, &mut rng).unwrap();
         for path in &paths {
             assert_eq!(path.n_transitions(), 0);
             assert_eq!(path.state_at(10.0), 1);
@@ -533,11 +533,19 @@ mod simulation_tests {
         let sim = MigrationSimulator::new(gen, 5.0).unwrap();
         let mut rng1 = Pcg64::seed_from_u64(99);
         let mut rng2 = Pcg64::seed_from_u64(99);
-        let paths1 = sim.simulate(0, 10, &mut rng1);
-        let paths2 = sim.simulate(0, 10, &mut rng2);
+        let paths1 = sim.simulate(0, 10, &mut rng1).unwrap();
+        let paths2 = sim.simulate(0, 10, &mut rng2).unwrap();
         for (p1, p2) in paths1.iter().zip(paths2.iter()) {
             assert_eq!(p1.transitions(), p2.transitions());
         }
+    }
+
+    #[test]
+    fn simulator_rejects_invalid_state_and_zero_empirical_paths() {
+        let sim = MigrationSimulator::new(two_state_gen(), 1.0).unwrap();
+        let mut rng = Pcg64::seed_from_u64(7);
+        assert!(sim.simulate(2, 1, &mut rng).is_err());
+        assert!(sim.empirical_matrix(0, &mut rng).is_err());
     }
 
     #[test]
@@ -546,7 +554,7 @@ mod simulation_tests {
         let gen = two_state_gen();
         let sim = MigrationSimulator::new(gen, 1.0).unwrap();
         let mut rng = Pcg64::seed_from_u64(12345);
-        let emp = sim.empirical_matrix(100_000, &mut rng);
+        let emp = sim.empirical_matrix(100_000, &mut rng).unwrap();
         let empirical_pd = emp.probability_by_index(0, 1);
         let analytical_pd = 1.0 - (-0.1_f64).exp();
         assert!(
@@ -560,7 +568,7 @@ mod simulation_tests {
         let gen = two_state_gen();
         let sim = MigrationSimulator::new(gen, 20.0).unwrap();
         let mut rng = Pcg64::seed_from_u64(7);
-        let paths = sim.simulate(0, 1000, &mut rng);
+        let paths = sim.simulate(0, 1000, &mut rng).unwrap();
         let defaults: usize = paths.iter().filter(|p| p.defaulted()).count();
         // With lambda=0.1, P(default within 20y) = 1 - exp(-2) ≈ 0.865
         assert!(

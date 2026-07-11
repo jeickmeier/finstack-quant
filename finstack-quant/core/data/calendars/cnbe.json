@@ -2,18 +2,54 @@
   "id": "cnbe",
   "name": "China Mainland (Banking) Holiday Calendar",
   "ignore_weekends": false,
-  "comment": "Mainland China national statutory holidays (banking). Mirrors the exchange (sse) arrangement: single-day festivals use the modern 3-day 连休 (china_bridge) convention codified by the State Council (Nov 2024, effective 2025); Dragon Boat, Mid-Autumn and Qingming became national holidays in 2008 (from_year gated). exact_date is reserved for genuine irregulars the rules cannot derive.",
+  "comment": "Mainland China banking calendar. Spring Festival and Labour Day use published year-specific closure spans for 2004-2026; rules outside that verified range are explicitly estimates. Single-day statutory festivals use the modern 3-day 连休 (china_bridge) convention codified by the State Council (Nov 2024, effective 2025).",
   "rules": [
     { "type": "china_bridge", "name": "New Year's Day", "festival": { "type": "fixed", "month": "january", "day": 1 } },
 
-    { "type": "span", "name": "Spring Festival (7-day break from Lunar New Year, pre-2025)", "start": { "type": "chinese_new_year" }, "len": 7, "to_year": 2024 },
-    { "type": "span", "name": "Spring Festival (8-day break from Lunar New Year's Eve, 2025+)", "start": { "type": "chinese_new_year" }, "offset": -1, "len": 8, "from_year": 2025 },
+    { "type": "span", "name": "Estimated Spring Festival (pre-verified coverage)", "start": { "type": "chinese_new_year" }, "len": 7, "to_year": 2003 },
+    { "type": "span", "name": "Spring Festival 2004", "start": { "type": "fixed", "month": "january", "day": 22 }, "len": 7, "from_year": 2004, "to_year": 2004 },
+    { "type": "span", "name": "Spring Festival 2005", "start": { "type": "fixed", "month": "february", "day": 9 }, "len": 7, "from_year": 2005, "to_year": 2005 },
+    { "type": "span", "name": "Spring Festival 2006", "start": { "type": "fixed", "month": "january", "day": 29 }, "len": 7, "from_year": 2006, "to_year": 2006 },
+    { "type": "span", "name": "Spring Festival 2007", "start": { "type": "fixed", "month": "february", "day": 18 }, "len": 7, "from_year": 2007, "to_year": 2007 },
+    { "type": "span", "name": "Spring Festival 2008", "start": { "type": "fixed", "month": "february", "day": 6 }, "len": 7, "from_year": 2008, "to_year": 2008 },
+    { "type": "span", "name": "Spring Festival 2009", "start": { "type": "fixed", "month": "january", "day": 25 }, "len": 7, "from_year": 2009, "to_year": 2009 },
+    { "type": "span", "name": "Spring Festival 2010", "start": { "type": "fixed", "month": "february", "day": 13 }, "len": 7, "from_year": 2010, "to_year": 2010 },
+    { "type": "span", "name": "Spring Festival 2011", "start": { "type": "fixed", "month": "february", "day": 2 }, "len": 7, "from_year": 2011, "to_year": 2011 },
+    { "type": "span", "name": "Spring Festival 2012", "start": { "type": "fixed", "month": "january", "day": 22 }, "len": 7, "from_year": 2012, "to_year": 2012 },
+    { "type": "span", "name": "Spring Festival 2013", "start": { "type": "fixed", "month": "february", "day": 9 }, "len": 7, "from_year": 2013, "to_year": 2013 },
+    { "type": "span", "name": "Spring Festival 2014", "start": { "type": "fixed", "month": "january", "day": 31 }, "len": 7, "from_year": 2014, "to_year": 2014 },
+    { "type": "span", "name": "Spring Festival 2015", "start": { "type": "fixed", "month": "february", "day": 18 }, "len": 7, "from_year": 2015, "to_year": 2015 },
+    { "type": "span", "name": "Spring Festival 2016", "start": { "type": "fixed", "month": "february", "day": 7 }, "len": 7, "from_year": 2016, "to_year": 2016 },
+    { "type": "span", "name": "Spring Festival 2017", "start": { "type": "fixed", "month": "january", "day": 27 }, "len": 7, "from_year": 2017, "to_year": 2017 },
+    { "type": "span", "name": "Spring Festival 2018", "start": { "type": "fixed", "month": "february", "day": 15 }, "len": 7, "from_year": 2018, "to_year": 2018 },
+    { "type": "span", "name": "Spring Festival 2019", "start": { "type": "fixed", "month": "february", "day": 4 }, "len": 7, "from_year": 2019, "to_year": 2019 },
+    { "type": "span", "name": "Spring Festival 2020 extended closure", "start": { "type": "fixed", "month": "january", "day": 24 }, "len": 10, "from_year": 2020, "to_year": 2020 },
+    { "type": "span", "name": "Spring Festival 2021", "start": { "type": "fixed", "month": "february", "day": 11 }, "len": 7, "from_year": 2021, "to_year": 2021 },
+    { "type": "span", "name": "Spring Festival 2022", "start": { "type": "fixed", "month": "january", "day": 31 }, "len": 7, "from_year": 2022, "to_year": 2022 },
+    { "type": "span", "name": "Spring Festival 2023", "start": { "type": "fixed", "month": "january", "day": 21 }, "len": 7, "from_year": 2023, "to_year": 2023 },
+    { "type": "span", "name": "Spring Festival 2024", "start": { "type": "fixed", "month": "february", "day": 9 }, "len": 9, "from_year": 2024, "to_year": 2024 },
+    { "type": "span", "name": "Spring Festival 2025", "start": { "type": "fixed", "month": "january", "day": 28 }, "len": 8, "from_year": 2025, "to_year": 2025 },
+    { "type": "span", "name": "Spring Festival 2026", "start": { "type": "fixed", "month": "february", "day": 15 }, "len": 9, "from_year": 2026, "to_year": 2026 },
+    { "type": "span", "name": "Estimated Spring Festival (post-verified coverage)", "start": { "type": "chinese_new_year" }, "offset": -1, "len": 8, "from_year": 2027 },
 
     { "type": "china_bridge", "name": "Qingming Festival", "festival": { "type": "qing_ming" }, "from_year": 2008 },
 
-    { "type": "span", "name": "Labour Day Golden Week (7 days, 2000-2007)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 7, "from_year": 2000, "to_year": 2007 },
-    { "type": "span", "name": "Labour Day (3 days, 2008-2019)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 3, "from_year": 2008, "to_year": 2019 },
-    { "type": "span", "name": "Labour Day (5 days, 2020+)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 5, "from_year": 2020 },
+    { "type": "span", "name": "Estimated Labour Day Golden Week (pre-verified coverage)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 7, "to_year": 2003 },
+    { "type": "span", "name": "Labour Day Golden Week 2004-2007", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 7, "from_year": 2004, "to_year": 2007 },
+    { "type": "span", "name": "Labour Day 2008-2010", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 3, "from_year": 2008, "to_year": 2010 },
+    { "type": "span", "name": "Labour Day 2011", "start": { "type": "fixed", "month": "april", "day": 30 }, "len": 3, "from_year": 2011, "to_year": 2011 },
+    { "type": "span", "name": "Labour Day 2012", "start": { "type": "fixed", "month": "april", "day": 29 }, "len": 3, "from_year": 2012, "to_year": 2012 },
+    { "type": "span", "name": "Labour Day 2013", "start": { "type": "fixed", "month": "april", "day": 29 }, "len": 3, "from_year": 2013, "to_year": 2013 },
+    { "type": "span", "name": "Labour Day 2014-2015", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 3, "from_year": 2014, "to_year": 2015 },
+    { "type": "span", "name": "Labour Day 2016", "start": { "type": "fixed", "month": "april", "day": 30 }, "len": 3, "from_year": 2016, "to_year": 2016 },
+    { "type": "span", "name": "Labour Day 2017", "start": { "type": "fixed", "month": "april", "day": 29 }, "len": 3, "from_year": 2017, "to_year": 2017 },
+    { "type": "span", "name": "Labour Day 2018", "start": { "type": "fixed", "month": "april", "day": 29 }, "len": 3, "from_year": 2018, "to_year": 2018 },
+    { "type": "span", "name": "Labour Day 2019", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 4, "from_year": 2019, "to_year": 2019 },
+    { "type": "span", "name": "Labour Day 2020-2021", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 5, "from_year": 2020, "to_year": 2021 },
+    { "type": "span", "name": "Labour Day 2022", "start": { "type": "fixed", "month": "april", "day": 30 }, "len": 5, "from_year": 2022, "to_year": 2022 },
+    { "type": "span", "name": "Labour Day 2023", "start": { "type": "fixed", "month": "april", "day": 29 }, "len": 5, "from_year": 2023, "to_year": 2023 },
+    { "type": "span", "name": "Labour Day 2024-2026", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 5, "from_year": 2024, "to_year": 2026 },
+    { "type": "span", "name": "Estimated Labour Day (post-verified coverage)", "start": { "type": "fixed", "month": "may", "day": 1 }, "len": 5, "from_year": 2027 },
 
     { "type": "china_bridge", "name": "Dragon Boat Festival", "festival": { "type": "dragon_boat" }, "from_year": 2008 },
 
@@ -21,7 +57,6 @@
 
     { "type": "span", "name": "National Day Golden Week", "start": { "type": "fixed", "month": "october", "day": 1 }, "len": 7 },
 
-    { "type": "exact_date", "name": "Spring Festival Eve (2024 ad-hoc 调休, pre-codification)", "year": 2024, "month": "february", "day": 9 },
     { "type": "exact_date", "name": "National Day / Mid-Autumn merged 8th day (2025)", "year": 2025, "month": "october", "day": 8 }
   ]
 }

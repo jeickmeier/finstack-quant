@@ -45,11 +45,37 @@ __all__ = [
     "ScheduleErrorPolicy",
     "Schedule",
     "ScheduleBuilder",
+    # SIFMA settlements
+    "SifmaSettlementClass",
+    "sifma_settlement_date",
+    "sifma_settlement_date_for_class",
+    "estimated_sifma_settlement_date_for_class",
+    "next_sifma_settlement",
     # free functions
     "create_date",
     "days_since_epoch",
     "date_from_epoch_days",
 ]
+
+class SifmaSettlementClass:
+    """SIFMA good-delivery settlement class."""
+
+    A: SifmaSettlementClass
+    B: SifmaSettlementClass
+    C: SifmaSettlementClass
+    D: SifmaSettlementClass
+
+    @classmethod
+    def from_agency_term(cls, agency: str, term_years: int) -> SifmaSettlementClass: ...
+
+def sifma_settlement_date(month: int, year: int) -> datetime.date | None: ...
+def sifma_settlement_date_for_class(
+    month: int, year: int, settlement_class: SifmaSettlementClass
+) -> datetime.date | None: ...
+def estimated_sifma_settlement_date_for_class(
+    month: int, year: int, settlement_class: SifmaSettlementClass
+) -> datetime.date: ...
+def next_sifma_settlement(date: datetime.date) -> datetime.date | None: ...
 
 # ---------------------------------------------------------------------------
 # Day-count conventions

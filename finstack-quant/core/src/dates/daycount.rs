@@ -155,6 +155,23 @@ pub struct DayCountContext<'a> {
     pub end_is_termination_date: bool,
 }
 
+impl<'a> DayCountContext<'a> {
+    /// Return a copy with a validated ACT/ACT ICMA reference coupon period.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless `start < end`.
+    pub fn with_coupon_period(mut self, start: Date, end: Date) -> crate::Result<Self> {
+        if start >= end {
+            return Err(crate::Error::Validation(
+                "coupon period start must be before end".to_string(),
+            ));
+        }
+        self.coupon_period = Some((start, end));
+        Ok(self)
+    }
+}
+
 impl<'a> std::fmt::Debug for DayCountContext<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DayCountContext")

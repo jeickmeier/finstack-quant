@@ -34,7 +34,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "count_consecutive",
-            "consecutive",
             "linalg",
             "stats",
             "special_functions",

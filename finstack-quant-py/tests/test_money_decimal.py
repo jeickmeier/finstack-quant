@@ -87,3 +87,12 @@ def test_decimal_ordering_and_repr_do_not_round_through_float() -> None:
 
     assert lower < higher
     assert repr(lower) == "Money(10000000000000000.1, 'USD')"
+
+
+def test_convert_at_rate_preserves_decimal_amount_and_retags_currency() -> None:
+    converted = Money(Decimal("10000000000000000.1"), "USD").convert_at_rate("EUR", 1.25)
+    assert converted.amount_decimal == Decimal("12500000000000000.125")
+    assert converted.currency.code == "EUR"
+
+    with pytest.raises(ValueError, match=r"rate|positive"):
+        Money(1, "USD").convert_at_rate("EUR", 0.0)

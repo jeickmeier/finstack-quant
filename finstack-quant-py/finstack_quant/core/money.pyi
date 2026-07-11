@@ -215,6 +215,14 @@ class Money:
         """
         ...
 
+    def convert_at_rate(self, target: Union[Currency, str], rate: float) -> Money:
+        """Convert with an already-resolved positive FX rate.
+
+        The multiplication remains Decimal-backed; no destination minor-unit
+        rounding is applied until formatting.
+        """
+        ...
+
     @classmethod
     def from_tuple(cls, tup: tuple[float, str]) -> Money:
         """Build from ``(amount, currency_code)`` tuple.

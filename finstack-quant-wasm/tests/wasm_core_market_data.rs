@@ -18,7 +18,7 @@ fn fx_matrix_rate_returns_structured_result() {
             "EUR",
             "USD",
             "2024-01-02",
-            Some(FxConversionPolicy::cashflow_date()),
+            &FxConversionPolicy::cashflow_date(),
         )
         .unwrap();
 
@@ -31,10 +31,22 @@ fn fx_matrix_rate_defaults_policy_to_cashflow_date() {
     let matrix = FxMatrix::new();
     matrix.set_quote("GBP", "USD", 1.25).unwrap();
 
-    let result = matrix.rate("GBP", "USD", "2024-01-02", None).unwrap();
+    let result = matrix.rate_default("GBP", "USD", "2024-01-02").unwrap();
 
     assert!((result.rate() - 1.25).abs() < 1e-12);
     assert!(!result.triangulated());
+}
+
+#[wasm_bindgen_test]
+fn fx_matrix_policy_can_be_reused() {
+    let matrix = FxMatrix::new();
+    let policy = FxConversionPolicy::cashflow_date();
+    matrix
+        .set_quote_on("EUR", "USD", "2024-01-02", &policy, 1.10)
+        .unwrap();
+    let first = matrix.rate("EUR", "USD", "2024-01-02", &policy).unwrap();
+    let second = matrix.rate("EUR", "USD", "2024-01-02", &policy).unwrap();
+    assert_eq!(first.rate(), second.rate());
 }
 
 #[wasm_bindgen_test]
@@ -104,4 +116,22 @@ fn day_count_context_supports_context_dependent_conventions() {
         .year_fraction_with_context(start, end, &bus_ctx)
         .unwrap();
     assert!(bus > 0.0);
+}
+
+#[wasm_bindgen_test]
+fn day_count_exposes_act365l_and_signed_fraction() {
+    let start = create_date(2024, 1, 1).unwrap();
+    let end = create_date(2025, 1, 1).unwrap();
+    assert_eq!(
+        DayCount::act365l()
+            .signed_year_fraction(start, end)
+            .unwrap(),
+        1.0
+    );
+    assert_eq!(
+        DayCount::act365l()
+            .signed_year_fraction(end, start)
+            .unwrap(),
+        -1.0
+    );
 }

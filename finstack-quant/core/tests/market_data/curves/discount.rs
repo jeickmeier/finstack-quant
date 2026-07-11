@@ -70,6 +70,26 @@ fn to_forward_curve_uses_requested_simple_tenor() {
 }
 
 #[test]
+fn to_forward_curve_reconstructs_source_discount_factors_on_tenor_grid() {
+    let curve = DiscountCurve::builder("ROUNDTRIP")
+        .base_date(sample_base_date())
+        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.85)])
+        .interp(InterpStyle::LogLinear)
+        .build()
+        .unwrap();
+    let forwards = curve.to_forward_curve("ROUNDTRIP-FWD", 1.0, None).unwrap();
+
+    for t in [0.0, 1.0, 2.0] {
+        let rebuilt = forwards.df(t).unwrap();
+        assert!(
+            (rebuilt - curve.df(t)).abs() < 1e-12,
+            "t={t}: rebuilt={rebuilt}, source={}",
+            curve.df(t)
+        );
+    }
+}
+
+#[test]
 fn to_forward_curve_rejects_invalid_tenor() {
     let curve = sample_discount_curve("INVALID-TENOR");
     for tenor in [0.0, -0.25, f64::NAN, f64::INFINITY] {

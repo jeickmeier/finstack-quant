@@ -15,7 +15,10 @@ from finstack_quant.core.dates import (
     DayCount,
     DayCountContext,
     PeriodId,
+    SifmaSettlementClass,
     build_periods,
+    sifma_settlement_date,
+    sifma_settlement_date_for_class,
 )
 from finstack_quant.core.market_data import (
     DiscountCurve,
@@ -199,6 +202,10 @@ class TestDayCountParity:
         d = date(2024, 1, 1)
         assert DayCount.ACT_360.year_fraction(d, d) == pytest.approx(0.0)
 
+    def test_coupon_period_is_validated_by_core(self) -> None:
+        with pytest.raises(Exception, match="coupon period start must be before end"):
+            DayCountContext(coupon_period=(date(2025, 7, 1), date(2025, 1, 1)))
+
 
 class TestPeriodParity:
     """Period ID construction and build_periods match Rust."""
@@ -223,6 +230,16 @@ class TestPeriodParity:
         assert pid.code == "2024"
         assert pid.year == 2024
 
+    def test_invalid_period_ids_are_rejected(self) -> None:
+        with pytest.raises(ValueError, match=r"(?i)invalid"):
+            PeriodId.month(2025, 13)
+        with pytest.raises(ValueError, match=r"(?i)invalid"):
+            PeriodId.quarter(2025, 0)
+        with pytest.raises(ValueError, match=r"(?i)invalid"):
+            PeriodId.week(2021, 53)
+        with pytest.raises(ValueError, match=r"(?i)invalid"):
+            PeriodId.day(2025, 366)
+
     def test_build_periods_quarterly(self) -> None:
         """Build 4 quarterly periods from a range string."""
         plan = build_periods("2024Q1..Q4", None)
@@ -245,6 +262,14 @@ class TestPeriodParity:
         assert plan.periods[1].is_actual
         assert not plan.periods[2].is_actual
         assert not plan.periods[3].is_actual
+
+
+def test_sifma_settlement_classes_and_default() -> None:
+    assert SifmaSettlementClass.from_agency_term("FNMA", 30) == SifmaSettlementClass.A
+    assert SifmaSettlementClass.from_agency_term("GNMA", 30) == SifmaSettlementClass.C
+    assert SifmaSettlementClass.from_agency_term("FNMA", 15) == SifmaSettlementClass.B
+    assert sifma_settlement_date(1, 2026) == date(2026, 1, 14)
+    assert sifma_settlement_date_for_class(1, 2026, SifmaSettlementClass.B) == date(2026, 1, 20)
 
 
 class TestDiscountCurveParity:

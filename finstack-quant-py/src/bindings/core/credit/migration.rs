@@ -279,14 +279,14 @@ impl PyMigrationSimulator {
         initial_state: usize,
         n_paths: usize,
         seed: u64,
-    ) -> Vec<PyRatingPath> {
-        py.detach(|| {
-            let mut rng = Pcg64::seed_from_u64(seed);
-            self.inner.simulate(initial_state, n_paths, &mut rng)
-        })
-        .into_iter()
-        .map(PyRatingPath::from_inner)
-        .collect()
+    ) -> PyResult<Vec<PyRatingPath>> {
+        let paths = py
+            .detach(|| {
+                let mut rng = Pcg64::seed_from_u64(seed);
+                self.inner.simulate(initial_state, n_paths, &mut rng)
+            })
+            .map_err(migration_to_py)?;
+        Ok(paths.into_iter().map(PyRatingPath::from_inner).collect())
     }
 
     /// Build an empirical transition matrix by simulation.
@@ -298,12 +298,14 @@ impl PyMigrationSimulator {
         py: Python<'_>,
         n_paths_per_state: usize,
         seed: u64,
-    ) -> PyTransitionMatrix {
+    ) -> PyResult<PyTransitionMatrix> {
         let matrix = py.detach(|| {
             let mut rng = Pcg64::seed_from_u64(seed);
             self.inner.empirical_matrix(n_paths_per_state, &mut rng)
         });
-        PyTransitionMatrix::from_inner(matrix)
+        matrix
+            .map(PyTransitionMatrix::from_inner)
+            .map_err(migration_to_py)
     }
 
     fn horizon(&self) -> f64 {

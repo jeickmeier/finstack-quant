@@ -58,7 +58,7 @@ pub(crate) fn sifma_settlement_for_period(period_end: Date) -> Result<Date> {
             estimated_sifma_settlement_date_for_class(
                 period_end.month(),
                 period_end.year(),
-                SifmaSettlementClass::B,
+                SifmaSettlementClass::A,
             )
         }),
     )

@@ -90,11 +90,11 @@ impl DayCountContext {
     ) -> Result<DayCountContext, JsValue> {
         let start = epoch_to_date(start_epoch_days)?;
         let end = epoch_to_date(end_epoch_days)?;
-        if start >= end {
-            return Err(JsValue::from_str("coupon period start must be before end"));
-        }
+        let validated = RustDayCountContext::default()
+            .with_coupon_period(start, end)
+            .map_err(to_js_err)?;
         let mut next = self.clone();
-        next.coupon_period = Some((start, end));
+        next.coupon_period = validated.coupon_period;
         Ok(next)
     }
 
@@ -171,6 +171,14 @@ impl DayCount {
     pub fn act365f() -> DayCount {
         DayCount {
             inner: RustDayCount::Act365F,
+        }
+    }
+
+    /// Actual/365 Leap.
+    #[wasm_bindgen(js_name = act365l)]
+    pub fn act365l() -> DayCount {
+        DayCount {
+            inner: RustDayCount::Act365L,
         }
     }
 
@@ -251,6 +259,20 @@ impl DayCount {
         let end = epoch_to_date(end_epoch_days)?;
         self.inner
             .year_fraction(start, end, RustDayCountContext::default())
+            .map_err(to_js_err)
+    }
+
+    /// Compute a signed year fraction, preserving the start/end orientation.
+    #[wasm_bindgen(js_name = signedYearFraction)]
+    pub fn signed_year_fraction(
+        &self,
+        start_epoch_days: i32,
+        end_epoch_days: i32,
+    ) -> Result<f64, JsValue> {
+        let start = epoch_to_date(start_epoch_days)?;
+        let end = epoch_to_date(end_epoch_days)?;
+        self.inner
+            .signed_year_fraction(start, end, RustDayCountContext::default())
             .map_err(to_js_err)
     }
 

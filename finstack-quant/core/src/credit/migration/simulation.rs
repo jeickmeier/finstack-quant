@@ -148,7 +148,7 @@ impl RatingPath {
 /// let sim = MigrationSimulator::new(gen, 5.0).expect("valid simulator");
 ///
 /// let mut rng = Pcg64::seed_from_u64(42);
-/// let paths = sim.simulate(0, 1000, &mut rng);
+/// let paths = sim.simulate(0, 1000, &mut rng).expect("valid simulation inputs");
 /// assert_eq!(paths.len(), 1000);
 /// ```
 #[derive(Debug, Clone)]
@@ -184,11 +184,18 @@ impl MigrationSimulator {
         initial_state: usize,
         n_paths: usize,
         rng: &mut R,
-    ) -> Vec<RatingPath> {
+    ) -> Result<Vec<RatingPath>, MigrationError> {
+        let n_states = self.generator.n_states();
+        if initial_state >= n_states {
+            return Err(MigrationError::InvalidState {
+                state: initial_state,
+                n_states,
+            });
+        }
         let scale = Arc::new(self.generator.scale.clone());
-        (0..n_paths)
+        Ok((0..n_paths)
             .map(|_| simulate_path(&self.generator, &scale, initial_state, self.horizon, rng))
-            .collect()
+            .collect())
     }
 
     /// Estimate the transition matrix from batch simulation.
@@ -204,7 +211,10 @@ impl MigrationSimulator {
         &self,
         n_paths_per_state: usize,
         rng: &mut R,
-    ) -> TransitionMatrix {
+    ) -> Result<TransitionMatrix, MigrationError> {
+        if n_paths_per_state == 0 {
+            return Err(MigrationError::InvalidPathCount);
+        }
         let n = self.generator.n_states();
         let scale = Arc::new(self.generator.scale.clone());
         // Flat row-major counts (index `from * n + to`) for cache-friendly
@@ -219,25 +229,18 @@ impl MigrationSimulator {
             }
         }
 
-        // Normalize each row to sum to 1.0 in place (correct rounding); for tiny
-        // `n_paths` an empty row falls back to a divisor of 1.0.
+        // Normalize each row to sum to 1.0 in place.
         let mut data = vec![0.0f64; n * n];
         for from in 0..n {
             let row = &counts[from * n..(from + 1) * n];
             let row_sum: usize = row.iter().sum();
-            let divisor = if row_sum == 0 { 1.0 } else { row_sum as f64 };
+            let divisor = row_sum as f64;
             for to in 0..n {
                 data[from * n + to] = row[to] as f64 / divisor;
             }
         }
 
-        // Construct directly to avoid the strict absorbing-state check, which may
-        // not hold for small sample sizes.
-        TransitionMatrix {
-            data: nalgebra::DMatrix::from_row_slice(n, n, &data),
-            horizon: self.horizon,
-            scale: self.generator.scale.clone(),
-        }
+        TransitionMatrix::new(self.generator.scale.clone(), &data, self.horizon)
     }
 
     /// The generator matrix.

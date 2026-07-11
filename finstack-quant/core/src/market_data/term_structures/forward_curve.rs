@@ -421,16 +421,17 @@ impl ForwardCurve {
     /// is displayed with both forward rates and an implied discount factor curve.
     ///
     /// The forward curve stores **simple forward rates** for a fixed tenor. We interpret the
-    /// curve as defining an average simple rate over each accrual interval and chain
-    /// accrual factors deterministically:
+    /// curve as defining the simple rate for each reset interval and chain accrual
+    /// factors deterministically:
     ///
     /// ```text
     /// DF(0) = 1
-    /// DF(t + dt) = DF(t) / (1 + avg_fwd(t, t+dt) * dt)
+    /// DF(t + dt) = DF(t) / (1 + F(t, t+tenor) * dt)
     /// ```
     ///
-    /// Where `avg_fwd(t, t+dt)` is computed via [`rate_period`](Self::rate_period) to match
-    /// the library’s interpolation/shape assumptions.
+    /// Full-tenor steps therefore use the forward quoted at the reset date. For a
+    /// final fractional stub, the same start-date forward is applied over the
+    /// shorter accrual interval (flat simple-forward stub convention).
     ///
     /// Notes
     /// -----
@@ -458,10 +459,6 @@ impl ForwardCurve {
         }
 
         const EPS: f64 = 1e-12;
-        let is_linear = matches!(
-            self.interp.style(),
-            crate::math::interp::InterpStyle::Linear
-        );
         let mut df = 1.0_f64;
         let mut cur = 0.0_f64;
 
@@ -471,15 +468,11 @@ impl ForwardCurve {
             if dt <= 0.0 {
                 break;
             }
-            let avg = if is_linear {
-                (self.rate(cur) + self.rate(nxt)) * 0.5
-            } else {
-                self.rate_period(cur, nxt)
-            };
-            let denom = 1.0 + avg * dt;
+            let forward = self.rate(cur);
+            let denom = 1.0 + forward * dt;
             if !denom.is_finite() || denom <= 0.0 {
                 return Err(crate::Error::Validation(format!(
-                    "Invalid implied projection DF step for {}: t={cur:.6} -> {nxt:.6}, avg_fwd={avg:.6}, denom={denom:.6}",
+                    "Invalid implied projection DF step for {}: t={cur:.6} -> {nxt:.6}, forward={forward:.6}, denom={denom:.6}",
                     self.id.as_str(),
                 )));
             }

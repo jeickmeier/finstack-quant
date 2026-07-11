@@ -245,6 +245,16 @@ impl PyMoney {
             .map_err(core_to_py)
     }
 
+    /// Convert using an already-resolved positive FX rate.
+    #[pyo3(text_signature = "(target, rate)")]
+    fn convert_at_rate(&self, target: &Bound<'_, PyAny>, rate: f64) -> PyResult<Self> {
+        let target = extract_currency(target)?;
+        self.inner
+            .convert_at_rate(target, rate)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
     /// Add two amounts (same currency); maps [`Money::checked_add`] errors to Python.
     fn __add__(&self, other: &Bound<'_, PyAny>) -> PyResult<Self> {
         let rhs = extract_money(other)?;

@@ -99,6 +99,25 @@ fn total_variance_mode_changes_off_expiry_interpolation() {
 }
 
 #[test]
+fn total_variance_materialized_slice_matches_canonical_cube_query() {
+    let p0 = SabrParams::new(0.02, 0.5, -0.2, 0.3).unwrap();
+    let p1 = SabrParams::new(0.10, 0.5, -0.2, 0.3).unwrap();
+    let cube = VolCube::from_grid("MODE", &[1.0, 5.0], &[2.0], &[p0, p1], &[0.03, 0.03])
+        .unwrap()
+        .with_interpolation_mode(VolInterpolationMode::TotalVariance);
+    let strike = 0.03;
+
+    let surface = cube.materialize_expiry_slice(3.0, &[strike]).unwrap();
+    let expected = cube.vol_clamped(3.0, 2.0, strike);
+    let actual = surface.value_checked(2.0, strike).unwrap();
+    assert!((actual - expected).abs() < 1e-12);
+
+    assert!(cube.materialize_expiry_slice(f64::NAN, &[strike]).is_err());
+    assert!(cube.materialize_tenor_slice(f64::NAN, &[strike]).is_err());
+    assert!(cube.materialize_expiry_slice(3.0, &[f64::NAN]).is_err());
+}
+
+#[test]
 fn vol_cube_revalidates_public_sabr_fields() {
     let invalid = SabrParams {
         alpha: 0.03,

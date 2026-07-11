@@ -203,6 +203,44 @@ def test_contract_symbols_match_live_surface(crate_name: str, crate: dict[str, A
     )
 
 
+def _module_symbol_entries() -> list[tuple[str, str, dict[str, Any]]]:
+    """Yield per-submodule symbol contracts declared under each crate."""
+    entries: list[tuple[str, str, dict[str, Any]]] = []
+    for crate_name, crate in CONTRACT["crates"].items():
+        entries.extend((crate_name, module_name, spec) for module_name, spec in crate.get("module_symbols", {}).items())
+    return entries
+
+
+@pytest.mark.parametrize(
+    ("crate_name", "module_name", "spec"),
+    _module_symbol_entries(),
+)
+def test_module_symbol_contract_matches_live_surface(
+    crate_name: str,
+    module_name: str,
+    spec: dict[str, Any],
+) -> None:
+    """Every contracted submodule symbol resolves and agrees with `__all__`."""
+    assert crate_name
+    assert module_name
+    module = importlib.import_module(spec["python_package"])
+    expected = set(spec["public"])
+    missing = {name for name in expected if not hasattr(module, name)}
+    assert not missing, f"{spec['python_package']} is missing contracted symbols: {sorted(missing)}"
+
+    module_all = set(getattr(module, "__all__", []))
+    if spec.get("allow_additional", False):
+        assert expected <= module_all, (
+            f"{spec['python_package']}.__all__ omits contracted symbols: {sorted(expected - module_all)}"
+        )
+    else:
+        assert module_all == expected, (
+            f"{spec['python_package']}.__all__ diverged from its module-symbol contract.\n"
+            f"  missing from __all__: {sorted(expected - module_all)}\n"
+            f"  unlisted in contract: {sorted(module_all - expected)}"
+        )
+
+
 def _wasm_index_js_namespaces(index_js_path: Path) -> set[str]:
     """Extract top-level namespaces re-exported from `./exports/<file>.js`.
 

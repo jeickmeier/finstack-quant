@@ -51,3 +51,14 @@ def test_empirical_matrix_shape() -> None:
     assert matrix.n_states() == 2
     assert len(matrix.to_matrix()) == 2
     assert all(len(row) == 2 for row in matrix.to_matrix())
+
+
+def test_simulation_validation_maps_to_python_errors() -> None:
+    scale = migration.RatingScale.custom(["AAA", "D"])
+    gen = migration.GeneratorMatrix(scale, [-0.05, 0.05, 0.0, 0.0])
+    sim = migration.MigrationSimulator(gen, 1.0)
+
+    with pytest.raises(Exception, match=r"state index|out of range"):
+        sim.simulate(2, 1, 7)
+    with pytest.raises(Exception, match=r"paths per state|positive"):
+        sim.empirical_matrix(0, 7)

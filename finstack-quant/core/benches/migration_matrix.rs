@@ -44,7 +44,9 @@ fn benchmark_migration(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("simulate_1000", n), &n, |b, _| {
             let mut rng = Pcg64::seed_from_u64(42);
             b.iter(|| {
-                let paths = sim.simulate(black_box(0), black_box(1000), &mut rng);
+                let paths = sim
+                    .simulate(black_box(0), black_box(1000), &mut rng)
+                    .expect("benchmark uses a valid initial state");
                 black_box(paths.len())
             });
         });
@@ -52,7 +54,9 @@ fn benchmark_migration(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("empirical_matrix_500", n), &n, |b, _| {
             let mut rng = Pcg64::seed_from_u64(7);
             b.iter(|| {
-                let m = sim.empirical_matrix(black_box(500), &mut rng);
+                let m = sim
+                    .empirical_matrix(black_box(500), &mut rng)
+                    .expect("benchmark uses a positive path count");
                 black_box(m.n_states())
             });
         });

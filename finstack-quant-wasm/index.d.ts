@@ -74,6 +74,7 @@ export interface Money {
   readonly currency: Currency;
   /** Lossless amount as a decimal string (exact Rust Decimal rendering). */
   amountDecimal(): string;
+  convertAtRate(target: Currency, rate: number): Money;
   add(other: Money): Money;
   sub(other: Money): Money;
   mulScalar(factor: number): Money;
@@ -118,6 +119,7 @@ export interface PercentageConstructor {
 
 export interface DayCount {
   yearFraction(startEpochDays: number, endEpochDays: number): number;
+  signedYearFraction(startEpochDays: number, endEpochDays: number): number;
   yearFractionWithContext(
     startEpochDays: number,
     endEpochDays: number,
@@ -131,6 +133,7 @@ export interface DayCountConstructor {
   new (name: string): DayCount;
   act360(): DayCount;
   act365f(): DayCount;
+  act365l(): DayCount;
   thirty360(): DayCount;
   thirtyE360(): DayCount;
   thirtyE360Isda(): DayCount;
@@ -260,7 +263,8 @@ export interface FxRateResultConstructor {
 export interface FxMatrix {
   setQuote(base: string, quote: string, rate: number): void;
   setQuoteOn(base: string, quote: string, date: string, policy: FxConversionPolicy, rate: number): void;
-  rate(base: string, quote: string, date: string, policy?: FxConversionPolicy): FxRateResult;
+  rate(base: string, quote: string, date: string, policy: FxConversionPolicy): FxRateResult;
+  rateDefault(base: string, quote: string, date: string): FxRateResult;
 }
 
 export interface FxMatrixConstructor {

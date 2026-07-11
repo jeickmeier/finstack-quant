@@ -598,17 +598,16 @@ impl VolCube {
         if strikes.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
+        if !tenor.is_finite() || strikes.iter().any(|strike| !strike.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
         let mut vols = Vec::with_capacity(self.expiries.len() * strikes.len());
-        let mut floored = 0usize;
         for &exp in self.expiries.iter() {
-            let (params, fwd, exp_c) = self.interpolate_params_clamped(exp, tenor);
             for &k in strikes {
-                let v = params.implied_vol_lognormal(fwd, k, exp_c);
-                vols.push(floor_sabr_vol(v, &mut floored));
+                vols.push(self.vol_clamped(exp, tenor, k));
             }
         }
-        warn_sabr_vol_floored("VolCube::materialize_tenor_slice", &self.id, floored);
 
         VolSurface::from_grid(self.id.as_str(), &self.expiries, strikes, &vols)
             .map(|surface| surface.with_interpolation_mode(self.interpolation_mode))
@@ -629,17 +628,16 @@ impl VolCube {
         if strikes.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
+        if !tenor.is_finite() || strikes.iter().any(|strike| !strike.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
         let mut vols = Vec::with_capacity(self.expiries.len() * strikes.len());
-        let mut floored = 0usize;
         for &exp in self.expiries.iter() {
-            let (params, fwd, exp_c) = self.interpolate_params_clamped(exp, tenor);
             for &k in strikes {
-                let v = params.implied_vol_normal(fwd, k, exp_c);
-                vols.push(floor_sabr_vol_normal(v, fwd, &mut floored));
+                vols.push(self.vol_normal_clamped(exp, tenor, k));
             }
         }
-        warn_sabr_vol_normal_floored("VolCube::materialize_tenor_slice_normal", &self.id, floored);
 
         VolSurface::from_grid(self.id.as_str(), &self.expiries, strikes, &vols).map(|surface| {
             surface
@@ -661,19 +659,19 @@ impl VolCube {
         if strikes.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
+        if !expiry.is_finite() || strikes.iter().any(|strike| !strike.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
         let mut vols = Vec::with_capacity(self.tenors.len() * strikes.len());
-        let mut floored = 0usize;
         for &tnr in self.tenors.iter() {
-            let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tnr);
             for &k in strikes {
-                let v = params.implied_vol_lognormal(fwd, k, exp_c);
-                vols.push(floor_sabr_vol(v, &mut floored));
+                vols.push(self.vol_clamped(expiry, tnr, k));
             }
         }
-        warn_sabr_vol_floored("VolCube::materialize_expiry_slice", &self.id, floored);
 
         VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols)
+            .map(|surface| surface.with_interpolation_mode(self.interpolation_mode))
     }
 
     /// Materialize an expiry slice as a **normal-vol** [`VolSurface`].
@@ -690,24 +688,21 @@ impl VolCube {
         if strikes.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
+        if !expiry.is_finite() || strikes.iter().any(|strike| !strike.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
         let mut vols = Vec::with_capacity(self.tenors.len() * strikes.len());
-        let mut floored = 0usize;
         for &tnr in self.tenors.iter() {
-            let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tnr);
             for &k in strikes {
-                let v = params.implied_vol_normal(fwd, k, exp_c);
-                vols.push(floor_sabr_vol_normal(v, fwd, &mut floored));
+                vols.push(self.vol_normal_clamped(expiry, tnr, k));
             }
         }
-        warn_sabr_vol_normal_floored(
-            "VolCube::materialize_expiry_slice_normal",
-            &self.id,
-            floored,
-        );
 
-        VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols)
-            .map(|s| s.with_quote_type(VolQuoteType::Normal))
+        VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols).map(|s| {
+            s.with_quote_type(VolQuoteType::Normal)
+                .with_interpolation_mode(self.interpolation_mode)
+        })
     }
 
     /// Materialize the full grid as a flat vector in `(expiry, tenor, strike)` order.
@@ -717,23 +712,22 @@ impl VolCube {
         if strikes.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
+        if strikes.iter().any(|strike| !strike.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
         let n_exp = self.expiries.len();
         let n_ten = self.tenors.len();
         let n_str = strikes.len();
         let mut out = Vec::with_capacity(n_exp * n_ten * n_str);
 
-        let mut floored = 0usize;
         for &exp in self.expiries.iter() {
             for &tnr in self.tenors.iter() {
-                let (params, fwd, exp_c) = self.interpolate_params_clamped(exp, tnr);
                 for &k in strikes {
-                    let v = params.implied_vol_lognormal(fwd, k, exp_c);
-                    out.push(floor_sabr_vol(v, &mut floored));
+                    out.push(self.vol_clamped(exp, tnr, k));
                 }
             }
         }
-        warn_sabr_vol_floored("VolCube::materialize_grid", &self.id, floored);
 
         Ok(out)
     }

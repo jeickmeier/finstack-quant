@@ -155,25 +155,6 @@ impl PeriodKind {
         Ok(index)
     }
 
-    fn parse_absolute_index(self, year: i32, raw: &str) -> crate::Result<u16> {
-        match self {
-            PeriodKind::Weekly => self.parse_index_with_limit(raw, iso_weeks_in_year(year) as u16),
-            PeriodKind::Annual => Ok(1),
-            _ => self.parse_index_with_limit(raw, self.relative_max_index()),
-        }
-    }
-
-    fn parse_relative_id(self, year: i32, rhs: &str) -> crate::Result<PeriodId> {
-        let index = match self.designator() {
-            Some(designator) => self.parse_index_with_limit(
-                rhs.trim_start_matches(designator),
-                self.relative_max_index(),
-            )?,
-            None => 1,
-        };
-        Ok(self.build_id(year, index))
-    }
-
     fn gregorian_bounds(self, year: i32, index: u16) -> crate::Result<(Date, Date)> {
         match self {
             PeriodKind::Daily => daily_bounds(year, index),
@@ -255,43 +236,79 @@ pub struct PeriodId {
 impl PeriodId {
     /// Build a daily identifier from an ordinal day (1..=366).
     pub fn day(year: i32, ordinal: u16) -> Self {
+        assert!(
+            (1..=days_in_year(year)).contains(&ordinal),
+            "daily period ordinal must be valid for the Gregorian year"
+        );
         Self {
             year,
             index: ordinal,
             kind: PeriodKind::Daily,
         }
     }
+    /// Try to build a daily identifier from an ordinal day (1..=366).
+    pub fn try_day(year: i32, ordinal: u16) -> crate::Result<Self> {
+        Self::try_new(year, ordinal, PeriodKind::Daily, days_in_year(year))
+    }
     /// Build a quarterly identifier.
     pub fn quarter(year: i32, q: u8) -> Self {
+        assert!((1..=4).contains(&q), "quarter must be in 1..=4");
         Self {
             year,
-            index: q as u16,
+            index: u16::from(q),
             kind: PeriodKind::Quarterly,
         }
     }
+    /// Try to build a quarterly identifier.
+    pub fn try_quarter(year: i32, q: u8) -> crate::Result<Self> {
+        Self::try_new(year, u16::from(q), PeriodKind::Quarterly, 4)
+    }
     /// Build a monthly identifier.
     pub fn month(year: i32, m: u8) -> Self {
+        assert!((1..=12).contains(&m), "month must be in 1..=12");
         Self {
             year,
-            index: m as u16,
+            index: u16::from(m),
             kind: PeriodKind::Monthly,
         }
     }
+    /// Try to build a monthly identifier.
+    pub fn try_month(year: i32, m: u8) -> crate::Result<Self> {
+        Self::try_new(year, u16::from(m), PeriodKind::Monthly, 12)
+    }
     /// Build a weekly identifier.
     pub fn week(year: i32, w: u8) -> Self {
+        assert!(
+            (1..=iso_weeks_in_year(year)).contains(&w),
+            "week must be valid for the ISO week-year"
+        );
         Self {
             year,
-            index: w as u16,
+            index: u16::from(w),
             kind: PeriodKind::Weekly,
         }
     }
+    /// Try to build a weekly identifier for a Gregorian ISO week-year.
+    pub fn try_week(year: i32, w: u8) -> crate::Result<Self> {
+        Self::try_new(
+            year,
+            u16::from(w),
+            PeriodKind::Weekly,
+            u16::from(iso_weeks_in_year(year)),
+        )
+    }
     /// Build a semi-annual identifier.
     pub fn half(year: i32, h: u8) -> Self {
+        assert!((1..=2).contains(&h), "half must be in 1..=2");
         Self {
             year,
-            index: h as u16,
+            index: u16::from(h),
             kind: PeriodKind::SemiAnnual,
         }
+    }
+    /// Try to build a semi-annual identifier.
+    pub fn try_half(year: i32, h: u8) -> crate::Result<Self> {
+        Self::try_new(year, u16::from(h), PeriodKind::SemiAnnual, 2)
     }
     /// Build an annual identifier.
     pub fn annual(year: i32) -> Self {
@@ -300,6 +317,13 @@ impl PeriodId {
             index: 1,
             kind: PeriodKind::Annual,
         }
+    }
+
+    fn try_new(year: i32, index: u16, kind: PeriodKind, max: u16) -> crate::Result<Self> {
+        if !(1..=max).contains(&index) {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+        Ok(Self { year, index, kind })
     }
 
     /// Get the period kind (frequency).
@@ -566,6 +590,7 @@ pub fn build_fiscal_periods(
 // Minimal calendar abstraction to unify bounds computation across calendar and fiscal paths.
 trait PeriodCalendar {
     fn bounds(&self, year: i32, kind: PeriodKind, index: u16) -> crate::Result<(Date, Date)>;
+    fn max_index(&self, year: i32, kind: PeriodKind) -> crate::Result<u16>;
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -574,6 +599,10 @@ struct Gregorian;
 impl PeriodCalendar for Gregorian {
     fn bounds(&self, year: i32, kind: PeriodKind, index: u16) -> crate::Result<(Date, Date)> {
         kind.gregorian_bounds(year, index)
+    }
+
+    fn max_index(&self, year: i32, kind: PeriodKind) -> crate::Result<u16> {
+        Ok(kind.max_index_for_year(year))
     }
 }
 
@@ -586,6 +615,17 @@ impl PeriodCalendar for FiscalCalendar {
     fn bounds(&self, year: i32, kind: PeriodKind, index: u16) -> crate::Result<(Date, Date)> {
         kind.fiscal_bounds(year, index, self.config)
     }
+
+    fn max_index(&self, year: i32, kind: PeriodKind) -> crate::Result<u16> {
+        let days = (fiscal_year_start(year + 1, self.config)?
+            - fiscal_year_start(year, self.config)?)
+        .whole_days() as u16;
+        Ok(match kind {
+            PeriodKind::Daily => days,
+            PeriodKind::Weekly => days.div_ceil(7),
+            _ => kind.relative_max_index(),
+        })
+    }
 }
 
 /// Generic builder using a provided calendar policy.
@@ -594,10 +634,12 @@ fn build_periods_with_calendar<C: PeriodCalendar>(
     calendar: C,
     actuals_until: Option<&str>,
 ) -> crate::Result<PeriodPlan> {
-    let (start, end) = parse_range(range)?;
-    let mut ids = enumerate_ids(start, end)?;
+    let (start, end) = parse_range_with_calendar(range, &calendar)?;
+    let mut ids = enumerate_ids(start, end, &calendar)?;
 
-    let actual_cut = actuals_until.map(parse_id).transpose()?;
+    let actual_cut = actuals_until
+        .map(|value| parse_id_with_calendar(value, &calendar))
+        .transpose()?;
     let periods = ids
         .drain(..)
         .map(|pid| make_period_with_calendar(pid, &calendar, actual_cut.as_ref()))
@@ -829,12 +871,15 @@ fn fiscal_year_start(fiscal_year: i32, config: FiscalConfig) -> crate::Result<Da
     }
 }
 
-fn parse_range(s: &str) -> crate::Result<(PeriodId, PeriodId)> {
+fn parse_range_with_calendar<C: PeriodCalendar>(
+    s: &str,
+    calendar: &C,
+) -> crate::Result<(PeriodId, PeriodId)> {
     let s = s.trim();
     let (lhs, rhs_raw) = s
         .split_once("..")
         .ok_or(crate::error::InputError::Invalid)?;
-    let start = parse_id(lhs)?;
+    let start = parse_id_with_calendar(lhs, calendar)?;
     let rhs_raw = rhs_raw.trim();
     let rhs_upper = rhs_raw.to_ascii_uppercase();
     let rhs = rhs_upper.as_str();
@@ -845,10 +890,18 @@ fn parse_range(s: &str) -> crate::Result<(PeriodId, PeriodId)> {
         .map(|c| c.is_ascii_digit())
         .unwrap_or(false)
     {
-        parse_id(rhs)?
+        parse_id_with_calendar(rhs, calendar)?
     } else {
         // relative form like "..D100" / "..Q4" / "..M12" / "..W52" / "..H2" / "..A"
-        start.kind.parse_relative_id(start.year, rhs)?
+        let designator = start
+            .kind
+            .designator()
+            .ok_or(crate::error::InputError::Invalid)?;
+        let index = start.kind.parse_index_with_limit(
+            rhs.trim_start_matches(designator),
+            calendar.max_index(start.year, start.kind)?,
+        )?;
+        start.kind.build_id(start.year, index)
     };
     // Validate period kind consistency and non-inverted ranges
     if start.kind != end.kind {
@@ -860,33 +913,46 @@ fn parse_range(s: &str) -> crate::Result<(PeriodId, PeriodId)> {
     Ok((start, end))
 }
 
-fn parse_designated_id(s: &str, split_index: usize, kind: PeriodKind) -> crate::Result<PeriodId> {
-    let year: i32 = s[..split_index]
+fn parse_designated_id<C: PeriodCalendar>(
+    s: &str,
+    split_index: usize,
+    kind: PeriodKind,
+    calendar: &C,
+) -> crate::Result<PeriodId> {
+    let year_raw = s[..split_index]
+        .strip_prefix("FY")
+        .unwrap_or(&s[..split_index]);
+    let year: i32 = year_raw
         .parse()
         .map_err(|_| crate::error::InputError::Invalid)?;
-    let index = kind.parse_absolute_index(year, &s[split_index + 1..])?;
+    let index =
+        kind.parse_index_with_limit(&s[split_index + 1..], calendar.max_index(year, kind)?)?;
     Ok(kind.build_id(year, index))
 }
 
 fn parse_id(s: &str) -> crate::Result<PeriodId> {
+    parse_id_with_calendar(s, &Gregorian)
+}
+
+fn parse_id_with_calendar<C: PeriodCalendar>(s: &str, calendar: &C) -> crate::Result<PeriodId> {
     let s = s.trim();
     // Normalize to uppercase to accept lowercase inputs.
     let s = s.to_ascii_uppercase();
     let s = s.as_str();
     if let Some(i) = s.find('D') {
-        return parse_designated_id(s, i, PeriodKind::Daily);
+        return parse_designated_id(s, i, PeriodKind::Daily, calendar);
     }
     if let Some(i) = s.find('Q') {
-        return parse_designated_id(s, i, PeriodKind::Quarterly);
+        return parse_designated_id(s, i, PeriodKind::Quarterly, calendar);
     }
     if let Some(i) = s.find('M') {
-        return parse_designated_id(s, i, PeriodKind::Monthly);
+        return parse_designated_id(s, i, PeriodKind::Monthly, calendar);
     }
     if let Some(i) = s.find('W') {
-        return parse_designated_id(s, i, PeriodKind::Weekly);
+        return parse_designated_id(s, i, PeriodKind::Weekly, calendar);
     }
     if let Some(i) = s.find('H') {
-        return parse_designated_id(s, i, PeriodKind::SemiAnnual);
+        return parse_designated_id(s, i, PeriodKind::SemiAnnual, calendar);
     }
     if s.chars().all(|c| c.is_ascii_digit()) {
         // annual
@@ -896,11 +962,21 @@ fn parse_id(s: &str) -> crate::Result<PeriodId> {
     Err(crate::error::InputError::Invalid.into())
 }
 
-fn enumerate_ids(mut cur: PeriodId, end: PeriodId) -> crate::Result<Vec<PeriodId>> {
+fn enumerate_ids<C: PeriodCalendar>(
+    mut cur: PeriodId,
+    end: PeriodId,
+    calendar: &C,
+) -> crate::Result<Vec<PeriodId>> {
     let mut out = Vec::new();
     while cur <= end {
         out.push(cur);
-        cur = step(cur)?;
+        let max = calendar.max_index(cur.year, cur.kind)?;
+        if cur.index >= max {
+            cur.year += 1;
+            cur.index = 1;
+        } else {
+            cur.index += 1;
+        }
     }
     Ok(out)
 }
@@ -1152,6 +1228,36 @@ mod tests {
         let week = build_fiscal_periods("2020W53..W53", cfg, None).expect("fiscal week 53");
         assert_eq!(week.periods[0].start, d(2020, Month::September, 29));
         assert_eq!(week.periods[0].end, d(2020, Month::October, 1));
+    }
+
+    #[test]
+    fn fiscal_ranges_include_partial_week_53_and_leap_day_366() {
+        let federal = FiscalConfig::us_federal();
+        let week = build_fiscal_periods("FY2025W53..W53", federal, None)
+            .expect("FY2025 has a partial week 53");
+        assert_eq!(week.periods[0].start, d(2025, Month::September, 30));
+        assert_eq!(week.periods[0].end, d(2025, Month::October, 1));
+
+        let crossing = build_fiscal_periods("2025W52..2026W01", federal, None)
+            .expect("cross-fiscal-year weeks");
+        assert_eq!(crossing.periods.len(), 3);
+        assert_eq!(crossing.periods[1].id.index, 53);
+        assert_eq!(crossing.periods[1].end, crossing.periods[2].start);
+
+        let february = FiscalConfig::new(2, 1).expect("valid fiscal start");
+        let leap_day = build_fiscal_periods("FY2025D366..D366", february, None)
+            .expect("FY2025 spans leap day and has D366");
+        assert_eq!(leap_day.periods[0].start, d(2025, Month::January, 31));
+        assert_eq!(leap_day.periods[0].end, d(2025, Month::February, 1));
+    }
+
+    #[test]
+    fn fallible_period_id_constructors_reject_invalid_indices() {
+        assert!(PeriodId::try_month(2025, 13).is_err());
+        assert!(PeriodId::try_quarter(2025, 0).is_err());
+        assert!(PeriodId::try_week(2021, 53).is_err());
+        assert!(PeriodId::try_day(2025, 366).is_err());
+        assert!(PeriodId::try_half(2025, 3).is_err());
     }
 
     #[test]

@@ -7083,7 +7083,7 @@
     },
     "CsaSpec": {
       "additionalProperties": false,
-      "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```ignore\nuse finstack_quant_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::simm_standard(Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n};\n# Ok(())\n# }\n```",
+      "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```ignore\nuse finstack_quant_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::simm_standard(Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n    calendar_id: \"usny\".into(),\n};\n# Ok(())\n# }\n```",
       "properties": {
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -10572,7 +10572,7 @@
           ]
         },
         "maturity": {
-          "description": "Maturity/settlement date",
+          "description": "Contractual end of the observation period.",
           "format": "date",
           "type": "string"
         },
@@ -10639,6 +10639,15 @@
           "$ref": "#/$defs/RealizedVarMethod",
           "default": "CloseToClose",
           "description": "Method for calculating realized variance (defaults to CloseToClose)"
+        },
+        "settlement_date": {
+          "default": null,
+          "description": "Optional cash-settlement date. Defaults to the adjusted final observation date.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -16113,22 +16122,22 @@
       "oneOf": [
         {
           "const": "a",
-          "description": "Class A: GNMA single-family 30-year.",
+          "description": "Class A: Conventional 30-year (FNMA/FHLMC UMBS).",
           "type": "string"
         },
         {
           "const": "b",
-          "description": "Class B: Conventional 30-year (FNMA/FHLMC UMBS). Most common for dollar rolls.",
+          "description": "Class B: Fixed-rate 15-year agency MBS.",
           "type": "string"
         },
         {
           "const": "c",
-          "description": "Class C: GNMA multi-family, ARMs, and other GNMA products.",
+          "description": "Class C: GNMA single-family 30-year.",
           "type": "string"
         },
         {
           "const": "d",
-          "description": "Class D: Conventional 15-year and 20-year (FNMA/FHLMC).",
+          "description": "Class D: Balloons, ARMs, multifamily, and other non-standard products.",
           "type": "string"
         }
       ]
@@ -18314,7 +18323,7 @@
           ]
         },
         "maturity": {
-          "description": "Maturity/settlement date",
+          "description": "Contractual end of the observation period.",
           "format": "date",
           "type": "string"
         },
@@ -18377,6 +18386,15 @@
           "$ref": "#/$defs/RealizedVarMethod",
           "default": "CloseToClose",
           "description": "Method for calculating realized variance (defaults to CloseToClose)"
+        },
+        "settlement_date": {
+          "default": null,
+          "description": "Optional cash-settlement date. Defaults to the adjusted final observation date.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -18577,6 +18595,15 @@
           "description": "Final settlement date — the morning Special Opening Quotation (SOQ)\nof the index is computed on this date (same day as `expiry` for VIX).",
           "format": "date",
           "type": "string"
+        },
+        "settlement_fixing": {
+          "default": null,
+          "description": "Final settlement/SOQ fixing in index points.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
         },
         "vol_index_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",

@@ -129,15 +129,19 @@ impl PyPeriodId {
     /// Build a monthly period identifier.
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, month)")]
-    fn month(_cls: &Bound<'_, PyType>, year: i32, month: u8) -> Self {
-        Self::from_inner(PeriodId::month(year, month))
+    fn month(_cls: &Bound<'_, PyType>, year: i32, month: u8) -> PyResult<Self> {
+        PeriodId::try_month(year, month)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Build a quarterly period identifier.
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, quarter)")]
-    fn quarter(_cls: &Bound<'_, PyType>, year: i32, quarter: u8) -> Self {
-        Self::from_inner(PeriodId::quarter(year, quarter))
+    fn quarter(_cls: &Bound<'_, PyType>, year: i32, quarter: u8) -> PyResult<Self> {
+        PeriodId::try_quarter(year, quarter)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Build an annual period identifier.
@@ -150,22 +154,28 @@ impl PyPeriodId {
     /// Build a semi-annual period identifier.
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, half)")]
-    fn half(_cls: &Bound<'_, PyType>, year: i32, h: u8) -> Self {
-        Self::from_inner(PeriodId::half(year, h))
+    fn half(_cls: &Bound<'_, PyType>, year: i32, h: u8) -> PyResult<Self> {
+        PeriodId::try_half(year, h)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Build a weekly period identifier.
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, week)")]
-    fn week(_cls: &Bound<'_, PyType>, year: i32, w: u8) -> Self {
-        Self::from_inner(PeriodId::week(year, w))
+    fn week(_cls: &Bound<'_, PyType>, year: i32, w: u8) -> PyResult<Self> {
+        PeriodId::try_week(year, w)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Build a daily period identifier from an ordinal day.
     #[classmethod]
     #[pyo3(text_signature = "(cls, year, ordinal)")]
-    fn day(_cls: &Bound<'_, PyType>, year: i32, ordinal: u16) -> Self {
-        Self::from_inner(PeriodId::day(year, ordinal))
+    fn day(_cls: &Bound<'_, PyType>, year: i32, ordinal: u16) -> PyResult<Self> {
+        PeriodId::try_day(year, ordinal)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Period code string (e.g. ``"2025Q1"``).
