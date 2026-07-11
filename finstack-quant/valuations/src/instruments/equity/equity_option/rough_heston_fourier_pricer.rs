@@ -76,6 +76,14 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
                 )
             })?;
 
+        if as_of > equity_option.expiry {
+            return Ok(crate::results::ValuationResult::stamped(
+                equity_option.id(),
+                as_of,
+                Money::new(0.0, option_currency(equity_option)),
+            ));
+        }
+
         reject_future_discrete_dividends_for_stochastic_vol(
             equity_option,
             as_of,

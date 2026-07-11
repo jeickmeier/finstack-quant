@@ -618,7 +618,11 @@ fn release_principal_funding_account(
 /// but on the current balances, so a net-WAC cap tracks collateral that has
 /// amortized, prepaid or defaulted heterogeneously instead of being frozen at
 /// closing. Returns `0.0` for an empty/exhausted performing pool.
-fn current_collateral_wac(state: &SimulationState) -> f64 {
+fn current_collateral_wac(
+    state: &SimulationState,
+    context: &MarketContext,
+    pay_date: Date,
+) -> Result<f64> {
     let mut weighted = 0.0_f64;
     let mut balance = 0.0_f64;
     for i in 0..state.pool_state.len() {
@@ -629,13 +633,30 @@ fn current_collateral_wac(state: &SimulationState) -> f64 {
         if b <= 0.0 {
             continue;
         }
-        weighted += state.pool_state.rates[i] * b;
+        let all_in_rate = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
+            let curve_id = &state.pool_state.unique_curves[curve_idx];
+            let fwd = context.get_forward(curve_id)?;
+            let base = fwd.base_date();
+            let dc = fwd.day_count();
+            let t2 = dc.year_fraction(base, pay_date, DayCountContext::default())?;
+            let tenor = fwd.tenor();
+            let t1 = (t2 - tenor).max(0.0);
+            let base_rate = if t2 > 0.0 && t1 < t2 {
+                fwd.rate_period(t1, t2)
+            } else {
+                fwd.rate(0.0)
+            };
+            base_rate + state.pool_state.spread_bps[i].unwrap_or(0.0) / 10_000.0
+        } else {
+            state.pool_state.rates[i]
+        };
+        weighted += all_in_rate * b;
         balance += b;
     }
     if balance > 0.0 {
-        weighted / balance
+        Ok(weighted / balance)
     } else {
-        0.0
+        Ok(0.0)
     }
 }
 
@@ -643,16 +664,21 @@ fn current_collateral_wac(state: &SimulationState) -> f64 {
 /// ([`current_collateral_wac`]) less the AFC spec's net-WAC fee load (servicing
 /// plus trustee bps ranking ahead of the capped interest). Returns `0.0` when no
 /// AFC rule is configured (cap unused).
-fn live_afc_cap_rate(instrument: &StructuredCredit, state: &SimulationState) -> f64 {
+fn live_afc_cap_rate(
+    instrument: &StructuredCredit,
+    state: &SimulationState,
+    context: &MarketContext,
+    pay_date: Date,
+) -> Result<f64> {
     match instrument
         .waterfall_rules
         .as_ref()
         .and_then(|rules| rules.afc.as_ref())
     {
-        Some(afc) => {
-            (current_collateral_wac(state) - afc.net_wac_fee_bps.unwrap_or(0.0) / 10_000.0).max(0.0)
-        }
-        None => 0.0,
+        Some(afc) => Ok((current_collateral_wac(state, context, pay_date)?
+            - afc.net_wac_fee_bps.unwrap_or(0.0) / 10_000.0)
+            .max(0.0)),
+        None => Ok(0.0),
     }
 }
 
@@ -2620,7 +2646,7 @@ fn simulate_period(
     // period's pool flows amortize it. `0.0` when no AFC rule is configured. Used
     // for both the cash *routed* to capped tranches (the per-period AFC waterfall
     // below) and the interest *recorded* (Step 5), so the two cannot diverge.
-    let live_afc_cap = live_afc_cap_rate(instrument, state);
+    let live_afc_cap = live_afc_cap_rate(instrument, state, context, pay_date)?;
 
     // Early amortization (master-trust style): once cumulative losses reach the
     // configured threshold, the revolving period ends immediately and the deal

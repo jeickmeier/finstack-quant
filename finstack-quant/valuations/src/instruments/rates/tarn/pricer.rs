@@ -291,12 +291,35 @@ impl TarnPricer {
     ) -> Result<MoneyEstimate> {
         inst.validate()?;
 
+        let first_coupon_date = inst.coupon_dates[0];
+        let final_coupon_date = *inst.coupon_dates.last().ok_or_else(|| {
+            finstack_quant_core::Error::Validation("TARN requires coupon dates".to_string())
+        })?;
+        if as_of >= final_coupon_date {
+            let zero = Money::new(0.0, inst.notional.currency());
+            return Ok(MoneyEstimate {
+                mean: zero,
+                stderr: 0.0,
+                ci_95: (zero, zero),
+                num_paths: 0,
+                num_simulated_paths: 0,
+                std_dev: Some(0.0),
+                median: None,
+                percentile_25: None,
+                percentile_75: None,
+                min: Some(0.0),
+                max: Some(0.0),
+                num_skipped: 0,
+            });
+        }
+        if as_of > first_coupon_date {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Seasoned TARN '{}' requires realized cumulative coupon, knockout/redemption state, and historical fixings; pricing without that state is not supported",
+                inst.id
+            )));
+        }
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
-        // The HW1F MC path is single-curve: both the period term forwards (M7)
-        // and the simulated short rate are reconstructed from `discount_curve`.
-        // The declared floating index is still required to exist in the market
-        // as an instrument-contract precondition, but is not otherwise read.
-        let _forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+        let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
 
         let hw_params = self.effective_hw_params(inst, market, as_of)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
@@ -356,11 +379,28 @@ impl TarnPricer {
                     )));
                 }
                 event_times.push(fixing_time);
+                let coeffs =
+                    term_forward.period_coeffs(fixing_time, inst.floating_tenor.to_years_simple());
+                let projection_time = forward_curve.day_count().signed_year_fraction(
+                    forward_curve.base_date(),
+                    start,
+                    DayCountContext::default(),
+                )?;
+                let discount_time = discount_curve.day_count().signed_year_fraction(
+                    discount_curve.base_date(),
+                    start,
+                    DayCountContext::default(),
+                )?;
+                let tenor = inst.floating_tenor.to_years_simple();
+                let discount_forward = (discount_curve.df(discount_time)
+                    / discount_curve.df(discount_time + tenor)
+                    - 1.0)
+                    / tenor;
+                let basis = forward_curve.rate(projection_time) - discount_forward;
                 events.push(CouponEvent {
                     accrual_fraction,
                     discount_factor,
-                    forward_coeffs: term_forward
-                        .period_coeffs(fixing_time, inst.floating_tenor.to_years_simple()),
+                    forward_coeffs: coeffs.with_additive_spread(basis),
                     needs_path_sample: true,
                 });
                 continue;
@@ -718,6 +758,9 @@ mod tests {
         let disc = market
             .get_discount(tarn.discount_curve_id.as_ref())
             .expect("discount");
+        let projection = market
+            .get_forward(tarn.floating_index_id.as_ref())
+            .expect("projection");
         let dc = tarn.day_count;
         let ctx = DayCountContext::default();
         let mut tracker = CumulativeCouponTracker::with_target(tarn.target_coupon);
@@ -731,13 +774,12 @@ mod tests {
                 continue;
             }
             let accrual = dc.year_fraction(start, end, ctx).expect("accrual");
-            // In-advance fixing: simple forward over the fixing window
-            // [max(start, as_of), end] implied by the discount curve.
-            let fixing_start = start.max(as_of);
-            let p_start =
-                relative_df_discount_curve(disc.as_ref(), as_of, fixing_start).expect("p_start");
             let p_end = relative_df_discount_curve(disc.as_ref(), as_of, end).expect("p_end");
-            let floating_rate = (p_start / p_end - 1.0) / accrual;
+            let projection_time = projection
+                .day_count()
+                .signed_year_fraction(projection.base_date(), start.max(as_of), ctx)
+                .expect("projection time");
+            let floating_rate = projection.rate(projection_time);
 
             let coupon = (tarn.fixed_rate - floating_rate).max(tarn.coupon_floor) * accrual;
             let actual = tracker.add_coupon(coupon);

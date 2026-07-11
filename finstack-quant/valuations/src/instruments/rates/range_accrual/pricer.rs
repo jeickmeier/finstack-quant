@@ -133,12 +133,18 @@ impl RangeAccrualMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<finstack_quant_core::money::Money> {
-        inst.validate()?;
         let final_date = inst
             .payment_date
             .unwrap_or(inst.observation_dates.last().copied().unwrap_or(as_of));
         if final_date <= as_of {
             return Ok(Money::new(0.0, inst.notional.currency()));
+        }
+        inst.validate()?;
+        if inst.rate_index_id.is_some() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Rate-linked RangeAccrual '{}' cannot use the equity GBM Monte Carlo pricer",
+                inst.id
+            )));
         }
         validate_historical_observations(inst, as_of)?;
 
@@ -221,7 +227,7 @@ impl RangeAccrualMcPricer {
             observation_times,
             effective_lower,
             effective_upper,
-            inst.coupon_rate,
+            inst.coupon_rate * inst.accrual_year_fraction()?,
             inst.notional.amount(),
             inst.notional.currency(),
             inst.past_fixings_in_range.unwrap_or(0),
@@ -264,7 +270,10 @@ fn compute_known_value(
     match (inst.past_fixings_in_range, inst.total_past_observations) {
         (Some(in_range), Some(total)) if total > 0 => {
             let accrual_fraction = in_range as f64 / total as f64;
-            let fv = inst.notional.amount() * inst.coupon_rate * accrual_fraction;
+            let fv = inst.notional.amount()
+                * inst.coupon_rate
+                * inst.accrual_year_fraction()?
+                * accrual_fraction;
             let discount_factor = curves
                 .get_discount(inst.discount_curve_id.as_str())?
                 .df_between_dates(as_of, payment_date)?;
@@ -349,6 +358,12 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    if inst.rate_index_id.is_some() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Rate-linked RangeAccrual '{}' cannot use equity static replication",
+            inst.id
+        )));
+    }
     if inst.pricing_overrides.metrics.mc_seed_scenario.is_some() {
         tracing::warn!(
             instrument_id = %inst.id,
@@ -375,13 +390,13 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     use crate::models::volatility::black::d1_d2_black76;
     use finstack_quant_core::math::special_functions::norm_cdf;
 
-    inst.validate()?;
     let final_date = inst
         .payment_date
         .unwrap_or(inst.observation_dates.last().copied().unwrap_or(as_of));
     if final_date <= as_of {
         return Ok(Money::new(0.0, inst.notional.currency()));
     }
+    inst.validate()?;
     validate_historical_observations(inst, as_of)?;
 
     let has_future_observations =
@@ -535,7 +550,10 @@ pub fn npv_analytic(inst: &RangeAccrual, curves: &MarketContext, as_of: Date) ->
     let expected_fraction = expected_total_in_range / (total_obs_count as f64);
 
     // Future value and present value
-    let fv = inst.notional.amount() * inst.coupon_rate * expected_fraction;
+    let fv = inst.notional.amount()
+        * inst.coupon_rate
+        * inst.accrual_year_fraction()?
+        * expected_fraction;
     let pv = fv * discount_factor;
 
     Ok(Money::new(pv, inst.notional.currency()))
@@ -586,6 +604,7 @@ mod tests {
     ) {
         let as_of = date(2024, 4, 30);
         let mut inst = RangeAccrual::example();
+        inst.accrual_start_date = Some(date(2023, 12, 31));
         inst.observation_dates = vec![as_of];
         inst.payment_date = Some(as_of);
         inst.past_fixings_in_range = None;
@@ -628,7 +647,11 @@ mod tests {
             .expect("curve")
             .df_between_dates(as_of, payment_date)
             .expect("df");
-        let expected = inst.notional.amount() * inst.coupon_rate * 0.5 * df;
+        let expected = inst.notional.amount()
+            * inst.coupon_rate
+            * inst.accrual_year_fraction().expect("accrual factor")
+            * 0.5
+            * df;
         assert!((pv.amount() - expected).abs() < 1e-10);
     }
 

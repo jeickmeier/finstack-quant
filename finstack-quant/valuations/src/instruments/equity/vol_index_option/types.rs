@@ -509,6 +509,22 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Volatilit
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.vega(market, as_of)?))
     }
+
+    fn option_gamma(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        Ok(Some(self.gamma(market, as_of)?))
+    }
+
+    fn option_theta(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        Ok(Some(self.theta(market, as_of)?))
+    }
 }
 
 // =============================================================================

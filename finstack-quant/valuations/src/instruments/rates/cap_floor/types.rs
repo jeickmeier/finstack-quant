@@ -591,6 +591,48 @@ fn infer_single_period_frequency(start_date: Date, maturity: Date) -> Tenor {
 impl crate::instruments::common_impl::traits::Instrument for CapFloor {
     impl_instrument_base!(crate::pricer::InstrumentType::CapFloor);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        if self.start_date >= self.maturity {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' start_date ({}) must precede maturity ({})",
+                self.id, self.start_date, self.maturity
+            )));
+        }
+        if !self.notional.amount().is_finite() || self.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' notional must be finite and positive, got {}",
+                self.id,
+                self.notional.amount()
+            )));
+        }
+        let strike = self.strike_f64()?;
+        if !strike.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' strike must be finite",
+                self.id
+            )));
+        }
+        if !self.vol_shift.is_finite() || self.vol_shift < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' vol_shift must be finite and non-negative, got {}",
+                self.id, self.vol_shift
+            )));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' supports European exercise only; got {}",
+                self.id, self.exercise_style
+            )));
+        }
+        if !matches!(self.settlement, SettlementType::Cash) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' supports cash settlement only",
+                self.id
+            )));
+        }
+        Ok(())
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76
     }
@@ -677,7 +719,7 @@ mod tests {
             .build()
             .expect("discount curve should build");
 
-        let fwd = ForwardCurve::builder(CurveId::new("TEST-FWD"), 0.25)
+        let fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"), 0.25)
             .base_date(base_date)
             .day_count(DayCount::Act360)
             .knots(vec![(0.0, 0.04), (0.5, 0.042), (1.0, 0.045), (2.0, 0.05)])
@@ -733,7 +775,7 @@ mod tests {
             Tenor::quarterly(),
             DayCount::Act360,
             "TEST-DISC",
-            "TEST-FWD",
+            "USD-SOFR-3M",
             "TEST-VOL",
         )
         .expect("valid strike");
@@ -747,7 +789,7 @@ mod tests {
             Tenor::quarterly(),
             DayCount::Act360,
             "TEST-DISC",
-            "TEST-FWD",
+            "USD-SOFR-3M",
             "TEST-VOL",
         )
         .expect("valid strike");
@@ -761,7 +803,7 @@ mod tests {
 
         // Calculate expected forward swap value: sum of DF * tau * (F - K)
         let disc = ctx.get_discount(CurveId::new("TEST-DISC")).expect("disc");
-        let fwd = ctx.get_forward(CurveId::new("TEST-FWD")).expect("fwd");
+        let fwd = ctx.get_forward(CurveId::new("USD-SOFR-3M")).expect("fwd");
 
         // IMPORTANT: Use the same canonical schedule builder as the instrument pricer.
         //
@@ -842,7 +884,7 @@ mod tests {
                 Tenor::quarterly(),
                 DayCount::Act360,
                 "TEST-DISC",
-                "TEST-FWD",
+                "USD-SOFR-3M",
                 "TEST-VOL",
             )
             .expect("valid strike");
@@ -856,7 +898,7 @@ mod tests {
                 Tenor::quarterly(),
                 DayCount::Act360,
                 "TEST-DISC",
-                "TEST-FWD",
+                "USD-SOFR-3M",
                 "TEST-VOL",
             )
             .expect("valid strike");
@@ -891,7 +933,7 @@ mod tests {
         let notional = Money::new(1_000_000.0, Currency::USD);
 
         let mut ctx = test_market_context(base_date);
-        let neg_fwd = ForwardCurve::builder(CurveId::new("TEST-FWD-NEG"), 0.25)
+        let neg_fwd = ForwardCurve::builder(CurveId::new("USD-SOFR-3M"), 0.25)
             .base_date(base_date)
             .day_count(DayCount::Act360)
             .knots(vec![
@@ -927,7 +969,7 @@ mod tests {
             Tenor::quarterly(),
             DayCount::Act360,
             "TEST-DISC",
-            "TEST-FWD-NEG",
+            "USD-SOFR-3M",
             "TEST-VOL-NORMAL",
         )
         .expect("valid strike")
@@ -942,7 +984,7 @@ mod tests {
             Tenor::quarterly(),
             DayCount::Act360,
             "TEST-DISC",
-            "TEST-FWD-NEG",
+            "USD-SOFR-3M",
             "TEST-VOL-NORMAL",
         )
         .expect("valid strike")

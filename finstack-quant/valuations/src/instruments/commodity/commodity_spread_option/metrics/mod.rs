@@ -17,20 +17,33 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use std::sync::Arc;
 
-/// Delta calculator for leg 1 forward price.
-///
-/// Computes dPV/dF1 by bumping the leg 1 price curve up and down.
-struct SpreadDeltaLeg1Calculator;
+/// Delta calculator for one spread leg's forward price.
+struct SpreadDeltaCalculator {
+    leg: u8,
+}
 
-impl MetricCalculator for SpreadDeltaLeg1Calculator {
+impl MetricCalculator for SpreadDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let inst: &CommoditySpreadOption = context.instrument_as()?;
 
         let bump_pct = crate::metrics::bump_sizes::SPOT; // 1% = 0.01
 
-        let curve_id = CurveId::new(inst.leg1_forward_curve_id.as_str());
-        let f1 = inst.leg1_forward(&context.curves)?;
-        let bump_size = f1 * bump_pct;
+        let (curve_id, forward) = match self.leg {
+            1 => (
+                CurveId::new(inst.leg1_forward_curve_id.as_str()),
+                inst.leg1_forward(&context.curves)?,
+            ),
+            2 => (
+                CurveId::new(inst.leg2_forward_curve_id.as_str()),
+                inst.leg2_forward(&context.curves)?,
+            ),
+            _ => {
+                return Err(finstack_quant_core::Error::Validation(
+                    "invalid spread leg".into(),
+                ))
+            }
+        };
+        let bump_size = forward * bump_pct;
         if bump_size <= 0.0 {
             return Ok(0.0);
         }
@@ -64,7 +77,9 @@ impl MetricCalculator for SpreadDeltaLeg1Calculator {
 /// Vega calculator: combined sensitivity to both vol surfaces.
 ///
 /// Bumps both leg 1 and leg 2 vol surfaces simultaneously by 1 vol point.
-struct SpreadVegaCalculator;
+struct SpreadVegaCalculator {
+    leg: Option<u8>,
+}
 
 impl MetricCalculator for SpreadVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -72,33 +87,43 @@ impl MetricCalculator for SpreadVegaCalculator {
 
         let vol_bump = crate::metrics::bump_sizes::VOLATILITY; // 1 vol point = 0.01
 
-        // Bump both vol surfaces up
-        let up1 = crate::metrics::bump_surface_vol_absolute(
-            &context.curves,
-            inst.leg1_vol_surface_id.as_str(),
-            vol_bump,
-        )?;
-        let up_both = crate::metrics::bump_surface_vol_absolute(
-            &up1,
-            inst.leg2_vol_surface_id.as_str(),
-            vol_bump,
-        )?;
-        let pv_up = inst.value(&up_both, context.as_of)?.amount();
+        let bump_market = |amount: f64| -> Result<_> {
+            match self.leg {
+                Some(1) => crate::metrics::bump_surface_vol_absolute(
+                    &context.curves,
+                    inst.leg1_vol_surface_id.as_str(),
+                    amount,
+                ),
+                Some(2) => crate::metrics::bump_surface_vol_absolute(
+                    &context.curves,
+                    inst.leg2_vol_surface_id.as_str(),
+                    amount,
+                ),
+                None => {
+                    let first = crate::metrics::bump_surface_vol_absolute(
+                        &context.curves,
+                        inst.leg1_vol_surface_id.as_str(),
+                        amount,
+                    )?;
+                    crate::metrics::bump_surface_vol_absolute(
+                        &first,
+                        inst.leg2_vol_surface_id.as_str(),
+                        amount,
+                    )
+                }
+                Some(_) => Err(finstack_quant_core::Error::Validation(
+                    "invalid spread-option vega leg".into(),
+                )),
+            }
+        };
+        let pv_up = inst.value(&bump_market(vol_bump)?, context.as_of)?.amount();
+        let pv_dn = inst
+            .value(&bump_market(-vol_bump)?, context.as_of)?
+            .amount();
 
-        // Bump both vol surfaces down
-        let dn1 = crate::metrics::bump_surface_vol_absolute(
-            &context.curves,
-            inst.leg1_vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let dn_both = crate::metrics::bump_surface_vol_absolute(
-            &dn1,
-            inst.leg2_vol_surface_id.as_str(),
-            -vol_bump,
-        )?;
-        let pv_dn = inst.value(&dn_both, context.as_of)?.amount();
-
-        Ok((pv_up - pv_dn) / (2.0 * vol_bump))
+        // Report cash P&L per one-vol-point move. The scenarios are already
+        // shifted by +/- `vol_bump`, so do not normalize back to dPV/dsigma.
+        Ok((pv_up - pv_dn) / 2.0)
     }
 }
 
@@ -106,12 +131,32 @@ impl MetricCalculator for SpreadVegaCalculator {
 pub(crate) fn register_commodity_spread_option_metrics(registry: &mut MetricRegistry) {
     registry.register_metric(
         MetricId::Delta,
-        Arc::new(SpreadDeltaLeg1Calculator),
+        Arc::new(SpreadDeltaCalculator { leg: 1 }),
         &[InstrumentType::CommoditySpreadOption],
     );
     registry.register_metric(
         MetricId::Vega,
-        Arc::new(SpreadVegaCalculator),
+        Arc::new(SpreadVegaCalculator { leg: None }),
+        &[InstrumentType::CommoditySpreadOption],
+    );
+    registry.register_metric(
+        MetricId::custom("delta::leg1"),
+        Arc::new(SpreadDeltaCalculator { leg: 1 }),
+        &[InstrumentType::CommoditySpreadOption],
+    );
+    registry.register_metric(
+        MetricId::custom("delta::leg2"),
+        Arc::new(SpreadDeltaCalculator { leg: 2 }),
+        &[InstrumentType::CommoditySpreadOption],
+    );
+    registry.register_metric(
+        MetricId::custom("vega::leg1"),
+        Arc::new(SpreadVegaCalculator { leg: Some(1) }),
+        &[InstrumentType::CommoditySpreadOption],
+    );
+    registry.register_metric(
+        MetricId::custom("vega::leg2"),
+        Arc::new(SpreadVegaCalculator { leg: Some(2) }),
         &[InstrumentType::CommoditySpreadOption],
     );
     registry.register_metric(

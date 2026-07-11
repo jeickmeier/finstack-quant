@@ -284,11 +284,14 @@ impl CDSTranchePricer {
                 let effective = tranche
                     .contractual_effective_date(valuation_date)
                     .unwrap_or(valuation_date);
-                if tranche.effective_date.is_some() {
-                    effective
-                } else {
-                    first_period_start.unwrap_or(effective).max(effective)
-                }
+                // A seasoned tranche accrues the next premium from the latest
+                // contractual coupon boundary, never from the original trade
+                // effective date. Bound the boundary below by the effective
+                // date for a genuine first stub.
+                first_period_start
+                    .filter(|boundary| *boundary < valuation_date)
+                    .unwrap_or(effective)
+                    .max(effective)
             } else {
                 payment_dates[i - 1]
             };

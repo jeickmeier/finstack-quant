@@ -293,12 +293,42 @@ impl Equity {
     ) -> finstack_quant_core::Result<Money> {
         let s0 = self.price_per_share(market, as_of)?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        if !t.is_finite() || t < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Equity '{}' forward horizon must be finite and non-negative, got {t}",
+                self.id
+            )));
+        }
+
+        // `t` is a horizon from `as_of`, while `DiscountCurve::df(t)` is
+        // anchored at the curve base date. Rebase the terminal discount factor
+        // explicitly so a seasoned valuation is invariant to how the same term
+        // structure is dated.
+        let curve_time_to_as_of = disc.day_count().year_fraction(
+            disc.base_date(),
+            as_of,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        let df_as_of = disc.df(curve_time_to_as_of);
+        let df_terminal = disc.df(curve_time_to_as_of + t);
+        if !df_as_of.is_finite()
+            || df_as_of <= 0.0
+            || !df_terminal.is_finite()
+            || df_terminal <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Equity '{}' discount curve returned invalid rebased discount factors",
+                self.id
+            )));
+        }
+        let df_horizon = df_terminal / df_as_of;
         let fwd = if !self.discrete_dividends.is_empty() {
             let pv_dividends: f64 = self
                 .discrete_dividends
                 .iter()
                 .filter_map(|(ex_date, amount)| {
-                    let t_div = finstack_quant_core::dates::DayCount::Act365F
+                    let t_div = disc
+                        .day_count()
                         .year_fraction(
                             as_of,
                             *ex_date,
@@ -306,17 +336,18 @@ impl Equity {
                         )
                         .ok()?;
                     if t_div > 0.0 && t_div <= t {
-                        Some(amount * disc.df(t_div))
+                        disc.df_between_dates(as_of, *ex_date)
+                            .ok()
+                            .map(|df| amount * df)
                     } else {
                         None
                     }
                 })
                 .sum();
-            (s0.amount() - pv_dividends) / disc.df(t)
+            (s0.amount() - pv_dividends) / df_horizon
         } else {
             let dy = self.dividend_yield(market)?;
-            let r = disc.zero(t);
-            s0.amount() * ((r - dy) * t).exp()
+            s0.amount() / df_horizon * (-dy * t).exp()
         };
         Ok(Money::new(fwd, self.currency))
     }

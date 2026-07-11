@@ -277,14 +277,14 @@ pub fn validate_sifma_variance(allocated_face: f64, trade_notional: f64) -> bool
 /// Calculate value adjustment for a specified pool vs. generic.
 ///
 /// Positive adjustment means the specified pool is worth more than generic.
-pub fn calculate_pay_up(_characteristics: &PoolCharacteristics, _tba: &AgencyTba) -> f64 {
-    // Simplified: no pay-up calculation
-    // Full implementation would consider:
-    // - WAC vs. market rate (refi incentive)
-    // - Loan balance (lower balance = slower prepay = worth more at premium)
-    // - Geographic concentration
-    // - Loan purpose (purchase vs. refi)
-    0.0
+pub fn calculate_pay_up(
+    _characteristics: &PoolCharacteristics,
+    tba: &AgencyTba,
+) -> finstack_quant_core::Result<f64> {
+    Err(finstack_quant_core::Error::Validation(format!(
+        "AgencyTba '{}' specified-pool pay-up model is not implemented; refusing to return a zero adjustment",
+        tba.id
+    )))
 }
 
 #[cfg(test)]

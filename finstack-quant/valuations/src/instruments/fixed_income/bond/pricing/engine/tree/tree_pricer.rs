@@ -224,7 +224,17 @@ impl TreePricer {
         };
 
         if as_of >= bond.maturity {
-            return Ok(0.0);
+            // The contractual maturity can roll to a later business-day
+            // payment date. Once the option exercise period has ended there
+            // is no tree optionality left, but any adjusted future redemption
+            // must still be discounted rather than discarded.
+            let flows = tree_bond.pricing_dated_cashflows(market_context, as_of)?;
+            let mut pv = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+            for (date, amount) in flows {
+                let df = discount_curve.df_between_dates(as_of, date)?;
+                pv.add(amount.amount() * df);
+            }
+            return Ok(pv.total());
         }
         let time_to_maturity = discount_curve.day_count().year_fraction(
             as_of,

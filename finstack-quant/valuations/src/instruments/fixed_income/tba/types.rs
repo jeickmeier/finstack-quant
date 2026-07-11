@@ -303,14 +303,13 @@ impl CashflowProvider for AgencyTba {
 
     fn cashflow_schedule(
         &self,
-        curves: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: Date,
+        _curves: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
-        let assumed_pool =
-            crate::instruments::fixed_income::tba::pricer::resolve_assumed_pool(self, as_of)?;
-        let mut schedule = assumed_pool.cashflow_schedule(curves, as_of)?;
-        schedule.meta.representation = crate::cashflow::builder::CashflowRepresentation::Projected;
-        Ok(schedule)
+        Err(finstack_quant_core::Error::Validation(format!(
+            "AgencyTba '{}' is a physically settled forward and has no standalone cashflow schedule; represent the delivered pool separately after settlement",
+            self.id
+        )))
     }
 }
 
@@ -327,6 +326,10 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
 
     fn effective_start_date(&self) -> Option<Date> {
         self.trade_date
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        self.get_settlement_date().ok()
     }
 
     fn pricing_overrides_mut(

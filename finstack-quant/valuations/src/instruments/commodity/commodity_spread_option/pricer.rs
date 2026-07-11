@@ -98,19 +98,14 @@ fn kirk_price(
     // Kirk's adjusted strike
     let k_adj = f2 + inst.strike;
 
-    // Guard: if K_adj <= 0 (or near-zero), Kirk's approximation breaks down.
-    // A non-positive k_adj = F2 + K makes ln(F1/k_adj) undefined (NaN for
-    // negative, -inf for zero). Under Kirk's framework the best available
-    // approximation is the discounted forward spread df*(F1-F2-K) for the
-    // call; the put is then worthless by put-call parity. Note: the spread
-    // payoff (F1_T - F2_T - K)^+ can still expire worthless in Monte-Carlo
-    // paths even when k_adj <= 0 — this is an approximation, not a certainty.
+    // A non-positive adjusted strike is outside Kirk's lognormal domain.
+    // Returning intrinsic here discards stochastic spread optionality and can
+    // report a plausible but materially wrong zero for puts, so fail closed.
     if k_adj <= KIRK_DENOM_EPSILON {
-        let price = match inst.option_type {
-            OptionType::Call => (f1 - f2 - inst.strike).max(0.0) * df,
-            OptionType::Put => 0.0,
-        };
-        return Ok(price);
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySpreadOption '{}' is outside Kirk's domain: F2 + strike = {k_adj}; use a bivariate-normal or Monte Carlo spread model",
+            inst.id
+        )));
     }
 
     // Kirk's vol: sigma_kirk = sqrt(sigma1^2 - 2*rho*sigma1*sigma2*w + (sigma2*w)^2)
@@ -583,13 +578,9 @@ mod tests {
         );
     }
 
-    /// Test that a spread CALL with K < -F2 (i.e. k_adj = F2+K < 0) returns
-    /// the discounted intrinsic value (df*(F1-F2-K)) and is NOT NaN.
-    ///
-    /// The old code called Black76(F1, k_adj<0, ...) which computed ln(F1/k_adj)
-    /// of a negative number, producing NaN.
+    /// Kirk's lognormal ratio approximation is undefined when `F2 + K <= 0`.
     #[test]
-    fn negative_adjusted_strike_call_returns_intrinsic_not_nan() {
+    fn negative_adjusted_strike_call_is_rejected() {
         let as_of =
             time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
         let expiry =
@@ -605,43 +596,12 @@ mod tests {
         let market = make_market(as_of, f1, f2, 0.25, 0.30, rate);
         let call = make_spread_option(OptionType::Call, k, 0.5, expiry);
 
-        let pv = call
-            .value(&market, as_of)
-            .expect("negative k_adj call")
-            .amount();
-
-        assert!(
-            pv.is_finite(),
-            "Call with k_adj<0 must be finite, got {}",
-            pv
-        );
-        assert!(
-            !pv.is_nan(),
-            "Call with k_adj<0 must not be NaN, got {}",
-            pv
-        );
-
-        // Expected: discounted intrinsic = df * (F1 - F2 - K) = df * 170
-        let disc = market.get_discount("USD-OIS").expect("discount curve");
-        let df = disc
-            .df_between_dates(as_of, expiry)
-            .expect("discount factor");
-        let expected = df * (f1 - f2 - k); // 170 * df, always > 0
-
-        assert!(
-            (pv - expected).abs() < 1e-8,
-            "Call with k_adj<0 should equal discounted intrinsic ({:.6}), got {:.6}",
-            expected,
-            pv
-        );
+        assert!(call.value(&market, as_of).is_err());
     }
 
-    /// Test that a spread PUT with K < -F2 (k_adj < 0) returns 0.
-    ///
-    /// When k_adj < 0, the call is worth its full intrinsic (always exercised),
-    /// and put-call parity implies the put is worthless.
+    /// The same domain restriction applies to puts.
     #[test]
-    fn negative_adjusted_strike_put_returns_zero() {
+    fn negative_adjusted_strike_put_is_rejected() {
         let as_of =
             time::Date::from_calendar_date(2025, time::Month::January, 1).expect("valid date");
         let expiry =
@@ -655,21 +615,7 @@ mod tests {
         let market = make_market(as_of, f1, f2, 0.25, 0.30, 0.05);
         let put = make_spread_option(OptionType::Put, k, 0.5, expiry);
 
-        let pv = put
-            .value(&market, as_of)
-            .expect("negative k_adj put")
-            .amount();
-
-        assert!(
-            pv.is_finite(),
-            "Put with k_adj<0 must be finite, got {}",
-            pv
-        );
-        assert!(
-            pv.abs() < 1e-12,
-            "Put with k_adj<0 should be 0 (worthless), got {}",
-            pv
-        );
+        assert!(put.value(&market, as_of).is_err());
     }
 
     #[test]

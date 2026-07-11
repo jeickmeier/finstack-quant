@@ -208,7 +208,7 @@ fn test_at_expiry_boundary() {
 }
 
 #[test]
-fn test_past_expiry_is_intrinsic() {
+fn test_past_expiry_is_zero() {
     // Arrange: Valuing after expiry
     let expiry = date!(2024 - 01 - 01);
     let as_of = date!(2024 - 01 - 15); // 2 weeks past expiry
@@ -227,16 +227,7 @@ fn test_past_expiry_is_intrinsic() {
     // Act
     let pv = call.value(&market, as_of).unwrap();
 
-    // Assert: Should equal intrinsic at expiry spot (not current spot)
-    // Note: System uses current spot, but time = 0, so it computes intrinsic
-    let intrinsic = (spot - strike).max(0.0) * 1_000_000.0;
-    assert_approx_eq(
-        pv.amount(),
-        intrinsic,
-        1e-6,
-        1e-6,
-        "Past expiry value = intrinsic",
-    );
+    assert_eq!(pv.amount(), 0.0);
 }
 
 #[test]
@@ -324,7 +315,7 @@ fn test_strike_equals_spot_exactly() {
 }
 
 #[test]
-fn test_negative_time_to_expiry_treated_as_expired() {
+fn test_negative_time_to_expiry_is_zero() {
     // Arrange: as_of after expiry
     let expiry = date!(2024 - 01 - 01);
     let as_of = date!(2024 - 06 - 01);
@@ -344,15 +335,7 @@ fn test_negative_time_to_expiry_treated_as_expired() {
     let pv = call.value(&market, as_of).unwrap();
     let greeks = compute_greeks(&call, &market, as_of);
 
-    // Assert: Should behave as expired
-    let intrinsic = (spot - strike).max(0.0) * 1_000_000.0;
-    assert_approx_eq(
-        pv.amount(),
-        intrinsic,
-        1e-6,
-        1e-6,
-        "Negative time = expired",
-    );
+    assert_eq!(pv.amount(), 0.0);
     assert_eq!(greeks.gamma, 0.0, "Expired gamma = 0");
 }
 

@@ -156,8 +156,9 @@ impl CommoditySwaption {
             self.notional,
             "CommoditySwaption notional",
         )?;
-        // fixed_price must be finite (negative strikes can be legitimate for spread commodities)
-        crate::instruments::common_impl::validation::validate_f64_finite(
+        // This instrument is dispatched to unshifted Black-76, whose logarithm
+        // requires a strictly positive strike.
+        crate::instruments::common_impl::validation::validate_f64_positive(
             self.fixed_price,
             "CommoditySwaption fixed_price",
         )?;
@@ -213,17 +214,20 @@ impl CommoditySwaption {
             .stub_rule(finstack_quant_core::dates::StubKind::ShortBack);
 
         if let Some(ref cal_id) = self.calendar_id {
-            if let Some(cal) = CalendarRegistry::global().resolve_str(cal_id) {
-                builder = builder.adjust_with(self.bdc, cal);
-            }
+            let cal = CalendarRegistry::global()
+                .resolve_str(cal_id)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "CommoditySwaption '{}' references unknown calendar_id '{cal_id}'",
+                        self.id
+                    ))
+                })?;
+            builder = builder.adjust_with(self.bdc, cal);
         }
 
         let schedule = builder.build()?;
 
-        let dates: Vec<Date> = schedule
-            .into_iter()
-            .filter(|&d| d > self.swap_start && d <= self.swap_end)
-            .collect();
+        let dates: Vec<Date> = schedule.into_iter().skip(1).collect();
 
         Ok(dates)
     }
@@ -405,6 +409,13 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
                 intrinsic * annuity * self.notional,
                 self.underlying.currency,
             ));
+        }
+
+        if !forward.is_finite() || forward <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CommoditySwaption '{}' Black-76 forward must be finite and positive, got {forward}; use a normal or shifted model for nonpositive forwards",
+                self.id
+            )));
         }
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
@@ -757,12 +768,13 @@ mod tests {
     }
 
     #[test]
-    fn validation_accepts_negative_fixed_price() {
-        // Negative fixed price is legitimate for certain commodity spreads
+    fn validation_rejects_negative_fixed_price_for_black76() {
+        // This instrument is priced with Black-76, whose strike domain is
+        // strictly positive. Spread options use a separate instrument/model.
         let result = base_swaption_builder().fixed_price(-1.0).build();
         assert!(
-            result.is_ok(),
-            "CommoditySwaption must allow negative fixed_price"
+            result.is_err(),
+            "CommoditySwaption must reject negative fixed_price"
         );
     }
 

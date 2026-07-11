@@ -53,6 +53,12 @@ impl FxBarrierOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        if as_of > inst.expiry {
+            return Ok(finstack_quant_core::money::Money::new(
+                0.0,
+                inst.quote_currency,
+            ));
+        }
         validate_fx_barrier_currencies(inst)?;
 
         let (fx_spot, t) = collect_fx_barrier_expiry_state(inst, curves, as_of)?;
@@ -199,6 +205,9 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
+    if as_of > inst.expiry {
+        return Ok(Money::new(0.0, inst.quote_currency));
+    }
     let pricer = FxBarrierOptionMcPricer::new();
     pricer.price_internal(inst, curves, as_of)
 }
@@ -500,6 +509,14 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
                 PricingError::type_mismatch(InstrumentType::FxBarrierOption, instrument.key())
             })?;
 
+        if as_of > fx_barrier.expiry {
+            return Ok(ValuationResult::stamped(
+                fx_barrier.id(),
+                as_of,
+                Money::new(0.0, fx_barrier.quote_currency),
+            ));
+        }
+
         if fx_barrier.use_gobet_miri {
             return Err(PricingError::model_failure_with_context(
                 "Discrete barrier monitoring (use_gobet_miri = true) requires the Monte Carlo \
@@ -778,6 +795,14 @@ impl Pricer for FxBarrierOptionVannaVolgaPricer {
             .ok_or_else(|| {
                 PricingError::type_mismatch(InstrumentType::FxBarrierOption, instrument.key())
             })?;
+
+        if as_of > fx_barrier.expiry {
+            return Ok(ValuationResult::stamped(
+                fx_barrier.id(),
+                as_of,
+                Money::new(0.0, fx_barrier.quote_currency),
+            ));
+        }
 
         let pv = self.price_with_vv(fx_barrier, market, as_of)?;
         Ok(ValuationResult::stamped(fx_barrier.id(), as_of, pv))

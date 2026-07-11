@@ -127,7 +127,7 @@ pub(crate) fn validate_f64_finite(value: f64, context: &str) -> finstack_quant_c
 /// Validate that a floating-point value is positive (> 0).
 #[inline]
 pub(crate) fn validate_f64_positive(value: f64, context: &str) -> finstack_quant_core::Result<()> {
-    require_with(value > 0.0, || {
+    require_with(value.is_finite() && value > 0.0, || {
         format!("Invalid {}: must be positive, got {}", context, value)
     })
 }
@@ -138,7 +138,7 @@ pub(crate) fn validate_f64_non_negative(
     value: f64,
     context: &str,
 ) -> finstack_quant_core::Result<()> {
-    require_with(value >= 0.0, || {
+    require_with(value.is_finite() && value >= 0.0, || {
         format!("Invalid {}: must be non-negative, got {}", context, value)
     })
 }

@@ -18,6 +18,9 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    if as_of > inst.expiry {
+        return Ok(Money::new(0.0, inst.quote_currency));
+    }
     FxTouchOptionCalculator.npv(inst, curves, as_of)
 }
 

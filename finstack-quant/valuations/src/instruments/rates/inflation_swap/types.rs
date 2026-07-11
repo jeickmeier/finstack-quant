@@ -142,6 +142,12 @@ impl InflationSwap {
                 finstack_quant_core::InputError::NonPositiveValue,
             )?;
         }
+        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        validation::require_with(fixed_rate > -1.0, || {
+            format!(
+                "InflationSwap fixed_rate ({fixed_rate}) must be greater than -1.0 for geometric compounding"
+            )
+        })?;
         Ok(())
     }
 
@@ -461,6 +467,10 @@ impl InflationSwapBuilder {
 
 impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::InflationSwap);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        InflationSwap::validate(self)
+    }
 
     fn base_value(
         &self,

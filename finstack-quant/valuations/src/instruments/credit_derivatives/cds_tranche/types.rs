@@ -134,6 +134,18 @@ impl CDSTranche {
     /// and that notional is positive. Can be called after builder construction
     /// to catch configuration errors early.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        for (name, value) in [
+            ("attach_pct", self.attach_pct),
+            ("detach_pct", self.detach_pct),
+            ("running_coupon_bp", self.running_coupon_bp),
+            ("accumulated_loss", self.accumulated_loss),
+        ] {
+            if !value.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CDS tranche {name} must be finite, got {value}"
+                )));
+            }
+        }
         if self.attach_pct >= self.detach_pct {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "attach_pct ({}) must be less than detach_pct ({})",
@@ -157,6 +169,17 @@ impl CDSTranche {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "Tranche notional must be positive, got {}",
                 self.notional.amount()
+            )));
+        }
+        if !self.notional.amount().is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CDS tranche notional must be finite".to_string(),
+            ));
+        }
+        if !(0.0..=1.0).contains(&self.accumulated_loss) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS tranche accumulated_loss must be in [0, 1], got {}",
+                self.accumulated_loss
             )));
         }
         let currency = self.notional.currency();

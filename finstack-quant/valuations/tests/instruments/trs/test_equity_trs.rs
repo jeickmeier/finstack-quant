@@ -10,7 +10,6 @@ use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::Instrument;
@@ -200,14 +199,9 @@ fn test_equity_trs_discrete_dividends_preserve_small_amounts_after_large_amounts
     // Act
     let tr_pv = trs.pv_total_return_leg(&market, as_of).unwrap();
 
-    // Assert. The engine sums dividends with Neumaier compensation — the exact
-    // f64-level behavior is asserted in the pricer unit test
-    // (`discrete_dividends_preserve_small_amounts_after_large_amounts`). The leg
-    // PV is returned as `Money`, whose `Decimal::from_f64` ingestion keeps only
-    // ~16 significant digits, so the expectation must pass through the same
-    // ingestion for an end-to-end comparison.
-    let expected = neumaier_sum([1e16, 1.0, 1.0]) / 100.0;
-    assert_eq!(tr_pv, Money::new(expected, USD));
+    // Gross dividend pass-through offsets the corresponding ex-dividend price
+    // drop; counting both as positive return would double count distributions.
+    assert_eq!(tr_pv, Money::new(0.0, USD));
 }
 
 #[test]

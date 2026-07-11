@@ -31,6 +31,9 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    if as_of > inst.expiry {
+        return Ok(Money::new(0.0, inst.quote_currency));
+    }
     FxDigitalOptionCalculator::default().npv(inst, curves, as_of)
 }
 
@@ -39,6 +42,9 @@ pub(crate) fn compute_greeks(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<FxDigitalOptionGreeks> {
+    if as_of > inst.expiry {
+        return Ok(FxDigitalOptionGreeks::default());
+    }
     FxDigitalOptionCalculator::default().compute_greeks(inst, curves, as_of)
 }
 

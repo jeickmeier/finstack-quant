@@ -45,11 +45,11 @@ pub(crate) fn compute_pv_raw(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
-    let disc = context.get_discount(&option.discount_curve_id)?;
     let settlement_date = option.effective_settlement_date();
     if as_of > settlement_date {
         return Ok(0.0);
     }
+    let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
         .day_count
         .year_fraction(as_of, option.expiry, DayCountContext::default())?
@@ -135,6 +135,9 @@ pub(crate) fn delta(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    if as_of > option.expiry {
+        return Ok(0.0);
+    }
     let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
@@ -165,9 +168,6 @@ pub(crate) fn delta(
                 }
             }
         };
-        if as_of > option.expiry {
-            return Ok(0.0);
-        }
         let df = disc.df_between_dates(as_of, option.effective_settlement_date())?;
         return Ok(delta_per_point
             * option.contract_specs.multiplier
@@ -191,6 +191,9 @@ pub(crate) fn gamma(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    if as_of > option.expiry {
+        return Ok(0.0);
+    }
     let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
@@ -214,6 +217,9 @@ pub(crate) fn vega(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    if as_of > option.expiry {
+        return Ok(0.0);
+    }
     let vol_surface = context.get_surface(&option.vol_of_vol_surface_id)?;
     let disc = context.get_discount(&option.discount_curve_id)?;
     let t = option
@@ -249,6 +255,9 @@ pub(crate) fn intrinsic_value(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    if as_of > option.effective_settlement_date() {
+        return Ok(0.0);
+    }
     let forward = forward_vol(option, context, as_of)?;
     let intrinsic = match option.option_type {
         OptionType::Call => (forward - option.strike).max(0.0),
@@ -265,6 +274,9 @@ pub(crate) fn time_value(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    if as_of > option.effective_settlement_date() {
+        return Ok(0.0);
+    }
     Ok(compute_pv_raw(option, context, as_of)? - intrinsic_value(option, context, as_of)?)
 }
 

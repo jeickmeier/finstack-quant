@@ -273,6 +273,14 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
                 )
             })?;
 
+        if as_of > equity_option.expiry {
+            return Ok(crate::results::ValuationResult::stamped(
+                equity_option.id(),
+                as_of,
+                Money::new(0.0, option_currency(equity_option)),
+            ));
+        }
+
         // W-31: `collect_inputs_extended` applies the escrowed-dividend model
         // (spot shift + `q = 0`) when `discrete_dividends` is non-empty. The
         // escrowed-dividend identity holds only under Black-Scholes; under the

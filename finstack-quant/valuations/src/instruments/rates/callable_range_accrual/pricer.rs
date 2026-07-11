@@ -314,7 +314,7 @@ impl CallableRangeAccrualPricer {
         let payoff = CallableRangeAccrualPayoff::new(
             lower_bound,
             upper_bound,
-            inst.range_accrual.coupon_rate,
+            inst.range_accrual.coupon_rate * inst.range_accrual.accrual_year_fraction()?,
             inst.range_accrual.notional.amount(),
             schedule.events.clone(),
             schedule.call_prices.clone(),
@@ -475,30 +475,6 @@ impl Pricer for CallableRangeAccrualPricer {
     }
 }
 
-/// Reference-rate tenor used by the range-accrual term-forward reconstruction.
-///
-/// A range accrual checks a term rate whose tenor conventionally tracks the
-/// observation frequency. This returns the *median* gap between consecutive
-/// observation dates (years), which is robust to a leading/trailing stub.
-/// Falls back to 0.25y (quarterly) when fewer than two observations exist.
-fn observation_tenor_years(
-    observation_dates: &[Date],
-    day_count: finstack_quant_core::dates::DayCount,
-) -> Result<f64> {
-    let mut gaps = Vec::new();
-    for pair in observation_dates.windows(2) {
-        let g = day_count.year_fraction(pair[0], pair[1], DayCountContext::default())?;
-        if g.is_finite() && g > 0.0 {
-            gaps.push(g);
-        }
-    }
-    if gaps.is_empty() {
-        return Ok(0.25);
-    }
-    gaps.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    Ok(gaps[gaps.len() / 2])
-}
-
 fn build_schedule(
     inst: &CallableRangeAccrual,
     market: &MarketContext,
@@ -519,8 +495,20 @@ fn build_schedule(
     let final_payment_discount_factor =
         relative_df_discount_curve(discount_curve.as_ref(), as_of, final_payment_date)?;
 
-    // Tenor of the range-accrual reference rate (tracks observation frequency).
-    let reference_tenor = observation_tenor_years(&range.observation_dates, range.day_count)?;
+    let reference_tenor = range
+        .reference_tenor
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "CallableRangeAccrual requires reference_tenor".to_string(),
+            )
+        })?
+        .to_years_simple();
+    if !reference_tenor.is_finite() || reference_tenor <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CallableRangeAccrual '{}' reference_tenor must be positive",
+            inst.id
+        )));
+    }
 
     let mut event_dates: BTreeMap<Date, CallableRangeAccrualEvent> = BTreeMap::new();
     for &date in &range.observation_dates {
@@ -678,6 +666,13 @@ mod tests {
                 .notional(Money::new(1_000_000.0, Currency::USD))
                 .day_count(DayCount::Act365F)
                 .discount_curve_id(CurveId::new("USD-OIS"))
+                .accrual_start_date_opt(Some(date(2025, Month::January, 1)))
+                .rate_index_id_opt(Some("SOFR".into()))
+                .projection_curve_id_opt(Some(CurveId::new("USD-OIS")))
+                .reference_tenor_opt(Some(finstack_quant_core::dates::Tenor::new(
+                    6,
+                    finstack_quant_core::dates::TenorUnit::Months,
+                )))
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)
@@ -764,10 +759,17 @@ mod tests {
             .expect("discount")
             .df_between_dates(as_of, maturity)
             .expect("df");
-        // All observations are in range (deterministic short rate ≈ 3%), so the
-        // accrual fraction is 1: value = notional·(coupon_rate + 1)·df.
-        let expected =
-            inst.range_accrual.notional.amount() * (inst.range_accrual.coupon_rate + 1.0) * df;
+        // All observations are in range (deterministic short rate ≈ 3%). The
+        // coupon is quoted annually and scales by the contractual accrual year
+        // fraction; principal redeems at par.
+        let expected = inst.range_accrual.notional.amount()
+            * (inst.range_accrual.coupon_rate
+                * inst
+                    .range_accrual
+                    .accrual_year_fraction()
+                    .expect("accrual factor")
+                + 1.0)
+            * df;
 
         let estimate = deterministic_pricer(8)
             .price_estimate(&inst, &curves, as_of)

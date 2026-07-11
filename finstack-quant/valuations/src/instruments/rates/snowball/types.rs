@@ -254,6 +254,10 @@ impl Snowball {
 impl crate::instruments::common_impl::traits::Instrument for Snowball {
     impl_instrument_base!(crate::pricer::InstrumentType::Snowball);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        Snowball::validate(self)
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         match self.variant {
             // Snowball is path-dependent, needs MC.

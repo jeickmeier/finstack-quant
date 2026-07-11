@@ -128,6 +128,7 @@ impl MetricCalculator for MoicToWorstCalculator {
         // Lower any return-floor into call_put before enumerating exit paths.
         let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
         let flows = eff.pricing_dated_cashflows(&ctx.curves, ctx.as_of)?;
+        let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
 
         let candidates = crate::instruments::fixed_income::bond::pricing::quote_conversions::enumerate_exit_paths(
             &eff, &flows, ctx.as_of,
@@ -150,8 +151,11 @@ impl MetricCalculator for MoicToWorstCalculator {
                 .filter(|(d, _)| *d > t0 && *d <= cand.date)
                 .map(|(_, m)| m.amount().max(0.0))
                 .sum();
-            // Redemption cash = stated price % of notional.
-            let redemption = bond.notional.amount() * cand.price_pct_of_par / 100.0;
+            let outstanding = crate::instruments::fixed_income::bond::pricing::quote_conversions::outstanding_principal_at_date(
+                &schedule,
+                cand.date,
+            );
+            let redemption = outstanding * cand.price_pct_of_par / 100.0;
             worst = worst.min((coupons + redemption) / v0);
         }
 

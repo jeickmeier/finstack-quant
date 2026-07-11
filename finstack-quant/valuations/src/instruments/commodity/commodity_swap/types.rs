@@ -348,10 +348,15 @@ impl CommoditySwap {
         let obs_end = period_end - time::Duration::days(lag_days as i64);
 
         // Resolve holiday calendar if available (Item 8: integrate holiday calendars)
-        let calendar = self
-            .calendar_id
-            .as_deref()
-            .and_then(|id| CalendarRegistry::global().resolve_str(id));
+        let calendar = match self.calendar_id.as_deref() {
+            Some(id) => Some(CalendarRegistry::global().resolve_str(id).ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CommoditySwap '{}' references unknown calendar_id '{id}'",
+                    self.id
+                ))
+            })?),
+            None => None,
+        };
 
         // Business day filter: exclude weekends and exchange holidays
         let is_business_day = |date: Date| -> bool {
@@ -415,18 +420,24 @@ impl CommoditySwap {
 
         // Apply calendar adjustment if calendar_id is specified
         if let Some(ref cal_id) = self.calendar_id {
-            if let Some(cal) = CalendarRegistry::global().resolve_str(cal_id) {
-                builder = builder.adjust_with(bdc, cal);
-            }
+            let cal = CalendarRegistry::global()
+                .resolve_str(cal_id)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "CommoditySwap '{}' references unknown calendar_id '{cal_id}'",
+                        self.id
+                    ))
+                })?;
+            builder = builder.adjust_with(bdc, cal);
         }
 
         let schedule = builder.build()?;
 
-        // Filter to payment dates only (skip start date if it's in the schedule)
-        let dates: Vec<Date> = schedule
-            .into_iter()
-            .filter(|&d| d > self.start_date && d <= self.maturity)
-            .collect();
+        // ScheduleBuilder always emits the adjusted start anchor first.
+        // Preserve every subsequent adjusted anchor positionally: comparing
+        // adjusted dates with raw start/maturity can admit a rolled start or
+        // discard a rolled final payment.
+        let dates: Vec<Date> = schedule.into_iter().skip(1).collect();
 
         Ok(dates)
     }

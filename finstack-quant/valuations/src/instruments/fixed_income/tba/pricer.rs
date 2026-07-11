@@ -93,21 +93,19 @@ pub(crate) fn resolve_assumed_pool(tba: &AgencyTba, as_of: Date) -> Result<Agenc
 /// * `as_of` - Valuation date
 pub(crate) fn price_tba(tba: &AgencyTba, market: &MarketContext, as_of: Date) -> Result<Money> {
     let settlement_date = tba.get_settlement_date()?;
+    if as_of >= settlement_date {
+        return Ok(Money::new(0.0, tba.notional.currency()));
+    }
     let assumed_pool = resolve_assumed_pool(tba, as_of)?;
 
     // Price the assumed pool
     let pool_pv = price_mbs(&assumed_pool, market, as_of)?;
 
-    // For settled TBAs (settlement_date <= as_of), compute the realized P&L
-    // as the net position value: delivered pool value minus trade cost.
-    // The discount factor is 1.0 since settlement has already occurred.
-    // For unsettled TBAs, discount the trade value back to the valuation date.
+    // Before settlement, discount the contractual trade value back to the
+    // valuation date. After settlement the forward is extinguished; any
+    // delivered pool must be represented as a separate MBS position.
     let discount_curve = market.get_discount(&tba.discount_curve_id)?;
-    let df_to_settle = if settlement_date <= as_of {
-        1.0
-    } else {
-        discount_curve.df_between_dates(as_of, settlement_date)?
-    };
+    let df_to_settle = discount_curve.df_between_dates(as_of, settlement_date)?;
 
     // Trade value at settlement = notional × trade_price / 100
     let trade_value_at_settle = tba.notional.amount() * tba.trade_price / 100.0;
@@ -178,23 +176,14 @@ mod tests {
     }
 
     #[test]
-    fn test_resolved_pool_schedule_matches_provider_schedule() {
+    fn tba_cashflow_provider_rejects_physical_delivery_projection() {
         let tba = AgencyTba::example().expect("AgencyTba example is valid");
         let as_of = Date::from_calendar_date(2027, Month::January, 15).expect("valid");
         let market = create_test_market(as_of);
-        let pool = resolve_assumed_pool(&tba, as_of).expect("assumed pool should resolve");
-        let provider_schedule =
+        let err =
             crate::cashflow::traits::CashflowProvider::cashflow_schedule(&tba, &market, as_of)
-                .expect("tba provider schedule");
-        let pool_schedule =
-            crate::cashflow::traits::CashflowProvider::cashflow_schedule(&pool, &market, as_of)
-                .expect("pool provider schedule");
-
-        assert_eq!(provider_schedule.flows.len(), pool_schedule.flows.len());
-        assert_eq!(
-            provider_schedule.flows.first().map(|cf| cf.kind),
-            pool_schedule.flows.first().map(|cf| cf.kind)
-        );
+                .expect_err("physical TBA delivery is not a standalone cashflow schedule");
+        assert!(err.to_string().contains("physically settled forward"));
     }
 
     #[test]
@@ -220,7 +209,6 @@ mod tests {
 
         let pv = price_tba(&tba, &market, as_of).expect("should price");
 
-        // Settled TBA returns realized P&L (pool value - trade cost), not zero
-        assert!(pv.amount().abs() < tba.notional.amount());
+        assert_eq!(pv.amount(), 0.0);
     }
 }

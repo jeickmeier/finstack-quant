@@ -106,7 +106,10 @@ impl MetricCalculator for AsianVegaCalculator {
         )?;
         let pv_down = asian.value(&market_down, context.as_of)?.amount();
 
-        // Central difference: dPV / d(sigma), per 1 vol point
-        Ok((pv_up - pv_down) / (2.0 * vol_bump))
+        // `MetricId::Vega` is cash P&L for a one-vol-point move, not
+        // dPV/d(absolute volatility).  Because the scenarios already move the
+        // surface by +/- one vol point, the central P&L is simply half the
+        // difference between the two valuations.
+        Ok((pv_up - pv_down) / 2.0)
     }
 }

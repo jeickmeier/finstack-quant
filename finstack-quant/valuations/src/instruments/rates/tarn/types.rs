@@ -154,6 +154,10 @@ impl Tarn {
 impl crate::instruments::common_impl::traits::Instrument for Tarn {
     impl_instrument_base!(crate::pricer::InstrumentType::Tarn);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        Tarn::validate(self)
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::MonteCarloHullWhite1F
     }

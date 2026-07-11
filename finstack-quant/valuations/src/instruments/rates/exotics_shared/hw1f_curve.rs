@@ -197,6 +197,8 @@ pub struct PeriodForwardCoeffs {
     ln_a: f64,
     /// Accrual fraction τ of the coupon period (years).
     tau: f64,
+    /// Deterministic projection-basis spread over the discount-curve forward.
+    spread: f64,
 }
 
 impl PeriodForwardCoeffs {
@@ -213,7 +215,7 @@ impl PeriodForwardCoeffs {
             return 0.0;
         }
         let inv_p = (self.b * short_rate - self.ln_a).exp();
-        (inv_p - 1.0) / self.tau
+        (inv_p - 1.0) / self.tau + self.spread
     }
 
     /// Degenerate coefficients that reproduce a *fixed* simple forward `rate`
@@ -231,7 +233,15 @@ impl PeriodForwardCoeffs {
             b: 0.0,
             ln_a: -one_plus.ln(),
             tau,
+            spread: 0.0,
         }
+    }
+
+    /// Add a deterministic projection-basis spread to the reconstructed rate.
+    #[must_use]
+    pub fn with_additive_spread(mut self, spread: f64) -> Self {
+        self.spread = spread;
+        self
     }
 }
 
@@ -277,7 +287,12 @@ impl<'a> Hw1fTermForward<'a> {
         let big_t = t + tau.max(0.0);
         let b = hw_b(self.kappa, t, big_t);
         let ln_a = hw_ln_a(self.kappa, self.sigma, t, big_t, self.discount_fn.as_ref());
-        PeriodForwardCoeffs { b, ln_a, tau }
+        PeriodForwardCoeffs {
+            b,
+            ln_a,
+            tau,
+            spread: 0.0,
+        }
     }
 }
 

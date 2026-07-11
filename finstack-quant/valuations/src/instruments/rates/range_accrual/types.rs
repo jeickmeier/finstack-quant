@@ -7,7 +7,7 @@ use crate::instruments::common_impl::validation;
 use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::{CurveId, InstrumentId, PriceId, Rate};
+use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, PriceId, Rate};
 
 /// Specifies how the range bounds are interpreted.
 #[derive(
@@ -105,6 +105,27 @@ pub struct RangeAccrual {
     pub notional: Money,
     /// Day count convention
     pub day_count: finstack_quant_core::dates::DayCount,
+    /// Contractual accrual-period start date.
+    ///
+    /// When omitted, the legacy representation infers the start by stepping
+    /// one first-observation interval backward. Single-observation contracts
+    /// must provide this field explicitly.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub accrual_start_date: Option<Date>,
+    /// Explicit rate index for rate-linked range accruals.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_index_id: Option<IndexId>,
+    /// Projection curve for a rate-linked range accrual.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection_curve_id: Option<CurveId>,
+    /// Contractual tenor of the observed reference rate.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_tenor: Option<finstack_quant_core::dates::Tenor>,
     /// Discount curve ID for present value calculations
     pub discount_curve_id: CurveId,
     /// Spot price identifier
@@ -137,6 +158,36 @@ pub struct RangeAccrual {
 }
 
 impl RangeAccrual {
+    /// Return the contractual accrual factor applied to the annual coupon.
+    pub fn accrual_year_fraction(&self) -> finstack_quant_core::Result<f64> {
+        let accrual_end = self.observation_dates.last().copied().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "RangeAccrual requires at least one observation date".to_string(),
+            )
+        })?;
+        let accrual_start = if let Some(start) = self.accrual_start_date {
+            start
+        } else if self.observation_dates.len() >= 2 {
+            let first = self.observation_dates[0];
+            let second = self.observation_dates[1];
+            first - (second - first)
+        } else {
+            return Err(finstack_quant_core::Error::Validation(
+                "RangeAccrual with a single observation requires accrual_start_date".to_string(),
+            ));
+        };
+        if accrual_start >= accrual_end {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "RangeAccrual accrual_start_date ({accrual_start}) must precede final observation ({accrual_end})"
+            )));
+        }
+        self.day_count.year_fraction(
+            accrual_start,
+            accrual_end,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )
+    }
+
     /// Create a canonical example range accrual (monthly observations).
     ///
     /// This example uses relative bounds (95%-105% of initial spot) which is
@@ -238,6 +289,17 @@ impl RangeAccrual {
             "RangeAccrual observation_dates",
         )?;
 
+        validation::validate_f64_finite(self.lower_bound, "RangeAccrual lower_bound")?;
+        validation::validate_f64_finite(self.upper_bound, "RangeAccrual upper_bound")?;
+        validation::validate_f64_finite(self.coupon_rate, "RangeAccrual coupon_rate")?;
+        validation::validate_money_finite(self.notional, "RangeAccrual notional")?;
+        validation::require_with(self.notional.amount() > 0.0, || {
+            format!(
+                "RangeAccrual notional must be positive, got {}",
+                self.notional.amount()
+            )
+        })?;
+
         // Check bound ordering
         validation::require_with(self.lower_bound < self.upper_bound, || {
             format!(
@@ -279,6 +341,27 @@ impl RangeAccrual {
             (None, None) => {} // Both unset is valid
         }
 
+        if let (Some(payment_date), Some(last_observation)) =
+            (self.payment_date, self.observation_dates.last().copied())
+        {
+            validation::require_with(payment_date >= last_observation, || {
+                format!(
+                    "RangeAccrual payment_date ({payment_date}) must be on or after the final observation date ({last_observation})"
+                )
+            })?;
+        }
+        let accrual_factor = self.accrual_year_fraction()?;
+        validation::require_with(accrual_factor.is_finite() && accrual_factor > 0.0, || {
+            format!("RangeAccrual accrual factor must be finite and positive, got {accrual_factor}")
+        })?;
+        let rate_field_count = usize::from(self.rate_index_id.is_some())
+            + usize::from(self.projection_curve_id.is_some())
+            + usize::from(self.reference_tenor.is_some());
+        validation::require_with(rate_field_count == 0 || rate_field_count == 3, || {
+            "RangeAccrual rate_index_id, projection_curve_id, and reference_tenor must be supplied together"
+                .to_string()
+        })?;
+
         Ok(())
     }
 
@@ -315,6 +398,10 @@ impl RangeAccrualBuilder {
 
 impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
     impl_instrument_base!(crate::pricer::InstrumentType::RangeAccrual);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        RangeAccrual::validate(self)
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::StaticReplication
@@ -362,9 +449,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for RangeAccrual
         &self,
     ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
     {
-        crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .build()
+        let mut builder = crate::instruments::common_impl::traits::InstrumentCurves::builder()
+            .discount(self.discount_curve_id.clone());
+        if let Some(projection) = &self.projection_curve_id {
+            builder = builder.forward(projection.clone());
+        }
+        builder.build()
     }
 }
 
@@ -388,10 +478,8 @@ impl crate::metrics::HasPricingOverrides for RangeAccrual {
 
 impl crate::metrics::HasExpiry for RangeAccrual {
     fn expiry(&self) -> finstack_quant_core::dates::Date {
-        self.observation_dates
-            .last()
-            .copied()
-            .or(self.payment_date)
+        self.payment_date
+            .or_else(|| self.observation_dates.last().copied())
             .unwrap_or(Date::MIN)
     }
 }
@@ -406,3 +494,37 @@ crate::impl_empty_cashflow_provider!(
     RangeAccrual,
     crate::cashflow::builder::CashflowRepresentation::Placeholder
 );
+
+#[cfg(test)]
+mod audit_regression_tests {
+    use super::*;
+    use time::macros::date;
+
+    #[test]
+    fn accrual_factor_uses_explicit_contractual_period() {
+        let mut range = RangeAccrual::example();
+        range.day_count = finstack_quant_core::dates::DayCount::Act360;
+        range.accrual_start_date = Some(date!(2024 - 01 - 01));
+        range.observation_dates = vec![date!(2024 - 01 - 31), date!(2024 - 04 - 01)];
+        range.payment_date = Some(date!(2024 - 04 - 03));
+        let factor = range.accrual_year_fraction().expect("accrual factor");
+        assert!((factor - 91.0 / 360.0).abs() < 1e-12);
+        range.validate().expect("valid contractual period");
+    }
+
+    #[test]
+    fn rate_contract_fields_are_all_or_none() {
+        let mut range = RangeAccrual::example();
+        range.rate_index_id = Some(IndexId::new("SOFR"));
+        let err = range.validate().expect_err("partial rate spec must fail");
+        assert!(err.to_string().contains("must be supplied together"));
+    }
+
+    #[test]
+    fn payment_cannot_precede_final_observation() {
+        let mut range = RangeAccrual::example();
+        range.payment_date = Some(date!(2024 - 06 - 01));
+        let err = range.validate().expect_err("early payment must fail");
+        assert!(err.to_string().contains("final observation"));
+    }
+}

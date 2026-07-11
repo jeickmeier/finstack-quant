@@ -20,19 +20,10 @@ use finstack_quant_core::{
 /// it is **not** an exact fair variance and the caller logs a WARN diagnostic
 /// whenever it is used.
 ///
-/// # Method
-///
-/// The previous proxy used only the two strikes immediately bracketing the
-/// forward, which badly under-weights wing convexity: the variance-replication
-/// kernel `1/K²` places material weight on *deep* OTM strikes that a 2-strike
-/// butterfly ignores entirely.
-///
-/// This version instead aggregates `σ(K)²` across the **entire** available
-/// strike grid, weighted by the variance-replication kernel `w(K) ∝ 1/K²`
-/// (the leading term of the Carr–Madan integrand). That captures the full wing
-/// span and the smile's convexity far better than two strikes, while remaining
-/// a cheap closed-form proxy. The result is floored at the ATM variance so the
-/// fallback never reports *less* variance than a flat-ATM assumption.
+/// The fallback is deliberately the validated ATM variance. It does not try to
+/// approximate the Carr-Madan integral from an under-specified strike grid:
+/// doing so without strike spacing makes the result depend on how densely the
+/// same smile happens to be sampled.
 fn smile_convexity_adjusted_variance(
     surface: &finstack_quant_core::market_data::surfaces::VolSurface,
     time_to_expiry: f64,
@@ -50,40 +41,7 @@ fn smile_convexity_adjusted_variance(
     if !vol_atm.is_finite() || vol_atm <= 0.0 {
         return None;
     }
-    let atm_variance = vol_atm * vol_atm;
-
-    let strikes = surface.strikes();
-    if strikes.is_empty() {
-        return Some(atm_variance);
-    }
-
-    // 1/K²-weighted average of σ(K)² across the full strike grid. The 1/K²
-    // kernel is the leading term of the Carr–Madan variance-replication
-    // integrand, so this weights the wings the way the fair-variance integral
-    // does — heavily on low strikes (downside puts), capturing skew convexity.
-    let mut weighted_var = 0.0;
-    let mut weight_sum = 0.0;
-    for &k in strikes {
-        if !k.is_finite() || k <= 0.0 {
-            continue;
-        }
-        let vol = surface.value_clamped(time_to_expiry, k);
-        if !vol.is_finite() || vol <= 0.0 {
-            continue;
-        }
-        let w = 1.0 / (k * k);
-        weighted_var += w * vol * vol;
-        weight_sum += w;
-    }
-
-    if weight_sum <= 0.0 {
-        return Some(atm_variance);
-    }
-
-    let smile_variance = weighted_var / weight_sum;
-    // Never report less than the flat-ATM variance: the smile (skew/convexity)
-    // can only add fair variance relative to a flat ATM assumption.
-    Some(smile_variance.max(atm_variance))
+    Some(vol_atm * vol_atm)
 }
 
 pub(crate) fn compute_pv(
@@ -91,9 +49,9 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
-    if inst.strike_variance < 0.0 {
+    if !inst.strike_variance.is_finite() || inst.strike_variance < 0.0 {
         return Err(finstack_quant_core::Error::Validation(format!(
-            "VarianceSwap strike_variance ({:.6}) must be non-negative",
+            "VarianceSwap strike_variance ({:.6}) must be finite and non-negative",
             inst.strike_variance
         )));
     }
@@ -582,7 +540,7 @@ pub(crate) fn remaining_forward_variance(
                     vol_atm = vol_atm,
                     fallback_variance = fallback_variance,
                     "VarianceSwap forward variance: Carr-Madan replication failed; \
-                     falling back to ATM variance plus local smile convexity"
+                     falling back to validated ATM variance"
                 );
                 return Ok(fallback_variance);
             }
@@ -602,6 +560,12 @@ pub(crate) fn remaining_forward_variance(
                 )));
             }
         };
+        if !vol.is_finite() || vol <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "variance-swap implied volatility '{}_IMPL_VOL' must be finite and positive, got {vol}",
+                inst.underlying_ticker
+            )));
+        }
         let fallback_variance = vol * vol;
         tracing::warn!(
             instrument_id = %inst.id,
@@ -936,7 +900,7 @@ mod tests {
     }
 
     #[test]
-    fn smile_convexity_fallback_lifts_forward_variance_above_atm_variance() {
+    fn sparse_strip_fallback_uses_atm_variance() {
         let surface = VolSurface::builder("SPX")
             .expiries(&[1.0])
             .strikes(&[90.0, 100.0, 110.0])
@@ -947,19 +911,11 @@ mod tests {
         let fallback =
             smile_convexity_adjusted_variance(&surface, 1.0, 100.0).expect("fallback variance");
 
-        assert!(
-            fallback > 0.04,
-            "expected smile correction above ATM variance"
-        );
+        assert!((fallback - 0.04).abs() < 1e-12);
     }
 
-    /// W-39: the smile-convexity fallback must capture *deep-wing* convexity.
-    ///
-    /// On a surface that is flat at the strikes bracketing the forward but has
-    /// elevated *deep* wings, the old 2-strike proxy only inspected the two
-    /// near-forward strikes and saw a flat smile, so it reported ≈ ATM variance
-    /// — under-weighting the wings. The 1/K²-weighted full-grid estimate must
-    /// pick up the deep wings and report variance materially above ATM.
+    /// A volatility grid is not an option-price strip. Deep-wing volatility
+    /// points must not be integrated as though they were variance-swap quotes.
     #[test]
     fn smile_convexity_fallback_captures_deep_wing_convexity() {
         // Strikes bracketing the forward (90, 100, 110) are FLAT at 20% vol;
@@ -976,12 +932,6 @@ mod tests {
         let fallback =
             smile_convexity_adjusted_variance(&surface, 1.0, 100.0).expect("fallback variance");
 
-        // The deep wings must lift the estimate meaningfully above ATM. The old
-        // 2-strike proxy (k_lo=90, k_hi=110, both 20%) returned exactly 0.04.
-        assert!(
-            fallback > atm_variance * 1.05,
-            "deep-wing convexity must lift the fallback well above ATM variance \
-             ({atm_variance}); got {fallback}"
-        );
+        assert!((fallback - atm_variance).abs() < 1e-12);
     }
 }

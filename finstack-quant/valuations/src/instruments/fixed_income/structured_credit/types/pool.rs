@@ -82,17 +82,10 @@ impl PoolAsset {
                     spec.dc,
                 )),
                 crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => {
-                    let spread_bps = spec.rate_spec.spread_bp.to_f64().ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "bond floating spread cannot be represented as f64".into(),
-                        )
-                    })?;
-                    Ok((
-                        spread_bps / BASIS_POINTS_DIVISOR,
-                        Some(spread_bps),
-                        Some(spec.rate_spec.index_id.as_str().to_string()),
-                        spec.rate_spec.dc,
-                    ))
+                    Err(finstack_quant_core::Error::Validation(format!(
+                        "PoolAsset::from_bond cannot faithfully flatten floating-rate bond '{}' into the simplified pool asset schema: reset lag/frequency, fixing calendars, gearing, floors/caps, and overnight conventions would be lost; construct an explicit PoolAsset with supported pool-rate terms instead",
+                        spec.rate_spec.index_id
+                    )))
                 }
                 crate::instruments::fixed_income::bond::CashflowSpec::Amortizing {
                     base, ..

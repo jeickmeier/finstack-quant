@@ -243,6 +243,62 @@ pub struct Repo {
 }
 
 impl Repo {
+    /// Validate structural and economic repo invariants at the canonical boundary.
+    pub fn validate(&self) -> Result<()> {
+        if !self.cash_amount.amount().is_finite() || self.cash_amount.amount() <= 0.0 {
+            return Err(Error::Validation(format!(
+                "Repo '{}' cash_amount must be finite and positive, got {}",
+                self.id,
+                self.cash_amount.amount()
+            )));
+        }
+        if !self.haircut.is_finite() || !(0.0..1.0).contains(&self.haircut) {
+            return Err(Error::Validation(format!(
+                "Repo '{}' haircut must be finite and in [0, 1), got {}",
+                self.id, self.haircut
+            )));
+        }
+        if !self.collateral.quantity.is_finite() || self.collateral.quantity <= 0.0 {
+            return Err(Error::Validation(format!(
+                "Repo '{}' collateral quantity must be finite and positive, got {}",
+                self.id, self.collateral.quantity
+            )));
+        }
+        if let CollateralType::Special {
+            rate_adjustment_bp: Some(adjustment),
+            ..
+        } = &self.collateral.collateral_type
+        {
+            if !adjustment.is_finite() {
+                return Err(Error::Validation(format!(
+                    "Repo '{}' special-collateral rate adjustment must be finite, got {}",
+                    self.id, adjustment
+                )));
+            }
+        }
+        if self.start_date >= self.maturity {
+            return Err(Error::Validation(format!(
+                "Repo '{}' start_date ({}) must precede maturity ({})",
+                self.id, self.start_date, self.maturity
+            )));
+        }
+        let (adjusted_start, adjusted_maturity) = self.adjusted_dates()?;
+        if adjusted_start >= adjusted_maturity {
+            return Err(Error::Validation(format!(
+                "Repo '{}' adjusted start date ({adjusted_start}) must precede adjusted maturity ({adjusted_maturity})",
+                self.id
+            )));
+        }
+        let effective_rate = self.effective_rate()?;
+        if !effective_rate.is_finite() {
+            return Err(Error::Validation(format!(
+                "Repo '{}' effective rate must be finite",
+                self.id
+            )));
+        }
+        Ok(())
+    }
+
     /// Create a canonical example term repo for testing and documentation.
     ///
     /// Returns a 7-day general collateral USD repo.
@@ -559,6 +615,10 @@ impl Repo {
 
 impl Instrument for Repo {
     impl_instrument_base!(crate::pricer::InstrumentType::Repo);
+
+    fn validate_invariants(&self) -> Result<()> {
+        Repo::validate(self)
+    }
 
     // === Pricing Methods ===
 

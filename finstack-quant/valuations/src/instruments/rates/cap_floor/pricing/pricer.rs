@@ -69,6 +69,8 @@ pub(crate) fn price_cap_floor(
     };
     use crate::instruments::rates::cap_floor::pricing::{black, normal};
 
+    cap_floor.validate_for_pricing()?;
+
     let disc_curve = curves.get_discount(cap_floor.discount_curve_id.as_ref())?;
     let fwd_curve = curves.get_forward(cap_floor.forward_curve_id.as_ref())?;
     let strike = cap_floor.strike_f64()?;

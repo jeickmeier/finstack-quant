@@ -122,6 +122,20 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             self.div_yield
         };
 
+        let pv_discrete_dividends_to = |target: Date| -> Result<f64> {
+            if !uses_discrete_dividends {
+                return Ok(0.0);
+            }
+            let mut values = Vec::new();
+            for (div_date, amount) in &self.trs.discrete_dividends {
+                if *div_date > as_of && *div_date <= target {
+                    let df = relative_df_discount_curve(disc.as_ref(), as_of, *div_date)?;
+                    values.push(*amount * df);
+                }
+            }
+            Ok(neumaier_sum(values))
+        };
+
         // Price return component (Forward Price change)
         // F_t = S_0 * e^{(r-q)t}
         let (fwd_start, fwd_end) = if t_start < 0.0 {
@@ -129,18 +143,21 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             // start and project the live spot forward to the period end. The
             // realized move (spot vs. start fixing) stays in the return.
             let start_level = self.period_start_level(period_start)?;
-            let fwd_spot_end = self.spot * df_end.recip() * (-carry_div_yield * t_end).exp();
+            let ex_div_spot = self.spot - pv_discrete_dividends_to(period_end)?;
+            let fwd_spot_end = ex_div_spot * df_end.recip() * (-carry_div_yield * t_end).exp();
             (start_level, fwd_spot_end)
         } else {
             // Future period: deterministic carry — the level cancels in the
             // ratio, so anchoring to `initial_level` is exact.
             let df_start = relative_df_discount_curve(disc.as_ref(), as_of, period_start)?;
-            let fwd_start = initial_level * df_start.recip() * (-carry_div_yield * t_start).exp();
-            let fwd_end = initial_level * df_end.recip() * (-carry_div_yield * t_end).exp();
+            let fwd_start = (initial_level - pv_discrete_dividends_to(period_start)?)
+                * df_start.recip()
+                * (-carry_div_yield * t_start).exp();
+            let fwd_end = (initial_level - pv_discrete_dividends_to(period_end)?)
+                * df_end.recip()
+                * (-carry_div_yield * t_end).exp();
             (fwd_start, fwd_end)
         };
-        let price_return = (fwd_end - fwd_start) / fwd_start;
-
         // Dividend return component (Income), net of withholding tax
         // Gross dividend return: q * dt
         // Net dividend return: q * dt * (1 - tax_rate)
@@ -172,7 +189,29 @@ impl TrsReturnModel for EquityReturnModel<'_> {
             self.div_yield * dt * (1.0 - tax_rate)
         };
 
-        Ok(price_return + dividend_return)
+        // Combine discrete price and income cashflows with compensated
+        // summation before normalizing. This preserves small distributions
+        // alongside very large ones and avoids subtracting two huge returns.
+        if uses_discrete_dividends {
+            let net_dividends = self
+                .trs
+                .discrete_dividends
+                .iter()
+                .filter(|(div_date, amount)| {
+                    *div_date > period_start
+                        && *div_date <= period_end
+                        && amount.is_finite()
+                        && *amount > 0.0
+                })
+                .map(|(_, amount)| *amount * (1.0 - tax_rate));
+            Ok(neumaier_sum(
+                std::iter::once(fwd_end)
+                    .chain(std::iter::once(-fwd_start))
+                    .chain(net_dividends),
+            ) / fwd_start)
+        } else {
+            Ok((fwd_end - fwd_start) / fwd_start + dividend_return)
+        }
     }
 }
 
@@ -234,7 +273,6 @@ mod tests {
     use finstack_quant_core::dates::{Date, DayCount};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
-    use finstack_quant_core::math::neumaier_sum;
     use finstack_quant_core::types::CurveId;
     use time::Month;
 
@@ -243,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn discrete_dividends_preserve_small_amounts_after_large_amounts() {
+    fn gross_discrete_dividends_offset_the_ex_dividend_price_drop() {
         let period_start = date(2025, 1, 1);
         let period_end = date(2025, 2, 1);
 
@@ -285,8 +323,7 @@ mod tests {
             )
             .expect("period return");
 
-        let expected = neumaier_sum([1e16, 1.0, 1.0]) / 100.0;
-        assert_eq!(period_return, expected);
+        assert_eq!(period_return, 0.0);
     }
 
     fn flat_market(as_of: Date, spot: f64) -> MarketContext {

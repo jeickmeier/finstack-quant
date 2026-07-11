@@ -36,6 +36,9 @@ pub(crate) fn compute_pv(
     market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
+    if as_of > inst.expiry {
+        return Ok(Money::new(0.0, inst.underlying.currency));
+    }
     let t = inst
         .day_count
         .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
@@ -1052,5 +1055,14 @@ mod tests {
             "fix must materially change the price vs the naive transform: \
              corrected={analytic} naive={old_naive}"
         );
+    }
+
+    #[test]
+    fn post_expiry_option_is_zero_without_market_data() {
+        let option = CommodityAsianOption::example();
+        let as_of = option.expiry + time::Duration::days(1);
+        let pv = compute_pv(&option, &MarketContext::new(), as_of)
+            .expect("settled Asian option must be zero");
+        assert_eq!(pv.amount(), 0.0);
     }
 }

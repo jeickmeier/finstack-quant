@@ -46,6 +46,9 @@ impl EquityOptionPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
+        if as_of > inst.expiry {
+            return Ok(Money::new(0.0, inst.notional.currency()));
+        }
         let inputs = collect_inputs_extended(inst, market, as_of).map_err(|e| {
             PricingError::model_failure_with_context(
                 e.to_string(),

@@ -55,6 +55,9 @@ impl EquityOptionHestonPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
+        if as_of > inst.expiry {
+            return Ok(Money::new(0.0, inst.notional.currency()));
+        }
         reject_future_discrete_dividends_for_stochastic_vol(
             inst,
             as_of,

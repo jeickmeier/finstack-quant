@@ -365,20 +365,14 @@ fn test_zero_notional() {
         .insert(fwd_curve)
         .insert_surface(vol_surface);
 
-    let pv = cap.value(&market, as_of).unwrap().amount();
-    let result = cap
-        .price_with_metrics(
-            &market,
-            as_of,
-            &[MetricId::Delta, MetricId::Vega],
-            finstack_quant_valuations::instruments::PricingOptions::default(),
-        )
-        .unwrap();
-
-    // Zero notional should result in zero PV and zero Greeks
-    assert_eq!(pv, 0.0);
-    assert_eq!(*result.measures.get("delta").unwrap(), 0.0);
-    assert_eq!(*result.measures.get("vega").unwrap(), 0.0);
+    assert!(cap.value(&market, as_of).is_err());
+    let result = cap.price_with_metrics(
+        &market,
+        as_of,
+        &[MetricId::Delta, MetricId::Vega],
+        finstack_quant_valuations::instruments::PricingOptions::default(),
+    );
+    assert!(result.is_err());
 }
 
 #[test]

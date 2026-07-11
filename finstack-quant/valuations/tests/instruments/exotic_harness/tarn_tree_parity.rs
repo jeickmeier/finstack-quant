@@ -51,7 +51,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::calibration::hull_white::HullWhiteParams;
@@ -87,13 +87,10 @@ fn sloped_discount_curve(as_of: Date) -> DiscountCurve {
 
 fn market(as_of: Date) -> MarketContext {
     let discount = sloped_discount_curve(as_of);
-    // The forward curve is a required instrument-contract input but is not read
-    // by the HW1F MC path (single-curve: index reconstructed from the OIS curve).
-    let forward = ForwardCurve::builder("USD-SOFR-6M", 0.5)
-        .base_date(as_of)
-        .day_count(DayCount::Act365F)
-        .knots([(0.0, 0.03), (6.0, 0.03)])
-        .build()
+    // Use a projection curve consistent with the discount curve so this test
+    // isolates MC-vs-tree discretization rather than a deterministic basis.
+    let forward = discount
+        .to_forward_curve("USD-SOFR-6M", 0.5, None)
         .expect("forward curve");
     MarketContext::new().insert(discount).insert(forward)
 }

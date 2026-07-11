@@ -155,10 +155,6 @@ impl HazardBondEngine {
 
     /// Price a bond using a hazard curve and return the unrounded PV.
     pub(crate) fn price_raw(bond: &Bond, market: &MarketContext, as_of: Date) -> Result<f64> {
-        if as_of >= bond.maturity {
-            return Ok(0.0);
-        }
-
         // Resolve discount curve
         let disc = market.get_discount(&bond.discount_curve_id)?;
 

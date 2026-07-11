@@ -118,6 +118,14 @@
         "spec": {
           "additionalProperties": false,
           "properties": {
+            "accrual_start_date": {
+              "description": "Contractual accrual-period start date.\n\nWhen omitted, the legacy representation infers the start by stepping\none first-observation interval backward. Single-observation contracts\nmust provide this field explicitly.",
+              "format": "date",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "attributes": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
               "description": "Attributes for scenario selection and grouping"
@@ -213,6 +221,17 @@
               },
               "description": "Pricing overrides (manual price, yield, spread)"
             },
+            "projection_curve_id": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Projection curve for a rate-linked range accrual."
+            },
             "quanto": {
               "anyOf": [
                 {
@@ -223,6 +242,28 @@
                 }
               ],
               "description": "Optional quanto adjustment parameters. When provided, applies a drift\ncorrection for instruments whose payoff currency differs from the\nunderlying asset currency."
+            },
+            "rate_index_id": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Explicit rate index for rate-linked range accruals."
+            },
+            "reference_tenor": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Contractual tenor of the observed reference rate."
             },
             "spot_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",

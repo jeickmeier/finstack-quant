@@ -168,6 +168,14 @@ impl Pricer for QuantoOptionAnalyticalPricer {
                 PricingError::type_mismatch(InstrumentType::QuantoOption, instrument.key())
             })?;
 
+        if as_of > quanto.expiry {
+            return Ok(ValuationResult::stamped(
+                quanto.id(),
+                as_of,
+                Money::new(0.0, quanto.quote_currency),
+            ));
+        }
+
         let (spot, r_dom, r_for, q, sigma_equity, sigma_fx, t) =
             collect_quanto_inputs(quanto, market, as_of).map_err(|e| {
                 PricingError::model_failure_with_context(

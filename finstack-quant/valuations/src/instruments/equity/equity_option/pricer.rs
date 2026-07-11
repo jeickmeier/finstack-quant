@@ -28,6 +28,9 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    if as_of > inst.expiry {
+        return Ok(Money::new(0.0, option_currency(inst)));
+    }
     let (spot, r, q, sigma, t) = collect_inputs(inst, curves, as_of)?;
     let ccy = option_currency(inst);
 
@@ -449,6 +452,9 @@ pub(crate) fn compute_greeks(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<EquityOptionGreeks> {
+    if as_of > inst.expiry {
+        return Ok(EquityOptionGreeks::default());
+    }
     let inputs = collect_inputs_extended(inst, curves, as_of)?;
     let (spot, r, q, sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
 
@@ -887,6 +893,14 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
                 )
             })?;
 
+        if as_of > equity_option.expiry {
+            return Ok(crate::results::ValuationResult::stamped(
+                equity_option.id(),
+                as_of,
+                Money::new(0.0, option_currency(equity_option)),
+            ));
+        }
+
         reject_future_discrete_dividends_for_stochastic_vol(
             equity_option,
             as_of,
@@ -1232,5 +1246,19 @@ mod tests {
         let noisy_pv = compute_pv(&noisy, &curves, as_of).expect("noisy bermudan pv");
 
         assert!((filtered_pv.amount() - noisy_pv.amount()).abs() < 1e-10);
+    }
+
+    #[test]
+    fn post_expiry_value_and_greeks_are_zero_without_market_data() {
+        let expiry = date(2025, 1, 1);
+        let as_of = date(2025, 1, 2);
+        let option = option(expiry, OptionType::Call, ExerciseStyle::European);
+        let empty = MarketContext::new();
+        let pv = compute_pv(&option, &empty, as_of).expect("post-expiry PV");
+        let greeks = compute_greeks(&option, &empty, as_of).expect("post-expiry greeks");
+        assert_eq!(pv.amount(), 0.0);
+        assert_eq!(greeks.delta, 0.0);
+        assert_eq!(greeks.gamma, 0.0);
+        assert_eq!(greeks.vega, 0.0);
     }
 }

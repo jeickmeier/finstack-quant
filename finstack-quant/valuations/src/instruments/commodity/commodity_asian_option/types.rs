@@ -162,7 +162,7 @@ impl CommodityAsianOption {
     ///   seasoned effective strike.
     pub fn validate_realized_fixings(&self, as_of: Date) -> finstack_quant_core::Result<()> {
         let mut seen: std::collections::BTreeSet<Date> = std::collections::BTreeSet::new();
-        for (d, _) in &self.realized_fixings {
+        for (d, value) in &self.realized_fixings {
             if !seen.insert(*d) {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CommodityAsianOption '{}' has duplicate realized fixing for date {d}",
@@ -173,6 +173,18 @@ impl CommodityAsianOption {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "CommodityAsianOption '{}' has a realized fixing for {d}, which is \
                      not a scheduled fixing date (date mismatch)",
+                    self.id
+                )));
+            }
+            if !value.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CommodityAsianOption '{}' realized fixing for {d} must be finite, got {value}",
+                    self.id
+                )));
+            }
+            if matches!(self.averaging_method, AveragingMethod::Geometric) && *value <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CommodityAsianOption '{}' geometric-average fixing for {d} must be positive, got {value}",
                     self.id
                 )));
             }
@@ -197,30 +209,22 @@ impl CommodityAsianOption {
     /// Only considers fixings that match dates in `fixing_dates` and are on or
     /// before `as_of`.
     ///
-    /// # Non-positive fixings
-    ///
-    /// Non-positive fixings are included in the arithmetic sum but signal
-    /// an undefined geometric average by setting `product_log` to `NEG_INFINITY`.
+    /// Call [`Self::validate_realized_fixings`] first. Geometric averaging
+    /// requires strictly positive values, so this function never needs to
+    /// encode an invalid observation as a sentinel.
     pub fn accumulated_state(&self, as_of: Date) -> (f64, f64, usize) {
         let mut sum = 0.0;
         let mut product_log = 0.0;
         let mut count = 0;
-        let mut has_non_positive = false;
 
         for (d, v) in &self.realized_fixings {
             if *d <= as_of && self.fixing_dates.contains(d) {
                 sum += v;
                 if *v > 0.0 {
                     product_log += v.ln();
-                } else {
-                    has_non_positive = true;
                 }
                 count += 1;
             }
-        }
-
-        if has_non_positive {
-            product_log = f64::NEG_INFINITY;
         }
 
         (sum, product_log, count)

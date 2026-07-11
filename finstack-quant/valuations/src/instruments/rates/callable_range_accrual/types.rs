@@ -50,6 +50,20 @@ impl CallableRangeAccrual {
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.range_accrual.validate()?;
         self.call_provision.validate()?;
+        if self.range_accrual.rate_index_id.is_none() {
+            return Err(finstack_quant_core::Error::Validation(
+                "CallableRangeAccrual requires explicit rate_index_id, projection_curve_id, and reference_tenor; asset-style spot/dividend inputs cannot be priced with Hull-White"
+                    .to_string(),
+            ));
+        }
+        if self.range_accrual.projection_curve_id.as_ref()
+            != Some(&self.range_accrual.discount_curve_id)
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CallableRangeAccrual '{}' HW1F implementation is currently single-curve; projection_curve_id must equal discount_curve_id until basis-adjusted projection is implemented",
+                self.id
+            )));
+        }
         Ok(())
     }
 
@@ -57,6 +71,7 @@ impl CallableRangeAccrual {
     #[allow(clippy::expect_used)]
     pub fn example() -> Self {
         use finstack_quant_core::currency::Currency;
+        use time::macros::date;
         use time::Month;
 
         let observation_dates = vec![
@@ -92,6 +107,10 @@ impl CallableRangeAccrual {
                 .coupon_rate(0.065)
                 .notional(Money::new(1_000_000.0, Currency::USD))
                 .day_count(DayCount::Act360)
+                .accrual_start_date(date!(2025 - 12 - 31))
+                .rate_index_id(finstack_quant_core::types::IndexId::new("SOFR"))
+                .projection_curve_id(CurveId::new("USD-OIS"))
+                .reference_tenor(finstack_quant_core::dates::Tenor::quarterly())
                 .discount_curve_id(CurveId::new("USD-OIS"))
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
@@ -112,6 +131,10 @@ impl CallableRangeAccrual {
 
 impl crate::instruments::common_impl::traits::Instrument for CallableRangeAccrual {
     impl_instrument_base!(crate::pricer::InstrumentType::CallableRangeAccrual);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        CallableRangeAccrual::validate(self)
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::MonteCarloHullWhite1F

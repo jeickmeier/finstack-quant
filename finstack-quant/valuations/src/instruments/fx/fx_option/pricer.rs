@@ -17,6 +17,9 @@ const STRIKE_ZERO_TOL: f64 = 1e-12;
 const THETA_DAYS_PER_YEAR: f64 = 365.0;
 
 pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
+    if as_of > inst.expiry {
+        return Ok(Money::new(0.0, inst.quote_currency));
+    }
     npv(inst, curves, as_of)
 }
 
@@ -25,6 +28,9 @@ pub(crate) fn compute_greeks(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<FxOptionGreeks> {
+    if as_of > inst.expiry {
+        return Ok(FxOptionGreeks::default());
+    }
     compute_greeks_impl(inst, curves, as_of)
 }
 
@@ -459,5 +465,15 @@ mod delegation_tests {
 
         assert!((via_pricer.amount() - via_instrument.amount()).abs() < 1e-10);
         assert_eq!(via_pricer.currency(), via_instrument.currency());
+    }
+
+    #[test]
+    fn post_expiry_value_is_zero_without_live_spot_or_curves() {
+        let expiry = date!(2025 - 01 - 01);
+        let option = build_option(expiry);
+        let empty = MarketContext::new();
+        let pv = compute_pv(&option, &empty, date!(2025 - 01 - 02))
+            .expect("post-expiry option must be extinguished");
+        assert_eq!(pv.amount(), 0.0);
     }
 }

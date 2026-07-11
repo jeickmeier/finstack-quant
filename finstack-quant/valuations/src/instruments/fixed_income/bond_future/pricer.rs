@@ -342,12 +342,13 @@ impl BondFuturePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
+        let delivery_date = future.delivery_start.max(as_of);
         Self::calculate_model_price_with_financing_curve(
             ctd_bond,
             conversion_factor,
             market,
             as_of,
-            future.delivery_start,
+            delivery_date,
             future.repo_curve_id.as_ref(),
         )
     }

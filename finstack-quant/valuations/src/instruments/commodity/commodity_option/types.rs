@@ -367,6 +367,16 @@ impl CommodityOption {
     ) -> Result<Money> {
         use finstack_quant_monte_carlo::prelude::*;
 
+        if as_of > self.expiry {
+            return Ok(Money::new(0.0, self.underlying.currency));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CommodityOption '{}' Monte Carlo pricing currently supports European exercise only; got {:?}",
+                self.id, self.exercise_style
+            )));
+        }
+
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 {
             // At or past expiry: return intrinsic value

@@ -51,6 +51,9 @@ impl EquityOptionHestonMcPricer {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<(Money, f64)> {
+        if as_of > inst.expiry {
+            return Ok((Money::new(0.0, inst.notional.currency()), 0.0));
+        }
         // The escrowed-dividend identity used by `collect_inputs_extended`
         // is Black-Scholes-specific; reject it for Heston stochastic vol.
         if inst

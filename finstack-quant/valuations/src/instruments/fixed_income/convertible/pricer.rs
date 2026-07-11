@@ -165,9 +165,17 @@ impl ConvertibleBondValuator {
         // Map cashflows to tree steps
         let dt = time_to_maturity / steps as f64;
         let mut time_steps = Vec::with_capacity(steps + 1);
+        let mut step_dates = Vec::with_capacity(steps + 1);
+        let total_calendar_days = (bond.maturity - base_date).whole_days();
 
         for i in 0..=steps {
             time_steps.push(i as f64 * dt);
+            let offset_days = if i == steps {
+                total_calendar_days
+            } else {
+                ((total_calendar_days as f64) * (i as f64 / steps as f64)).round() as i64
+            };
+            step_dates.push(base_date + time::Duration::days(offset_days));
         }
 
         // Process coupon cashflows (exclude reset-only events) using schedule day count
@@ -193,7 +201,7 @@ impl ConvertibleBondValuator {
         if let Some(ref call_put) = bond.call_put {
             for call in &call_put.calls {
                 if call.end_date > base_date && call.start_date <= bond.maturity {
-                    let call_price = bond.notional.amount() * (call.price_pct_of_par / 100.0);
+                    let floor_price = bond.notional.amount() * (call.price_pct_of_par / 100.0);
                     let start_step = map_date_to_step(
                         base_date,
                         call.start_date.max(base_date),
@@ -211,9 +219,43 @@ impl ConvertibleBondValuator {
                         cashflow_schedule.day_count,
                     );
 
+                    let reference_curve = if let Some(spec) = &call.make_whole {
+                        Some((
+                            market_context.get_discount(&spec.reference_curve_id)?,
+                            spec.spread_bps / 10_000.0,
+                        ))
+                    } else {
+                        None
+                    };
+
                     // For overlapping call windows (e.g., step-down calls), the issuer
                     // will select the *cheapest* call price available at each step.
-                    for s in start_step..=end_step {
+                    for (s, &exercise_date) in step_dates
+                        .iter()
+                        .enumerate()
+                        .take(end_step + 1)
+                        .skip(start_step)
+                    {
+                        let call_price = if let Some((curve, spread)) = &reference_curve {
+                            let mut pv_remaining = 0.0;
+                            for cashflow in cashflow_schedule
+                                .flows
+                                .iter()
+                                .filter(|cashflow| cashflow.date > exercise_date)
+                            {
+                                let df = curve.df_between_dates(exercise_date, cashflow.date)?;
+                                let tau = curve.day_count().year_fraction(
+                                    exercise_date,
+                                    cashflow.date,
+                                    finstack_quant_core::dates::DayCountContext::default(),
+                                )?;
+                                pv_remaining +=
+                                    cashflow.amount.amount() * df * (-spread * tau).exp();
+                            }
+                            floor_price.max(pv_remaining)
+                        } else {
+                            floor_price
+                        };
                         call_map
                             .entry(s)
                             .and_modify(|p| *p = p.min(call_price))
@@ -288,18 +330,13 @@ impl ConvertibleBondValuator {
         let mut risky_step_dfs = Vec::with_capacity(steps);
 
         for i in 0..steps {
-            let t_i = time_steps[i];
-            let t_next = time_steps[i + 1];
-
-            let df_i = rf_curve.df(t_i);
-            let df_next = rf_curve.df(t_next);
-            let rf_fwd = if df_i > 0.0 { df_next / df_i } else { 1.0 };
+            let step_start = step_dates[i];
+            let step_end = step_dates[i + 1];
+            let rf_fwd = rf_curve.df_between_dates(step_start, step_end)?;
             rf_step_dfs.push(rf_fwd);
 
             if let Some(ref cc) = credit_curve {
-                let cdf_i = cc.df(t_i);
-                let cdf_next = cc.df(t_next);
-                let raw_risky_fwd = if cdf_i > 0.0 { cdf_next / cdf_i } else { 1.0 };
+                let raw_risky_fwd = cc.df_between_dates(step_start, step_end)?;
                 // Blend risky and risk-free using recovery:
                 //   adjusted = risky * (1 - R) + rf * R
                 // At R=0: pure zero-recovery TZ model.
@@ -652,11 +689,11 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 .get(&self.steps)
                 .copied()
                 .unwrap_or(0.0);
-            let redemption_val = self.valuator.face_value + coupon;
+            let redemption_val = self.valuator.face_value;
 
             let can_convert = self.valuator.conversion_allowed(self.steps, node_spot);
 
-            let (total_val, cash_val) = if can_convert && mandatory {
+            let (ex_coupon_total, ex_coupon_cash) = if can_convert && mandatory {
                 // Mandatory conversion: holder must convert regardless of optimality.
                 // For PERCS/DECS below the lower strike, this correctly reflects
                 // the holder bearing equity downside risk.
@@ -667,7 +704,11 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 (redemption_val, redemption_val)
             };
 
-            values.push((total_val, cash_val));
+            // Coupon entitlement is independent of the exercise choice under
+            // the public contract (there is no coupon-forfeiture flag). Make
+            // the exercise decision ex-coupon, then add the date's coupon as
+            // a cash component.
+            values.push((ex_coupon_total + coupon, ex_coupon_cash + coupon));
         }
 
         // 2. Backward Induction. Double-buffer the value layers so each per-step
@@ -712,13 +753,12 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 // TZ discounting: equity at risk-free, cash at risky
                 let equity_part = (exp_total - exp_cash) * df_rf;
                 let cash_part = exp_cash * df_risky;
-                let mut continuation_total = equity_part + cash_part;
-                let mut continuation_cash = cash_part;
+                let continuation_total = equity_part + cash_part;
+                let continuation_cash = cash_part;
 
-                // Add coupons at this node
+                // Exercise decisions are ex-coupon. The coupon is added after
+                // conversion/call/put resolution so no branch can overwrite it.
                 let coupon = self.valuator.coupon_map.get(&step).copied().unwrap_or(0.0);
-                continuation_total += coupon;
-                continuation_cash += coupon;
 
                 // Node decision logic
                 let node_spot = get_spot(step, i);
@@ -794,6 +834,9 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                         final_cash = final_total;
                     }
                 }
+
+                final_total += coupon;
+                final_cash += coupon;
 
                 next_values.push((final_total, final_cash));
             }

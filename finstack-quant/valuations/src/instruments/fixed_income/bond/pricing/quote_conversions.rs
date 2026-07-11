@@ -754,7 +754,7 @@ pub fn price_from_ytm(
 ///
 /// This is used by YTW and other yield calculations to determine the
 /// redemption amount for amortizing callable/putable bonds.
-fn outstanding_principal_at_date(
+pub(crate) fn outstanding_principal_at_date(
     schedule: &crate::cashflow::builder::CashFlowSchedule,
     target_date: Date,
 ) -> f64 {

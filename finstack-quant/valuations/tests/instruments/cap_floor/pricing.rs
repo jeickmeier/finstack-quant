@@ -366,10 +366,7 @@ fn test_zero_notional_cap() {
         .insert(fwd_curve)
         .insert_surface(vol_surface);
 
-    let pv = cap.value(&market, as_of).unwrap().amount();
-
-    // Zero notional should result in zero PV
-    assert_eq!(pv, 0.0, "Zero notional cap should have zero PV");
+    assert!(cap.value(&market, as_of).is_err());
 }
 
 #[test]
