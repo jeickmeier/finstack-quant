@@ -67,7 +67,8 @@ impl Default for MetricRegistry {
 impl MetricRegistry {
     /// Registers a metric calculator with explicit ID and applicability.
     ///
-    /// If a calculator with the same ID already exists, it will be replaced.
+    /// A duplicate default or instrument-specific registration is rejected
+    /// without changing the existing calculator.
     /// The `applicable_to` parameter specifies which instrument types this metric
     /// applies to. An empty slice means it applies to all instruments.
     ///
@@ -81,6 +82,29 @@ impl MetricRegistry {
     ///
     /// See unit tests and `examples/` for usage.
     pub fn register_metric(
+        &mut self,
+        id: MetricId,
+        calculator: Arc<dyn MetricCalculator>,
+        applicable_to: &[InstrumentType],
+    ) -> &mut Self {
+        let duplicate = self.entries.get(&id).is_some_and(|entry| {
+            if applicable_to.is_empty() {
+                entry.default.is_some()
+            } else {
+                applicable_to
+                    .iter()
+                    .any(|instrument_type| entry.per_instrument.contains_key(instrument_type))
+            }
+        });
+        if duplicate {
+            tracing::warn!(metric = %id, "duplicate metric registration rejected");
+            return self;
+        }
+        self.replace_metric(id, calculator, applicable_to)
+    }
+
+    /// Deliberately replace metric registrations for tests or controlled overrides.
+    pub fn replace_metric(
         &mut self,
         id: MetricId,
         calculator: Arc<dyn MetricCalculator>,
@@ -569,6 +593,32 @@ mod tests {
             base_value,
             MetricContext::default_config(),
         )
+    }
+
+    #[test]
+    fn duplicate_registration_is_rejected_and_replace_is_explicit() {
+        let calculator = |value| {
+            Arc::new(SuccessCalculator {
+                value,
+                deps: Vec::new(),
+            }) as Arc<dyn MetricCalculator>
+        };
+        let mut registry = MetricRegistry::new();
+        registry.register_metric(MetricId::Dv01, calculator(1.0), &[]);
+        registry.register_metric(MetricId::Dv01, calculator(2.0), &[]);
+
+        let mut context = create_test_context();
+        assert_eq!(
+            registry.compute(&[MetricId::Dv01], &mut context).unwrap()["dv01"],
+            1.0
+        );
+
+        registry.replace_metric(MetricId::Dv01, calculator(2.0), &[]);
+        let mut context = create_test_context();
+        assert_eq!(
+            registry.compute(&[MetricId::Dv01], &mut context).unwrap()["dv01"],
+            2.0
+        );
     }
 
     #[test]

@@ -45,7 +45,7 @@ fn build_floating_loan(
             overnight_index_constraints: Default::default(),
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
-            reset_lag_days: 2,
+            reset_lag_days: 0,
             dc: DayCount::Act360,
             bdc: BusinessDayConvention::ModifiedFollowing,
             calendar_id: "weekends_only".to_string(),

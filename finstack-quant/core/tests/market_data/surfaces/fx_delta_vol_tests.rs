@@ -47,11 +47,11 @@ fn pillar_smile_5pt(i: usize) -> ([f64; 5], [f64; 5]) {
     let sc10 = atm + BF10[i] + 0.5 * RR10[i];
     // Put strike at |delta| = d corresponds to call delta 1 - d under the
     // premium-unadjusted forward-delta convention.
-    let k_p10 = FxDeltaVolSurface::delta_to_strike(0.90, f, sp10, t, R_F);
-    let k_p25 = FxDeltaVolSurface::delta_to_strike(0.75, f, sp25, t, R_F);
+    let k_p10 = FxDeltaVolSurface::delta_to_strike(0.90, f, sp10, t);
+    let k_p25 = FxDeltaVolSurface::delta_to_strike(0.75, f, sp25, t);
     let k_atm = f * (0.5 * atm * atm * t).exp();
-    let k_c25 = FxDeltaVolSurface::delta_to_strike(0.25, f, sc25, t, R_F);
-    let k_c10 = FxDeltaVolSurface::delta_to_strike(0.10, f, sc10, t, R_F);
+    let k_c25 = FxDeltaVolSurface::delta_to_strike(0.25, f, sc25, t);
+    let k_c10 = FxDeltaVolSurface::delta_to_strike(0.10, f, sc10, t);
     (
         [k_p10, k_p25, k_atm, k_c25, k_c10],
         [sp10, sp25, atm, sc25, sc10],
@@ -191,7 +191,7 @@ fn pillar_strikes_reproduce_pillar_vols_exactly() {
             );
 
             let got = delta_surface
-                .implied_vol(t, *k, f, r_d(), R_F)
+                .implied_vol(t, *k, f)
                 .expect("implied_vol at pillar should succeed");
             assert!(
                 (got - v).abs() < 1e-12,
@@ -221,9 +221,9 @@ fn pillar_strikes_reproduce_pillar_vols_three_point_smile() {
         let atm = ATM[i];
         let sp25 = atm + BF25[i] - 0.5 * RR25[i];
         let sc25 = atm + BF25[i] + 0.5 * RR25[i];
-        let k_p25 = FxDeltaVolSurface::delta_to_strike(0.75, f, sp25, t, R_F);
+        let k_p25 = FxDeltaVolSurface::delta_to_strike(0.75, f, sp25, t);
         let k_atm = f * (0.5 * atm * atm * t).exp();
-        let k_c25 = FxDeltaVolSurface::delta_to_strike(0.25, f, sc25, t, R_F);
+        let k_c25 = FxDeltaVolSurface::delta_to_strike(0.25, f, sc25, t);
 
         for (k, v) in [(k_p25, sp25), (k_atm, atm), (k_c25, sc25)] {
             let got = surface.value_clamped(t, k);
@@ -256,7 +256,7 @@ fn implied_vol_rebuilds_smile_at_intermediate_expiry() {
     let k_atm = f * (0.5 * atm * atm * t).exp();
 
     let got = delta_surface
-        .implied_vol(t, k_atm, f, r_d(), R_F)
+        .implied_vol(t, k_atm, f)
         .expect("intermediate-expiry implied_vol should succeed");
     assert!(
         (got - atm).abs() < 1e-12,
@@ -266,9 +266,9 @@ fn implied_vol_rebuilds_smile_at_intermediate_expiry() {
 
     // The intermediate smile has genuine put skew around its own forward.
     let sp25 = atm + bf25 - 0.5 * rr25;
-    let k_p25 = FxDeltaVolSurface::delta_to_strike(0.75, f, sp25, t, R_F);
+    let k_p25 = FxDeltaVolSurface::delta_to_strike(0.75, f, sp25, t);
     let got_put = delta_surface
-        .implied_vol(t, k_p25, f, r_d(), R_F)
+        .implied_vol(t, k_p25, f)
         .expect("intermediate-expiry 25Δ-put implied_vol should succeed");
     assert!(
         (got_put - sp25).abs() < 1e-12,

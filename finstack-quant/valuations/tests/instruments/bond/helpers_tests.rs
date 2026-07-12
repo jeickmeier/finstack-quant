@@ -45,13 +45,13 @@ fn test_periods_per_year_days() {
 #[test]
 fn test_periods_per_year_zero_months_error() {
     // 0 months should be an error
-    assert!(periods_per_year(Tenor::new(0, TenorUnit::Months)).is_err());
+    assert!(Tenor::try_new(0, TenorUnit::Months).is_err());
 }
 
 #[test]
 fn test_periods_per_year_zero_days_error() {
     // 0 days should be an error
-    assert!(periods_per_year(Tenor::new(0, TenorUnit::Days)).is_err());
+    assert!(Tenor::try_new(0, TenorUnit::Days).is_err());
 }
 
 #[test]
@@ -72,8 +72,8 @@ fn test_periods_per_year_years_and_weeks() {
 
 #[test]
 fn test_periods_per_year_zero_years_and_weeks_error() {
-    assert!(periods_per_year(Tenor::new(0, TenorUnit::Years)).is_err());
-    assert!(periods_per_year(Tenor::new(0, TenorUnit::Weeks)).is_err());
+    assert!(Tenor::try_new(0, TenorUnit::Years).is_err());
+    assert!(Tenor::try_new(0, TenorUnit::Weeks).is_err());
 }
 
 #[test]

@@ -1271,9 +1271,9 @@ fn year_fraction_act_act_isma(start: Date, end: Date, freq: Tenor) -> crate::Res
 
     // Coupon length in years based on frequency (e.g., 0.5 for semi-annual, 0.25 for quarterly).
     // ISMA/ICMA is defined for regular coupon periods; treat Week/Day frequencies as invalid.
-    let coupon_length_years = match freq.unit {
-        TenorUnit::Months => freq.count as f64 / 12.0,
-        TenorUnit::Years => freq.count as f64,
+    let coupon_length_years = match freq.unit() {
+        TenorUnit::Months => freq.count() as f64 / 12.0,
+        TenorUnit::Years => freq.count() as f64,
         TenorUnit::Weeks | TenorUnit::Days => {
             return Err(InputError::ActActIsmaUnsupportedFrequency {
                 frequency: freq.to_string(),
@@ -1292,9 +1292,9 @@ fn year_fraction_act_act_isma(start: Date, end: Date, freq: Tenor) -> crate::Res
     // regular EOM semi-annual period [2025-08-31, 2026-02-28) drifted to a
     // grid ending Aug 28 and returned 181/184 × 0.5 ≈ 0.49185 instead of
     // exactly 0.5 .
-    let months_per_period = match freq.unit {
-        TenorUnit::Months => freq.count as i32,
-        TenorUnit::Years => freq.count as i32 * 12,
+    let months_per_period = match freq.unit() {
+        TenorUnit::Months => freq.count() as i32,
+        TenorUnit::Years => freq.count() as i32 * 12,
         // Unreachable: rejected above when computing `coupon_length_years`.
         TenorUnit::Weeks | TenorUnit::Days => {
             return Err(InputError::ActActIsmaUnsupportedFrequency {
@@ -1381,7 +1381,7 @@ fn year_fraction_act_365l(start: Date, end: Date, ctx: DayCountContext<'_>) -> f
     // With no frequency in context, default to the annual rule.
     let annual = match ctx.frequency {
         Some(freq) => matches!(
-            (freq.unit, freq.count),
+            (freq.unit(), freq.count()),
             (TenorUnit::Years, 1) | (TenorUnit::Months, 12)
         ),
         None => true,

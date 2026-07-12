@@ -291,7 +291,7 @@ fn test_implied_vol_method() {
 
     // Act
     let pv = call.value(&market, as_of).unwrap();
-    let iv = call.implied_vol(&market, as_of, pv.amount(), None).unwrap();
+    let iv = call.implied_vol(&market, as_of, pv.amount()).unwrap();
 
     // Assert
     assert_approx_eq(iv, 0.15, 1e-6, 1e-6, "IV method should recover market vol");

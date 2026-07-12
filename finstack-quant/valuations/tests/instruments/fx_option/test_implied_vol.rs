@@ -73,7 +73,7 @@ fn test_implied_vol_recovers_market_vol() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), None)
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert: Should recover market vol (15%)
@@ -87,7 +87,7 @@ fn test_implied_vol_recovers_market_vol() {
 }
 
 #[test]
-fn test_implied_vol_with_custom_initial_guess() {
+fn test_implied_vol_self_seeding_solver() {
     // Arrange
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -98,9 +98,9 @@ fn test_implied_vol_with_custom_initial_guess() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
 
-    // Act: Solve with custom initial guess
+    // Act: Solve with the canonical self-seeding solver.
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), Some(0.25))
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert: Should still converge to correct vol
@@ -109,7 +109,7 @@ fn test_implied_vol_with_custom_initial_guess() {
         0.15,
         1e-6,
         1e-6,
-        "IV converges from custom guess",
+        "IV solver recovers market vol",
     );
 }
 
@@ -126,7 +126,7 @@ fn test_implied_vol_high_vol_scenario() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), None)
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert: Should recover high vol (35%)
@@ -146,7 +146,7 @@ fn test_implied_vol_low_vol_scenario() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), None)
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert: Should recover low vol (5%)
@@ -165,9 +165,7 @@ fn test_implied_vol_put_option() {
     // Act
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&put, params, as_of), QUOTE);
-    let implied_vol = put
-        .implied_vol(&market, as_of, market_pv.amount(), None)
-        .unwrap();
+    let implied_vol = put.implied_vol(&market, as_of, market_pv.amount()).unwrap();
 
     // Assert
     assert_approx_eq(
@@ -192,7 +190,7 @@ fn test_implied_vol_itm_option() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), None)
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert
@@ -218,7 +216,7 @@ fn test_implied_vol_otm_option() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), None)
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert
@@ -244,7 +242,7 @@ fn test_implied_vol_short_dated_option() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), None)
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert
@@ -270,7 +268,7 @@ fn test_implied_vol_long_dated_option() {
     let market_pv =
         finstack_quant_core::money::Money::new(analytical_fx_price(&call, params, as_of), QUOTE);
     let implied_vol = call
-        .implied_vol(&market, as_of, market_pv.amount(), None)
+        .implied_vol(&market, as_of, market_pv.amount())
         .unwrap();
 
     // Assert
@@ -294,16 +292,14 @@ fn test_implied_vol_expired_option_returns_zero() {
 
     // Act
     let target_price = 10_000.0; // Arbitrary
-    let implied_vol = call
-        .implied_vol(&market, as_of, target_price, None)
-        .unwrap();
+    let implied_vol = call.implied_vol(&market, as_of, target_price).unwrap();
 
     // Assert: Should return 0 for expired
     assert_eq!(implied_vol, 0.0, "Expired option IV should be 0");
 }
 
 #[test]
-fn test_implied_vol_uses_override_as_initial_guess() {
+fn test_implied_vol_recovers_price_after_override_is_removed() {
     // Arrange: Option with vol override
     let as_of = date!(2024 - 01 - 01);
     let expiry = date!(2025 - 01 - 01);
@@ -320,12 +316,11 @@ fn test_implied_vol_uses_override_as_initial_guess() {
     // Remove override for IV solve
     call.pricing_overrides.market_quotes.implied_volatility = None;
 
-    // Act: Solve without explicit guess (should use surface vol as initial)
-    let implied_vol = call.implied_vol(&market, as_of, pv.amount(), None).unwrap();
+    // Act: Solve from the target price.
+    let implied_vol = call.implied_vol(&market, as_of, pv.amount()).unwrap();
 
     // Assert: Should converge to the price's implied vol
     // (which was 25% from the override used for pricing)
-    // But since we removed override, it uses surface vol as guess and should still find correct IV
     assert!(
         implied_vol > 0.0 && implied_vol < 1.0,
         "IV should be reasonable"

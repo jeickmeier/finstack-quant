@@ -87,8 +87,7 @@ Deep dives:
 
 Deep dives:
 
-- `02_pricing/instruments/` (19 notebooks): bonds, rates derivatives, FX, equities/options, credit derivatives, structured credit, inflation-linked products, loans, repos, cashflows, convertibles, Fourier pricing, exotic rates, credit events, total-return/variance swaps.
-- `02_pricing/instruments/typed_instrument_api.ipynb` is a reference catalog for typed instrument construction and coverage; start with the asset-class notebooks for finance pedagogy.
+- `02_pricing/instruments/`: bonds, rates derivatives, FX, equities/options, credit derivatives, structured credit, inflation-linked products, loans, repos, cashflows, convertibles, Fourier pricing, exotic rates, credit events, and total-return/variance swaps.
 
 ## Level 3 -- Performance And Risk Analytics (`03_analytics/`)
 
@@ -178,7 +177,5 @@ how to package results for review.
 | `09_reporting/reporting_portfolio_risk_tearsheet.ipynb` | Euler VaR/ES contributions and risk budget (`portfolio_risk_tearsheet`) |
 | `09_reporting/reporting_benchmark_tearsheet.ipynb` | Alpha/beta, capture, rolling greeks, relative series, multi-factor (`benchmark_tearsheet`) |
 | `09_reporting/reporting_instrument_tearsheet.ipynb` | Generic instrument valuation tear sheet |
-| `09_reporting/reporting_instrument_cds_tearsheet.ipynb` | CDS valuation and credit-risk tear sheet |
-| `09_reporting/reporting_instrument_option_tearsheet.ipynb` | Option valuation and greeks tear sheet |
 | `09_reporting/reporting_performance_tearsheet.ipynb` | Performance analytics tear sheet |
 | `09_reporting/reporting_attribution_tearsheet.ipynb` | Return and P&L attribution tear sheet |

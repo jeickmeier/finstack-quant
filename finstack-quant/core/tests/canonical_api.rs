@@ -57,7 +57,6 @@ mod npv_tests {
         let pv = npv_with_options(
             &curve,
             base,
-            Some(dc),
             DayCountContext::default(),
             NpvOptions::default().include_past_flows(true),
             &flows,
@@ -91,7 +90,6 @@ mod npv_tests {
             let pv = npv_with_options(
                 &curve,
                 base,
-                Some(dc),
                 DayCountContext::default(),
                 NpvOptions::default().include_past_flows(true),
                 &flows,
@@ -123,7 +121,7 @@ mod npv_tests {
         for dc in [DayCount::Act365F, DayCount::Act360, DayCount::Thirty360] {
             let continuous_rate = (1.0 + rate).ln();
             let curve = FlatCurve::new(continuous_rate, base, dc, "TEST");
-            let pv = npv(&curve, base, Some(dc), &flows).unwrap();
+            let pv = npv(&curve, base, &flows).unwrap();
             results.push((dc, pv.amount()));
         }
 

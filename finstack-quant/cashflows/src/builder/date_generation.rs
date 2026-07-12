@@ -58,23 +58,23 @@ pub struct PeriodSchedule {
 /// day-of-month into short months) so regularity checks agree with the
 /// generated anchor grid.
 fn step_tenor(date: Date, tenor: Tenor, sign: i32) -> Option<Date> {
-    match tenor.unit {
+    match tenor.unit() {
         TenorUnit::Days => {
-            let days = i64::from(tenor.count).checked_mul(i64::from(sign))?;
+            let days = i64::from(tenor.count()).checked_mul(i64::from(sign))?;
             Some(date + time::Duration::days(days))
         }
         TenorUnit::Weeks => {
-            let days = i64::from(tenor.count)
+            let days = i64::from(tenor.count())
                 .checked_mul(7)?
                 .checked_mul(i64::from(sign))?;
             Some(date + time::Duration::days(days))
         }
         TenorUnit::Months => {
-            let months = i32::try_from(tenor.count).ok()?.checked_mul(sign)?;
+            let months = i32::try_from(tenor.count()).ok()?.checked_mul(sign)?;
             Some(date.add_months(months))
         }
         TenorUnit::Years => {
-            let months = i32::try_from(tenor.count)
+            let months = i32::try_from(tenor.count())
                 .ok()?
                 .checked_mul(12)?
                 .checked_mul(sign)?;

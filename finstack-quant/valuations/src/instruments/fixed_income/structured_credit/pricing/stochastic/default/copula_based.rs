@@ -199,7 +199,7 @@ impl CopulaBasedDefault {
         let p = pd.clamp(1e-10, 1.0 - 1e-10);
         match &self.copula_spec {
             CopulaSpec::StudentT { degrees_of_freedom } => {
-                student_t_inv_cdf(p, *degrees_of_freedom)
+                student_t_inv_cdf(p, *degrees_of_freedom).unwrap_or(f64::NAN)
             }
             _ => standard_normal_inv_cdf(p),
         }

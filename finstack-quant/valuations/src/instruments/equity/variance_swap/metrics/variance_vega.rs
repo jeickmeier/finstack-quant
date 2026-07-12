@@ -16,9 +16,9 @@ use finstack_quant_core::Result;
 /// vega = variance_vega · 2·σ_K · 0.01
 /// ```
 ///
-/// where `σ_K = √(strike_variance)` is the strike vol — the same vol base the
-/// `Vega` metric and the vega-notional conversions
-/// ([`VarianceSwap::vega_to_variance_notional`]) are anchored to.
+/// where `σ` is the current remaining forward volatility used by the PV vega.
+/// Strike volatility remains the basis for quoted-notional conversion
+/// ([`VarianceSwap::vega_to_variance_notional`]).
 pub(crate) struct VarianceVegaCalculator;
 
 impl MetricCalculator for VarianceVegaCalculator {

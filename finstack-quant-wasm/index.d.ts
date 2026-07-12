@@ -271,6 +271,20 @@ export interface ForwardCurveConstructor {
     projectionGrid?: NumericArray | null,
     resetLag?: number | null
   ): ForwardCurve;
+  /** Construct from an unambiguous named specification. */
+  fromOptions(options: ForwardCurveOptions): ForwardCurve;
+}
+
+export interface ForwardCurveOptions {
+  id: string;
+  tenor: number;
+  baseDate: string;
+  knots: NumericArray;
+  dayCount?: string;
+  interp?: string;
+  extrapolation?: string;
+  projectionGrid?: NumericArray | null;
+  resetLag?: number | null;
 }
 
 export interface VolCube extends WasmOwned {
@@ -363,9 +377,9 @@ export interface FxDeltaVolSurfaceConstructor {
     bf10d?: NumericArray
   ): FxDeltaVolSurface;
   /** Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted). */
-  deltaToStrike(delta: number, forward: number, vol: number, expiry: number, rF: number): number;
+  deltaToStrike(delta: number, forward: number, vol: number, expiry: number): number;
   /** Convert a strike to forward (call) delta. */
-  strikeToDelta(strike: number, forward: number, vol: number, expiry: number, rF: number): number;
+  strikeToDelta(strike: number, forward: number, vol: number, expiry: number): number;
 }
 
 /** Monte Carlo pricer result (JSON object from Rust). */
@@ -1951,15 +1965,21 @@ export interface ValuationsNamespace {
     redemption_index: number | null;
     redeemed_early: boolean;
   };
-  /** Snowball / inverse-floater coupon schedule. */
+  /** Snowball coupon schedule. */
   snowballCouponProfile(
     initialCoupon: number,
     fixedRate: number,
     floatingFixings: number[],
     floor: number,
+    cap: number
+  ): number[];
+  /** Path-independent inverse-floater coupon schedule. */
+  inverseFloaterCouponProfile(
+    fixedRate: number,
+    floatingFixings: number[],
+    floor: number,
     cap: number,
-    isInverseFloater: boolean,
-    leverage?: number
+    leverage: number
   ): number[];
   /** Intrinsic (undiscounted) payoff of a CMS spread option. */
   cmsSpreadOptionIntrinsic(

@@ -283,7 +283,7 @@ impl std::str::FromStr for StubKind {
 ///
 /// # Use Cases
 ///
-/// - **Graceful fallback**: When `graceful_fallback(true)` is set and an error
+/// - **Graceful fallback**: When [`ScheduleErrorPolicy::GracefulEmpty`] is set and an error
 ///   would normally occur, the builder returns an empty schedule with a warning
 ///   describing the original error.
 ///
@@ -296,9 +296,8 @@ impl std::str::FromStr for StubKind {
 /// let start = Date::from_calendar_date(2025, Month::December, 31)?;
 /// let end = Date::from_calendar_date(2025, Month::January, 1)?; // Invalid: end before start
 ///
-/// // With graceful_fallback, invalid date range returns empty schedule with warning
+/// // Invalid date ranges are rejected by new() before an error policy applies.
 /// // rather than an error. Note: new() itself returns Result, so we handle the error
-/// // at the graceful_fallback level when start > end.
 /// let result = ScheduleBuilder::new(start, end);
 /// assert!(result.is_err()); // new() validates start <= end
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -319,7 +318,7 @@ pub enum ScheduleWarning {
     },
 
     /// A calendar ID was provided, but resolution was skipped because
-    /// `allow_missing_calendar(true)` was enabled.
+    /// [`ScheduleErrorPolicy::MissingCalendarWarning`] was enabled.
     MissingCalendarId {
         /// The calendar identifier that could not be resolved.
         calendar_id: String,
@@ -379,7 +378,7 @@ impl std::fmt::Display for ScheduleWarning {
 ///
 /// # Warnings
 ///
-/// When using [`ScheduleBuilder::graceful_fallback(true)`](ScheduleBuilder::graceful_fallback),
+/// When using [`ScheduleErrorPolicy::GracefulEmpty`],
 /// the schedule may contain warnings that describe issues encountered during
 /// generation. Always check [`has_warnings()`](Schedule::has_warnings) when
 /// using graceful fallback mode to detect potential pricing issues.
@@ -754,111 +753,6 @@ impl<'a> ScheduleBuilder<'a> {
         self
     }
 
-    /// Enable graceful fallback mode.
-    ///
-    /// When enabled, [`build()`](Self::build) returns an empty schedule with a
-    /// [`ScheduleWarning::GracefulFallback`] warning on errors instead of propagating
-    /// them. This is useful for instrument pricing where you want to avoid panics
-    /// but need to detect degraded schedules.
-    ///
-    /// # Warning Detection
-    ///
-    /// **Always check [`Schedule::has_warnings()`]** when using graceful fallback mode.
-    /// An empty schedule without warning detection can silently cause:
-    /// - PV = 0 due to missing cashflows
-    /// - Incorrect accruals from missing periods
-    /// - Silent pricing failures
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleBuilder, Tenor, ScheduleWarning};
-    /// use time::{Date, Month};
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::December, 31).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date"); // Invalid: end before start
-    ///
-    /// // Invalid date range returns error immediately at new()
-    /// let result = ScheduleBuilder::new(start, end);
-    /// assert!(result.is_err());
-    ///
-    /// // Graceful mode is useful for other errors (e.g., missing calendars):
-    /// let valid_start = Date::from_calendar_date(2025, Month::January, 15).expect("Valid date");
-    /// let valid_end = Date::from_calendar_date(2025, Month::March, 15).expect("Valid date");
-    ///
-    /// // Valid date range with invalid calendar + graceful mode returns empty with warning
-    /// use finstack_quant_core::dates::BusinessDayConvention;
-    /// let schedule = ScheduleBuilder::new(valid_start, valid_end)
-    ///     .expect("Valid dates")
-    ///     .frequency(Tenor::monthly())
-    ///     .adjust_with_id(BusinessDayConvention::Following, "INVALID_CALENDAR")
-    ///     .graceful_fallback(true)
-    ///     .build()
-    ///     .expect("Graceful fallback should succeed");
-    ///
-    /// assert!(schedule.dates.is_empty());
-    /// assert!(schedule.has_warnings());
-    /// assert!(schedule.used_graceful_fallback());
-    /// ```
-    #[must_use]
-    pub fn graceful_fallback(mut self, enabled: bool) -> Self {
-        if enabled {
-            self.error_policy = ScheduleErrorPolicy::GracefulEmpty;
-        } else if self.error_policy == ScheduleErrorPolicy::GracefulEmpty {
-            self.error_policy = ScheduleErrorPolicy::Strict;
-        }
-        self
-    }
-
-    /// Allow missing calendar IDs without error.
-    ///
-    /// By default, [`adjust_with_id`](Self::adjust_with_id) returns an error at build time
-    /// if the calendar ID is not found. This method enables lenient behavior where unknown
-    /// calendars are silently ignored and the schedule is generated without adjustment.
-    ///
-    /// # Warning
-    ///
-    /// Enabling this option is **dangerous** for production use. A wrong holiday calendar
-    /// is a first-order pricing error for accrual periods and payment dates. Only enable
-    /// this for testing or when you explicitly want to tolerate missing calendars.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::{ScheduleBuilder, Tenor, BusinessDayConvention};
-    /// use time::{Date, Month};
-    ///
-    /// let start = Date::from_calendar_date(2025, Month::January, 15).expect("Valid date");
-    /// let end = Date::from_calendar_date(2025, Month::December, 15).expect("Valid date");
-    ///
-    /// // Without allow_missing_calendar: error on unknown calendar
-    /// let result = ScheduleBuilder::new(start, end)
-    ///     .expect("Valid dates")
-    ///     .frequency(Tenor::monthly())
-    ///     .adjust_with_id(BusinessDayConvention::Following, "unknown_calendar")
-    ///     .build();
-    /// assert!(result.is_err());
-    ///
-    /// // With allow_missing_calendar: proceeds without adjustment and records a warning
-    /// let schedule = ScheduleBuilder::new(start, end)
-    ///     .expect("Valid dates")
-    ///     .frequency(Tenor::monthly())
-    ///     .allow_missing_calendar(true)
-    ///     .adjust_with_id(BusinessDayConvention::Following, "unknown_calendar")
-    ///     .build()
-    ///     .expect("Schedule builder should succeed");
-    /// assert!(schedule.dates.len() > 0);
-    /// ```
-    #[must_use]
-    pub fn allow_missing_calendar(mut self, enabled: bool) -> Self {
-        if enabled {
-            self.error_policy = ScheduleErrorPolicy::MissingCalendarWarning;
-        } else if self.error_policy == ScheduleErrorPolicy::MissingCalendarWarning {
-            self.error_policy = ScheduleErrorPolicy::Strict;
-        }
-        self
-    }
-
     /// Configure business-day adjustment using calendar ID string lookup.
     ///
     /// This is a convenience method that combines calendar lookup with adjustment
@@ -867,8 +761,8 @@ impl<'a> ScheduleBuilder<'a> {
     /// # Errors
     ///
     /// By default, returns an error at [`build()`](Self::build) time if the calendar ID
-    /// is not found. Use [`allow_missing_calendar(true)`](Self::allow_missing_calendar)
-    /// to opt-in to lenient behavior where unknown calendars are silently ignored.
+    /// is not found. Use [`error_policy`](Self::error_policy) with
+    /// [`ScheduleErrorPolicy::MissingCalendarWarning`] to opt into lenient behavior.
     ///
     /// # Arguments
     ///
@@ -901,7 +795,7 @@ impl<'a> ScheduleBuilder<'a> {
 
     /// Build a concrete schedule (adjusted if configured).
     ///
-    /// When graceful fallback mode is enabled via [`graceful_fallback(true)`](Self::graceful_fallback),
+    /// When [`ScheduleErrorPolicy::GracefulEmpty`] is selected,
     /// this method returns an empty schedule with a [`ScheduleWarning::GracefulFallback`]
     /// warning instead of propagating errors. Always check [`Schedule::has_warnings()`]
     /// when using graceful mode to detect potential pricing issues.
@@ -910,7 +804,7 @@ impl<'a> ScheduleBuilder<'a> {
     ///
     /// Returns an error if:
     /// - Start date is after end date (and graceful mode is disabled)
-    /// - Calendar lookup fails (and neither graceful nor `allow_missing_calendar` is enabled)
+    /// - Calendar lookup fails under [`ScheduleErrorPolicy::Strict`]
     pub fn build(self) -> crate::Result<Schedule> {
         if self.imm_mode && self.cds_imm_mode {
             return Err(crate::Error::Validation(
@@ -1091,12 +985,8 @@ pub struct ScheduleSpec {
     pub imm_mode: bool,
     /// If true, use CDS IMM date logic (20th of quarterly months).
     pub cds_imm_mode: bool,
-    /// If true, allow graceful handling of edge cases.
-    pub graceful: bool,
-    /// If true, silently ignore missing calendar IDs instead of returning an error.
-    /// Default: false (strict mode - errors on unknown calendar IDs).
-    #[serde(default)]
-    pub allow_missing_calendar: bool,
+    /// Policy for recoverable schedule-construction errors.
+    pub error_policy: ScheduleErrorPolicy,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -1113,9 +1003,12 @@ struct ScheduleSpecWire {
     #[serde(default)]
     imm_mode: bool,
     cds_imm_mode: bool,
-    graceful: bool,
     #[serde(default)]
-    allow_missing_calendar: bool,
+    error_policy: Option<ScheduleErrorPolicy>,
+    #[serde(default)]
+    graceful: Option<bool>,
+    #[serde(default)]
+    allow_missing_calendar: Option<bool>,
 }
 
 impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
@@ -1125,6 +1018,22 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
         if wire.imm_mode && wire.cds_imm_mode {
             return Err("standard IMM and CDS IMM modes are mutually exclusive".to_string());
         }
+        if wire.error_policy.is_some()
+            && (wire.graceful.is_some() || wire.allow_missing_calendar.is_some())
+        {
+            return Err(
+                "error_policy cannot be combined with legacy schedule policy booleans".to_string(),
+            );
+        }
+        let error_policy = wire.error_policy.unwrap_or_else(|| {
+            if wire.graceful.unwrap_or(false) {
+                ScheduleErrorPolicy::GracefulEmpty
+            } else if wire.allow_missing_calendar.unwrap_or(false) {
+                ScheduleErrorPolicy::MissingCalendarWarning
+            } else {
+                ScheduleErrorPolicy::Strict
+            }
+        });
         Ok(Self {
             start: wire.start,
             end: wire.end,
@@ -1135,8 +1044,7 @@ impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
             end_of_month: wire.end_of_month,
             imm_mode: wire.imm_mode,
             cds_imm_mode: wire.cds_imm_mode,
-            graceful: wire.graceful,
-            allow_missing_calendar: wire.allow_missing_calendar,
+            error_policy,
         })
     }
 }
@@ -1154,11 +1062,7 @@ impl ScheduleSpec {
             .stub_rule(self.stub)
             .end_of_month(self.end_of_month);
 
-        builder = match (self.graceful, self.allow_missing_calendar) {
-            (true, _) => builder.error_policy(ScheduleErrorPolicy::GracefulEmpty),
-            (false, true) => builder.error_policy(ScheduleErrorPolicy::MissingCalendarWarning),
-            (false, false) => builder.error_policy(ScheduleErrorPolicy::Strict),
-        };
+        builder = builder.error_policy(self.error_policy);
 
         if let (Some(conv), Some(id)) = (self.business_day_convention, self.calendar_id.as_deref())
         {

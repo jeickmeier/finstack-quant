@@ -13,6 +13,6 @@ define_metric_calculator!(
     instrument = FxOption,
     calc = |option, ctx| {
         let target = ctx.base_value.amount();
-        option.implied_vol(&ctx.curves, ctx.as_of, target, None)
+        option.implied_vol(&ctx.curves, ctx.as_of, target)
     }
 );

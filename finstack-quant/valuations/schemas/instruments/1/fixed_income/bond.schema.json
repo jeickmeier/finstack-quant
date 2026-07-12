@@ -379,8 +379,40 @@
     },
     "CashFlowMeta": {
       "additionalProperties": false,
-      "description": "Metadata for cashflow schedules (calendar IDs, facility limits, issue date).\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
+      "description": "Metadata for cashflow schedules (calendar IDs, facility limits, contract dates,\nand true accrual periods).\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
       "properties": {
+        "accrual_day_counts": {
+          "default": [],
+          "description": "Per-flow day-count conventions aligned with the sorted flow vector.\n\nThis preserves heterogeneous legs and avoids applying the schedule's\nrepresentative day count to every coupon during accrual calculation.",
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": "array"
+        },
+        "accrual_periods": {
+          "default": [],
+          "description": "Contractual accrual periods aligned with the sorted flow vector.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "type": "array"
+        },
         "calendar_ids": {
           "description": "Holiday calendar IDs used for schedule adjustments.",
           "items": {
@@ -401,6 +433,14 @@
         },
         "issue_date": {
           "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maturity_date": {
+          "description": "Contractual maturity date, distinct from an adjusted final payment date.",
           "format": "date",
           "type": [
             "string",

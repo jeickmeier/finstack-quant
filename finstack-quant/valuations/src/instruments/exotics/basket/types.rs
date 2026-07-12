@@ -275,7 +275,7 @@ impl Basket {
                     price_id: PriceId::new("AAPL-SPOT"),
                     asset_type: AssetType::Equity,
                 },
-                weight: 0.4,
+                weight: 1.0,
                 units: None,
                 ticker: Some("AAPL".to_string()),
             },

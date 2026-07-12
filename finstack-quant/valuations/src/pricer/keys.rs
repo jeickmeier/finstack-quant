@@ -486,14 +486,6 @@ pub enum ModelKey {
     ///
     /// Used for: FX barrier options.
     FxBarrierBSContinuous = 25,
-    /// FX barrier with Vanna-Volga smile correction on top of BS (Castagna
-    /// & Mercurio 2007, Wystup 2006).
-    ///
-    /// Used for: FX barrier options priced against a three-pillar vol
-    /// smile (25Δ put, ATM, 25Δ call). Pricing engine starts from the BS
-    /// barrier price at ATM vol and adds vanna/volga smile adjustments
-    /// using the three pillar vols as market quotes.
-    FxBarrierVannaVolga = 27,
     /// Heston semi-analytical via Fourier transform.
     ///
     /// Used for: European options requiring stochastic vol.
@@ -619,7 +611,6 @@ impl std::fmt::Display for ModelKey {
             ModelKey::LookbackBSContinuous => "lookback_bs_continuous",
             ModelKey::QuantoBS => "quanto_bs",
             ModelKey::FxBarrierBSContinuous => "fx_barrier_bs_continuous",
-            ModelKey::FxBarrierVannaVolga => "fx_barrier_vanna_volga",
             ModelKey::HestonFourier => "heston_fourier",
             ModelKey::MertonMc => "merton_mc",
             ModelKey::MonteCarloSchwartzSmith => "monte_carlo_schwartz_smith",
@@ -673,9 +664,6 @@ impl std::str::FromStr for ModelKey {
             "quanto_bs" | "quanto" => Ok(ModelKey::QuantoBS),
             "fx_barrier_bs_continuous" | "fx_barrier_bs" | "fx_barrier_continuous" => {
                 Ok(ModelKey::FxBarrierBSContinuous)
-            }
-            "fx_barrier_vanna_volga" | "fx_barrier_vv" | "vanna_volga_fx_barrier" => {
-                Ok(ModelKey::FxBarrierVannaVolga)
             }
             "heston_fourier" | "heston_semi_analytical" | "heston_analytical" => {
                 Ok(ModelKey::HestonFourier)
@@ -970,8 +958,6 @@ mod tests {
             ("quanto", ModelKey::QuantoBS),
             ("fx_barrier_bs", ModelKey::FxBarrierBSContinuous),
             ("fx_barrier_continuous", ModelKey::FxBarrierBSContinuous),
-            ("fx_barrier_vv", ModelKey::FxBarrierVannaVolga),
-            ("vanna_volga_fx_barrier", ModelKey::FxBarrierVannaVolga),
             ("heston_semi_analytical", ModelKey::HestonFourier),
             ("heston_analytical", ModelKey::HestonFourier),
             ("merton", ModelKey::MertonMc),

@@ -63,7 +63,7 @@ impl MetricCalculator for ImpliedVolCalculator {
             if let Some(ov) = option.pricing_overrides.market_quotes.implied_volatility {
                 ov
             } else if let Some(sabr) = &option.sabr_params {
-                let model = crate::models::SABRModel::new(sabr.to_internal()?);
+                let model = crate::models::SABRModel::new(sabr.clone());
                 model.implied_volatility(forward, strike, t).unwrap_or(0.2)
             } else {
                 context

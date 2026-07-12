@@ -671,7 +671,6 @@ mod tests {
         }
     }
 
-    #[ignore = "slow: covered by mise rust-test-slow"]
     #[test]
     fn quote_engine_works_for_bond_with_hazard_curve() {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::{

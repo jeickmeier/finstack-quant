@@ -32,10 +32,8 @@
 //! - ECB TARGET2 calendar: https://www.ecb.europa.eu/paym/target/target2/profuse/calendar/html/index.en.html
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::fx::{
-    add_joint_business_days, fx_spot_date, resolve_calendar, roll_spot_date,
-};
-use finstack_quant_core::dates::{create_date, BusinessDayConvention};
+use finstack_quant_core::dates::create_date;
+use finstack_quant_core::dates::fx::{add_joint_business_days, fx_spot_date, resolve_calendar};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
 use finstack_quant_valuations::instruments::FxSpot;
@@ -166,12 +164,12 @@ fn test_usd_eur_spot_christmas_2024() {
 fn test_gbp_jpy_spot_may_bank_holiday_2025() {
     let trade_date = create_date(2025, Month::May, 1).expect("Valid date");
 
-    let spot = roll_spot_date(
+    let spot = add_joint_business_days(
         trade_date,
         2,
-        BusinessDayConvention::Following,
         Some("gblo"), // GBP calendar
         Some("jpx"),  // JPY calendar (Tokyo Stock Exchange)
+        None,
     )
     .expect("Valid calendars");
 
@@ -204,14 +202,8 @@ fn test_gbp_jpy_spot_may_bank_holiday_2025() {
 fn test_gbp_jpy_spot_spring_bank_holiday_2025() {
     let trade_date = create_date(2025, Month::May, 22).expect("Valid date");
 
-    let spot = roll_spot_date(
-        trade_date,
-        2,
-        BusinessDayConvention::Following,
-        Some("gblo"),
-        Some("jpx"),
-    )
-    .expect("Valid calendars");
+    let spot = add_joint_business_days(trade_date, 2, Some("gblo"), Some("jpx"), None)
+        .expect("Valid calendars");
 
     // Expected: Tuesday, May 27, 2025
     let expected = create_date(2025, Month::May, 27).expect("Valid expected date");
@@ -286,9 +278,9 @@ fn test_add_joint_business_days_christmas_week_2024() {
     let result = add_joint_business_days(
         start,
         5, // 5 joint business days
-        BusinessDayConvention::Following,
         Some("nyse"),
         Some("target2"),
+        None,
     )
     .expect("Valid calendars");
 
@@ -339,12 +331,12 @@ fn test_usd_gbp_spot_mlk_day_2025() {
 fn test_unknown_base_calendar_errors() {
     let trade_date = create_date(2024, Month::January, 15).expect("Valid date");
 
-    let result = roll_spot_date(
+    let result = add_joint_business_days(
         trade_date,
         2,
-        BusinessDayConvention::Following,
         Some("unknown_calendar"), // Invalid
         Some("gblo"),
+        None,
     );
 
     assert!(result.is_err(), "Unknown base calendar should return error");
@@ -365,12 +357,12 @@ fn test_unknown_base_calendar_errors() {
 fn test_unknown_quote_calendar_errors() {
     let trade_date = create_date(2024, Month::January, 15).expect("Valid date");
 
-    let result = roll_spot_date(
+    let result = add_joint_business_days(
         trade_date,
         2,
-        BusinessDayConvention::Following,
         Some("nyse"),
         Some("invalid_cal"), // Invalid
+        None,
     );
 
     assert!(
@@ -397,12 +389,10 @@ fn test_unknown_quote_calendar_errors() {
 fn test_weekends_only_no_holidays() {
     let trade_date = create_date(2024, Month::January, 15).expect("Valid date"); // Monday
 
-    let spot = roll_spot_date(
-        trade_date,
-        2,
-        BusinessDayConvention::Following,
+    let spot = add_joint_business_days(
+        trade_date, 2, None, // Weekends-only
         None, // Weekends-only
-        None, // Weekends-only
+        None,
     )
     .expect("None should use weekends-only");
 
@@ -470,9 +460,9 @@ fn test_add_joint_business_days_iteration_limit() {
     let result = add_joint_business_days(
         start,
         20, // 20 business days
-        BusinessDayConvention::Following,
         Some("nyse"),
         Some("target2"),
+        None,
     );
 
     // Should succeed without hitting iteration limit

@@ -91,7 +91,7 @@ impl ThresholdKind {
         match self {
             ThresholdKind::Gaussian => standard_normal_inv_cdf(p),
             ThresholdKind::StudentT { degrees_of_freedom } => {
-                student_t_inv_cdf(p, *degrees_of_freedom)
+                student_t_inv_cdf(p, *degrees_of_freedom).unwrap_or(f64::NAN)
             }
         }
     }

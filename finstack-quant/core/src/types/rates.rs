@@ -208,14 +208,24 @@ impl Rate {
     ///
     /// # Panics
     ///
-    /// Panics if `percent` is not finite. Use [`try_from_decimal`](Self::try_from_decimal)
-    /// with manual conversion for untrusted input.
+    /// Panics if `percent` is not finite. Use [`try_from_percent`](Self::try_from_percent)
+    /// for untrusted or external input.
     pub fn from_percent(percent: f64) -> Self {
         assert!(
             percent.is_finite(),
             "Rate::from_percent called with non-finite value: {percent}"
         );
         Self(percent / 100.0)
+    }
+
+    /// Create a rate from a percentage value, rejecting non-finite inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Input(InputError::NonFiniteValue { .. })` when
+    /// `percent` is NaN or infinite.
+    pub fn try_from_percent(percent: f64) -> Result<Self> {
+        Self::try_from_decimal(percent / 100.0)
     }
 
     /// Create a rate from basis points (500 bps = 5%)
@@ -635,12 +645,9 @@ impl Percentage {
     ///
     /// Panics if `percent` is not finite. Use [`try_new`](Self::try_new)
     /// for untrusted or external input.
+    #[allow(clippy::expect_used)] // Compatibility constructor is documented to panic.
     pub fn new(percent: f64) -> Self {
-        assert!(
-            percent.is_finite(),
-            "Percentage::new called with non-finite value: {percent}"
-        );
-        Self(percent)
+        Self::try_new(percent).expect("Percentage::new requires a finite value")
     }
 
     /// Create a percentage value, rejecting non-finite inputs.
@@ -659,7 +666,7 @@ impl Percentage {
             }
             .into());
         }
-        Ok(Self::new(pct))
+        Ok(Self(pct))
     }
 
     /// Get the percentage value
@@ -859,6 +866,17 @@ mod tests {
 
         let rate3 = Rate::from_decimal(0.025);
         assert_eq!(rate, rate3);
+    }
+
+    #[test]
+    fn try_from_percent_rejects_non_finite_values() {
+        assert_eq!(
+            Rate::try_from_percent(2.5).expect("finite percent"),
+            Rate::from_percent(2.5)
+        );
+        assert!(Rate::try_from_percent(f64::NAN).is_err());
+        assert!(Rate::try_from_percent(f64::INFINITY).is_err());
+        assert!(Rate::try_from_percent(f64::NEG_INFINITY).is_err());
     }
 
     #[test]

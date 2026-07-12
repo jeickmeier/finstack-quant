@@ -3,12 +3,12 @@
 use finstack_quant_cashflows::builder::{
     CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
 };
+use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::traits::{Discounting, TermStructure};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
-use finstack_quant_valuations::instruments::Discountable;
 use rust_decimal_macros::dec;
 use time::Month;
 
@@ -74,18 +74,15 @@ fn test_schedule_discountable_simple() {
         .unwrap();
 
     // Act - use explicit day count
-    let pv = schedule
-        .npv(&curve, curve.base_date(), Some(DayCount::Act365F))
-        .unwrap();
+    let pv = schedule.npv(&curve, curve.base_date()).unwrap();
 
     // Assert
     assert!(pv.amount().is_finite(), "PV is finite");
-    // Note: PV includes initial notional outflow at issue date
-    // With 5% coupon and 5% discount rate, bond trades near par
-    // PV should be close to 0 (slightly negative due to time value)
+    // The issue-date funding exchange is already settled, so schedule NPV is
+    // the value of the strictly future coupon and redemption cashflows.
     assert!(
-        pv.amount().abs() < 1.0,
-        "PV near zero for at-par bond: got {}",
+        (pv.amount() - 1_000.0).abs() < 1.0,
+        "future cashflows should value near par: got {}",
         pv.amount()
     );
     assert_eq!(pv.currency(), Currency::USD);
@@ -130,14 +127,15 @@ fn test_npv_zero_rate() {
         .unwrap();
 
     // Act - use explicit day count
-    let pv = schedule
-        .npv(&curve, curve.base_date(), Some(DayCount::Act365F))
-        .unwrap();
+    let pv = schedule.npv(&curve, curve.base_date()).unwrap();
 
-    // Assert: With zero rate, PV = sum of cashflows
-    // Cashflows: -1000 (initial outflow) + coupon + 1000 (principal repayment)
-    // With Act365F over a leap year (366 days): coupon ≈ 1000 * 0.05 * (366/365) ≈ 50.14
-    // Tolerance of 1.0 covers day count variations across leap/non-leap years
-    let expected = 1_000.0 * 0.05;
+    // The issue-date funding exchange is excluded; at zero rates the NPV is
+    // exactly the sum of strictly future coupon and redemption cashflows.
+    let expected = schedule
+        .flows
+        .iter()
+        .filter(|cf| cf.date > curve.base_date())
+        .map(|cf| cf.amount.amount())
+        .sum();
     assert_approx_eq(pv.amount(), expected, 1.0, "PV equals cashflow sum at 0%");
 }

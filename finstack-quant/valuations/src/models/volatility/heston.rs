@@ -40,139 +40,14 @@
 //! pins them within 10 bps to catch silent drift between the two.
 
 use finstack_quant_core::math::integration::gauss_legendre_integrate_adaptive;
+pub use finstack_quant_core::math::volatility::heston::HestonParams as HestonParameters;
 use finstack_quant_core::Result;
 use num_complex::Complex;
 use std::cell::RefCell;
 use std::f64::consts::PI;
-use tracing::warn;
 
 const HESTON_G_DENOM_EPS: f64 = 1e-8;
 const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
-
-/// Heston model parameters.
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct HestonParameters {
-    /// Initial variance ($v_0$)
-    pub v0: f64,
-    /// Mean reversion speed ($\kappa$)
-    pub kappa: f64,
-    /// Long-run average variance ($\theta$)
-    pub theta: f64,
-    /// Volatility of variance ($\sigma$)
-    pub sigma: f64,
-    /// Correlation between asset and variance ($\rho$)
-    pub rho: f64,
-}
-
-impl HestonParameters {
-    /// Create new Heston parameters with validation.
-    ///
-    /// # Feller Condition Warning
-    ///
-    /// If the Feller condition (2κθ > σ²) is violated, an informational warning
-    /// is logged. This pricer evaluates the Heston characteristic function via
-    /// Fourier inversion and never simulates the variance path, so a Feller
-    /// violation does **not** create a zero-variance pricing risk here. The
-    /// warning is retained only as a heads-up for callers who also run a Monte
-    /// Carlo simulation of the variance process with the same parameters.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any parameter is out of valid range.
-    #[must_use = "creating parameters without using them has no effect"]
-    pub fn new(v0: f64, kappa: f64, theta: f64, sigma: f64, rho: f64) -> Result<Self> {
-        if v0 <= 0.0 || !v0.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston parameter v0 (initial variance) must be positive, got: {:.6}",
-                v0
-            )));
-        }
-        if kappa <= 0.0 || !kappa.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston parameter κ (kappa, mean reversion) must be positive, got: {:.6}",
-                kappa
-            )));
-        }
-        if theta <= 0.0 || !theta.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston parameter θ (theta, long-run variance) must be positive, got: {:.6}",
-                theta
-            )));
-        }
-        if sigma <= 0.0 || !sigma.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston parameter σ (sigma, vol-of-vol) must be positive, got: {:.6}",
-                sigma
-            )));
-        }
-        if !(-1.0..=1.0).contains(&rho) || !rho.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Heston parameter ρ (rho, correlation) must be in [-1, 1], got: {:.6}",
-                rho
-            )));
-        }
-
-        let params = Self {
-            v0,
-            kappa,
-            theta,
-            sigma,
-            rho,
-        };
-
-        // Warn if Feller condition is violated. Informational only: this pricer
-        // uses Fourier inversion of the characteristic function and never
-        // simulates the variance path, so a Feller violation poses no
-        // zero-variance pricing risk here.
-        if !params.satisfies_feller_condition() {
-            warn!(
-                v0 = v0,
-                kappa = kappa,
-                theta = theta,
-                sigma = sigma,
-                feller_lhs = 2.0 * kappa * theta,
-                feller_rhs = sigma * sigma,
-                "Heston Feller condition violated (2κθ ≤ σ²): informational only — the \
-                 Fourier pricer never simulates the variance path, so this poses no \
-                 zero-variance pricing risk; relevant only for Monte Carlo simulation \
-                 of the variance process"
-            );
-        }
-
-        Ok(params)
-    }
-
-    /// Check Feller condition ($2\kappa\theta > \sigma^2$).
-    ///
-    /// If true, the variance process is strictly positive.
-    /// If false, the variance can reach zero, which may cause numerical issues.
-    #[must_use]
-    pub fn satisfies_feller_condition(&self) -> bool {
-        2.0 * self.kappa * self.theta > self.sigma * self.sigma
-    }
-}
-
-impl Default for HestonParameters {
-    /// Returns safe default Heston parameters that satisfy the Feller condition.
-    ///
-    /// Default values:
-    /// - v0 = 0.04 (initial variance, equivalent to 20% vol)
-    /// - κ (kappa) = 2.0 (mean reversion speed)
-    /// - θ (theta) = 0.04 (long-run variance, equivalent to 20% vol)
-    /// - σ (sigma) = 0.3 (vol-of-vol)
-    /// - ρ (rho) = -0.5 (typical negative correlation for equities)
-    ///
-    /// Feller condition: 2 × 2.0 × 0.04 = 0.16 > 0.09 = 0.3² ✓
-    fn default() -> Self {
-        Self {
-            v0: 0.04,
-            kappa: 2.0,
-            theta: 0.04,
-            sigma: 0.3,
-            rho: -0.5,
-        }
-    }
-}
 
 /// Heston model pricer.
 pub struct HestonModel {

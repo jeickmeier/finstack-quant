@@ -81,6 +81,20 @@ fn discount_curve_negative_rate_validation_mode_is_explicit() {
     )
     .expect("negative-rate-friendly curve");
     assert!(curve.forward(0.0, 1.0).expect("negative forward") < 0.0);
+
+    for floor in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assert!(DiscountCurve::new(
+            "CHF-OIS",
+            "2025-01-01",
+            &[0.0, 1.0, 1.0, 1.002],
+            None,
+            None,
+            None,
+            Some("negative_rate_friendly".to_string()),
+            Some(floor),
+        )
+        .is_err());
+    }
 }
 
 #[wasm_bindgen_test]

@@ -146,7 +146,7 @@ fn test_dm_solver_convergence_across_spread_regimes() {
         .build()
         .unwrap();
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
+        .base_date(date!(2024 - 12 - 30))
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.03), (10.0, 0.03)])
         .build()
@@ -293,7 +293,7 @@ fn test_dm_monotone_residual_does_not_break_valid_solve() {
         .build()
         .expect("disc curve");
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
+        .base_date(date!(2024 - 12 - 30))
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.03), (5.0, 0.03)])
         .build()

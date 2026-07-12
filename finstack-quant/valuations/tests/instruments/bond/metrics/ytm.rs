@@ -81,7 +81,7 @@ fn test_ytm_floating_bond_is_finite_from_price() {
         .build()
         .unwrap();
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
+        .base_date(date!(2024 - 12 - 30))
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.03), (2.0, 0.035)])
         .build()

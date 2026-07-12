@@ -358,10 +358,11 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     // the intended coupon period is still "1 year", not "1 year + 2 days".
     //
     // Mirror that convention here so the expected value tracks the impl.
-    let coupon_info: Vec<(Date, f64, Option<f64>)> = {
+    type CouponInfo = (Date, f64, Option<f64>, Option<(Date, Date)>);
+    let coupon_info: Vec<CouponInfo> = {
         use finstack_quant_cashflows::primitives::CFKind;
-        let mut out: Vec<(Date, f64, Option<f64>)> = Vec::new();
-        for cf in &schedule.flows {
+        let mut out: Vec<CouponInfo> = Vec::new();
+        for (idx, cf) in schedule.flows.iter().enumerate() {
             if !matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {
                 continue;
             }
@@ -370,36 +371,39 @@ fn test_accrued_interest_amortizing_schedule_driven() {
             } else {
                 None
             };
+            let accrual_period = schedule.meta.accrual_periods.get(idx).copied().flatten();
             if let Some(last) = out.last_mut() {
                 if last.0 == cf.date {
                     last.1 += cf.amount.amount();
                     last.2 = last.2.or(af);
+                    last.3 = last.3.or(accrual_period);
                     continue;
                 }
             }
-            out.push((cf.date, cf.amount.amount(), af));
+            out.push((cf.date, cf.amount.amount(), af, accrual_period));
         }
         out
     };
     let mut expected = 0.0;
     let mut prev = issue;
-    for (end, coupon_total, af) in coupon_info {
-        if prev <= as_of && as_of < end {
+    for (payment_date, coupon_total, af, accrual_period) in coupon_info {
+        let (accrual_start, accrual_end) = accrual_period.unwrap_or((prev, payment_date));
+        if accrual_start <= as_of && as_of < accrual_end {
             let total_period = match af {
                 Some(v) => v,
                 None => schedule
                     .day_count
-                    .year_fraction(prev, end, DayCountContext::default())
+                    .year_fraction(accrual_start, accrual_end, DayCountContext::default())
                     .unwrap(),
             };
             let dc_elapsed = schedule
                 .day_count
-                .year_fraction(prev, as_of, DayCountContext::default())
+                .year_fraction(accrual_start, as_of, DayCountContext::default())
                 .unwrap()
                 .max(0.0);
             let dc_total = schedule
                 .day_count
-                .year_fraction(prev, end, DayCountContext::default())
+                .year_fraction(accrual_start, accrual_end, DayCountContext::default())
                 .unwrap();
             let elapsed = if dc_total.is_finite() && dc_total > 0.0 {
                 total_period * dc_elapsed / dc_total
@@ -410,7 +414,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
             expected = coupon_total * (elapsed / total_period);
             break;
         }
-        prev = end;
+        prev = accrual_end;
     }
     assert!(
         expected > 0.0,

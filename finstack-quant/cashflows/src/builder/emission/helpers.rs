@@ -53,10 +53,11 @@ pub(in crate::builder) fn add_pik_flow_if_nonzero(
 /// **business days** using the fixing calendar (or accrual calendar), then adjusted
 /// to a business day using the specified business-day convention.
 ///
-/// With a zero lag, the accrual start is adjusted with `Preceding` regardless
-/// of `bdc`: a fixing can never be observed *after* the accrual it applies
-/// to, so rolling forward (e.g. `Following` on a weekend start) would land
-/// the reset after the accrual start.
+/// With a zero lag, the reset date is exactly the accrual start. Callers that
+/// require a business-day fixing must provide an adjusted accrual start or a
+/// positive reset lag; silently moving an explicit zero-lag reset earlier
+/// changes the contract and can incorrectly turn a new trade into a seasoned
+/// one that requires historical fixings.
 #[inline]
 pub(in crate::builder) fn compute_reset_date(
     accrual_start: Date,
@@ -65,11 +66,7 @@ pub(in crate::builder) fn compute_reset_date(
     cal: &dyn HolidayCalendar,
 ) -> finstack_quant_core::Result<Date> {
     if reset_lag_days == 0 {
-        return adjust(
-            accrual_start,
-            finstack_quant_core::dates::BusinessDayConvention::Preceding,
-            cal,
-        );
+        return Ok(accrual_start);
     }
 
     // Business-day subtraction avoids weekend/holiday traps where calendar-day subtraction

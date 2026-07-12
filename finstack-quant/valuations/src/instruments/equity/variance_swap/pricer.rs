@@ -186,10 +186,10 @@ pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
 
     if let Some(months) = inst.observation_freq.months() {
         12.0 / months as f64
-    } else if inst.observation_freq.unit == TenorUnit::Weeks {
-        52.0 / f64::from(inst.observation_freq.count)
-    } else if inst.observation_freq.unit == TenorUnit::Days {
-        TRADING_DAYS_PER_YEAR / f64::from(inst.observation_freq.count)
+    } else if inst.observation_freq.unit() == TenorUnit::Weeks {
+        52.0 / f64::from(inst.observation_freq.count())
+    } else if inst.observation_freq.unit() == TenorUnit::Days {
+        TRADING_DAYS_PER_YEAR / f64::from(inst.observation_freq.count())
     } else {
         TRADING_DAYS_PER_YEAR
     }
@@ -222,11 +222,11 @@ pub(crate) fn annualization_factor_with_policy(
     if let Some(months) = inst.observation_freq.months() {
         return 12.0 / months as f64;
     }
-    if inst.observation_freq.unit == finstack_quant_core::dates::TenorUnit::Weeks {
-        return 52.0 / f64::from(inst.observation_freq.count);
+    if inst.observation_freq.unit() == finstack_quant_core::dates::TenorUnit::Weeks {
+        return 52.0 / f64::from(inst.observation_freq.count());
     }
-    if inst.observation_freq.unit == finstack_quant_core::dates::TenorUnit::Days {
-        return tdy_override / f64::from(inst.observation_freq.count);
+    if inst.observation_freq.unit() == finstack_quant_core::dates::TenorUnit::Days {
+        return tdy_override / f64::from(inst.observation_freq.count());
     }
     tdy_override
 }

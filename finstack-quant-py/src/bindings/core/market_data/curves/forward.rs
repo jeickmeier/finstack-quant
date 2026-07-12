@@ -5,6 +5,7 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use std::sync::Arc;
 
 use pyo3::prelude::*;
+use pyo3::types::PyType;
 
 use super::helpers::{parse_day_count, parse_extrapolation, parse_interp_style};
 use crate::bindings::core::dates::utils::{date_to_py, py_to_date};
@@ -33,6 +34,46 @@ impl PyForwardCurve {
     /// Build from an existing `Arc<ForwardCurve>`.
     pub(crate) fn from_inner(inner: Arc<ForwardCurve>) -> Self {
         Self { inner }
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the shared constructor receives the complete curve specification"
+    )]
+    fn build(
+        id: &str,
+        tenor: f64,
+        base_date: &Bound<'_, PyAny>,
+        knots: Vec<(f64, f64)>,
+        day_count: Option<&str>,
+        interp: &str,
+        extrapolation: &str,
+        projection_grid: Option<Vec<f64>>,
+        reset_lag: Option<i32>,
+    ) -> PyResult<Self> {
+        let base = py_to_date(base_date)?;
+        let style = parse_interp_style(interp)?;
+        let extrap = parse_extrapolation(extrapolation)?;
+
+        let mut builder = ForwardCurve::builder(id, tenor)
+            .base_date(base)
+            .knots(knots)
+            .interp(style)
+            .extrapolation(extrap)
+            .projection_grid_opt(projection_grid);
+        if let Some(day_count) = day_count {
+            builder = builder.day_count(parse_day_count(day_count)?);
+        }
+        if let Some(reset_lag) = reset_lag {
+            builder = builder.reset_lag(reset_lag);
+        }
+
+        builder
+            .build()
+            .map(|curve| Self {
+                inner: Arc::new(curve),
+            })
+            .map_err(core_to_py)
     }
 }
 
@@ -64,7 +105,7 @@ impl PyForwardCurve {
     #[new]
     #[expect(
         clippy::too_many_arguments,
-        reason = "preserves the published Python positional constructor while appending optional curve metadata compatibly"
+        reason = "the cross-host constructor includes curve identity, data, and optional projection metadata"
     )]
     #[pyo3(signature = (id, tenor, knots, base_date, day_count=None, interp="linear", extrapolation="flat_forward", projection_grid=None, reset_lag=None))]
     fn new(
@@ -78,28 +119,49 @@ impl PyForwardCurve {
         projection_grid: Option<Vec<f64>>,
         reset_lag: Option<i32>,
     ) -> PyResult<Self> {
-        let base = py_to_date(base_date)?;
-        let style = parse_interp_style(interp)?;
-        let extrap = parse_extrapolation(extrapolation)?;
+        Self::build(
+            id,
+            tenor,
+            base_date,
+            knots,
+            day_count,
+            interp,
+            extrapolation,
+            projection_grid,
+            reset_lag,
+        )
+    }
 
-        let mut builder = ForwardCurve::builder(id, tenor)
-            .base_date(base)
-            .knots(knots)
-            .interp(style)
-            .extrapolation(extrap)
-            .projection_grid_opt(projection_grid);
-        if let Some(day_count) = day_count {
-            builder = builder.day_count(parse_day_count(day_count)?);
-        }
-        if let Some(reset_lag) = reset_lag {
-            builder = builder.reset_lag(reset_lag);
-        }
-
-        let curve = builder.build().map_err(core_to_py)?;
-
-        Ok(Self {
-            inner: Arc::new(curve),
-        })
+    /// Construct from a keyword-only curve specification.
+    #[classmethod]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the named factory exposes the complete curve specification"
+    )]
+    #[pyo3(signature = (id, *, tenor, base_date, knots, day_count=None, interp="linear", extrapolation="flat_forward", projection_grid=None, reset_lag=None))]
+    fn from_knots(
+        _cls: &Bound<'_, PyType>,
+        id: &str,
+        tenor: f64,
+        base_date: &Bound<'_, PyAny>,
+        knots: Vec<(f64, f64)>,
+        day_count: Option<&str>,
+        interp: &str,
+        extrapolation: &str,
+        projection_grid: Option<Vec<f64>>,
+        reset_lag: Option<i32>,
+    ) -> PyResult<Self> {
+        Self::build(
+            id,
+            tenor,
+            base_date,
+            knots,
+            day_count,
+            interp,
+            extrapolation,
+            projection_grid,
+            reset_lag,
+        )
     }
 
     /// Forward rate at year fraction `t`.

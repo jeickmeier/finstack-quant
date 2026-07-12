@@ -121,6 +121,17 @@
               "format": "date",
               "type": "string"
             },
+            "expiry_fixing": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent."
+            },
             "id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Unique instrument identifier"

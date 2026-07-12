@@ -169,6 +169,14 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Unique instrument identifier"
             },
+            "monitoring_start_date": {
+              "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_barrier_breached`.",
+              "format": "date",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "notional": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
               "description": "Notional amount in foreign currency"

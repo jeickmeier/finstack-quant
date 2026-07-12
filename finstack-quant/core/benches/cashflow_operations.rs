@@ -79,7 +79,7 @@ fn bench_npv_flat_curve(c: &mut Criterion) {
         let flows = money_flows(size);
         group.bench_with_input(BenchmarkId::new("money", size), &size, |b, _| {
             b.iter(|| {
-                let pv = npv(black_box(&curve), base_date(), None, black_box(&flows)).unwrap();
+                let pv = npv(black_box(&curve), base_date(), black_box(&flows)).unwrap();
                 black_box(pv);
             })
         });
@@ -97,7 +97,7 @@ fn bench_npv_shaped_curve(c: &mut Criterion) {
         let flows = money_flows(size);
         group.bench_with_input(BenchmarkId::new("money", size), &size, |b, _| {
             b.iter(|| {
-                let pv = npv(black_box(&curve), base_date(), None, black_box(&flows)).unwrap();
+                let pv = npv(black_box(&curve), base_date(), black_box(&flows)).unwrap();
                 black_box(pv);
             })
         });
@@ -129,39 +129,18 @@ fn bench_npv_amounts(c: &mut Criterion) {
     group.finish();
 }
 
-fn bench_npv_day_count_comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("npv_day_count_variants");
-    let curve = flat_curve(0.05_f64.ln_1p());
-    let flows = money_flows(60);
-
-    let day_counts = [
-        ("Act365F", DayCount::Act365F),
-        ("Act360", DayCount::Act360),
-        ("Thirty360", DayCount::Thirty360),
-    ];
-
-    for (name, dc) in day_counts {
-        bench_iter(&mut group, name, || {
-            let pv = npv(&curve, base_date(), Some(dc), &flows).unwrap();
-            black_box(pv);
-        });
-    }
-
-    group.finish();
-}
-
 fn bench_discountable_trait(c: &mut Criterion) {
     let mut group = c.benchmark_group("discountable_trait");
     let curve = shaped_curve();
     let flows = money_flows(60);
 
     bench_iter(&mut group, "via_trait", || {
-        let pv = flows.npv(black_box(&curve), base_date(), None).unwrap();
+        let pv = flows.npv(black_box(&curve), base_date()).unwrap();
         black_box(pv);
     });
 
     bench_iter(&mut group, "via_fn", || {
-        let pv = npv(black_box(&curve), base_date(), None, &flows).unwrap();
+        let pv = npv(black_box(&curve), base_date(), &flows).unwrap();
         black_box(pv);
     });
 
@@ -208,7 +187,6 @@ criterion_group!(
     bench_npv_flat_curve,
     bench_npv_shaped_curve,
     bench_npv_amounts,
-    bench_npv_day_count_comparison,
     bench_discountable_trait,
     bench_npv_investment_profile,
 );

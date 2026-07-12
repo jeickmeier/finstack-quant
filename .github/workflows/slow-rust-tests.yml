@@ -1,0 +1,41 @@
+name: Slow Rust Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-rust-slow:
+    name: Test ignored Rust suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 1
+      CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C debuginfo=0 -C strip=symbols -C linker=cc -C link-arg=-fuse-ld=bfd"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up swap space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 10
+
+      - name: Provision toolchain
+        uses: jdx/mise-action@v2
+        with:
+          cache: true
+
+      - name: Run ignored and slow Rust tests
+        run: mise run rust-test-slow

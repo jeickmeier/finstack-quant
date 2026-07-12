@@ -491,11 +491,7 @@ fn bench_npv(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
                 black_box(&schedule)
-                    .npv(
-                        black_box(disc.as_ref()),
-                        black_box(base),
-                        Some(DayCount::Act365F),
-                    )
+                    .npv(black_box(disc.as_ref()), black_box(base))
                     .unwrap()
                     .amount()
             });

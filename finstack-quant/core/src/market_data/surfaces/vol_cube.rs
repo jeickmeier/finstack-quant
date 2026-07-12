@@ -435,9 +435,9 @@ impl VolCube {
         let evaluate = |pillar_expiry: f64| -> crate::Result<f64> {
             let (params, forward, _) = self.interpolate_params_clamped(pillar_expiry, tenor);
             if normal {
-                params.try_implied_vol_normal(forward, strike, pillar_expiry)
+                params.implied_vol_normal(forward, strike, pillar_expiry)
             } else {
-                params.try_implied_vol_lognormal(forward, strike, pillar_expiry)
+                params.implied_vol_lognormal(forward, strike, pillar_expiry)
             }
         };
 
@@ -475,7 +475,7 @@ impl VolCube {
         match self.interpolation_mode {
             VolInterpolationMode::Vol => {
                 let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-                params.try_implied_vol_lognormal(fwd, strike, exp_c)
+                params.implied_vol_lognormal(fwd, strike, exp_c)
             }
             VolInterpolationMode::TotalVariance => {
                 self.total_variance_vol(expiry, tenor, strike, false)
@@ -498,7 +498,9 @@ impl VolCube {
         let v = match self.interpolation_mode {
             VolInterpolationMode::Vol => {
                 let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-                params.implied_vol_lognormal(fwd, strike, exp_c)
+                params
+                    .implied_vol_lognormal(fwd, strike, exp_c)
+                    .unwrap_or(f64::NAN)
             }
             VolInterpolationMode::TotalVariance => self
                 .total_variance_vol(expiry, tenor, strike, false)
@@ -517,7 +519,7 @@ impl VolCube {
     /// the swaption market quotes normal vol as the standard convention.
     /// For shifted SABR the expansion is evaluated on the shifted
     /// forward/strike (`F+s`, `K+s`) — the shift is applied inside
-    /// [`SabrParams::try_implied_vol_normal`](crate::math::volatility::sabr::SabrParams::try_implied_vol_normal),
+    /// [`SabrParams::implied_vol_normal`](crate::math::volatility::sabr::SabrParams::implied_vol_normal),
     /// identical to the lognormal path's shift semantics. The returned vol is
     /// in absolute rate units (e.g. `0.008` = 80 bp/yr normal vol).
     ///
@@ -537,7 +539,7 @@ impl VolCube {
         match self.interpolation_mode {
             VolInterpolationMode::Vol => {
                 let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
-                params.try_implied_vol_normal(fwd, strike, exp_c)
+                params.implied_vol_normal(fwd, strike, exp_c)
             }
             VolInterpolationMode::TotalVariance => {
                 self.total_variance_vol(expiry, tenor, strike, true)
@@ -566,7 +568,12 @@ impl VolCube {
                 if params.beta > 0.0 && (fwd + shift <= 0.0 || strike + shift <= 0.0) {
                     return f64::NAN;
                 }
-                (params.implied_vol_normal(fwd, strike, exp_c), fwd)
+                (
+                    params
+                        .implied_vol_normal(fwd, strike, exp_c)
+                        .unwrap_or(f64::NAN),
+                    fwd,
+                )
             }
             VolInterpolationMode::TotalVariance => {
                 let (params, fwd, _) = self.interpolate_params_clamped(expiry, tenor);

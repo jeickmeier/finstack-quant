@@ -217,32 +217,32 @@ pub fn psa_to_cpr(psa_speed: f64, month: u32) -> f64 {
 #[inline]
 pub(crate) fn frequency_periods_per_year(freq: finstack_quant_core::dates::Tenor) -> f64 {
     use finstack_quant_core::dates::TenorUnit;
-    match freq.unit {
+    match freq.unit() {
         TenorUnit::Months => {
-            if freq.count > 0 {
-                12.0 / freq.count as f64
+            if freq.count() > 0 {
+                12.0 / freq.count() as f64
             } else {
                 4.0
             }
         }
         TenorUnit::Days => {
-            if freq.count > 0 {
-                365.0 / freq.count as f64
+            if freq.count() > 0 {
+                365.0 / freq.count() as f64
             } else {
                 4.0
             }
         }
 
         TenorUnit::Weeks => {
-            if freq.count > 0 {
-                52.0 / freq.count as f64
+            if freq.count() > 0 {
+                52.0 / freq.count() as f64
             } else {
                 4.0
             }
         }
         TenorUnit::Years => {
-            if freq.count > 0 {
-                1.0 / freq.count as f64
+            if freq.count() > 0 {
+                1.0 / freq.count() as f64
             } else {
                 4.0
             }

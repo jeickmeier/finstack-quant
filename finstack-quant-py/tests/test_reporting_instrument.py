@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from finstack_quant.reporting import instrument as ins
-from finstack_quant.valuations import list_standard_metrics
+from finstack_quant.valuations.instruments import list_standard_metrics
 
 
 def test_recommended_metrics_known_types() -> None:

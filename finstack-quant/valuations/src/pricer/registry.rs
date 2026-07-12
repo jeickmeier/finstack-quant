@@ -76,10 +76,9 @@ pub struct PricerRegistry {
     pricers: BTreeMap<PricerKey, Arc<dyn Pricer>>,
     /// Keys that were registered more than once via [`PricerRegistry::register`].
     ///
-    /// `register` legitimately overwrites for test setup and monkey-patching,
-    /// but in the standard-registry build a collision is a bug. Recording the
-    /// offending keys lets [`build_standard_registry`](super::build_standard_registry)
-    /// surface them without threading a `Result` through every shard.
+    /// `register` rejects duplicates without mutation. Recording the offending
+    /// keys lets [`build_standard_registry`](super::build_standard_registry)
+    /// surface configuration bugs without threading a `Result` through every shard.
     duplicate_keys: Vec<PricerKey>,
 }
 
@@ -118,65 +117,32 @@ impl PricerRegistry {
 
     /// Register a pricer for a specific (instrument type, model) combination.
     ///
-    /// If a pricer already exists for this key it is replaced, a warning is
-    /// emitted, and the colliding key is recorded in `Self::duplicate_keys`
-    /// so the standard-registry build can fail loudly. Overwriting is a
-    /// legitimate operation for test setup and monkey-patching; use
-    /// [`PricerRegistry::try_register`] when a duplicate must be rejected
-    /// outright rather than recorded.
+    /// Duplicate keys are rejected without changing the existing registration.
+    /// The colliding key is recorded so registry construction can fail loudly.
     pub fn register(
         &mut self,
         inst: InstrumentType,
         model: ModelKey,
         pricer: impl Pricer + 'static,
     ) {
-        let pricer: Arc<dyn Pricer> = Arc::new(pricer);
-        if let Err(key) = self.try_register_arc(inst, model, Arc::clone(&pricer)) {
-            tracing::warn!(
-                ?key,
-                "duplicate pricer registration overwrites the existing pricer"
-            );
+        let key = PricerKey::new(inst, model);
+        if self.pricers.contains_key(&key) {
+            tracing::warn!(?key, "duplicate pricer registration rejected");
             self.duplicate_keys.push(key);
-            self.pricers.insert(key, pricer);
+            return;
         }
+        self.pricers.insert(key, Arc::new(pricer));
     }
 
-    /// Register a pricer, returning an error if a pricer is already registered
-    /// for the same `(instrument, model)` key.
-    ///
-    /// Use this where a duplicate registration must be rejected as a hard
-    /// error. The complementary [`PricerRegistry::register`] overwrites and
-    /// records the collision instead — useful for test setup and
-    /// monkey-patching.
-    ///
-    /// # Errors
-    ///
-    /// Returns the conflicting `PricerKey` if a pricer is already registered.
-    pub fn try_register(
+    /// Deliberately replace a pricer for test setup or controlled monkey-patching.
+    pub fn replace(
         &mut self,
         inst: InstrumentType,
         model: ModelKey,
         pricer: impl Pricer + 'static,
-    ) -> std::result::Result<(), PricerKey> {
-        self.try_register_arc(inst, model, Arc::new(pricer))
-    }
-
-    /// Insert an already-boxed pricer, rejecting (without overwriting) a
-    /// duplicate `(instrument, model)` key.
-    ///
-    /// Shared insertion core for [`Self::register`] and [`Self::try_register`].
-    fn try_register_arc(
-        &mut self,
-        inst: InstrumentType,
-        model: ModelKey,
-        pricer: Arc<dyn Pricer>,
-    ) -> std::result::Result<(), PricerKey> {
+    ) {
         let key = PricerKey::new(inst, model);
-        if self.pricers.contains_key(&key) {
-            return Err(key);
-        }
-        self.pricers.insert(key, pricer);
-        Ok(())
+        self.pricers.insert(key, Arc::new(pricer));
     }
 
     /// Keys registered more than once via [`Self::register`].
@@ -1482,15 +1448,6 @@ mod tests {
                 ))
                 .is_some(),
             "FxSwap Discounting pricer should be registered"
-        );
-        assert!(
-            registry
-                .get_pricer(PricerKey::new(
-                    InstrumentType::FxBarrierOption,
-                    ModelKey::FxBarrierVannaVolga
-                ))
-                .is_none(),
-            "FxBarrierOption Vanna-Volga must not be registered without a quote contract"
         );
         assert!(
             registry

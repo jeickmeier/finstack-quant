@@ -2,7 +2,13 @@
 //!
 //! This module provides a macro to reduce boilerplate in instrument metric registration.
 
-/// Simplifies metric registration by providing a declarative syntax.
+/// Simplifies instrument-specific metric registration by providing a declarative syntax.
+///
+/// Instrument modules are authoritative for their `(metric, instrument)` pairs,
+/// so the macro uses the registry's explicit replacement operation. This lets a
+/// specialized calculator deliberately supersede a generic bootstrap entry while
+/// direct [`MetricRegistry::register_metric`](crate::metrics::MetricRegistry::register_metric)
+/// calls continue to reject accidental duplicates.
 ///
 /// See unit tests and `examples/` for usage.
 #[macro_export]
@@ -18,7 +24,7 @@ macro_rules! register_metrics {
         use std::sync::Arc;
 
         $(
-            $registry.register_metric(
+            $registry.replace_metric(
                 MetricId::$metric_id,
                 Arc::new($calculator),
                 &[$instrument],

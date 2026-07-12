@@ -423,9 +423,17 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
         .amount();
     let base_ccy = context.base_value.currency();
 
-    let rolled_pv = context
-        .instrument_value_with_scenario(&context.curves, rolled_date)?
-        .amount();
+    let horizon_days = (rolled_date - context.as_of).whole_days();
+    let rolled_reprice = context
+        .curves
+        .roll_forward(horizon_days)
+        .and_then(|market| context.instrument_value_with_scenario(&market, rolled_date));
+    let rolled_pv = match rolled_reprice {
+        Ok(value) => value.amount(),
+        Err(_) => context
+            .instrument_value_with_scenario(&context.curves, rolled_date)?
+            .amount(),
+    };
 
     let start_date = context.as_of;
     let carry = collect_cashflows_in_period_cached(context, start_date, rolled_date, base_ccy)?;
@@ -436,7 +444,7 @@ fn compute_theta_breakdown(context: &mut crate::metrics::MetricContext) -> Resul
         total: carry + roll_down,
         carry,
         roll_down,
-        horizon_days: (rolled_date - context.as_of).whole_days() as f64,
+        horizon_days: horizon_days as f64,
     })
 }
 

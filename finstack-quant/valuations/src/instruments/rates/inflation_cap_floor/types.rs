@@ -225,7 +225,7 @@ impl InflationCapFloor {
             finstack_quant_core::InputError::NonPositiveValue,
         )?;
         validation::require_or(
-            self.frequency.count != 0,
+            self.frequency.count() != 0,
             finstack_quant_core::InputError::Invalid,
         )?;
         Ok(())

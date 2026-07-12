@@ -197,9 +197,8 @@ impl FxOption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
         target_price: f64,
-        initial_guess: Option<f64>,
     ) -> Result<f64> {
-        pricer::implied_vol(self, curves, as_of, target_price, initial_guess)
+        pricer::implied_vol(self, curves, as_of, target_price)
     }
 
     /// Create a canonical example FX option for testing and documentation.
@@ -353,9 +352,8 @@ impl FxOption {
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
         target_price: f64,
-        initial_guess: Option<f64>,
     ) -> Result<f64> {
-        self.implied_vol_internal(curves, as_of, target_price, initial_guess)
+        self.implied_vol_internal(curves, as_of, target_price)
     }
 
     /// Calculate the at-the-money forward (ATMF) strike.

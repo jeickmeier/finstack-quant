@@ -70,7 +70,7 @@
 /// let fwd = 0.05;
 /// let strike = 0.05;
 /// let expiry = 1.0;
-/// let vol = params.implied_vol_lognormal(fwd, strike, expiry);
+/// let vol = params.implied_vol_lognormal(fwd, strike, expiry).expect("valid checked inputs");
 /// assert!(vol > 0.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -237,7 +237,7 @@ impl SabrParams {
     /// Returns `f64::NAN` for degenerate inputs (non-positive forward/strike,
     /// non-positive expiry, or a χ(z) breakdown). Callers on pricing/risk paths
     /// must guard the result with `is_finite()`, or use the fallible
-    /// [`try_implied_vol_lognormal`](Self::try_implied_vol_lognormal), since a
+    /// [`implied_vol_lognormal`](Self::implied_vol_lognormal), since a
     /// silent NaN poisons Black-76 pricing and compensated summations downstream.
     ///
     /// # Special Cases
@@ -245,7 +245,7 @@ impl SabrParams {
     /// - ATM (`f ≈ k`): Uses the simplified ATM formula for numerical stability
     /// - β = 0: Degenerates to normal SABR; lognormal vol is approximated
     /// - β = 1: Standard lognormal SABR formula
-    pub fn implied_vol_lognormal(&self, f: f64, k: f64, t: f64) -> f64 {
+    fn implied_vol_lognormal_unchecked(&self, f: f64, k: f64, t: f64) -> f64 {
         let alpha = self.alpha;
         let beta = self.beta;
         let rho = self.rho;
@@ -335,9 +335,9 @@ impl SabrParams {
     /// shift-invariant, so such quotes require an explicit
     /// [`with_shift`](Self::with_shift). β = 0 (normal SABR) is shift-invariant
     /// and prices cross-zero quotes directly. Guard with `is_finite()` or use
-    /// the fallible [`try_implied_vol_normal`](Self::try_implied_vol_normal)
+    /// the checked [`implied_vol_normal`](Self::implied_vol_normal)
     /// on pricing paths.
-    pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> f64 {
+    fn implied_vol_normal_unchecked(&self, f: f64, k: f64, t: f64) -> f64 {
         let alpha = self.alpha;
         let beta = self.beta;
         let rho = self.rho;
@@ -378,11 +378,11 @@ impl SabrParams {
                 let shift = (-f.min(k)).max(0.0) + shift_scale;
                 let shifted_f = f + shift;
                 let shifted_k = k + shift;
-                return self.implied_vol_normal(shifted_f, shifted_k, t);
+                return self.implied_vol_normal_unchecked(shifted_f, shifted_k, t);
             }
             // β > 0: the CEV backbone F^β is NOT shift-invariant, so any
             // internal shift silently changes the model. Refuse (NaN here;
-            // a descriptive error from `try_implied_vol_normal`) and require
+            // a descriptive error from `implied_vol_normal`) and require
             // an explicit, calibrated shift via `with_shift`.
             return f64::NAN;
         }
@@ -424,18 +424,14 @@ impl SabrParams {
         alpha * fk_beta_half * numer_series / denom_series * z_over_chi * correction
     }
 
-    /// Fallible [`implied_vol_lognormal`](Self::implied_vol_lognormal): returns
-    /// an error instead of a silent `f64::NAN` for degenerate inputs.
-    ///
-    /// Prefer this on any pricing/risk path where a NaN vol could silently
-    /// propagate into Black-76 valuation or a compensated aggregation.
+    /// Lognormal SABR implied volatility with checked error semantics.
     ///
     /// # Errors
     ///
     /// Returns [`InputError::Invalid`](crate::error::InputError::Invalid) when
     /// the underlying expansion yields a non-finite volatility.
-    pub fn try_implied_vol_lognormal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
-        let v = self.implied_vol_lognormal(f, k, t);
+    pub fn implied_vol_lognormal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
+        let v = self.implied_vol_lognormal_unchecked(f, k, t);
         if v.is_finite() {
             Ok(v)
         } else {
@@ -443,8 +439,7 @@ impl SabrParams {
         }
     }
 
-    /// Fallible [`implied_vol_normal`](Self::implied_vol_normal): returns an
-    /// error instead of a silent `f64::NAN` for degenerate inputs.
+    /// Normal SABR implied volatility with checked error semantics.
     ///
     /// # Errors
     ///
@@ -454,7 +449,7 @@ impl SabrParams {
     ///   explicit shift via [`with_shift`](Self::with_shift).
     /// - Returns [`InputError::Invalid`](crate::error::InputError::Invalid)
     ///   when the underlying expansion yields a non-finite volatility.
-    pub fn try_implied_vol_normal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
+    pub fn implied_vol_normal(&self, f: f64, k: f64, t: f64) -> crate::Result<f64> {
         let shift = self.shift.unwrap_or(0.0);
         let (sf, sk) = (f + shift, k + shift);
         if sf * sk <= 0.0 && self.beta > 0.0 && (sf - sk).abs() > 1e-12 * sf.abs().max(1e-10) {
@@ -465,7 +460,7 @@ impl SabrParams {
                 self.beta
             )));
         }
-        let v = self.implied_vol_normal(f, k, t);
+        let v = self.implied_vol_normal_unchecked(f, k, t);
         if v.is_finite() {
             Ok(v)
         } else {
@@ -487,9 +482,9 @@ impl SabrParams {
             if k <= dk || k <= 0.0 {
                 continue;
             }
-            let vol_lo = self.implied_vol_lognormal(forward, k - dk, expiry);
-            let vol_mid = self.implied_vol_lognormal(forward, k, expiry);
-            let vol_hi = self.implied_vol_lognormal(forward, k + dk, expiry);
+            let vol_lo = self.implied_vol_lognormal_unchecked(forward, k - dk, expiry);
+            let vol_mid = self.implied_vol_lognormal_unchecked(forward, k, expiry);
+            let vol_hi = self.implied_vol_lognormal_unchecked(forward, k + dk, expiry);
 
             if !vol_lo.is_finite() || !vol_mid.is_finite() || !vol_hi.is_finite() {
                 continue;
@@ -660,7 +655,7 @@ fn chi(z: f64, rho: f64) -> crate::Result<f64> {
 /// let params = calibrate_sabr(forward, expiry, beta, strikes, vols, None)
 ///     .expect("Calibration should succeed");
 /// // Verify ATM vol is close to input
-/// let atm_vol = params.implied_vol_lognormal(forward, forward, expiry);
+/// let atm_vol = params.implied_vol_lognormal(forward, forward, expiry).expect("valid checked inputs");
 /// assert!((atm_vol - 0.20).abs() < 0.01);
 /// ```
 pub fn calibrate_sabr(
@@ -732,7 +727,7 @@ pub fn calibrate_sabr(
         };
 
         for (i, (&k, &mv)) in strikes.iter().zip(market_vols.iter()).enumerate() {
-            let model_vol = params.implied_vol_lognormal(forward, k, expiry);
+            let model_vol = params.implied_vol_lognormal_unchecked(forward, k, expiry);
             if model_vol.is_finite() {
                 resid[i] = w[i].sqrt() * (model_vol - mv);
             } else {
@@ -772,7 +767,7 @@ pub fn calibrate_sabr(
             .zip(market_vols.iter())
             .enumerate()
             .map(|(i, (&k, &mv))| {
-                let mv_hat = p.implied_vol_lognormal(forward, k, expiry);
+                let mv_hat = p.implied_vol_lognormal_unchecked(forward, k, expiry);
                 if mv_hat.is_finite() {
                     w[i] * (mv_hat - mv) * (mv_hat - mv)
                 } else {
@@ -887,7 +882,7 @@ fn calibrate_sabr_coordinate_descent(
         };
         let mut sse = 0.0;
         for (i, (&k, &mv)) in strikes.iter().zip(market_vols.iter()).enumerate() {
-            let model_vol = params.implied_vol_lognormal(forward, k, expiry);
+            let model_vol = params.implied_vol_lognormal_unchecked(forward, k, expiry);
             if !model_vol.is_finite() {
                 return f64::MAX;
             }
@@ -982,7 +977,9 @@ mod tests {
     fn sabr_atm_vol_is_positive() {
         let params = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid params");
         let fwd = 0.05;
-        let vol = params.implied_vol_lognormal(fwd, fwd, 1.0);
+        let vol = params
+            .implied_vol_lognormal(fwd, fwd, 1.0)
+            .expect("valid checked inputs");
         assert!(vol > 0.0, "ATM vol should be positive: {vol}");
     }
 
@@ -991,19 +988,24 @@ mod tests {
         let params = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid params");
         // Valid inputs return Ok and match the infallible path.
         let ok = params
-            .try_implied_vol_lognormal(0.05, 0.06, 1.0)
+            .implied_vol_lognormal(0.05, 0.06, 1.0)
             .expect("finite vol");
-        assert!((ok - params.implied_vol_lognormal(0.05, 0.06, 1.0)).abs() < 1e-12);
+        assert!(
+            (ok - params
+                .implied_vol_lognormal(0.05, 0.06, 1.0)
+                .expect("valid checked inputs"))
+            .abs()
+                < 1e-12
+        );
 
         // Degenerate inputs (non-positive forward/strike/expiry) yield NaN in the
         // infallible path and an error in the fallible one.
-        assert!(params.implied_vol_lognormal(-0.05, 0.06, 1.0).is_nan());
-        assert!(params.try_implied_vol_lognormal(-0.05, 0.06, 1.0).is_err());
-        assert!(params.try_implied_vol_lognormal(0.05, 0.06, 0.0).is_err());
-        assert!(params.try_implied_vol_normal(0.05, 0.06, 0.0).is_err());
+        assert!(params.implied_vol_lognormal(-0.05, 0.06, 1.0).is_err());
+        assert!(params.implied_vol_lognormal(0.05, 0.06, 0.0).is_err());
+        assert!(params.implied_vol_normal(0.05, 0.06, 0.0).is_err());
         // Cross-zero with beta > 0 now errors (CEV backbone is not
         // shift-invariant); use with_shift for negative-rate quotes.
-        assert!(params.try_implied_vol_normal(0.01, -0.01, 1.0).is_err());
+        assert!(params.implied_vol_normal(0.01, -0.01, 1.0).is_err());
     }
 
     #[test]
@@ -1012,9 +1014,15 @@ mod tests {
         let fwd = 0.05;
         let t = 1.0;
 
-        let vol_otm_put = params.implied_vol_lognormal(fwd, 0.03, t);
-        let vol_atm = params.implied_vol_lognormal(fwd, fwd, t);
-        let vol_otm_call = params.implied_vol_lognormal(fwd, 0.07, t);
+        let vol_otm_put = params
+            .implied_vol_lognormal(fwd, 0.03, t)
+            .expect("valid checked inputs");
+        let vol_atm = params
+            .implied_vol_lognormal(fwd, fwd, t)
+            .expect("valid checked inputs");
+        let vol_otm_call = params
+            .implied_vol_lognormal(fwd, 0.07, t)
+            .expect("valid checked inputs");
 
         // With negative rho, we expect left-skew: OTM put vol > ATM vol
         assert!(
@@ -1032,7 +1040,9 @@ mod tests {
         // β=0 is the normal SABR model
         let params = SabrParams::new(0.005, 0.0, -0.3, 0.3).expect("valid params");
         let fwd = 0.03;
-        let vol = params.implied_vol_lognormal(fwd, fwd, 1.0);
+        let vol = params
+            .implied_vol_lognormal(fwd, fwd, 1.0)
+            .expect("valid checked inputs");
         assert!(vol > 0.0, "Normal SABR ATM vol should be positive: {vol}");
     }
 
@@ -1041,7 +1051,9 @@ mod tests {
         // β=1 is the standard lognormal SABR
         let params = SabrParams::new(0.2, 1.0, -0.15, 0.3).expect("valid params");
         let fwd = 0.05;
-        let vol = params.implied_vol_lognormal(fwd, fwd, 1.0);
+        let vol = params
+            .implied_vol_lognormal(fwd, fwd, 1.0)
+            .expect("valid checked inputs");
         // With β=1, α=0.2, ATM vol should be close to α=0.2
         assert!(
             (vol - 0.2).abs() < 0.05,
@@ -1053,24 +1065,26 @@ mod tests {
     fn sabr_normal_vol_positive() {
         let params = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid params");
         let fwd = 0.05;
-        let vol = params.implied_vol_normal(fwd, fwd, 1.0);
+        let vol = params
+            .implied_vol_normal(fwd, fwd, 1.0)
+            .expect("valid checked inputs");
         assert!(vol > 0.0, "Normal vol should be positive: {vol}");
     }
 
     #[test]
     fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
         let cev = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
-        assert!(cev.try_implied_vol_normal(-0.01, -0.01, 1.0).is_err());
-        assert!(cev.try_implied_vol_normal(0.01, 0.0, 1.0).is_err());
+        assert!(cev.implied_vol_normal(-0.01, -0.01, 1.0).is_err());
+        assert!(cev.implied_vol_normal(0.01, 0.0, 1.0).is_err());
 
         let shifted_to_zero = cev.with_shift(0.01);
         assert!(shifted_to_zero
-            .try_implied_vol_normal(-0.01, -0.01, 1.0)
+            .implied_vol_normal(-0.01, -0.01, 1.0)
             .is_err());
 
         let normal = SabrParams::new(0.005, 0.0, -0.2, 0.4).unwrap();
         assert!(normal
-            .try_implied_vol_normal(-0.01, -0.02, 1.0)
+            .implied_vol_normal(-0.01, -0.02, 1.0)
             .unwrap()
             .is_finite());
     }
@@ -1116,7 +1130,7 @@ mod tests {
         ] {
             let p = SabrParams::new(alpha, beta, rho, nu).expect("valid params");
             for &k in &[0.018_f64, 0.024, 0.036, 0.045] {
-                let got = p.implied_vol_normal(f, k, t);
+                let got = p.implied_vol_normal(f, k, t).expect("valid checked inputs");
                 let want = hagan_normal_vol_reference(alpha, beta, rho, nu, f, k, t);
                 assert!(
                     (got - want).abs() <= 1e-9 * want.abs() + 1e-13,
@@ -1153,7 +1167,9 @@ mod tests {
         let strike = 0.02;
         let t = 1.0;
 
-        let vol = params.implied_vol_normal(fwd, strike, t);
+        let vol = params
+            .implied_vol_normal(fwd, strike, t)
+            .expect("valid checked inputs");
         let midpoint_atm = params.atm_vol_normal(0.5 * (fwd + strike), t);
 
         assert!(
@@ -1173,9 +1189,15 @@ mod tests {
         let fwd = 0.05;
         let t = 1.0;
 
-        let vol_exact = params.implied_vol_lognormal(fwd, fwd, t);
-        let vol_near_above = params.implied_vol_lognormal(fwd, fwd + 1e-8, t);
-        let vol_near_below = params.implied_vol_lognormal(fwd, fwd - 1e-8, t);
+        let vol_exact = params
+            .implied_vol_lognormal(fwd, fwd, t)
+            .expect("valid checked inputs");
+        let vol_near_above = params
+            .implied_vol_lognormal(fwd, fwd + 1e-8, t)
+            .expect("valid checked inputs");
+        let vol_near_below = params
+            .implied_vol_lognormal(fwd, fwd - 1e-8, t)
+            .expect("valid checked inputs");
 
         assert!(
             (vol_exact - vol_near_above).abs() < 1e-4,
@@ -1193,9 +1215,15 @@ mod tests {
         let fwd = 0.0005;
         let t = 1.0;
 
-        let vol_exact = params.implied_vol_lognormal(fwd, fwd, t);
-        let vol_near_above = params.implied_vol_lognormal(fwd, fwd + 1e-12, t);
-        let vol_near_below = params.implied_vol_lognormal(fwd, fwd - 1e-12, t);
+        let vol_exact = params
+            .implied_vol_lognormal(fwd, fwd, t)
+            .expect("valid checked inputs");
+        let vol_near_above = params
+            .implied_vol_lognormal(fwd, fwd + 1e-12, t)
+            .expect("valid checked inputs");
+        let vol_near_below = params
+            .implied_vol_lognormal(fwd, fwd - 1e-12, t)
+            .expect("valid checked inputs");
 
         assert!(vol_exact.is_finite() && vol_exact > 0.0);
         assert_eq!(
@@ -1237,7 +1265,11 @@ mod tests {
         let strikes: Vec<f64> = vec![0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08];
         let vols: Vec<f64> = strikes
             .iter()
-            .map(|&k| true_params.implied_vol_lognormal(fwd, k, expiry))
+            .map(|&k| {
+                true_params
+                    .implied_vol_lognormal(fwd, k, expiry)
+                    .expect("valid checked inputs")
+            })
             .collect();
 
         let calibrated = calibrate_sabr(fwd, expiry, 0.5, &strikes, &vols, None)
@@ -1263,9 +1295,9 @@ mod tests {
     #[test]
     fn sabr_invalid_inputs_return_nan() {
         let params = SabrParams::new(0.035, 0.5, -0.2, 0.4).expect("valid params");
-        assert!(params.implied_vol_lognormal(-0.01, 0.05, 1.0).is_nan());
-        assert!(params.implied_vol_lognormal(0.05, -0.01, 1.0).is_nan());
-        assert!(params.implied_vol_lognormal(0.05, 0.05, 0.0).is_nan());
+        assert!(params.implied_vol_lognormal(-0.01, 0.05, 1.0).is_err());
+        assert!(params.implied_vol_lognormal(0.05, -0.01, 1.0).is_err());
+        assert!(params.implied_vol_lognormal(0.05, 0.05, 0.0).is_err());
     }
 
     #[test]
@@ -1356,11 +1388,11 @@ mod tests {
         let t = 1.0;
 
         assert!(
-            params.implied_vol_normal(fwd, strike, t).is_nan(),
+            params.implied_vol_normal(fwd, strike, t).is_err(),
             "cross-zero with beta > 0 must return NaN"
         );
         let err = params
-            .try_implied_vol_normal(fwd, strike, t)
+            .implied_vol_normal(fwd, strike, t)
             .expect_err("cross-zero with beta > 0 must error");
         assert!(
             err.to_string().contains("with_shift"),
@@ -1370,7 +1402,7 @@ mod tests {
         // With an explicit shift the same quote prices fine.
         let shifted = params.with_shift(0.03);
         let vol = shifted
-            .try_implied_vol_normal(fwd, strike, t)
+            .implied_vol_normal(fwd, strike, t)
             .expect("shifted SABR should price cross-zero quotes");
         assert!(vol.is_finite() && vol > 0.0);
     }
@@ -1384,7 +1416,9 @@ mod tests {
         let strike = 0.02;
         let t = 1.0;
 
-        let vol = params.implied_vol_normal(fwd, strike, t);
+        let vol = params
+            .implied_vol_normal(fwd, strike, t)
+            .expect("valid checked inputs");
         assert!(
             vol.is_finite() && vol > 0.0,
             "beta = 0 cross-zero quote should price: {vol}"
@@ -1393,8 +1427,14 @@ mod tests {
         // Shift invariance of the exact normal SABR model: explicit shifts of
         // different sizes agree closely (the log-moneyness expansion is only
         // asymptotically shift-invariant, hence the modest tolerance).
-        let vol_s1 = params.with_shift(0.05).implied_vol_normal(fwd, strike, t);
-        let vol_s2 = params.with_shift(0.10).implied_vol_normal(fwd, strike, t);
+        let vol_s1 = params
+            .with_shift(0.05)
+            .implied_vol_normal(fwd, strike, t)
+            .expect("valid checked inputs");
+        let vol_s2 = params
+            .with_shift(0.10)
+            .implied_vol_normal(fwd, strike, t)
+            .expect("valid checked inputs");
         assert!(
             (vol_s1 - vol_s2).abs() / vol_s1 < 5e-2,
             "normal SABR should be (approximately) shift-invariant: \
@@ -1429,16 +1469,24 @@ mod tests {
                 // cancellation noise for z ≈ 1e-10, i.e. ~1e-7 on the vol.
                 // The pre-fix discontinuity (dropped correction terms) was
                 // orders of magnitude larger (~1e-3 relative).
-                let v_below = below.implied_vol_lognormal(f, k, t);
-                let v_above = above.implied_vol_lognormal(f, k, t);
+                let v_below = below
+                    .implied_vol_lognormal(f, k, t)
+                    .expect("valid checked inputs");
+                let v_above = above
+                    .implied_vol_lognormal(f, k, t)
+                    .expect("valid checked inputs");
                 assert!(
                     (v_below - v_above).abs() < 1e-7,
                     "lognormal vol discontinuity at ν=1e-10 (β={beta}, K={k}): \
                      below={v_below:.12}, above={v_above:.12}"
                 );
 
-                let n_below = below.implied_vol_normal(f, k, t);
-                let n_above = above.implied_vol_normal(f, k, t);
+                let n_below = below
+                    .implied_vol_normal(f, k, t)
+                    .expect("valid checked inputs");
+                let n_above = above
+                    .implied_vol_normal(f, k, t)
+                    .expect("valid checked inputs");
                 assert!(
                     (n_below - n_above).abs() < 1e-7,
                     "normal vol discontinuity at ν=1e-10 (β={beta}, K={k}): \
@@ -1464,7 +1512,9 @@ mod tests {
             nu: 1e-12,
             shift: None,
         };
-        let got = p.implied_vol_lognormal(f, f, t);
+        let got = p
+            .implied_vol_lognormal(f, f, t)
+            .expect("valid checked inputs");
         let omb = 1.0 - beta;
         let f_omb = f.powf(omb);
         let want = alpha / f_omb * (1.0 + omb * omb / 24.0 * alpha * alpha / (f_omb * f_omb) * t);
@@ -1518,7 +1568,9 @@ mod tests {
         let f = -0.005; // negative forward
         let k = 0.01;
         let t = 1.0;
-        let vol = p.implied_vol_lognormal(f, k, t);
+        let vol = p
+            .implied_vol_lognormal(f, k, t)
+            .expect("valid checked inputs");
         assert!(
             vol.is_finite() && vol > 0.0,
             "shifted SABR should handle negative rates"

@@ -102,7 +102,7 @@ Legend:
 
 ## Cross-cutting / Calibration
 
-- market_bootstrap_tour.ipynb: ✅ canonical calibrate -> result.market, report_to_dataframe, market_json snapshot, dry_run/dependency_graph in error paths, TypedDict envelope construction.
+- market_bootstrap_tour.ipynb: ✅ canonical calibrate -> result.market, report_to_dataframe, market_json snapshot, and dry_run/dependency_graph in error paths.
 
 ## Notes on "FinstackConfig default"
 

@@ -513,7 +513,7 @@ mod tests {
                 flows: vec![CashFlow {
                     date: Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     reset_date: None,
-                    amount: Money::new(100_000.0, Currency::USD),
+                    amount: Money::new(-100_000.0, Currency::USD),
                     kind: CFKind::RevolvingDraw,
                     accrual_factor: 0.0,
                     rate: None,
@@ -737,7 +737,7 @@ mod tests {
                         date: Date::from_calendar_date(2025, Month::February, 15)
                             .expect("valid date"),
                         reset_date: None,
-                        amount: Money::new(100_000.0, Currency::USD),
+                        amount: Money::new(-100_000.0, Currency::USD),
                         kind: CFKind::RevolvingDraw,
                         accrual_factor: 0.0,
                         rate: None,

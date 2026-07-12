@@ -6,7 +6,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::money::Money;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 /// Recovery queue for delayed recovery processing.
 ///
@@ -76,41 +76,4 @@ impl RecoveryQueue {
 
         Ok(released)
     }
-}
-
-/// Cashflows generated in a single payment period.
-#[allow(dead_code)]
-pub(crate) struct PeriodFlows {
-    /// Interest collected from pool assets.
-    pub(crate) interest_collections: Money,
-    /// Principal from prepayments.
-    pub(crate) prepayments: Money,
-    /// Principal lost to defaults (gross).
-    pub(crate) defaults: Money,
-    /// Recoveries received this period.
-    pub(crate) recoveries: Money,
-}
-
-impl PeriodFlows {
-    // NOTE: total cash helper removed (unused). Callers can compute:
-    // interest_collections + prepayments + recoveries explicitly with currency-safe ops.
-}
-
-/// Update tranche balance after payment.
-#[allow(dead_code)]
-pub(crate) fn update_tranche_balance(
-    tranche_balances: &mut HashMap<String, Money>,
-    tranche_id: &str,
-    payment: Money,
-    interest_portion: Money,
-) -> finstack_quant_core::Result<()> {
-    let principal_payment = payment
-        .checked_sub(interest_portion)
-        .unwrap_or(Money::new(0.0, payment.currency()));
-
-    if let Some(current) = tranche_balances.get_mut(tranche_id) {
-        *current = current.checked_sub(principal_payment).unwrap_or(*current);
-    }
-
-    Ok(())
 }

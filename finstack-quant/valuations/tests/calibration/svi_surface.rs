@@ -134,7 +134,9 @@ fn svi_option_quotes(base_date: Date) -> Vec<MarketQuote> {
         let expiry_date = base_date + time::Duration::days((expiry_years * 365.0).round() as i64);
         for &mult in &moneyness {
             let strike = mult * f;
-            let vol = params.implied_vol((strike / f).ln(), expiry_years);
+            let vol = params
+                .implied_vol((strike / f).ln(), expiry_years)
+                .expect("valid checked inputs");
             quotes.push(MarketQuote::Vol(VolQuote::OptionVol {
                 id: QuoteId::new(format!("{UNDERLYING}-VOL-{expiry_years}-{mult}")),
                 underlying: UnderlyingId::new(UNDERLYING),

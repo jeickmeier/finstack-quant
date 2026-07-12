@@ -104,41 +104,71 @@ pub fn tarn_coupon_profile(
     })
 }
 
-/// Compute the coupon schedule for a snowball note or inverse floater.
+/// Compute the coupon schedule for a snowball note.
 ///
-/// For `is_inverse_floater = false` (snowball):
 /// `c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)` with
 /// `c_0 = initial_coupon`.
 ///
-/// For `is_inverse_floater = true`:
-/// `c_i = clip(fixed_rate - leverage * L_i, floor, cap)` (path-independent;
-/// `initial_coupon` is ignored).
-///
 /// # Arguments
 ///
-/// * `initial_coupon` - Initial coupon `c_0` for the snowball variant (ignored
-///   for the inverse floater; must be non-negative for snowball).
+/// * `initial_coupon` - Initial coupon `c_0` (must be non-negative).
 /// * `fixed_rate` - Fixed rate component.
 /// * `floating_fixings` - Floating rate fixings (one per period).
 /// * `floor` - Per-period floor (non-negative).
 /// * `cap` - Per-period cap; must be strictly greater than `floor`. Pass
 ///   `f64::INFINITY` for an uncapped coupon.
-/// * `is_inverse_floater` - If `true`, use the inverse-floater formula.
-/// * `leverage` - Leverage on the floating rate (strictly positive).
 ///
 /// # Errors
 ///
 /// Returns an error message string if any input is non-finite, the floor is
 /// negative, the cap is not strictly above the floor, the leverage is
-/// non-positive, or the snowball initial coupon is negative.
+/// or the initial coupon is negative.
 pub fn snowball_coupon_profile(
     initial_coupon: f64,
     fixed_rate: f64,
     floating_fixings: &[f64],
     floor: f64,
     cap: f64,
-    is_inverse_floater: bool,
+) -> Result<Vec<f64>, String> {
+    coupon_profile(
+        CouponProfileMode::Snowball { initial_coupon },
+        fixed_rate,
+        floating_fixings,
+        floor,
+        cap,
+    )
+}
+
+/// Compute the path-independent inverse-floater coupon schedule.
+///
+/// `c_i = clip(fixed_rate - leverage * L_i, floor, cap)`.
+pub fn inverse_floater_coupon_profile(
+    fixed_rate: f64,
+    floating_fixings: &[f64],
+    floor: f64,
+    cap: f64,
     leverage: f64,
+) -> Result<Vec<f64>, String> {
+    coupon_profile(
+        CouponProfileMode::InverseFloater { leverage },
+        fixed_rate,
+        floating_fixings,
+        floor,
+        cap,
+    )
+}
+
+enum CouponProfileMode {
+    Snowball { initial_coupon: f64 },
+    InverseFloater { leverage: f64 },
+}
+
+fn coupon_profile(
+    mode: CouponProfileMode,
+    fixed_rate: f64,
+    floating_fixings: &[f64],
+    floor: f64,
+    cap: f64,
 ) -> Result<Vec<f64>, String> {
     if !fixed_rate.is_finite() {
         return Err("fixed_rate must be finite".to_owned());
@@ -151,25 +181,32 @@ pub fn snowball_coupon_profile(
             "cap ({cap}) must be strictly greater than floor ({floor})"
         ));
     }
-    if !leverage.is_finite() || leverage <= 0.0 {
-        return Err(format!("leverage ({leverage}) must be positive and finite"));
-    }
-    if !is_inverse_floater && initial_coupon < 0.0 {
-        return Err(format!(
-            "initial_coupon ({initial_coupon}) must be non-negative for snowball variant"
-        ));
-    }
+    let (mut prev, leverage) = match mode {
+        CouponProfileMode::Snowball { initial_coupon } => {
+            if !initial_coupon.is_finite() || initial_coupon < 0.0 {
+                return Err(format!(
+                    "initial_coupon ({initial_coupon}) must be non-negative and finite"
+                ));
+            }
+            (Some(initial_coupon), None)
+        }
+        CouponProfileMode::InverseFloater { leverage } => {
+            if !leverage.is_finite() || leverage <= 0.0 {
+                return Err(format!("leverage ({leverage}) must be positive and finite"));
+            }
+            (None, Some(leverage))
+        }
+    };
 
-    let mut prev = initial_coupon;
     let mut out: Vec<f64> = Vec::with_capacity(floating_fixings.len());
     for &l_i in floating_fixings {
         if !l_i.is_finite() {
             return Err("floating_fixings must all be finite".to_owned());
         }
-        let raw = if is_inverse_floater {
-            fixed_rate - leverage * l_i
-        } else {
-            prev + fixed_rate - l_i
+        let raw = match (prev, leverage) {
+            (Some(previous), None) => previous + fixed_rate - l_i,
+            (None, Some(leverage)) => fixed_rate - leverage * l_i,
+            _ => unreachable!("coupon profile mode is internally consistent"),
         };
         let floored = raw.max(floor);
         let c = if cap.is_finite() {
@@ -178,7 +215,9 @@ pub fn snowball_coupon_profile(
             floored
         };
         out.push(c);
-        prev = c;
+        if prev.is_some() {
+            prev = Some(c);
+        }
     }
     Ok(out)
 }
@@ -322,9 +361,8 @@ mod tests {
 
     #[test]
     fn snowball_honors_cap_and_floor() {
-        let coupons =
-            snowball_coupon_profile(0.02, 0.05, &[0.01, 0.04, 0.03], 0.0, 0.10, false, 1.0)
-                .expect("valid snowball inputs");
+        let coupons = snowball_coupon_profile(0.02, 0.05, &[0.01, 0.04, 0.03], 0.0, 0.10)
+            .expect("valid snowball inputs");
         assert_eq!(coupons.len(), 3);
         for c in coupons {
             assert!((0.0..=0.10).contains(&c));
@@ -333,9 +371,8 @@ mod tests {
 
     #[test]
     fn snowball_inverse_floater_is_path_independent() {
-        let coupons =
-            snowball_coupon_profile(0.0, 0.06, &[0.01, 0.02], 0.0, f64::INFINITY, true, 2.0)
-                .expect("valid inverse-floater inputs");
+        let coupons = inverse_floater_coupon_profile(0.06, &[0.01, 0.02], 0.0, f64::INFINITY, 2.0)
+            .expect("valid inverse-floater inputs");
         // c_i = 0.06 - 2 * L_i
         assert!((coupons[0] - (0.06 - 2.0 * 0.01)).abs() < 1e-12);
         assert!((coupons[1] - (0.06 - 2.0 * 0.02)).abs() < 1e-12);
@@ -343,7 +380,7 @@ mod tests {
 
     #[test]
     fn snowball_rejects_cap_below_floor() {
-        let err = snowball_coupon_profile(0.0, 0.05, &[0.01], 0.10, 0.05, false, 1.0)
+        let err = snowball_coupon_profile(0.0, 0.05, &[0.01], 0.10, 0.05)
             .expect_err("cap <= floor must be rejected");
         assert!(err.contains("cap"));
     }

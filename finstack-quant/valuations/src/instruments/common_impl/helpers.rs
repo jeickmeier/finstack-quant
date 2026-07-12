@@ -92,7 +92,7 @@ where
     let flows = S::dated_cashflows(instrument, curves, as_of)?;
     let disc = curves.get_discount(discount_curve_id.as_str())?;
     // Use None to use the curve's day count for consistent pricing with metrics
-    npv(disc.as_ref(), as_of, None, &flows)
+    npv(disc.as_ref(), as_of, &flows)
 }
 
 /// Schedule → PV helper that uses the curve's own day count convention (raw f64).
@@ -111,7 +111,7 @@ where
 /// - **FRAs and same-day settling instruments**: Payment on as_of is part of value
 ///
 /// For holder-view semantics (excludes `date <= as_of`), see
-/// [`crate::instruments::common_impl::discountable::npv_by_date`].
+/// the holder-view term-loan discounting path.
 ///
 /// # Numerical Stability
 ///
@@ -454,12 +454,12 @@ pub(crate) fn build_with_metrics_dyn(
     context.set_instrument_overrides(
         instrument
             .pricing_overrides()
-            .map(crate::instruments::InstrumentPricingOverrides::from_pricing_overrides),
+            .map(crate::instruments::InstrumentPricingOverrides::from),
     );
     context.set_metric_overrides(
         instrument
             .pricing_overrides()
-            .map(crate::instruments::MetricPricingOverrides::from_pricing_overrides),
+            .map(crate::instruments::MetricPricingOverrides::from),
     );
     context.set_scenario_overrides(instrument.scenario_overrides().cloned());
 

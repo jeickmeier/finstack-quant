@@ -87,33 +87,33 @@ fn resolved_asw_forward_curve_id(bond: &Bond) -> Option<CurveId> {
 pub fn periods_per_year(
     freq: finstack_quant_core::dates::Tenor,
 ) -> finstack_quant_core::Result<f64> {
-    match freq.unit {
+    match freq.unit() {
         finstack_quant_core::dates::TenorUnit::Months => {
-            if freq.count == 0 {
+            if freq.count() == 0 {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
-            Ok(12.0 / (freq.count as f64))
+            Ok(12.0 / (freq.count() as f64))
         }
         finstack_quant_core::dates::TenorUnit::Days => {
-            if freq.count == 0 {
+            if freq.count() == 0 {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
             // Use 365 as approximate annual basis for frequency calculations
             // Note: This is NOT a day count convention - actual day count is handled
             // via the DayCount enum (Actual/360, Actual/365, Actual/Actual, etc.)
-            Ok(365.0 / (freq.count as f64))
+            Ok(365.0 / (freq.count() as f64))
         }
         finstack_quant_core::dates::TenorUnit::Years => {
-            if freq.count == 0 {
+            if freq.count() == 0 {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
-            Ok(1.0 / (freq.count as f64))
+            Ok(1.0 / (freq.count() as f64))
         }
         finstack_quant_core::dates::TenorUnit::Weeks => {
-            if freq.count == 0 {
+            if freq.count() == 0 {
                 return Err(finstack_quant_core::InputError::Invalid.into());
             }
-            Ok(52.0 / (freq.count as f64))
+            Ok(52.0 / (freq.count() as f64))
         }
     }
 }

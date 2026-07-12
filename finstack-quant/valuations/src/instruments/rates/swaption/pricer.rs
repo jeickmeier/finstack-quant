@@ -67,7 +67,7 @@ impl Pricer for SimpleSwaptionBlackPricer {
                 )
             })?;
             let disc = market
-                .get_discount(swaption.discount_curve_id.as_ref())
+                .get_discount(swaption.underlying_discount_curve_id().as_ref())
                 .map_err(|e| {
                     PricingError::missing_market_data_with_context(
                         e.to_string(),

@@ -9,7 +9,33 @@ callers can pass numpy-friendly grids without first constructing a
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Literal, Optional, TypedDict
+
+class _ArbitrageViolation(TypedDict):
+    type: Literal[
+        "butterfly",
+        "calendar_spread",
+        "local_vol_density",
+        "svi_moment_bound",
+        "svi_butterfly_condition",
+        "svi_calendar_spread",
+    ]
+    severity: Literal["negligible", "minor", "major", "critical"]
+    strike: float
+    expiry: float
+    adjacent_expiry: float | None
+    magnitude: float
+    value: float
+    message: str
+    description: str
+
+class _ArbitrageReport(TypedDict):
+    total_violations: int
+    passed: bool
+    by_severity: dict[Literal["negligible", "minor", "major", "critical"], int]
+    by_type: dict[Literal["butterfly", "calendar_spread", "local_vol_density"], int]
+    violations: list[_ArbitrageViolation]
+    elapsed_us: int
 
 __all__ = [
     "check_butterfly_grid",
@@ -24,7 +50,7 @@ def check_butterfly_grid(
     vols: list[list[float]],
     forward_prices: list[float],
     tolerance: float = 1e-6,
-) -> list[dict[str, Any]]:
+) -> list[_ArbitrageViolation]:
     """Check butterfly arbitrage via Durrleman's ``g(k)`` density condition.
 
     Parameters
@@ -43,7 +69,7 @@ def check_butterfly_grid(
 
     Returns
     -------
-    list[dict[str, Any]]
+    list[_ArbitrageViolation]
         One dict per violation with keys ``type``, ``severity``, ``strike``,
         ``expiry``, ``adjacent_expiry``, ``magnitude``, ``value``, ``message``,
         and ``description``.
@@ -70,7 +96,7 @@ def check_calendar_spread_grid(
     vols: list[list[float]],
     forward_prices: list[float],
     tolerance: float = 1e-6,
-) -> list[dict[str, Any]]:
+) -> list[_ArbitrageViolation]:
     """Check calendar-spread arbitrage (total-variance monotonicity in log-moneyness).
 
     Parameters
@@ -88,7 +114,7 @@ def check_calendar_spread_grid(
 
     Returns
     -------
-    list[dict[str, Any]]
+    list[_ArbitrageViolation]
         Violation dicts with the same schema as :func:`check_butterfly_grid`.
 
     Raises
@@ -108,7 +134,7 @@ def check_local_vol_density_grid(
     expiries: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
-) -> list[dict[str, Any]]:
+) -> list[_ArbitrageViolation]:
     """Check Dupire local-volatility density positivity on the implied-vol grid.
 
     Parameters
@@ -124,7 +150,7 @@ def check_local_vol_density_grid(
 
     Returns
     -------
-    list[dict[str, Any]]
+    list[_ArbitrageViolation]
         Violation dicts with the same schema as :func:`check_butterfly_grid`.
 
     Raises
@@ -150,7 +176,7 @@ def check_surface_grid(
     forward: Optional[float] = None,
     forward_prices: Optional[list[float]] = None,
     tolerance: float = 1e-6,
-) -> dict[str, Any]:
+) -> _ArbitrageReport:
     """Run butterfly, calendar-spread, and local-vol density checks together.
 
     Parameters
@@ -171,10 +197,9 @@ def check_surface_grid(
 
     Returns
     -------
-    dict[str, Any]
-        Summary dict with keys ``butterfly``, ``calendar_spread``, and
-        ``local_vol_density``, each a list of violation dicts, plus
-        ``is_arbitrage_free`` (``True`` when all three lists are empty).
+    _ArbitrageReport
+        Aggregate report with ``total_violations``, ``passed``,
+        ``by_severity``, ``by_type``, ``violations``, and ``elapsed_us``.
 
     Raises
     ------
@@ -186,7 +211,7 @@ def check_surface_grid(
     --------
     >>> from finstack_quant.core.market_data.arbitrage import check_surface_grid
     >>> report = check_surface_grid(strikes, expiries, vols, forward=100.0)  # doctest: +SKIP
-    >>> report["is_arbitrage_free"]  # doctest: +SKIP
+    >>> report["passed"]  # doctest: +SKIP
     True
     """
     ...

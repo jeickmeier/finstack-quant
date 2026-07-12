@@ -137,11 +137,11 @@ fn par_annuity(rate: f64, tenor_years: f64, m: f64) -> f64 {
 /// Examples: 6M → 2, 3M → 4, 1Y → 1, 1W → 52.
 #[inline]
 fn tenor_to_m(freq: Tenor) -> f64 {
-    match freq.unit {
-        TenorUnit::Years => 1.0 / freq.count as f64,
-        TenorUnit::Months => 12.0 / freq.count as f64,
-        TenorUnit::Weeks => 52.0 / freq.count as f64,
-        TenorUnit::Days => 360.0 / freq.count as f64,
+    match freq.unit() {
+        TenorUnit::Years => 1.0 / freq.count() as f64,
+        TenorUnit::Months => 12.0 / freq.count() as f64,
+        TenorUnit::Weeks => 52.0 / freq.count() as f64,
+        TenorUnit::Days => 360.0 / freq.count() as f64,
     }
 }
 

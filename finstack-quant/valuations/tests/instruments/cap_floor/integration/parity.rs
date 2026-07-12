@@ -238,8 +238,8 @@ fn test_parity_with_different_vols() {
 #[test]
 fn test_caplet_floorlet_parity() {
     let as_of = date!(2024 - 01 - 01);
-    let start = date!(2024 - 01 - 01);
-    let end = date!(2024 - 04 - 01);
+    let start = date!(2024 - 04 - 01);
+    let end = date!(2024 - 07 - 01);
     let strike = 0.05;
 
     let caplet = CapFloor {

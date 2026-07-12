@@ -59,7 +59,7 @@ fn ln_gamma(x: f64) -> f64 {
 #[pyfunction]
 #[pyo3(text_signature = "(x, df)")]
 fn student_t_cdf(x: f64, df: f64) -> PyResult<f64> {
-    special_functions::try_student_t_cdf(x, df).map_err(core_to_py)
+    special_functions::student_t_cdf(x, df).map_err(core_to_py)
 }
 
 /// Inverse Student-t CDF (quantile function).
@@ -68,7 +68,7 @@ fn student_t_cdf(x: f64, df: f64) -> PyResult<f64> {
 #[pyfunction]
 #[pyo3(text_signature = "(p, df)")]
 fn student_t_inv_cdf(p: f64, df: f64) -> PyResult<f64> {
-    special_functions::try_student_t_inv_cdf(p, df).map_err(core_to_py)
+    special_functions::student_t_inv_cdf(p, df).map_err(core_to_py)
 }
 
 // ---------------------------------------------------------------------------

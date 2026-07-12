@@ -28,7 +28,7 @@ if (!existsSync(WASM_BG)) {
 
 const facade = await import('../../index.js');
 const init = facade.default;
-const { core } = facade;
+const { core, valuations } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
@@ -106,6 +106,26 @@ test('ForwardCurve exposes resetLag without changing prior positional arguments'
     3
   );
   assert.equal(curve.resetLag, 3);
+});
+
+test('ForwardCurve.fromOptions provides an unambiguous named factory', () => {
+  const curve = core.ForwardCurve.fromOptions({
+    id: 'USD-SOFR',
+    tenor: 0.25,
+    baseDate: '2025-01-01',
+    knots: new Float64Array([0, 0.04, 1, 0.045]),
+    dayCount: 'act_360',
+  });
+  assert.equal(curve.rate(1), 0.045);
+});
+
+test('coupon profile variants use separate explicit entrypoints', () => {
+  const snowball = valuations.snowballCouponProfile(0.02, 0.05, [0.01, 0.04], 0, 0.1);
+  const inverse = valuations.inverseFloaterCouponProfile(0.05, [0.01, 0.02], 0, 0.1, 2);
+  assert.ok(Math.abs(snowball[0] - 0.06) < 1e-12);
+  assert.ok(Math.abs(snowball[1] - 0.07) < 1e-12);
+  assert.ok(Math.abs(inverse[0] - 0.03) < 1e-12);
+  assert.ok(Math.abs(inverse[1] - 0.01) < 1e-12);
 });
 
 test('VolCube canonical camelCase methods exist at runtime', () => {

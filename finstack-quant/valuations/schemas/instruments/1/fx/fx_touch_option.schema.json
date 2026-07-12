@@ -144,6 +144,14 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Unique instrument identifier"
             },
+            "monitoring_start_date": {
+              "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_touch`.",
+              "format": "date",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "observed_touch": {
               "description": "Observed barrier event state for expired valuations.\n\n`Some(true)` means the barrier was touched during the option life,\n`Some(false)` means it was observed not to have touched, and `None`\nmeans the historical touch state is unavailable.\n\nThis is only required once the option has expired. Without it, a\ntouched-and-reverted path cannot be distinguished from an untouched path\nusing the terminal spot alone.",
               "type": [

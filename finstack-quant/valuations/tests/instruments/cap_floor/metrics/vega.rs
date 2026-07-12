@@ -5,7 +5,7 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
@@ -340,7 +340,8 @@ fn test_hull_white_1f_surface_shock_moves_pv_and_vega() {
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let vol_surface = build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL");
+    let vol_surface =
+        build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL").with_quote_type(VolQuoteType::Normal);
     let market = MarketContext::new()
         .insert(disc_curve)
         .insert(fwd_curve)

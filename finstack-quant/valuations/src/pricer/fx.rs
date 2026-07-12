@@ -59,10 +59,6 @@ pub(crate) fn register_fx_pricers(registry: &mut PricerRegistry) {
         ModelKey::FxBarrierBSContinuous,
         crate::instruments::fx::fx_barrier_option::pricer::FxBarrierOptionAnalyticalPricer,
     );
-    // Vanna-Volga remains an internal helper until market smile quotes are part
-    // of the instrument/market contract. Do not register a standard route that
-    // cannot be parameterized per trade.
-
     // FX Digital Option
     register_generic!(
         registry,

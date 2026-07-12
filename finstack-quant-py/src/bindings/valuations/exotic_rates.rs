@@ -106,9 +106,7 @@ fn tarn_coupon_profile<'py>(
 // Snowball / Inverse Floater
 // ---------------------------------------------------------------------------
 
-/// Compute the coupon schedule for a snowball note or inverse floater.
-///
-/// For ``is_inverse_floater = False`` (snowball):
+/// Compute the coupon schedule for a snowball note.
 ///
 /// ```text
 /// c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)
@@ -116,19 +114,10 @@ fn tarn_coupon_profile<'py>(
 ///
 /// with ``c_0 = initial_coupon``.
 ///
-/// For ``is_inverse_floater = True``:
-///
-/// ```text
-/// c_i = clip(fixed_rate - leverage * L_i, floor, cap)
-/// ```
-///
-/// (the path is not used — ``initial_coupon`` is ignored).
-///
 /// Parameters
 /// ----------
 /// initial_coupon : float
-///     Initial coupon ``c_0`` for the snowball variant (ignored for
-///     inverse floater).  Must be non-negative.
+///     Initial coupon ``c_0``. Must be non-negative.
 /// fixed_rate : float
 ///     Fixed rate component.
 /// floating_fixings : list[float]
@@ -138,26 +127,17 @@ fn tarn_coupon_profile<'py>(
 /// cap : float
 ///     Per-period cap; must be strictly greater than ``floor``.  Pass
 ///     ``float('inf')`` for an uncapped coupon.
-/// is_inverse_floater : bool
-///     If ``True``, use the inverse-floater formula; else snowball.
-/// leverage : float
-///     Leverage on the floating rate (used for the inverse floater;
-///     typically ``1.0`` for snowball).  Must be strictly positive.
-///
 /// Returns
 /// -------
 /// list[float]
 ///     Coupon for each period in order.
 #[pyfunction]
-#[pyo3(signature = (initial_coupon, fixed_rate, floating_fixings, floor, cap, is_inverse_floater, leverage=1.0))]
 fn snowball_coupon_profile(
     initial_coupon: f64,
     fixed_rate: f64,
     floating_fixings: Vec<f64>,
     floor: f64,
     cap: f64,
-    is_inverse_floater: bool,
-    leverage: f64,
 ) -> PyResult<Vec<f64>> {
     coupon_profiles::snowball_coupon_profile(
         initial_coupon,
@@ -165,7 +145,24 @@ fn snowball_coupon_profile(
         &floating_fixings,
         floor,
         cap,
-        is_inverse_floater,
+    )
+    .map_err(display_to_py)
+}
+
+/// Compute a path-independent inverse-floater coupon schedule.
+#[pyfunction]
+fn inverse_floater_coupon_profile(
+    fixed_rate: f64,
+    floating_fixings: Vec<f64>,
+    floor: f64,
+    cap: f64,
+    leverage: f64,
+) -> PyResult<Vec<f64>> {
+    coupon_profiles::inverse_floater_coupon_profile(
+        fixed_rate,
+        &floating_fixings,
+        floor,
+        cap,
         leverage,
     )
     .map_err(display_to_py)
@@ -273,6 +270,7 @@ fn callable_range_accrual_accrued(
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(tarn_coupon_profile, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(snowball_coupon_profile, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(inverse_floater_coupon_profile, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(cms_spread_option_intrinsic, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(callable_range_accrual_accrued, m)?)?;
     Ok(())

@@ -187,7 +187,9 @@ fn test_vol_cube_vol_at_grid_node() {
     let cube = VolCube::from_grid("TEST", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
     let strike = 0.03;
     let vol = cube.vol(1.0, 5.0, strike).unwrap();
-    let expected = p.implied_vol_lognormal(fwd, strike, 1.0);
+    let expected = p
+        .implied_vol_lognormal(fwd, strike, 1.0)
+        .expect("valid checked inputs");
     assert!(
         (vol - expected).abs() < 1e-14,
         "grid-node vol {vol} != direct SABR {expected}"

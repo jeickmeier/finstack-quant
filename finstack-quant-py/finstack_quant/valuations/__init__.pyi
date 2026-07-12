@@ -65,192 +65,16 @@ from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import correlation as correlation
 from finstack_quant.valuations import instruments as instruments
 from finstack_quant.valuations import models as models
-from finstack_quant.valuations.envelope import (
-    BaseCorrelationCurvePrior as BaseCorrelationCurvePrior,
-    BaseCorrelationStep as BaseCorrelationStep,
-    BasisSpreadCurvePrior as BasisSpreadCurvePrior,
-    BondCleanPriceDatum as BondCleanPriceDatum,
-    BondFixedRateBulletCleanPrice as BondFixedRateBulletCleanPrice,
-    BondFixedRateBulletOas as BondFixedRateBulletOas,
-    BondFixedRateBulletYtm as BondFixedRateBulletYtm,
-    BondFixedRateBulletZSpread as BondFixedRateBulletZSpread,
-    BondOasDatum as BondOasDatum,
-    BondYtmDatum as BondYtmDatum,
-    BondZSpreadDatum as BondZSpreadDatum,
-    CalibrationEnvelope as CalibrationEnvelope,
-    CalibrationPlan as CalibrationPlan,
-    CalibrationStep as CalibrationStep,
-    CapFloorHullWhiteStep as CapFloorHullWhiteStep,
-    CapFloorVolDatum as CapFloorVolDatum,
-    CapFloorVolPayload as CapFloorVolPayload,
-    CapFloorVolQuote as CapFloorVolQuote,
-    CdsConventionKey as CdsConventionKey,
-    CdsParSpread as CdsParSpread,
-    CdsParSpreadDatum as CdsParSpreadDatum,
-    CdsTrancheDatum as CdsTrancheDatum,
-    CdsTrancheQuote as CdsTrancheQuote,
-    CdsUpfront as CdsUpfront,
-    CdsUpfrontDatum as CdsUpfrontDatum,
-    CollateralDatum as CollateralDatum,
-    CreditIndexDatum as CreditIndexDatum,
-    DatePillar as DatePillar,
-    DiscountCurvePrior as DiscountCurvePrior,
-    DiscountStep as DiscountStep,
-    DividendScheduleDatum as DividendScheduleDatum,
-    FixingSeriesDatum as FixingSeriesDatum,
-    ForwardCurvePrior as ForwardCurvePrior,
-    ForwardStep as ForwardStep,
-    FxForwardOutright as FxForwardOutright,
-    FxForwardOutrightDatum as FxForwardOutrightDatum,
-    FxOptionVanilla as FxOptionVanilla,
-    FxOptionVanillaDatum as FxOptionVanillaDatum,
-    FxSpotDatum as FxSpotDatum,
-    FxSwapOutright as FxSwapOutright,
-    FxSwapOutrightDatum as FxSwapOutrightDatum,
-    FxVolSurfaceDatum as FxVolSurfaceDatum,
-    HazardCurvePrior as HazardCurvePrior,
-    HazardStep as HazardStep,
-    HullWhiteStep as HullWhiteStep,
-    InflationCurvePrior as InflationCurvePrior,
-    InflationFixingsDatum as InflationFixingsDatum,
-    InflationStep as InflationStep,
-    InflationSwapDatum as InflationSwapDatum,
-    InflationSwapPayload as InflationSwapPayload,
-    InflationSwapQuote as InflationSwapQuote,
-    MarketDatum as MarketDatum,
-    MarketQuote as MarketQuote,
-    OptionVolDatum as OptionVolDatum,
-    OptionVolPayload as OptionVolPayload,
-    OptionVolQuote as OptionVolQuote,
-    ParametricCurvePrior as ParametricCurvePrior,
-    ParametricStep as ParametricStep,
-    Pillar as Pillar,
-    PriceCurvePrior as PriceCurvePrior,
-    PriceDatum as PriceDatum,
-    PriorMarketObject as PriorMarketObject,
-    RateDeposit as RateDeposit,
-    RateFra as RateFra,
-    RateFutures as RateFutures,
-    RateQuoteDepositDatum as RateQuoteDepositDatum,
-    RateQuoteFraDatum as RateQuoteFraDatum,
-    RateQuoteFuturesDatum as RateQuoteFuturesDatum,
-    RateQuoteSwapDatum as RateQuoteSwapDatum,
-    RateSwap as RateSwap,
-    StudentTStep as StudentTStep,
-    SviSurfaceStep as SviSurfaceStep,
-    SwaptionVolDatum as SwaptionVolDatum,
-    SwaptionVolPayload as SwaptionVolPayload,
-    SwaptionVolQuote as SwaptionVolQuote,
-    SwaptionVolStep as SwaptionVolStep,
-    Tenor as Tenor,
-    TenorPillar as TenorPillar,
-    VolCubeDatum as VolCubeDatum,
-    VolSurfacePrior as VolSurfacePrior,
-    VolSurfaceStep as VolSurfaceStep,
-    VolatilityIndexCurvePrior as VolatilityIndexCurvePrior,
-    XccyBasisStep as XccyBasisStep,
-    XccyBasisSwapDatum as XccyBasisSwapDatum,
-    XccyBasisSwapQuote as XccyBasisSwapQuote,
-    YoyInflationSwapDatum as YoyInflationSwapDatum,
-    YoyInflationSwapPayload as YoyInflationSwapPayload,
-    YoyInflationSwapQuote as YoyInflationSwapQuote,
-)
+from finstack_quant.valuations.envelope import CalibrationEnvelope as CalibrationEnvelope
 
 __all__ = [
     "correlation",
     "instruments",
     "models",
     "ValuationResult",
-    "BaseCorrelationCurvePrior",
-    "BaseCorrelationStep",
-    "BasisSpreadCurvePrior",
-    "BondCleanPriceDatum",
-    "BondFixedRateBulletCleanPrice",
-    "BondFixedRateBulletOas",
-    "BondFixedRateBulletYtm",
-    "BondFixedRateBulletZSpread",
-    "BondOasDatum",
-    "BondYtmDatum",
-    "BondZSpreadDatum",
     "CalibrationEnvelope",
     "CalibrationEnvelopeError",
-    "CalibrationPlan",
     "CalibrationResult",
-    "CalibrationStep",
-    "CapFloorHullWhiteStep",
-    "CapFloorVolDatum",
-    "CapFloorVolPayload",
-    "CapFloorVolQuote",
-    "CdsConventionKey",
-    "CdsParSpread",
-    "CdsParSpreadDatum",
-    "CdsTrancheDatum",
-    "CdsTrancheQuote",
-    "CdsUpfront",
-    "CdsUpfrontDatum",
-    "CollateralDatum",
-    "CreditIndexDatum",
-    "DatePillar",
-    "DiscountCurvePrior",
-    "DiscountStep",
-    "DividendScheduleDatum",
-    "FixingSeriesDatum",
-    "ForwardCurvePrior",
-    "ForwardStep",
-    "FxForwardOutright",
-    "FxForwardOutrightDatum",
-    "FxOptionVanilla",
-    "FxOptionVanillaDatum",
-    "FxSpotDatum",
-    "FxSwapOutright",
-    "FxSwapOutrightDatum",
-    "FxVolSurfaceDatum",
-    "HazardCurvePrior",
-    "HazardStep",
-    "HullWhiteStep",
-    "InflationCurvePrior",
-    "InflationFixingsDatum",
-    "InflationStep",
-    "InflationSwapDatum",
-    "InflationSwapPayload",
-    "InflationSwapQuote",
-    "MarketDatum",
-    "MarketQuote",
-    "OptionVolDatum",
-    "OptionVolPayload",
-    "OptionVolQuote",
-    "ParametricCurvePrior",
-    "ParametricStep",
-    "Pillar",
-    "PriceCurvePrior",
-    "PriceDatum",
-    "PriorMarketObject",
-    "RateDeposit",
-    "RateFra",
-    "RateFutures",
-    "RateQuoteDepositDatum",
-    "RateQuoteFraDatum",
-    "RateQuoteFuturesDatum",
-    "RateQuoteSwapDatum",
-    "RateSwap",
-    "StudentTStep",
-    "SviSurfaceStep",
-    "SwaptionVolDatum",
-    "SwaptionVolPayload",
-    "SwaptionVolQuote",
-    "SwaptionVolStep",
-    "Tenor",
-    "TenorPillar",
-    "VolCubeDatum",
-    "VolSurfacePrior",
-    "VolSurfaceStep",
-    "VolatilityIndexCurvePrior",
-    "XccyBasisStep",
-    "XccyBasisSwapDatum",
-    "XccyBasisSwapQuote",
-    "YoyInflationSwapDatum",
-    "YoyInflationSwapPayload",
-    "YoyInflationSwapQuote",
     "validate_calibration_json",
     "calibrate",
     "dry_run",
@@ -260,6 +84,7 @@ __all__ = [
     "merton_jump_cos_price",
     "tarn_coupon_profile",
     "snowball_coupon_profile",
+    "inverse_floater_coupon_profile",
     "cms_spread_option_intrinsic",
     "callable_range_accrual_accrued",
     "bs_price",
@@ -275,12 +100,6 @@ __all__ = [
     "SabrSmile",
     "SabrCalibrator",
     "instrument_cashflows",
-    "instrument_cashflows_json",
-    "validate_instrument_json",
-    "price_instrument",
-    "price_instrument_with_metrics",
-    "list_standard_metrics",
-    "list_standard_metrics_grouped",
 ]
 
 class ValuationResult:
@@ -501,150 +320,6 @@ class ValuationResult:
         ''
         """
         ...
-
-def validate_instrument_json(json: str) -> str:
-    """Validate tagged instrument JSON and return canonical pretty-printed JSON.
-
-    Parameters
-    ----------
-    json : str
-        Raw tagged instrument JSON string.
-
-    Returns
-    -------
-    str
-        Canonical, pretty-printed JSON suitable for :func:`price_instrument`.
-
-    Raises
-    ------
-    ValueError
-        If the instrument JSON is invalid.
-    """
-    ...
-
-def price_instrument(
-    instrument_json: str,
-    market: MarketContext | str,
-    as_of: str,
-    model: str = "default",
-) -> str:
-    """Price an instrument from tagged JSON, returning a ``ValuationResult`` JSON.
-
-    Parameters
-    ----------
-    instrument_json : str
-        Tagged instrument JSON.
-    market : MarketContext or str
-        ``MarketContext`` instance or JSON string.
-    as_of : str
-        ISO 8601 valuation date.
-    model : str, default "default"
-        Model key (e.g. ``"default"``, ``"discounting"``,
-        ``"hazard_rate"``, ``"black76"``).
-
-    Returns
-    -------
-    str
-        JSON-serialized ``ValuationResult``.
-    """
-    ...
-
-def price_instrument_with_metrics(
-    instrument_json: str,
-    market: MarketContext | str,
-    as_of: str,
-    model: str = "default",
-    metrics: list[str] = [],
-    pricing_options: str | None = None,
-    market_history: str | None = None,
-) -> str:
-    """Price an instrument with explicit metric requests.
-
-    Parameters
-    ----------
-    instrument_json : str
-        Tagged instrument JSON.
-    market : MarketContext or str
-        ``MarketContext`` instance or JSON string.
-    as_of : str
-        ISO 8601 valuation date.
-    model : str, default "default"
-        Model key string.
-    metrics : list[str], default []
-        Metric identifiers to compute (e.g.
-        ``["ytm", "dv01", "modified_duration"]``).
-    pricing_options : str, optional
-        Optional JSON string of ``MetricPricingOverrides``.
-    market_history : str, optional
-        Optional JSON string of ``MarketHistory`` scenarios
-        required by ``hvar`` and ``expected_shortfall`` metrics.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``ValuationResult`` including requested metrics.
-    """
-    ...
-
-def list_standard_metrics() -> list[str]:
-    """Return all metric IDs in the standard metric registry (sorted).
-
-    Returns
-    -------
-    list[str]
-        Sorted list of fully qualified metric keys (e.g.
-        ``"bucketed_dv01::USD-OIS::10y"``, ``"cs01::BOND_A"``).
-    """
-    ...
-
-def list_standard_metrics_grouped() -> dict[str, list[str]]:
-    """Return standard metrics organized by human-readable group name.
-
-    Returns
-    -------
-    dict[str, list[str]]
-        Mapping from group label (e.g. ``"Rates sensitivities"``) to sorted
-        metric ID lists for that group.
-    """
-    ...
-
-def instrument_cashflows_json(
-    instrument_json: str,
-    market: MarketContext | str,
-    as_of: str,
-    model: str = "discounting",
-) -> str:
-    """Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
-
-    Supports ``model in {"discounting", "hazard_rate"}``. The envelope's
-    ``total_pv`` reconciles with the instrument's ``base_value`` for the
-    supported model-instrument pairs.
-
-    Parameters
-    ----------
-    instrument_json : str
-        Tagged instrument JSON.
-    market : MarketContext or str
-        ``MarketContext`` instance or JSON string.
-    as_of : str
-        ISO 8601 valuation date.
-    model : str, default "discounting"
-        ``"discounting"`` (DF only) or ``"hazard_rate"`` (adds
-        survival probability, conditional default probability, and
-        recovery-adjusted principal PV).
-
-    Returns
-    -------
-    str
-        JSON-serialized ``InstrumentCashflowEnvelope``.
-
-    Raises
-    ------
-    ValueError
-        If ``model`` is unsupported or the instrument type isn't
-        priced under that model.
-    """
-    ...
 
 def instrument_cashflows(
     instrument_json: str,
@@ -1918,16 +1593,11 @@ def snowball_coupon_profile(
     floating_fixings: list[float],
     floor: float,
     cap: float,
-    is_inverse_floater: bool,
-    leverage: float = 1.0,
 ) -> list[float]:
-    """Compute a snowball or inverse-floater coupon schedule.
+    """Compute a snowball coupon schedule.
 
     Snowball: ``c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)``
     with ``c_0 = initial_coupon``.
-
-    Inverse floater: ``c_i = clip(fixed_rate - leverage * L_i, floor, cap)``
-    (``initial_coupon`` ignored).
 
     Pass ``float('inf')`` as ``cap`` for an uncapped coupon.
 
@@ -1953,6 +1623,16 @@ def snowball_coupon_profile(
     list[float]
         Coupon schedule, one per period.
     """
+    ...
+
+def inverse_floater_coupon_profile(
+    fixed_rate: float,
+    floating_fixings: list[float],
+    floor: float,
+    cap: float,
+    leverage: float,
+) -> list[float]:
+    """Compute a path-independent inverse-floater coupon schedule."""
     ...
 
 def cms_spread_option_intrinsic(

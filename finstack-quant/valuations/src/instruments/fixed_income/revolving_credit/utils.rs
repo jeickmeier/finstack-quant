@@ -241,11 +241,11 @@ pub(super) fn compute_reset_period_end(
     let reset_freq = spec.index_tenor.as_ref().unwrap_or(&spec.reset_freq);
     // Compute unadjusted end date based on frequency
     use finstack_quant_core::dates::TenorUnit;
-    let mut reset_end = match reset_freq.unit {
-        TenorUnit::Months => reset_date.add_months(reset_freq.count as i32),
-        TenorUnit::Years => reset_date.add_months(reset_freq.count as i32 * 12),
-        TenorUnit::Weeks => reset_date + time::Duration::weeks(reset_freq.count as i64),
-        TenorUnit::Days => reset_date + time::Duration::days(reset_freq.count as i64),
+    let mut reset_end = match reset_freq.unit() {
+        TenorUnit::Months => reset_date.add_months(reset_freq.count() as i32),
+        TenorUnit::Years => reset_date.add_months(reset_freq.count() as i32 * 12),
+        TenorUnit::Weeks => reset_date + time::Duration::weeks(reset_freq.count() as i64),
+        TenorUnit::Days => reset_date + time::Duration::days(reset_freq.count() as i64),
     };
 
     if spec.end_of_month && reset_date == reset_date.end_of_month() {

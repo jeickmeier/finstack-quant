@@ -73,7 +73,7 @@
 //! let continuous_rate = (1.0 + rate).ln();
 //! let curve = FlatCurve::new(continuous_rate, base, DayCount::Act365F, "EXAMPLE");
 //!
-//! let present_value = npv(&curve, base, Some(DayCount::Act365F), &[cf1, cf2])?;
+//! let present_value = npv(&curve, base, &[cf1, cf2])?;
 //! assert!(present_value.amount() > 0.0);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
@@ -119,8 +119,8 @@ mod primitives;
 mod xirr;
 
 pub use discounting::{
-    npv, npv_amounts, npv_amounts_with_ctx, npv_prediscounted_money, npv_with_ctx,
-    npv_with_options, Discountable, NpvOptions,
+    npv, npv_amounts, npv_amounts_with_ctx, npv_with_ctx, npv_with_options,
+    sum_prediscounted_money, Discountable, NpvOptions,
 };
 pub use primitives::{CFKind, CashFlow};
 pub use xirr::{irr, xirr, xirr_with_daycount, xirr_with_daycount_ctx};

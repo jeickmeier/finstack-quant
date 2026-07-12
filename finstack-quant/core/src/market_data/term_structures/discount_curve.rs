@@ -1341,6 +1341,43 @@ pub enum ValidationMode {
     },
 }
 
+impl ValidationMode {
+    /// Resolve the public binding preset and its optional forward-rate floor.
+    ///
+    /// Bindings expose the two safe presets by name while keeping [`Self::Raw`]
+    /// available only to canonical Rust callers.
+    pub fn from_preset(name: &str, forward_floor: Option<f64>) -> crate::Result<Self> {
+        match name {
+            "market_standard" => {
+                if forward_floor.is_some() {
+                    return Err(crate::Error::Validation(
+                        "forward_floor is only valid with validation_mode='negative_rate_friendly'"
+                            .to_string(),
+                    ));
+                }
+                Ok(Self::MarketStandard)
+            }
+            "negative_rate_friendly" => {
+                let forward_floor = forward_floor.ok_or_else(|| {
+                    crate::Error::Validation(
+                        "forward_floor is required with validation_mode='negative_rate_friendly'"
+                            .to_string(),
+                    )
+                })?;
+                if !forward_floor.is_finite() {
+                    return Err(crate::Error::Validation(
+                        "forward_floor must be finite".to_string(),
+                    ));
+                }
+                Ok(Self::NegativeRateFriendly { forward_floor })
+            }
+            other => Err(crate::Error::Validation(format!(
+                "unknown DiscountCurve validation_mode {other:?}; expected 'market_standard' or 'negative_rate_friendly'"
+            ))),
+        }
+    }
+}
+
 /// Fluent builder for [`DiscountCurve`].
 ///
 /// Typical usage chains `base_date`, `knots`, and `interp` (optional)
@@ -1533,7 +1570,7 @@ impl DiscountCurveBuilder {
     /// This is an internal optimization for calibration solvers.
     /// For general use, prefer [`Self::build`] which includes full validation.
     #[doc(hidden)]
-    pub fn build_for_solver(self) -> crate::Result<DiscountCurve> {
+    pub fn build_for_solver(mut self) -> crate::Result<DiscountCurve> {
         let base = self.base.ok_or(crate::error::InputError::Invalid)?;
         if self.points.len() < 2 {
             return Err(crate::error::InputError::TooFewPoints.into());
@@ -1543,35 +1580,8 @@ impl DiscountCurveBuilder {
             return Err(crate::error::InputError::NonPositiveValue.into());
         }
 
-        let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) = split_points(self.points);
-
-        let knots = knots_vec.into_boxed_slice();
-        let dfs = dfs_vec.into_boxed_slice();
-
-        let interp = build_interp_input_error(
-            self.style,
-            knots.clone(),
-            dfs.clone(),
-            self.extrapolation,
-            true,
-        )?;
-
-        Ok(DiscountCurve {
-            id: self.id,
-            base,
-            day_count: self.day_count,
-            knots,
-            dfs,
-            interp,
-            style: self.style,
-            extrapolation: self.extrapolation,
-            min_forward_rate: self.min_forward_rate,
-            allow_non_monotonic: self.allow_non_monotonic,
-            min_forward_tenor: self.min_forward_tenor,
-            rate_calibration: self.rate_calibration,
-            calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
-            fx_policy: self.fx_policy,
-        })
+        let (knots, dfs) = split_points(std::mem::take(&mut self.points));
+        self.finish(base, knots, dfs)
     }
 
     /// Validate input and create the [`DiscountCurve`].
@@ -1595,7 +1605,8 @@ impl DiscountCurveBuilder {
             return Err(crate::error::InputError::NonPositiveValue.into());
         }
 
-        let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) = split_points(self.points);
+        let (knots_vec, dfs_vec): (Vec<f64>, Vec<f64>) =
+            split_points(std::mem::take(&mut self.points));
         crate::math::interp::utils::validate_knots(&knots_vec)?;
 
         if !self.allow_non_monotonic {
@@ -1606,8 +1617,12 @@ impl DiscountCurveBuilder {
             validate_forward_rates(&knots_vec, &dfs_vec, min_fwd)?;
         }
 
-        let knots = knots_vec.into_boxed_slice();
-        let dfs = dfs_vec.into_boxed_slice();
+        self.finish(base, knots_vec, dfs_vec)
+    }
+
+    fn finish(self, base: Date, knots: Vec<f64>, dfs: Vec<f64>) -> crate::Result<DiscountCurve> {
+        let knots = knots.into_boxed_slice();
+        let dfs = dfs.into_boxed_slice();
 
         let interp = build_interp_input_error(
             self.style,

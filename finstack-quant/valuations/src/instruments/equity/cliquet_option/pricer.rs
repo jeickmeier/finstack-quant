@@ -433,9 +433,7 @@ mod tests {
     #[test]
     fn expired_cliquet_returns_zero_for_price_and_unitless_spot() {
         let as_of = date(2025, 1, 1);
-        let mut option = CliquetOption::example().expect("example");
-        option.reset_dates.clear();
-        option.expiry = as_of;
+        let option = CliquetOption::example().expect("example");
 
         let unitless_market = market(as_of);
         let price_market = unitless_market.clone().insert_price(

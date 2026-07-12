@@ -330,20 +330,20 @@ fn test_vega_matches_formula() {
     // Assert
     // Vega must differentiate the same PV as `compute_pv`, which uses the
     // day-count `time_elapsed_fraction` (W-32), not an observation-count weight.
-    // W-34: vega is anchored to the STRIKE vol `σ_K = √(strike_variance)` — the
-    // codebase's vega-notional convention — not the forward implied vol, so the
-    // vega / variance-vega chain-rule identity closes with a single σ.
+    // PV vega differentiates the remaining forward-variance leg, so its
+    // volatility base is the current forward vol. Strike vol is reserved for
+    // quoted-notional conversion.
     let remaining_fraction = 1.0 - swap.time_elapsed_fraction(as_of);
     let df = ctx
         .get_discount(DISC_ID)
         .unwrap()
         .df_between_dates(as_of, swap.maturity)
         .unwrap();
-    let strike_vol = swap.strike_variance.sqrt();
+    let forward_vol = swap.remaining_forward_variance(&ctx, as_of).unwrap().sqrt();
     let expected = df
         * 2.0
         * swap.notional.amount()
-        * strike_vol
+        * forward_vol
         * 0.01
         * remaining_fraction
         * swap.side.sign();
@@ -351,11 +351,8 @@ fn test_vega_matches_formula() {
     assert!((vega - expected).abs() < LOOSE_EPSILON);
 }
 
-/// W-34: the vega / variance-vega chain-rule identity
-/// `vega = variance_vega · 2·σ_K · 0.01` must hold exactly, with `σ_K` the
-/// strike vol. Before the fix, `vega` used the forward implied vol while
-/// `variance_vega` (and the vega-notional conversions) used the strike vol, so
-/// no single `σ` closed the identity.
+/// The vega / variance-vega chain-rule identity uses the current remaining
+/// forward volatility because both metrics differentiate the PV axis.
 #[test]
 fn test_vega_and_variance_vega_satisfy_chain_rule_identity() {
     let mut swap = sample_swap(PayReceive::Receive);
@@ -375,11 +372,11 @@ fn test_vega_and_variance_vega_satisfy_chain_rule_identity() {
         .unwrap()
         .measures[MetricId::VarianceVega.as_str()];
 
-    let strike_vol = swap.strike_variance.sqrt();
-    let implied = variance_vega * 2.0 * strike_vol * 0.01;
+    let forward_vol = swap.remaining_forward_variance(&ctx, as_of).unwrap().sqrt();
+    let implied = variance_vega * 2.0 * forward_vol * 0.01;
     assert!(
         (vega - implied).abs() <= LOOSE_EPSILON * vega.abs().max(1.0),
-        "vega ({vega}) must equal variance_vega * 2σ_K * 0.01 ({implied})"
+        "vega ({vega}) must equal variance_vega * 2σ_forward * 0.01 ({implied})"
     );
 }
 

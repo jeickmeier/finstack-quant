@@ -188,6 +188,13 @@
           "format": "date",
           "type": "string"
         },
+        "last_paid_accrual_end": {
+          "description": "End date of the latest accrual period whose delayed P&I payment has\nsettled and is already reflected in `current_face`.\n\nWhen omitted, pricing infers the latest paid period from the agency\npayment-delay rule and `as_of`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "maturity": {
           "description": "Legal maturity date.",
           "format": "date",
@@ -1731,6 +1738,17 @@
           "description": "Option expiry date",
           "format": "date",
           "type": "string"
+        },
+        "expiry_fixing": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -3723,8 +3741,40 @@
     },
     "CashFlowMeta": {
       "additionalProperties": false,
-      "description": "Metadata for cashflow schedules (calendar IDs, facility limits, issue date).\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
+      "description": "Metadata for cashflow schedules (calendar IDs, facility limits, contract dates,\nand true accrual periods).\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
       "properties": {
+        "accrual_day_counts": {
+          "default": [],
+          "description": "Per-flow day-count conventions aligned with the sorted flow vector.\n\nThis preserves heterogeneous legs and avoids applying the schedule's\nrepresentative day count to every coupon during accrual calculation.",
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": "array"
+        },
+        "accrual_periods": {
+          "default": [],
+          "description": "Contractual accrual periods aligned with the sorted flow vector.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "type": "array"
+        },
         "calendar_ids": {
           "description": "Holiday calendar IDs used for schedule adjustments.",
           "items": {
@@ -3745,6 +3795,14 @@
         },
         "issue_date": {
           "description": "Issue date of the instrument, when known.\n\nUsed by the accrual engine to establish the first coupon period start\ndate precisely, avoiding the inverse day count approximation that can\nbe off by 1-2 days.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "maturity_date": {
+          "description": "Contractual maturity date, distinct from an adjusted final payment date.",
           "format": "date",
           "type": [
             "string",
@@ -5413,7 +5471,7 @@
       "type": "object"
     },
     "CommodityOption": {
-      "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\n# Bermudan Exercise Status\n\nBermudan exercise is currently **rejected**. The prior American-style\napproximation was removed because it materially overstates option value\nfor sparse exercise schedules.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
+      "description": "Commodity option (option on commodity forward or spot).\n\n# Pricing\n\n- **European options**: Black-76 model using the forward price from the `PriceCurve`\n- **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from\n  the forward/spot relationship\n\n# American Option Assumptions\n\nFor American exercise, the model requires a spot price to build the binomial tree.\nIf `spot_id` is provided, it uses that spot price. Otherwise, the forward\nprice is used as a proxy for spot, which may underestimate early exercise value.\nThe convenience yield (cost-of-carry) is implied from the forward/spot ratio:\n`q = r - ln(F/S)/T`\n\nBermudan exercise uses the configured exercise schedule and a binomial\ntree. The schedule must contain at least one strictly future date when the\noption is priced before expiry.\n\n# Forward Price Retrieval\n\nForward prices are retrieved from a `PriceCurve` (not a `ForwardCurve`).\nThe curve must be added via `MarketContext::insert_price_curve()`.\nIf `quoted_forward` is provided, it overrides the curve lookup.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -8282,6 +8340,14 @@
             "null"
           ]
         },
+        "settlement_price": {
+          "description": "Official settlement price fixed after the last trading date.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Index spot price identifier for fair value calculation."
@@ -9752,6 +9818,14 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier"
         },
+        "monitoring_start_date": {
+          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_barrier_breached`.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount in foreign currency"
@@ -10443,6 +10517,14 @@
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Unique instrument identifier"
+        },
+        "monitoring_start_date": {
+          "description": "First date on which barrier monitoring is active. When set, a live\nvaluation after this date requires `observed_touch`.",
+          "format": "date",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "observed_touch": {
           "description": "Observed barrier event state for expired valuations.\n\n`Some(true)` means the barrier was touched during the option life,\n`Some(false)` means it was observed not to have touched, and `None`\nmeans the historical touch state is unavailable.\n\nThis is only required once the option has expired. Without it, a\ntouched-and-reverted path cannot be distinguished from an untouched path\nusing the terminal spot alone.",
@@ -13156,6 +13238,17 @@
           "description": "Option expiry date",
           "format": "date",
           "type": "string"
+        },
+        "expiry_fixing": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized payoff cannot move\nwith a later market spot snapshot. At expiry itself, the current market\nspot is treated as the terminal fixing when this field is absent."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -18321,7 +18414,7 @@
     },
     "VarianceSwap": {
       "additionalProperties": false,
-      "description": "Variance swap instrument.\n\nA variance swap is a forward contract on realized variance with payoff:\n```text\nPayoff = Notional_variance × (σ²_realized - K²_variance)\n```\n\n# Notional Conventions\n\nVariance swaps use **variance notional** (in variance units), not vega notional.\nThe notional represents the P&L per unit of variance point (e.g., per 0.0001 change\nin annualized variance).\n\n## Variance Notional vs Vega Notional\n\nTraders often quote positions in **vega notional** (sensitivity to 1% vol change).\nThe conversion between notional types is:\n\n```text\nNotional_variance = Notional_vega / (2 × σ_strike)\n```\n\nwhere `σ_strike` is the strike volatility (square root of strike variance).\n\n### Example\n\nFor a variance swap with strike vol of 20% (strike variance = 0.04):\n- Vega notional of $100,000 → Variance notional = $100,000 / (2 × 0.20) = $250,000\n- If realized variance is 0.05 (22.4% vol) vs strike 0.04:\n  - Payoff = $250,000 × (0.05 - 0.04) = $2,500\n\n# Realized Variance Calculation\n\nUses **log returns** (not simple returns) per market standard:\n```text\nσ²_realized = (252/N) × Σ [ln(S_i / S_{i-1})]²\n```\n\nwhere 252 is the standard trading days per year for equity markets.\n\n# References\n\n- Demeterfi, K. et al. (1999). \"More Than You Ever Wanted to Know About Volatility Swaps.\"\n- Carr, P. & Madan, D. (1998). \"Towards a Theory of Volatility Trading.\"",
+      "description": "Variance swap instrument.\n\nA variance swap is a forward contract on realized variance with payoff:\n```text\nPayoff = Notional_variance × (σ²_realized - K²_variance)\n```\n\n# Notional Conventions\n\nVariance swaps use **variance notional** (in variance units), not vega notional.\nThe notional scales variance expressed in decimal-squared units.\n\n## Variance Notional vs Vega Notional\n\nTraders often quote positions in **vega notional** (sensitivity to 1% vol change).\nThe conversion between notional types is:\n\n```text\nNotional_variance = Notional_vega / (2 × σ_strike × 0.01)\n```\n\nwhere `σ_strike` is the strike volatility (square root of strike variance).\n\n### Example\n\nFor a variance swap with strike vol of 20% (strike variance = 0.04):\n- Vega notional of $100,000 → Variance notional = $100,000 / (2 × 0.20 × 0.01) = $25,000,000\n- If realized variance is 0.05 (22.4% vol) vs strike 0.04:\n  - Payoff = $25,000,000 × (0.05 - 0.04) = $250,000\n\n# Realized Variance Calculation\n\nUses **log returns** (not simple returns) per market standard:\n```text\nσ²_realized = (252/N) × Σ [ln(S_i / S_{i-1})]²\n```\n\nwhere 252 is the standard trading days per year for equity markets.\n\n# References\n\n- Demeterfi, K. et al. (1999). \"More Than You Ever Wanted to Know About Volatility Swaps.\"\n- Carr, P. & Madan, D. (1998). \"Towards a Theory of Volatility Trading.\"",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",

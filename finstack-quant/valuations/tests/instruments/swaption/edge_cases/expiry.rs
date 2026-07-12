@@ -35,18 +35,17 @@ fn test_expired_swaption_zero_greeks() {
     let swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     let market = create_flat_market(as_of, 0.05, 0.30);
 
-    // Should return an error for expired swaptions
-    assert!(
-        swaption
-            .price_with_metrics(
-                &market,
-                as_of,
-                &[MetricId::Delta, MetricId::Vega],
-                finstack_quant_valuations::instruments::PricingOptions::default()
-            )
-            .is_err(),
-        "Expired swaption should return error"
-    );
+    let result = swaption
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta, MetricId::Vega],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("expired swaption metrics should be well-defined");
+    assert_eq!(result.value.amount(), 0.0);
+    assert_eq!(result.measures.get("delta"), Some(&0.0));
+    assert_eq!(result.measures.get("vega"), Some(&0.0));
 }
 
 #[test]

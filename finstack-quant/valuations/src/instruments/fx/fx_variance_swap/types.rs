@@ -142,7 +142,7 @@ impl FxVarianceSwap {
                 "FxVarianceSwap start_date must precede maturity".to_string(),
             ));
         }
-        if self.observation_freq.count == 0 {
+        if self.observation_freq.count() == 0 {
             return Err(finstack_quant_core::Error::Validation(
                 "FxVarianceSwap observation frequency must be positive".to_string(),
             ));

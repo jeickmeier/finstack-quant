@@ -51,32 +51,41 @@ pub fn tarn_coupon_profile(
     to_js_value(&payload)
 }
 
-/// Snowball / inverse-floater coupon schedule.
+/// Snowball coupon schedule.
 ///
-/// For snowball (`is_inverse_floater = false`):
 ///   `c_i = clip(c_{i-1} + fixed_rate - L_i, floor, cap)` with `c_0 = initial_coupon`.
-///
-/// For inverse floater (`is_inverse_floater = true`):
-///   `c_i = clip(fixed_rate - leverage * L_i, floor, cap)` (path-independent).
 #[wasm_bindgen(js_name = snowballCouponProfile)]
-#[allow(clippy::too_many_arguments)]
 pub fn snowball_coupon_profile(
     initial_coupon: f64,
     fixed_rate: f64,
     floating_fixings: Vec<f64>,
     floor: f64,
     cap: f64,
-    is_inverse_floater: bool,
-    leverage: Option<f64>,
 ) -> Result<Vec<f64>, JsValue> {
-    let leverage = leverage.unwrap_or(1.0);
     coupon_profiles::snowball_coupon_profile(
         initial_coupon,
         fixed_rate,
         &floating_fixings,
         floor,
         cap,
-        is_inverse_floater,
+    )
+    .map_err(to_js_err)
+}
+
+/// Path-independent inverse-floater coupon schedule.
+#[wasm_bindgen(js_name = inverseFloaterCouponProfile)]
+pub fn inverse_floater_coupon_profile(
+    fixed_rate: f64,
+    floating_fixings: Vec<f64>,
+    floor: f64,
+    cap: f64,
+    leverage: f64,
+) -> Result<Vec<f64>, JsValue> {
+    coupon_profiles::inverse_floater_coupon_profile(
+        fixed_rate,
+        &floating_fixings,
+        floor,
+        cap,
         leverage,
     )
     .map_err(to_js_err)
@@ -130,13 +139,20 @@ mod tests {
 
     #[test]
     fn snowball_honors_cap_and_floor() {
-        let coupons =
-            snowball_coupon_profile(0.02, 0.05, vec![0.01, 0.04, 0.03], 0.0, 0.10, false, None)
-                .expect("snowball");
+        let coupons = snowball_coupon_profile(0.02, 0.05, vec![0.01, 0.04, 0.03], 0.0, 0.10)
+            .expect("snowball");
         assert_eq!(coupons.len(), 3);
         for c in coupons {
             assert!((0.0..=0.10).contains(&c));
         }
+    }
+
+    #[test]
+    fn inverse_floater_uses_explicit_leverage() {
+        let coupons = inverse_floater_coupon_profile(0.05, vec![0.01, 0.02], 0.0, 0.10, 2.0)
+            .expect("inverse floater");
+        assert!((coupons[0] - 0.03).abs() < 1e-12);
+        assert!((coupons[1] - 0.01).abs() < 1e-12);
     }
 
     #[test]

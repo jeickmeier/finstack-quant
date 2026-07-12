@@ -183,18 +183,7 @@ fn example_04_cdx_ig_hazard_builds_queryable_curve() {
     );
 }
 
-// TRACKED FOLLOW-UP — stale reference-envelope data, not a pricing defect.
-// `05_cdx_base_correlation.json` carries model-derived tranche `upfront_pct` quotes
-// (priced at a seed base-correlation curve). The credit-derivatives accrual-on-default
-// and protection-leg-timing corrections legitimately shifted tranche prices, so the
-// senior 7-10% tranche no longer calibrates within the base-correlation validation
-// tolerance and the bootstrap hard-fails. The fix is to re-derive the envelope's five
-// illustrative upfront quotes against the chained USD-OIS + CDX-NA-IG-46 market — a
-// focused maintenance task. The genuine base-correlation round-trip correctness test
-// (`base_correlation_step_builds_curve_and_updates_credit_index_data`) is fixed and
-// passing; this is only the reference-example smoke test.
 #[test]
-#[ignore = "05_cdx reference-envelope tranche upfronts are stale post credit-derivs pricing correction; needs re-derivation (tracked follow-up)"]
 fn example_05_cdx_base_correlation_builds_queryable_curve() {
     let envelope = load_envelope("05_cdx_base_correlation.json");
     let market = execute(&envelope);

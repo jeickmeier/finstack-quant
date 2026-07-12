@@ -136,7 +136,7 @@ fn test_quote_engine_roundtrip_dm_for_frn() {
         .build()
         .unwrap();
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(as_of)
+        .base_date(date!(2024 - 12 - 30))
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.03), (10.0, 0.03)])
         .build()

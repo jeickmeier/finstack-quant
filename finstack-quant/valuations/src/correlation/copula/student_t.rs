@@ -336,17 +336,18 @@ impl Copula for StudentTCopula {
                     actual = factor_realization.len(),
                     "StudentTCopula: factor length mismatch; returning unconditional PD"
                 );
-                return student_t_cdf(default_threshold, self.degrees_of_freedom);
+                return student_t_cdf(default_threshold, self.degrees_of_freedom)
+                    .unwrap_or(f64::NAN);
             }
         }
         let [m] = factor_realization else {
-            return student_t_cdf(default_threshold, self.degrees_of_freedom);
+            return student_t_cdf(default_threshold, self.degrees_of_freedom).unwrap_or(f64::NAN);
         };
         let m = *m;
         let nu = self.degrees_of_freedom;
 
         if correlation <= MIN_CORRELATION {
-            return student_t_cdf(default_threshold, nu);
+            return student_t_cdf(default_threshold, nu).unwrap_or(f64::NAN);
         }
 
         // General formula with smoothing and argument clipping. We deliberately
@@ -366,7 +367,7 @@ impl Copula for StudentTCopula {
         let scaling = ((nu + 1.0) / (nu + m * m)).sqrt();
         let conditional_threshold = (base_arg * scaling).clamp(-CDF_CLIP, CDF_CLIP);
 
-        student_t_cdf(conditional_threshold, nu + 1.0)
+        student_t_cdf(conditional_threshold, nu + 1.0).unwrap_or(f64::NAN)
     }
 
     fn conditional_default_prob_given_systematic_and_mixing(
@@ -483,7 +484,7 @@ impl Copula for StudentTCopula {
 
         // λ_L = 2 · t_{ν+1}(-√((ν+1)(1-ρ)/(1+ρ)))
         let arg = -((nu + 1.0) * (1.0 - rho) / (1.0 + rho)).sqrt();
-        2.0 * student_t_cdf(arg, nu + 1.0)
+        2.0 * student_t_cdf(arg, nu + 1.0).unwrap_or(f64::NAN)
     }
 }
 
@@ -563,7 +564,7 @@ mod tests {
     #[test]
     fn test_conditional_prob_sensitive_to_factor() {
         let copula = StudentTCopula::new(5.0);
-        let threshold = student_t_inv_cdf(0.05, 5.0);
+        let threshold = student_t_inv_cdf(0.05, 5.0).expect("valid Student-t inputs");
         let correlation = 0.3;
 
         let prob_neg = copula.conditional_default_prob(threshold, &[-2.0], correlation);
@@ -590,7 +591,8 @@ mod tests {
             let threshold: f64 = -1.25;
             let base_arg = (threshold - sqrt_rho * factor) / sqrt_1mr;
             let scaling = ((nu + 1.0) / (nu + factor * factor)).sqrt();
-            let expected = student_t_cdf(base_arg * scaling, nu + 1.0);
+            let expected =
+                student_t_cdf(base_arg * scaling, nu + 1.0).expect("valid Student-t inputs");
 
             let prob = copula.conditional_default_prob(threshold, &[factor], rho);
 
@@ -631,7 +633,7 @@ mod tests {
         for &df in &[4.0, 5.0, 10.0, 30.0] {
             let copula = StudentTCopula::new(df);
             let pd = 0.05;
-            let threshold = student_t_inv_cdf(pd, df);
+            let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
             let correlation = 0.30;
 
             let integrated_prob = copula
@@ -653,7 +655,7 @@ mod tests {
         let copula = StudentTCopula::new(5.0);
 
         for &pd in &[0.01, 0.05, 0.10, 0.20] {
-            let threshold = student_t_inv_cdf(pd, 5.0);
+            let threshold = student_t_inv_cdf(pd, 5.0).expect("valid Student-t inputs");
             let correlation = 0.30;
 
             let integrated_prob = copula
@@ -704,14 +706,14 @@ mod tests {
 
     #[test]
     fn test_student_t_cdf_accuracy() {
-        let cdf = student_t_cdf(-2.0, 5.0);
+        let cdf = student_t_cdf(-2.0, 5.0).expect("valid Student-t inputs");
         assert!(
             (cdf - 0.051).abs() < 0.002,
             "CDF(-2.0, df=5) = {}, expected ~0.051",
             cdf
         );
 
-        let cdf_10 = student_t_cdf(-1.812, 10.0);
+        let cdf_10 = student_t_cdf(-1.812, 10.0).expect("valid Student-t inputs");
         assert!(
             (cdf_10 - 0.05).abs() < 0.005,
             "CDF(-1.812, df=10) = {}, expected ~0.05",
@@ -726,8 +728,8 @@ mod tests {
 
         for &df in &test_dfs {
             for &p in &test_probs {
-                let x = student_t_inv_cdf(p, df);
-                let p_back = student_t_cdf(x, df);
+                let x = student_t_inv_cdf(p, df).expect("valid Student-t inputs");
+                let p_back = student_t_cdf(x, df).expect("valid Student-t inputs");
                 assert!(
                     (p - p_back).abs() < 1e-6,
                     "Round-trip failed for df={}, p={}: got x={}, p_back={}",
@@ -806,7 +808,7 @@ mod tests {
         let df = 5.0;
         let copula = StudentTCopula::new(df);
         let pd = 0.05;
-        let threshold = student_t_inv_cdf(pd, df);
+        let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
         let correlation = 0.30;
 
         let assert_contract = |factors: &[f64]| {
@@ -852,7 +854,7 @@ mod tests {
         let nu = 5.0;
         let copula = StudentTCopula::with_quadrature_order(nu, 40);
         let pd = 0.05;
-        let threshold = student_t_inv_cdf(pd, nu);
+        let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let rho = 0.30;
 
         let quad_joint = copula.integrate_fn(&|factors| {
@@ -895,7 +897,7 @@ mod tests {
         let nu = 6.0;
         let copula = StudentTCopula::new(nu);
         let pd = 0.05;
-        let threshold = student_t_inv_cdf(pd, nu);
+        let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let rho = 0.30;
 
         let mut rng = PhiloxRng::new(11);
@@ -930,7 +932,7 @@ mod tests {
         let df = 50.0;
         let copula = StudentTCopula::new(df);
         let pd = 0.05;
-        let threshold = student_t_inv_cdf(pd, df);
+        let threshold = student_t_inv_cdf(pd, df).expect("valid Student-t inputs");
         let correlation = 0.30;
 
         let t_prob = copula.conditional_default_prob(threshold, &[0.0], correlation);
@@ -965,7 +967,7 @@ mod tests {
     fn gamma_quadrature_bias_within_5bp_at_nu_4() {
         let nu = 4.0;
         let pd = 0.05; // senior-tranche regime: 5% unconditional PD
-        let threshold = student_t_inv_cdf(pd, nu);
+        let threshold = student_t_inv_cdf(pd, nu).expect("valid Student-t inputs");
         let correlation = 0.30;
 
         // Default-order copula (20 Laguerre nodes, clamped to MIN_LAGUERRE_ORDER=10).

@@ -34,12 +34,4 @@ pub mod monte_carlo;
 pub(crate) mod pricer;
 pub(crate) mod types;
 
-/// Vanna-Volga smile correction. Behind `fx-vanna-volga` feature flag —
-/// aspirational until per-trade smile quotes are part of the market-data
-/// contract.
-#[cfg(feature = "fx-vanna-volga")]
-pub mod vanna_volga;
-
 pub use types::FxBarrierOption;
-#[cfg(feature = "fx-vanna-volga")]
-pub use vanna_volga::VannaVolgaQuotes;

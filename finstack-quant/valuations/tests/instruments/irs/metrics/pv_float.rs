@@ -71,7 +71,7 @@ fn create_swap(as_of: Date, end: Date, fixed_rate: rust_decimal::Decimal) -> Int
             end,
         },
         float: finstack_quant_valuations::instruments::FloatLegSpec {
-            discount_curve_id: "USD_LIBOR_DISC".into(), // Use different discount curve for non-OIS swap
+            discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             spread_bp: rust_decimal::Decimal::try_from(0.0).expect("valid"),
             frequency: Tenor::quarterly(),

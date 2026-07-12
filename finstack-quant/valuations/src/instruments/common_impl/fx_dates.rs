@@ -6,7 +6,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::Result;
 
 pub use finstack_quant_core::dates::fx::{
-    add_joint_business_days, adjust_joint_calendar, roll_spot_date, ResolvedCalendarPair,
+    add_joint_business_days, adjust_joint_calendar, ResolvedCalendarPair,
 };
 
 /// Roll a trade date to spot using the market (CLS-consistent) FX convention,

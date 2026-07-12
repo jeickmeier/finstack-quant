@@ -358,7 +358,9 @@ fn test_vol_models_quantlib_parity() {
                 if let Some(s) = shift {
                     params = params.with_shift(*s);
                 }
-                let vol = params.implied_vol_lognormal(*forward, *strike, *t);
+                let vol = params
+                    .implied_vol_lognormal(*forward, *strike, *t)
+                    .expect("valid checked inputs");
                 check_rel(
                     &mut failures,
                     id,
@@ -385,7 +387,9 @@ fn test_vol_models_quantlib_parity() {
                 }
                 *counts.entry("sabr_normal").or_default() += 1;
                 let params = SabrParams::new(*alpha, *beta, *rho, *nu).expect("valid SABR params");
-                let vol = params.implied_vol_normal(*forward, *strike, *t);
+                let vol = params
+                    .implied_vol_normal(*forward, *strike, *t)
+                    .expect("valid checked inputs");
                 check_rel(
                     &mut failures,
                     id,
@@ -455,7 +459,7 @@ fn test_vol_models_quantlib_parity() {
                     &mut failures,
                     id,
                     "implied_vol",
-                    params.implied_vol(*k, *t),
+                    params.implied_vol(*k, *t).expect("valid checked inputs"),
                     expected.implied_vol,
                     tol,
                 );

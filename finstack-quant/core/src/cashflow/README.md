@@ -17,7 +17,7 @@ Instrument-specific logic belongs in `valuations`, not here.
 - **`mod.rs`**
   - Re‑exports:
     - `primitives::{CashFlow, CFKind}`
-    - `discounting::{npv, npv_with_ctx, npv_amounts, npv_amounts_with_ctx, npv_prediscounted_money, Discountable}`
+    - `discounting::{npv, npv_with_ctx, npv_amounts, npv_amounts_with_ctx, sum_prediscounted_money, Discountable}`
     - `xirr::{irr, xirr, xirr_with_daycount, xirr_with_daycount_ctx}`
 - **`primitives.rs`**
   - Defines:

@@ -504,7 +504,7 @@ mod tests {
     }
 
     #[test]
-    fn expired_option_returns_intrinsic_delta() {
+    fn expired_option_has_zero_delta() {
         let opt = IrFutureOption::builder()
             .id(InstrumentId::new("IRFO-EXPIRED"))
             .futures_price(96.00)
@@ -521,7 +521,7 @@ mod tests {
 
         // as_of is after expiry
         let delta = opt.delta(date!(2025 - 03 - 01)).expect("delta");
-        assert_eq!(delta, 1.0, "Expired ITM call delta should be 1.0");
+        assert_eq!(delta, 0.0, "Expired option should have no remaining delta");
     }
 
     #[test]

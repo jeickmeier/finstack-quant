@@ -40,9 +40,8 @@ pub(crate) fn implied_vol(
     curves: &MarketContext,
     as_of: Date,
     target_price: f64,
-    initial_guess: Option<f64>,
 ) -> Result<f64> {
-    implied_vol_impl(inst, curves, as_of, target_price, initial_guess)
+    implied_vol_impl(inst, curves, as_of, target_price)
 }
 
 fn npv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
@@ -148,7 +147,6 @@ fn implied_vol_impl(
     curves: &MarketContext,
     as_of: Date,
     target_price: f64,
-    initial_guess: Option<f64>,
 ) -> Result<f64> {
     validate_currency(inst)?;
     let (spot, r_d, r_f, t) = collect_inputs_no_vol(inst, curves, as_of)?;
@@ -163,12 +161,6 @@ fn implied_vol_impl(
             )));
     }
 
-    // `initial_guess` is accepted in the public API for forward-compatibility
-    // but the underlying Newton-Raphson/bisection solver (`bs_implied_vol`)
-    // self-seeds its bracket from [MIN_VOL, 0.3] and does not consume an
-    // external starting point. The parameter is intentionally ignored here;
-    // callers should not rely on it affecting convergence.
-    let _ = initial_guess;
     let target_unit = target_price / inst.notional.amount();
 
     crate::models::bs_implied_vol(
@@ -404,53 +396,22 @@ mod delegation_tests {
             .expect("fx option")
     }
 
-    /// W-45: implied_vol initial_guess parameter was silently discarded via
-    /// `let _ = initial_guess.unwrap_or(IV_INITIAL_GUESS)`.
-    ///
-    /// The underlying `bs_implied_vol` solver uses Newton-Raphson + bisection
-    /// and self-seeds its bracket — it does not consume an external initial
-    /// guess. This test verifies:
-    /// 1. Convergence is unconditional regardless of the supplied `initial_guess`.
-    /// 2. Wildly-wrong guesses (e.g. 10.0 = 1000% vol) do not cause divergence.
-    /// 3. Both `None` and `Some(x)` return the same result (parameter is inert).
     #[test]
-    fn w45_implied_vol_initial_guess_is_inert_solver_always_converges() {
+    fn implied_vol_self_seeding_solver_recovers_market_vol() {
         let as_of = date!(2024 - 01 - 01);
         let expiry = date!(2025 - 01 - 01);
         let option = build_option(expiry);
         let market = build_market(as_of);
 
         // Price the option at sigma=0.15 (the vol surface value), then recover
-        // implied vol. Use a deliberately-bad initial guess (1000% vol) to
-        // confirm the solver does not rely on it.
+        // implied vol with the solver's canonical self-seeding path.
         let pv = compute_pv(&option, &market, as_of).expect("pv");
         let target_price = pv.amount();
 
-        let iv_no_guess =
-            implied_vol(&option, &market, as_of, target_price, None).expect("iv with None guess");
-        let iv_bad_guess = implied_vol(&option, &market, as_of, target_price, Some(10.0))
-            .expect("iv with bad guess (10.0 = 1000% vol)");
-        let iv_zero_guess = implied_vol(&option, &market, as_of, target_price, Some(0.0001))
-            .expect("iv with near-zero guess");
-
-        // All three must recover ~0.15 (the market vol).
+        let implied = implied_vol(&option, &market, as_of, target_price).expect("implied vol");
         assert!(
-            (iv_no_guess - 0.15).abs() < 1e-6,
-            "iv_no_guess={iv_no_guess} expected ~0.15"
-        );
-        assert!(
-            (iv_bad_guess - 0.15).abs() < 1e-6,
-            "iv_bad_guess={iv_bad_guess} expected ~0.15 — solver must be unconditional"
-        );
-        assert!(
-            (iv_zero_guess - 0.15).abs() < 1e-6,
-            "iv_zero_guess={iv_zero_guess} expected ~0.15"
-        );
-
-        // All three must agree with each other (initial_guess is inert).
-        assert!(
-            (iv_no_guess - iv_bad_guess).abs() < 1e-10,
-            "initial_guess must not affect the result: no_guess={iv_no_guess} bad_guess={iv_bad_guess}"
+            (implied - 0.15).abs() < 1e-6,
+            "implied={implied} expected ~0.15"
         );
     }
 

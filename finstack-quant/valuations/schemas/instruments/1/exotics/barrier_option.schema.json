@@ -160,6 +160,17 @@
               "format": "date",
               "type": "string"
             },
+            "expiry_fixing": {
+              "anyOf": [
+                {
+                  "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Terminal underlying fixing observed at expiry.\n\nRequired when valuing after expiry so the realized intrinsic value is\ninvariant to later market spot updates. At expiry, the current market\nspot is used when this field is absent."
+            },
             "id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Unique instrument identifier"

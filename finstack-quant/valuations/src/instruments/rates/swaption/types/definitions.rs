@@ -1,6 +1,7 @@
-use crate::models::SABRParameters as InternalSabrParameters;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::Result;
+
+pub use crate::models::SABRParameters;
 
 /// Volatility model for pricing
 #[derive(
@@ -22,104 +23,6 @@ pub enum VolatilityModel {
     Black,
     /// Bachelier (Normal) model
     Normal,
-}
-
-/// Public SABR parameters for swaption volatility modeling.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-pub struct SABRParameters {
-    /// Initial volatility (alpha)
-    pub alpha: f64,
-    /// CEV exponent (beta) - typically 0 to 1
-    pub beta: f64,
-    /// Volatility of volatility (nu/volvol)
-    pub nu: f64,
-    /// Correlation between asset and volatility (rho)
-    pub rho: f64,
-    /// Shift parameter for handling negative rates (optional)
-    pub shift: Option<f64>,
-}
-
-impl SABRParameters {
-    /// Create new SABR parameters with validation.
-    pub fn new(alpha: f64, beta: f64, nu: f64, rho: f64) -> Result<Self> {
-        InternalSabrParameters::new(alpha, beta, nu, rho)?;
-        Ok(Self {
-            alpha,
-            beta,
-            nu,
-            rho,
-            shift: None,
-        })
-    }
-
-    /// Create new SABR parameters with a shift for negative rates.
-    pub fn new_with_shift(alpha: f64, beta: f64, nu: f64, rho: f64, shift: f64) -> Result<Self> {
-        InternalSabrParameters::new_with_shift(alpha, beta, nu, rho, shift)?;
-        Ok(Self {
-            alpha,
-            beta,
-            nu,
-            rho,
-            shift: Some(shift),
-        })
-    }
-
-    /// Create SABR parameters with equity market standard (beta=1.0).
-    pub fn equity_standard(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        InternalSabrParameters::equity_standard(alpha, nu, rho)?;
-        Ok(Self {
-            alpha,
-            beta: 1.0,
-            nu,
-            rho,
-            shift: None,
-        })
-    }
-
-    /// Create SABR parameters with interest rate market standard (beta=0.5).
-    pub fn rates_standard(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        InternalSabrParameters::rates_standard(alpha, nu, rho)?;
-        Ok(Self {
-            alpha,
-            beta: 0.5,
-            nu,
-            rho,
-            shift: None,
-        })
-    }
-
-    /// Create SABR parameters with normal model convention (beta=0.0).
-    pub fn normal(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        InternalSabrParameters::normal(alpha, nu, rho)?;
-        Ok(Self {
-            alpha,
-            beta: 0.0,
-            nu,
-            rho,
-            shift: None,
-        })
-    }
-
-    /// Create SABR parameters with lognormal model convention (beta=1.0).
-    pub fn lognormal(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        InternalSabrParameters::lognormal(alpha, nu, rho)?;
-        Ok(Self {
-            alpha,
-            beta: 1.0,
-            nu,
-            rho,
-            shift: None,
-        })
-    }
-
-    pub(crate) fn to_internal(&self) -> Result<InternalSabrParameters> {
-        match self.shift {
-            Some(shift) => InternalSabrParameters::new_with_shift(
-                self.alpha, self.beta, self.nu, self.rho, shift,
-            ),
-            None => InternalSabrParameters::new(self.alpha, self.beta, self.nu, self.rho),
-        }
-    }
 }
 
 impl std::fmt::Display for VolatilityModel {

@@ -158,6 +158,12 @@ class TestMoneyParity:
 class TestCoreTypesParity:
     """Core scalar type contracts."""
 
+    def test_rate_from_percent_uses_fallible_rust_validation(self) -> None:
+        assert Rate.from_percent(2.5).as_decimal == pytest.approx(0.025)
+        for value in (math.nan, math.inf, -math.inf):
+            with pytest.raises(ValueError, match="finite"):
+                Rate.from_percent(value)
+
     def test_rate_hash_matches_equality_for_signed_zero(self) -> None:
         pos_zero = Rate(0.0)
         neg_zero = Rate(-0.0)
@@ -396,6 +402,19 @@ class TestDiscountCurveParity:
                 forward_floor=-0.01,
             )
 
+    @pytest.mark.parametrize("forward_floor", [float("nan"), float("inf"), -float("inf")])
+    def test_negative_rate_validation_mode_requires_finite_floor(
+        self, forward_floor: float
+    ) -> None:
+        with pytest.raises(ValueError, match="forward_floor must be finite"):
+            DiscountCurve(
+                "CHF-OIS",
+                date(2024, 1, 1),
+                [(0.0, 1.0), (1.0, 1.002)],
+                validation_mode="negative_rate_friendly",
+                forward_floor=forward_floor,
+            )
+
 
 class TestForwardCurveParity:
     """Forward curve operations match Rust."""
@@ -405,7 +424,7 @@ class TestForwardCurveParity:
         curve = ForwardCurve(
             "USD-SOFR",
             0.25,
-            [(0.0, 0.04), (1.0, 0.045), (5.0, 0.05)],
+            knots=[(0.0, 0.04), (1.0, 0.045), (5.0, 0.05)],
             base_date=date(2024, 1, 1),
             day_count="act_360",
         )
@@ -417,7 +436,7 @@ class TestForwardCurveParity:
         curve = ForwardCurve(
             "USD-SOFR",
             0.25,
-            [(0.0, 0.04), (1.0, 0.045)],
+            knots=[(0.0, 0.04), (1.0, 0.045)],
             base_date=date(2024, 1, 1),
             day_count="act_360",
         )
@@ -453,6 +472,16 @@ class TestForwardCurveParity:
         with pytest.raises(AttributeError):
             curve.reset_lag = 2
 
+    def test_named_factory_avoids_positional_order_ambiguity(self) -> None:
+        curve = ForwardCurve.from_knots(
+            "USD-SOFR",
+            tenor=0.25,
+            base_date=date(2024, 1, 1),
+            knots=[(0.0, 0.04), (1.0, 0.045)],
+            day_count="act_360",
+        )
+        assert curve.rate(1.0) == pytest.approx(0.045, abs=1e-10)
+
     def test_explicit_projection_grid_is_constructible_and_exposed(self) -> None:
         """Contractual boundaries round-trip through the canonical Rust curve."""
         last_reset = 91.0 / 360.0
@@ -460,7 +489,7 @@ class TestForwardCurveParity:
         curve = ForwardCurve(
             "USD-SOFR",
             0.25,
-            [(0.0, 0.04), (last_reset, 0.045)],
+            knots=[(0.0, 0.04), (last_reset, 0.045)],
             base_date=date(2024, 1, 1),
             day_count="act_360",
             projection_grid=projection_grid,
@@ -477,7 +506,7 @@ class TestForwardCurveParity:
         curve = ForwardCurve(
             "USD-SOFR",
             0.25,
-            [(0.0, 0.04), (1.0, 0.045)],
+            knots=[(0.0, 0.04), (1.0, 0.045)],
             base_date=date(2024, 1, 1),
         )
         with pytest.raises(ValueError, match=r"(rate_between requires|Invalid input|invalid input)"):
@@ -493,7 +522,7 @@ class TestForwardCurveParity:
         curve = ForwardCurve(
             "USD-SOFR",
             0.25,
-            [(0.0, 0.04), (1.0, 0.05), (5.0, 0.06)],
+            knots=[(0.0, 0.04), (1.0, 0.05), (5.0, 0.06)],
             base_date=date(2024, 1, 1),
         )
         assert curve.projection_grid is None
@@ -583,7 +612,7 @@ class TestMarketContextParity:
         curve = ForwardCurve(
             "USD-SOFR",
             0.25,
-            [(0.0, 0.04), (1.0, 0.045)],
+            knots=[(0.0, 0.04), (1.0, 0.045)],
             base_date=date(2024, 1, 1),
             day_count="act_360",
         )

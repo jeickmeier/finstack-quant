@@ -34,7 +34,6 @@ Bindings: umbrella `finstack-quant` (`valuations` feature), `finstack-quant-py`,
 | Feature | Default | Purpose |
 |---------|---------|---------|
 | `ts_export` | off | TypeScript export for selected schema types |
-| `fx-vanna-volga` | off | FX barrier Vanna–Volga smile correction (research; not registered in the default pricer registry) |
 
 ## Usage
 

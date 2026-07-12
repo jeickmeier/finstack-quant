@@ -917,9 +917,8 @@ impl Instrument for StructuredCredit {
         let disc = context.get_discount(self.discount_curve_id.as_str())?;
         let flows = self.dated_cashflows(context, as_of)?;
 
-        use crate::instruments::common_impl::discountable::Discountable;
-        let curve_day_count = disc.day_count();
-        flows.npv(disc.as_ref(), as_of, Some(curve_day_count))
+        use finstack_quant_core::cashflow::Discountable;
+        flows.npv(disc.as_ref(), as_of)
     }
 
     fn seed_metric_context(

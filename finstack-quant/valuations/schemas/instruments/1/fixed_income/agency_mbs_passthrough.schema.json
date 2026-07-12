@@ -168,6 +168,13 @@
               "format": "date",
               "type": "string"
             },
+            "last_paid_accrual_end": {
+              "description": "End date of the latest accrual period whose delayed P&I payment has\nsettled and is already reflected in `current_face`.\n\nWhen omitted, pricing infers the latest paid period from the agency\npayment-delay rule and `as_of`.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "maturity": {
               "description": "Legal maturity date.",
               "format": "date",

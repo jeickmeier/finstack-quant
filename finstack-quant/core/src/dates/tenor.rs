@@ -149,9 +149,9 @@ impl TenorUnit {
 #[serde(try_from = "TenorDe")]
 pub struct Tenor {
     /// Number of units.
-    pub count: u32,
+    count: u32,
     /// Unit type (days, weeks, months, years).
-    pub unit: TenorUnit,
+    unit: TenorUnit,
 }
 
 /// Deserialization mirror of [`Tenor`] used to validate inbound values.
@@ -191,7 +191,24 @@ impl Tenor {
     /// ```
     #[inline]
     pub const fn new(count: u32, unit: TenorUnit) -> Self {
+        let max_count = match unit {
+            TenorUnit::Days => MAX_TENOR_DAYS,
+            TenorUnit::Weeks => MAX_TENOR_WEEKS,
+            TenorUnit::Months => MAX_TENOR_MONTHS,
+            TenorUnit::Years => MAX_TENOR_YEARS,
+        };
+        assert!(count > 0 && count <= max_count, "invalid tenor count");
         Self { count, unit }
+    }
+
+    /// Number of units in this tenor.
+    pub const fn count(self) -> u32 {
+        self.count
+    }
+
+    /// Unit represented by this tenor.
+    pub const fn unit(self) -> TenorUnit {
+        self.unit
     }
 
     /// Create a validated tenor.
@@ -264,9 +281,13 @@ impl Tenor {
     /// # Arguments
     /// * `years` - The time period in years
     /// * `day_count` - The day count convention to use for day conversion
-    pub fn from_years(years: f64, day_count: DayCount) -> Self {
-        if years < 0.0 || !years.is_finite() {
-            return Self::new(0, TenorUnit::Days);
+    pub fn from_years(years: f64, day_count: DayCount) -> crate::Result<Self> {
+        if years <= 0.0 || !years.is_finite() {
+            return Err(InputError::InvalidTenor {
+                tenor: format!("{years}Y"),
+                reason: "year fraction must be positive and finite".to_string(),
+            }
+            .into());
         }
         let months = years * 12.0;
         let rounded_months = months.round();
@@ -275,9 +296,9 @@ impl Tenor {
             // It's effectively an integer number of months
             let m = rounded_months as u32;
             if m > 0 && m.is_multiple_of(12) {
-                Self::new(m / 12, TenorUnit::Years)
+                Self::try_new(m / 12, TenorUnit::Years)
             } else {
-                Self::new(m, TenorUnit::Months)
+                Self::try_new(m, TenorUnit::Months)
             }
         } else {
             // Convert to days
@@ -289,7 +310,7 @@ impl Tenor {
                 DayCount::Act365F => (years * 365.0).round(),
                 _ => (years * 365.25).round(),
             };
-            Self::new(days as u32, TenorUnit::Days)
+            Self::try_new(days as u32, TenorUnit::Days)
         }
     }
 
@@ -791,25 +812,19 @@ mod tests {
     #[test]
     fn test_from_years_prefers_months_and_handles_invalid_values() {
         assert_eq!(
-            Tenor::from_years(1.0, DayCount::Act365F),
+            Tenor::from_years(1.0, DayCount::Act365F).expect("valid"),
             Tenor::new(1, TenorUnit::Years)
         );
         assert_eq!(
-            Tenor::from_years(0.25, DayCount::Act365F),
+            Tenor::from_years(0.25, DayCount::Act365F).expect("valid"),
             Tenor::new(3, TenorUnit::Months)
         );
         assert_eq!(
-            Tenor::from_years(10.0 / 365.0, DayCount::Act365F),
+            Tenor::from_years(10.0 / 365.0, DayCount::Act365F).expect("valid"),
             Tenor::new(10, TenorUnit::Days)
         );
-        assert_eq!(
-            Tenor::from_years(-1.0, DayCount::Act365F),
-            Tenor::new(0, TenorUnit::Days)
-        );
-        assert_eq!(
-            Tenor::from_years(f64::NAN, DayCount::Act365F),
-            Tenor::new(0, TenorUnit::Days)
-        );
+        assert!(Tenor::from_years(-1.0, DayCount::Act365F).is_err());
+        assert!(Tenor::from_years(f64::NAN, DayCount::Act365F).is_err());
     }
 
     #[test]
@@ -928,18 +943,10 @@ mod tests {
     }
 
     #[test]
-    fn tenor_rejects_count_exceeding_i32_max() {
-        let start = Date::from_calendar_date(2025, Month::January, 15).expect("valid");
-        let tenor = Tenor::new((i32::MAX as u32) + 1, TenorUnit::Months);
-
-        let err = tenor
-            .add_to_date(start, None, BusinessDayConvention::Unadjusted)
-            .expect_err("count above i32::MAX should be rejected");
-
-        assert!(
-            err.to_string().contains("exceeds i32::MAX"),
-            "unexpected error: {err}"
-        );
+    fn tenor_rejects_count_exceeding_supported_range() {
+        let err = Tenor::try_new((i32::MAX as u32) + 1, TenorUnit::Months)
+            .expect_err("oversized tenor rejected at construction");
+        assert!(err.to_string().contains("maximum supported tenor"));
     }
 
     #[test]

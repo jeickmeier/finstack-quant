@@ -124,7 +124,7 @@ run = [
 
 [tasks.rust-test-slow]
 description = "Run Rust tests including ignored/slow ones"
-run = "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --run-ignored all --no-fail-fast -- --skip vendor_golden"
+run = "cargo nextest run --workspace --exclude finstack-quant-py --lib --test '*' --run-ignored all --no-fail-fast"
 
 [tasks.rust-test-cov]
 description = "Run Rust tests with HTML coverage report"

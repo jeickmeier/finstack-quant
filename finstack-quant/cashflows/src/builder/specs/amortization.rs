@@ -104,9 +104,9 @@ impl Notional {
                 "initial notional must be finite".into(),
             ));
         }
-        if self.initial.amount() <= 0.0 {
+        if self.initial.amount() < 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "initial notional must be strictly positive; got {}",
+                "initial notional must be non-negative; got {}",
                 self.initial.amount()
             )));
         }

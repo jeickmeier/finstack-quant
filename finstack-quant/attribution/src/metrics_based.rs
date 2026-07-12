@@ -1913,7 +1913,7 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
     use finstack_quant_core::money::Money;
     use indexmap::IndexMap;
     use std::sync::{Arc, OnceLock};
@@ -2545,6 +2545,7 @@ mod tests {
         let surface = VolSurface::builder("USD-CAP-VOL")
             .expiries(&[0.25, 1.0, 5.0, 10.0])
             .strikes(&[0.05])
+            .quote_type(VolQuoteType::Normal)
             .row(&[0.010])
             .row(&[0.010])
             .row(&[0.010])

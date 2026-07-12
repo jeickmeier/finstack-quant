@@ -24,10 +24,16 @@ from typing import Optional, Union
 
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import arbitrage as arbitrage
+from finstack_quant.core.market_data import context as context
+from finstack_quant.core.market_data import curves as curves
 from finstack_quant.core.market_data import dtsm as dtsm
+from finstack_quant.core.market_data import fx as fx
 
 __all__ = [
     # submodules
+    "curves",
+    "fx",
+    "context",
     "dtsm",
     "arbitrage",
     # curves
@@ -285,6 +291,23 @@ class ForwardCurve:
         ValueError
             If the curve cannot be built.
         """
+        ...
+
+    @classmethod
+    def from_knots(
+        cls,
+        id: str,
+        *,
+        tenor: float,
+        base_date: datetime.date,
+        knots: list[tuple[float, float]],
+        day_count: str | None = None,
+        interp: str = "linear",
+        extrapolation: str = "flat_forward",
+        projection_grid: list[float] | None = None,
+        reset_lag: int | None = None,
+    ) -> ForwardCurve:
+        """Construct from an unambiguous keyword-only specification."""
         ...
 
     def rate(self, t: float) -> float:
@@ -793,8 +816,6 @@ class FxDeltaVolSurface:
         expiry: float,
         strike: float,
         forward: float,
-        r_d: float,
-        r_f: float,
     ) -> float:
         """Interpolated implied vol at the given ``(expiry, strike)``."""
         ...
@@ -804,12 +825,12 @@ class FxDeltaVolSurface:
         ...
 
     @staticmethod
-    def delta_to_strike(delta: float, forward: float, vol: float, expiry: float, r_f: float) -> float:
+    def delta_to_strike(delta: float, forward: float, vol: float, expiry: float) -> float:
         """Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted)."""
         ...
 
     @staticmethod
-    def strike_to_delta(strike: float, forward: float, vol: float, expiry: float, r_f: float) -> float:
+    def strike_to_delta(strike: float, forward: float, vol: float, expiry: float) -> float:
         """Convert a strike to forward call delta."""
         ...
 

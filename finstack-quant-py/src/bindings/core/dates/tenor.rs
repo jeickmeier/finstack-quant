@@ -179,13 +179,13 @@ impl PyTenor {
     /// Numeric count.
     #[getter]
     fn count(&self) -> u32 {
-        self.inner.count
+        self.inner.count()
     }
 
     /// Unit of the tenor.
     #[getter]
     fn unit(&self) -> PyTenorUnit {
-        PyTenorUnit::from_inner(self.inner.unit)
+        PyTenorUnit::from_inner(self.inner.unit())
     }
 
     /// Equivalent whole months (``None`` for day/week tenors).

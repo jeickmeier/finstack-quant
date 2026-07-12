@@ -223,8 +223,10 @@ impl Money {
     /// assert_eq!(format!("{}", amt), "USD 10.00");
     /// ```
     #[inline]
+    #[allow(clippy::expect_used)] // Compatibility constructor is documented to panic.
     pub fn new(amount: f64, currency: Currency) -> Self {
-        Self::new_impl(amount, currency, None, "Money::new")
+        Self::try_new(amount, currency)
+            .expect("Money::new requires finite amount representable by Decimal")
     }
 
     /// Create a new [`Money`] value using an explicit configuration for rounding.
@@ -234,8 +236,10 @@ impl Money {
     /// Panics if `amount` is not finite (NaN or infinity) or cannot be
     /// represented by the internal Decimal type. Use
     /// [`Money::try_new_with_config`] for a fallible constructor.
+    #[allow(clippy::expect_used)] // Compatibility constructor is documented to panic.
     pub fn new_with_config(amount: f64, currency: Currency, cfg: &FinstackConfig) -> Self {
-        Self::new_impl(amount, currency, Some(cfg), "Money::new_with_config")
+        Self::try_new_with_config(amount, currency, cfg)
+            .expect("Money::new_with_config requires a finite representable amount")
     }
 
     /// Fallible constructor using ISO-4217 minor units and bankers rounding.
@@ -290,13 +294,6 @@ impl Money {
     }
 
     #[inline]
-    #[allow(clippy::expect_used)] // Infallible constructor contract is documented to panic.
-    fn new_finite(amount: f64, currency: Currency, cfg: Option<&FinstackConfig>) -> Self {
-        Self::try_new_finite(amount, currency, cfg)
-            .expect("Money construction requires a representable amount")
-    }
-
-    #[inline]
     fn try_new_finite(
         amount: f64,
         currency: Currency,
@@ -337,21 +334,6 @@ impl Money {
             return Err(Error::Input(InputError::NonFiniteValue { kind }));
         }
         Self::try_new_finite(amount, currency, cfg)
-    }
-
-    #[inline]
-    fn new_impl(
-        amount: f64,
-        currency: Currency,
-        cfg: Option<&FinstackConfig>,
-        caller: &'static str,
-    ) -> Self {
-        assert!(
-            amount.is_finite(),
-            "{caller} requires finite amount (got {:?})",
-            amount
-        );
-        Self::new_finite(amount, currency, cfg)
     }
 
     #[inline]

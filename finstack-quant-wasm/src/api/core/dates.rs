@@ -408,7 +408,7 @@ impl Tenor {
     /// Numeric count.
     #[wasm_bindgen(getter, js_name = count)]
     pub fn count(&self) -> u32 {
-        self.inner.count
+        self.inner.count()
     }
 
     /// Approximate length in years (simple estimate, no calendar).

@@ -253,18 +253,11 @@ impl PyFxDeltaVolSurface {
     }
 
     /// Interpolated implied vol at the given ``(expiry, strike)`` for the
-    /// supplied forward and rates.
-    #[pyo3(text_signature = "(self, expiry, strike, forward, r_d, r_f)")]
-    fn implied_vol(
-        &self,
-        expiry: f64,
-        strike: f64,
-        forward: f64,
-        r_d: f64,
-        r_f: f64,
-    ) -> PyResult<f64> {
+    /// supplied forward.
+    #[pyo3(text_signature = "(self, expiry, strike, forward)")]
+    fn implied_vol(&self, expiry: f64, strike: f64, forward: f64) -> PyResult<f64> {
         self.inner
-            .implied_vol(expiry, strike, forward, r_d, r_f)
+            .implied_vol(expiry, strike, forward)
             .map_err(core_to_py)
     }
 
@@ -284,16 +277,16 @@ impl PyFxDeltaVolSurface {
     /// Convert a forward delta to a strike using Garman-Kohlhagen
     /// (premium-unadjusted forward delta).
     #[staticmethod]
-    #[pyo3(text_signature = "(delta, forward, vol, expiry, r_f)")]
-    fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
-        FxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry, r_f)
+    #[pyo3(text_signature = "(delta, forward, vol, expiry)")]
+    fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
+        FxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry)
     }
 
     /// Convert a strike to forward delta (premium-unadjusted call delta).
     #[staticmethod]
-    #[pyo3(text_signature = "(strike, forward, vol, expiry, r_f)")]
-    fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
-        FxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry, r_f)
+    #[pyo3(text_signature = "(strike, forward, vol, expiry)")]
+    fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
+        FxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry)
     }
 
     fn __repr__(&self) -> String {

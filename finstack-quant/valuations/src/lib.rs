@@ -330,8 +330,6 @@
 //! # Feature Flags
 //!
 //! - `ts_export`: Enable TypeScript type export support for schema tooling.
-//! - `fx-vanna-volga`: Build the experimental Vanna-Volga smile-correction
-//!   pricer for FX barrier research and calibration.
 //!
 //! # References
 //!

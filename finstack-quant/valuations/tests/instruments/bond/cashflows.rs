@@ -142,11 +142,12 @@ fn test_floating_rate_cashflows() {
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
-            CashflowSpec::floating(
+            CashflowSpec::floating_with_reset_lag(
                 CurveId::new("USD-SOFR-3M"),
                 150.0,
                 Tenor::quarterly(),
                 DayCount::Act360,
+                0,
             )
             .expect("finite test rate"),
         )
@@ -444,11 +445,12 @@ fn test_cashflow_schedule_floating() {
         .issue_date(as_of)
         .maturity(maturity)
         .cashflow_spec(
-            CashflowSpec::floating(
+            CashflowSpec::floating_with_reset_lag(
                 CurveId::new("USD-SOFR-3M"),
                 100.0,
                 Tenor::quarterly(),
                 DayCount::Act360,
+                0,
             )
             .expect("finite test rate"),
         )

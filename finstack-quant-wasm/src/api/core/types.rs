@@ -62,12 +62,9 @@ impl Rate {
     /// ```
     #[wasm_bindgen(js_name = fromPercent)]
     pub fn from_percent(pct: f64) -> Result<Rate, JsValue> {
-        if !pct.is_finite() {
-            return Err(to_js_err("percent must be finite"));
-        }
-        Ok(Rate {
-            inner: RustRate::from_percent(pct),
-        })
+        RustRate::try_from_percent(pct)
+            .map(|inner| Rate { inner })
+            .map_err(to_js_err)
     }
 
     /// Create a rate from basis points.

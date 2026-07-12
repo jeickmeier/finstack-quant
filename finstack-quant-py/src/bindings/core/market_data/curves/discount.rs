@@ -88,31 +88,9 @@ impl PyDiscountCurve {
         if let Some(day_count) = day_count {
             builder = builder.day_count(parse_day_count(day_count)?);
         }
-        builder = match validation_mode {
-            "market_standard" => {
-                if forward_floor.is_some() {
-                    return Err(crate::errors::value_error(
-                        "forward_floor is only valid with validation_mode='negative_rate_friendly'",
-                    ));
-                }
-                builder.validation(ValidationMode::MarketStandard)
-            }
-            "negative_rate_friendly" => {
-                let floor = forward_floor.ok_or_else(|| {
-                    crate::errors::value_error(
-                        "forward_floor is required with validation_mode='negative_rate_friendly'",
-                    )
-                })?;
-                builder.validation(ValidationMode::NegativeRateFriendly {
-                    forward_floor: floor,
-                })
-            }
-            other => {
-                return Err(crate::errors::value_error(format!(
-                    "unknown DiscountCurve validation_mode {other:?}; expected 'market_standard' or 'negative_rate_friendly'"
-                )));
-            }
-        };
+        builder = builder.validation(
+            ValidationMode::from_preset(validation_mode, forward_floor).map_err(core_to_py)?,
+        );
 
         let curve = builder.build().map_err(core_to_py)?;
 

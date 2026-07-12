@@ -1,29 +1,13 @@
 from __future__ import annotations
 
 from finstack_quant.core.market_data import MarketContext
-from finstack_quant.valuations.instruments import (
-    commodity as commodity,
-    credit_derivatives as credit_derivatives,
-    equity as equity,
-    exotics as exotics,
-    fixed_income as fixed_income,
-    fx as fx,
-    rates as rates,
-)
 
 __all__ = [
-    "commodity",
-    "credit_derivatives",
-    "equity",
-    "exotics",
-    "fixed_income",
-    "fx",
     "instrument_cashflows_json",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "price_instrument",
     "price_instrument_with_metrics",
-    "rates",
     "validate_instrument_json",
 ]
 

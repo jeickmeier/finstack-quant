@@ -898,14 +898,7 @@ fn test_zero_count_tenor_rejected_at_generation() {
     // loudly instead of looping forever.
     use finstack_quant_core::dates::TenorUnit;
 
-    let start = make_date(2025, 1, 1);
-    let end = make_date(2026, 1, 1);
-
-    let err = ScheduleBuilder::new(start, end)
-        .unwrap()
-        .frequency(Tenor::new(0, TenorUnit::Months))
-        .build()
-        .expect_err("zero-count tenor must be rejected");
+    let err = Tenor::try_new(0, TenorUnit::Months).expect_err("zero-count tenor rejected");
 
     assert!(
         err.to_string().contains("positive"),

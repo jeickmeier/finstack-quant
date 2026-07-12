@@ -68,22 +68,22 @@ pub(crate) fn variance_observation_dates(
     end_of_month: bool,
     calendar: VarianceCalendar<'_>,
 ) -> finstack_quant_core::Result<Vec<Date>> {
-    if frequency.count == 0 {
+    if frequency.count() == 0 {
         return Err(finstack_quant_core::InputError::InvalidTenor {
-            tenor: format!("0{:?}", frequency.unit),
+            tenor: format!("0{:?}", frequency.unit()),
             reason: "count must be positive".to_string(),
         }
         .into());
     }
     let calendar = ResolvedVarianceCalendar::resolve(calendar)?;
 
-    let mut dates = if frequency.unit == TenorUnit::Days {
+    let mut dates = if frequency.unit() == TenorUnit::Days {
         let mut dates = Vec::new();
         let mut current = calendar.adjust(start, bdc)?;
         let end = calendar.adjust(maturity, bdc)?;
         while current <= end {
             dates.push(current);
-            current = calendar.add_business_days(current, frequency.count)?;
+            current = calendar.add_business_days(current, frequency.count())?;
         }
         if dates.last() != Some(&end) {
             dates.push(end);
@@ -159,15 +159,7 @@ mod tests {
 
     #[test]
     fn zero_frequency_is_rejected_without_iteration() {
-        let error = variance_observation_dates(
-            date!(2025 - 01 - 01),
-            date!(2025 - 02 - 01),
-            Tenor::new(0, TenorUnit::Days),
-            BusinessDayConvention::Following,
-            false,
-            VarianceCalendar::Single("USNY"),
-        )
-        .expect_err("zero tenor");
+        let error = Tenor::try_new(0, TenorUnit::Days).expect_err("zero tenor");
         assert!(error.to_string().contains("count must be positive"));
     }
 

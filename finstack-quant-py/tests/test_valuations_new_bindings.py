@@ -30,12 +30,13 @@ from finstack_quant.valuations import (
     bs_implied_vol,
     bs_price,
     instrument_cashflows,
-    instrument_cashflows_json,
+    inverse_floater_coupon_profile,
     lookback_option_price,
     quanto_option_price,
+    snowball_coupon_profile,
 )
 from finstack_quant.valuations.correlation import nearest_correlation
-from finstack_quant.valuations.instruments import price_instrument
+from finstack_quant.valuations.instruments import instrument_cashflows_json, price_instrument
 
 # ---------------------------------------------------------------------------
 # B1 — Black-Scholes / Black-76 primitives
@@ -264,3 +265,12 @@ def test_quanto_option_price_call_positive() -> None:
 def test_barrier_unknown_direction_raises() -> None:
     with pytest.raises(ValueError, match=r"barrier spec|direction"):
         barrier_call(100.0, 100.0, 110.0, 0.05, 0.02, 0.2, 1.0, "sideways", "in")
+
+
+def test_coupon_profile_entrypoints_have_distinct_explicit_inputs() -> None:
+    assert snowball_coupon_profile(0.02, 0.05, [0.01, 0.04], 0.0, 0.10) == pytest.approx(
+        [0.06, 0.07]
+    )
+    assert inverse_floater_coupon_profile(0.05, [0.01, 0.02], 0.0, 0.10, 2.0) == pytest.approx(
+        [0.03, 0.01]
+    )

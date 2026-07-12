@@ -123,7 +123,7 @@ fn test_standard_recovery_rate() {
 fn test_standard_tranche_derives_contractual_effective_date_for_seasoned_trade() {
     let pricer = CDSTranchePricer::new();
     let market = standard_market_context();
-    let as_of = date!(2025 - 02 - 15);
+    let as_of = base_date();
 
     let params = CDSTrancheParams::mezzanine_tranche(
         "CDX.NA.IG.42",

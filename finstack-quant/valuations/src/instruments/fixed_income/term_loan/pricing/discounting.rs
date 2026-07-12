@@ -55,10 +55,32 @@ use crate::pricer::{
 };
 use crate::results::ValuationResult;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
 
 use crate::instruments::fixed_income::term_loan::cashflows::generate_cashflows;
 use crate::instruments::fixed_income::term_loan::TermLoan;
+
+/// Discount holder-view flows using the curve's date-based discount factors.
+/// Cashflows on or before `as_of` are already settled and therefore excluded.
+fn npv_by_date(
+    disc: &DiscountCurve,
+    as_of: finstack_quant_core::dates::Date,
+    flows: &[(finstack_quant_core::dates::Date, Money)],
+) -> finstack_quant_core::Result<Money> {
+    if flows.is_empty() {
+        return Err(finstack_quant_core::InputError::TooFewPoints.into());
+    }
+
+    let mut total = Money::new(0.0, flows[0].1.currency());
+    for (date, amount) in flows {
+        if *date <= as_of {
+            continue;
+        }
+        total = total.checked_add(*amount * disc.df_between_dates(as_of, *date)?)?;
+    }
+    Ok(total)
+}
 
 /// Term loan pricer using deterministic cashflow discounting.
 ///
@@ -170,11 +192,7 @@ impl TermLoanDiscountingPricer {
         let (settlement_date, flows) = Self::pricing_flows(loan, market, as_of)?;
         let disc = market.get_discount(loan.discount_curve_id.as_str())?;
 
-        crate::instruments::common_impl::discountable::npv_by_date(
-            disc.as_ref(),
-            settlement_date,
-            &flows,
-        )
+        npv_by_date(disc.as_ref(), settlement_date, &flows)
     }
 
     /// Build the holder-view cashflows the discounting pricer values, anchored
@@ -373,7 +391,6 @@ mod tests {
     use super::*;
     use crate::cashflow::builder::specs::CouponType;
     use crate::cashflow::builder::FloatingRateSpec;
-    use crate::instruments::common_impl::discountable::npv_by_date;
     use crate::instruments::fixed_income::term_loan::spec::AmortizationSpec;
     use crate::instruments::pricing_overrides::PricingOverrides;
     use finstack_quant_core::cashflow::CFKind;

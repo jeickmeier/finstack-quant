@@ -1004,9 +1004,8 @@ impl TrancheScenarioStats {
         let paths = num_paths.max(1) as f64;
         let mean_pv = self.pv_stats.mean();
         let mean_loss = self.loss_stats.mean();
-        // Use population variance (n denominator) to match the sibling
-        // `StochasticMetricsCalculator::weighted_variance` convention and
-        // the INVARIANTS §3 requirement for MC estimators.
+        // Use population variance (n denominator), the established convention
+        // for these Monte Carlo loss estimators.
         let loss_std = self.loss_stats.population_variance().sqrt();
         let es = expected_shortfall(&mut self.losses, es_confidence);
 
@@ -1097,8 +1096,6 @@ impl ScenarioCollector {
         let mean_loss = self.deal_loss_stats.mean();
         // Welford population variance avoids catastrophic cancellation when
         // tranche PVs are large (≥ 1e7) and relative dispersion is small.
-        // The sibling `StochasticMetricsCalculator::weighted_variance` uses
-        // the same population-variance convention.
         let loss_pop_var = self.deal_loss_stats.population_variance();
         // Std-error: under antithetic mode each pair `(2k, 2k+1)` is one
         // negatively-correlated draw — dividing the per-path variance by

@@ -383,7 +383,7 @@ mod tests {
     use super::*;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::scalars::MarketScalar;
-    use finstack_quant_core::market_data::surfaces::VolSurface;
+    use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
     use serde_json::json;
 
     fn empty_market() -> MarketContext {
@@ -514,6 +514,7 @@ mod tests {
         let surface = VolSurface::builder("USD-CAP-VOL")
             .expiries(&[t_fix])
             .strikes(&[strike])
+            .quote_type(VolQuoteType::Normal)
             .row(&[normal_vol])
             .build()
             .expect("surface");
@@ -559,6 +560,7 @@ mod tests {
         let bumped_surface = VolSurface::builder("USD-CAP-VOL")
             .expiries(&[t_fix])
             .strikes(&[strike])
+            .quote_type(VolQuoteType::Normal)
             .row(&[base_normal_vol * 1.25])
             .build()
             .expect("surface");

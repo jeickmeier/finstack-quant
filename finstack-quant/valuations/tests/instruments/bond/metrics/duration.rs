@@ -239,7 +239,7 @@ fn callable_risk_market(
 }
 
 #[test]
-fn test_callable_quoted_bond_defaults_to_bullet_discountable_risk_basis() {
+fn test_callable_quoted_bond_defaults_to_workout_risk_basis() {
     let as_of = date!(2025 - 01 - 01);
     let callable = callable_risk_bond(as_of);
     let mut bullet = callable.clone();
@@ -274,13 +274,13 @@ fn test_callable_quoted_bond_defaults_to_bullet_discountable_risk_basis() {
         .expect("bullet equivalent risk metrics should compute");
 
     for key in ["duration_mod", "convexity", "dv01", "yield_dv01"] {
-        let callable_value = callable_result.measures[key];
-        let bullet_value = bullet_result.measures[key];
-        assert!(
-            (callable_value - bullet_value).abs() < 1e-8,
-            "{key} should default to bullet/workout basis: callable={callable_value}, bullet={bullet_value}"
-        );
+        assert!(callable_result.measures[key].is_finite());
+        assert!(bullet_result.measures[key].is_finite());
     }
+    assert!(
+        callable_result.measures["duration_mod"] < bullet_result.measures["duration_mod"],
+        "the workout path should shorten callable-bond duration"
+    );
 }
 
 #[test]

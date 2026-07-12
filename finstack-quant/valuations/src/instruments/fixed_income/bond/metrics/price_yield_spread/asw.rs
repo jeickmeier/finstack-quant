@@ -225,26 +225,28 @@ fn asw_effective_date(
     Ok(previous.min(quote_date))
 }
 
-fn asw_float_leg_conventions(fwd: &ForwardCurve) -> (DayCount, Tenor, BusinessDayConvention) {
+fn asw_float_leg_conventions(
+    fwd: &ForwardCurve,
+) -> finstack_quant_core::Result<(DayCount, Tenor, BusinessDayConvention)> {
     let id = fwd.id().as_str().to_ascii_uppercase();
     if id.contains("SOFRRATE") || id.contains("SOFR") {
-        (
+        Ok((
             DayCount::Act360,
             Tenor::annual(),
             BusinessDayConvention::ModifiedFollowing,
-        )
+        ))
     } else if id.contains("EURIBOR-6M") || id.contains("EURIBOR6M") {
-        (
+        Ok((
             DayCount::Act360,
             Tenor::semi_annual(),
             BusinessDayConvention::ModifiedFollowing,
-        )
+        ))
     } else {
-        (
+        Ok((
             fwd.day_count(),
-            Tenor::from_years(fwd.tenor(), fwd.day_count()),
+            Tenor::from_years(fwd.tenor(), fwd.day_count())?,
             BusinessDayConvention::ModifiedFollowing,
-        )
+        ))
     }
 }
 
@@ -883,7 +885,7 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                     let dc_fixed = self.config.fixed_leg_day_count.unwrap_or(dc);
                     if let Some(fwd_id) = asw_forward_curve_id.as_ref() {
                         let fwd = context.curves.get_forward(fwd_id)?;
-                        let (float_dc, float_freq, float_bdc) = asw_float_leg_conventions(&fwd);
+                        let (float_dc, float_freq, float_bdc) = asw_float_leg_conventions(&fwd)?;
                         let float_schedule = build_asw_schedule(
                             effective_date,
                             workout_maturity,

@@ -96,7 +96,9 @@ fn quadrature_panels(lower: f64, upper: f64) -> usize {
 /// let call = params.price_european(100.0, 100.0, 0.05, 0.0, 1.0, true);
 /// assert!(call > 0.0 && call < 100.0);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[serde(try_from = "RawHestonParams")]
 pub struct HestonParams {
     /// Initial variance (v₀ > 0).
@@ -111,12 +113,24 @@ pub struct HestonParams {
     pub rho: f64,
 }
 
+impl Default for HestonParams {
+    fn default() -> Self {
+        Self {
+            v0: 0.04,
+            kappa: 2.0,
+            theta: 0.04,
+            sigma: 0.3,
+            rho: -0.5,
+        }
+    }
+}
+
 /// Raw deserialization state of [`HestonParams`].
 ///
 /// Mirrors the serialized field layout exactly so the wire format is
 /// unchanged; conversion runs [`HestonParams::new`] validation and rejects
 /// unknown fields.
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct RawHestonParams {
     /// Initial variance.

@@ -848,7 +848,7 @@ impl VolSurface {
         match svi::calibrate_svi(&self.strikes, &slice_vols, forward, slice_expiry) {
             Ok(params) => {
                 let k = (strike / forward).ln();
-                let vol = params.implied_vol(k, slice_expiry);
+                let vol = params.implied_vol(k, slice_expiry).unwrap_or(f64::NAN);
                 if vol.is_finite() && vol > 0.0 {
                     vol
                 } else {
@@ -969,11 +969,6 @@ impl VolSurfaceBuilder {
     /// Finalise the surface and return an immutable [`VolSurface`] instance.
     /// Performs consistency checks on grid dimensions.
     pub fn build(self) -> crate::Result<VolSurface> {
-        if self.expiries.is_empty() || self.strikes.is_empty() {
-            return Err(InputError::TooFewPoints.into());
-        }
-        validate_axis(&self.expiries[..])?;
-        validate_axis(&self.strikes[..])?;
         if self.vols.len() != self.expiries.len() {
             return Err(InputError::DimensionMismatch.into());
         }
@@ -981,26 +976,19 @@ impl VolSurfaceBuilder {
             if row.len() != self.strikes.len() {
                 return Err(InputError::DimensionMismatch.into());
             }
-            // Validate numeric properties: volatilities must be finite and non-negative
-            for &v in row {
-                if !v.is_finite() {
-                    return Err(InputError::Invalid.into());
-                }
-                if v < 0.0 {
-                    return Err(InputError::NegativeValue.into());
-                }
-            }
         }
         let flat: Vec<f64> = self.vols.into_iter().flatten().collect();
-        Ok(VolSurface {
-            id: self.id,
-            expiries: self.expiries.into_boxed_slice(),
-            strikes: self.strikes.into_boxed_slice(),
-            secondary_axis: self.secondary_axis,
-            quote_type: self.quote_type,
-            interpolation_mode: self.interpolation_mode,
-            vols: flat.into_boxed_slice(),
-        })
+        VolSurface::from_grid_opts(
+            self.id.as_str(),
+            &self.expiries,
+            &self.strikes,
+            &flat,
+            VolGridOpts {
+                secondary_axis: self.secondary_axis,
+                quote_type: self.quote_type,
+                interpolation_mode: self.interpolation_mode,
+            },
+        )
     }
 }
 
@@ -1183,12 +1171,11 @@ impl VolSurface {
             let row: Vec<f64> = strikes
                 .iter()
                 .map(|&k| {
-                    let vol = params.implied_vol_lognormal(forward, k, t);
-                    // Floor for invalid params: use a small positive vol instead of
-                    // NaN/negative which would fail builder validation.
-                    super::floor_sabr_vol(vol, &mut floored)
+                    params
+                        .implied_vol_lognormal(forward, k, t)
+                        .map(|vol| super::floor_sabr_vol(vol, &mut floored))
                 })
-                .collect();
+                .collect::<crate::Result<_>>()?;
             builder = builder.row(&row);
         }
         super::warn_sabr_vol_floored("VolSurface::from_sabr", &id, floored);

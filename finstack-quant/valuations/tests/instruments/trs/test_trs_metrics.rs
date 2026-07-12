@@ -423,7 +423,7 @@ fn test_ir01_scales_with_notional() {
 // ================================================================================================
 
 #[test]
-fn test_equity_trs_index_delta_positive_for_receive() {
+fn test_equity_trs_index_delta_zero_before_start_for_receive() {
     // Arrange
     let market = create_market_context();
     let as_of = as_of_date();
@@ -443,11 +443,11 @@ fn test_equity_trs_index_delta_positive_for_receive() {
 
     // Assert
     let delta = *result.measures.get("index_delta").unwrap();
-    assert!(delta > 0.0, "Receive TR should have positive delta");
+    assert_eq!(delta, 0.0, "Pre-start TRS should have no spot delta");
 }
 
 #[test]
-fn test_equity_trs_index_delta_negative_for_pay() {
+fn test_equity_trs_index_delta_zero_before_start_for_pay() {
     // Arrange
     let market = create_market_context();
     let as_of = as_of_date();
@@ -467,7 +467,7 @@ fn test_equity_trs_index_delta_negative_for_pay() {
 
     // Assert
     let delta = *result.measures.get("index_delta").unwrap();
-    assert!(delta < 0.0, "Pay TR should have negative delta");
+    assert_eq!(delta, 0.0, "Pre-start TRS should have no spot delta");
 }
 
 #[test]

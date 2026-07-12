@@ -221,6 +221,14 @@
                 "null"
               ]
             },
+            "settlement_price": {
+              "description": "Official settlement price fixed after the last trading date.",
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
             "spot_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
               "description": "Index spot price identifier for fair value calculation."

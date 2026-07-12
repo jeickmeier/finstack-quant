@@ -561,22 +561,21 @@ pub struct InstrumentPricingOverrides {
 }
 
 impl InstrumentPricingOverrides {
-    /// Build instrument-owned pricing inputs from the compatibility wrapper.
-    pub fn from_pricing_overrides(pricing_overrides: &PricingOverrides) -> Self {
-        // Clone the sub-structs `PricingOverrides` owns by composition rather
-        // than re-listing each field, so this stays correct when fields are added.
-        Self {
-            market_quotes: pricing_overrides.market_quotes.clone(),
-            model_config: pricing_overrides.model_config.clone(),
-            term_loan: pricing_overrides.term_loan.clone(),
-        }
-    }
-
     /// Validate instrument-owned override fields.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.market_quotes.validate()?;
         self.model_config.validate()?;
         Ok(())
+    }
+}
+
+impl From<&PricingOverrides> for InstrumentPricingOverrides {
+    fn from(pricing_overrides: &PricingOverrides) -> Self {
+        Self {
+            market_quotes: pricing_overrides.market_quotes.clone(),
+            model_config: pricing_overrides.model_config.clone(),
+            term_loan: pricing_overrides.term_loan.clone(),
+        }
     }
 }
 
@@ -641,13 +640,6 @@ pub struct MetricPricingOverrides {
 }
 
 impl MetricPricingOverrides {
-    /// Build metric-only overrides from the compatibility `PricingOverrides` wrapper.
-    pub fn from_pricing_overrides(pricing_overrides: &PricingOverrides) -> Self {
-        // `PricingOverrides` owns the metric overrides by composition, so clone
-        // the whole sub-struct instead of re-listing each field.
-        pricing_overrides.metrics.clone()
-    }
-
     /// Validate metric override fields.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::InputError;
@@ -733,6 +725,12 @@ impl MetricPricingOverrides {
     }
 }
 
+impl From<&PricingOverrides> for MetricPricingOverrides {
+    fn from(pricing_overrides: &PricingOverrides) -> Self {
+        pricing_overrides.metrics.clone()
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Sub-struct: Scenario adjustments
 // ---------------------------------------------------------------------------
@@ -764,11 +762,6 @@ pub struct ScenarioPricingOverrides {
 }
 
 impl ScenarioPricingOverrides {
-    /// Build scenario-only adjustments from the compatibility `PricingOverrides` wrapper.
-    pub fn from_pricing_overrides(pricing_overrides: &PricingOverrides) -> Self {
-        pricing_overrides.scenario.clone()
-    }
-
     /// Validate scenario shocks for finiteness.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         // Shocks may be negative (downside / tightening scenarios) but must be finite.
@@ -784,6 +777,12 @@ impl ScenarioPricingOverrides {
             return value;
         };
         Money::new(value.amount() * (1.0 + shock), value.currency())
+    }
+}
+
+impl From<&PricingOverrides> for ScenarioPricingOverrides {
+    fn from(pricing_overrides: &PricingOverrides) -> Self {
+        pricing_overrides.scenario.clone()
     }
 }
 
@@ -1326,7 +1325,7 @@ mod tests {
             .with_var_config(crate::metrics::risk::VarConfig::var_99())
             .with_price_shock_pct(-0.10);
 
-        let metric_overrides = MetricPricingOverrides::from_pricing_overrides(&po);
+        let metric_overrides = MetricPricingOverrides::from(&po);
 
         assert_eq!(metric_overrides.theta_period.as_deref(), Some("1W"));
         assert_eq!(
@@ -1381,7 +1380,7 @@ mod tests {
 
         po.model_config.use_gobet_miri = true;
 
-        let scenario_overrides = ScenarioPricingOverrides::from_pricing_overrides(&po);
+        let scenario_overrides = ScenarioPricingOverrides::from(&po);
 
         assert_eq!(scenario_overrides.scenario_price_shock_pct, Some(-0.10));
     }

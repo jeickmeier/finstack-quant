@@ -13,9 +13,9 @@
 
 use super::StructuredCredit;
 use crate::cashflow::traits::CashflowProvider;
-use crate::instruments::common_impl::discountable::Discountable;
 use crate::metrics::{MetricContext, MetricId};
 use crate::results::ValuationResult;
+use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -36,8 +36,7 @@ impl StructuredCredit {
         let disc = context.get_discount(self.discount_curve_id.as_str())?;
         let flows = self.dated_cashflows(context, as_of)?;
 
-        let day_count = disc.day_count();
-        flows.npv(disc.as_ref(), as_of, Some(day_count))
+        flows.npv(disc.as_ref(), as_of)
     }
 
     /// Value the total hedge swap portfolio.

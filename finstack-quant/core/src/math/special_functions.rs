@@ -405,10 +405,10 @@ pub fn standard_normal_inv_cdf(p: f64) -> f64 {
 /// use finstack_quant_core::math::special_functions::student_t_cdf;
 ///
 /// // CDF at zero should be 0.5 (symmetric distribution)
-/// assert!((student_t_cdf(0.0, 5.0) - 0.5).abs() < 1e-6);
+/// assert!((student_t_cdf(0.0, 5.0).expect("valid checked inputs") - 0.5).abs() < 1e-6);
 ///
 /// // High df approaches normal distribution
-/// let t_cdf = student_t_cdf(1.96, 1000.0);
+/// let t_cdf = student_t_cdf(1.96, 1000.0).expect("valid checked inputs");
 /// assert!((t_cdf - 0.975).abs() < 0.01);
 /// ```
 ///
@@ -416,15 +416,9 @@ pub fn standard_normal_inv_cdf(p: f64) -> f64 {
 ///
 /// This is a thin wrapper around `statrs::distribution::StudentsT::cdf`.
 #[inline]
-pub fn student_t_cdf(x: f64, df: f64) -> f64 {
-    try_student_t_cdf(x, df).unwrap_or(f64::NAN)
-}
-
-/// Fallible Student-t cumulative distribution function.
-///
 /// # Errors
 /// Returns a validation error when `df` is non-finite or not strictly positive.
-pub fn try_student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
+pub fn student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
     if !df.is_finite() || df <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "student_t_cdf requires finite df > 0, got {df}"
@@ -461,26 +455,20 @@ pub fn try_student_t_cdf(x: f64, df: f64) -> crate::Result<f64> {
 /// use finstack_quant_core::math::special_functions::{student_t_inv_cdf, student_t_cdf};
 ///
 /// // Inverse of median should be zero
-/// assert!((student_t_inv_cdf(0.5, 5.0) - 0.0).abs() < 1e-6);
+/// assert!((student_t_inv_cdf(0.5, 5.0).expect("valid checked inputs") - 0.0).abs() < 1e-6);
 ///
 /// // Round-trip test
-/// let x = student_t_inv_cdf(0.95, 10.0);
-/// let p_back = student_t_cdf(x, 10.0);
+/// let x = student_t_inv_cdf(0.95, 10.0).expect("valid checked inputs");
+/// let p_back = student_t_cdf(x, 10.0).expect("valid checked inputs");
 /// assert!((p_back - 0.95).abs() < 1e-6);
 /// ```
 ///
 /// # Implementation
 ///
 /// This is a thin wrapper around `statrs::distribution::StudentsT::inverse_cdf`.
-pub fn student_t_inv_cdf(p: f64, df: f64) -> f64 {
-    try_student_t_inv_cdf(p, df).unwrap_or(f64::NAN)
-}
-
-/// Fallible inverse Student-t cumulative distribution function.
-///
 /// # Errors
 /// Returns a validation error when `df` is non-finite or not strictly positive.
-pub fn try_student_t_inv_cdf(p: f64, df: f64) -> crate::Result<f64> {
+pub fn student_t_inv_cdf(p: f64, df: f64) -> crate::Result<f64> {
     if !df.is_finite() || df <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "student_t_inv_cdf requires finite df > 0, got {df}"
@@ -522,12 +510,29 @@ mod tests {
     #[test]
     fn test_student_t_inv_cdf_out_of_domain_saturates() {
         for df in [5.0, 1000.0] {
-            assert!(student_t_inv_cdf(f64::NAN, df).is_nan(), "df={df}");
-            assert_eq!(student_t_inv_cdf(-0.1, df), f64::NEG_INFINITY, "df={df}");
-            assert_eq!(student_t_inv_cdf(0.0, df), f64::NEG_INFINITY, "df={df}");
-            assert_eq!(student_t_inv_cdf(1.0, df), f64::INFINITY, "df={df}");
+            assert!(
+                student_t_inv_cdf(f64::NAN, df)
+                    .expect("valid checked inputs")
+                    .is_nan(),
+                "df={df}"
+            );
             assert_eq!(
-                student_t_inv_cdf(1.000_000_000_000_000_2, df),
+                student_t_inv_cdf(-0.1, df).expect("valid checked inputs"),
+                f64::NEG_INFINITY,
+                "df={df}"
+            );
+            assert_eq!(
+                student_t_inv_cdf(0.0, df).expect("valid checked inputs"),
+                f64::NEG_INFINITY,
+                "df={df}"
+            );
+            assert_eq!(
+                student_t_inv_cdf(1.0, df).expect("valid checked inputs"),
+                f64::INFINITY,
+                "df={df}"
+            );
+            assert_eq!(
+                student_t_inv_cdf(1.000_000_000_000_000_2, df).expect("valid checked inputs"),
                 f64::INFINITY,
                 "df={df}"
             );
@@ -537,10 +542,8 @@ mod tests {
     #[test]
     fn invalid_student_t_df_is_consistent_across_build_profiles() {
         for df in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert!(student_t_cdf(1.0, df).is_nan());
-            assert!(student_t_inv_cdf(0.95, df).is_nan());
-            assert!(try_student_t_cdf(1.0, df).is_err());
-            assert!(try_student_t_inv_cdf(0.95, df).is_err());
+            assert!(student_t_cdf(1.0, df).is_err());
+            assert!(student_t_inv_cdf(0.95, df).is_err());
         }
     }
 
@@ -553,11 +556,12 @@ mod tests {
         let exact_quantile = dist.inverse_cdf(0.001);
 
         assert!(
-            (student_t_cdf(-3.0, 101.0) - exact_cdf).abs() < 1e-14,
+            (student_t_cdf(-3.0, 101.0).expect("valid checked inputs") - exact_cdf).abs() < 1e-14,
             "df=101 CDF should use exact Student-t tail"
         );
         assert!(
-            (student_t_inv_cdf(0.001, 101.0) - exact_quantile).abs() < 1e-12,
+            (student_t_inv_cdf(0.001, 101.0).expect("valid checked inputs") - exact_quantile).abs()
+                < 1e-12,
             "df=101 inverse CDF should use exact Student-t tail"
         );
     }
@@ -795,12 +799,12 @@ mod tests {
     #[test]
     fn test_student_t_cdf() {
         // Test CDF at zero (should be 0.5 for symmetric distribution)
-        assert!((student_t_cdf(0.0, 5.0) - 0.5).abs() < 1e-6);
-        assert!((student_t_cdf(0.0, 10.0) - 0.5).abs() < 1e-6);
+        assert!((student_t_cdf(0.0, 5.0).expect("valid checked inputs") - 0.5).abs() < 1e-6);
+        assert!((student_t_cdf(0.0, 10.0).expect("valid checked inputs") - 0.5).abs() < 1e-6);
 
         // Test known values from statistical tables
         // t-distribution with df=5, x=-2.0 should give CDF ≈ 0.051
-        let cdf = student_t_cdf(-2.0, 5.0);
+        let cdf = student_t_cdf(-2.0, 5.0).expect("valid checked inputs");
         assert!(
             (cdf - 0.051).abs() < 0.002,
             "CDF(-2.0, df=5) = {}, expected ~0.051",
@@ -810,8 +814,8 @@ mod tests {
         // Test symmetry: F(-x) = 1 - F(x)
         let x = 1.5;
         let df = 5.0;
-        let cdf_neg = student_t_cdf(-x, df);
-        let cdf_pos = student_t_cdf(x, df);
+        let cdf_neg = student_t_cdf(-x, df).expect("valid checked inputs");
+        let cdf_pos = student_t_cdf(x, df).expect("valid checked inputs");
         assert!(
             (cdf_neg + cdf_pos - 1.0).abs() < 1e-10,
             "CDF symmetry violated: F(-{}) + F({}) = {} + {} ≠ 1",
@@ -826,7 +830,7 @@ mod tests {
     fn test_student_t_cdf_approaches_normal() {
         // With high df, Student-t approaches Normal
         let x = -1.5;
-        let t_cdf = student_t_cdf(x, 200.0);
+        let t_cdf = student_t_cdf(x, 200.0).expect("valid checked inputs");
         let normal_cdf = norm_cdf(x);
 
         assert!(
@@ -837,7 +841,7 @@ mod tests {
         );
 
         // Test fallback to normal for very high df
-        let t_cdf_high = student_t_cdf(x, 1000.0);
+        let t_cdf_high = student_t_cdf(x, 1000.0).expect("valid checked inputs");
         assert!(
             (t_cdf_high - normal_cdf).abs() < 0.001,
             "Very high df should be almost identical to normal"
@@ -847,14 +851,14 @@ mod tests {
     #[test]
     fn test_student_t_inv_cdf() {
         // Test inverse of median should be zero
-        assert!((student_t_inv_cdf(0.5, 5.0) - 0.0).abs() < 1e-6);
-        assert!((student_t_inv_cdf(0.5, 10.0) - 0.0).abs() < 1e-6);
+        assert!((student_t_inv_cdf(0.5, 5.0).expect("valid checked inputs") - 0.0).abs() < 1e-6);
+        assert!((student_t_inv_cdf(0.5, 10.0).expect("valid checked inputs") - 0.0).abs() < 1e-6);
 
         // Test round-trip
         let p = 0.95;
         let df = 10.0;
-        let x = student_t_inv_cdf(p, df);
-        let p_back = student_t_cdf(x, df);
+        let x = student_t_inv_cdf(p, df).expect("valid checked inputs");
+        let p_back = student_t_cdf(x, df).expect("valid checked inputs");
         assert!(
             (p_back - p).abs() < 1e-6,
             "Round-trip failed: p={}, x={}, p_back={}",
@@ -871,8 +875,8 @@ mod tests {
 
         for &p in &test_probs {
             for &df in &test_dfs {
-                let x = student_t_inv_cdf(p, df);
-                let p_back = student_t_cdf(x, df);
+                let x = student_t_inv_cdf(p, df).expect("valid checked inputs");
+                let p_back = student_t_cdf(x, df).expect("valid checked inputs");
                 assert!(
                     (p - p_back).abs() < 1e-5,
                     "Round-trip failed for p={}, df={}: got x={}, p_back={}",

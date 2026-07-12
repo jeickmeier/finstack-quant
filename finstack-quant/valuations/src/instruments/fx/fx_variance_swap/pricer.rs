@@ -100,11 +100,11 @@ pub(crate) fn annualization_factor(inst: &FxVarianceSwap) -> f64 {
     if let Some(months) = inst.observation_freq.months() {
         return 12.0 / months as f64;
     }
-    if inst.observation_freq.unit == TenorUnit::Weeks {
-        return 52.0 / f64::from(inst.observation_freq.count);
+    if inst.observation_freq.unit() == TenorUnit::Weeks {
+        return 52.0 / f64::from(inst.observation_freq.count());
     }
-    if inst.observation_freq.unit == TenorUnit::Days {
-        return 252.0 / f64::from(inst.observation_freq.count);
+    if inst.observation_freq.unit() == TenorUnit::Days {
+        return 252.0 / f64::from(inst.observation_freq.count());
     }
     252.0
 }

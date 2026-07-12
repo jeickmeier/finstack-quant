@@ -1887,7 +1887,7 @@ mod tests {
     }
 
     #[test]
-    fn test_cashflow_provider_emits_delivery_invoice_flow() {
+    fn test_cashflow_provider_rejects_physical_delivery_schedule() {
         let ctd_bond_id = InstrumentId::new("US912828XG33");
         let ctd_bond = Bond::fixed(
             ctd_bond_id.as_str(),
@@ -1918,19 +1918,14 @@ mod tests {
             .build()
             .expect("valid future");
 
-        let flows = future
+        let err = future
             .dated_cashflows(&MarketContext::new(), future.expiry)
-            .expect("delivery schedule should build");
-
-        assert_eq!(
-            flows.len(),
-            1,
-            "bond future should emit one delivery invoice flow"
-        );
-        assert_eq!(flows[0].0, future.delivery_start);
+            .expect_err("physical delivery requires the typed invoice result");
         assert!(
-            flows[0].1.amount() < 0.0,
-            "long futures delivery should require paying the invoice"
+            err.to_string().contains(
+                "physical delivery cannot be represented as a standalone cashflow schedule"
+            ),
+            "unexpected error: {err}"
         );
     }
 }

@@ -136,7 +136,6 @@ pub use solver::{BracketHint, BrentSolver, NewtonSolver, Solver};
 pub use solver_multi::{AnalyticalDerivatives, LevenbergMarquardtSolver};
 pub use special_functions::{
     erf, ln_gamma, norm_cdf, norm_pdf, standard_normal_inv_cdf, student_t_cdf, student_t_inv_cdf,
-    try_student_t_cdf, try_student_t_inv_cdf,
 };
 pub use stats::{
     correlation, covariance, finite_count, finite_max_or_nan, finite_min_or_nan, mean, mean_or_nan,

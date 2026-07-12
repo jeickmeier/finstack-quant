@@ -19,6 +19,7 @@
       "expiry": "2026-07-30",
       "foreign_discount_curve_id": "EUR-OIS",
       "id": "EURUSD-UP-OUT-CALL-3M-QUANTLIB",
+      "monitoring_start_date": "2026-04-30",
       "notional": {
         "amount": "1000000",
         "currency": "EUR"

@@ -238,9 +238,7 @@ impl FxDeltaVolSurface {
     /// Convert a forward delta to a strike using Garman-Kohlhagen.
     ///
     /// Uses **forward delta** (premium-unadjusted) convention, which is standard
-    /// for most G10 pairs. The `r_f` parameter is accepted for API compatibility
-    /// but is not used — forward delta depends only on the forward price, not
-    /// individual interest rates.
+    /// for most G10 pairs. Forward delta depends only on the forward price.
     ///
     /// ```text
     /// K = F * exp(-N_inv(delta) * sigma * sqrt(T) + 0.5 * sigma^2 * T)
@@ -248,7 +246,7 @@ impl FxDeltaVolSurface {
     ///
     /// `delta` should be in (0, 1) for a call.
     #[inline]
-    pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64, _r_f: f64) -> f64 {
+    pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
         let z_delta = crate::math::special_functions::standard_normal_inv_cdf(delta);
         let sqrt_t = expiry.sqrt();
         forward * (-z_delta * vol * sqrt_t + 0.5 * vol * vol * expiry).exp()
@@ -256,13 +254,12 @@ impl FxDeltaVolSurface {
 
     /// Convert a strike to forward delta using Garman-Kohlhagen.
     ///
-    /// Uses **forward delta** (premium-unadjusted) convention. The `r_f`
-    /// parameter is accepted for API compatibility but is not used.
+    /// Uses **forward delta** (premium-unadjusted) convention.
     ///
     /// Returns the call delta: `N(d1)` where
     /// `d1 = [ln(F/K) + 0.5 * sigma^2 * T] / (sigma * sqrt(T))`.
     #[inline]
-    pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64, _r_f: f64) -> f64 {
+    pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
         let d1 = d1_black76(forward, strike, vol, expiry);
         norm_cdf(d1)
     }
@@ -293,14 +290,7 @@ impl FxDeltaVolSurface {
     ///
     /// Returns an error if the expiry is non-positive or a recovered wing vol
     /// is non-positive.
-    pub fn implied_vol(
-        &self,
-        expiry: f64,
-        strike: f64,
-        forward: f64,
-        _r_d: f64,
-        _r_f: f64,
-    ) -> crate::Result<f64> {
+    pub fn implied_vol(&self, expiry: f64, strike: f64, forward: f64) -> crate::Result<f64> {
         if expiry <= 0.0 || !expiry.is_finite() {
             return Err(InputError::NonPositiveValue.into());
         }
@@ -474,11 +464,10 @@ mod tests {
         let forward = 1.10;
         let vol = 0.09;
         let expiry = 1.0;
-        let r_f = 0.04;
         let delta = 0.25;
 
-        let strike = FxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry, r_f);
-        let recovered_delta = FxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry, r_f);
+        let strike = FxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry);
+        let recovered_delta = FxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry);
 
         assert!(
             (recovered_delta - delta).abs() < 1e-10,
@@ -491,11 +480,10 @@ mod tests {
         let forward = 1.10;
         let vol = 0.09;
         let expiry = 0.5;
-        let r_f = 0.04;
         let delta = 0.75;
 
-        let strike = FxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry, r_f);
-        let recovered_delta = FxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry, r_f);
+        let strike = FxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry);
+        let recovered_delta = FxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry);
 
         assert!(
             (recovered_delta - delta).abs() < 1e-10,
@@ -510,10 +498,9 @@ mod tests {
         let forward = 1.10;
         let vol = 0.001; // nearly zero vol -> K_ATM -> F
         let expiry = 1.0;
-        let r_f = 0.0;
 
         // ATM DNS: delta = 0.5, strike = F * exp(0.5 * sigma^2 * T)
-        let k_atm = FxDeltaVolSurface::delta_to_strike(0.5, forward, vol, expiry, r_f);
+        let k_atm = FxDeltaVolSurface::delta_to_strike(0.5, forward, vol, expiry);
 
         // With very small vol, K_ATM should be very close to F
         assert!(
@@ -579,13 +566,11 @@ mod tests {
     fn implied_vol_returns_positive_finite() {
         let surface = sample_surface();
         let forward = 1.10;
-        let r_d = 0.05;
-        let r_f = 0.04;
 
         // ATM-ish strike
         let k_atm = forward * (0.5 * 0.09_f64.powi(2) * 1.0).exp();
         let vol = surface
-            .implied_vol(1.0, k_atm, forward, r_d, r_f)
+            .implied_vol(1.0, k_atm, forward)
             .expect("implied_vol should succeed");
 
         assert!(vol > 0.0, "vol should be positive, got {vol}");
@@ -601,18 +586,16 @@ mod tests {
     fn implied_vol_at_wing_strikes() {
         let surface = sample_surface();
         let forward = 1.10;
-        let r_d = 0.05;
-        let r_f = 0.04;
 
         // Low strike (put wing)
         let vol_low = surface
-            .implied_vol(1.0, 0.95, forward, r_d, r_f)
+            .implied_vol(1.0, 0.95, forward)
             .expect("low strike implied_vol should succeed");
         assert!(vol_low > 0.0 && vol_low.is_finite());
 
         // High strike (call wing)
         let vol_high = surface
-            .implied_vol(1.0, 1.30, forward, r_d, r_f)
+            .implied_vol(1.0, 1.30, forward)
             .expect("high strike implied_vol should succeed");
         assert!(vol_high > 0.0 && vol_high.is_finite());
     }
@@ -621,12 +604,10 @@ mod tests {
     fn implied_vol_interpolated_expiry() {
         let surface = sample_surface();
         let forward = 1.10;
-        let r_d = 0.05;
-        let r_f = 0.04;
         let k_atm = forward * (0.5 * 0.0825_f64.powi(2) * 0.375).exp();
 
         let vol = surface
-            .implied_vol(0.375, k_atm, forward, r_d, r_f)
+            .implied_vol(0.375, k_atm, forward)
             .expect("interpolated expiry should succeed");
 
         assert!(vol > 0.0 && vol.is_finite());
@@ -671,14 +652,10 @@ mod tests {
     #[test]
     fn implied_vol_rejects_non_positive_expiry() {
         let surface = sample_surface();
-        assert!(surface.implied_vol(0.0, 1.10, 1.10, 0.05, 0.04).is_err());
-        assert!(surface.implied_vol(-0.5, 1.10, 1.10, 0.05, 0.04).is_err());
-        assert!(surface
-            .implied_vol(1.0, f64::NAN, 1.10, 0.05, 0.04)
-            .is_err());
-        assert!(surface
-            .implied_vol(1.0, 1.10, f64::NAN, 0.05, 0.04)
-            .is_err());
-        assert!(surface.implied_vol(1.0, 1.10, 0.0, 0.05, 0.04).is_err());
+        assert!(surface.implied_vol(0.0, 1.10, 1.10).is_err());
+        assert!(surface.implied_vol(-0.5, 1.10, 1.10).is_err());
+        assert!(surface.implied_vol(1.0, f64::NAN, 1.10).is_err());
+        assert!(surface.implied_vol(1.0, 1.10, f64::NAN).is_err());
+        assert!(surface.implied_vol(1.0, 1.10, 0.0).is_err());
     }
 }

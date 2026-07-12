@@ -18,6 +18,7 @@ use finstack_quant_core::money::fx::{
     FxRateResult as RustFxRateResult, SimpleFxProvider,
 };
 use js_sys::Float64Array;
+use serde::Deserialize;
 use wasm_bindgen::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -134,31 +135,13 @@ impl DiscountCurve {
         if let Some(ref s) = day_count {
             builder = builder.day_count(parse_day_count(s)?);
         }
-        builder = match validation_mode.as_deref().unwrap_or("market_standard") {
-            "market_standard" => {
-                if forward_floor.is_some() {
-                    return Err(to_js_err(
-                        "forwardFloor is only valid with validationMode='negative_rate_friendly'",
-                    ));
-                }
-                builder.validation(ValidationMode::MarketStandard)
-            }
-            "negative_rate_friendly" => {
-                let floor = forward_floor.ok_or_else(|| {
-                    to_js_err(
-                        "forwardFloor is required with validationMode='negative_rate_friendly'",
-                    )
-                })?;
-                builder.validation(ValidationMode::NegativeRateFriendly {
-                    forward_floor: floor,
-                })
-            }
-            other => {
-                return Err(to_js_err(format!(
-                    "unknown DiscountCurve validationMode {other:?}; expected 'market_standard' or 'negative_rate_friendly'"
-                )));
-            }
-        };
+        builder = builder.validation(
+            ValidationMode::from_preset(
+                validation_mode.as_deref().unwrap_or("market_standard"),
+                forward_floor,
+            )
+            .map_err(to_js_err)?,
+        );
 
         let curve = builder.build().map_err(to_js_err)?;
 
@@ -200,6 +183,25 @@ impl DiscountCurve {
 // ForwardCurve
 // ---------------------------------------------------------------------------
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ForwardCurveOptions {
+    id: String,
+    tenor: f64,
+    base_date: String,
+    knots: Vec<f64>,
+    #[serde(default)]
+    day_count: Option<String>,
+    #[serde(default)]
+    interp: Option<String>,
+    #[serde(default)]
+    extrapolation: Option<String>,
+    #[serde(default)]
+    projection_grid: Option<Vec<f64>>,
+    #[serde(default)]
+    reset_lag: Option<i32>,
+}
+
 /// Forward rate curve for a floating-rate index with a fixed tenor.
 #[wasm_bindgen(js_name = ForwardCurve)]
 pub struct ForwardCurve {
@@ -209,6 +211,53 @@ pub struct ForwardCurve {
 
 #[wasm_bindgen(js_class = ForwardCurve)]
 impl ForwardCurve {
+    fn build(options: ForwardCurveOptions) -> Result<ForwardCurve, JsValue> {
+        let base = parse_iso_date(&options.base_date)?;
+        let style = options
+            .interp
+            .as_deref()
+            .map(parse_interp_style)
+            .transpose()?
+            .unwrap_or(InterpStyle::Linear);
+        let extrap = options
+            .extrapolation
+            .as_deref()
+            .map(parse_extrapolation)
+            .transpose()?
+            .unwrap_or(ExtrapolationPolicy::FlatForward);
+
+        if !options.knots.len().is_multiple_of(2) {
+            return Err(to_js_err(
+                "knots array must have even length (t, rate pairs)",
+            ));
+        }
+        let pairs = options
+            .knots
+            .chunks_exact(2)
+            .map(|c| (c[0], c[1]))
+            .collect::<Vec<_>>();
+
+        let mut builder = RustForwardCurve::builder(options.id, options.tenor)
+            .base_date(base)
+            .knots(pairs)
+            .interp(style)
+            .extrapolation(extrap)
+            .projection_grid_opt(options.projection_grid);
+        if let Some(day_count) = options.day_count.as_deref() {
+            builder = builder.day_count(parse_day_count(day_count)?);
+        }
+        if let Some(reset_lag) = options.reset_lag {
+            builder = builder.reset_lag(reset_lag);
+        }
+
+        builder
+            .build()
+            .map(|curve| Self {
+                inner: Arc::new(curve),
+            })
+            .map_err(to_js_err)
+    }
+
     /// Construct from an array of `[time, rate]` pairs.
     ///
     /// # Arguments
@@ -238,41 +287,24 @@ impl ForwardCurve {
         projection_grid: Option<Vec<f64>>,
         reset_lag: Option<i32>,
     ) -> Result<ForwardCurve, JsValue> {
-        let base = parse_iso_date(base_date)?;
-        let style = match interp {
-            Some(ref s) => parse_interp_style(s)?,
-            None => InterpStyle::Linear,
-        };
-        let extrap = match extrapolation {
-            Some(ref s) => parse_extrapolation(s)?,
-            None => ExtrapolationPolicy::FlatForward,
-        };
-
-        if !knots.len().is_multiple_of(2) {
-            return Err(to_js_err(
-                "knots array must have even length (t, rate pairs)",
-            ));
-        }
-        let pairs: Vec<(f64, f64)> = knots.chunks_exact(2).map(|c| (c[0], c[1])).collect();
-
-        let mut builder = RustForwardCurve::builder(id, tenor)
-            .base_date(base)
-            .knots(pairs)
-            .interp(style)
-            .extrapolation(extrap)
-            .projection_grid_opt(projection_grid);
-        if let Some(ref s) = day_count {
-            builder = builder.day_count(parse_day_count(s)?);
-        }
-        if let Some(reset_lag) = reset_lag {
-            builder = builder.reset_lag(reset_lag);
-        }
-
-        let curve = builder.build().map_err(to_js_err)?;
-
-        Ok(Self {
-            inner: Arc::new(curve),
+        Self::build(ForwardCurveOptions {
+            id: id.to_string(),
+            tenor,
+            base_date: base_date.to_string(),
+            knots: knots.to_vec(),
+            day_count,
+            interp,
+            extrapolation,
+            projection_grid,
+            reset_lag,
         })
+    }
+
+    /// Construct from a named JavaScript options object.
+    #[wasm_bindgen(js_name = fromOptions)]
+    pub fn from_options(options: JsValue) -> Result<ForwardCurve, JsValue> {
+        let options = serde_wasm_bindgen::from_value(options).map_err(to_js_err)?;
+        Self::build(options)
     }
 
     /// Forward rate at year fraction `t`.
@@ -738,31 +770,24 @@ impl FxDeltaVolSurface {
         Ok(vec![atm, p, c])
     }
 
-    /// Implied vol at `(expiry, strike)` for the supplied forward + rates.
+    /// Implied vol at `(expiry, strike)` for the supplied forward.
     #[wasm_bindgen(js_name = impliedVol)]
-    pub fn implied_vol(
-        &self,
-        expiry: f64,
-        strike: f64,
-        forward: f64,
-        r_d: f64,
-        r_f: f64,
-    ) -> Result<f64, JsValue> {
+    pub fn implied_vol(&self, expiry: f64, strike: f64, forward: f64) -> Result<f64, JsValue> {
         self.inner
-            .implied_vol(expiry, strike, forward, r_d, r_f)
+            .implied_vol(expiry, strike, forward)
             .map_err(to_js_err)
     }
 
     /// Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted).
     #[wasm_bindgen(js_name = deltaToStrike)]
-    pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
-        RustFxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry, r_f)
+    pub fn delta_to_strike(delta: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
+        RustFxDeltaVolSurface::delta_to_strike(delta, forward, vol, expiry)
     }
 
     /// Convert a strike to forward delta (Garman-Kohlhagen call delta).
     #[wasm_bindgen(js_name = strikeToDelta)]
-    pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64, r_f: f64) -> f64 {
-        RustFxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry, r_f)
+    pub fn strike_to_delta(strike: f64, forward: f64, vol: f64, expiry: f64) -> f64 {
+        RustFxDeltaVolSurface::strike_to_delta(strike, forward, vol, expiry)
     }
 }
 

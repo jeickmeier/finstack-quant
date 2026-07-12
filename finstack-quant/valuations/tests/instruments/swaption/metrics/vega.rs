@@ -119,8 +119,8 @@ fn test_atm_vega_highest() {
 #[test]
 fn test_vega_increases_with_time() {
     let as_of = time::macros::date!(2024 - 01 - 01);
-    let swap_start = time::macros::date!(2025 - 01 - 01);
-    let swap_end = time::macros::date!(2030 - 01 - 01);
+    let swap_start = time::macros::date!(2027 - 01 - 01);
+    let swap_end = time::macros::date!(2032 - 01 - 01);
     let market = create_flat_market(as_of, 0.05, 0.30);
 
     // Short expiry

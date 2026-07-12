@@ -56,13 +56,9 @@ pub(crate) fn compute_pv(
         .collect();
 
     let future_pv = if let Some(ref discount_curve_id) = fund.discount_curve_id {
-        use crate::instruments::common_impl::discountable::Discountable;
+        use finstack_quant_core::cashflow::Discountable;
         let disc = curves.get_discount(discount_curve_id.as_str())?;
-        future_flows.npv(
-            disc.as_ref(),
-            disc.base_date(),
-            Some(fund.waterfall_spec.irr_basis),
-        )?
+        future_flows.npv(disc.as_ref(), disc.base_date())?
     } else {
         let total: f64 = future_flows.iter().map(|(_, m)| m.amount()).sum();
         Money::new(total, fund.currency)

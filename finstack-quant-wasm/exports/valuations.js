@@ -50,6 +50,7 @@ export const valuations = {
   mertonJumpCosPrice: wasm.mertonJumpCosPrice,
   tarnCouponProfile: wasm.tarnCouponProfile,
   snowballCouponProfile: wasm.snowballCouponProfile,
+  inverseFloaterCouponProfile: wasm.inverseFloaterCouponProfile,
   cmsSpreadOptionIntrinsic: wasm.cmsSpreadOptionIntrinsic,
   callableRangeAccrualAccrued: wasm.callableRangeAccrualAccrued,
 };

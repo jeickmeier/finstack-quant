@@ -59,37 +59,37 @@ fn compute_index_maturity(
     index_tenor: Tenor,
 ) -> finstack_quant_core::Result<Date> {
     use finstack_quant_core::dates::TenorUnit;
-    let maturity = match index_tenor.unit {
+    let maturity = match index_tenor.unit() {
         TenorUnit::Months => {
-            let months = i32::try_from(index_tenor.count).map_err(|_| {
+            let months = i32::try_from(index_tenor.count()).map_err(|_| {
                 finstack_quant_core::Error::Validation(format!(
                     "index tenor months = {} exceeds i32::MAX",
-                    index_tenor.count
+                    index_tenor.count()
                 ))
             })?;
             reset_date.add_months(months)
         }
-        TenorUnit::Days => reset_date + time::Duration::days(i64::from(index_tenor.count)),
+        TenorUnit::Days => reset_date + time::Duration::days(i64::from(index_tenor.count())),
         TenorUnit::Years => {
-            let months = index_tenor.count.checked_mul(12).ok_or_else(|| {
+            let months = index_tenor.count().checked_mul(12).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "index tenor years = {} overflows month conversion",
-                    index_tenor.count
+                    index_tenor.count()
                 ))
             })?;
             let months = i32::try_from(months).map_err(|_| {
                 finstack_quant_core::Error::Validation(format!(
                     "index tenor years = {} exceeds i32::MAX months",
-                    index_tenor.count
+                    index_tenor.count()
                 ))
             })?;
             reset_date.add_months(months)
         }
         TenorUnit::Weeks => {
-            let days = index_tenor.count.checked_mul(7).ok_or_else(|| {
+            let days = index_tenor.count().checked_mul(7).ok_or_else(|| {
                 finstack_quant_core::Error::Validation(format!(
                     "index tenor weeks = {} overflows day conversion",
-                    index_tenor.count
+                    index_tenor.count()
                 ))
             })?;
             reset_date + time::Duration::days(i64::from(days))

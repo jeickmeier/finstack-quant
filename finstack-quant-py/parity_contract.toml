@@ -396,104 +396,17 @@ correlation  = { python = "finstack_quant.valuations.correlation",  status = "ex
 # resolve when imported from `finstack_quant.valuations`. Adding a public name to
 # the Python surface without listing it here fails the parity test.
 [crates.valuations.symbols]
-# Existing PyO3 + Python pyclasses + the expanded calibration TypedDict catalog
-# (see finstack-quant-py/finstack_quant/valuations/envelope.py).
+# Existing PyO3/Python classes plus the broad JSON-native CalibrationEnvelope
+# alias from finstack-quant-py/finstack_quant/valuations/envelope.py.
 public = [
-    "BaseCorrelationCurvePrior",
-    "BaseCorrelationStep",
-    "BasisSpreadCurvePrior",
-    "BondCleanPriceDatum",
-    "BondFixedRateBulletCleanPrice",
-    "BondFixedRateBulletOas",
-    "BondFixedRateBulletYtm",
-    "BondFixedRateBulletZSpread",
-    "BondOasDatum",
-    "BondYtmDatum",
-    "BondZSpreadDatum",
     "CalibrationEnvelope",
     "CalibrationEnvelopeError",
-    "CalibrationPlan",
     "CalibrationResult",
-    "CalibrationStep",
-    "CapFloorHullWhiteStep",
-    "CapFloorVolDatum",
-    "CapFloorVolPayload",
-    "CapFloorVolQuote",
-    "CdsConventionKey",
-    "CdsParSpread",
-    "CdsParSpreadDatum",
-    "CdsTrancheDatum",
-    "CdsTrancheQuote",
-    "CdsUpfront",
-    "CdsUpfrontDatum",
-    "CollateralDatum",
-    "CreditIndexDatum",
-    "DatePillar",
-    "DiscountCurvePrior",
-    "DiscountStep",
-    "DividendScheduleDatum",
-    "FixingSeriesDatum",
-    "ForwardCurvePrior",
-    "ForwardStep",
-    "FxForwardOutright",
-    "FxForwardOutrightDatum",
-    "FxOptionVanilla",
-    "FxOptionVanillaDatum",
-    "FxSpotDatum",
-    "FxSwapOutright",
-    "FxSwapOutrightDatum",
-    "FxVolSurfaceDatum",
-    "HazardCurvePrior",
-    "HazardStep",
-    "HullWhiteStep",
-    "InflationCurvePrior",
-    "InflationFixingsDatum",
-    "InflationStep",
-    "InflationSwapDatum",
-    "InflationSwapPayload",
-    "InflationSwapQuote",
-    "MarketDatum",
-    "MarketQuote",
-    "OptionVolDatum",
-    "OptionVolPayload",
-    "OptionVolQuote",
-    "ParametricCurvePrior",
-    "ParametricStep",
-    "Pillar",
-    "PriceCurvePrior",
-    "PriceDatum",
-    "PriorMarketObject",
-    "RateDeposit",
-    "RateFra",
-    "RateFutures",
-    "RateQuoteDepositDatum",
-    "RateQuoteFraDatum",
-    "RateQuoteFuturesDatum",
-    "RateQuoteSwapDatum",
-    "RateSwap",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",
     "SabrSmile",
-    "StudentTStep",
-    "SviSurfaceStep",
-    "SwaptionVolDatum",
-    "SwaptionVolPayload",
-    "SwaptionVolQuote",
-    "SwaptionVolStep",
-    "Tenor",
-    "TenorPillar",
     "ValuationResult",
-    "VolCubeDatum",
-    "VolSurfacePrior",
-    "VolSurfaceStep",
-    "VolatilityIndexCurvePrior",
-    "XccyBasisStep",
-    "XccyBasisSwapDatum",
-    "XccyBasisSwapQuote",
-    "YoyInflationSwapDatum",
-    "YoyInflationSwapPayload",
-    "YoyInflationSwapQuote",
     "asian_option_price",
     "barrier_call",
     "black76_implied_vol",
@@ -507,18 +420,13 @@ public = [
     "dependency_graph_json",
     "dry_run",
     "instrument_cashflows",
-    "instrument_cashflows_json",
-    "list_standard_metrics",
-    "list_standard_metrics_grouped",
+    "inverse_floater_coupon_profile",
     "lookback_option_price",
     "merton_jump_cos_price",
-    "price_instrument",
-    "price_instrument_with_metrics",
     "quanto_option_price",
     "snowball_coupon_profile",
     "tarn_coupon_profile",
     "validate_calibration_json",
-    "validate_instrument_json",
     "vg_cos_price",
 ]
 
@@ -550,157 +458,12 @@ public = [
 [crates.valuations.instruments]
 python_package = "finstack_quant.valuations.instruments"
 public = [
-    "commodity",
-    "credit_derivatives",
-    "equity",
-    "exotics",
-    "fixed_income",
-    "fx",
     "instrument_cashflows_json",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
     "price_instrument",
     "price_instrument_with_metrics",
-    "rates",
     "validate_instrument_json",
-]
-
-[crates.valuations.instruments.modules]
-commodity          = { python = "finstack_quant.valuations.instruments.commodity",          status = "exists", note = "Direct commodity instrument wrappers" }
-credit_derivatives = { python = "finstack_quant.valuations.instruments.credit_derivatives", status = "exists", note = "Typed wrappers for CDS, CDS index, tranche, and option JSON pricing" }
-equity             = { python = "finstack_quant.valuations.instruments.equity",             status = "exists", note = "Direct equity instrument wrappers" }
-exotics            = { python = "finstack_quant.valuations.instruments.exotics",            status = "exists", note = "Direct exotic instrument wrappers" }
-fixed_income       = { python = "finstack_quant.valuations.instruments.fixed_income",       status = "exists", note = "Direct fixed-income instrument wrappers" }
-fx                 = { python = "finstack_quant.valuations.instruments.fx",                 status = "exists", note = "Direct FX instrument wrappers for Rust/WASM-supported FX instruments" }
-rates              = { python = "finstack_quant.valuations.instruments.rates",              status = "exists", note = "Direct rates instrument wrappers" }
-
-[crates.valuations.instruments.commodity]
-python_package = "finstack_quant.valuations.instruments.commodity"
-public = [
-    "CommodityAsianOption",
-    "CommodityForward",
-    "CommodityOption",
-    "CommoditySpreadOption",
-    "CommoditySwap",
-    "CommoditySwaption",
-]
-
-[crates.valuations.instruments.credit_derivatives]
-python_package = "finstack_quant.valuations.instruments.credit_derivatives"
-public = [
-    "CDSIndex",
-    "CDSOption",
-    "CDSTranche",
-    "CreditDefaultSwap",
-]
-
-[crates.valuations.instruments.equity]
-python_package = "finstack_quant.valuations.instruments.equity"
-public = [
-    "Autocallable",
-    "CliquetOption",
-    "DiscountedCashFlow",
-    "Equity",
-    "EquityIndexFuture",
-    "EquityOption",
-    "EquityTotalReturnSwap",
-    "LeveredRealEstateEquity",
-    "PrivateMarketsFund",
-    "RealEstateAsset",
-    "VarianceSwap",
-    "VolatilityIndexFuture",
-    "VolatilityIndexOption",
-]
-
-[crates.valuations.instruments.exotics]
-python_package = "finstack_quant.valuations.instruments.exotics"
-public = [
-    "AsianOption",
-    "BarrierOption",
-    "Basket",
-    "LookbackOption",
-]
-
-[crates.valuations.instruments.fixed_income]
-python_package = "finstack_quant.valuations.instruments.fixed_income"
-public = [
-    "AgencyCmo",
-    "AgencyMbsPassthrough",
-    "AgencyTba",
-    "Bond",
-    "BondFuture",
-    "ConvertibleBond",
-    "DollarRoll",
-    "FIIndexTotalReturnSwap",
-    "InflationLinkedBond",
-    "RevolvingCredit",
-    "StructuredCredit",
-    "TermLoan",
-]
-
-# Bond.return_floor field note:
-# The Rust ``Bond`` struct has an optional ``return_floor: Option<ReturnFloorSpec>``
-# field (``ReturnFloorSpec`` / ``ReturnFloorKind`` / ``IssuePrice`` / ``ProtectionWindow``
-# from ``finstack_quant_valuations::instruments::fixed_income::bond``). These types are
-# JSON-native — they are not exposed as Python classes (consistent with the JSON-first
-# house convention for all bond nested-spec types such as CallPut/MakeWholeSpec).
-# Users pass them as Python dicts matching the Rust serde shape.
-#
-# Return-floor metric IDs (registered in MetricId::ALL_STANDARD; reachable via
-# ``price_with_metrics(metrics=[...])`` on any Bond and via the global
-# ``price_instrument_with_metrics`` function):
-#   "moic"          — money-on-invested-capital multiple to maturity
-#   "moic_to_worst" — minimum MOIC across all exits (calls, puts, maturity)
-#   "xirr"          — annualized IRR to maturity
-#   "xirr_to_worst" — minimum XIRR across all exits
-# These metrics are available on any Bond, with or without return_floor attached.
-[crates.valuations.instruments.fixed_income.return_floor]
-status = "exists"
-approach = "json-native"
-rust_types = ["ReturnFloorSpec", "ReturnFloorKind", "IssuePrice", "ProtectionWindow"]
-rust_module = "finstack_quant_valuations::instruments::fixed_income::bond"
-note = "Consistent with house convention: nested bond spec types travel as JSON dicts. No Python class wrappers. Metric IDs 'moic', 'moic_to_worst', 'xirr', 'xirr_to_worst' are standard and accessible via price_with_metrics."
-metric_ids = ["moic", "moic_to_worst", "xirr", "xirr_to_worst"]
-
-[crates.valuations.instruments.fx]
-python_package = "finstack_quant.valuations.instruments.fx"
-public = [
-    "FxBarrierOption",
-    "FxDigitalOption",
-    "FxForward",
-    "FxOption",
-    "FxSpot",
-    "FxSwap",
-    "FxTouchOption",
-    "FxVarianceSwap",
-    "Ndf",
-    "QuantoOption",
-]
-
-[crates.valuations.instruments.rates]
-python_package = "finstack_quant.valuations.instruments.rates"
-public = [
-    "BasisSwap",
-    "BermudanSwaption",
-    "CallableRangeAccrual",
-    "CapFloor",
-    "CmsOption",
-    "CmsSpreadOption",
-    "CmsSwap",
-    "Deposit",
-    "ForwardRateAgreement",
-    "InflationCapFloor",
-    "InflationSwap",
-    "InterestRateFuture",
-    "InterestRateSwap",
-    "IrFutureOption",
-    "RangeAccrual",
-    "Repo",
-    "Snowball",
-    "Swaption",
-    "Tarn",
-    "XccySwap",
-    "YoYInflationSwap",
 ]
 
 [crates.valuations.models]
@@ -1412,6 +1175,7 @@ root_exports = [
     "dependencyGraphJson",
     "dryRun",
     "instrumentCashflowsJson",
+    "inverseFloaterCouponProfile",
     "lookbackOptionPrice",
     "mertonJumpCosPrice",
     "quantoOptionPrice",
@@ -1426,24 +1190,9 @@ root_exports = [
 python_only = [
     "CalibrationEnvelope",
     "CalibrationEnvelopeError",
-    "CalibrationPlan",
     "CalibrationResult",
-    "CalibrationStep",
-    "DiscountStep",
-    "ForwardStep",
-    "HazardStep",
-    "MarketQuote",
-    "Pillar",
-    "RateDeposit",
-    "RateSwap",
-    "Tenor",
     "ValuationResult",
-    "VolSurfaceStep",
-    "list_standard_metrics",
-    "list_standard_metrics_grouped",
-    "price_instrument",
-    "price_instrument_with_metrics",
-    "validate_instrument_json",
+    "instrument_cashflows",
 ]
 
 # Root exports with no Python snake_case twin (WASM JSON helpers / handles).
@@ -1455,7 +1204,6 @@ wasm_only = [
 # Explicit python_snake_case -> js_name for root exports (triplet pinning).
 # Omitted entries follow default camelCase from snake_case.
 [wasm_valuations_subset.python_js_map]
-instrument_cashflows_json = "instrumentCashflowsJson"
 bs_price = "bsPrice"
 bs_greeks = "bsGreeks"
 bs_implied_vol = "bsImpliedVol"
@@ -1469,6 +1217,7 @@ vg_cos_price = "vgCosPrice"
 merton_jump_cos_price = "mertonJumpCosPrice"
 tarn_coupon_profile = "tarnCouponProfile"
 snowball_coupon_profile = "snowballCouponProfile"
+inverse_floater_coupon_profile = "inverseFloaterCouponProfile"
 cms_spread_option_intrinsic = "cmsSpreadOptionIntrinsic"
 callable_range_accrual_accrued = "callableRangeAccrualAccrued"
 validate_calibration_json = "validateCalibrationJson"
@@ -1480,8 +1229,13 @@ SabrCalibrator = "SabrCalibrator"
 calibrate = "calibrate"
 dry_run = "dryRun"
 
+# Python twins that live below the valuations root after API consolidation.
+[wasm_valuations_subset.python_path_js_map]
+"instruments.instrument_cashflows_json" = "instrumentCashflowsJson"
+
 # Nested facade exports pinned per namespace. These are intentional WASM
-# subsets; Python may expose additional direct classes for the same Rust module.
+# subsets; Python uses the consolidated JSON-first instrument API instead of
+# mirroring the WASM host wrappers class-for-class.
 [wasm_valuations_subset.nested_exports]
 correlation = [
     "Copula",

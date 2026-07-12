@@ -7,7 +7,9 @@ use finstack_quant_core::{
     currency::Currency,
     dates::{Date, DayCount},
     market_data::{
-        context::MarketContext, scalars::MarketScalar, term_structures::DiscountCurve,
+        context::MarketContext,
+        scalars::{MarketScalar, ScalarTimeSeries},
+        term_structures::DiscountCurve,
         term_structures::ForwardCurve,
     },
     math::interp::InterpStyle,
@@ -75,6 +77,14 @@ pub fn create_market_context() -> MarketContext {
         .build()
         .unwrap();
     context = context.insert(fwd_curve);
+    context = context.insert_series(
+        ScalarTimeSeries::new(
+            "FIXING:USD-SOFR-3M",
+            vec![(d(2025, 1, 1), 0.02), (d(2025, 1, 2), 0.02)],
+            None,
+        )
+        .expect("valid SOFR fixing series"),
+    );
 
     // EUR curves for multi-currency testing
     let eur_disc = DiscountCurve::builder("EUR-ESTR")

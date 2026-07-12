@@ -265,8 +265,7 @@ impl PyScheduleBuilder {
                 end_of_month: false,
                 imm_mode: false,
                 cds_imm_mode: false,
-                graceful: false,
-                allow_missing_calendar: false,
+                error_policy: ScheduleErrorPolicy::Strict,
             },
         })
     }
@@ -323,20 +322,7 @@ impl PyScheduleBuilder {
         mut slf: PyRefMut<'py, Self>,
         policy: &PyScheduleErrorPolicy,
     ) -> PyRefMut<'py, Self> {
-        match policy.inner {
-            ScheduleErrorPolicy::Strict => {
-                slf.spec.graceful = false;
-                slf.spec.allow_missing_calendar = false;
-            }
-            ScheduleErrorPolicy::MissingCalendarWarning => {
-                slf.spec.graceful = false;
-                slf.spec.allow_missing_calendar = true;
-            }
-            ScheduleErrorPolicy::GracefulEmpty => {
-                slf.spec.graceful = true;
-                slf.spec.allow_missing_calendar = false;
-            }
-        }
+        slf.spec.error_policy = policy.inner;
         slf
     }
 
@@ -348,7 +334,7 @@ impl PyScheduleBuilder {
     /// (inspect via ``Schedule.warnings`` / ``Schedule.has_warnings()``).
     fn build(&self) -> PyResult<PySchedule> {
         let schedule = self.spec.build().map_err(core_to_py)?;
-        let strict = !self.spec.graceful && !self.spec.allow_missing_calendar;
+        let strict = self.spec.error_policy == ScheduleErrorPolicy::Strict;
         if strict && schedule.has_warnings() {
             let warnings = schedule
                 .warnings

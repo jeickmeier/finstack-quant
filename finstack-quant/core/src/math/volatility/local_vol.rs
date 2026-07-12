@@ -70,7 +70,7 @@ use crate::math::volatility::black_call;
 ///     .build()
 ///     .expect("surface");
 ///
-/// let local_vol = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
+/// let local_vol = LocalVolSurface::from_implied_vol(&surface, 100.0)
 ///     .expect("extraction should succeed");
 ///
 /// let lv = local_vol.value(0.5, 100.0);
@@ -94,10 +94,10 @@ impl LocalVolSurface {
     ///
     /// * `surface` — implied volatility surface (bilinear-interpolated)
     /// * `forward` — forward price under the forward measure (assumed constant across expiries for simplicity)
-    /// * `_rate` — unused; retained for signature stability. The Dupire ratio
-    ///   is evaluated on **undiscounted** forward call prices — discounting
-    ///   would inject a spurious −r·C̃ term into ∂C̃/∂T (it cancels in the
-    ///   strike derivatives but not in the time derivative)
+    ///
+    /// The Dupire ratio is evaluated on **undiscounted** forward call prices — discounting
+    /// would inject a spurious −r·C̃ term into ∂C̃/∂T (it cancels in the
+    /// strike derivatives but not in the time derivative).
     ///
     /// # Returns
     ///
@@ -107,7 +107,7 @@ impl LocalVolSurface {
     ///
     /// Returns an error if the surface has fewer than 2 expiries or 3 strikes
     /// (insufficient for finite differences).
-    pub fn from_implied_vol(surface: &VolSurface, forward: f64, _rate: f64) -> crate::Result<Self> {
+    pub fn from_implied_vol(surface: &VolSurface, forward: f64) -> crate::Result<Self> {
         let expiries = surface.expiries().to_vec();
         let strikes = surface.strikes().to_vec();
         let n_exp = expiries.len();
@@ -300,8 +300,6 @@ impl LocalVolSurface {
     ///
     /// * `surface` — implied volatility surface
     /// * `forward` — forward price
-    /// * `rate` — unused; retained for signature stability (see
-    ///   [`from_implied_vol`](Self::from_implied_vol))
     /// * `sigma_strikes` — Gaussian kernel width in strike-space units (≥ 0)
     ///
     /// # Errors
@@ -311,7 +309,6 @@ impl LocalVolSurface {
     pub fn from_implied_vol_smoothed(
         surface: &VolSurface,
         forward: f64,
-        rate: f64,
         sigma_strikes: f64,
     ) -> crate::Result<Self> {
         if sigma_strikes < 0.0 {
@@ -320,7 +317,7 @@ impl LocalVolSurface {
             ));
         }
         if sigma_strikes < 1e-14 {
-            return Self::from_implied_vol(surface, forward, rate);
+            return Self::from_implied_vol(surface, forward);
         }
 
         let expiries = surface.expiries().to_vec();
@@ -370,7 +367,7 @@ impl LocalVolSurface {
         }
         let smoothed_surface = builder.build()?;
 
-        Self::from_implied_vol(&smoothed_surface, forward, rate)
+        Self::from_implied_vol(&smoothed_surface, forward)
     }
 
     /// Evaluate the local volatility at a given (expiry, strike) point.
@@ -500,8 +497,8 @@ mod tests {
     #[test]
     fn local_vol_from_implied_vol_succeeds() {
         let surface = test_surface();
-        let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
         assert_eq!(lv.grid_shape(), (4, 7));
     }
@@ -509,7 +506,7 @@ mod tests {
     #[test]
     fn local_vol_smoothed_rejects_negative_sigma() {
         let surface = test_surface();
-        let err = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.03, -1.0)
+        let err = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, -1.0)
             .expect_err("negative smoothing width should be rejected");
 
         assert!(
@@ -521,9 +518,9 @@ mod tests {
     #[test]
     fn local_vol_smoothed_zero_sigma_matches_unsmoothed() {
         let surface = test_surface();
-        let unsmoothed = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
-            .expect("extraction should succeed");
-        let smoothed = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.03, 0.0)
+        let unsmoothed =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
+        let smoothed = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.0)
             .expect("zero smoothing should delegate to unsmoothed extractor");
 
         assert_eq!(smoothed.grid_shape(), unsmoothed.grid_shape());
@@ -537,7 +534,7 @@ mod tests {
     #[test]
     fn local_vol_smoothed_positive_sigma_is_positive_and_finite() {
         let surface = test_surface();
-        let lv = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 0.03, 7.5)
+        let lv = LocalVolSurface::from_implied_vol_smoothed(&surface, 100.0, 7.5)
             .expect("positive smoothing should succeed");
 
         for &t in lv.expiries() {
@@ -551,8 +548,8 @@ mod tests {
     #[test]
     fn local_vol_positive_and_finite() {
         let surface = test_surface();
-        let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
         for &t in lv.expiries() {
             for &k in lv.strikes() {
@@ -568,8 +565,8 @@ mod tests {
     #[test]
     fn local_vol_interpolation_works() {
         let surface = test_surface();
-        let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
         // Interpolated point between grid nodes
         let vol = lv.value(0.75, 97.5);
@@ -582,8 +579,8 @@ mod tests {
     #[test]
     fn local_vol_clamped_outside_grid() {
         let surface = test_surface();
-        let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
         // Outside grid bounds should clamp (flat extrapolation)
         let vol_low = lv.value(0.1, 60.0);
@@ -602,8 +599,8 @@ mod tests {
     #[test]
     fn local_vol_reasonable_magnitude() {
         let surface = test_surface();
-        let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
 
         // Local vol should be of similar magnitude to implied vol (within 3x)
         let atm_local = lv.value(1.0, 100.0);
@@ -628,8 +625,8 @@ mod tests {
             .build()
             .expect("flat surface should build");
 
-        let lv = LocalVolSurface::from_implied_vol(&flat, 100.0, 0.0)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&flat, 100.0).expect("extraction should succeed");
 
         // Interior points (not boundaries) should be close to 0.20
         let vol_mid = lv.value(0.75, 100.0);
@@ -659,8 +656,8 @@ mod tests {
         }
         let flat = builder.build().expect("flat surface should build");
 
-        let lv = LocalVolSurface::from_implied_vol(&flat, 100.0, 0.03)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&flat, 100.0).expect("extraction should succeed");
 
         for &t in &[0.5, 1.0, 1.5] {
             for &k in &[80.0, 90.0, 100.0, 110.0, 120.0] {
@@ -684,8 +681,8 @@ mod tests {
             .build()
             .expect("surface should build");
 
-        let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.0)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
         let fallback_vol = lv.value(1.0, 2_000_000.0);
 
         assert!(
@@ -705,8 +702,8 @@ mod tests {
             .build()
             .expect("surface should build");
 
-        let lv = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.0)
-            .expect("extraction should succeed");
+        let lv =
+            LocalVolSurface::from_implied_vol(&surface, 100.0).expect("extraction should succeed");
         let fallback_vol = lv.value(0.5, 100.0);
 
         assert!(
@@ -724,7 +721,7 @@ mod tests {
             .build()
             .expect("surface should build");
 
-        let result = LocalVolSurface::from_implied_vol(&surface, 100.0, 0.03);
+        let result = LocalVolSurface::from_implied_vol(&surface, 100.0);
         assert!(result.is_err(), "Should require at least 2 expiries");
     }
 }

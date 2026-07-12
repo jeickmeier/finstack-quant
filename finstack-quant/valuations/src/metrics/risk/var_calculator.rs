@@ -802,12 +802,12 @@ fn compute_taylor_sensitivities(
     context.set_instrument_overrides(
         instrument
             .pricing_overrides()
-            .map(crate::instruments::InstrumentPricingOverrides::from_pricing_overrides),
+            .map(crate::instruments::InstrumentPricingOverrides::from),
     );
     context.set_metric_overrides(
         instrument
             .pricing_overrides()
-            .map(crate::instruments::MetricPricingOverrides::from_pricing_overrides),
+            .map(crate::instruments::MetricPricingOverrides::from),
     );
     context.set_scenario_overrides(instrument.scenario_overrides().cloned());
     context.set_pricer_dispatch(pricing_model, pricer_registry);

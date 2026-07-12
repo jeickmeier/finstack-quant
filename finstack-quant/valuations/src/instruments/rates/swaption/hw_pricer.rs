@@ -92,7 +92,7 @@ impl SwaptionHullWhitePricer {
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<ValuationResult, PricingError> {
         // Single-curve requirement (same as Bermudan pricer)
-        if swaption.forward_curve_id != swaption.discount_curve_id {
+        if swaption.underlying_forward_curve_id() != swaption.underlying_discount_curve_id() {
             return Err(PricingError::model_failure_with_context(
                 "Hull-White tree pricing is currently single-curve only. \
                  Set forward_curve_id equal to discount_curve_id or use a multi-curve-capable engine."
@@ -103,7 +103,7 @@ impl SwaptionHullWhitePricer {
 
         // Get discount curve
         let disc = market
-            .get_discount(swaption.discount_curve_id.as_str())
+            .get_discount(swaption.underlying_discount_curve_id().as_str())
             .map_err(|e| {
                 PricingError::missing_market_data_with_context(
                     e.to_string(),
@@ -112,8 +112,8 @@ impl SwaptionHullWhitePricer {
             })?;
 
         // Time to expiry
-        let time_to_expiry =
-            year_fraction(swaption.day_count, as_of, swaption.expiry).map_err(|e| {
+        let time_to_expiry = year_fraction(swaption.underlying_day_count(), as_of, swaption.expiry)
+            .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
@@ -154,7 +154,7 @@ impl SwaptionHullWhitePricer {
         let context_label = format!("Swaption {}", swaption.id);
         let overrides = hw1f_overrides_json(swaption);
         let req = Hw1fResolveRequest {
-            curve_id: swaption.discount_curve_id.as_str(),
+            curve_id: swaption.underlying_discount_curve_id().as_str(),
             flavor: Hw1fCalibrationFlavor::Swaption,
             overrides: overrides.as_ref(),
             surface: Some(Hw1fSurfaceCalibration::Swaption {
@@ -194,7 +194,7 @@ impl SwaptionHullWhitePricer {
         let sched = crate::cashflow::builder::build_dates(
             swaption.swap_start,
             swaption.swap_end,
-            swaption.fixed_freq,
+            swaption.underlying_fixed_frequency(),
             StubKind::None,
             BusinessDayConvention::ModifiedFollowing,
             false,
@@ -227,7 +227,7 @@ impl SwaptionHullWhitePricer {
                         PricingErrorContext::default(),
                     )
                 })?;
-            let accrual = year_fraction(swaption.day_count, prev, d).map_err(|e| {
+            let accrual = year_fraction(swaption.underlying_day_count(), prev, d).map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),

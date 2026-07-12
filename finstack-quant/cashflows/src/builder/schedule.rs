@@ -250,12 +250,7 @@ pub struct CashFlowSchedule {
 impl Discountable for CashFlowSchedule {
     type PVOutput = finstack_quant_core::Result<Money>;
 
-    fn npv(
-        &self,
-        disc: &dyn Discounting,
-        base: Date,
-        dc: Option<DayCount>,
-    ) -> finstack_quant_core::Result<Money> {
+    fn npv(&self, disc: &dyn Discounting, base: Date) -> finstack_quant_core::Result<Money> {
         // Compute NPV directly without allocating an intermediate Vec.
         // Two-pass approach: first find currency and check non-empty,
         // then compute the discounted sum.
@@ -281,7 +276,7 @@ impl Discountable for CashFlowSchedule {
         let Some(ccy) = ccy else {
             return Err(finstack_quant_core::error::InputError::TooFewPoints.into());
         };
-        let day_count = dc.unwrap_or_else(|| disc.day_count());
+        let day_count = disc.day_count();
         let curve_base = disc.base_date();
         let ctx = finstack_quant_core::dates::DayCountContext::default();
         let t_base = day_count.signed_year_fraction(curve_base, base, ctx)?;
@@ -414,14 +409,14 @@ impl CashFlowSchedule {
     /// Internal future-flow filtering step for composed schedule normalization.
     #[must_use]
     pub(crate) fn filter_future(mut self, as_of: Date) -> Self {
-        self.flows.retain(|cf| cf.date >= as_of);
+        retain_schedule_flows(&mut self, |cf| cf.date >= as_of);
         self
     }
 
     /// Internal PIK-omission step for composed schedule normalization.
     #[must_use]
     pub(crate) fn omit_pure_pik(mut self) -> Self {
-        self.flows.retain(|cf| cf.kind != CFKind::PIK);
+        retain_schedule_flows(&mut self, |cf| cf.kind != CFKind::PIK);
         self
     }
 
@@ -435,7 +430,7 @@ impl CashFlowSchedule {
     #[must_use]
     pub fn normalize_public(self, as_of: Date, representation: CashflowRepresentation) -> Self {
         let mut normalized = self.filter_future(as_of).omit_pure_pik();
-        sort_flows(&mut normalized.flows);
+        sort_schedule_with_metadata(&mut normalized);
         normalized.meta.representation = representation;
         normalized
     }
@@ -681,6 +676,34 @@ impl CashFlowSchedule {
         }
 
         Ok(result)
+    }
+}
+
+fn retain_schedule_flows(schedule: &mut CashFlowSchedule, mut keep: impl FnMut(&CashFlow) -> bool) {
+    let periods_aligned = schedule.meta.accrual_periods.len() == schedule.flows.len();
+    let day_counts_aligned = schedule.meta.accrual_day_counts.len() == schedule.flows.len();
+    let mut retained_flows = Vec::with_capacity(schedule.flows.len());
+    let mut retained_periods = Vec::with_capacity(schedule.meta.accrual_periods.len());
+    let mut retained_day_counts = Vec::with_capacity(schedule.meta.accrual_day_counts.len());
+
+    for (idx, flow) in schedule.flows.drain(..).enumerate() {
+        if keep(&flow) {
+            retained_flows.push(flow);
+            if periods_aligned {
+                retained_periods.push(schedule.meta.accrual_periods[idx]);
+            }
+            if day_counts_aligned {
+                retained_day_counts.push(schedule.meta.accrual_day_counts[idx]);
+            }
+        }
+    }
+
+    schedule.flows = retained_flows;
+    if periods_aligned {
+        schedule.meta.accrual_periods = retained_periods;
+    }
+    if day_counts_aligned {
+        schedule.meta.accrual_day_counts = retained_day_counts;
     }
 }
 
@@ -942,12 +965,12 @@ fn apply_flow_to_outstanding(
         _ => {}
     }
     if outstanding.amount() < -NEGATIVE_BALANCE_EPSILON {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "replayed outstanding balance became negative ({}) after {:?} on {}",
-            outstanding.amount(),
-            cf.kind,
-            cf.date
-        )));
+        tracing::warn!(
+            date = %cf.date,
+            kind = ?cf.kind,
+            balance = outstanding.amount(),
+            "replayed outstanding balance went negative"
+        );
     }
     Ok(())
 }

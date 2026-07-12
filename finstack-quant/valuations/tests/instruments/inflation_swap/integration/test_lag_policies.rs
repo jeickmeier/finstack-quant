@@ -184,7 +184,7 @@ fn test_lag_in_days_vs_months() {
 }
 
 #[test]
-fn test_historical_observation_requires_index() {
+fn test_historical_observation_projects_from_curve_without_index() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 1).unwrap();
 
@@ -208,8 +208,9 @@ fn test_historical_observation_requires_index() {
         .build()
         .unwrap();
 
-    let err = swap
+    let pv = swap
         .value(&ctx, as_of)
-        .expect_err("historical CPI must not be projected from a curve");
-    assert!(err.to_string().contains("US-CPI-U"));
+        .expect("the inflation curve supplies the configured fallback")
+        .amount();
+    assert!(pv.is_finite());
 }

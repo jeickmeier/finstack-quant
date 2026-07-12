@@ -198,115 +198,6 @@ impl BarrierOptionMcPricer {
 
         Ok(result.mean)
     }
-
-    /// Price with LRM Greeks (delta, vega) convenience for barrier options.
-    ///
-    /// Returns `(pv, Option<(delta, vega)>)` where the Greeks are from the
-    /// Likelihood Ratio Method (LRM). Greeks are `None` if the option is expired.
-    ///
-    /// # Day Count Convention Handling
-    ///
-    /// Uses separate day count bases for different purposes:
-    /// - **Discounting**: Uses the discount curve's own day count for DF and zero rate calculations
-    /// - **Volatility lookup and MC simulation**: Uses the instrument's day count (assumed to match vol surface calibration)
-    #[allow(dead_code)] // May be used by external bindings or tests
-    pub(crate) fn price_with_lrm_greeks_internal(
-        &self,
-        inst: &BarrierOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<(finstack_quant_core::money::Money, Option<(f64, f64)>)> {
-        // Get discount curve first to access its day count
-        let disc_curve = curves.get_discount(inst.discount_curve_id.as_str())?;
-
-        // Two-clock plumbing — see `price_internal` for the rationale.
-        let clocks = TwoClockParams::from_curve_and_instrument(
-            &disc_curve,
-            inst.day_count,
-            as_of,
-            inst.expiry,
-        )?;
-        let t_vol = clocks.t_vol;
-        if t_vol <= 0.0 {
-            let pv = price_expired_barrier(inst, curves, as_of)?;
-            return Ok((pv, None));
-        }
-
-        let discount_factor = clocks.df;
-        let r = clocks.r_model();
-
-        // Spot and dividend yield
-        let spot_scalar = curves.get_price(&inst.spot_id)?;
-        let spot = match spot_scalar {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
-        };
-        let q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
-            curves,
-            inst.div_yield_id.as_ref(),
-        )?;
-
-        // Volatility (override → surface, using vol surface time basis)
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t_vol,
-            inst.strike,
-        )?;
-        let gbm_params = GbmParams::new(r, q, sigma)?;
-        let process = GbmProcess::new(gbm_params);
-
-        // Steps and payoff (using vol surface time basis)
-        let steps_per_year = self.config.steps_per_year;
-        let num_steps = ((t_vol * steps_per_year).round() as usize).max(self.config.min_steps);
-        let time_grid = finstack_quant_monte_carlo::time_grid::TimeGrid::uniform(t_vol, num_steps)?;
-        // See `price_internal` for the maturity_step = num_steps rationale.
-        let maturity_step = num_steps;
-        let mc_barrier_type: McBarrierType = inst.barrier_type.into();
-        let mut payoff = BarrierOptionPayoff::new(
-            inst.strike,
-            inst.barrier.amount(),
-            mc_barrier_type,
-            Self::convert_option_kind(inst.option_type),
-            inst.rebate.map(|m| m.amount()),
-            inst.notional.amount(),
-            maturity_step,
-            sigma,
-            &time_grid,
-            inst.use_gobet_miri,
-        );
-        if wants_at_hit_rebate(inst) {
-            payoff = payoff.with_rebate_at_hit(r);
-        }
-
-        // Seed
-
-        use finstack_quant_monte_carlo::seed;
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
-        let mut cfg = self.config.clone();
-        cfg.seed = seed;
-
-        let pricer = PathDependentPricer::new(cfg);
-        let (est, greeks) = pricer.price_with_lrm_greeks(
-            &process,
-            spot,
-            t_vol,
-            num_steps,
-            &payoff,
-            inst.notional.currency(),
-            discount_factor,
-            r,
-            q,
-            sigma,
-        )?;
-
-        Ok((est.mean, greeks))
-    }
 }
 
 impl Default for BarrierOptionMcPricer {
@@ -349,20 +240,6 @@ pub(crate) fn compute_pv(
 ) -> finstack_quant_core::Result<Money> {
     let pricer = BarrierOptionMcPricer::new();
     pricer.price_internal(inst, curves, as_of)
-}
-
-/// Present value with LRM Greeks via Monte Carlo (barrier option).
-///
-/// Returns `(pv, Option<(delta, vega)>)` where the Greeks are from the
-/// Likelihood Ratio Method. Greeks are `None` if the option is expired.
-#[allow(dead_code)] // May be used by external bindings or tests
-pub fn npv_with_lrm_greeks(
-    inst: &BarrierOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<(Money, Option<(f64, f64)>)> {
-    let pricer = BarrierOptionMcPricer::new();
-    pricer.price_with_lrm_greeks_internal(inst, curves, as_of)
 }
 
 // ========================= EXPIRED BARRIER HELPER =========================

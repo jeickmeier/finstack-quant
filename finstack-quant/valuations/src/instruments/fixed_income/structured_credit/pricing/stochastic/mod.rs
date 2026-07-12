@@ -2,10 +2,8 @@
 //!
 //! This module provides stochastic prepayment and default models with:
 //! - Factor-driven CPR/CDR models with correlation
-//! - Scenario tree infrastructure for path-dependent valuation
 //! - Industry-standard calibrations (RMBS, CLO, CMBS)
-//! - Stochastic pricing engine with NPV and risk metrics
-//! - Comprehensive risk metrics and correlation sensitivities
+//! - Stochastic pricing with tree and Monte Carlo modes
 //!
 //! # Module Organization
 //!
@@ -13,15 +11,12 @@
 //! - [`prepayment`]: Stochastic prepayment models (factor-correlated, Richard-Roll)
 //! - [`default`]: Stochastic default models (copula-based, intensity process)
 //! - [`correlation`]: Correlation structures for structured credit
-//! - [`tree`]: Scenario tree infrastructure for path-dependent analysis
-//! - [`pricer`]: Stochastic pricing engine with tree and MC modes
-//! - [`metrics`]: Risk metrics and correlation sensitivities
+//! - [`tree`]: Configuration for the stochastic pricer's tree mode
+//! - [`pricer`]: Stochastic pricing engine with tree and Monte Carlo modes
 
 pub(crate) mod calibrations;
 pub(crate) mod correlation;
 pub(crate) mod default;
-#[cfg(test)]
-pub(crate) mod metrics;
 pub(crate) mod prepayment;
 pub(crate) mod pricer;
 pub(crate) mod tree;

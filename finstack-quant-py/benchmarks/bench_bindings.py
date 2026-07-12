@@ -373,8 +373,8 @@ class TestCoreBenchmarks:
         curve = ForwardCurve(
             "USD-SOFR-3M",
             0.25,
-            [(0.0, 0.05), (1.0, 0.052), (5.0, 0.055), (10.0, 0.06)],
             date(2024, 1, 1),
+            [(0.0, 0.05), (1.0, 0.052), (5.0, 0.055), (10.0, 0.06)],
         )
         benchmark(curve.rate, 2.5)
 

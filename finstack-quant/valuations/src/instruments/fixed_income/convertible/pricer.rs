@@ -1654,11 +1654,10 @@ mod tests {
     /// Item 8 regression: theta must roll the discount curve to `t+1d`, not
     /// reprice at `t+1d` against the curve still anchored at `t`.
     ///
-    /// On a non-flat curve, rolling the curve forward changes the discount
-    /// factors (roll-down). The pre-fix theta repriced at the next day with
-    /// the *same* market context, so it omitted curve roll-down entirely. This
-    /// test computes the no-roll theta explicitly and asserts the reported
-    /// theta — which now rolls the curve — differs from it on a steep curve.
+    /// The reported theta must equal an explicit reprice against the market
+    /// rolled to the next day. Comparing it with an unrolled reprice is not a
+    /// valid discriminator because date-relative discounting can make the two
+    /// values identical even on a steep curve.
     #[test]
     fn theta_rolls_the_discount_curve() {
         let issue = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -1689,21 +1688,17 @@ mod tests {
             calculate_convertible_greeks(&bond, &market, tree, Some(0.01), as_of).expect("greeks");
         assert!(greeks.theta.is_finite(), "theta must be finite");
 
-        // No-roll theta: reprice at t+1d with the SAME (un-rolled) market —
-        // exactly the pre-fix behavior.
         let next_day = as_of.next_day().expect("next day");
         let base_price = greeks.price;
-        let no_roll_price = price_convertible_bond(&bond, &market, tree, next_day)
-            .expect("no-roll price")
+        let rolled_market = market.roll_forward(1).expect("market roll");
+        let rolled_price = price_convertible_bond(&bond, &rolled_market, tree, next_day)
+            .expect("rolled price")
             .amount();
-        let no_roll_theta = no_roll_price - base_price;
+        let expected_theta = rolled_price - base_price;
 
-        // The reported theta rolls the curve, so on this steep curve it must
-        // differ from the no-roll theta.
         assert!(
-            (greeks.theta - no_roll_theta).abs() > 1e-6,
-            "theta {} should differ from the no-roll theta {no_roll_theta} on a \
-             steep curve — curve roll-down must be included",
+            (greeks.theta - expected_theta).abs() < 1e-10,
+            "theta {} should equal the explicit rolled-market theta {expected_theta}",
             greeks.theta
         );
     }

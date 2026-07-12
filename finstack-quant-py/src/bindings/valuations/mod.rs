@@ -5,19 +5,11 @@
 
 mod analytic;
 mod calibration;
-mod commodity;
 pub mod correlation;
 mod credit;
-mod credit_derivatives;
-mod direct_wrapper;
-mod equity;
 mod exotic_rates;
-mod exotics;
-mod fixed_income;
 mod fourier;
-mod fx;
 mod pricing;
-mod rates;
 mod sabr;
 
 use crate::bindings::pandas_utils::dict_to_dataframe;
@@ -149,8 +141,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     )?;
 
     m.add_class::<PyValuationResult>()?;
-    m.add_function(wrap_pyfunction!(validate_instrument_json, &m)?)?;
-    pricing::register(py, &m)?;
     analytic::register(py, &m)?;
     sabr::register(py, &m)?;
     calibration::register(py, &m)?;
@@ -164,12 +154,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "ValuationResult",
-            "validate_instrument_json",
-            "price_instrument",
-            "price_instrument_with_metrics",
-            "list_standard_metrics",
-            "list_standard_metrics_grouped",
-            "instrument_cashflows_json",
             "CalibrationResult",
             "CalibrationEnvelopeError",
             "validate_calibration_json",
@@ -181,6 +165,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "merton_jump_cos_price",
             "tarn_coupon_profile",
             "snowball_coupon_profile",
+            "inverse_floater_coupon_profile",
             "cms_spread_option_intrinsic",
             "callable_range_accrual_accrued",
             "bs_price",
@@ -216,34 +201,19 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     )?;
     m.setattr(
         "__doc__",
-        "Instrument wrappers and JSON helpers for valuation workflows.",
+        "JSON validation, pricing, metric, and cashflow helpers for valuation workflows.",
     )?;
 
     m.add_function(wrap_pyfunction!(validate_instrument_json, &m)?)?;
     pricing::register(py, &m)?;
-    commodity::register(py, &m)?;
-    credit_derivatives::register(py, &m)?;
-    equity::register(py, &m)?;
-    exotics::register(py, &m)?;
-    fixed_income::register(py, &m)?;
-    fx::register(py, &m)?;
-    rates::register(py, &m)?;
-
     let all = PyList::new(
         py,
         [
-            "commodity",
-            "credit_derivatives",
-            "equity",
-            "exotics",
-            "fixed_income",
-            "fx",
             "instrument_cashflows_json",
             "list_standard_metrics",
             "list_standard_metrics_grouped",
             "price_instrument",
             "price_instrument_with_metrics",
-            "rates",
             "validate_instrument_json",
         ],
     )?;

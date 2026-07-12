@@ -281,7 +281,10 @@ fn test_theta_metric_via_price_with_metrics() {
     );
 
     // Assert
-    assert!(result.is_ok(), "Theta calculation should succeed");
+    assert!(
+        result.is_ok(),
+        "Theta calculation should succeed: {result:?}"
+    );
     let valuation = result.unwrap();
     let theta = *valuation
         .measures

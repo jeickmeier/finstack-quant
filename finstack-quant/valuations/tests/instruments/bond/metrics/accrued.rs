@@ -150,11 +150,12 @@ fn test_accrued_frn_uses_forward_rate() {
         .issue_date(issue)
         .maturity(date!(2026 - 01 - 01))
         .cashflow_spec(
-            CashflowSpec::floating(
+            CashflowSpec::floating_with_reset_lag(
                 CurveId::new("USD-SOFR-3M"),
                 0.0,
                 Tenor::quarterly(),
                 DayCount::Act360,
+                0,
             )
             .expect("finite test rate"),
         )

@@ -3,7 +3,6 @@
 //! This module contains utilities and types that are used
 //! by multiple instrument implementations, including:
 //! - Core instrument traits (Instrument)
-//! - NPV calculation interfaces (Discountable)
 //! - Common helper functions
 //! - Shared data structures and enums
 
@@ -12,9 +11,6 @@ pub(crate) mod traits;
 
 // Unified dependency representation
 pub(crate) mod dependencies;
-
-// NPV calculation interface
-pub(crate) mod discountable;
 
 /// Stable date constants for `example()` constructors. Defined once so all
 /// instrument examples can rotate forward together.

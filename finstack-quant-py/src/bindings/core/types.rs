@@ -4,8 +4,6 @@ use crate::errors::core_to_py;
 use finstack_quant_core::types::{
     Attributes, Bps, CreditRating, CurveId, InstrumentId, Percentage, Rate,
 };
-use finstack_quant_core::InputError;
-use finstack_quant_core::NonFiniteKind;
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 use std::hash::{Hash, Hasher};
@@ -63,17 +61,9 @@ impl PyRate {
     #[classmethod]
     #[pyo3(text_signature = "(cls, percent)")]
     fn from_percent(_cls: &Bound<'_, PyType>, percent: f64) -> PyResult<Self> {
-        if !percent.is_finite() {
-            let kind = if percent.is_nan() {
-                NonFiniteKind::NaN
-            } else if percent.is_sign_positive() {
-                NonFiniteKind::PosInfinity
-            } else {
-                NonFiniteKind::NegInfinity
-            };
-            return Err(core_to_py(InputError::NonFiniteValue { kind }.into()));
-        }
-        Ok(Self::from_inner(Rate::from_percent(percent)))
+        Rate::try_from_percent(percent)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Build from an integer basis-point amount (e.g. ``500`` for 5%).

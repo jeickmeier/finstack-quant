@@ -153,6 +153,13 @@ impl Swaption {
         validation::validate_f64_finite(strike, "swaption strike")?;
         validation::validate_f64_abs_le(strike, 2.0, "swaption strike", Some(" (rate)"))?;
 
+        if self.underlying_fixed_leg.is_some() != self.underlying_float_leg.is_some() {
+            return Err(Error::Validation(
+                "swaption underlier must provide both fixed and floating leg specifications"
+                    .to_string(),
+            ));
+        }
+
         Ok(())
     }
 
@@ -374,6 +381,37 @@ impl Swaption {
             .map(std::string::ToString::to_string)
     }
 
+    /// Fixed-leg convention used by every pricing path.
+    ///
+    /// Explicit leg state is canonical. The scalar fields are retained only as
+    /// the legacy wire/build input used to synthesize a vanilla leg.
+    pub(crate) fn underlying_fixed_frequency(&self) -> Tenor {
+        self.underlying_fixed_leg
+            .as_ref()
+            .map_or(self.fixed_freq, |leg| leg.frequency)
+    }
+
+    /// Accrual convention used by every pricing path.
+    pub(crate) fn underlying_day_count(&self) -> DayCount {
+        self.underlying_fixed_leg
+            .as_ref()
+            .map_or(self.day_count, |leg| leg.day_count)
+    }
+
+    /// Discount curve selected by the canonical fixed leg.
+    pub(crate) fn underlying_discount_curve_id(&self) -> &CurveId {
+        self.underlying_fixed_leg
+            .as_ref()
+            .map_or(&self.discount_curve_id, |leg| &leg.discount_curve_id)
+    }
+
+    /// Forward curve selected by the canonical floating leg.
+    pub(crate) fn underlying_forward_curve_id(&self) -> &CurveId {
+        self.underlying_float_leg
+            .as_ref()
+            .map_or(&self.forward_curve_id, |leg| &leg.forward_curve_id)
+    }
+
     fn default_fixed_leg(&self, rate: Decimal) -> FixedLegSpec {
         FixedLegSpec {
             discount_curve_id: self.discount_curve_id.clone(),
@@ -435,7 +473,7 @@ impl Swaption {
             self.underlying_float_leg.clone()
         } else {
             let mut float = self.default_float_leg();
-            if let Ok(forward) = curves.get_forward(self.forward_curve_id.as_ref()) {
+            if let Ok(forward) = curves.get_forward(self.underlying_forward_curve_id().as_ref()) {
                 float.day_count = forward.day_count();
             }
             Some(float)
@@ -480,7 +518,7 @@ impl Swaption {
         // rather than an ad-hoc 30-day-month / ACT-365 mix. This value feeds
         // the vol-surface tenor axis, so it must be consistent with the rest
         // of the instrument's day-count conventions.
-        year_fraction(self.day_count, self.swap_start, self.swap_end)
+        year_fraction(self.underlying_day_count(), self.swap_start, self.swap_end)
     }
 
     /// Set the cash settlement annuity method.
@@ -531,7 +569,7 @@ impl Swaption {
             return Ok(Money::new(0.0, self.notional.currency()));
         }
 
-        let disc = curves.get_discount(self.discount_curve_id.as_ref())?;
+        let disc = curves.get_discount(self.underlying_discount_curve_id().as_ref())?;
         let forward_rate = self.forward_swap_rate(curves, as_of)?;
         let annuity = self.annuity(disc.as_ref(), as_of, forward_rate)?;
         let strike = self.strike_f64()?;
@@ -651,7 +689,7 @@ impl Swaption {
             .sabr_params
             .as_ref()
             .ok_or_else(|| Error::internal("swaption SABR pricing requires sabr_params"))?;
-        let model = SABRModel::new(params.to_internal()?);
+        let model = SABRModel::new(params.clone());
         let time_to_expiry = self.time_to_expiry(as_of)?;
         if time_to_expiry <= 0.0 {
             return Ok(Money::new(0.0, self.notional.currency()));
@@ -777,18 +815,19 @@ impl Swaption {
     ///
     /// When `forward_rate ≈ 0`, uses L'Hôpital's limit: `A → N/m` (sum of accruals).
     pub fn cash_annuity_par_yield(&self, forward_rate: f64) -> Result<f64> {
-        let freq_per_year = match self.fixed_freq.unit {
-            finstack_quant_core::dates::TenorUnit::Months if self.fixed_freq.count > 0 => {
-                12.0 / self.fixed_freq.count as f64
+        let fixed_frequency = self.underlying_fixed_frequency();
+        let freq_per_year = match fixed_frequency.unit() {
+            finstack_quant_core::dates::TenorUnit::Months if fixed_frequency.count() > 0 => {
+                12.0 / fixed_frequency.count() as f64
             }
-            finstack_quant_core::dates::TenorUnit::Days if self.fixed_freq.count > 0 => {
-                365.0 / self.fixed_freq.count as f64
+            finstack_quant_core::dates::TenorUnit::Days if fixed_frequency.count() > 0 => {
+                365.0 / fixed_frequency.count() as f64
             }
-            finstack_quant_core::dates::TenorUnit::Years if self.fixed_freq.count > 0 => {
-                1.0 / self.fixed_freq.count as f64
+            finstack_quant_core::dates::TenorUnit::Years if fixed_frequency.count() > 0 => {
+                1.0 / fixed_frequency.count() as f64
             }
-            finstack_quant_core::dates::TenorUnit::Weeks if self.fixed_freq.count > 0 => {
-                52.0 / self.fixed_freq.count as f64
+            finstack_quant_core::dates::TenorUnit::Weeks if fixed_frequency.count() > 0 => {
+                52.0 / fixed_frequency.count() as f64
             }
             _ => {
                 return Err(Error::Validation(
@@ -800,12 +839,13 @@ impl Swaption {
         if forward_rate.abs() < 1e-8 {
             // L'Hopital's limit for S -> 0: A = N/m (sum of accruals)
             // We need number of periods.
-            let tenor = year_fraction(self.day_count, self.swap_start, self.swap_end)?;
+            let tenor = year_fraction(self.underlying_day_count(), self.swap_start, self.swap_end)?;
             let periods = freq_per_year * tenor;
             return Ok(periods / freq_per_year);
         }
 
-        let tenor_years = year_fraction(self.day_count, self.swap_start, self.swap_end)?;
+        let tenor_years =
+            year_fraction(self.underlying_day_count(), self.swap_start, self.swap_end)?;
         let n_periods = tenor_years * freq_per_year;
 
         let df_swap = (1.0 + forward_rate / freq_per_year).powf(-n_periods);
@@ -829,7 +869,7 @@ impl Swaption {
     pub fn cash_annuity_zero_coupon(&self, disc: &dyn Discounting, as_of: Date) -> Result<f64> {
         use crate::instruments::common_impl::pricing::time::relative_df_discounting;
 
-        let tenor = year_fraction(self.day_count, self.swap_start, self.swap_end)?;
+        let tenor = year_fraction(self.underlying_day_count(), self.swap_start, self.swap_end)?;
         let df = relative_df_discounting(disc, as_of, self.swap_end)?;
         Ok(tenor * df)
     }
@@ -852,8 +892,8 @@ impl Swaption {
     /// - PV_float = Σ (accrual_i × forward_i × DF_i)
     /// - Annuity = Σ (accrual_i × DF_i) for all fixed leg payments.
     pub fn forward_swap_rate(&self, curves: &MarketContext, as_of: Date) -> Result<f64> {
-        let disc = curves.get_discount(self.discount_curve_id.as_ref())?;
-        if self.underlying_float_leg.is_none() && self.forward_curve_id == self.discount_curve_id {
+        let disc = curves.get_discount(self.underlying_discount_curve_id().as_ref())?;
+        if self.underlying_forward_curve_id() == self.underlying_discount_curve_id() {
             return self.single_curve_forward_from_fixed_schedule(disc.as_ref(), as_of);
         }
 
@@ -944,7 +984,7 @@ impl Swaption {
     ) -> Result<f64> {
         // 1. SABR model (highest priority)
         if let Some(sabr) = &self.sabr_params {
-            let model = SABRModel::new(sabr.to_internal()?);
+            let model = SABRModel::new(sabr.clone());
             return model.implied_volatility(forward, self.strike_f64()?, time_to_expiry);
         }
 
@@ -986,7 +1026,7 @@ impl Swaption {
     /// `Some(GreekInputs)` containing forward, annuity, sigma, and time to expiry,
     /// or `None` if the option has expired.
     pub fn greek_inputs(&self, curves: &MarketContext, as_of: Date) -> Result<Option<GreekInputs>> {
-        let disc = curves.get_discount(self.discount_curve_id.as_ref())?;
+        let disc = curves.get_discount(self.underlying_discount_curve_id().as_ref())?;
         if as_of >= self.expiry {
             return Ok(None);
         }
@@ -1111,8 +1151,8 @@ impl crate::instruments::common_impl::traits::CurveDependencies for Swaption {
     ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::InstrumentCurves>
     {
         crate::instruments::common_impl::traits::InstrumentCurves::builder()
-            .discount(self.discount_curve_id.clone())
-            .forward(self.forward_curve_id.clone())
+            .discount(self.underlying_discount_curve_id().clone())
+            .forward(self.underlying_forward_curve_id().clone())
             .build()
     }
 }

@@ -63,11 +63,6 @@ impl StructuredCreditAssumptionRegistry {
         )
     }
 
-    #[cfg(test)]
-    pub(crate) fn default_recovery_rate(&self) -> f64 {
-        self.credit_model_defaults.recovery_rate
-    }
-
     pub(crate) fn cmo_collateral_defaults(&self) -> CmoCollateralDefaults {
         CmoCollateralDefaults {
             wac: self.cmo_collateral_defaults.wac,

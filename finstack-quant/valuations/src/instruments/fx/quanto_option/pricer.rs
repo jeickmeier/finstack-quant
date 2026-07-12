@@ -329,7 +329,8 @@ mod tests {
             .insert_price(
                 "NKY-SPOT",
                 MarketScalar::Price(Money::new(34000.0, Currency::JPY)),
-            );
+            )
+            .insert_price("JPYUSD-SPOT", MarketScalar::Unitless(0.0068));
 
         let quanto = QuantoOption::builder()
             .id(InstrumentId::new("QUANTO-DISC"))
@@ -347,6 +348,7 @@ mod tests {
             .spot_id("NKY-SPOT".into())
             .vol_surface_id(CurveId::new("NKY-VOL"))
             .div_yield_id_opt(None)
+            .fx_rate_id_opt(Some("JPYUSD-SPOT".to_string()))
             .fx_vol_id_opt(Some(CurveId::new("JPYUSD-VOL")))
             .attributes(Attributes::new())
             .build()

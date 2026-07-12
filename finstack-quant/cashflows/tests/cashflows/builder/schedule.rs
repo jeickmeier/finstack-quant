@@ -310,9 +310,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
         .build()
         .unwrap();
 
-    let pv = schedule
-        .npv(&curve, curve.base_date(), Some(schedule.day_count))
-        .unwrap();
+    let pv = schedule.npv(&curve, curve.base_date()).unwrap();
 
     // PV with flat curve DF=1.0 should equal only strictly-future cashflows;
     // the issue-date funding exchange is already settled at the valuation date.
@@ -902,9 +900,7 @@ fn npv_golden_value_with_realistic_discount_curve() {
         .build()
         .unwrap();
 
-    let npv_flat = schedule
-        .npv(&flat_curve, issue, Some(schedule.day_count))
-        .unwrap();
+    let npv_flat = schedule.npv(&flat_curve, issue).unwrap();
 
     // Build 5% discount curve
     let curve_5pct = CoreDiscCurve::builder("USD-OIS")
@@ -918,9 +914,7 @@ fn npv_golden_value_with_realistic_discount_curve() {
         .build()
         .unwrap();
 
-    let npv_5pct = schedule
-        .npv(&curve_5pct, issue, Some(schedule.day_count))
-        .unwrap();
+    let npv_5pct = schedule.npv(&curve_5pct, issue).unwrap();
 
     // Key invariants:
     // 1. NPV with 5% rate should be less than NPV with flat curve (discounting works)
@@ -1247,27 +1241,9 @@ fn npv_decreases_with_higher_discount_rate() {
     let curve_5pct = build_curve(0.05);
     let curve_7pct = build_curve(0.07);
 
-    let npv_3pct = schedule
-        .npv(
-            &curve_3pct,
-            curve_3pct.base_date(),
-            Some(schedule.day_count),
-        )
-        .unwrap();
-    let npv_5pct = schedule
-        .npv(
-            &curve_5pct,
-            curve_5pct.base_date(),
-            Some(schedule.day_count),
-        )
-        .unwrap();
-    let npv_7pct = schedule
-        .npv(
-            &curve_7pct,
-            curve_7pct.base_date(),
-            Some(schedule.day_count),
-        )
-        .unwrap();
+    let npv_3pct = schedule.npv(&curve_3pct, curve_3pct.base_date()).unwrap();
+    let npv_5pct = schedule.npv(&curve_5pct, curve_5pct.base_date()).unwrap();
+    let npv_7pct = schedule.npv(&curve_7pct, curve_7pct.base_date()).unwrap();
 
     // Monotonicity: higher discount rate = lower NPV
     assert!(

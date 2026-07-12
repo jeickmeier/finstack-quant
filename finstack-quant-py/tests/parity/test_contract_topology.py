@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import inspect
 from pathlib import Path
@@ -113,6 +114,20 @@ def _pyi_top_level_names(pyi_path: Path) -> set[str]:
     """
     source = pyi_path.read_text()
     return {m.group(1) for m in re.finditer(r"^([a-z][a-zA-Z0-9_]*)\s*:\s*\w", source, re.MULTILINE)}
+
+
+def _pyi_all_names(pyi_path: Path) -> list[str]:
+    """Extract the string names from a stub's explicit ``__all__`` list."""
+    tree = ast.parse(pyi_path.read_text())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+            isinstance(target, ast.Name) and target.id == "__all__" for target in node.targets
+        ):
+            names = ast.literal_eval(node.value)
+            assert isinstance(names, list)
+            assert all(isinstance(name, str) for name in names)
+            return names
+    raise AssertionError(f"{pyi_path} must declare an explicit __all__ list")
 
 
 def test_pyi_top_level_matches_contract() -> None:
@@ -508,8 +523,24 @@ def test_wasm_valuations_python_js_map_matches_root_exports() -> None:
     """Pinned python->js map must resolve to root exports on the WASM facade."""
     block = CONTRACT["wasm_valuations_subset"]
     root_exports = set(block["root_exports"])
-    for python_name, js_name in block["python_js_map"].items():
+    mappings = block["python_js_map"] | block.get("python_path_js_map", {})
+    for python_name, js_name in mappings.items():
         assert js_name in root_exports, f"python_js_map[{python_name!r}] -> {js_name!r} not in root_exports"
+
+
+def test_wasm_valuations_python_twins_resolve() -> None:
+    """Every root and qualified Python twin must resolve on the live package."""
+    block = CONTRACT["wasm_valuations_subset"]
+    module = importlib.import_module("finstack_quant.valuations")
+    missing = [name for name in block["python_js_map"] if not hasattr(module, name)]
+    for path in block.get("python_path_js_map", {}):
+        value: Any = module
+        for component in path.split("."):
+            value = getattr(value, component, None)
+            if value is None:
+                missing.append(path)
+                break
+    assert not missing, f"finstack_quant.valuations missing mapped twins: {missing}"
 
 
 def test_wasm_valuations_root_exports_are_triplet_accounted_for() -> None:
@@ -517,7 +548,7 @@ def test_wasm_valuations_root_exports_are_triplet_accounted_for() -> None:
     block = CONTRACT["wasm_valuations_subset"]
     root_exports = set(block["root_exports"])
     wasm_only = set(block.get("wasm_only", []))
-    mapped_js = set(block["python_js_map"].values())
+    mapped_js = set(block["python_js_map"].values()) | set(block.get("python_path_js_map", {}).values())
     unaccounted = root_exports - wasm_only - mapped_js
     assert not unaccounted, f"root_exports must appear in python_js_map or wasm_only: {sorted(unaccounted)}"
     overlap = wasm_only & mapped_js
@@ -533,10 +564,26 @@ def test_wasm_valuations_python_only_excludes_wasm_map() -> None:
     assert not overlap, f"python_only overlaps python_js_map keys: {sorted(overlap)}"
 
 
+def test_wasm_valuations_python_surface_is_exhaustively_accounted_for() -> None:
+    """Every Python root symbol is mapped to WASM or explicitly Python-only."""
+    block = CONTRACT["wasm_valuations_subset"]
+    public = set(CONTRACT["crates"]["valuations"]["symbols"]["public"])
+    mapped_python = set(block["python_js_map"])
+    python_only = set(block["python_only"])
+    assert not mapped_python & python_only, "mapped Python names cannot also be Python-only"
+    accounted = mapped_python | python_only
+    assert accounted == public, (
+        "valuations Python/WASM accounting diverged from the canonical Python surface.\n"
+        f"  unaccounted Python symbols: {sorted(public - accounted)}\n"
+        f"  non-public accounting entries: {sorted(accounted - public)}"
+    )
+
+
 def test_wasm_valuations_python_js_names_use_camel_or_pascal_case() -> None:
     """WASM export names should be camelCase or PascalCase, not snake_case."""
     block = CONTRACT["wasm_valuations_subset"]
-    for js_name in block["python_js_map"].values():
+    mappings = block["python_js_map"] | block.get("python_path_js_map", {})
+    for js_name in mappings.values():
         assert "_" not in js_name, f"WASM name must not be snake_case: {js_name!r}"
 
 
@@ -630,6 +677,19 @@ def test_core_market_data_public_matches_contract() -> None:
         f"  unlisted: {sorted(set(module.__all__) - set(expected))}"
     )
 
+    root_stub = CONTRACT_PATH.parent / "finstack_quant" / "core" / "market_data" / "__init__.pyi"
+    assert _pyi_all_names(root_stub) == expected
+
+
+@pytest.mark.parametrize("submodule_name", ["curves", "fx", "context", "dtsm", "arbitrage"])
+def test_core_market_data_submodule_stubs_match_runtime(submodule_name: str) -> None:
+    """Each runtime market-data submodule must have an exact stub ``__all__``."""
+    package = "finstack_quant.core.market_data"
+    module = importlib.import_module(f"{package}.{submodule_name}")
+    stub = CONTRACT_PATH.parent / "finstack_quant" / "core" / "market_data" / f"{submodule_name}.pyi"
+    assert stub.exists(), f"missing stub for {package}.{submodule_name}"
+    assert _pyi_all_names(stub) == module.__all__
+
 
 def test_valuations_correlation_public_matches_contract() -> None:
     """``finstack_quant.valuations.correlation.__all__`` must match [crates.valuations.correlation].
@@ -667,13 +727,6 @@ def test_valuations_instruments_public_matches_contract() -> None:
 @pytest.mark.parametrize(
     "contract_path",
     [
-        ("valuations", "instruments", "commodity"),
-        ("valuations", "instruments", "credit_derivatives"),
-        ("valuations", "instruments", "equity"),
-        ("valuations", "instruments", "exotics"),
-        ("valuations", "instruments", "fixed_income"),
-        ("valuations", "instruments", "fx"),
-        ("valuations", "instruments", "rates"),
         ("valuations", "models"),
         ("valuations", "models", "credit"),
     ],

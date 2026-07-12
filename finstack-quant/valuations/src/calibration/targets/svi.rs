@@ -180,7 +180,9 @@ impl SviSurfaceTarget {
 
             for (idx, (strike, market_vol)) in expiry_quotes.iter().enumerate() {
                 let log_moneyness = (*strike / forward).ln();
-                let model_vol = svi_params.implied_vol(log_moneyness, expiry);
+                let model_vol = svi_params
+                    .implied_vol(log_moneyness, expiry)
+                    .unwrap_or(f64::NAN);
                 residuals.insert(
                     format!("svi_t{expiry:.6}_k{strike:.6}_i{idx}"),
                     (model_vol - *market_vol).abs(),
@@ -353,16 +355,16 @@ fn interpolate_svi_vol(
 
     if params_by_expiry.len() == 1 || target_expiry <= first_key.into_inner() {
         let k = slice_log_moneyness(first_key.into_inner())?;
-        return Ok(first_params.implied_vol(k, target_expiry));
+        return first_params.implied_vol(k, target_expiry);
     }
 
     let Some((&last_key, &last_params)) = params_by_expiry.iter().next_back() else {
         let k = slice_log_moneyness(first_key.into_inner())?;
-        return Ok(first_params.implied_vol(k, target_expiry));
+        return first_params.implied_vol(k, target_expiry);
     };
     if target_expiry >= last_key.into_inner() {
         let k = slice_log_moneyness(last_key.into_inner())?;
-        return Ok(last_params.implied_vol(k, target_expiry));
+        return last_params.implied_vol(k, target_expiry);
     }
 
     let mut lower = (first_key.into_inner(), first_params);
@@ -380,7 +382,7 @@ fn interpolate_svi_vol(
 
     if (upper.0 - lower.0).abs() < f64::EPSILON {
         let k = slice_log_moneyness(lower.0)?;
-        return Ok(lower.1.implied_vol(k, target_expiry));
+        return lower.1.implied_vol(k, target_expiry);
     }
 
     // Total-variance interpolation per Gatheral. Each slice is evaluated at

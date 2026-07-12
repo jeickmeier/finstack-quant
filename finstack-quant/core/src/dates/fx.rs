@@ -23,15 +23,13 @@
 //! - **T+0** requests return the trade date unchanged (no adjustment), matching
 //!   [`add_joint_business_days`].
 //!
-//! The symmetric helpers [`add_joint_business_days`] and [`roll_spot_date`]
-//! gate every counted day on **both** calendars; use [`fx_spot_date`] when the
-//! USD asymmetry matters.
+//! The symmetric helper [`add_joint_business_days`] gates every counted day on
+//! all supplied calendars; use [`fx_spot_date`] when the USD asymmetry matters.
 //!
 //! # Typical usage
 //!
 //! - [`adjust_joint_calendar`] for applying a business-day convention on a joint calendar
 //! - [`add_joint_business_days`] for T+n style symmetric joint counting
-//! - [`roll_spot_date`] for symmetric trade-date to spot-date rolling
 //! - [`fx_spot_date`] for market-convention (USD-aware) spot rolling
 //!
 //! # References
@@ -153,15 +151,40 @@ pub fn adjust_joint_calendar(
     )
 }
 
-/// Add N business days on a joint calendar.
+fn advance_business_days(
+    start: Date,
+    n_days: u32,
+    is_business_day: impl Fn(Date) -> bool,
+) -> Result<Date> {
+    let max_iters = (n_days.saturating_mul(10).saturating_add(25)).max(1000);
+    let mut date = start;
+    let mut count = 0;
+    let mut iters = 0;
+
+    while count < n_days && iters < max_iters {
+        date += Duration::days(1);
+        if is_business_day(date) {
+            count += 1;
+        }
+        iters += 1;
+    }
+
+    if count < n_days {
+        return Err(Error::Input(
+            crate::error::InputError::JointCalendarIterationLimitExceeded {
+                start,
+                n_days,
+                max_iters,
+            },
+        ));
+    }
+    Ok(date)
+}
+
+/// Add N business days on all supplied calendars.
 ///
-/// A day is counted as a business day only if it is a business day on **both**
-/// the base and quote calendars.
-///
-/// This helper implements the two-calendar joint-business-day rule only.
-/// Some market pairs use additional settlement calendars (for example USD)
-/// beyond the two named currencies; callers must model those explicitly when
-/// that convention matters.
+/// A day is counted only when it is a business day on both currency calendars
+/// and, when provided, the settlement calendar.
 ///
 /// # T+0 behavior
 ///
@@ -174,9 +197,9 @@ pub fn adjust_joint_calendar(
 ///
 /// * `start` - Starting date
 /// * `n_days` - Number of joint business days to add
-/// * `bdc` - Business day convention (typically unused in counting, but kept for API consistency)
 /// * `base_cal_id` - Optional calendar ID for the base currency
 /// * `quote_cal_id` - Optional calendar ID for the quote currency
+/// * `settlement_cal_id` - Optional third settlement calendar
 ///
 /// # Returns
 ///
@@ -187,35 +210,6 @@ pub fn adjust_joint_calendar(
 /// Returns an error if:
 /// - Either calendar ID is not recognized (see [`resolve_calendar`])
 /// - Too many iterations needed (>5x the requested days), suggesting a calendar configuration issue
-///
-/// # Examples
-///
-/// ```
-/// # use finstack_quant_core::dates::{create_date, BusinessDayConvention};
-/// # use time::Month;
-/// # use finstack_quant_core::dates::fx::add_joint_business_days;
-/// let trade_date = create_date(2024, Month::January, 15).unwrap();
-/// let spot_date = add_joint_business_days(
-///     trade_date,
-///     2, // T+2
-///     BusinessDayConvention::Following,
-///     Some("nyse"),
-///     Some("gblo"),
-/// ).expect("Valid calendars");
-/// // spot_date will be 2 joint business days after trade_date
-/// ```
-pub fn add_joint_business_days(
-    start: Date,
-    n_days: u32,
-    bdc: BusinessDayConvention,
-    base_cal_id: Option<&str>,
-    quote_cal_id: Option<&str>,
-) -> Result<Date> {
-    add_joint_business_days_with_settlement(start, n_days, bdc, base_cal_id, quote_cal_id, None)
-}
-
-/// Add N business days on a joint calendar that also includes an optional
-/// **third settlement calendar** (typically USD).
 ///
 /// For FX cross pairs that do not involve USD (e.g. EUR/JPY), USD-good days
 /// matter because the cross settles as two USD legs. This helper implements the
@@ -238,19 +232,9 @@ pub fn add_joint_business_days(
 ///
 /// * `start` - Starting date
 /// * `n_days` - Number of joint business days to add
-/// * `_bdc` - Business day convention (unused in counting, kept for API parity)
-/// * `base_cal_id` - Optional calendar ID for the base currency
-/// * `quote_cal_id` - Optional calendar ID for the quote currency
-/// * `settlement_cal_id` - Optional third settlement calendar (e.g. USD)
-///
-/// # Errors
-///
-/// Returns an error if any calendar ID is unrecognized, or if the iteration
-/// limit is exceeded (suggesting a calendar configuration issue).
-pub fn add_joint_business_days_with_settlement(
+pub fn add_joint_business_days(
     start: Date,
     n_days: u32,
-    _bdc: BusinessDayConvention,
     base_cal_id: Option<&str>,
     quote_cal_id: Option<&str>,
     settlement_cal_id: Option<&str>,
@@ -262,130 +246,13 @@ pub fn add_joint_business_days_with_settlement(
         None => None,
     };
 
-    let mut date = start;
-    let mut count = 0u32;
-
-    // Iterate until we've found n_days that are business days on every calendar.
-    let max_iters: u32 = (n_days.saturating_mul(10).saturating_add(25)).max(1000);
-    let mut iters: u32 = 0;
-
-    while count < n_days && iters < max_iters {
-        date += Duration::days(1);
-
-        // Check if business day on the two currency calendars and, when
-        // supplied, the settlement (USD) calendar.
-        let good = base_cal.as_holiday_calendar().is_business_day(date)
+    advance_business_days(start, n_days, |date| {
+        base_cal.as_holiday_calendar().is_business_day(date)
             && quote_cal.as_holiday_calendar().is_business_day(date)
             && settlement_cal
                 .as_ref()
-                .is_none_or(|c| c.as_holiday_calendar().is_business_day(date));
-        if good {
-            count += 1;
-        }
-
-        iters += 1;
-    }
-
-    if iters >= max_iters {
-        return Err(Error::Input(
-            crate::error::InputError::JointCalendarIterationLimitExceeded {
-                start,
-                n_days,
-                max_iters,
-            },
-        ));
-    }
-
-    Ok(date)
-}
-
-/// Roll a trade date to spot using joint business day counting.
-///
-/// This helper rolls spot using the same two-calendar joint-business-day rule as
-/// [`add_joint_business_days`].
-///
-/// Some market pairs use additional settlement calendars beyond the two named
-/// currencies; callers must model those explicitly when that convention matters.
-///
-/// # Arguments
-///
-/// * `trade_date` - The trade execution date
-/// * `spot_lag_days` - Number of business days to spot (typically 2 for most FX pairs)
-/// * `bdc` - Business day convention (kept for API consistency)
-/// * `base_cal_id` - Optional calendar ID for the base currency
-/// * `quote_cal_id` - Optional calendar ID for the quote currency
-///
-/// # Returns
-///
-/// The spot settlement date.
-///
-/// # Errors
-///
-/// Returns an error if calendar resolution or date arithmetic fails.
-///
-/// # Examples
-///
-/// ```
-/// # use finstack_quant_core::dates::{create_date, BusinessDayConvention};
-/// # use time::Month;
-/// # use finstack_quant_core::dates::fx::roll_spot_date;
-/// let trade_date = create_date(2024, Month::January, 15).unwrap();
-/// let spot_date = roll_spot_date(
-///     trade_date,
-///     2, // Standard T+2 for most FX pairs
-///     BusinessDayConvention::Following,
-///     Some("nyse"),
-///     Some("gblo"),
-/// ).expect("Valid calendars");
-/// ```
-pub fn roll_spot_date(
-    trade_date: Date,
-    spot_lag_days: u32,
-    bdc: BusinessDayConvention,
-    base_cal_id: Option<&str>,
-    quote_cal_id: Option<&str>,
-) -> Result<Date> {
-    // Use joint business day counting instead of calendar days
-    add_joint_business_days(trade_date, spot_lag_days, bdc, base_cal_id, quote_cal_id)
-}
-
-/// Roll a trade date to spot, including a third **settlement calendar** (USD).
-///
-/// Applies the cross-pair T+2 convention where intermediate and final value
-/// dates must be good business days in the two currency calendars **and** the
-/// settlement (USD) calendar — see
-/// [`add_joint_business_days_with_settlement`]. Use this for non-USD crosses
-/// (e.g. EUR/JPY) so that USD holidays correctly shift the spot date; pass
-/// `settlement_cal_id = None` for the plain two-calendar behaviour.
-///
-/// # Arguments
-///
-/// * `trade_date` - The trade execution date
-/// * `spot_lag_days` - Business days to spot (typically 2)
-/// * `bdc` - Business day convention (kept for API parity)
-/// * `base_cal_id` - Optional calendar ID for the base currency
-/// * `quote_cal_id` - Optional calendar ID for the quote currency
-/// * `settlement_cal_id` - Optional third settlement calendar (e.g. USD)
-///
-/// # Errors
-///
-/// Returns an error if calendar resolution or date arithmetic fails.
-pub fn roll_spot_date_with_settlement(
-    trade_date: Date,
-    spot_lag_days: u32,
-    bdc: BusinessDayConvention,
-    base_cal_id: Option<&str>,
-    quote_cal_id: Option<&str>,
-    settlement_cal_id: Option<&str>,
-) -> Result<Date> {
-    add_joint_business_days_with_settlement(
-        trade_date,
-        spot_lag_days,
-        bdc,
-        base_cal_id,
-        quote_cal_id,
-        settlement_cal_id,
-    )
+                .is_none_or(|calendar| calendar.as_holiday_calendar().is_business_day(date))
+    })
 }
 
 /// Roll a trade date to spot using the market (CLS-consistent) FX convention,
@@ -408,7 +275,7 @@ pub fn roll_spot_date_with_settlement(
 /// treated as the USD leg and excluded from intermediate-day gating. For
 /// non-USD crosses, pass the USD calendar so the final value date is also
 /// checked against USD. Passing `None` reproduces the symmetric two-calendar
-/// rule of [`roll_spot_date`].
+/// rule of [`add_joint_business_days`].
 ///
 /// # Arguments
 ///
@@ -571,30 +438,7 @@ impl ResolvedCalendarPair {
     ///
     /// The date that is `n_days` joint business days after `start`.
     pub fn add_joint_business_days(&self, start: Date, n_days: u32) -> Result<Date> {
-        let mut date = start;
-        let mut count = 0u32;
-        let max_iters: u32 = (n_days.saturating_mul(10).saturating_add(25)).max(1000);
-        let mut iters: u32 = 0;
-
-        while count < n_days && iters < max_iters {
-            date += Duration::days(1);
-            if self.is_joint_business_day(date) {
-                count += 1;
-            }
-            iters += 1;
-        }
-
-        if iters >= max_iters {
-            return Err(Error::Input(
-                crate::error::InputError::JointCalendarIterationLimitExceeded {
-                    start,
-                    n_days,
-                    max_iters,
-                },
-            ));
-        }
-
-        Ok(date)
+        advance_business_days(start, n_days, |date| self.is_joint_business_day(date))
     }
 
     /// Adjust a date using pre-resolved calendars.
@@ -647,11 +491,9 @@ mod tests {
         // Test with weekends-only calendars (no holidays)
         let start = create_date(2024, Month::January, 15).unwrap(); // Monday
         let result = add_joint_business_days(
-            start,
-            2,
-            BusinessDayConvention::Following,
+            start, 2, None, // weekends-only
             None, // weekends-only
-            None, // weekends-only
+            None,
         )
         .expect("Should succeed with no holidays");
 
@@ -669,9 +511,9 @@ mod tests {
         let result = add_joint_business_days(
             start,
             3,
-            BusinessDayConvention::Following,
             Some("nyse"), // NYSE closed on MLK day (Jan 15)
             None,         // weekends-only
+            None,
         )
         .expect("Should succeed");
 
@@ -694,9 +536,9 @@ mod tests {
         let result = add_joint_business_days(
             start,
             3,
-            BusinessDayConvention::Following,
             None,         // weekends-only
             Some("gblo"), // UK/London closed on Dec 25-26
+            None,
         )
         .expect("Should succeed");
 
@@ -720,9 +562,9 @@ mod tests {
         let result = add_joint_business_days(
             start,
             2,
-            BusinessDayConvention::Following,
             Some("nyse"), // NYSE closed on Jan 1
             Some("gblo"), // GBLO closed on Jan 1
+            None,
         )
         .expect("Should succeed");
 
@@ -736,15 +578,15 @@ mod tests {
     }
 
     #[test]
-    fn test_roll_spot_date_near_holiday() {
+    fn test_add_joint_business_days_near_holiday() {
         // Test T+2 spot rolling near a holiday
         let trade_date = create_date(2024, Month::January, 12).unwrap(); // Friday before MLK day
 
-        let spot_date = roll_spot_date(
+        let spot_date = add_joint_business_days(
             trade_date,
             2, // T+2
-            BusinessDayConvention::Following,
             Some("nyse"),
+            None,
             None,
         )
         .expect("Should succeed");
@@ -808,9 +650,7 @@ mod tests {
     fn test_add_joint_business_days_zero_days() {
         // Edge case: adding 0 days should return the start date
         let start = create_date(2024, Month::January, 15).unwrap();
-        let result =
-            add_joint_business_days(start, 0, BusinessDayConvention::Following, None, None)
-                .expect("Should succeed");
+        let result = add_joint_business_days(start, 0, None, None, None).expect("Should succeed");
 
         assert_eq!(result, start, "Adding 0 days should return start date");
     }
@@ -844,16 +684,9 @@ mod tests {
     }
 
     #[test]
-    fn test_roll_spot_date_unknown_calendar() {
-        // Test that roll_spot_date errors on unknown calendar
+    fn test_add_joint_business_days_unknown_calendar() {
         let trade_date = create_date(2024, Month::January, 15).unwrap();
-        let result = roll_spot_date(
-            trade_date,
-            2,
-            BusinessDayConvention::Following,
-            Some("unknown_cal"),
-            None,
-        );
+        let result = add_joint_business_days(trade_date, 2, Some("unknown_cal"), None, None);
 
         assert!(result.is_err(), "Unknown calendar should error");
     }
@@ -893,14 +726,8 @@ mod tests {
         );
 
         // The symmetric joint rule (pre-fix behavior) lands one day later.
-        let symmetric = roll_spot_date(
-            trade,
-            2,
-            BusinessDayConvention::Following,
-            Some("target2"),
-            Some("usny"),
-        )
-        .expect("symmetric roll");
+        let symmetric = add_joint_business_days(trade, 2, Some("target2"), Some("usny"), None)
+            .expect("symmetric roll");
         assert_eq!(symmetric, create_date(2025, Month::July, 8).unwrap());
     }
 
@@ -941,14 +768,8 @@ mod tests {
         let trade = create_date(2024, Month::December, 23).unwrap();
         let spot =
             fx_spot_date(trade, 2, Some("target2"), Some("gblo"), None).expect("fx spot roll");
-        let symmetric = roll_spot_date(
-            trade,
-            2,
-            BusinessDayConvention::Following,
-            Some("target2"),
-            Some("gblo"),
-        )
-        .expect("symmetric roll");
+        let symmetric = add_joint_business_days(trade, 2, Some("target2"), Some("gblo"), None)
+            .expect("symmetric roll");
         assert_eq!(spot, symmetric);
     }
 
@@ -962,35 +783,23 @@ mod tests {
     }
 
     #[test]
-    fn roll_spot_date_with_settlement_honours_usd_holiday_on_cross() {
+    fn symmetric_settlement_calendar_honours_usd_holiday_on_cross() {
         // EUR/JPY traded Wed 2025-07-02. The two-currency T+2 lands on Fri
         // 2025-07-04 (good in EUR and JPY). US Independence Day closes USD on
         // that date, so the cross's spot value date must roll to Mon 2025-07-07.
         let trade = create_date(2025, Month::July, 2).unwrap();
 
-        let spot_two_cal = roll_spot_date(
-            trade,
-            2,
-            BusinessDayConvention::Following,
-            Some("target2"),
-            Some("jpto"),
-        )
-        .expect("two-calendar roll");
+        let spot_two_cal = add_joint_business_days(trade, 2, Some("target2"), Some("jpto"), None)
+            .expect("two-calendar roll");
         assert_eq!(
             spot_two_cal,
             create_date(2025, Month::July, 4).unwrap(),
             "without USD settlement, spot lands on the US holiday"
         );
 
-        let spot_with_usd = roll_spot_date_with_settlement(
-            trade,
-            2,
-            BusinessDayConvention::Following,
-            Some("target2"),
-            Some("jpto"),
-            Some("usny"),
-        )
-        .expect("three-calendar roll");
+        let spot_with_usd =
+            add_joint_business_days(trade, 2, Some("target2"), Some("jpto"), Some("usny"))
+                .expect("three-calendar roll");
         assert_eq!(
             spot_with_usd,
             create_date(2025, Month::July, 7).unwrap(),

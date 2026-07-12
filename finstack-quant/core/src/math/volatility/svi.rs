@@ -56,7 +56,7 @@
 /// let w = params.total_variance(0.0); // ATM total variance
 /// assert!(w > 0.0);
 ///
-/// let vol = params.implied_vol(0.0, 1.0); // ATM implied vol at T=1
+/// let vol = params.implied_vol(0.0, 1.0).expect("valid checked inputs"); // ATM implied vol at T=1
 /// assert!(vol > 0.0);
 /// ```
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -137,25 +137,8 @@ impl SviParams {
     ///
     /// # Returns
     ///
-    /// Implied volatility `σ = √(w(k) / T)`. Returns `NaN` if `t ≤ 0` or
-    /// if total variance is negative (arbitrage violation).
-    #[inline]
-    pub fn implied_vol(&self, k: f64, t: f64) -> f64 {
-        if t <= 0.0 {
-            return f64::NAN;
-        }
-        let w = self.total_variance(k);
-        if w < 0.0 {
-            return f64::NAN;
-        }
-        (w / t).sqrt()
-    }
-
-    /// Fallible version of [`implied_vol`](Self::implied_vol) with descriptive errors.
-    ///
-    /// Prefer this when diagnostics are needed; use `implied_vol` on hot paths
-    /// where NaN propagation is acceptable.
-    pub fn try_implied_vol(&self, k: f64, t: f64) -> crate::Result<f64> {
+    /// Implied volatility `σ = √(w(k) / T)` with checked error semantics.
+    pub fn implied_vol(&self, k: f64, t: f64) -> crate::Result<f64> {
         if t <= 0.0 {
             return Err(crate::Error::Validation(
                 "SVI implied vol: time-to-expiry must be positive".into(),
@@ -298,7 +281,7 @@ impl SviParams {
 /// params.validate().expect("calibrated params should be valid");
 ///
 /// // ATM vol should be close to input
-/// let atm_vol = params.implied_vol(0.0, expiry);
+/// let atm_vol = params.implied_vol(0.0, expiry).expect("valid checked inputs");
 /// assert!((atm_vol - 0.20).abs() < 0.02);
 /// ```
 ///
@@ -504,7 +487,7 @@ mod tests {
         params.validate().expect("params should be valid");
 
         for k in [-0.5, -0.2, 0.0, 0.2, 0.5] {
-            let vol = params.implied_vol(k, 1.0);
+            let vol = params.implied_vol(k, 1.0).expect("valid checked inputs");
             assert!(
                 vol > 0.0 && vol.is_finite(),
                 "vol at k={k} should be positive and finite: {vol}"
@@ -600,8 +583,8 @@ mod tests {
             m: 0.0,
             sigma: 0.1,
         };
-        assert!(params.implied_vol(0.0, 0.0).is_nan());
-        assert!(params.implied_vol(0.0, -1.0).is_nan());
+        assert!(params.implied_vol(0.0, 0.0).is_err());
+        assert!(params.implied_vol(0.0, -1.0).is_err());
     }
 
     #[test]
@@ -626,7 +609,9 @@ mod tests {
             .iter()
             .map(|&k| {
                 let log_k = (k / forward).ln();
-                true_params.implied_vol(log_k, expiry)
+                true_params
+                    .implied_vol(log_k, expiry)
+                    .expect("valid checked inputs")
             })
             .collect();
 
@@ -636,7 +621,9 @@ mod tests {
         // Check vol fit is close at each strike
         for (&k, &mkt_vol) in strikes.iter().zip(vols.iter()) {
             let log_k = (k / forward).ln();
-            let cal_vol = calibrated.implied_vol(log_k, expiry);
+            let cal_vol = calibrated
+                .implied_vol(log_k, expiry)
+                .expect("valid checked inputs");
             assert!(
                 (cal_vol - mkt_vol).abs() < 0.005,
                 "Vol mismatch at K={k}: calibrated={cal_vol:.4}, market={mkt_vol:.4}"
@@ -684,7 +671,11 @@ mod tests {
         let strikes = &[80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0];
         let mut vols: Vec<f64> = strikes
             .iter()
-            .map(|&k| true_params.implied_vol((k / 100.0_f64).ln(), 1.0))
+            .map(|&k| {
+                true_params
+                    .implied_vol((k / 100.0_f64).ln(), 1.0)
+                    .expect("valid checked inputs")
+            })
             .collect();
         vols[1] += 0.03;
         vols[5] -= 0.03;

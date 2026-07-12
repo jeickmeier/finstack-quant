@@ -69,7 +69,7 @@ impl CDSTranchePricer {
         let p = default_prob.max(eps).min(1.0 - eps);
         match &self.params.copula_spec {
             CopulaSpec::StudentT { degrees_of_freedom } => {
-                student_t_inv_cdf(p, *degrees_of_freedom)
+                student_t_inv_cdf(p, *degrees_of_freedom).unwrap_or(f64::NAN)
             }
             _ => standard_normal_inv_cdf(p),
         }

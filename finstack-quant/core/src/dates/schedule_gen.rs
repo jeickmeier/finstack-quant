@@ -197,17 +197,6 @@ pub(super) struct BuilderInternal {
 
 impl BuilderInternal {
     pub(super) fn generate(self) -> crate::Result<Vec<Date>> {
-        // A zero-count tenor makes every roll a no-op, so the generation
-        // loops below would never terminate. Reject it up front (the count
-        // is also validated at parse and deserialization time, but `Tenor`
-        // fields are public so a zero count remains constructible).
-        if self.freq.count == 0 {
-            return Err(crate::error::InputError::InvalidTenor {
-                tenor: self.freq.to_string(),
-                reason: "tenor count must be positive for schedule generation".to_string(),
-            }
-            .into());
-        }
         if self.start >= self.end {
             return Err(crate::error::InputError::InvalidScheduleRange {
                 start: self.start,
@@ -238,9 +227,9 @@ impl BuilderInternal {
             return Ok(anchor);
         }
         let count_i32 =
-            i32::try_from(tenor.count).map_err(|_| crate::error::InputError::InvalidTenor {
+            i32::try_from(tenor.count()).map_err(|_| crate::error::InputError::InvalidTenor {
                 tenor: tenor.to_string(),
-                reason: format!("count {} exceeds i32::MAX", tenor.count),
+                reason: format!("count {} exceeds i32::MAX", tenor.count()),
             })?;
         let checked_mul_i32 = |lhs: i32, rhs: i32| -> crate::Result<i32> {
             lhs.checked_mul(rhs).ok_or_else(|| {
@@ -258,17 +247,17 @@ impl BuilderInternal {
                 })
             })
         };
-        Ok(match tenor.unit {
+        Ok(match tenor.unit() {
             crate::dates::TenorUnit::Months => anchor.add_months(checked_mul_i32(n, count_i32)?),
             crate::dates::TenorUnit::Years => {
                 let years = checked_mul_i32(n, count_i32)?;
                 anchor.add_months(checked_mul_i32(years, 12)?)
             }
             crate::dates::TenorUnit::Weeks => {
-                anchor + Duration::weeks(checked_mul_i64(i64::from(n), i64::from(tenor.count))?)
+                anchor + Duration::weeks(checked_mul_i64(i64::from(n), i64::from(tenor.count()))?)
             }
             crate::dates::TenorUnit::Days => {
-                anchor + Duration::days(checked_mul_i64(i64::from(n), i64::from(tenor.count))?)
+                anchor + Duration::days(checked_mul_i64(i64::from(n), i64::from(tenor.count()))?)
             }
         })
     }

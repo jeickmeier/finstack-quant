@@ -179,7 +179,7 @@ pub fn update_rate_from_binding(
                 BusinessDayConvention::ModifiedFollowing,
             )?;
 
-        let accrual_years = Tenor::from_years(curve.tenor(), effective_dc).to_years_with_context(
+        let accrual_years = Tenor::from_years(curve.tenor(), effective_dc)?.to_years_with_context(
             forward_start,
             calendar,
             BusinessDayConvention::ModifiedFollowing,

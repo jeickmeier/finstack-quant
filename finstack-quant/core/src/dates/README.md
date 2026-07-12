@@ -242,7 +242,7 @@ Key invariants:
 
 - Dates are strictly increasing and deduplicated after EOM and adjustment.
 - `build()` returns `Result<Schedule>`; invalid ranges (`start > end`) yield `Error::Input(InputError::InvalidDateRange)`.
-- With `.graceful_fallback(true)`, `build()` returns an **empty** schedule with a `ScheduleWarning::GracefulFallback` warning instead of an error. Always check `schedule.has_warnings()` to detect suppressed errors and avoid silent PV=0 scenarios.
+- With `.error_policy(ScheduleErrorPolicy::GracefulEmpty)`, `build()` returns an **empty** schedule with a `ScheduleWarning::GracefulFallback` warning instead of an error. Always check `schedule.has_warnings()` to detect suppressed errors and avoid silent PV=0 scenarios.
 
 `ScheduleSpec` is a serde‑capable spec you can persist and later call `.build()` on to rebuild schedules.
 

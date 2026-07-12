@@ -162,12 +162,6 @@ impl CommoditySwaption {
             self.fixed_price,
             "CommoditySwaption fixed_price",
         )?;
-        // swap_frequency count must be > 0 (count is u32, so only zero is invalid)
-        if self.swap_frequency.count == 0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommoditySwaption swap_frequency count must be positive (got 0)".to_string(),
-            ));
-        }
         Ok(())
     }
 
@@ -847,13 +841,7 @@ mod tests {
 
     #[test]
     fn validation_rejects_zero_frequency_count() {
-        let result = base_swaption_builder()
-            .swap_frequency(Tenor::new(0, finstack_quant_core::dates::TenorUnit::Months))
-            .build();
-        assert!(
-            result.is_err(),
-            "CommoditySwaption must reject swap_frequency with count = 0"
-        );
+        assert!(Tenor::try_new(0, finstack_quant_core::dates::TenorUnit::Months).is_err());
     }
 
     #[test]
