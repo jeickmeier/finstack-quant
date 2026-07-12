@@ -81,6 +81,7 @@ fn create_market() -> MarketContext {
 fn create_barrier_option() -> BarrierOption {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).unwrap();
     BarrierOption {
+        expiry_fixing: None,
         id: "BARRIER-12M".into(),
         underlying_ticker: "SPX".into(),
         strike: 100.0,

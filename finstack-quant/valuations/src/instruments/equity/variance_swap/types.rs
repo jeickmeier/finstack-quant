@@ -33,8 +33,7 @@ fn default_observation_bdc() -> BusinessDayConvention {
 /// # Notional Conventions
 ///
 /// Variance swaps use **variance notional** (in variance units), not vega notional.
-/// The notional represents the P&L per unit of variance point (e.g., per 0.0001 change
-/// in annualized variance).
+/// The notional scales variance expressed in decimal-squared units.
 ///
 /// ## Variance Notional vs Vega Notional
 ///
@@ -42,7 +41,7 @@ fn default_observation_bdc() -> BusinessDayConvention {
 /// The conversion between notional types is:
 ///
 /// ```text
-/// Notional_variance = Notional_vega / (2 × σ_strike)
+/// Notional_variance = Notional_vega / (2 × σ_strike × 0.01)
 /// ```
 ///
 /// where `σ_strike` is the strike volatility (square root of strike variance).
@@ -50,9 +49,9 @@ fn default_observation_bdc() -> BusinessDayConvention {
 /// ### Example
 ///
 /// For a variance swap with strike vol of 20% (strike variance = 0.04):
-/// - Vega notional of $100,000 → Variance notional = $100,000 / (2 × 0.20) = $250,000
+/// - Vega notional of $100,000 → Variance notional = $100,000 / (2 × 0.20 × 0.01) = $25,000,000
 /// - If realized variance is 0.05 (22.4% vol) vs strike 0.04:
-///   - Payoff = $250,000 × (0.05 - 0.04) = $2,500
+///   - Payoff = $25,000,000 × (0.05 - 0.04) = $250,000
 ///
 /// # Realized Variance Calculation
 ///
@@ -154,7 +153,7 @@ impl VarianceSwap {
     /// This converts to the variance notional used internally:
     ///
     /// ```text
-    /// Notional_variance = Notional_vega / (2 × σ_strike)
+    /// Notional_variance = Notional_vega / (2 × σ_strike × 0.01)
     /// ```
     ///
     /// where `σ_strike` is the strike volatility (square root of strike variance).
@@ -177,15 +176,15 @@ impl VarianceSwap {
     /// ```
     /// use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
     ///
-    /// // $100,000 vega notional at 20% strike vol → $250,000 variance notional
+    /// // $100,000 vega notional at 20% strike vol → $25,000,000 variance notional
     /// let var_notional = VarianceSwap::vega_to_variance_notional(100_000.0, 0.20);
-    /// assert!((var_notional - 250_000.0).abs() < 1e-6);
+    /// assert!((var_notional - 25_000_000.0).abs() < 1e-6);
     /// ```
     pub fn vega_to_variance_notional(vega_notional: f64, strike_vol: f64) -> f64 {
         if strike_vol <= 0.0 {
             return 0.0;
         }
-        vega_notional / (2.0 * strike_vol)
+        vega_notional / (2.0 * strike_vol * 0.01)
     }
 
     /// Convert variance notional to vega notional.
@@ -193,7 +192,7 @@ impl VarianceSwap {
     /// Inverse of [`vega_to_variance_notional`](Self::vega_to_variance_notional):
     ///
     /// ```text
-    /// Notional_vega = Notional_variance × 2 × σ_strike
+    /// Notional_vega = Notional_variance × 2 × σ_strike × 0.01
     /// ```
     ///
     /// # Arguments
@@ -205,7 +204,7 @@ impl VarianceSwap {
     ///
     /// Vega notional amount (P&L per 1 vol point move)
     pub fn variance_to_vega_notional(variance_notional: f64, strike_vol: f64) -> f64 {
-        variance_notional * 2.0 * strike_vol
+        variance_notional * 2.0 * strike_vol * 0.01
     }
 
     /// Create a canonical example equity variance swap (SPX, 1Y).

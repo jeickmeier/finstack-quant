@@ -1,12 +1,64 @@
 use crate::instruments::common_impl::pricing::time::{
     rate_between_on_dates, relative_df_discount_curve,
 };
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
+
+use crate::instruments::IRSConvention;
+
+/// Resolve the reference-swap convention from an explicit override or the
+/// notional currency.
+pub fn resolve_reference_swap_convention(
+    explicit: Option<IRSConvention>,
+    currency: Currency,
+) -> Result<IRSConvention> {
+    if let Some(convention) = explicit {
+        return Ok(convention);
+    }
+    match currency {
+        Currency::USD => Ok(IRSConvention::USDStandard),
+        Currency::EUR => Ok(IRSConvention::EURStandard),
+        Currency::GBP => Ok(IRSConvention::GBPStandard),
+        Currency::JPY => Ok(IRSConvention::JPYStandard),
+        _ => Err(finstack_quant_core::Error::Validation(format!(
+            "CMS reference swap requires an explicit IRS convention for currency {currency}"
+        ))),
+    }
+}
+
+/// Validate that a term-index curve represents the instrument's contractual
+/// reset tenor.
+pub(crate) fn validate_term_curve_tenor(
+    curve: &ForwardCurve,
+    tenor: Tenor,
+    instrument: &str,
+) -> Result<()> {
+    let expected = tenor.to_years_simple();
+    if (curve.tenor() - expected).abs() > 1e-8 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{instrument} floating tenor {expected} does not match forward curve '{}' tenor {}",
+            curve.id(),
+            curve.tenor()
+        )));
+    }
+    Ok(())
+}
+
+/// Fixed-tenor index fixing at a reset date.
+pub(crate) fn term_fixing_on_date(curve: &ForwardCurve, date: Date) -> Result<f64> {
+    let t = curve.day_count().signed_year_fraction(
+        curve.base_date(),
+        date,
+        DayCountContext::default(),
+    )?;
+    Ok(curve.rate(t))
+}
 
 /// Inputs for forward swap rate calculation.
 pub struct ForwardSwapRateInputs<'a> {
@@ -30,6 +82,19 @@ pub struct ForwardSwapRateInputs<'a> {
     pub float_freq: Tenor,
     /// Floating leg day-count convention.
     pub float_day_count: DayCount,
+    /// Calendar used to adjust reference-swap schedules.
+    pub calendar_id: &'a str,
+    /// Business-day convention for both legs.
+    pub business_day_convention: BusinessDayConvention,
+    /// Stub rule for irregular reference swaps.
+    pub stub: StubKind,
+    /// Preserve end-of-month rolls.
+    pub end_of_month: bool,
+    /// Payment lag in business days.
+    pub payment_lag_days: i32,
+    /// Require a term projection curve whose tenor matches `float_freq`.
+    /// Disable for overnight-compounded reference swaps.
+    pub enforce_forward_tenor: bool,
 }
 
 /// Calculate forward swap rate and annuity for a swap running from `start` to `end`.
@@ -47,11 +112,11 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
         inputs.start,
         inputs.end,
         inputs.fixed_freq,
-        StubKind::None,
-        BusinessDayConvention::ModifiedFollowing,
-        false,
-        0,
-        crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+        inputs.stub,
+        inputs.business_day_convention,
+        inputs.end_of_month,
+        inputs.payment_lag_days,
+        inputs.calendar_id,
     )?;
 
     let mut annuity = 0.0;
@@ -82,15 +147,18 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
         let fwd_curve = inputs
             .market
             .get_forward(inputs.forward_curve_id.as_ref())?;
+        if inputs.enforce_forward_tenor {
+            validate_term_curve_tenor(fwd_curve.as_ref(), inputs.float_freq, "CMS reference swap")?;
+        }
         let sched_float = crate::cashflow::builder::build_dates(
             inputs.start,
             inputs.end,
             inputs.float_freq,
-            StubKind::None,
-            BusinessDayConvention::ModifiedFollowing,
-            false,
-            0,
-            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+            inputs.stub,
+            inputs.business_day_convention,
+            inputs.end_of_month,
+            inputs.payment_lag_days,
+            inputs.calendar_id,
         )?;
 
         let mut pv_float = 0.0;
@@ -150,6 +218,12 @@ mod tests {
             fixed_day_count: DayCount::Act365F,
             float_freq: "1Y".parse().expect("tenor"),
             float_day_count: DayCount::Act365F,
+            calendar_id: crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+            business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            stub: StubKind::None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            enforce_forward_tenor: false,
         })
         .expect("forward swap rate");
 

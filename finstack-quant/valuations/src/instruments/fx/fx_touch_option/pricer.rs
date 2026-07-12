@@ -32,12 +32,12 @@ impl FxTouchOptionCalculator {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        if inst
-            .monitoring_start_date
-            .is_some_and(|start| as_of > start)
-            && as_of <= inst.expiry
-            && inst.observed_touch.is_none()
-        {
+        let start = inst.monitoring_start_date.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "FxTouchOption requires monitoring_start_date".to_string(),
+            )
+        })?;
+        if as_of > start && as_of <= inst.expiry && inst.observed_touch.is_none() {
             return Err(finstack_quant_core::Error::Validation(
                 "Seasoned FX touch option requires observed_touch after monitoring starts"
                     .to_string(),
@@ -298,6 +298,7 @@ mod tests {
             .barrier_direction(crate::instruments::fx::fx_touch_option::BarrierDirection::Down)
             .payout_amount(Money::new(100_000.0, Currency::USD))
             .payout_timing(crate::instruments::fx::fx_touch_option::PayoutTiming::AtExpiry)
+            .monitoring_start_date(date!(2024 - 01 - 01))
             .expiry(expiry)
             .day_count(DayCount::Act365F)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -336,6 +337,7 @@ mod tests {
             .barrier_direction(crate::instruments::fx::fx_touch_option::BarrierDirection::Down)
             .payout_amount(Money::new(100_000.0, Currency::USD))
             .payout_timing(timing)
+            .monitoring_start_date(date!(2024 - 01 - 01))
             .expiry(expiry)
             .day_count(DayCount::Act365F)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

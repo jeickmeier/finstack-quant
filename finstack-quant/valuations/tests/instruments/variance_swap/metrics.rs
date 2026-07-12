@@ -4,7 +4,7 @@ use super::common::*;
 use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::stats::{realized_variance, RealizedVarMethod};
-use finstack_quant_valuations::instruments::equity::variance_swap::PayReceive;
+use finstack_quant_valuations::instruments::equity::variance_swap::{PayReceive, VarianceSwap};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 
@@ -44,6 +44,15 @@ fn test_variance_notional_returns_correct_amount() {
 
     // Assert
     assert_eq!(notional, swap.notional.amount());
+}
+
+#[test]
+fn vega_notional_conversion_uses_one_vol_point() {
+    let variance_notional = VarianceSwap::vega_to_variance_notional(100_000.0, 0.20);
+    assert!((variance_notional - 25_000_000.0).abs() < 1e-9);
+
+    let vega_notional = VarianceSwap::variance_to_vega_notional(variance_notional, 0.20);
+    assert!((vega_notional - 100_000.0).abs() < 1e-9);
 }
 
 #[test]

@@ -262,13 +262,16 @@ impl FxTouchOption {
                 actual: self.payout_amount.currency(),
             });
         }
-        if let Some(start) = self.monitoring_start_date {
-            if start > self.expiry {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "FxTouchOption monitoring_start_date ({start}) must not be after expiry ({})",
-                    self.expiry
-                )));
-            }
+        let start = self.monitoring_start_date.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "FxTouchOption requires monitoring_start_date".to_string(),
+            )
+        })?;
+        if start > self.expiry {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxTouchOption monitoring_start_date ({start}) must not be after expiry ({})",
+                self.expiry
+            )));
         }
         Ok(())
     }
@@ -276,6 +279,7 @@ impl FxTouchOption {
     /// Create a canonical example FX touch option expiring on the
     /// project-wide stable example epoch.
     pub fn example() -> finstack_quant_core::Result<Self> {
+        use time::macros::date;
         Self::builder()
             .id(InstrumentId::new("FXTOUCH-EURUSD-OT"))
             .base_currency(Currency::EUR)
@@ -286,6 +290,7 @@ impl FxTouchOption {
             .payout_amount(Money::new(1_000_000.0, Currency::USD))
             .payout_timing(PayoutTiming::AtExpiry)
             .expiry(crate::instruments::common_impl::example_constants::FAR_EXPIRY)
+            .monitoring_start_date_opt(Some(date!(2024 - 01 - 01)))
             .day_count(DayCount::Act365F)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
@@ -607,6 +612,7 @@ mod tests {
             .barrier_direction(BarrierDirection::Down)
             .payout_amount(Money::new(1_000_000.0, Currency::USD))
             .payout_timing(PayoutTiming::AtExpiry)
+            .monitoring_start_date(time::macros::date!(2024 - 01 - 01))
             .expiry(time::macros::date!(2027 - 01 - 15))
             .day_count(DayCount::Act365F)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
@@ -764,6 +770,7 @@ mod tests {
             .barrier_direction(BarrierDirection::Down)
             .payout_amount(Money::new(1_000_000.0, Currency::USD))
             .payout_timing(PayoutTiming::AtExpiry)
+            .monitoring_start_date(as_of)
             .expiry(expiry)
             .day_count(DayCount::Act365F)
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))

@@ -57,6 +57,31 @@ pub(crate) fn cost_basis(
     Ok((bond.issue_date, v0))
 }
 
+/// Full holder-view contractual cashflows used by lifetime return metrics.
+/// Unlike pricing cashflows, this intentionally retains already-paid coupons
+/// so an issue-date cost basis is matched with an issue-date return horizon.
+pub(crate) fn lifetime_dated_cashflows(
+    bond: &Bond,
+    curves: &finstack_quant_core::market_data::context::MarketContext,
+) -> finstack_quant_core::Result<
+    Vec<(
+        finstack_quant_core::dates::Date,
+        finstack_quant_core::money::Money,
+    )>,
+> {
+    use finstack_quant_core::cashflow::CFKind;
+
+    let schedule = bond.full_cashflow_schedule(curves)?;
+    Ok(schedule
+        .flows
+        .into_iter()
+        .filter(|cf| {
+            cf.kind != CFKind::PIK && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0)
+        })
+        .map(|cf| (cf.date, cf.amount))
+        .collect())
+}
+
 /// MOIC if held to maturity.
 ///
 /// Computes the sum of all positive cashflows received by the holder strictly
@@ -76,7 +101,7 @@ impl MetricCalculator for MoicCalculator {
     fn calculate(&self, ctx: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let bond: &Bond = ctx.instrument_as()?;
         let (t0, v0) = cost_basis(bond)?;
-        let flows = bond.pricing_dated_cashflows(&ctx.curves, ctx.as_of)?;
+        let flows = lifetime_dated_cashflows(bond, &ctx.curves)?;
         let total_in: f64 = flows
             .iter()
             .filter(|(d, _)| *d > t0)
@@ -121,7 +146,7 @@ impl MetricCalculator for MoicToWorstCalculator {
 
         // Lower any return-floor into call_put before enumerating exit paths.
         let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
-        let flows = eff.pricing_dated_cashflows(&ctx.curves, ctx.as_of)?;
+        let flows = lifetime_dated_cashflows(&eff, &ctx.curves)?;
         let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
 
         let candidates = crate::instruments::fixed_income::bond::pricing::quote_conversions::enumerate_exit_paths(
@@ -199,6 +224,40 @@ mod tests {
             (moic - 1.20).abs() < 1e-3,
             "expected MOIC ≈ 1.20, got {moic}"
         );
+    }
+
+    #[test]
+    fn lifetime_moic_retains_already_paid_coupons() {
+        let bond = Bond::fixed(
+            "LIFETIME",
+            Money::new(100.0, Currency::USD),
+            Rate::from_percent(10.0),
+            date!(2024 - 01 - 15),
+            date!(2026 - 01 - 15),
+            "USD-OIS",
+        )
+        .expect("bond");
+        let curves = Arc::new(MarketContext::new());
+        let mut at_issue = MetricContext::new(
+            Arc::new(bond.clone()),
+            Arc::clone(&curves),
+            date!(2024 - 01 - 15),
+            Money::new(100.0, Currency::USD),
+            MetricContext::default_config(),
+        );
+        let mut after_coupon = MetricContext::new(
+            Arc::new(bond),
+            curves,
+            date!(2024 - 08 - 01),
+            Money::new(100.0, Currency::USD),
+            MetricContext::default_config(),
+        );
+
+        let issue_moic = MoicCalculator.calculate(&mut at_issue).expect("issue MOIC");
+        let seasoned_moic = MoicCalculator
+            .calculate(&mut after_coupon)
+            .expect("seasoned MOIC");
+        assert!((issue_moic - seasoned_moic).abs() < 1e-12);
     }
 
     /// Bullet bond without call options: to-worst equals to-maturity.

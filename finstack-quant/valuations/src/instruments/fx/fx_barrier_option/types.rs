@@ -146,13 +146,16 @@ impl FxBarrierOption {
                 actual: self.notional.currency(),
             });
         }
-        if let Some(start) = self.monitoring_start_date {
-            if start > self.expiry {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "FxBarrierOption monitoring_start_date ({start}) must not be after expiry ({})",
-                    self.expiry
-                )));
-            }
+        let start = self.monitoring_start_date.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "FxBarrierOption requires monitoring_start_date".to_string(),
+            )
+        })?;
+        if start > self.expiry {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "FxBarrierOption monitoring_start_date ({start}) must not be after expiry ({})",
+                self.expiry
+            )));
         }
         Ok(())
     }
@@ -177,6 +180,9 @@ impl FxBarrierOption {
             .expiry(
                 Date::from_calendar_date(2024, Month::December, 20).expect("Valid example date"),
             )
+            .monitoring_start_date_opt(Some(
+                Date::from_calendar_date(2024, Month::January, 1).expect("Valid example date"),
+            ))
             .observed_barrier_breached_opt(None)
             .notional(Money::new(1_000_000.0, Currency::EUR)) // Notional in foreign currency (EUR)
             .base_currency(Currency::EUR)
@@ -583,6 +589,9 @@ mod tests {
             .barrier(1.20)
             .option_type(OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
+            .monitoring_start_date(
+                Date::from_calendar_date(2024, Month::January, 1).expect("valid date"),
+            )
             .expiry(Date::from_calendar_date(2025, Month::June, 15).expect("valid date"))
             .notional(Money::new(1_000_000.0, Currency::EUR))
             .base_currency(Currency::EUR)

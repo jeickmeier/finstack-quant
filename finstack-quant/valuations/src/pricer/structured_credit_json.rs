@@ -85,8 +85,15 @@ pub fn structured_credit_tranche_discount_margin_json(
         tranche_id,
         market,
         as_of,
-        Money::new(target_pv, currency),
+        discount_margin_target_money(target_pv, currency)?,
     )
+}
+
+fn discount_margin_target_money(
+    target_pv: f64,
+    currency: finstack_quant_core::currency::Currency,
+) -> Result<Money> {
+    Money::try_new(target_pv, currency)
 }
 
 /// Break-even constant default rate (CDR, decimal) for a tranche from tagged
@@ -180,4 +187,17 @@ pub fn structured_credit_tranche_scenario_table_json(
     let grid: ScenarioGrid = serde_json::from_str(grid_json)
         .map_err(|e| Error::Validation(format!("invalid scenario grid JSON: {e}")))?;
     scenario_table(&deal, tranche_id, market, as_of, &grid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::currency::Currency;
+
+    #[test]
+    fn non_finite_discount_margin_target_is_a_typed_error() {
+        for target in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(discount_margin_target_money(target, Currency::USD).is_err());
+        }
+    }
 }

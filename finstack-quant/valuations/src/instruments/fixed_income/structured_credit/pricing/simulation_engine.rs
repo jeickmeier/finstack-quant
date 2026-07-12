@@ -649,6 +649,37 @@ fn term_rate_for_period(
     )
 }
 
+/// Resolve an asset's all-in coupon without re-projecting an already-reset
+/// period. The pool's stored `rate` is the contractual current coupon and is
+/// therefore the authoritative fallback when no historical fixing series is
+/// supplied for a reset before the curve base date.
+fn collateral_asset_rate_for_period(
+    fwd: &ForwardCurve,
+    context: &MarketContext,
+    accrual_start: Date,
+    fallback_all_in_rate: f64,
+    spread_bps: Option<f64>,
+) -> Result<f64> {
+    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
+    let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
+    let spread = spread_bps.unwrap_or(0.0) / 10_000.0;
+
+    if fixing_date < fwd.base_date() {
+        if let Ok(series) = fixings::get_fixing_series(context, fwd.id().as_str()) {
+            let fixing = fixings::require_fixing_value_exact(
+                Some(series),
+                fwd.id().as_str(),
+                fixing_date,
+                fwd.base_date(),
+            )?;
+            return Ok(fixing + spread);
+        }
+        return Ok(fallback_all_in_rate);
+    }
+
+    Ok(term_rate_for_period(fwd, context, accrual_start)? + spread)
+}
+
 fn current_collateral_wac(
     state: &SimulationState,
     context: &MarketContext,
@@ -667,8 +698,13 @@ fn current_collateral_wac(
         let all_in_rate = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
             let curve_id = &state.pool_state.unique_curves[curve_idx];
             let fwd = context.get_forward(curve_id)?;
-            let base_rate = term_rate_for_period(fwd.as_ref(), context, period_start)?;
-            base_rate + state.pool_state.spread_bps[i].unwrap_or(0.0) / 10_000.0
+            collateral_asset_rate_for_period(
+                fwd.as_ref(),
+                context,
+                period_start,
+                state.pool_state.rates[i],
+                state.pool_state.spread_bps[i],
+            )?
         } else {
             state.pool_state.rates[i]
         };
@@ -1277,6 +1313,31 @@ mod tests {
             .expect_err("straddling term period should require a fixing");
 
         assert!(error.to_string().contains("FIXING:USD-3M"));
+    }
+
+    #[test]
+    fn seasoned_collateral_uses_stored_coupon_without_fixing_series() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
+        let curve = ForwardCurve::builder("USD-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .reset_lag(2)
+            .knots([(0.0, 0.03), (1.0, 0.08)])
+            .build()
+            .expect("forward curve");
+        let accrual_start =
+            Date::from_calendar_date(2024, Month::December, 1).expect("accrual start");
+
+        let rate = collateral_asset_rate_for_period(
+            &curve,
+            &MarketContext::new(),
+            accrual_start,
+            0.071,
+            Some(125.0),
+        )
+        .expect("stored current coupon is authoritative for an already-reset period");
+
+        assert!((rate - 0.071).abs() < 1e-14);
     }
 
     #[test]
@@ -3766,11 +3827,9 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     let global_period_mdr = 1.0 - (1.0 - request.rates.mdr).powf(request.months_per_period);
 
     // Pre-resolve all curves
-    let mut resolved_rates = Vec::with_capacity(state.pool_state.unique_curves.len());
+    let mut resolved_curves = Vec::with_capacity(state.pool_state.unique_curves.len());
     for idx_str in &state.pool_state.unique_curves {
-        let fwd = request.context.get_forward(idx_str)?;
-        let r = term_rate_for_period(fwd.as_ref(), request.context, request.prev_date)?;
-        resolved_rates.push(r);
+        resolved_curves.push(request.context.get_forward(idx_str)?);
     }
 
     // Copula default resolution. For `PerName`, `per_name_mask[k]` is the
@@ -3893,8 +3952,13 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
 
         // 1. Interest -- computed first so matured assets still pay their final coupon
         let rate = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
-            let base_rate = resolved_rates[curve_idx];
-            base_rate + (state.pool_state.spread_bps[i].unwrap_or(0.0).max(0.0) / 10_000.0)
+            collateral_asset_rate_for_period(
+                resolved_curves[curve_idx].as_ref(),
+                request.context,
+                request.prev_date,
+                state.pool_state.rates[i],
+                state.pool_state.spread_bps[i],
+            )?
         } else {
             state.pool_state.rates[i]
         };

@@ -84,6 +84,7 @@ pub fn create_down_and_out_call(
     day_count: DayCount,
 ) -> BarrierOption {
     BarrierOption {
+        expiry_fixing: None,
         id: "BARRIER_DOC_TEST".into(),
         underlying_ticker: SPOT_ID.into(),
         strike,

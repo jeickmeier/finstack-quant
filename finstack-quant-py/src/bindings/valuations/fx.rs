@@ -204,14 +204,80 @@ macro_rules! fx_option_class {
     };
 }
 
+macro_rules! fx_option_subset_class {
+    ($py_name:literal, $rust_name:ident, $type_tag:literal, [$(($method:ident, $metric:literal)),+ $(,)?]) => {
+        fx_class!($py_name, $rust_name, $type_tag);
+
+        #[pymethods]
+        impl $rust_name {
+            $(
+                #[pyo3(signature = (market, as_of, model="default"))]
+                fn $method(
+                    &self,
+                    py: Python<'_>,
+                    market: &Bound<'_, PyAny>,
+                    as_of: &str,
+                    model: &str,
+                ) -> PyResult<f64> {
+                    metric_value(py, &self.json, market, as_of, model, $metric)
+                }
+            )+
+
+            #[pyo3(signature = (market, as_of, model="default"))]
+            fn greeks<'py>(
+                &self,
+                py: Python<'py>,
+                market: &Bound<'_, PyAny>,
+                as_of: &str,
+                model: &str,
+            ) -> PyResult<Bound<'py, PyDict>> {
+                greeks_dict(py, &self.json, market, as_of, model)
+            }
+        }
+    };
+}
+
 fx_class!("FxSpot", PyFxSpot, "fx_spot");
 fx_class!("FxForward", PyFxForward, "fx_forward");
 fx_class!("FxSwap", PyFxSwap, "fx_swap");
 fx_class!("Ndf", PyNdf, "ndf");
 fx_option_class!("FxOption", PyFxOption, "fx_option");
-fx_option_class!("FxDigitalOption", PyFxDigitalOption, "fx_digital_option");
-fx_option_class!("FxTouchOption", PyFxTouchOption, "fx_touch_option");
-fx_option_class!("FxBarrierOption", PyFxBarrierOption, "fx_barrier_option");
+fx_option_subset_class!(
+    "FxDigitalOption",
+    PyFxDigitalOption,
+    "fx_digital_option",
+    [
+        (delta, "delta"),
+        (gamma, "gamma"),
+        (vega, "vega"),
+        (theta, "theta"),
+        (rho, "rho"),
+    ]
+);
+fx_option_subset_class!(
+    "FxTouchOption",
+    PyFxTouchOption,
+    "fx_touch_option",
+    [
+        (delta, "delta"),
+        (gamma, "gamma"),
+        (vega, "vega"),
+        (rho, "rho"),
+    ]
+);
+fx_option_subset_class!(
+    "FxBarrierOption",
+    PyFxBarrierOption,
+    "fx_barrier_option",
+    [
+        (delta, "delta"),
+        (gamma, "gamma"),
+        (vega, "vega"),
+        (rho, "rho"),
+        (vanna, "vanna"),
+        (volga, "volga"),
+    ]
+);
 fx_class!("FxVarianceSwap", PyFxVarianceSwap, "fx_variance_swap");
 fx_option_class!("QuantoOption", PyQuantoOption, "quanto_option");
 

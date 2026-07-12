@@ -21,7 +21,6 @@ use crate::instruments::common_impl::pricing::time::{
     rate_between_on_dates, relative_df_discount_curve,
 };
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::cms_option::pricer::convexity_adjustment;
 use crate::instruments::rates::cms_swap::types::{CmsSwap, FundingLeg};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
@@ -246,6 +245,15 @@ pub(super) fn cms_coupon_rate(
     let swap_start = inst.reference_swap_start(fixing_date)?;
     let swap_tenor_months = (inst.cms_tenor * 12.0).round() as i32;
     let swap_end = swap_start.add_months(swap_tenor_months);
+    let convention = crate::instruments::rates::exotics_shared::forward_swap_rate::resolve_reference_swap_convention(
+        inst.swap_convention,
+        inst.notional.currency(),
+    )?;
+    let calendar_id = convention.calendar_id().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "CMS reference-swap convention has no calendar".to_string(),
+        )
+    })?;
 
     let (forward_swap_rate, _annuity) =
         crate::instruments::rates::exotics_shared::forward_swap_rate::calculate_forward_swap_rate(
@@ -260,6 +268,13 @@ pub(super) fn cms_coupon_rate(
                 fixed_day_count: inst.resolved_swap_day_count(),
                 float_freq: inst.resolved_swap_float_freq(),
                 float_day_count: inst.resolved_swap_float_day_count(),
+                calendar_id: &calendar_id,
+                business_day_convention: convention.business_day_convention(),
+                stub: finstack_quant_core::dates::StubKind::ShortFront,
+                end_of_month: swap_start.end_of_month() == swap_start
+                    && swap_end.end_of_month() == swap_end,
+                payment_lag_days: convention.payment_lag_days(),
+                enforce_forward_tenor: !convention.uses_daily_compounding(),
             },
         )?;
 
@@ -272,11 +287,12 @@ pub(super) fn cms_coupon_rate(
         // non-positive forwards. In negative-rate regimes, keep the linear CMS
         // coupon and let embedded cap/floor optionality use the Bachelier
         // fallback in `cms_embedded_option_value`.
-        convexity_adjustment(
+        crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency(
             vol_surface.value_clamped(time_to_fixing.max(0.0), forward_swap_rate),
             time_to_fixing,
             inst.cms_tenor,
             forward_swap_rate,
+            1.0 / inst.resolved_swap_fixed_freq().to_years_simple(),
         ) * convexity_scale
     } else {
         0.0

@@ -1,9 +1,7 @@
 //! Pricers for snowball and inverse-floater structured notes.
 
 use crate::calibration::hull_white::HullWhiteParams;
-use crate::instruments::common_impl::pricing::time::{
-    rate_period_on_dates, relative_df_discount_curve,
-};
+use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::exotics_shared::cumulative_coupon::CouponEvent;
 use crate::instruments::rates::exotics_shared::hw1f_curve::{
@@ -262,7 +260,10 @@ impl SnowballDiscountingPricer {
 
             let projection_start = start.max(as_of);
             let floating_rate =
-                rate_period_on_dates(forward_curve.as_ref(), projection_start, end)?;
+                crate::instruments::rates::exotics_shared::forward_swap_rate::term_fixing_on_date(
+                    forward_curve.as_ref(),
+                    projection_start,
+                )?;
             let coupon_rate = inst.compute_coupon(floating_rate, prev_coupon);
             let event = &events[event_idx];
             pv += coupon_rate
@@ -694,6 +695,11 @@ fn coupon_events(
 ) -> Result<Vec<CouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
     let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+    crate::instruments::rates::exotics_shared::forward_swap_rate::validate_term_curve_tenor(
+        forward_curve.as_ref(),
+        inst.floating_tenor,
+        inst.id.as_str(),
+    )?;
     let mut events = Vec::new();
     for period in inst.coupon_dates.windows(2) {
         let start = period[0];
@@ -723,11 +729,6 @@ fn coupon_events(
                     .year_fraction(as_of, start, DayCountContext::default())?;
             let coeffs =
                 term_forward.period_coeffs(fixing_time, inst.floating_tenor.to_years_simple());
-            let projection_time = forward_curve.day_count().signed_year_fraction(
-                forward_curve.base_date(),
-                start,
-                DayCountContext::default(),
-            )?;
             let discount_time = discount_curve.day_count().signed_year_fraction(
                 discount_curve.base_date(),
                 start,
@@ -737,18 +738,21 @@ fn coupon_events(
             let discount_forward =
                 (discount_curve.df(discount_time) / discount_curve.df(discount_time + tenor) - 1.0)
                     / tenor;
-            let basis = forward_curve.rate(projection_time) - discount_forward;
+            let basis =
+                crate::instruments::rates::exotics_shared::forward_swap_rate::term_fixing_on_date(
+                    forward_curve.as_ref(),
+                    start,
+                )? - discount_forward;
             (coeffs.with_additive_spread(basis), true)
         } else {
             // At inception the first fixing is projected from the explicit
             // projection curve. Do not substitute the discount-curve short
             // rate, which would remove the index/discount basis.
-            let projection_time = forward_curve.day_count().signed_year_fraction(
-                forward_curve.base_date(),
-                start,
-                DayCountContext::default(),
-            )?;
-            let seasoned_rate = forward_curve.rate(projection_time);
+            let seasoned_rate =
+                crate::instruments::rates::exotics_shared::forward_swap_rate::term_fixing_on_date(
+                    forward_curve.as_ref(),
+                    start,
+                )?;
             (
                 PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction),
                 false,
@@ -1251,28 +1255,9 @@ mod tests {
             floating_tenor: Tenor::quarterly(),
             ..test_snowball()
         };
-        // Same instrument but 6M floating index (default test_snowball).
-        let inst_6m = test_snowball(); // floating_tenor = semi_annual()
-
-        let pv_3m = deterministic_mc_pricer(32)
+        let err = deterministic_mc_pricer(32)
             .price_estimate(&inst_3m, &market, as_of)
-            .expect("3M price")
-            .mean
-            .amount();
-        let pv_6m = deterministic_mc_pricer(32)
-            .price_estimate(&inst_6m, &market, as_of)
-            .expect("6M price")
-            .mean
-            .amount();
-
-        // On a sloped curve the 3M and 6M simple forwards differ materially.
-        // A PV shift of at least $100 is expected; if the two are equal (within
-        // $1) the pricer is ignoring floating_tenor.
-        assert!(
-            (pv_3m - pv_6m).abs() > 100.0,
-            "pv_3m={pv_3m:.2} pv_6m={pv_6m:.2}: |Δ|={:.2} ≤ $100 — \
-             the pricer is ignoring floating_tenor",
-            (pv_3m - pv_6m).abs()
-        );
+            .expect_err("3M instrument must reject a 6M forward curve");
+        assert!(err.to_string().contains("does not match forward curve"));
     }
 }

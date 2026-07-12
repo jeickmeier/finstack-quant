@@ -164,6 +164,15 @@ impl FxOption {
                 actual: self.notional.currency(),
             });
         }
+        crate::instruments::common_impl::validation::validate_money_finite(
+            self.notional,
+            "FxOption notional",
+        )?;
+        crate::instruments::common_impl::validation::validate_money_gt(
+            self.notional,
+            0.0,
+            "FxOption notional",
+        )?;
         Ok(())
     }
 

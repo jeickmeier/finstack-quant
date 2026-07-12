@@ -14,16 +14,19 @@ use time::Month;
 
 #[test]
 fn test_zero_notional() {
-    // Test swap with zero notional
     let dates = TestDates::standard();
-    let market = setup_standard_market(dates.as_of);
+    let result = FxSwap::builder()
+        .id("ZERO_NOTIONAL".to_string().into())
+        .base_currency(Currency::EUR)
+        .quote_currency(Currency::USD)
+        .near_date(dates.near_date)
+        .far_date(dates.far_date_1y)
+        .base_notional(Money::new(0.0, Currency::EUR))
+        .domestic_discount_curve_id("USD-OIS".into())
+        .foreign_discount_curve_id("EUR-OIS".into())
+        .build();
 
-    let swap = create_standard_fx_swap("ZERO_NOTIONAL", dates.near_date, dates.far_date_1y, 0.0);
-
-    let pv = swap.value(&market, dates.as_of).unwrap();
-
-    // Zero notional should produce zero PV
-    assert_eq!(pv.amount(), 0.0, "Zero notional should yield zero PV");
+    assert!(result.is_err(), "zero notional must be rejected");
 }
 
 #[test]

@@ -162,6 +162,7 @@ mod gbm_barrier {
     /// cancels and the test isolates the spot *process*.
     fn down_and_out_call(expiry: Date) -> BarrierOption {
         BarrierOption {
+            expiry_fixing: None,
             id: InstrumentId::new("BARRIER-GBM-HESTON-PARITY"),
             underlying_ticker: "SPX".to_string(),
             strike: STRIKE,

@@ -322,6 +322,15 @@ pub struct AgencyMbsPassthrough {
     /// Issue date of the pool.
     #[schemars(with = "String")]
     pub issue_date: Date,
+    /// End date of the latest accrual period whose delayed P&I payment has
+    /// settled and is already reflected in `current_face`.
+    ///
+    /// When omitted, pricing infers the latest paid period from the agency
+    /// payment-delay rule and `as_of`.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub last_paid_accrual_end: Option<Date>,
     /// Legal maturity date.
     #[schemars(with = "String")]
     pub maturity: Date,
@@ -366,6 +375,7 @@ impl AgencyMbsPassthrough {
             .guarantee_fee_rate(0.0025)
             .wam(348)
             .issue_date(date!(2022 - 01 - 01))
+            .last_paid_accrual_end_opt(None)
             .maturity(date!(2052 - 01 - 01))
             .prepayment_model(PrepaymentModelSpec::psa(1.0))
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -459,6 +469,19 @@ impl crate::instruments::common_impl::traits::CurveDependencies for AgencyMbsPas
 
 impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthrough {
     impl_instrument_base!(crate::pricer::InstrumentType::AgencyMbsPassthrough);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate_coupon_consistency()?;
+        if let Some(last_paid) = self.last_paid_accrual_end {
+            if last_paid < self.issue_date || last_paid > self.maturity {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "MBS last_paid_accrual_end {last_paid} must fall between issue date {} and maturity {}",
+                    self.issue_date, self.maturity
+                )));
+            }
+        }
+        Ok(())
+    }
 
     fn base_value(
         &self,

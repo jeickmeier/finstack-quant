@@ -317,6 +317,29 @@ impl Autocallable {
                 self.cap_level
             )));
         }
+        match self.final_payoff_type {
+            FinalPayoffType::CapitalProtection { floor } => {
+                if !floor.is_finite() || floor < 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Autocallable capital-protection floor = {floor} must be finite and non-negative"
+                    )));
+                }
+            }
+            FinalPayoffType::Participation { rate } => {
+                if !rate.is_finite() || rate < 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Autocallable final participation rate = {rate} must be finite and non-negative"
+                    )));
+                }
+            }
+            FinalPayoffType::KnockInPut { strike } => {
+                if !strike.is_finite() || strike <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Autocallable knock-in put strike = {strike} must be finite and positive"
+                    )));
+                }
+            }
+        }
         if !self.notional.amount().is_finite() {
             return Err(finstack_quant_core::Error::Validation(
                 "Autocallable notional amount must be finite".into(),
@@ -490,6 +513,22 @@ mod validation_tests {
     fn builder_rejects_mismatched_coupons_length() {
         let result = base_builder().coupons(vec![0.02]).build();
         assert!(result.is_err(), "coupons length mismatch must be rejected");
+    }
+
+    #[test]
+    fn builder_rejects_invalid_nested_final_payoff_parameters() {
+        assert!(base_builder()
+            .final_payoff_type(FinalPayoffType::CapitalProtection { floor: -0.1 })
+            .build()
+            .is_err());
+        assert!(base_builder()
+            .final_payoff_type(FinalPayoffType::Participation { rate: -1.0 })
+            .build()
+            .is_err());
+        assert!(base_builder()
+            .final_payoff_type(FinalPayoffType::KnockInPut { strike: 0.0 })
+            .build()
+            .is_err());
     }
 
     #[test]

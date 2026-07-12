@@ -187,17 +187,9 @@ impl Pricer for FxBarrierOptionMcPricer {
                 PricingError::type_mismatch(InstrumentType::FxBarrierOption, instrument.key())
             })?;
 
-        if fx_barrier
-            .monitoring_start_date
-            .is_some_and(|start| as_of > start)
-            && as_of <= fx_barrier.expiry
-            && fx_barrier.observed_barrier_breached.is_none()
-        {
-            return Err(PricingError::model_failure_with_context(
-                "Seasoned FX barrier option requires observed_barrier_breached after monitoring starts",
-                PricingErrorContext::default(),
-            ));
-        }
+        validate_monitoring_state(fx_barrier, as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
 
         let pv = self
             .price_internal(fx_barrier, market, as_of)
@@ -231,12 +223,12 @@ fn validate_monitoring_state(
     inst: &FxBarrierOption,
     as_of: Date,
 ) -> finstack_quant_core::Result<()> {
-    if inst
-        .monitoring_start_date
-        .is_some_and(|start| as_of > start)
-        && as_of <= inst.expiry
-        && inst.observed_barrier_breached.is_none()
-    {
+    let start = inst.monitoring_start_date.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "FxBarrierOption requires monitoring_start_date".to_string(),
+        )
+    })?;
+    if as_of > start && as_of <= inst.expiry && inst.observed_barrier_breached.is_none() {
         return Err(finstack_quant_core::Error::Validation(
             "Seasoned FX barrier option requires observed_barrier_breached after monitoring starts"
                 .to_string(),
@@ -543,6 +535,9 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             })?;
 
         fx_barrier.validate().map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+        validate_monitoring_state(fx_barrier, as_of).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
@@ -986,6 +981,7 @@ mod tests {
             .rebate(0.02)
             .option_type(OptionType::Call)
             .barrier_type(BarrierType::UpAndIn)
+            .monitoring_start_date(as_of)
             .expiry(expiry)
             .notional(Money::new(1_000_000.0, Currency::EUR))
             .base_currency(Currency::EUR)
@@ -1124,6 +1120,7 @@ mod tests {
             .rebate(0.0)
             .option_type(crate::instruments::OptionType::Call)
             .barrier_type(crate::instruments::exotics::barrier_option::types::BarrierType::UpAndOut)
+            .monitoring_start_date(as_of)
             .expiry(expiry)
             .notional(Money::new(1_000_000.0, Currency::EUR))
             .base_currency(Currency::EUR)
@@ -1211,6 +1208,7 @@ mod tests {
             .rebate_opt(None)
             .option_type(OptionType::Put)
             .barrier_type(BarrierType::DownAndOut)
+            .monitoring_start_date(as_of)
             .expiry(expiry)
             .notional(Money::new(1_000_000.0, Currency::EUR))
             .base_currency(Currency::EUR)
@@ -1234,6 +1232,7 @@ mod tests {
             .rebate_opt(None)
             .option_type(OptionType::Put)
             .barrier_type(BarrierType::DownAndOut)
+            .monitoring_start_date(as_of)
             .expiry(expiry)
             .notional(Money::new(1_000_000.0, Currency::EUR))
             .base_currency(Currency::EUR)
@@ -1324,6 +1323,7 @@ mod tests {
             .rebate_opt(None)
             .option_type(OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
+            .monitoring_start_date(as_of)
             .expiry(expiry)
             .notional(Money::new(1_000_000.0, Currency::EUR))
             .base_currency(Currency::EUR)

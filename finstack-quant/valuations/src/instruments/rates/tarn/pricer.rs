@@ -320,6 +320,11 @@ impl TarnPricer {
         }
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
         let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
+        crate::instruments::rates::exotics_shared::forward_swap_rate::validate_term_curve_tenor(
+            forward_curve.as_ref(),
+            inst.floating_tenor,
+            inst.id.as_str(),
+        )?;
 
         let hw_params = self.effective_hw_params(inst, market, as_of)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
@@ -381,11 +386,6 @@ impl TarnPricer {
                 event_times.push(fixing_time);
                 let coeffs =
                     term_forward.period_coeffs(fixing_time, inst.floating_tenor.to_years_simple());
-                let projection_time = forward_curve.day_count().signed_year_fraction(
-                    forward_curve.base_date(),
-                    start,
-                    DayCountContext::default(),
-                )?;
                 let discount_time = discount_curve.day_count().signed_year_fraction(
                     discount_curve.base_date(),
                     start,
@@ -396,7 +396,10 @@ impl TarnPricer {
                     / discount_curve.df(discount_time + tenor)
                     - 1.0)
                     / tenor;
-                let basis = forward_curve.rate(projection_time) - discount_forward;
+                let basis = crate::instruments::rates::exotics_shared::forward_swap_rate::term_fixing_on_date(
+                    forward_curve.as_ref(),
+                    start,
+                )? - discount_forward;
                 events.push(CouponEvent {
                     accrual_fraction,
                     discount_factor,
@@ -409,12 +412,10 @@ impl TarnPricer {
                 // historical observation. Use the projection curve for that
                 // fixing; discount-curve reconstruction alone would erase the
                 // projection/discount basis precisely at inception.
-                let projection_time = forward_curve.day_count().signed_year_fraction(
-                    forward_curve.base_date(),
+                let projected_rate = crate::instruments::rates::exotics_shared::forward_swap_rate::term_fixing_on_date(
+                    forward_curve.as_ref(),
                     start,
-                    DayCountContext::default(),
                 )?;
-                let projected_rate = forward_curve.rate(projection_time);
                 PeriodForwardCoeffs::from_flat_rate(projected_rate, accrual_fraction)
             };
 
@@ -961,28 +962,9 @@ mod tests {
             floating_tenor: Tenor::quarterly(),
             ..test_tarn(1.0)
         };
-        // Same instrument but 6M floating index.
-        let tarn_6m = test_tarn(1.0); // already floating_tenor = semi_annual()
-
-        let pv_3m = deterministic_pricer(32)
+        let err = deterministic_pricer(32)
             .price_estimate(&tarn_3m, &market, as_of)
-            .expect("3M price")
-            .mean
-            .amount();
-        let pv_6m = deterministic_pricer(32)
-            .price_estimate(&tarn_6m, &market, as_of)
-            .expect("6M price")
-            .mean
-            .amount();
-
-        // On a sloped curve the 3M and 6M simple forwards differ materially.
-        // A PV shift of at least $100 is expected; if the two are equal (within
-        // $1) the pricer is ignoring floating_tenor.
-        assert!(
-            (pv_3m - pv_6m).abs() > 100.0,
-            "pv_3m={pv_3m:.2} pv_6m={pv_6m:.2}: |Δ|={:.2} ≤ $100 — \
-             the pricer is ignoring floating_tenor",
-            (pv_3m - pv_6m).abs()
-        );
+            .expect_err("3M instrument must reject a 6M forward curve");
+        assert!(err.to_string().contains("does not match forward curve"));
     }
 }

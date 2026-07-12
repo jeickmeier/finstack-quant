@@ -75,9 +75,19 @@ pub fn canonical_instrument_json_from_str(
 /// canonical JSON representation.
 pub fn validate_instrument_json(json: &str) -> finstack_quant_core::Result<String> {
     parse_boxed_instrument_json(json, None)?;
-    let parsed = parse_instrument_json(json)?;
-    serde_json::to_string(&parsed)
-        .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
+    let value: Value = serde_json::from_str(json)
+        .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))?;
+    if value.get("schema").is_some() {
+        let parsed: InstrumentEnvelope = serde_json::from_value(value)
+            .map_err(|e| Error::Validation(format!("invalid instrument envelope JSON: {e}")))?;
+        serde_json::to_string(&parsed)
+            .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
+    } else {
+        let parsed: InstrumentJson = serde_json::from_value(value)
+            .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))?;
+        serde_json::to_string(&parsed)
+            .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
+    }
 }
 
 /// List all metric IDs in the standard metric registry.
@@ -362,7 +372,9 @@ fn instrument_json_for_pricing<'a>(
 mod tests {
     use super::*;
     use crate::instruments::equity::equity_option::EquityOption;
+    use crate::instruments::equity::pe_fund::PrivateMarketsFund;
     use crate::instruments::fixed_income::bond::Bond;
+    use crate::instruments::fixed_income::structured_credit::StructuredCredit;
     use crate::instruments::fx::FxOption;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
@@ -540,6 +552,50 @@ mod tests {
             err.to_string().contains("strike") && err.to_string().contains("positive"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn validate_instrument_json_rejects_non_conserving_waterfall() {
+        let fund = PrivateMarketsFund::example().expect("fund");
+        let mut json =
+            serde_json::to_value(InstrumentJson::PrivateMarketsFund(fund)).expect("serialize");
+        json["spec"]["waterfall_spec"]["tranches"][3]["promote_tier"]["gp_share"] =
+            Value::from(0.6);
+        let json = serde_json::to_string(&json).expect("json");
+
+        validate_instrument_json(&json).expect_err("LP and GP shares above 100% must be rejected");
+    }
+
+    #[test]
+    fn validate_instrument_json_rejects_invalid_cleanup_call_threshold() {
+        let mut deal = StructuredCredit::example();
+        deal.cleanup_call_pct = Some(-0.5);
+        let json = serde_json::to_string(&InstrumentJson::StructuredCredit(Box::new(deal)))
+            .expect("serialize");
+
+        let err = validate_instrument_json(&json)
+            .expect_err("cleanup-call threshold outside (0, 1) must be rejected");
+        assert!(err.to_string().contains("cleanup_call_pct"));
+    }
+
+    #[test]
+    fn validate_instrument_json_accepts_versioned_envelope() {
+        let bond = Bond::fixed(
+            "ENVELOPE-BOND",
+            Money::new(1_000_000.0, Currency::USD),
+            0.05,
+            time::Date::from_calendar_date(2024, time::Month::January, 1).expect("date"),
+            time::Date::from_calendar_date(2034, time::Month::January, 1).expect("date"),
+            "USD-OIS",
+        )
+        .expect("bond");
+        let envelope = InstrumentEnvelope::new(InstrumentJson::Bond(bond));
+        let json = serde_json::to_string(&envelope).expect("envelope json");
+
+        let canonical = validate_instrument_json(&json).expect("valid envelope");
+        let value: Value = serde_json::from_str(&canonical).expect("canonical json");
+        assert_eq!(value["schema"], InstrumentEnvelope::CURRENT_SCHEMA);
+        assert_eq!(value["instrument"]["type"], "bond");
     }
 
     #[test]

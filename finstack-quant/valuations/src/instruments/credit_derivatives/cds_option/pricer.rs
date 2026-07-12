@@ -37,6 +37,7 @@ pub(crate) fn npv(
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<Money> {
+    ensure_valuation_not_after_expiry(option, as_of)?;
     option.validate_supported_configuration()?;
     let sigma = resolve_sigma(option, curves, as_of)?;
     let cds = synthetic_underlying_cds(option, as_of)?;
@@ -53,6 +54,7 @@ pub(crate) fn forward_spread_bp(
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
+    ensure_valuation_not_after_expiry(option, as_of)?;
     let cds = synthetic_underlying_cds(option, as_of)?;
     bloomberg_quadrature::forward_par_at_expiry_bp(option, &cds, curves, as_of)
 }
@@ -72,10 +74,24 @@ pub(crate) fn theta(
     curves: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> Result<f64> {
+    ensure_valuation_not_after_expiry(option, as_of)?;
     option.validate_supported_configuration()?;
     let sigma = resolve_sigma(option, curves, as_of)?;
     let cds = synthetic_underlying_cds(option, as_of)?;
     bloomberg_quadrature::theta(option, &cds, curves, sigma, as_of)
+}
+
+fn ensure_valuation_not_after_expiry(
+    option: &CDSOption,
+    as_of: finstack_quant_core::dates::Date,
+) -> Result<()> {
+    if as_of > option.expiry {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CDSOption '{}' expired on {}; post-expiry valuation requires explicit exercise and settlement state",
+            option.id, option.expiry
+        )));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------- Implied volatility
@@ -295,5 +311,20 @@ impl crate::pricer::Pricer for BloombergCdsoPricer {
                 ),
             ),
         )
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use time::Duration;
+
+    #[test]
+    fn post_expiry_valuation_requires_explicit_settlement_state() {
+        let option = CDSOption::example().expect("CDS option example");
+        let as_of = option.expiry + Duration::days(1);
+        let err = ensure_valuation_not_after_expiry(&option, as_of)
+            .expect_err("post-expiry valuation must fail closed");
+        assert!(err.to_string().contains("exercise and settlement state"));
     }
 }

@@ -7,7 +7,6 @@
 
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::cms_option::pricer::convexity_adjustment;
 use crate::instruments::rates::cms_spread_option::{CmsSpreadOption, CmsSpreadOptionType};
 use crate::instruments::rates::exotics_shared::forward_swap_rate::{
     calculate_forward_swap_rate, ForwardSwapRateInputs,
@@ -189,6 +188,15 @@ impl CmsSpreadOptionPricer {
         // non-USD CMS spreads (e.g. EUR: annual/30360 fixed, annual/Act360
         // float). `resolved_swap_*` falls back to the USD market standard when
         // neither `swap_convention` nor an explicit field is set.
+        let convention = crate::instruments::rates::exotics_shared::forward_swap_rate::resolve_reference_swap_convention(
+            inst.swap_convention,
+            inst.notional.currency(),
+        )?;
+        let calendar_id = convention.calendar_id().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "CMS reference-swap convention has no calendar".to_string(),
+            )
+        })?;
         let (forward_rate, _) = calculate_forward_swap_rate(ForwardSwapRateInputs {
             market,
             discount_curve_id: &inst.discount_curve_id,
@@ -200,6 +208,13 @@ impl CmsSpreadOptionPricer {
             fixed_day_count: inst.resolved_swap_day_count(),
             float_freq: inst.resolved_swap_float_freq(),
             float_day_count: inst.resolved_swap_float_day_count(),
+            calendar_id: &calendar_id,
+            business_day_convention: convention.business_day_convention(),
+            stub: finstack_quant_core::dates::StubKind::ShortFront,
+            end_of_month: inst.expiry_date.end_of_month() == inst.expiry_date
+                && swap_end.end_of_month() == swap_end,
+            payment_lag_days: convention.payment_lag_days(),
+            enforce_forward_tenor: !convention.uses_daily_compounding(),
         })?;
         if forward_rate <= 0.0 || !forward_rate.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -211,7 +226,13 @@ impl CmsSpreadOptionPricer {
         let atm_volatility =
             clean_volatility(vol_provider, time_to_expiry, tenor_years, forward_rate)?;
         let convexity = if time_to_expiry > 0.0 {
-            convexity_adjustment(atm_volatility, time_to_expiry, tenor_years, forward_rate)
+            crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency(
+                atm_volatility,
+                time_to_expiry,
+                tenor_years,
+                forward_rate,
+                1.0 / inst.resolved_swap_fixed_freq().to_years_simple(),
+            )
         } else {
             0.0
         };

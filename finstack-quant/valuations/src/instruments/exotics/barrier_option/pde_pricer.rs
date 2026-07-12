@@ -539,6 +539,7 @@ mod tests {
         barrier: f64,
     ) -> BarrierOption {
         BarrierOption {
+            expiry_fixing: None,
             id: InstrumentId::new("BARRIER-PDE-TEST"),
             underlying_ticker: "SPX".to_string(),
             strike,

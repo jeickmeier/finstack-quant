@@ -88,13 +88,9 @@ pub fn generate_cashflows(
     let mut cashflows = Vec::with_capacity(cap);
     let mut balance = mbs.current_face.amount();
 
-    // Start from the active accrual period containing as_of, unless the pool
-    // has a forward issue date inside the month, in which case the partial
-    // pre-issue accrual month is skipped entirely.
-    let effective_start = as_of.max(mbs.issue_date);
-    let mut period_start =
-        Date::from_calendar_date(effective_start.year(), effective_start.month(), 1)
-            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+    // Start from the earliest unpaid accrual period. Agency P&I pays with a
+    // delay, so the active receivable may belong to the prior calendar month.
+    let mut period_start = first_unpaid_accrual_start(mbs, as_of)?;
     if mbs.issue_date > period_start && as_of < mbs.issue_date {
         period_start = period_start
             .checked_add(Duration::days(32))
@@ -276,6 +272,42 @@ fn next_month_start(date: Date) -> Result<Date> {
     Ok(next)
 }
 
+fn previous_month_start(date: Date) -> Result<Date> {
+    use time::Duration;
+    let current_start = Date::from_calendar_date(date.year(), date.month(), 1)
+        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+    let previous = current_start - Duration::days(1);
+    Date::from_calendar_date(previous.year(), previous.month(), 1)
+        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))
+}
+
+fn first_unpaid_accrual_start(mbs: &AgencyMbsPassthrough, as_of: Date) -> Result<Date> {
+    let issue_month = Date::from_calendar_date(mbs.issue_date.year(), mbs.issue_date.month(), 1)
+        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+
+    if let Some(last_paid) = mbs.last_paid_accrual_end {
+        let paid_month = Date::from_calendar_date(last_paid.year(), last_paid.month(), 1)
+            .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+        return Ok(next_month_start(paid_month)?.max(issue_month));
+    }
+
+    let effective_start = as_of.max(mbs.issue_date);
+    let mut start = Date::from_calendar_date(effective_start.year(), effective_start.month(), 1)
+        .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
+
+    while mbs.payment_date_for_accrual_period(start)? <= as_of {
+        start = next_month_start(start)?;
+    }
+    while start > issue_month {
+        let previous = previous_month_start(start)?;
+        if mbs.payment_date_for_accrual_period(previous)? <= as_of {
+            break;
+        }
+        start = previous;
+    }
+    Ok(start.max(issue_month))
+}
+
 /// Discount a set of MBS cashflows to present value.
 ///
 /// Uses the curve's own day count for time calculation, applying an optional
@@ -416,6 +448,30 @@ mod tests {
         for i in 1..cashflows.len() {
             assert!(cashflows[i].beginning_balance <= cashflows[i - 1].beginning_balance);
         }
+    }
+
+    #[test]
+    fn delayed_receivable_starts_at_earliest_unpaid_accrual() {
+        let mbs = create_test_mbs();
+        let before_payment =
+            Date::from_calendar_date(2024, Month::February, 10).expect("valid date");
+        let before = generate_cashflows(&mbs, before_payment, Some(1)).expect("cashflows");
+        assert_eq!(
+            before[0].period_start,
+            Date::from_calendar_date(2024, Month::January, 1).expect("valid date")
+        );
+        assert_eq!(
+            before[0].payment_date,
+            Date::from_calendar_date(2024, Month::February, 25).expect("valid date")
+        );
+
+        let after_payment =
+            Date::from_calendar_date(2024, Month::February, 26).expect("valid date");
+        let after = generate_cashflows(&mbs, after_payment, Some(1)).expect("cashflows");
+        assert_eq!(
+            after[0].period_start,
+            Date::from_calendar_date(2024, Month::February, 1).expect("valid date")
+        );
     }
 
     /// Item 12 regression: monthly investor interest must use the pool's

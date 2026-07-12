@@ -486,6 +486,15 @@ impl CDSTranchePricer {
                     ),
                 })
             })?;
+        if index_data_arc.index_credit_curve.base_date() != as_of {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CDS tranche '{}' requires credit curve '{}' to be based on valuation date {}; got {}. Rebase the curve or provide a conditionally rebased credit index.",
+                tranche.id,
+                tranche.credit_index_id,
+                as_of,
+                index_data_arc.index_credit_curve.base_date()
+            )));
+        }
         let valuation_date = self.calculate_settlement_date(tranche, market_ctx, as_of)?;
         let payment_dates = self.generate_payment_schedule(tranche, valuation_date)?;
         let el_curve = if payment_dates.is_empty() || valuation_date >= tranche.maturity {

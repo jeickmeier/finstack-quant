@@ -86,6 +86,48 @@ fn test_commodity_option_core_greeks_registered() -> finstack_quant_core::Result
     Ok(())
 }
 
+#[test]
+fn commodity_option_volga_is_per_vol_point_squared() -> finstack_quant_core::Result<()> {
+    let (option, market, as_of) = atm_commodity_option(OptionType::Call);
+    let pv = option.value(&market, as_of)?;
+    let mut ctx = MetricContext::new(
+        Arc::new(option.clone()),
+        Arc::new(market.clone()),
+        as_of,
+        pv,
+        MetricContext::default_config(),
+    );
+    let actual = *standard_registry()
+        .compute(&[MetricId::Volga], &mut ctx)?
+        .get(&MetricId::Volga)
+        .expect("volga");
+
+    let bump = 0.01;
+    let surface_id = CurveId::new("CL-VOL");
+    let make_bump = |value| MarketBump::Curve {
+        id: surface_id.clone(),
+        spec: BumpSpec {
+            bump_type: BumpType::Parallel,
+            mode: BumpMode::Additive,
+            units: BumpUnits::Fraction,
+            value,
+        },
+    };
+    let pv_up = option
+        .value(&market.bump([make_bump(bump)])?, as_of)?
+        .amount();
+    let pv_dn = option
+        .value(&market.bump([make_bump(-bump)])?, as_of)?
+        .amount();
+    let expected = pv_up - 2.0 * pv.amount() + pv_dn;
+
+    assert!(
+        (actual - expected).abs() < 1e-10,
+        "volga per one-vol-point squared: actual={actual}, expected={expected}"
+    );
+    Ok(())
+}
+
 /// Test that forward-based Greeks (gamma/vanna) bump the PriceCurve (not spot)
 /// when both are present in the market.
 ///

@@ -1552,6 +1552,28 @@ export interface FxOptionInstrument extends FxInstrument {
   greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;
 }
 
+export interface FxDigitalOptionInstrument extends FxInstrument {
+  delta(marketJson: string, asOf: string, model?: string | null): number;
+  gamma(marketJson: string, asOf: string, model?: string | null): number;
+  vega(marketJson: string, asOf: string, model?: string | null): number;
+  theta(marketJson: string, asOf: string, model?: string | null): number;
+  rho(marketJson: string, asOf: string, model?: string | null): number;
+  greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;
+}
+
+export interface FxTouchOptionInstrument extends FxInstrument {
+  delta(marketJson: string, asOf: string, model?: string | null): number;
+  gamma(marketJson: string, asOf: string, model?: string | null): number;
+  vega(marketJson: string, asOf: string, model?: string | null): number;
+  rho(marketJson: string, asOf: string, model?: string | null): number;
+  greeks(marketJson: string, asOf: string, model?: string | null): Record<string, number>;
+}
+
+export interface FxBarrierOptionInstrument extends FxTouchOptionInstrument {
+  vanna(marketJson: string, asOf: string, model?: string | null): number;
+  volga(marketJson: string, asOf: string, model?: string | null): number;
+}
+
 export interface FxInstrumentConstructor<T extends FxInstrument> {
   new (spec: FxInstrumentSpec): T;
   fromJson(json: string): T;
@@ -1563,9 +1585,9 @@ export interface FxNamespace {
   FxSwap: FxInstrumentConstructor<FxInstrument>;
   Ndf: FxInstrumentConstructor<FxInstrument>;
   FxOption: FxInstrumentConstructor<FxOptionInstrument>;
-  FxDigitalOption: FxInstrumentConstructor<FxOptionInstrument>;
-  FxTouchOption: FxInstrumentConstructor<FxOptionInstrument>;
-  FxBarrierOption: FxInstrumentConstructor<FxOptionInstrument>;
+  FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;
+  FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;
+  FxBarrierOption: FxInstrumentConstructor<FxBarrierOptionInstrument>;
   FxVarianceSwap: FxInstrumentConstructor<FxInstrument>;
   QuantoOption: FxInstrumentConstructor<FxOptionInstrument>;
 }

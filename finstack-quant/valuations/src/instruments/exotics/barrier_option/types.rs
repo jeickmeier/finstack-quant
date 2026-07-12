@@ -134,6 +134,14 @@ pub struct BarrierOption {
     /// Option expiry date
     #[schemars(with = "String")]
     pub expiry: Date,
+    /// Terminal underlying fixing observed at expiry.
+    ///
+    /// Required when valuing after expiry so the realized intrinsic value is
+    /// invariant to later market spot updates. At expiry, the current market
+    /// spot is used when this field is absent.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_fixing: Option<Money>,
     /// Observed barrier state for expired options.
     ///
     /// Historical barrier monitoring must be supplied explicitly for expired
@@ -212,6 +220,7 @@ impl BarrierOption {
             .option_type(crate::instruments::OptionType::Call)
             .barrier_type(BarrierType::UpAndOut)
             .expiry(date!(2024 - 12 - 20))
+            .expiry_fixing_opt(None)
             .observed_barrier_breached_opt(None)
             .notional(Money::new(100_000.0, Currency::USD))
             .day_count(DayCount::Act365F)
@@ -238,6 +247,23 @@ impl BarrierOption {
 
 impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
     impl_instrument_base!(crate::pricer::InstrumentType::BarrierOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        if let Some(fixing) = self.expiry_fixing {
+            if fixing.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.notional.currency(),
+                    actual: fixing.currency(),
+                });
+            }
+            if fixing.amount() <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "BarrierOption expiry_fixing must be positive".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         if self.use_gobet_miri {

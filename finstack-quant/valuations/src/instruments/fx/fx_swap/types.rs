@@ -149,6 +149,15 @@ impl FxSwap {
                 self.base_currency
             )));
         }
+        crate::instruments::common_impl::validation::validate_money_finite(
+            self.base_notional,
+            "FxSwap base_notional",
+        )?;
+        crate::instruments::common_impl::validation::validate_money_gt(
+            self.base_notional,
+            0.0,
+            "FxSwap base_notional",
+        )?;
         if self.near_date > self.far_date {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "FxSwap near_date ({}) must be <= far_date ({})",

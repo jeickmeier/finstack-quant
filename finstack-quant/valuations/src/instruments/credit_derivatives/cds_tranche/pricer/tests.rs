@@ -2451,13 +2451,13 @@ fn mid_period_protection_uses_survival_weighted_timing() {
 }
 
 #[test]
-fn first_period_default_timing_starts_at_contractual_effective_date() {
+fn seasoned_first_period_default_timing_starts_at_valuation_date() {
     let market_ctx = sample_market_context();
     let index_data = market_ctx
         .get_credit_index("CDX.NA.IG.42")
         .expect("test index data");
-    let as_of = Date::from_calendar_date(2025, Month::July, 1).expect("date");
-    let effective_date = Date::from_calendar_date(2025, Month::June, 20).expect("date");
+    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let effective_date = Date::from_calendar_date(2024, Month::December, 20).expect("date");
     let mut tranche = sample_tranche();
     tranche.effective_date = Some(effective_date);
     tranche.running_coupon_bp = 0.0;
@@ -2474,27 +2474,19 @@ fn first_period_default_timing_starts_at_contractual_effective_date() {
     let DiscountAt::WithinPeriod { start, fraction } = default_row.discount_at else {
         panic!("mid-period protection should discount default row within period");
     };
-    assert_eq!(start, effective_date);
+    assert_eq!(start, as_of);
 
     let t_start = pricer
-        .years_from_base(&index_data, effective_date)
-        .expect("effective-date time")
-        .max(0.0);
+        .years_from_base(&index_data, as_of)
+        .expect("valuation-date time");
     let t_end = pricer
         .years_from_base(&index_data, default_row.cashflow.date)
         .expect("payment-date time");
     let expected = pricer.within_period_default_fraction(&index_data, t_start, t_end);
-    let stale_zero_based = pricer.within_period_default_fraction(&index_data, 0.0, t_end);
-
     assert!(
         (fraction - expected).abs() < 1e-12,
-        "first-period default fraction must start from contractual effective date: \
+        "seasoned first-period default fraction must start from valuation date: \
          got={fraction}, expected={expected}"
-    );
-    assert!(
-        (fraction - stale_zero_based).abs() > 1e-6,
-        "regression guard must distinguish contractual-start timing from zero-based timing: \
-         got={fraction}, zero_based={stale_zero_based}"
     );
 }
 

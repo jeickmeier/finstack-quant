@@ -818,9 +818,16 @@ impl CDSTranchePricer {
         })?;
 
         // Get credit index data for loss calculations
-        let Ok(index_data) = market_ctx.get_credit_index(&tranche.credit_index_id) else {
-            return Ok(0.0); // No credit data, no accrued
-        };
+        let index_data = market_ctx
+            .get_credit_index(&tranche.credit_index_id)
+            .map_err(|_| {
+                finstack_quant_core::Error::Input(finstack_quant_core::InputError::NotFound {
+                    id: format!(
+                        "Credit index '{}' required for tranche '{}' accrued premium",
+                        tranche.credit_index_id, tranche.id
+                    ),
+                })
+            })?;
 
         // Generate the payment schedule
         let payment_dates = self.generate_payment_schedule(tranche, start_date)?;
@@ -852,13 +859,13 @@ impl CDSTranchePricer {
             return Ok(0.0);
         }
 
-        // Calculate outstanding notional (accounting for realized losses)
+        // Calculate outstanding notional after both bottom-up realized loss
+        // and top-down recovery writedown.
         let prior_loss = self.calculate_prior_tranche_loss(tranche);
-        let outstanding_notional = tranche.notional.amount() * (1.0 - prior_loss);
-
-        // Also factor in expected loss if we want to be more precise
-        // For simplicity, use outstanding based on realized loss only
-        let _ = index_data; // Mark as used (could compute expected loss here)
+        let prior_writedown =
+            self.calculate_prior_tranche_writedown(tranche, index_data.recovery_rate);
+        let outstanding_notional =
+            tranche.notional.amount() * (1.0 - prior_loss - prior_writedown).max(0.0);
 
         // Calculate accrued premium
         let coupon = tranche.running_coupon_bp / BASIS_POINTS_PER_UNIT;

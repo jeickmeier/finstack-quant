@@ -427,45 +427,19 @@ pub(crate) fn remaining_forward_variance(
     let r_f = zero_rate_from_df(df_for, t, "FxVarianceSwap foreign discount")?;
     let fwd = spot * ((r_d - r_f) * t).exp();
     let strikes = surface.strikes();
-    {
-        let vol_fn = |t_exp: f64, k: f64| surface.value_clamped(t_exp, k);
-        let bs_fn =
-            |k: f64, v: f64, opt: OptionType| -> f64 { bs_price(spot, k, r_d, r_f, v, t, opt) };
-        if let Some(variance) = carr_madan_forward_variance(strikes, fwd, r_d, t, vol_fn, bs_fn) {
-            return Ok(variance);
+    let vol_fn = |t_exp: f64, k: f64| surface.value_clamped(t_exp, k);
+    let bs_fn = |k: f64, v: f64, opt: OptionType| -> f64 { bs_price(spot, k, r_d, r_f, v, t, opt) };
+    carr_madan_forward_variance(strikes, fwd, r_d, t, vol_fn, bs_fn).ok_or_else(|| {
+        finstack_quant_core::Error::Calibration {
+            message: format!(
+                "FX variance swap '{}': Carr-Madan replication failed. The supplied vol surface \
+             must contain valid OTM put and call wings around forward {fwd} at maturity {t:.4}y \
+             (received {} strikes); ATM-vol² fallback is disabled because it discards smile risk.",
+                inst.id(),
+                strikes.len()
+            ),
+            category: "fx_variance_swap_replication".to_string(),
         }
-        // `debug` rather than `warn`: this branch fires on every PV when the
-        // surface is sparse (a known steady-state, not an alert). Use the
-        // `finstack_quant.fx_variance_swap` target for selective enablement.
-        tracing::debug!(
-            target = "finstack_quant.fx_variance_swap",
-            instrument_id = %inst.id(),
-            t,
-            num_strikes = strikes.len(),
-            "Carr-Madan forward-variance replication failed; falling back to ATM-vol²"
-        );
-    }
-
-    let vol_atm = surface.value_clamped(t, fwd.max(1e-12));
-    if vol_atm.is_finite() && vol_atm > 0.0 {
-        tracing::debug!(
-            target = "finstack_quant.fx_variance_swap",
-            instrument_id = %inst.id(),
-            vol_atm,
-            "Using ATM-vol² fallback for forward variance"
-        );
-        return Ok(vol_atm * vol_atm);
-    }
-
-    Err(finstack_quant_core::Error::Calibration {
-        message: format!(
-            "FX variance swap '{}': both Carr-Madan replication and the ATM-vol² fallback \
-             failed (vol_atm={vol_atm}). Cannot compute forward variance from the supplied \
-             vol surface; check that the surface has sufficient strikes around the forward \
-             {fwd} at maturity {t:.4}y.",
-            inst.id()
-        ),
-        category: "fx_variance_swap_replication".to_string(),
     })
 }
 
@@ -692,9 +666,8 @@ mod tests {
         //   Axis-buggy  fwd ≈ spot * exp((r_d≈10% − r_f≈0%) * 0.5) ≈ 1.10 * 1.051 ≈ 1.156
         //   Gap ≈ 0.11 >> 1e-3.
         //
-        // Vol surface has a strong strike slope ([0.9→30%, 1.3→5%]) so ATM-vol²
-        // is noticeably different at the two forwards.  Two-strike surface forces
-        // Carr-Madan to return None → ATM-vol² fallback is used.
+        // Vol surface has a strong strike slope so replicated variance is
+        // sensitive to the recovered forward.
         let curve_base = date!(2025 - 01 - 02);
         let as_of = date!(2025 - 07 - 01);
         let start = date!(2025 - 07 - 02);
@@ -730,12 +703,11 @@ mod tests {
         provider
             .set_quote(Currency::EUR, Currency::USD, 1.10)
             .expect("valid rate");
-        // Two-strike surface: forces Carr-Madan fallback to ATM-vol².
-        // Strong slope: 30% at 0.9, 5% at 1.3 → ATM vol is sensitive to forward.
+        // Dense wings support Carr-Madan replication while preserving a strong slope.
         let surface = VolSurface::builder("EURUSD-VOL")
             .expiries(&[1.0])
-            .strikes(&[0.9, 1.3])
-            .row(&[0.30, 0.05])
+            .strikes(&[0.80, 0.90, 1.00, 1.10, 1.20, 1.30])
+            .row(&[0.34, 0.30, 0.24, 0.18, 0.10, 0.05])
             .build()
             .expect("surface");
         let market = MarketContext::new()
@@ -825,21 +797,25 @@ mod tests {
         );
 
         // ── Assert the fixed pricer uses the date-based forward ───────────────
-        // With a 3-strike surface the Carr-Madan replication falls back to ATM vol².
-        // ATM vol is looked up at (t, fwd) — so the forward choice determines variance.
-        // We assert that remaining_forward_variance matches the date-based result.
+        // Recompute Carr-Madan with each candidate forward and assert the pricer
+        // follows the date-based one.
         let surface_ref = market.get_surface("EURUSD-VOL").expect("surface");
-        let vol_expected = surface_ref.value_clamped(t, fwd_expected.max(1e-12));
-        let expected_variance = vol_expected * vol_expected;
-
-        let vol_bug = surface_ref.value_clamped(t, fwd_bug.max(1e-12));
-        let bug_variance = vol_bug * vol_bug;
+        let strikes = surface_ref.strikes();
+        let vol_fn = |t_exp: f64, k: f64| surface_ref.value_clamped(t_exp, k);
+        let expected_variance =
+            carr_madan_forward_variance(strikes, fwd_expected, r_d_date, t, vol_fn, |k, v, opt| {
+                bs_price(spot, k, r_d_date, r_f_date, v, t, opt)
+            })
+            .expect("date-based replication");
+        let bug_variance =
+            carr_madan_forward_variance(strikes, fwd_bug, r_d_bug, t, vol_fn, |k, v, opt| {
+                bs_price(spot, k, r_d_bug, r_f_bug, v, t, opt)
+            })
+            .expect("axis-bug replication");
 
         let actual = remaining_forward_variance(&swap, &market, as_of)
             .expect("forward variance must succeed");
 
-        // If the surface is flat the vol lookup isn't fwd-sensitive — skip the
-        // forward-dependence check and just assert the call succeeds.
         if (expected_variance - bug_variance).abs() > 1e-8 {
             assert!(
                 (actual - expected_variance).abs() < (actual - bug_variance).abs(),

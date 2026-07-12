@@ -82,7 +82,7 @@ impl BarrierOptionMcPricer {
         let t_vol = clocks.t_vol;
 
         if t_vol <= 0.0 {
-            return price_expired_barrier(inst, curves);
+            return price_expired_barrier(inst, curves, as_of);
         }
 
         let discount_factor = clocks.df;
@@ -228,7 +228,7 @@ impl BarrierOptionMcPricer {
         )?;
         let t_vol = clocks.t_vol;
         if t_vol <= 0.0 {
-            let pv = price_expired_barrier(inst, curves)?;
+            let pv = price_expired_barrier(inst, curves, as_of)?;
             return Ok((pv, None));
         }
 
@@ -377,13 +377,23 @@ pub fn npv_with_lrm_greeks(
 fn price_expired_barrier(
     inst: &BarrierOption,
     curves: &MarketContext,
+    as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
     use crate::instruments::exotics::barrier_option::types::BarrierType;
 
-    let spot_scalar = curves.get_price(&inst.spot_id)?;
-    let spot = match spot_scalar {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
+    let spot = if let Some(fixing) = inst.expiry_fixing {
+        fixing.amount()
+    } else if as_of == inst.expiry {
+        let spot_scalar = curves.get_price(&inst.spot_id)?;
+        match spot_scalar {
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
+        }
+    } else {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "BarrierOption '{}' requires expiry_fixing when valued after expiry {}",
+            inst.id, inst.expiry
+        )));
     };
 
     let ccy = inst.notional.currency();
@@ -516,7 +526,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
         let df = bs_inputs.df;
 
         if t <= 0.0 {
-            let pv = price_expired_barrier(barrier_opt, market).map_err(|e| {
+            let pv = price_expired_barrier(barrier_opt, market, as_of).map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
@@ -697,6 +707,7 @@ mod tests {
             barrier_type: BarrierType::DownAndOut,
             expiry,
             observed_barrier_breached: None,
+            expiry_fixing: None,
             notional: Money::new(1.0, Currency::USD),
             day_count: DayCount::Act365F,
             use_gobet_miri: false,
@@ -823,25 +834,25 @@ mod tests {
         };
 
         assert_eq!(
-            price_expired_barrier(&knocked_out, &curves)
+            price_expired_barrier(&knocked_out, &curves, date(2024, 7, 1))
                 .expect("ko")
                 .amount(),
             3.0
         );
         assert_eq!(
-            price_expired_barrier(&alive_knock_out, &curves)
+            price_expired_barrier(&alive_knock_out, &curves, date(2024, 7, 1))
                 .expect("alive ko")
                 .amount(),
             20.0
         );
         assert_eq!(
-            price_expired_barrier(&knocked_in, &curves)
+            price_expired_barrier(&knocked_in, &curves, date(2024, 7, 1))
                 .expect("ki")
                 .amount(),
             20.0
         );
         assert_eq!(
-            price_expired_barrier(&no_hit_knock_in, &curves)
+            price_expired_barrier(&no_hit_knock_in, &curves, date(2024, 7, 1))
                 .expect("no hit ki")
                 .amount(),
             2.5
@@ -861,6 +872,7 @@ mod tests {
         let monitoring_dt = 1.0 / 252.0;
 
         let option = BarrierOption {
+            expiry_fixing: None,
             monitoring_frequency: Some(monitoring_dt),
             ..down_and_out_call(expiry, strike, barrier)
         };
@@ -1214,6 +1226,7 @@ mod tests {
 
         let option = BarrierOption {
             id: InstrumentId::new("BARRIER-UAO-DEGEN-UNIT"),
+            expiry_fixing: None,
             underlying_ticker: "SPX".to_string(),
             strike,
             barrier: Money::new(barrier, Currency::USD),

@@ -6,7 +6,9 @@
 
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::cms_option::pricer::{convexity_adjustment, CmsOptionPricer};
+use crate::instruments::rates::cms_option::pricer::{
+    convexity_adjustment_with_frequency, CmsOptionPricer,
+};
 use crate::instruments::rates::cms_option::types::CmsOption;
 use crate::metrics::bump_discount_curve_parallel;
 use crate::metrics::bump_sizes;
@@ -216,8 +218,13 @@ impl MetricCalculator for VannaCalculator {
             // Convexity = 0.5 * vol^2 * T * G(S)
             // where G(S) = swap_tenor / (1 + S * swap_tenor)^2
             // d(Convexity)/d(Vol) = vol * T * G(S) = 2 * Convexity / Vol
-            let conv_adj =
-                convexity_adjustment(vol, time_to_fixing, inst.cms_tenor, forward_swap_rate);
+            let conv_adj = convexity_adjustment_with_frequency(
+                vol,
+                time_to_fixing,
+                inst.cms_tenor,
+                forward_swap_rate,
+                1.0 / inst.resolved_swap_fixed_freq().to_years_simple(),
+            );
             let d_conv_d_vol = if vol.abs() > 1e-10 {
                 2.0 * conv_adj / vol
             } else {

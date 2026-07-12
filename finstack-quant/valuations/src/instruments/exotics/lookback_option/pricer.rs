@@ -51,7 +51,8 @@ impl LookbackOptionMcPricer {
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         if as_of >= inst.expiry {
-            let payoff = expired_lookback_payoff(inst, lookback_spot(curves, &inst.spot_id)?)?;
+            let payoff =
+                expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
             return Ok(finstack_quant_core::money::Money::new(
                 payoff * inst.notional.amount(),
                 inst.notional.currency(),
@@ -62,7 +63,8 @@ impl LookbackOptionMcPricer {
             .day_count
             .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
         if t <= 0.0 {
-            let payoff = expired_lookback_payoff(inst, lookback_spot(curves, &inst.spot_id)?)?;
+            let payoff =
+                expired_lookback_payoff(inst, terminal_lookback_spot(inst, curves, as_of)?)?;
             return Ok(finstack_quant_core::money::Money::new(
                 payoff * inst.notional.amount(),
                 inst.notional.currency(),
@@ -316,6 +318,23 @@ fn lookback_spot(
     })
 }
 
+fn terminal_lookback_spot(
+    inst: &LookbackOption,
+    curves: &MarketContext,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64> {
+    if let Some(fixing) = inst.expiry_fixing {
+        return Ok(fixing.amount());
+    }
+    if as_of == inst.expiry {
+        return lookback_spot(curves, &inst.spot_id);
+    }
+    Err(finstack_quant_core::Error::Validation(format!(
+        "LookbackOption '{}' requires expiry_fixing when valued after expiry {}",
+        inst.id, inst.expiry
+    )))
+}
+
 fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_core::Result<f64> {
     let payoff = match inst.lookback_type {
         LookbackType::FixedStrike => {
@@ -445,7 +464,7 @@ impl Pricer for LookbackOptionAnalyticalPricer {
             })?;
 
         if as_of >= lookback.expiry {
-            let spot = lookback_spot(market, &lookback.spot_id).map_err(|e| {
+            let spot = terminal_lookback_spot(lookback, market, as_of).map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),

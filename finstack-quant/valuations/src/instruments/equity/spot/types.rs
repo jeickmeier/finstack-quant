@@ -268,6 +268,15 @@ impl Equity {
 
     /// Resolve dividend yield (annualized, decimal) for the equity
     pub fn dividend_yield(&self, curves: &MarketContext) -> finstack_quant_core::Result<f64> {
+        if let Some(explicit_id) = self.div_yield_id.as_deref() {
+            return match curves.get_price(explicit_id)? {
+                MarketScalar::Unitless(value) => Ok(*value),
+                MarketScalar::Price(_) => Err(finstack_quant_core::Error::Validation(format!(
+                    "Equity '{}' dividend yield '{}' must be unitless",
+                    self.id, explicit_id
+                ))),
+            };
+        }
         let candidates = self.dividend_yield_id_candidates();
         for key in &candidates {
             match curves.get_price(key) {
@@ -323,27 +332,17 @@ impl Equity {
         }
         let df_horizon = df_terminal / df_as_of;
         let fwd = if !self.discrete_dividends.is_empty() {
-            let pv_dividends: f64 = self
-                .discrete_dividends
-                .iter()
-                .filter_map(|(ex_date, amount)| {
-                    let t_div = disc
-                        .day_count()
-                        .year_fraction(
-                            as_of,
-                            *ex_date,
-                            finstack_quant_core::dates::DayCountContext::default(),
-                        )
-                        .ok()?;
-                    if t_div > 0.0 && t_div <= t {
-                        disc.df_between_dates(as_of, *ex_date)
-                            .ok()
-                            .map(|df| amount * df)
-                    } else {
-                        None
-                    }
-                })
-                .sum();
+            let mut pv_dividends = 0.0;
+            for (ex_date, amount) in &self.discrete_dividends {
+                let t_div = disc.day_count().year_fraction(
+                    as_of,
+                    *ex_date,
+                    finstack_quant_core::dates::DayCountContext::default(),
+                )?;
+                if t_div > 0.0 && t_div <= t {
+                    pv_dividends += amount * disc.df_between_dates(as_of, *ex_date)?;
+                }
+            }
             (s0.amount() - pv_dividends) / df_horizon
         } else {
             let dy = self.dividend_yield(market)?;

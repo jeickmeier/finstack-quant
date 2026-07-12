@@ -1131,8 +1131,9 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         )?;
         let pv_up = self.value(&up, as_of)?.amount();
         let pv_dn = self.value(&dn, as_of)?.amount();
+        let width_vol_points = vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some(
-            (pv_up - 2.0 * base_pv + pv_dn) / (vol_bump * vol_bump),
+            (pv_up - 2.0 * base_pv + pv_dn) / (width_vol_points * width_vol_points),
         ))
     }
 }

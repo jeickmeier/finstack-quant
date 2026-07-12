@@ -151,6 +151,37 @@ impl PrivateMarketsFund {
 impl Instrument for PrivateMarketsFund {
     impl_instrument_base!(crate::pricer::InstrumentType::PrivateMarketsFund);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.waterfall_spec.validate()?;
+
+        for event in &self.events {
+            if event.amount.currency() != self.currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.currency,
+                    actual: event.amount.currency(),
+                });
+            }
+            if event.amount.amount() < 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "PrivateMarketsFund event amount must be non-negative, got {} on {}",
+                    event.amount.amount(),
+                    event.date
+                )));
+            }
+        }
+
+        if let Some(nav) = self.unrealized_nav {
+            if nav.currency() != self.currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.currency,
+                    actual: nav.currency(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
     // === Pricing Methods ===
 
     fn base_value(

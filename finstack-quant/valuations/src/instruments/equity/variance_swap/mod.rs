@@ -19,7 +19,7 @@
 //!
 //! For **vega notional** (market convention):
 //! ```text
-//! Notional_var = Notional_vega / (2 × σ_strike)
+//! Notional_var = Notional_vega / (2 × σ_strike × 0.01)
 //! ```
 //!
 //! # Realized Variance Calculation

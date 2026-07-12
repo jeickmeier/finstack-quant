@@ -127,6 +127,14 @@ pub struct LookbackOption {
     /// Option expiry date
     #[schemars(with = "String")]
     pub expiry: Date,
+    /// Terminal underlying fixing observed at expiry.
+    ///
+    /// Required when valuing after expiry so the realized payoff cannot move
+    /// with a later market spot snapshot. At expiry itself, the current market
+    /// spot is treated as the terminal fixing when this field is absent.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expiry_fixing: Option<Money>,
     /// Notional amount
     pub notional: Money,
     /// Day count convention
@@ -186,6 +194,7 @@ impl LookbackOption {
             .option_type(crate::instruments::OptionType::Call)
             .lookback_type(LookbackType::FixedStrike)
             .expiry(date!(2024 - 12 - 20))
+            .expiry_fixing_opt(None)
             .notional(Money::new(100_000.0, Currency::USD))
             .day_count(DayCount::Act365F)
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -211,6 +220,23 @@ impl LookbackOption {
 
 impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
     impl_instrument_base!(crate::pricer::InstrumentType::LookbackOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        if let Some(fixing) = self.expiry_fixing {
+            if fixing.currency() != self.notional.currency() {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: self.notional.currency(),
+                    actual: fixing.currency(),
+                });
+            }
+            if fixing.amount() <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(
+                    "LookbackOption expiry_fixing must be positive".to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         if self.use_gobet_miri {

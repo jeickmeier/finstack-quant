@@ -427,6 +427,15 @@ impl CmsReplicationPricer {
         start: Date,
         end: Date,
     ) -> Result<(f64, f64)> {
+        let convention = crate::instruments::rates::exotics_shared::forward_swap_rate::resolve_reference_swap_convention(
+            inst.swap_convention,
+            inst.notional.currency(),
+        )?;
+        let calendar_id = convention.calendar_id().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "CMS reference-swap convention has no calendar".to_string(),
+            )
+        })?;
         crate::instruments::rates::exotics_shared::forward_swap_rate::calculate_forward_swap_rate(
             crate::instruments::rates::exotics_shared::forward_swap_rate::ForwardSwapRateInputs {
                 market,
@@ -439,6 +448,12 @@ impl CmsReplicationPricer {
                 fixed_day_count: inst.resolved_swap_day_count(),
                 float_freq: inst.resolved_swap_float_freq(),
                 float_day_count: inst.resolved_swap_float_day_count(),
+                calendar_id: &calendar_id,
+                business_day_convention: convention.business_day_convention(),
+                stub: finstack_quant_core::dates::StubKind::ShortFront,
+                end_of_month: start.end_of_month() == start && end.end_of_month() == end,
+                payment_lag_days: convention.payment_lag_days(),
+                enforce_forward_tenor: !convention.uses_daily_compounding(),
             },
         )
     }

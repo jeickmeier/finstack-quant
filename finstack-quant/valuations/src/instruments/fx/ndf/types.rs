@@ -562,6 +562,15 @@ impl Ndf {
                 self.base_currency
             )));
         }
+        crate::instruments::common_impl::validation::validate_money_finite(
+            self.notional,
+            "NDF notional",
+        )?;
+        crate::instruments::common_impl::validation::validate_money_gt(
+            self.notional,
+            0.0,
+            "NDF notional",
+        )?;
         if self.fixing_date > self.maturity {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "NDF fixing_date ({}) must be <= maturity ({})",

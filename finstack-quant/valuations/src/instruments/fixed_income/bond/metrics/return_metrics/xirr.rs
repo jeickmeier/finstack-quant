@@ -27,7 +27,7 @@
 //! - `(issue_date, -V0)` is the initial outflow (holder pays `V0`).
 //! - All subsequent positive flows received by the holder are inflows.
 
-use super::moic::cost_basis;
+use super::moic::{cost_basis, lifetime_dated_cashflows};
 use crate::instruments::fixed_income::bond::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::cashflow::xirr;
@@ -53,7 +53,7 @@ impl MetricCalculator for XirrCalculator {
         let (t0, v0) = cost_basis(bond)?;
 
         let mut flows: Vec<(finstack_quant_core::dates::Date, f64)> = vec![(t0, -v0)];
-        for (d, m) in bond.pricing_dated_cashflows(&ctx.curves, ctx.as_of)? {
+        for (d, m) in lifetime_dated_cashflows(bond, &ctx.curves)? {
             if d > t0 {
                 flows.push((d, m.amount()));
             }
@@ -99,7 +99,7 @@ impl MetricCalculator for XirrToWorstCalculator {
 
         // Lower any return-floor into call_put before enumerating exit paths.
         let eff = bond.effective_for_pricing(&ctx.curves, ctx.as_of)?;
-        let flows = eff.pricing_dated_cashflows(&ctx.curves, ctx.as_of)?;
+        let flows = lifetime_dated_cashflows(&eff, &ctx.curves)?;
         let schedule = eff.full_cashflow_schedule(&ctx.curves)?;
 
         let candidates = crate::instruments::fixed_income::bond::pricing::quote_conversions::enumerate_exit_paths(

@@ -180,9 +180,9 @@ impl CommoditySpreadOption {
                 self.correlation
             )));
         }
-        if !self.strike.is_finite() || self.strike <= 0.0 {
+        if !self.strike.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "CommoditySpreadOption strike must be finite and positive, got {}",
+                "CommoditySpreadOption strike must be finite, got {}",
                 self.strike
             )));
         }

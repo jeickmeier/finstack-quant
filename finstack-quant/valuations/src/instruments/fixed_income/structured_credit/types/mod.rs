@@ -898,6 +898,17 @@ impl CashflowProvider for StructuredCredit {
 impl Instrument for StructuredCredit {
     impl_instrument_base!(crate::pricer::InstrumentType::StructuredCredit);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        if let Some(threshold) = self.cleanup_call_pct {
+            if !threshold.is_finite() || threshold <= 0.0 || threshold >= 1.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "cleanup_call_pct must be finite and in (0, 1), got {threshold}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     fn base_value(
         &self,
         context: &MarketContext,

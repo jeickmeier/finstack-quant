@@ -270,7 +270,9 @@ fn valuations_dts_exposes_direct_fx_instruments() {
     assert!(dts.contains("FxSwap: FxInstrumentConstructor<FxInstrument>;"));
     assert!(dts.contains("Ndf: FxInstrumentConstructor<FxInstrument>;"));
     assert!(dts.contains("FxOption: FxInstrumentConstructor<FxOptionInstrument>;"));
-    assert!(dts.contains("FxBarrierOption: FxInstrumentConstructor<FxOptionInstrument>;"));
+    assert!(dts.contains("FxBarrierOption: FxInstrumentConstructor<FxBarrierOptionInstrument>;"));
+    assert!(dts.contains("FxDigitalOption: FxInstrumentConstructor<FxDigitalOptionInstrument>;"));
+    assert!(dts.contains("FxTouchOption: FxInstrumentConstructor<FxTouchOptionInstrument>;"));
     assert!(dts.contains("QuantoOption: FxInstrumentConstructor<FxOptionInstrument>;"));
     assert!(dts.contains("fx: FxNamespace;"));
     assert!(dts

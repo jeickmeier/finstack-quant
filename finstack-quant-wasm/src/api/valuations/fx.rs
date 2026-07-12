@@ -273,13 +273,88 @@ macro_rules! fx_option_class {
     };
 }
 
+macro_rules! fx_option_subset_class {
+    ($rust_name:ident, $js_name:literal, $type_tag:literal, [$(($method:ident, $metric:literal)),+ $(,)?]) => {
+        fx_class!($rust_name, $js_name, $type_tag);
+
+        #[wasm_bindgen(js_class = $js_name)]
+        impl $rust_name {
+            $(
+                /// Compute this supported option sensitivity.
+                pub fn $method(
+                    &self,
+                    market_json: &str,
+                    as_of: &str,
+                    model: Option<String>,
+                ) -> Result<f64, JsValue> {
+                    metric_value(&self.json, market_json, as_of, model, $metric)
+                }
+            )+
+
+            /// Compute all Greeks supported by this instrument as a JavaScript object.
+            pub fn greeks(
+                &self,
+                market_json: &str,
+                as_of: &str,
+                model: Option<String>,
+            ) -> Result<JsValue, JsValue> {
+                let market = parse_market_json(market_json)?;
+                let pairs = standard_option_greeks_with_context(
+                    &self.json,
+                    &market,
+                    as_of,
+                    model.as_deref().unwrap_or("default"),
+                )?;
+                let mut out = Map::new();
+                for (metric, value) in pairs {
+                    out.insert(metric.to_string(), Value::from(value));
+                }
+                to_js_value(&Value::Object(out))
+            }
+        }
+    };
+}
+
 fx_class!(WasmFxSpot, "FxSpot", "fx_spot");
 fx_class!(WasmFxForward, "FxForward", "fx_forward");
 fx_class!(WasmFxSwap, "FxSwap", "fx_swap");
 fx_class!(WasmNdf, "Ndf", "ndf");
 fx_option_class!(WasmFxOption, "FxOption", "fx_option");
-fx_option_class!(WasmFxDigitalOption, "FxDigitalOption", "fx_digital_option");
-fx_option_class!(WasmFxTouchOption, "FxTouchOption", "fx_touch_option");
-fx_option_class!(WasmFxBarrierOption, "FxBarrierOption", "fx_barrier_option");
+fx_option_subset_class!(
+    WasmFxDigitalOption,
+    "FxDigitalOption",
+    "fx_digital_option",
+    [
+        (delta, "delta"),
+        (gamma, "gamma"),
+        (vega, "vega"),
+        (theta, "theta"),
+        (rho, "rho"),
+    ]
+);
+fx_option_subset_class!(
+    WasmFxTouchOption,
+    "FxTouchOption",
+    "fx_touch_option",
+    [
+        (delta, "delta"),
+        (gamma, "gamma"),
+        (vega, "vega"),
+        (rho, "rho"),
+    ]
+);
+fx_option_subset_class!(
+    WasmFxBarrierOption,
+    "FxBarrierOption",
+    "fx_barrier_option",
+    [
+        (delta, "delta"),
+        (gamma, "gamma"),
+        (vega, "vega"),
+        (rho, "rho"),
+        (vanna, "vanna"),
+        (volga, "volga"),
+    ]
+);
 fx_class!(WasmFxVarianceSwap, "FxVarianceSwap", "fx_variance_swap");
 fx_option_class!(WasmQuantoOption, "QuantoOption", "quanto_option");
