@@ -127,7 +127,7 @@ fn pik_capitalization_increases_outstanding() {
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
     let s = b.build_with_curves(None).unwrap();
-    let path = s.outstanding_path_per_flow().unwrap();
+    let path = s.outstanding_by_date().unwrap();
     // Find last outstanding before redemption
     let last_before = path
         .iter()
@@ -1187,7 +1187,7 @@ fn outstanding_never_negative() {
 
     // Get outstanding path (returns Vec<(Date, Money)>)
     let outstanding_path = schedule
-        .outstanding_path_per_flow()
+        .outstanding_by_date()
         .expect("outstanding path should succeed");
     for (i, (_date, balance)) in outstanding_path.iter().enumerate() {
         assert!(

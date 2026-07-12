@@ -369,7 +369,7 @@ impl CashFlowBuilder {
     ///     .build_with_curves(None)?;
     ///
     /// // Check that PIK flows increase outstanding balance
-    /// let outstanding_path = schedule.outstanding_path_per_flow()?;
+    /// let outstanding_path = schedule.outstanding_by_date()?;
     /// assert!(outstanding_path.len() > 0);
     /// # Ok(())
     /// # }

@@ -718,31 +718,11 @@ impl AssetPool {
         &self,
         cashflows: &[(Date, Money)],
         as_of: Date,
-    ) -> f64 {
-        let mut wal_numerator = 0.0;
-        let mut total_principal = 0.0;
-
-        for (date, amount) in cashflows {
-            if *date > as_of {
-                // Use Act365F for standardized WAL reporting unless specified otherwise
-                // Ideally this should take a day_count parameter, but Act365F is a common standard for WAL
-                let years = DayCount::Act365F
-                    .year_fraction(
-                        as_of,
-                        *date,
-                        finstack_quant_core::dates::DayCountContext::default(),
-                    )
-                    .unwrap_or(0.0);
-                wal_numerator += amount.amount() * years;
-                total_principal += amount.amount();
-            }
-        }
-
-        if total_principal > 0.0 {
-            wal_numerator / total_principal
-        } else {
-            0.0
-        }
+    ) -> finstack_quant_core::Result<f64> {
+        crate::cashflow::builder::schedule::weighted_average_life_from_principal(
+            cashflows.iter().copied(),
+            as_of,
+        )
     }
 
     /// Calculate diversity score (simplified Moody's approach)

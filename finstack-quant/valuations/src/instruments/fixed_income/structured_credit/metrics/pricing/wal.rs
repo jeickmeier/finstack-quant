@@ -1,5 +1,6 @@
 //! WAL (Weighted Average Life) calculator for structured credit.
 
+use crate::cashflow::builder::schedule::weighted_average_life_from_principal;
 use crate::instruments::fixed_income::structured_credit::types::TrancheCashflows;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::cashflow::CFKind;
@@ -20,30 +21,7 @@ use finstack_quant_core::Result;
 /// - Principal_i = principal payment at time i
 /// - Time_i = years from valuation date to payment date i
 pub fn calculate_tranche_wal(cashflows: &TrancheCashflows, as_of: Date) -> Result<f64> {
-    let mut weighted_sum = 0.0;
-    let mut total_principal = 0.0;
-
-    for (date, amount) in &cashflows.principal_flows {
-        if *date <= as_of {
-            continue;
-        }
-
-        let years = finstack_quant_core::dates::DayCount::Act365F
-            .year_fraction(
-                as_of,
-                *date,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )
-            .unwrap_or(0.0);
-        weighted_sum += amount.amount() * years;
-        total_principal += amount.amount();
-    }
-
-    if total_principal > 0.0 {
-        Ok(weighted_sum / total_principal)
-    } else {
-        Ok(0.0)
-    }
+    weighted_average_life_from_principal(cashflows.principal_flows.iter().copied(), as_of)
 }
 
 /// Calculates WAL (Weighted Average Life) in years.
@@ -78,83 +56,30 @@ impl MetricCalculator for WalCalculator {
         // Fallback: derive WAL from tagged cashflows when detailed tranche-level
         // cashflows are not cached into the metric context.
         if let Some(flows) = context.tagged_cashflows.as_ref() {
-            let mut weighted_sum = 0.0;
-            let mut total_principal = 0.0;
-
-            for flow in flows {
-                if flow.date <= context.as_of {
-                    continue;
-                }
-                // Cash principal only — Amortization / Notional / PrePayment.
-                // Write-downs (`DefaultedNotional`) are losses, not principal
-                // repayments, and are excluded so this fallback matches the
-                // primary `principal_flows` path (which never contains
-                // write-downs).
-                if !matches!(
-                    flow.kind,
-                    CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
-                ) {
-                    continue;
-                }
-
-                let principal = flow.amount.amount().abs();
-                if principal <= 0.0 {
-                    continue;
-                }
-
-                let years = finstack_quant_core::dates::DayCount::Act365F
-                    .year_fraction(
-                        context.as_of,
-                        flow.date,
-                        finstack_quant_core::dates::DayCountContext::default(),
+            return weighted_average_life_from_principal(
+                flows.iter().filter_map(|flow| {
+                    matches!(
+                        flow.kind,
+                        CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
                     )
-                    .unwrap_or(0.0);
-                weighted_sum += principal * years;
-                total_principal += principal;
-            }
-
-            return if total_principal > 0.0 {
-                Ok(weighted_sum / total_principal)
-            } else {
-                Ok(0.0)
-            };
+                    .then(|| {
+                        (
+                            flow.date,
+                            finstack_quant_core::money::Money::new(
+                                flow.amount.amount().abs(),
+                                flow.amount.currency(),
+                            ),
+                        )
+                    })
+                }),
+                context.as_of,
+            );
         }
 
         // Final fallback: use aggregate positive flows only.
         // This path is less accurate because interest and principal are not distinguished.
         if let Some(flows) = context.cashflows.as_ref() {
-            let mut weighted_sum = 0.0;
-            let mut total_principal = 0.0;
-
-            for (date, amount) in flows {
-                if *date <= context.as_of {
-                    continue;
-                }
-
-                // Only use positive flows as an approximation of principal.
-                // Negative flows (if any) are ignored; interest cannot be
-                // distinguished from principal in aggregated mode.
-                let principal = amount.amount();
-                if principal <= 0.0 {
-                    continue;
-                }
-
-                let years = finstack_quant_core::dates::DayCount::Act365F
-                    .year_fraction(
-                        context.as_of,
-                        *date,
-                        finstack_quant_core::dates::DayCountContext::default(),
-                    )
-                    .unwrap_or(0.0);
-                weighted_sum += principal * years;
-                total_principal += principal;
-            }
-
-            return if total_principal > 0.0 {
-                Ok(weighted_sum / total_principal)
-            } else {
-                Ok(0.0)
-            };
+            return weighted_average_life_from_principal(flows.iter().copied(), context.as_of);
         }
 
         Err(finstack_quant_core::Error::from(

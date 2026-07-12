@@ -226,7 +226,7 @@ pub struct CashFlowMeta {
 ///
 /// Contains ordered cashflows plus notional and a representative `DayCount`.
 /// Methods provide convenient accessors commonly used by pricing and analysis.
-#[derive(Debug, Clone, serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct CashFlowSchedule {
     /// Ordered cashflows (coupons, principal payments, fees)
     pub flows: Vec<CashFlow>,
@@ -236,6 +236,27 @@ pub struct CashFlowSchedule {
     pub day_count: DayCount,
     /// Additional metadata (calendars, facility limits)
     pub meta: CashFlowMeta,
+}
+
+#[allow(dead_code)]
+#[derive(serde::Serialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(deny_unknown_fields)]
+struct CashFlowScheduleSchema {
+    flows: Vec<CashFlow>,
+    notional: Notional,
+    day_count: DayCount,
+    meta: CashFlowMeta,
+}
+
+impl schemars::JsonSchema for CashFlowSchedule {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("CashFlowSchedule")
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        <CashFlowScheduleSchema as schemars::JsonSchema>::json_schema(generator)
+    }
 }
 
 #[derive(serde::Deserialize)]
@@ -542,74 +563,6 @@ impl CashFlowSchedule {
         normalized
     }
 
-    /// Outstanding principal path tracking Amortization and PIK flows only.
-    ///
-    /// This method provides a simplified balance view suitable for coupon calculations
-    /// where the accrual base tracks principal reductions (Amortization) and PIK
-    /// capitalizations, but **excludes** ad-hoc notional draws/repays.
-    ///
-    /// Returns one entry per cashflow, tracking the outstanding balance after
-    /// each flow is processed. Useful for debugging and detailed analysis.
-    ///
-    /// # When to Use Each Method
-    ///
-    /// - **`outstanding_path_per_flow()`**: Use for coupon accrual calculations on fixed
-    ///   amortization schedules (bonds, term loans with scheduled amortization).
-    /// - **[`Self::outstanding_by_date()`]**: Use for full balance tracking including
-    ///   notional events (revolving credit facilities, delayed draws, prepayments).
-    ///
-    /// Note: Amortization amounts in the schedule are stored as POSITIVE values
-    /// (the builder internally manages the reduction of outstanding balance).
-    /// PIK amounts are positive and increase outstanding.
-    ///
-    /// # Negative Balances
-    ///
-    /// Replayed balances are permitted to go negative (e.g. amortization
-    /// exceeding the tracked outstanding); a `tracing::warn!` is emitted when
-    /// the balance drops below a small negative tolerance, but no error is
-    /// raised. The builder validates over-repayment at construction time.
-    ///
-    /// # Errors
-    ///
-    /// Returns error if there is a currency mismatch between flows and the
-    /// notional.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use finstack_quant_core::dates::Date;
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_cashflows::builder::schedule::{CashFlowMeta, CashFlowSchedule};
-    /// use finstack_quant_core::cashflow::{CashFlow, CFKind};
-    /// use finstack_quant_cashflows::builder::Notional;
-    /// use time::Month;
-    ///
-    /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
-    /// let notional = Notional { initial: Money::new(100.0, Currency::USD), amort: Default::default() };
-    /// let flows = vec![
-    ///   CashFlow::new(base, None, Money::new(10.0, Currency::USD), CFKind::Amortization, 0.0, None),
-    ///   CashFlow::new(base, None, Money::new(5.0, Currency::USD), CFKind::PIK, 0.0, None),
-    /// ];
-    /// let s = CashFlowSchedule { flows, notional, day_count: finstack_quant_core::dates::DayCount::Act365F, meta: CashFlowMeta::default() };
-    /// let path = s.outstanding_path_per_flow().expect("valid schedule");
-    /// assert_eq!(path.len(), 2);
-    /// assert_eq!(path[0].1.amount(), 90.0);  // 100 - 10 = 90
-    /// assert_eq!(path[1].1.amount(), 95.0);  // 90 + 5 = 95
-    /// ```
-    pub fn outstanding_path_per_flow(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        let mut out = Vec::with_capacity(self.flows.len());
-        let mut outstanding = self.notional.initial;
-        for cf in &self.flows {
-            // `outstanding_path_per_flow` historically ignored notional draws/repays and
-            // only tracked Amortization and PIK. Preserve that behavior by
-            // passing `include_notional = false`.
-            apply_flow_to_outstanding(&mut outstanding, cf, false, false)?;
-            out.push((cf.date, outstanding));
-        }
-        Ok(out)
-    }
-
     /// Get an iterator over interest-like coupon cashflows.
     ///
     /// Filters the schedule via [`CFKind::is_interest_like`] — currently
@@ -674,28 +627,19 @@ impl CashFlowSchedule {
     ///
     /// Returns an error if the day-count year-fraction calculation fails.
     pub fn weighted_average_life(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
-        let (principal_time_sum, principal_total) = self
-            .flows
-            .iter()
-            .filter(|cf| {
-                matches!(
-                    cf.kind,
-                    CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
-                ) && cf.date > as_of
-                    && cf.amount.amount() > 0.0
-            })
-            .try_fold((0.0_f64, 0.0_f64), |(pts, pt), cf| {
-                let t =
-                    DayCount::Act365F.year_fraction(as_of, cf.date, DayCountContext::default())?;
-                let a = cf.amount.amount();
-                Ok::<_, finstack_quant_core::Error>((pts + a * t, pt + a))
-            })?;
-
-        if principal_total > 0.0 {
-            Ok(principal_time_sum / principal_total)
-        } else {
-            Ok(0.0)
-        }
+        weighted_average_life_from_principal(
+            self.flows
+                .iter()
+                .filter(|cf| {
+                    matches!(
+                        cf.kind,
+                        CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
+                    ) && cf.date > as_of
+                        && cf.amount.amount() > 0.0
+                })
+                .map(|cf| (cf.date, cf.amount)),
+            as_of,
+        )
     }
 
     /// Full outstanding path including Amortization, PIK, and Notional draws/repays.
@@ -706,9 +650,7 @@ impl CashFlowSchedule {
     ///
     /// # When to Use Each Method
     ///
-    /// - **[`Self::outstanding_path_per_flow()`]**: Simplified view for scheduled amortization
-    ///   (excludes Notional draws/repays).
-    /// - **`outstanding_by_date()`**: Full balance tracking including all notional events.
+    /// This is the canonical balance view for all principal event kinds.
     ///
     /// # Balance Changes
     ///
@@ -732,44 +674,87 @@ impl CashFlowSchedule {
     /// - `meta.issue_date` is unset
     /// - Currency mismatch between flows and notional
     pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        let mut result: Vec<(Date, Money)> = Vec::with_capacity(self.flows.len());
+        let replay = self.replay_balances()?;
+        let mut result = Vec::with_capacity(replay.len());
+        for (idx, _, after) in replay {
+            let date = self.flows[idx].date;
+            if let Some((last_date, last_balance)) = result.last_mut() {
+                if *last_date == date {
+                    *last_balance = after;
+                    continue;
+                }
+            }
+            result.push((date, after));
+        }
+        Ok(result)
+    }
+
+    pub(crate) fn replay_balances(
+        &self,
+    ) -> finstack_quant_core::Result<Vec<(usize, Money, Money)>> {
         if self.flows.is_empty() {
-            return Ok(result);
+            return Ok(Vec::new());
         }
         let issue = self.meta.issue_date.ok_or_else(|| {
             finstack_quant_core::Error::Validation(
-                "outstanding_by_date: schedule.meta.issue_date is required to identify the initial funding flow"
+                "balance replay: schedule.meta.issue_date is required to identify the initial funding flow"
                     .into(),
             )
         })?;
-
+        let mut order: Vec<usize> = (0..self.flows.len()).collect();
+        order.sort_by(|left, right| compare_flows(&self.flows[*left], &self.flows[*right]));
         let mut outstanding = self.notional.initial;
-
-        // Identify and skip the initial funding flow (negative notional equal to initial).
-        // This flow is already accounted for in `notional.initial`, and may not be the
-        // earliest flow if there are pre-issue principal events.
         let mut initial_funding_skipped = false;
         let initial_amount = self.notional.initial.amount();
-
-        for same_day_flows in self.flows.chunk_by(|left, right| left.date == right.date) {
-            let d = same_day_flows[0].date;
-            // Process all flows on this date in their deterministic order.
-            for cf in same_day_flows {
-                let is_initial_funding =
-                    is_initial_funding_flow(cf, issue, initial_amount, initial_funding_skipped);
-                if is_initial_funding {
-                    initial_funding_skipped = true;
-                }
-
-                // `outstanding_by_date` is the canonical balance tracker, including
-                // subsequent notional draws/repays as well as Amortization and PIK.
-                apply_flow_to_outstanding(&mut outstanding, cf, is_initial_funding, true)?;
-            }
-            result.push((d, outstanding));
+        let mut replay = Vec::with_capacity(order.len());
+        for idx in order {
+            let flow = &self.flows[idx];
+            let before = outstanding;
+            let is_initial_funding =
+                is_initial_funding_flow(flow, issue, initial_amount, initial_funding_skipped);
+            initial_funding_skipped |= is_initial_funding;
+            apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding, true)?;
+            replay.push((idx, before, outstanding));
         }
-
-        Ok(result)
+        Ok(replay)
     }
+}
+
+/// Calculate Act/365F weighted average life from dated principal reductions.
+pub fn weighted_average_life_from_principal<I>(
+    principal: I,
+    as_of: Date,
+) -> finstack_quant_core::Result<f64>
+where
+    I: IntoIterator<Item = (Date, Money)>,
+{
+    let mut currency = None;
+    let mut weighted = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+    let mut total = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+    for (date, amount) in principal {
+        if date <= as_of || amount.amount() <= 0.0 {
+            continue;
+        }
+        if let Some(expected) = currency {
+            if amount.currency() != expected {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected,
+                    actual: amount.currency(),
+                });
+            }
+        } else {
+            currency = Some(amount.currency());
+        }
+        let years = DayCount::Act365F.year_fraction(as_of, date, DayCountContext::default())?;
+        weighted.add(amount.amount() * years);
+        total.add(amount.amount());
+    }
+    let principal_total = total.total();
+    Ok(if principal_total > 0.0 {
+        weighted.total() / principal_total
+    } else {
+        0.0
+    })
 }
 
 fn retain_schedule_flows(schedule: &mut CashFlowSchedule, mut keep: impl FnMut(&CashFlow) -> bool) {
@@ -923,8 +908,7 @@ fn is_initial_funding_flow(
 ///    generates flows (e.g. [`crate::builder::emit_default_on`] subtracts the
 ///    defaulted amount when it emits a `DefaultedNotional` flow).
 /// 2. **Reconstruction time** — this function, driven by
-///    [`CashFlowSchedule::outstanding_by_date`] /
-///    [`CashFlowSchedule::outstanding_path_per_flow`], rebuilds the balance
+///    [`CashFlowSchedule::outstanding_by_date`] rebuilds the balance
 ///    path purely from `notional.initial` plus the finalized flow list.
 ///
 /// Because reconstruction starts from `notional.initial` and replays every

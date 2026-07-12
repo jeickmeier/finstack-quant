@@ -495,7 +495,7 @@ mod computation {
             .fixed_cf(standard_fixed_spec());
 
         let schedule = builder.build_with_curves(None).unwrap();
-        let path = schedule.outstanding_path_per_flow().unwrap();
+        let path = schedule.outstanding_by_date().unwrap();
 
         // Filter to get outstanding after each amortization event
         let amort_flows: Vec<_> = schedule

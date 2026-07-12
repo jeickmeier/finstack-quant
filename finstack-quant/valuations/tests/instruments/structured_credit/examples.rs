@@ -260,7 +260,9 @@ mod tests {
         let pool = AssetPool::new("DEMO_POOL", DealType::CLO, Currency::USD);
 
         // Calculate WAL using market-standard cashflow-based method
-        let wal = pool.weighted_avg_life_from_cashflows(&cashflows, as_of);
+        let wal = pool
+            .weighted_avg_life_from_cashflows(&cashflows, as_of)
+            .expect("WAL");
 
         // Expected WAL:
         // (20M×1 + 30M×2 + 30M×3 + 20M×4) / 100M
@@ -457,7 +459,9 @@ mod tests {
         ];
 
         // Calculate true WAL from cashflows
-        let wal = pool.weighted_avg_life_from_cashflows(&amortizing_cashflows, as_of);
+        let wal = pool
+            .weighted_avg_life_from_cashflows(&amortizing_cashflows, as_of)
+            .expect("WAL");
 
         // Expected WAL:
         // (25M×1 + 30M×2 + 25M×3 + 15M×4 + 5M×5) / 100M

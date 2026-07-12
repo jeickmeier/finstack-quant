@@ -50,8 +50,7 @@ valuations.
 `gbp_sonia_swap`, `jpy_tona_swap`).
 
 Schedule helpers include `weighted_average_life`, `coupons`,
-`outstanding_path_per_flow`, `outstanding_by_date`, `merge_cashflow_schedules`,
-and `normalize_public`.
+`outstanding_by_date`, `merge_cashflow_schedules`, and `normalize_public`.
 
 ## Quick start
 
@@ -361,7 +360,6 @@ use finstack_quant_core::dates::{Date, DayCount};
 fn inspect(schedule: &CashFlowSchedule, as_of: Date) -> finstack_quant_core::Result<()> {
     let _wal = schedule.weighted_average_life(as_of)?;
     let _coupons = schedule.coupons().count();
-    let _per_flow = schedule.outstanding_path_per_flow()?;
     let _by_date = schedule.outstanding_by_date()?;
     Ok(())
 }

@@ -12,7 +12,7 @@
 //! - Optional columns (survival_probs, base_rates, spreads, etc.) are conditionally computed
 //! - Facility limits enable undrawn balance calculations for revolving credit facilities
 
-use crate::builder::schedule::{amounts_approx_equal, CashFlowSchedule};
+use crate::builder::schedule::CashFlowSchedule;
 use crate::primitives::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, Tenor};
@@ -466,39 +466,11 @@ impl CashFlowSchedule {
         init_optional_column(include_floating, capacity, &mut out.base_rates);
         init_optional_column(include_floating, capacity, &mut out.spreads);
 
-        // Track outstanding drawn balance for Notional column
-        let mut outstanding = self.notional.initial;
-
-        // Anchor initial-funding detection on the schedule's issue date when
-        // available (populated by `finalize_flows`); a pre-issue principal
-        // event would otherwise make the real issue-date funding flow read as
-        // a draw (~2x notional). Fall back to the first flow's date only when
-        // no issue date is recorded.
-        let funding_anchor = self
-            .meta
-            .issue_date
-            .or_else(|| self.flows.first().map(|cf| cf.date));
-
         // Periods are validated sorted-by-start (half-open, non-overlapping) by
         // `validate_periods` above, so a plain cursor over `periods` suffices —
         // no separate sorted-index vector is needed.
         let mut period_cursor = 0;
 
-        // Schedule flows are kept in canonical date order by every builder
-        // constructor (`from_parts`/`finalize_flows`/`normalize_public`). Only
-        // build and sort an index vector when a caller handed us an unsorted
-        // schedule (e.g. a direct struct literal); the common path iterates the
-        // slice directly with no allocation, sort, or pointer indirection.
-        let flows_in_date_order = self.flows.windows(2).all(|w| w[0].date <= w[1].date);
-        let flow_order: Option<Vec<usize>> = if flows_in_date_order {
-            None
-        } else {
-            let mut idx: Vec<usize> = (0..self.flows.len()).collect();
-            idx.sort_by_key(|&i| self.flows[i].date);
-            Some(idx)
-        };
-
-        let mut initial_funding_seen = false;
         // Discounting, accrual, and forward-reset year fractions all share the
         // same calendar/frequency context.
         let dc_ctx = DayCountContext {
@@ -510,49 +482,8 @@ impl CashFlowSchedule {
         };
         let disc_dc_ctx = dc_ctx;
 
-        let n_flows = self.flows.len();
-        for iter_pos in 0..n_flows {
-            let cf = match &flow_order {
-                Some(order) => &self.flows[order[iter_pos]],
-                None => &self.flows[iter_pos],
-            };
-            // Outstanding before this cashflow
-            let outstanding_pre = outstanding;
-
-            // Detect initial funding notional flow (negative, equal to
-            // -notional.initial on the issue date). It is already accounted
-            // for in notional.initial, so we skip it to avoid double-counting.
-            let is_initial_funding = cf.kind == CFKind::Notional
-                && !initial_funding_seen
-                && funding_anchor == Some(cf.date)
-                && cf.amount.amount() < 0.0
-                && amounts_approx_equal(cf.amount.amount().abs(), self.notional.initial.amount());
-            if is_initial_funding {
-                initial_funding_seen = true;
-            }
-
-            // Balance replay must see every flow, including those outside the
-            // supplied reporting periods, so the update happens BEFORE the
-            // period-membership check below.
-            match cf.kind {
-                CFKind::Amortization => {
-                    outstanding = outstanding.checked_sub(cf.amount)?;
-                }
-                CFKind::PIK => {
-                    outstanding = outstanding.checked_add(cf.amount)?;
-                }
-                CFKind::Notional
-                | CFKind::RevolvingDraw
-                | CFKind::RevolvingRepayment
-                | CFKind::PrePayment
-                | CFKind::DefaultedNotional
-                    if !is_initial_funding =>
-                {
-                    // Draws are negative, repays are positive from lender perspective
-                    outstanding = outstanding.checked_sub(cf.amount)?;
-                }
-                _ => {}
-            }
+        for (flow_index, outstanding_pre, _) in self.replay_balances()? {
+            let cf = &self.flows[flow_index];
 
             // Advance cursor past periods that end on or before this cashflow.
             // Bucketing is half-open `[start, end)`, matching
