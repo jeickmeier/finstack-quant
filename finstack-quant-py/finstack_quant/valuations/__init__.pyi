@@ -66,11 +66,13 @@ from finstack_quant.valuations import correlation as correlation
 from finstack_quant.valuations import instruments as instruments
 from finstack_quant.valuations import models as models
 from finstack_quant.valuations.envelope import CalibrationEnvelope as CalibrationEnvelope
+from finstack_quant.valuations.instruments import price_instrument_with_metrics as price_instrument_with_metrics
 
 __all__ = [
     "correlation",
     "instruments",
     "models",
+    "price_instrument_with_metrics",
     "ValuationResult",
     "CalibrationEnvelope",
     "CalibrationEnvelopeError",

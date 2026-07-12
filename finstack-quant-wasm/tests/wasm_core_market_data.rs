@@ -144,9 +144,7 @@ fn fx_delta_vol_surface_basic_accessors_and_implied_vol() {
     let forward: f64 = 1.20;
     let atm_vol: f64 = 0.09;
     let k_atm = forward * (0.5 * atm_vol * atm_vol * 1.0_f64).exp();
-    let vol = surface
-        .implied_vol(1.0, k_atm, forward, 0.05, 0.03)
-        .unwrap();
+    let vol = surface.implied_vol(1.0, k_atm, forward).unwrap();
     assert!((vol - atm_vol).abs() < 1e-9);
 }
 

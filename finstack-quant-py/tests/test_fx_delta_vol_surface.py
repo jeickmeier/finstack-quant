@@ -66,7 +66,7 @@ def test_implied_vol_lookup_recovers_atm_at_atm_strike() -> None:
     atm_vol = 0.09  # pillar at expiry 1.0
     # ATM DNS strike: K_ATM = F * exp(0.5 * sigma^2 * T)
     k_atm = forward * math.exp(0.5 * atm_vol * atm_vol * 1.0)
-    vol = surface.implied_vol(1.0, k_atm, forward, r_d=0.05, r_f=0.03)
+    vol = surface.implied_vol(1.0, k_atm, forward)
     assert math.isclose(vol, atm_vol, abs_tol=1e-9)
 
 
@@ -82,11 +82,10 @@ def test_static_delta_strike_roundtrip() -> None:
     forward = 1.20
     vol = 0.08
     expiry = 1.0
-    r_f = 0.03
     # call delta 0.50 maps to a strike near the ATM DNS — converting back
     # should recover (approximately) the original delta.
-    strike = FxDeltaVolSurface.delta_to_strike(0.50, forward, vol, expiry, r_f)
-    delta = FxDeltaVolSurface.strike_to_delta(strike, forward, vol, expiry, r_f)
+    strike = FxDeltaVolSurface.delta_to_strike(0.50, forward, vol, expiry)
+    delta = FxDeltaVolSurface.strike_to_delta(strike, forward, vol, expiry)
     assert math.isclose(delta, 0.50, abs_tol=1e-9)
 
 
@@ -102,5 +101,5 @@ def test_with_10d_wings_smoke() -> None:
     surface = _example_surface(with_10d=True)
     assert surface.num_expiries == 3
     # 10D wings produce a 5-point smile in implied_vol; a sanity probe.
-    vol = surface.implied_vol(0.5, 1.30, forward=1.20, r_d=0.05, r_f=0.03)
+    vol = surface.implied_vol(0.5, 1.30, forward=1.20)
     assert vol > 0.0
