@@ -221,7 +221,7 @@ fn callable_risk_bond(as_of: finstack_quant_core::dates::Date) -> Bond {
         puts: vec![],
     });
     bond.pricing_overrides = PricingOverrides::default()
-        .with_quoted_clean_price(99.0)
+        .with_quoted_clean_price(105.0)
         .with_implied_vol(0.01);
     bond
 }
@@ -279,7 +279,9 @@ fn test_callable_quoted_bond_defaults_to_workout_risk_basis() {
     }
     assert!(
         callable_result.measures["duration_mod"] < bullet_result.measures["duration_mod"],
-        "the workout path should shorten callable-bond duration"
+        "the workout path should shorten callable-bond duration: callable={}, bullet={}",
+        callable_result.measures["duration_mod"],
+        bullet_result.measures["duration_mod"]
     );
 }
 
