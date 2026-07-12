@@ -884,7 +884,6 @@ pub(crate) fn enumerate_exit_paths(
     });
     put_candidates.dedup_by_key(|candidate| candidate.date);
     call_candidates.extend(put_candidates);
-    
 
     call_candidates
 }
