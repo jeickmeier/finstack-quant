@@ -239,13 +239,21 @@ pub struct CashFlowSchedule {
 }
 
 #[allow(dead_code)]
+/// Cashflow schedule output from the composable builder.
+///
+/// Contains ordered cashflows plus notional and a representative `DayCount`.
+/// Methods provide convenient accessors commonly used by pricing and analysis.
 #[derive(serde::Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(deny_unknown_fields)]
 struct CashFlowScheduleSchema {
+    /// Ordered cashflows (coupons, principal payments, fees)
     flows: Vec<CashFlow>,
+    /// Notional schedule (constant or amortizing)
     notional: Notional,
+    /// Day count convention for interest calculations
     day_count: DayCount,
+    /// Additional metadata (calendars, facility limits)
     meta: CashFlowMeta,
 }
 
