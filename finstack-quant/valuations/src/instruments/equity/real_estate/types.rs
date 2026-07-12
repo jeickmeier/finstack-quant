@@ -489,11 +489,16 @@ impl RealEstateAsset {
 impl Instrument for RealEstateAsset {
     impl_instrument_base!(InstrumentType::RealEstateAsset);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn base_value(
         &self,
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        self.validate()?;
         pricer::compute_pv(self, market, as_of)
     }
 

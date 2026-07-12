@@ -17,6 +17,7 @@ const STRIKE_ZERO_TOL: f64 = 1e-12;
 const THETA_DAYS_PER_YEAR: f64 = 365.0;
 
 pub(crate) fn compute_pv(inst: &FxOption, curves: &MarketContext, as_of: Date) -> Result<Money> {
+    inst.validate()?;
     if as_of > inst.expiry {
         return Ok(Money::new(0.0, inst.quote_currency));
     }

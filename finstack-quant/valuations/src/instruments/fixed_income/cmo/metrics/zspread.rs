@@ -62,7 +62,7 @@ pub(crate) fn calculate_tranche_zspread(
         for cf in &tranche_cfs {
             let years =
                 day_count.year_fraction(as_of, cf.payment_date, DayCountContext::default())?;
-            let base_df = discount_curve.df(years);
+            let base_df = discount_curve.df_between_dates(as_of, cf.payment_date)?;
             let spread_adj = (-spread * years).exp();
             let df = base_df * spread_adj;
             pv += cf.total * df;

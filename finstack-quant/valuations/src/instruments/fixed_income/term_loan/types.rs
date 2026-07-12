@@ -758,6 +758,12 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
     impl_instrument_base!(crate::pricer::InstrumentType::TermLoan);
 
     fn default_model(&self) -> crate::pricer::ModelKey {
+        // A supplied hazard curve is part of the economic contract even for
+        // non-callable loans. Route those loans through the rates+credit tree
+        // so survival and recovery affect PV and credit sensitivities.
+        if self.credit_curve_id.is_some() {
+            return crate::pricer::ModelKey::Tree;
+        }
         if let Some(ref cs) = self.call_schedule {
             let has_exercisable = cs
                 .calls
@@ -778,6 +784,10 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
         // If the loan has exercisable call options (Hard/Soft), use tree-based
         // pricing to capture optionality with frictional exercise.
         // MakeWhole calls are non-economic by design and do not require a tree.
+        if self.credit_curve_id.is_some() {
+            return crate::instruments::fixed_income::term_loan::pricing::TermLoanTreePricer::new()
+                .price_callable(self, curves, as_of);
+        }
         if let Some(ref cs) = self.call_schedule {
             let has_exercisable = cs
                 .calls

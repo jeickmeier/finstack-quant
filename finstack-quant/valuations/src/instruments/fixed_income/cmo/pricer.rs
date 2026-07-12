@@ -15,7 +15,7 @@ use crate::instruments::fixed_income::mbs_passthrough::pricer::generate_cashflow
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, PoolType};
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
+use finstack_quant_core::dates::{Date, DateExt, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::InstrumentId;
@@ -42,11 +42,11 @@ pub(crate) struct TrancheCashflow {
 }
 
 /// Resolve the collateral pool used as the canonical source for tranche projection.
-pub(crate) fn resolve_collateral(cmo: &AgencyCmo) -> Result<AgencyMbsPassthrough> {
+pub(crate) fn resolve_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPassthrough> {
     if let Some(ref pool) = cmo.collateral {
         Ok(pool.as_ref().clone())
     } else {
-        create_assumed_collateral(cmo)
+        create_assumed_collateral(cmo, as_of)
     }
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn generate_tranche_cashflows(
     as_of: Date,
     max_periods: Option<u32>,
 ) -> Result<Vec<TrancheCashflow>> {
-    let collateral = resolve_collateral(cmo)?;
+    let collateral = resolve_collateral(cmo, as_of)?;
 
     // Generate collateral cashflows
     let collateral_cfs = generate_cashflows(&collateral, as_of, max_periods)?;
@@ -282,7 +282,7 @@ pub(crate) fn build_reference_tranche_schedule(
 }
 
 /// Create assumed collateral for CMO valuation.
-fn create_assumed_collateral(cmo: &AgencyCmo) -> Result<AgencyMbsPassthrough> {
+fn create_assumed_collateral(cmo: &AgencyCmo, as_of: Date) -> Result<AgencyMbsPassthrough> {
     let defaults = embedded_registry()?.cmo_collateral_defaults();
     let total_face = cmo.waterfall.total_current_face();
     let wac = cmo.collateral_wac.unwrap_or(defaults.wac);
@@ -293,10 +293,7 @@ fn create_assumed_collateral(cmo: &AgencyCmo) -> Result<AgencyMbsPassthrough> {
     let guarantee_fee = defaults.guarantee_fee_rate;
     let pass_through = wac - servicing_fee - guarantee_fee;
 
-    let maturity = cmo
-        .issue_date
-        .checked_add(time::Duration::days((wam as i64) * 30))
-        .ok_or_else(|| finstack_quant_core::Error::Validation("Invalid maturity".to_string()))?;
+    let maturity = as_of.add_months(wam as i32);
 
     AgencyMbsPassthrough::builder()
         .id(InstrumentId::new(format!("{}-COLLATERAL", cmo.id.as_str())))
@@ -334,12 +331,9 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
     }
 
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
-    let dc = discount_curve.day_count();
-
     let mut pv = 0.0;
     for cf in &schedule.flows {
-        let years = dc.year_fraction(as_of, cf.date, DayCountContext::default())?;
-        let df = discount_curve.df(years);
+        let df = discount_curve.df_between_dates(as_of, cf.date)?;
         pv += cf.amount.amount() * df;
     }
 
@@ -350,6 +344,7 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
 mod tests {
     use super::*;
     use crate::cashflow::primitives::CFKind;
+    use finstack_quant_core::dates::DayCountContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::math::interp::InterpStyle;
     use time::Month;
@@ -483,7 +478,7 @@ mod tests {
         assert!(!pac_cfs.is_empty());
 
         // Build the collateral-derived PAC schedule directly for comparison.
-        let collateral = resolve_collateral(&cmo).expect("collateral resolves");
+        let collateral = resolve_collateral(&cmo, as_of).expect("collateral resolves");
         let pac_tranche = cmo.waterfall.get_tranche("PAC").expect("PAC tranche");
         let schedule = super::PacSchedule::generate(
             collateral.current_face.amount(),
@@ -553,7 +548,7 @@ mod tests {
 
         // Collateral PV: discount the pool's total investor cashflows with
         // the same curve and day count as the tranche pricer.
-        let collateral = resolve_collateral(&cmo).expect("collateral resolves");
+        let collateral = resolve_collateral(&cmo, as_of).expect("collateral resolves");
         let collateral_cfs =
             generate_cashflows(&collateral, as_of, None).expect("collateral cashflows");
         let curve = market

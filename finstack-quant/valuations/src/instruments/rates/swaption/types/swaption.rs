@@ -1028,11 +1028,16 @@ pub struct GreekInputs {
 impl crate::instruments::common_impl::traits::Instrument for Swaption {
     impl_instrument_base!(crate::pricer::InstrumentType::Swaption);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        self.validate()?;
         // The default `Instrument::value()` path only implements European exercise.
         // Bermudan / American swaptions must be priced via the dedicated LMM
         // pricer (see `swaption::lmm_pricer::LmmPricer`); silently downcasting to

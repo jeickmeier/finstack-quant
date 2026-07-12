@@ -569,6 +569,10 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
         Some(self.start_date)
     }
 
+    fn expiry(&self) -> Option<Date> {
+        Some(self.maturity)
+    }
+
     fn pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {

@@ -3,8 +3,7 @@
 //! This module defines the data structures for bond futures, including
 //! the deliverable basket, contract specifications, and the main BondFuture type.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
-use crate::cashflow::primitives::CFKind;
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::CashflowProvider;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::impl_instrument_base;
@@ -1204,24 +1203,6 @@ impl BondFuture {
 
         Ok(annualized)
     }
-
-    fn delivery_invoice_amount(
-        &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-    ) -> finstack_quant_core::Result<Money> {
-        let ctd_bond = self.ctd_bond.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "BondFuture '{}' requires an embedded ctd_bond to build contractual delivery cashflows",
-                self.id.as_str()
-            ))
-        })?;
-        let invoice = self.invoice_price(ctd_bond, market, self.delivery_start)?;
-        let signed_amount = match self.position {
-            Position::Long => -invoice.amount(),
-            Position::Short => invoice.amount(),
-        };
-        Ok(Money::new(signed_amount, invoice.currency()))
-    }
 }
 
 // Manually implement a validated builder method
@@ -2055,32 +2036,13 @@ impl CashflowProvider for BondFuture {
 
     fn cashflow_schedule(
         &self,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: Date,
+        _market: &finstack_quant_core::market_data::context::MarketContext,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let invoice = self.delivery_invoice_amount(market)?;
-        let anchor = if as_of < self.delivery_start {
-            as_of
-        } else {
-            self.expiry - time::Duration::days(1)
-        };
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(
-            Money::new(0.0, invoice.currency()),
-            anchor,
-            self.delivery_start,
-        );
-        let _ = builder.add_principal_event(
-            self.delivery_start,
-            Money::new(0.0, invoice.currency()),
-            Some(Money::new(-invoice.amount(), invoice.currency())),
-            CFKind::Notional,
-        );
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(self.notional.amount(), self.notional.currency());
-        schedule.meta.representation =
-            crate::cashflow::builder::CashflowRepresentation::Contractual;
-        Ok(schedule)
+        Err(finstack_quant_core::Error::Validation(
+            "BondFuture physical delivery cannot be represented as a standalone cashflow schedule; use the typed delivery result"
+                .to_string(),
+        ))
     }
 }
 

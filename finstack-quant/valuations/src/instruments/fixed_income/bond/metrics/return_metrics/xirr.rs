@@ -86,12 +86,6 @@ impl MetricCalculator for XirrCalculator {
 /// `xirr_floor_holds_on_every_early_call_path`,
 /// `moic_check_has_teeth_redemption_below_floor_breaks_target`).
 ///
-/// # Limitation
-///
-/// Redemption uses the initial notional (`bond.notional`), which is exact for
-/// bullet bonds. Amortizing bonds need the outstanding principal at the call
-/// date here; that is a v1 limitation (TODO).
-///
 /// # Errors
 ///
 /// Returns an error if the instrument is not a `Bond`, if the effective bond

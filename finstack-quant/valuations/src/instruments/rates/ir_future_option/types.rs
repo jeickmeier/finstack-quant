@@ -181,6 +181,9 @@ impl IrFutureOption {
 
     /// Present value of the option.
     pub fn npv(&self, context: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        if as_of > self.expiry {
+            return Ok(0.0);
+        }
         let (premium, df, _t) = self.black76_components(context, as_of)?;
         let pv = df * premium * self.contract_point_value()?;
         if !pv.is_finite() {
@@ -200,6 +203,9 @@ impl IrFutureOption {
     ///
     /// Propagates a day-count failure from internal time-to-expiry calculation.
     pub fn delta(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
+        if as_of > self.expiry {
+            return Ok(0.0);
+        }
         let t = self.time_to_expiry(as_of)?;
         if t <= 0.0 || self.volatility <= 0.0 {
             if self.is_call() {
@@ -360,40 +366,53 @@ impl CashflowProvider for IrFutureOption {
     }
 }
 
+impl IrFutureOption {
+    fn cash_scale(&self, market: &MarketContext, as_of: Date) -> finstack_quant_core::Result<f64> {
+        let df = if as_of >= self.expiry {
+            1.0
+        } else {
+            market
+                .get_discount(&self.discount_curve_id)?
+                .df_between_dates(as_of, self.expiry)?
+        };
+        Ok(df * self.contract_point_value()?)
+    }
+}
+
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for IrFutureOption {
     fn option_delta(
         &self,
-        _market: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(self.delta(as_of)? * self.contract_point_value()?))
+        Ok(Some(self.delta(as_of)? * self.cash_scale(market, as_of)?))
     }
 
     fn option_gamma(
         &self,
-        _market: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(Some(self.gamma(as_of)? * self.contract_point_value()?))
+        Ok(Some(self.gamma(as_of)? * self.cash_scale(market, as_of)?))
     }
 
     fn option_vega(
         &self,
-        _market: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(
-            self.vega_per_pct(as_of)? * self.contract_point_value()?,
+            self.vega_per_pct(as_of)? * self.cash_scale(market, as_of)?,
         ))
     }
 
     fn option_theta(
         &self,
-        _market: &MarketContext,
+        market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(
-            self.theta_daily(as_of)? * self.contract_point_value()?,
+            self.theta_daily(as_of)? * self.cash_scale(market, as_of)?,
         ))
     }
 }

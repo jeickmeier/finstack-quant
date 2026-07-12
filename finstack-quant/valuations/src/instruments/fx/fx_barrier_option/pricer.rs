@@ -53,6 +53,7 @@ impl FxBarrierOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        inst.validate()?;
         if as_of > inst.expiry {
             return Ok(finstack_quant_core::money::Money::new(
                 0.0,
@@ -186,6 +187,18 @@ impl Pricer for FxBarrierOptionMcPricer {
                 PricingError::type_mismatch(InstrumentType::FxBarrierOption, instrument.key())
             })?;
 
+        if fx_barrier
+            .monitoring_start_date
+            .is_some_and(|start| as_of > start)
+            && as_of <= fx_barrier.expiry
+            && fx_barrier.observed_barrier_breached.is_none()
+        {
+            return Err(PricingError::model_failure_with_context(
+                "Seasoned FX barrier option requires observed_barrier_breached after monitoring starts",
+                PricingErrorContext::default(),
+            ));
+        }
+
         let pv = self
             .price_internal(fx_barrier, market, as_of)
             .map_err(|e| {
@@ -205,11 +218,31 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
+    inst.validate()?;
+    validate_monitoring_state(inst, as_of)?;
     if as_of > inst.expiry {
         return Ok(Money::new(0.0, inst.quote_currency));
     }
     let pricer = FxBarrierOptionMcPricer::new();
     pricer.price_internal(inst, curves, as_of)
+}
+
+fn validate_monitoring_state(
+    inst: &FxBarrierOption,
+    as_of: Date,
+) -> finstack_quant_core::Result<()> {
+    if inst
+        .monitoring_start_date
+        .is_some_and(|start| as_of > start)
+        && as_of <= inst.expiry
+        && inst.observed_barrier_breached.is_none()
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "Seasoned FX barrier option requires observed_barrier_breached after monitoring starts"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 // ========================= ANALYTICAL PRICER =========================
@@ -509,6 +542,14 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
                 PricingError::type_mismatch(InstrumentType::FxBarrierOption, instrument.key())
             })?;
 
+        fx_barrier.validate().map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+
+        validate_monitoring_state(fx_barrier, as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+
         if as_of > fx_barrier.expiry {
             return Ok(ValuationResult::stamped(
                 fx_barrier.id(),
@@ -795,6 +836,10 @@ impl Pricer for FxBarrierOptionVannaVolgaPricer {
             .ok_or_else(|| {
                 PricingError::type_mismatch(InstrumentType::FxBarrierOption, instrument.key())
             })?;
+
+        fx_barrier.validate().map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
 
         if as_of > fx_barrier.expiry {
             return Ok(ValuationResult::stamped(

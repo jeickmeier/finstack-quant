@@ -136,7 +136,6 @@ impl MetricCalculator for ModifiedDurationCalculator {
         // Use the discount curve's day count for market-standard consistency
         // (e.g., 30/360 for US Agency RMBS, Act/360 for CLOs)
         let day_count = disc.day_count();
-        let base_date = disc.base_date();
 
         // Shift yield by 1bp
         let yield_shift = ONE_BASIS_POINT;
@@ -149,11 +148,11 @@ impl MetricCalculator for ModifiedDurationCalculator {
                 continue;
             }
 
-            // Calculate time from curve base date
-            let t = day_count.year_fraction(base_date, *date, DayCountContext::default())?;
+            // Calculate the spread bump time from valuation, not curve base.
+            let t = day_count.year_fraction(context.as_of, *date, DayCountContext::default())?;
 
             // Get base discount factor
-            let df = disc.df_on_date_curve(*date)?;
+            let df = disc.df_between_dates(context.as_of, *date)?;
 
             // Apply yield shift: df_shifted = df * exp(-shift * t)
             let df_shifted = df * (-yield_shift * t).exp();

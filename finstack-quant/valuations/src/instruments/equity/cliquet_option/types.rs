@@ -295,6 +295,10 @@ impl CliquetOption {
 impl crate::instruments::common_impl::traits::Instrument for CliquetOption {
     impl_instrument_base!(crate::pricer::InstrumentType::CliquetOption);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::MonteCarloGBM
     }
@@ -315,6 +319,7 @@ impl crate::instruments::common_impl::traits::Instrument for CliquetOption {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use crate::instruments::equity::cliquet_option::pricer;
+        self.validate()?;
         pricer::compute_pv(self, market, as_of)
     }
 

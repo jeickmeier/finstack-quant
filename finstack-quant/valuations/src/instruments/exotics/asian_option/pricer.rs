@@ -412,6 +412,7 @@ impl AsianOptionMcPricer {
         let drift_schedule = std::sync::Arc::new(
             crate::instruments::common_impl::helpers::build_gbm_drift_schedule(
                 disc_curve.as_ref(),
+                as_of,
                 r,
                 q,
                 t,
@@ -845,6 +846,7 @@ impl AsianOptionMcPricer {
         let process = process.with_drift_schedule(std::sync::Arc::new(
             crate::instruments::common_impl::helpers::build_gbm_drift_schedule(
                 disc_curve.as_ref(),
+                as_of,
                 r,
                 q,
                 t,

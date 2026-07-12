@@ -85,11 +85,9 @@ pub enum CommodityPricingModel {
 /// The convenience yield (cost-of-carry) is implied from the forward/spot ratio:
 /// `q = r - ln(F/S)/T`
 ///
-/// # Bermudan Exercise Status
-///
-/// Bermudan exercise is currently **rejected**. The prior American-style
-/// approximation was removed because it materially overstates option value
-/// for sparse exercise schedules.
+/// Bermudan exercise uses the configured exercise schedule and a binomial
+/// tree. The schedule must contain at least one strictly future date when the
+/// option is priced before expiry.
 ///
 /// # Forward Price Retrieval
 ///
@@ -188,6 +186,42 @@ pub struct CommodityOption {
 }
 
 impl CommodityOption {
+    /// Validate the static economic inputs shared by builders and JSON loads.
+    pub fn validate(&self) -> Result<()> {
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.strike,
+            "CommodityOption strike",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.quantity,
+            "CommodityOption quantity",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.multiplier,
+            "CommodityOption multiplier",
+        )?;
+        if let Some(schedule) = &self.exercise_schedule {
+            if schedule.windows(2).any(|w| w[0] >= w[1]) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "CommodityOption exercise_schedule must be strictly increasing".to_string(),
+                ));
+            }
+            if schedule.iter().any(|date| *date > self.expiry) {
+                return Err(finstack_quant_core::Error::Validation(
+                    "CommodityOption exercise_schedule cannot extend beyond expiry".to_string(),
+                ));
+            }
+        }
+        if matches!(self.exercise_style, ExerciseStyle::Bermudan)
+            && self.exercise_schedule.as_ref().is_none_or(Vec::is_empty)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "Commodity Bermudan option requires exercise_schedule".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Create a canonical example commodity option for testing and documentation.
     ///
     /// Returns a WTI European call option.
@@ -595,6 +629,10 @@ impl CurveDependencies for CommodityOption {
 impl Instrument for CommodityOption {
     impl_instrument_base!(crate::pricer::InstrumentType::CommodityOption);
 
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<
@@ -635,14 +673,22 @@ impl Instrument for CommodityOption {
         let inputs = self.collect_inputs(market, as_of)?;
 
         let unit_price = match self.exercise_style {
-            ExerciseStyle::European => black76_unit_price(
-                inputs.forward,
-                self.strike,
-                inputs.sigma,
-                inputs.t,
-                inputs.df,
-                self.option_type,
-            ),
+            ExerciseStyle::European => {
+                if !inputs.forward.is_finite() || inputs.forward <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CommodityOption '{}' Black-76 forward must be finite and positive, got {}",
+                        self.id, inputs.forward
+                    )));
+                }
+                black76_unit_price(
+                    inputs.forward,
+                    self.strike,
+                    inputs.sigma,
+                    inputs.t,
+                    inputs.df,
+                    self.option_type,
+                )
+            }
             ExerciseStyle::American => {
                 let steps = self
                     .pricing_overrides
@@ -685,7 +731,8 @@ impl Instrument for CommodityOption {
                 let exercise_times: Vec<f64> = schedule
                     .iter()
                     .filter_map(|date| {
-                        let yf = DayCount::Act365F
+                        let yf = self
+                            .day_count
                             .year_fraction(as_of, *date, DayCountContext::default())
                             .ok()?;
                         if yf > 0.0 && yf <= inputs.t {
@@ -715,6 +762,10 @@ impl Instrument for CommodityOption {
         None
     }
 
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
     fn pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
@@ -735,6 +786,15 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_cdf;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
 
         let t = self
             .day_count
@@ -792,6 +852,15 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_pdf;
 
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
+
         let t = self
             .day_count
             .year_fraction(as_of, self.expiry, DayCountContext::default())?
@@ -825,6 +894,15 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
 
         #[derive(Debug)]
         enum ForwardDriver {
@@ -916,6 +994,14 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
         #[derive(Debug)]
         enum ForwardDriver {
             QuotedForward(f64),
@@ -1012,6 +1098,15 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         base_pv: f64,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use crate::instruments::common_impl::traits::Instrument;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
 
         let vol_bump = crate::metrics::bump_sizes::VOLATILITY;
         let up = crate::metrics::bump_surface_vol_absolute(

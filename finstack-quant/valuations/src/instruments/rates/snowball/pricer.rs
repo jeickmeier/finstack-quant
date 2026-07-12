@@ -690,7 +690,7 @@ fn coupon_events(
     market: &MarketContext,
     as_of: Date,
     term_forward: &Hw1fTermForward<'_>,
-    r0: f64,
+    _r0: f64,
 ) -> Result<Vec<CouponEvent>> {
     let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
     let forward_curve = market.get_forward(inst.floating_index_id.as_ref())?;
@@ -740,12 +740,15 @@ fn coupon_events(
             let basis = forward_curve.rate(projection_time) - discount_forward;
             (coeffs.with_additive_spread(basis), true)
         } else {
-            // Already-seasoned first coupon: deterministic `r(0) = f(0,0)`
-            // fixing, reconstructed over the contractual floating tenor.
-            // The coupon still accrues over the full `[start, end]` period.
-            let seasoned_rate = term_forward
-                .period_coeffs(0.0, inst.floating_tenor.to_years_simple())
-                .simple_forward(r0);
+            // At inception the first fixing is projected from the explicit
+            // projection curve. Do not substitute the discount-curve short
+            // rate, which would remove the index/discount basis.
+            let projection_time = forward_curve.day_count().signed_year_fraction(
+                forward_curve.base_date(),
+                start,
+                DayCountContext::default(),
+            )?;
+            let seasoned_rate = forward_curve.rate(projection_time);
             (
                 PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction),
                 false,

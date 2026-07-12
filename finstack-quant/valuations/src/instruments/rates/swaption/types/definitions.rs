@@ -452,6 +452,7 @@ impl BermudanSchedule {
         let ctx = finstack_quant_core::dates::DayCountContext::default();
         self.effective_dates()
             .iter()
+            .filter(|&&d| d > as_of)
             .map(|&d| day_count.year_fraction(as_of, d, ctx))
             .collect()
     }

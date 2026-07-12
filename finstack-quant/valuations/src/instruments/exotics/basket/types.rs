@@ -347,9 +347,14 @@ impl Basket {
 impl Instrument for Basket {
     impl_instrument_base!(crate::pricer::InstrumentType::Basket);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     // === Pricing Methods ===
 
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
+        self.validate()?;
         // Scale NAV-per-unit by explicit basket notional for portfolio PV.
         let nav_per_unit = self.calculator().nav(self, curves, as_of, 1.0)?;
         let scaled = nav_per_unit.amount() * self.notional.amount();

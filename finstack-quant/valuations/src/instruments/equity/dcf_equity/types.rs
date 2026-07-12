@@ -869,6 +869,10 @@ impl DiscountedCashFlow {
 impl Instrument for DiscountedCashFlow {
     impl_instrument_base!(InstrumentType::DCF);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         MarketDependencies::from_curve_dependencies(self)
     }
@@ -878,6 +882,7 @@ impl Instrument for DiscountedCashFlow {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
+        self.validate()?;
         pricer::compute_pv(self, market, as_of)
     }
 

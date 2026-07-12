@@ -598,6 +598,10 @@ impl crate::instruments::common_impl::traits::CurveDependencies for FxForward {
 impl crate::instruments::common_impl::traits::Instrument for FxForward {
     impl_instrument_base!(crate::pricer::InstrumentType::FxForward);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<

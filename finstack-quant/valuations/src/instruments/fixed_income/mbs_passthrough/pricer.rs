@@ -290,7 +290,7 @@ fn discount_schedule(
     let mut pv = 0.0;
     for cf in &schedule.flows {
         let years = dc.year_fraction(as_of, cf.date, DayCountContext::default())?;
-        let base_df = curve.df(years);
+        let base_df = curve.df_between_dates(as_of, cf.date)?;
         let df = if spread.abs() > f64::EPSILON {
             base_df * (-spread * years).exp()
         } else {

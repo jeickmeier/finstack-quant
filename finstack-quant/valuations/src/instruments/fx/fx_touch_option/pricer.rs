@@ -18,6 +18,7 @@ pub(crate) fn compute_pv(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    inst.validate()?;
     if as_of > inst.expiry {
         return Ok(Money::new(0.0, inst.quote_currency));
     }
@@ -31,6 +32,17 @@ impl FxTouchOptionCalculator {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
+        if inst
+            .monitoring_start_date
+            .is_some_and(|start| as_of > start)
+            && as_of <= inst.expiry
+            && inst.observed_touch.is_none()
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "Seasoned FX touch option requires observed_touch after monitoring starts"
+                    .to_string(),
+            ));
+        }
         let (spot, r_d, r_f, sigma, t) = self.collect_inputs(inst, curves, as_of)?;
 
         if t <= 0.0 {

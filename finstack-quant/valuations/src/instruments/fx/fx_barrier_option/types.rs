@@ -53,6 +53,12 @@ pub struct FxBarrierOption {
     /// Option expiry date
     #[schemars(with = "String")]
     pub expiry: Date,
+    /// First date on which barrier monitoring is active. When set, a live
+    /// valuation after this date requires `observed_barrier_breached`.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub monitoring_start_date: Option<Date>,
     /// Observed barrier state for expired options.
     ///
     /// Historical monitoring must be supplied explicitly for expired contracts.
@@ -117,11 +123,36 @@ impl FxBarrierOption {
             self.quote_currency,
             "FxBarrierOption",
         )?;
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.strike,
+            "FxBarrierOption strike",
+        )?;
+        crate::instruments::common_impl::validation::validate_f64_positive(
+            self.barrier,
+            "FxBarrierOption barrier",
+        )?;
+        crate::instruments::common_impl::validation::validate_money_finite(
+            self.notional,
+            "FxBarrierOption notional",
+        )?;
+        if self.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxBarrierOption notional must be positive".to_string(),
+            ));
+        }
         if self.notional.currency() != self.base_currency {
             return Err(finstack_quant_core::Error::CurrencyMismatch {
                 expected: self.base_currency,
                 actual: self.notional.currency(),
             });
+        }
+        if let Some(start) = self.monitoring_start_date {
+            if start > self.expiry {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FxBarrierOption monitoring_start_date ({start}) must not be after expiry ({})",
+                    self.expiry
+                )));
+            }
         }
         Ok(())
     }
@@ -415,6 +446,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
 
 impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
     impl_instrument_base!(crate::pricer::InstrumentType::FxBarrierOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         if self.use_gobet_miri {

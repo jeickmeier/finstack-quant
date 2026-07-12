@@ -445,6 +445,10 @@ impl FxOption {
 impl crate::instruments::common_impl::traits::Instrument for FxOption {
     impl_instrument_base!(crate::pricer::InstrumentType::FxOption);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     /// `ModelKey::Black76` is the library-wide registry key for lognormal
     /// option pricing. The FX option pricer registered under this key is the
     /// Garman-Kohlhagen *spot-form* model (BSM with domestic rate `r_d` and

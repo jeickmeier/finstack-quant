@@ -203,6 +203,7 @@ pub fn resolve_optional_dividend_yield(
 /// `DriftSchedule::new`) — e.g. a non-finite curve evaluation.
 pub fn build_gbm_drift_schedule(
     disc_curve: &finstack_quant_core::market_data::term_structures::DiscountCurve,
+    as_of: Date,
     r: f64,
     q: f64,
     t: f64,
@@ -211,11 +212,27 @@ pub fn build_gbm_drift_schedule(
     use finstack_quant_monte_carlo::process::gbm::DriftSchedule;
 
     let knots = num_steps.max(1);
+    // `DiscountCurve::df(t)` is measured from the curve base date.  The
+    // simulation, however, starts at `as_of`; use the curve's time coordinate
+    // at that date and normalize every sampled DF by DF(as_of).  Sampling
+    // `df(tk)` directly would splice historical curve time into the future
+    // path whenever the curve base predates valuation.
+    let as_of_curve_time = disc_curve.day_count().signed_year_fraction(
+        disc_curve.base_date(),
+        as_of,
+        DayCountContext::default(),
+    )?;
+    let as_of_df = disc_curve.df(as_of_curve_time);
+    if !as_of_df.is_finite() || as_of_df <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "GBM drift schedule: invalid discount factor at as_of {as_of}: {as_of_df}"
+        )));
+    }
     // Rescale the curve's cumulative log-DF shape so the terminal cumulative
     // rate equals r·t exactly — this keeps the simulated terminal forward
     // consistent with the date-based discount factor used to discount the
     // payoff. The curve supplies only the *shape* of the term structure.
-    let terminal_rate_cum = -disc_curve.df(t).ln();
+    let terminal_rate_cum = -(disc_curve.df(as_of_curve_time + t) / as_of_df).ln();
     let scale = if terminal_rate_cum.abs() > 1e-12 {
         (r * t) / terminal_rate_cum
     } else {
@@ -227,7 +244,7 @@ pub fn build_gbm_drift_schedule(
     for k in 0..=knots {
         let tk = t * (k as f64) / (knots as f64);
         let rate_cum = if tk > 0.0 {
-            -disc_curve.df(tk).ln() * scale
+            -(disc_curve.df(as_of_curve_time + tk) / as_of_df).ln() * scale
         } else {
             0.0
         };

@@ -95,6 +95,13 @@ fn kirk_price(
 
     let rho = inst.correlation;
 
+    if !f1.is_finite() || f1 <= 0.0 || !f2.is_finite() || f2 <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySpreadOption '{}' requires positive finite forwards for Kirk pricing; got F1={f1}, F2={f2}",
+            inst.id
+        )));
+    }
+
     // Kirk's adjusted strike
     let k_adj = f2 + inst.strike;
 

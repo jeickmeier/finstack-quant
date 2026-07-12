@@ -52,6 +52,56 @@ impl Pricer for SimpleSwaptionBlackPricer {
                 PricingError::type_mismatch(InstrumentType::Swaption, instrument.key())
             })?;
 
+        if as_of > swaption.expiry {
+            return Ok(ValuationResult::stamped(
+                swaption.id(),
+                as_of,
+                finstack_quant_core::money::Money::new(0.0, swaption.notional.currency()),
+            ));
+        }
+        if as_of == swaption.expiry {
+            let forward = swaption.forward_swap_rate(market, as_of).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            let disc = market
+                .get_discount(swaption.discount_curve_id.as_ref())
+                .map_err(|e| {
+                    PricingError::missing_market_data_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
+            let annuity = swaption
+                .annuity(disc.as_ref(), as_of, forward)
+                .map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
+            let strike = swaption.strike_f64().map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            let intrinsic = match swaption.option_type {
+                crate::instruments::OptionType::Call => (forward - strike).max(0.0),
+                crate::instruments::OptionType::Put => (strike - forward).max(0.0),
+            };
+            return Ok(ValuationResult::stamped(
+                swaption.id(),
+                as_of,
+                finstack_quant_core::money::Money::new(
+                    intrinsic * annuity * swaption.notional.amount(),
+                    swaption.notional.currency(),
+                ),
+            ));
+        }
+
         let pv = match self.model {
             ModelKey::Black76 => {
                 if swaption.sabr_params.is_some() {

@@ -387,6 +387,10 @@ impl Autocallable {
 impl crate::instruments::common_impl::traits::Instrument for Autocallable {
     impl_instrument_base!(crate::pricer::InstrumentType::Autocallable);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::MonteCarloGBM
     }
@@ -407,6 +411,7 @@ impl crate::instruments::common_impl::traits::Instrument for Autocallable {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use crate::instruments::equity::autocallable::pricer;
+        self.validate()?;
         pricer::compute_pv(self, market, as_of)
     }
 

@@ -227,6 +227,10 @@ pub struct EquityIndexFuture {
     #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_price: Option<f64>,
+    /// Official settlement price fixed after the last trading date.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settlement_price: Option<f64>,
     /// Position side (Long or Short).
     pub position: Position,
     /// Contract specifications.
@@ -260,6 +264,43 @@ pub struct EquityIndexFuture {
 }
 
 impl EquityIndexFuture {
+    /// Validate contract, lifecycle, and market-quote invariants.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.last_trading_date > self.expiry {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "EquityIndexFuture '{}' last_trading_date ({}) must not be after expiry ({})",
+                self.id, self.last_trading_date, self.expiry
+            )));
+        }
+        if !self.notional.amount().is_finite() || self.notional.amount() <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "EquityIndexFuture '{}' notional must be finite and positive",
+                self.id
+            )));
+        }
+        if !self.contract_specs.multiplier.is_finite() || self.contract_specs.multiplier <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "EquityIndexFuture '{}' contract multiplier must be finite and positive",
+                self.id
+            )));
+        }
+        for (name, value) in [
+            ("entry_price", self.entry_price),
+            ("quoted_price", self.quoted_price),
+            ("settlement_price", self.settlement_price),
+        ] {
+            if let Some(value) = value {
+                if !value.is_finite() || value <= 0.0 {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "EquityIndexFuture '{}' {name} must be finite and positive",
+                        self.id
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Create a canonical example E-mini S&P 500 future for testing and documentation.
     pub fn example() -> finstack_quant_core::Result<Self> {
         Self::builder()
@@ -419,6 +460,10 @@ impl EquityIndexFuture {
 impl crate::instruments::common_impl::traits::Instrument for EquityIndexFuture {
     impl_instrument_base!(crate::pricer::InstrumentType::EquityIndexFuture);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<
@@ -446,6 +491,10 @@ impl crate::instruments::common_impl::traits::Instrument for EquityIndexFuture {
 
     fn effective_start_date(&self) -> Option<Date> {
         None
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
     }
 
     fn pricing_overrides_mut(

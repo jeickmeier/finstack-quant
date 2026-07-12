@@ -78,17 +78,10 @@ fn collect_quanto_inputs(
                 fx_vol_surface.value_clamped(t, atm_fwd_fx)
             }
             _ => {
-                tracing::warn!(
-                    instrument_id = %inst.id.as_str(),
-                    fx_vol_id = %fx_vol_id.as_str(),
-                    "Quanto FX spot not resolvable (no fx_rate_id and no FX matrix \
-                     entry for {base}/{quote}); falling back to value_clamped(t, 1.0) \
-                     for the FX vol lookup. Configure `fx_rate_id` or populate the \
-                     FX matrix to obtain ATM-forward FX vol.",
-                    base = inst.base_currency,
-                    quote = inst.quote_currency,
-                );
-                fx_vol_surface.value_clamped(t, 1.0)
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "QuantoOption '{}': FX spot is required to select ATM-forward FX volatility; configure fx_rate_id or populate the FX matrix",
+                    inst.id
+                )));
             }
         }
     } else {
@@ -173,6 +166,33 @@ impl Pricer for QuantoOptionAnalyticalPricer {
                 quanto.id(),
                 as_of,
                 Money::new(0.0, quanto.quote_currency),
+            ));
+        }
+
+        if as_of >= quanto.expiry {
+            let spot = crate::metrics::scalar_numeric_value(
+                market.get_price(&quanto.spot_id).map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?,
+            );
+            let scale = payoff_scale(quanto).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+            let strike = quanto.equity_strike.amount();
+            let intrinsic_unit = match quanto.option_type {
+                crate::instruments::OptionType::Call => (spot - strike).max(0.0),
+                crate::instruments::OptionType::Put => (strike - spot).max(0.0),
+            };
+            return Ok(ValuationResult::stamped(
+                quanto.id(),
+                as_of,
+                Money::new(intrinsic_unit * scale, quanto.quote_currency),
             ));
         }
 

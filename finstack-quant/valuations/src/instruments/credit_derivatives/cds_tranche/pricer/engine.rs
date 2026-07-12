@@ -295,7 +295,7 @@ impl CDSTranchePricer {
                 // effective date. Bound the boundary below by the effective
                 // date for a genuine first stub.
                 first_period_start
-                    .filter(|boundary| *boundary < valuation_date)
+                    .filter(|boundary| *boundary <= valuation_date)
                     .unwrap_or(effective)
                     .max(effective)
             } else {

@@ -194,6 +194,12 @@ fn resolve_capfloor_surface_params(
     let Ok(surface) = market.get_surface(surface_id) else {
         return Ok(None);
     };
+    // Caplet calibration points are expiry/fixing × strike normal vols.  Do
+    // not reinterpret a Black or tenor-axis surface as a normal caplet quote.
+    surface.require_secondary_axis(
+        finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
+    )?;
+    surface.require_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)?;
     let mut weighted_sigma = 0.0;
     let mut total_weight = 0.0;
     for point in points {

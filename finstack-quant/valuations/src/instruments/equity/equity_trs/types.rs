@@ -431,6 +431,10 @@ impl EquityTotalReturnSwap {
 impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::EquityTotalReturnSwap);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn base_value(&self, curves: &MarketContext, as_of: Date) -> Result<Money> {
         // Validate configuration
         self.validate()?;

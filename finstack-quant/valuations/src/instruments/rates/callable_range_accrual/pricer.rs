@@ -290,6 +290,37 @@ impl CallableRangeAccrualPricer {
     ) -> Result<MoneyEstimate> {
         inst.validate()?;
 
+        // A callable range accrual carries the same historical-observation
+        // state as its underlying range accrual.  Do not silently treat
+        // already-fixed observations as out-of-range when a seasoned trade is
+        // valued without that state.
+        let range = &inst.range_accrual;
+        let historical_count = range
+            .observation_dates
+            .iter()
+            .filter(|&&date| date <= as_of)
+            .count();
+        if historical_count > 0 {
+            let supplied_total = range.total_past_observations.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CallableRangeAccrual '{}' requires total_past_observations for {historical_count} historical observations",
+                    inst.id
+                ))
+            })?;
+            let supplied_in_range = range.past_fixings_in_range.ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CallableRangeAccrual '{}' requires past_fixings_in_range for {historical_count} historical observations",
+                    inst.id
+                ))
+            })?;
+            if supplied_total != historical_count || supplied_in_range > supplied_total {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CallableRangeAccrual '{}' historical observation state is inconsistent: supplied total={supplied_total}, in_range={supplied_in_range}, expected total={historical_count}",
+                    inst.id
+                )));
+            }
+        }
+
         let discount_curve = market.get_discount(inst.range_accrual.discount_curve_id.as_ref())?;
         let hw_params = self.effective_hw_params(inst, market, as_of)?;
         // HW1F bond-reconstruction built from the discount curve; turns the
@@ -382,6 +413,12 @@ fn callable_range_surface_points(
     let ctx = DayCountContext::default();
     let range = &inst.range_accrual;
     let strike = 0.5 * (range.lower_bound + range.upper_bound);
+    let reference_tenor = range.reference_tenor.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "CallableRangeAccrual requires reference_tenor for HW1F calibration".to_string(),
+        )
+    })?;
+    let accrual = reference_tenor.to_years_simple().max(1.0 / 365.0);
     let mut points = Vec::new();
     for &date in &range.observation_dates {
         if date <= as_of {
@@ -391,7 +428,7 @@ fn callable_range_surface_points(
         if t_fix > 0.0 {
             points.push(Hw1fCapletSurfacePoint {
                 t_fix,
-                accrual: (range.day_count.year_fraction(as_of, date, ctx)?).max(1.0 / 365.0),
+                accrual,
                 strike,
                 weight: range.notional.amount().abs(),
             });

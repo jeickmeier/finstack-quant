@@ -5,8 +5,9 @@
 //! equity in one currency but settled in another; FX delta measures sensitivity
 //! to changes in the FX exchange rate between those currencies.
 
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fx::quanto_option::QuantoOption;
-use crate::metrics::{bump_sizes, central_diff_scalar_relative, MetricCalculator, MetricContext};
+use crate::metrics::{bump_scalar_price, bump_sizes, MetricCalculator, MetricContext};
 use finstack_quant_core::Result;
 
 /// FX Delta calculator for quanto options.
@@ -33,12 +34,14 @@ impl MetricCalculator for FxDeltaCalculator {
             ))
         })?;
 
-        central_diff_scalar_relative(
-            option,
-            context.curves.as_ref(),
-            as_of,
-            fx_rate_id,
-            bump_sizes::SPOT,
-        )
+        let market_up = bump_scalar_price(context.curves.as_ref(), fx_rate_id, bump_sizes::SPOT)?;
+        let market_down =
+            bump_scalar_price(context.curves.as_ref(), fx_rate_id, -bump_sizes::SPOT)?;
+        let pv_up = option.value(&market_up, as_of)?.amount();
+        let pv_down = option.value(&market_down, as_of)?.amount();
+
+        // FxDelta is the cash P&L for a 1% relative FX move, not a derivative
+        // per one unit of spot.  The ±1% scenarios therefore divide by two.
+        Ok((pv_up - pv_down) / 2.0)
     }
 }

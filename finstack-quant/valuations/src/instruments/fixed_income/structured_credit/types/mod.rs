@@ -775,7 +775,7 @@ impl StructuredCredit {
                     continue;
                 }
 
-                let Ok(df_base) = discount_curve.df_on_date_curve(*date) else {
+                let Ok(df_base) = discount_curve.df_between_dates(as_of, *date) else {
                     return f64::NAN;
                 };
 

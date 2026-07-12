@@ -17,9 +17,9 @@ fn resolved_index_forward(
         if let Some(fixing) = option.expiry_fixing {
             return Ok(fixing);
         }
-        if as_of > option.expiry {
+        if as_of >= option.expiry {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "VolatilityIndexOption '{}' requires expiry_fixing between expiry and settlement",
+                "VolatilityIndexOption '{}' requires expiry_fixing on expiry and through settlement",
                 option.id
             )));
         }
@@ -45,6 +45,7 @@ pub(crate) fn compute_pv_raw(
     context: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    option.validate()?;
     let settlement_date = option.effective_settlement_date();
     if as_of > settlement_date {
         return Ok(0.0);

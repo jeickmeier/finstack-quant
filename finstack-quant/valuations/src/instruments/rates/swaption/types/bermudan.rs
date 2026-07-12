@@ -297,7 +297,13 @@ impl BermudanSwaption {
 
     /// Get exercise dates as year fractions from valuation date.
     pub fn exercise_times(&self, as_of: Date) -> Result<Vec<f64>> {
-        self.bermudan_schedule.exercise_times(as_of, self.day_count)
+        let times = self
+            .bermudan_schedule
+            .exercise_times(as_of, self.day_count)?;
+        if times.is_empty() {
+            return Ok(times);
+        }
+        Ok(times)
     }
 
     /// Build the underlying swap payment schedule.

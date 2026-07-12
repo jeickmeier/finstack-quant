@@ -516,11 +516,16 @@ impl ForwardRateAgreementBuilder {
 impl crate::instruments::common_impl::traits::Instrument for ForwardRateAgreement {
     impl_instrument_base!(crate::pricer::InstrumentType::FRA);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        self.validate()?;
         let pv = self.npv_raw(curves, as_of)?;
         Ok(finstack_quant_core::money::Money::new(
             pv,

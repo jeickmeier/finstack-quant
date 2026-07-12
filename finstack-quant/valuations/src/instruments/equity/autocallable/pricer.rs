@@ -49,6 +49,10 @@ impl AutocallableMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<finstack_quant_core::money::Money> {
+        inst.validate()?;
+        if as_of > inst.expiry {
+            return Ok(Money::new(0.0, inst.notional.currency()));
+        }
         let spot_scalar = curves.get_price(&inst.spot_id)?;
         let initial_spot = match spot_scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
@@ -61,10 +65,6 @@ impl AutocallableMcPricer {
         let final_date = inst.expiry;
         let disc_dc = disc_curve.day_count();
         let t = disc_dc.year_fraction(as_of, final_date, DayCountContext::default())?;
-        if t <= 0.0 {
-            return Ok(Money::new(0.0, inst.notional.currency()));
-        }
-
         let discount_factor = disc_curve.df_between_dates(as_of, final_date)?;
 
         // Reference (strike-set) level S_0 for barrier and payoff ratios.

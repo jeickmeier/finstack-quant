@@ -405,17 +405,17 @@ impl TarnPricer {
                 });
                 continue;
             } else {
-                // Already-seasoned first coupon: its in-advance fixing date is
-                // at or before `as_of`, so the rate is the deterministic
-                // `r(0) = f(0,0)` reconstruction. Mirroring the discounting
-                // pricer, the rate is projected over the *remaining* window
-                // `[as_of, end]` while the coupon still accrues over the full
-                // `[start, end]`. A flat (short-rate-independent) coeff set
-                // bakes that rate in; the event consumes no path sample.
-                let seasoned_rate = term_forward
-                    .period_coeffs(0.0, inst.floating_tenor.to_years_simple())
-                    .simple_forward(r0);
-                PeriodForwardCoeffs::from_flat_rate(seasoned_rate, accrual_fraction)
+                // At the valuation date the first fixing is not yet a
+                // historical observation. Use the projection curve for that
+                // fixing; discount-curve reconstruction alone would erase the
+                // projection/discount basis precisely at inception.
+                let projection_time = forward_curve.day_count().signed_year_fraction(
+                    forward_curve.base_date(),
+                    start,
+                    DayCountContext::default(),
+                )?;
+                let projected_rate = forward_curve.rate(projection_time);
+                PeriodForwardCoeffs::from_flat_rate(projected_rate, accrual_fraction)
             };
 
             events.push(CouponEvent {

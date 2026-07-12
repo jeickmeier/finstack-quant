@@ -698,7 +698,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 // For PERCS/DECS below the lower strike, this correctly reflects
                 // the holder bearing equity downside risk.
                 (conversion_val, 0.0)
-            } else if conversion_val > redemption_val {
+            } else if can_convert && conversion_val > redemption_val {
                 (conversion_val, 0.0)
             } else {
                 (redemption_val, redemption_val)
@@ -914,8 +914,13 @@ fn extract_equity_state(
     // Approximated as -ln(DF(epsilon))/epsilon with epsilon = 1/252 (~1 day).
     // Falls back to zero rate to maturity when TTM is very short.
     let risk_free_rate = if time_to_maturity > 0.0 {
-        let epsilon = (1.0_f64 / 252.0).min(time_to_maturity);
-        let df_short = discount_curve.df(epsilon);
+        let next_day = as_of + time::Duration::days(1);
+        let epsilon = process_dc.year_fraction(
+            as_of,
+            next_day,
+            finstack_quant_core::dates::DayCountContext::default(),
+        )?;
+        let df_short = discount_curve.df_between_dates(as_of, next_day)?;
         if df_short > 0.0 {
             -df_short.ln() / epsilon
         } else {
@@ -1068,10 +1073,28 @@ fn price_convertible_bond_with_inputs(
             bond.conversion.policy,
             ConversionPolicy::MandatoryOn(_) | ConversionPolicy::MandatoryVariable { .. }
         );
-        let payoff = if is_mandatory {
+        let can_convert = match &bond.conversion.policy {
+            ConversionPolicy::Voluntary => true,
+            ConversionPolicy::MandatoryOn(date) => *date == bond.maturity,
+            ConversionPolicy::MandatoryVariable {
+                conversion_date, ..
+            } => *conversion_date == bond.maturity,
+            ConversionPolicy::Window { start, end } => {
+                *start <= bond.maturity && bond.maturity <= *end
+            }
+            ConversionPolicy::UponEvent(ConversionEvent::PriceTrigger { threshold, .. }) => {
+                inputs.spot >= *threshold
+            }
+            ConversionPolicy::UponEvent(
+                ConversionEvent::QualifiedIpo | ConversionEvent::ChangeOfControl,
+            ) => false,
+        };
+        let payoff = if is_mandatory && can_convert {
             conversion_value
-        } else {
+        } else if can_convert {
             redemption_value.max(conversion_value)
+        } else {
+            redemption_value
         };
 
         return Ok(Money::new(payoff, bond.notional.currency()));

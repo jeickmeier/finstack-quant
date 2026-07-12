@@ -372,6 +372,10 @@ impl CurveDependencies for CommoditySwaption {
 impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
     impl_instrument_base!(crate::pricer::InstrumentType::CommoditySwaption);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76
     }
@@ -446,6 +450,10 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
         Some(self.swap_start)
     }
 
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
     fn pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
@@ -466,6 +474,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_cdf;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
 
         let t = self
             .day_count
@@ -526,6 +538,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             BumpMode, BumpSpec, BumpType, BumpUnits, MarketBump,
         };
 
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+
         let bump_pct = crate::metrics::bump_sizes::SPOT;
         let forward_price = self.forward_swap_rate(market, as_of)?;
         let bump_size = forward_price * bump_pct;
@@ -569,6 +585,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         as_of: Date,
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_pdf;
+
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
 
         let t = self
             .day_count

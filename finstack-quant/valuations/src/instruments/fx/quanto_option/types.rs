@@ -632,6 +632,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for QuantoOpt
 impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
     impl_instrument_base!(crate::pricer::InstrumentType::QuantoOption);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::QuantoBS
     }
@@ -658,6 +662,8 @@ impl crate::instruments::common_impl::traits::Instrument for QuantoOption {
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use crate::instruments::fx::quanto_option::pricer::QuantoOptionAnalyticalPricer;
         use crate::pricer::Pricer;
+
+        self.validate()?;
 
         let pricer = QuantoOptionAnalyticalPricer::new();
         let result = pricer

@@ -5,7 +5,9 @@
 //! fractional kernel internally using standard normal increments — no fBM generator
 //! is required.
 
-use super::pricer::{collect_inputs_extended, has_future_discrete_dividends, option_currency};
+use super::pricer::{
+    collect_inputs_extended, has_future_discrete_dividends, option_currency, require_european,
+};
 use super::types::EquityOption;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
@@ -84,6 +86,12 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
                     instrument.key(),
                 )
             })?;
+        require_european(equity_option, "Rough Heston Monte Carlo").map_err(|e| {
+            crate::pricer::PricingError::model_failure_with_context(
+                e.to_string(),
+                crate::pricer::PricingErrorContext::from_instrument(equity_option),
+            )
+        })?;
 
         if as_of > equity_option.expiry {
             return Ok(crate::results::ValuationResult::stamped(

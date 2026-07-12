@@ -19,6 +19,11 @@ pub(crate) fn compute_pv(
     context: &MarketContext,
     as_of: Date,
 ) -> Result<Money> {
+    inst.validate()?;
+    let settlement_date = inst.effective_settlement_date()?;
+    if as_of > settlement_date {
+        return Ok(Money::new(0.0, inst.notional.currency()));
+    }
     inst.validate_as_of(context, as_of)?;
 
     let dom = context.get_discount(inst.domestic_discount_curve_id.as_str())?;
@@ -27,12 +32,6 @@ pub(crate) fn compute_pv(
     // otherwise rebuild this 1-3 times via the helper functions.
     let obs_dates = observation_dates(inst)?;
     let final_observation_date = inst.final_observation_date()?;
-    let settlement_date = inst.effective_settlement_date()?;
-
-    if as_of > settlement_date {
-        return Ok(Money::new(0.0, inst.notional.currency()));
-    }
-
     if as_of >= final_observation_date {
         let realized_var = if inst.realized_var_method.requires_ohlc() {
             let (open, high, low, close) =

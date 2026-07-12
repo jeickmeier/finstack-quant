@@ -55,6 +55,15 @@ impl EquityOptionHestonPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
+        if !matches!(
+            inst.exercise_style,
+            crate::instruments::ExerciseStyle::European
+        ) {
+            return Err(PricingError::model_failure_with_context(
+                "Heston PDE supports European exercise only",
+                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
+            ));
+        }
         if as_of > inst.expiry {
             return Ok(Money::new(0.0, inst.notional.currency()));
         }
@@ -119,7 +128,6 @@ impl EquityOptionHestonPdePricer {
                     PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),
                 )
             })?;
-
         // V-grid: variance from near-zero to well above long-run level
         let v_min = 0.001;
         let v_max = 1.5_f64.max(5.0 * theta_v);

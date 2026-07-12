@@ -62,9 +62,9 @@ impl MetricCalculator for FxDeltaCalculator {
         let pv_up = calculate_pv(ctx.model_spot + rate_bump_amt)?;
         let pv_down = calculate_pv(ctx.model_spot - rate_bump_amt)?;
 
-        // FX Delta = (PV_up - PV_down) / (2 × bump_pct)
-        // This gives the PV change per 1% move in spot
-        let fx_delta = (pv_up - pv_down) / (2.0 * bump_sizes::SPOT);
+        // FxDelta is the cash P&L for a 1% relative spot move.  The two
+        // scenarios are ±1%, so half their PV difference is the metric.
+        let fx_delta = (pv_up - pv_down) / 2.0;
 
         Ok(fx_delta)
     }

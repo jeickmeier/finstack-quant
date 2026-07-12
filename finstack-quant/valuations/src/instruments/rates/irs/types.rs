@@ -611,6 +611,10 @@ impl InterestRateSwap {
 impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::IRS);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,

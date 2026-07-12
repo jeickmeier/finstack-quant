@@ -46,6 +46,12 @@ impl EquityOptionPdePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> std::result::Result<Money, PricingError> {
+        if matches!(inst.exercise_style, ExerciseStyle::Bermudan) {
+            return Err(PricingError::model_failure_with_context(
+                "EquityOption PDE1D does not support Bermudan exercise; use a tree model",
+                PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
+            ));
+        }
         if as_of > inst.expiry {
             return Ok(Money::new(0.0, inst.notional.currency()));
         }

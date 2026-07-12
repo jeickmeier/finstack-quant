@@ -24,8 +24,24 @@ pub(crate) fn compute_pv_raw(
     market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
+    future.validate()?;
     if future.expiry < as_of {
         return Ok(0.0);
+    }
+    if as_of > future.last_trading_date {
+        let settlement = future.settlement_price.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "EquityIndexFuture '{}' requires settlement_price after last_trading_date {}",
+                future.id, future.last_trading_date
+            ))
+        })?;
+        if !settlement.is_finite() || settlement <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "EquityIndexFuture settlement_price must be finite and positive".to_string(),
+            ));
+        }
+        // The settlement fixing is the final mark and is not a live quote.
+        return price_quoted(future, settlement);
     }
     if let Some(quoted) = future.quoted_price {
         return price_quoted(future, quoted);
@@ -41,17 +57,24 @@ pub(crate) fn compute_pv_raw(
 /// entry, so a missing entry would silently default to zero and book the
 /// full quoted price as P&L.
 fn require_entry_price(future: &EquityIndexFuture) -> finstack_quant_core::Result<f64> {
-    future.entry_price.ok_or_else(|| {
+    let entry = future.entry_price.ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "EquityIndexFuture '{}' has no entry_price; PV requires it. \
              Set `entry_price` to the trade fill, or remove the position from valuation.",
             future.id.as_str()
         ))
-    })
+    })?;
+    if !entry.is_finite() || entry <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "EquityIndexFuture '{}' entry_price must be finite and positive, got {entry}",
+            future.id
+        )));
+    }
+    Ok(entry)
 }
 
 fn entry_contracts(future: &EquityIndexFuture, entry_price: f64) -> f64 {
-    future.num_contracts(entry_price.max(1e-12))
+    future.num_contracts(entry_price)
 }
 
 pub(crate) fn price_quoted(

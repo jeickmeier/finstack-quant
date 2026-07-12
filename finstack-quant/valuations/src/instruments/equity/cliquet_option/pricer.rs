@@ -39,6 +39,10 @@ impl CliquetOptionMcPricer {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<finstack_quant_core::money::Money> {
+        inst.validate()?;
+        if as_of > inst.expiry {
+            return Ok(Money::new(0.0, inst.notional.currency()));
+        }
         let spot_scalar = curves.get_price(&inst.spot_id)?;
         let initial_spot = match spot_scalar {
             finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
@@ -103,7 +107,7 @@ impl CliquetOptionMcPricer {
         // All periods observed: the payoff is fully determined; discount the
         // known cashflow from the contract expiry.
         if future_resets.is_empty() {
-            if as_of >= inst.expiry {
+            if as_of > inst.expiry {
                 return Ok(Money::new(0.0, inst.notional.currency()));
             }
             let total_return = match inst.payoff_type {
@@ -114,7 +118,11 @@ impl CliquetOptionMcPricer {
                 .max(inst.global_floor)
                 .min(inst.global_cap)
                 .max(0.0);
-            let df = disc_curve.df_between_dates(as_of, inst.expiry)?;
+            let df = if as_of == inst.expiry {
+                1.0
+            } else {
+                disc_curve.df_between_dates(as_of, inst.expiry)?
+            };
             return Ok(Money::new(
                 clamped * inst.notional.amount() * df,
                 inst.notional.currency(),

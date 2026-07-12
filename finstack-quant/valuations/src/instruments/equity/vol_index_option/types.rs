@@ -270,6 +270,11 @@ impl VolatilityIndexOption {
     /// - `contract_specs.multiplier` is non-positive or non-finite
     /// - `settlement_date` is set but earlier than `expiry`
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "VolatilityIndexOption supports European exercise only".to_string(),
+            ));
+        }
         if !self.strike.is_finite() || self.strike <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "VolatilityIndexOption strike must be finite and positive, got {}",
@@ -534,6 +539,10 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Volatilit
 impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexOption {
     impl_instrument_base!(crate::pricer::InstrumentType::VolatilityIndexOption);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn base_value(
         &self,
         curves: &MarketContext,
@@ -548,6 +557,10 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexOpti
 
     fn effective_start_date(&self) -> Option<Date> {
         None
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.effective_settlement_date())
     }
 
     fn pricing_overrides_mut(

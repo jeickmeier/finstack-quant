@@ -58,8 +58,9 @@ impl MetricCalculator for Correlation01Calculator {
         option_down.correlation = rho - half_bump;
         let pv_down = option_down.value(&context.curves, as_of)?.amount();
 
-        // Per absolute 1.0 correlation; multiply by bump_sizes::CORRELATION
-        // outside if a per-1% number is wanted.
-        Ok((pv_up - pv_down) / (2.0 * half_bump))
+        // Report the PV change for one correlation percentage point.  Near a
+        // boundary the actual bump can be smaller, so recover the local
+        // derivative and rescale it to the public one-point unit.
+        Ok((pv_up - pv_down) / (2.0 * half_bump) * bump_sizes::CORRELATION)
     }
 }

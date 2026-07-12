@@ -5,7 +5,9 @@
 //! scheme.
 
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::equity::equity_option::pricer::collect_inputs_extended;
+use crate::instruments::equity::equity_option::pricer::{
+    collect_inputs_extended, require_european,
+};
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::models::closed_form::heston::HestonParams as ClosedFormHestonParams;
 use crate::pricer::{
@@ -199,6 +201,13 @@ impl Pricer for EquityOptionHestonMcPricer {
             .ok_or_else(|| {
                 PricingError::type_mismatch(InstrumentType::EquityOption, instrument.key())
             })?;
+        require_european(equity_option, "Heston Monte Carlo").map_err(|e| {
+            PricingError::model_failure_with_context(
+                e.to_string(),
+                PricingErrorContext::from_instrument(equity_option)
+                    .model(ModelKey::MonteCarloHeston),
+            )
+        })?;
 
         let (pv, stderr) = self
             .price_internal(equity_option, market, as_of)

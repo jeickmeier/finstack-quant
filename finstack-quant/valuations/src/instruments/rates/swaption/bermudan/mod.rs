@@ -367,16 +367,6 @@ impl BermudanSwaptionPricer {
             ));
         }
 
-        // Get discount curve
-        let disc = market
-            .get_discount(swaption.discount_curve_id.as_str())
-            .map_err(|e| {
-                PricingError::missing_market_data_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-
         // Calculate time to maturity
         let ttm = swaption.time_to_maturity(as_of).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
@@ -390,6 +380,33 @@ impl BermudanSwaptionPricer {
                 Money::new(0.0, swaption.notional.currency()),
             ));
         }
+
+        // Once the last exercise date has passed there is no remaining
+        // optionality.  Treat the instrument as settled rather than
+        // calibrating a tree with an empty exercise grid (which previously
+        // produced a misleading model failure and required market data for a
+        // position that had already expired).
+        let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+        if exercise_times.is_empty() {
+            return Ok(ValuationResult::stamped(
+                swaption.id.as_str(),
+                as_of,
+                Money::new(0.0, swaption.notional.currency()),
+            ));
+        }
+
+        // Get discount curve only after lifecycle checks so a post-exercise
+        // valuation does not fail because an otherwise unused curve is absent.
+        let disc = market
+            .get_discount(swaption.discount_curve_id.as_str())
+            .map_err(|e| {
+                PricingError::missing_market_data_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         // Use pre-calibrated model if available, otherwise calibrate a new one
         let (pv, used_cached_model) =
@@ -416,12 +433,6 @@ impl BermudanSwaptionPricer {
                 self.enforce_resolved_hw_params(swaption, hw_params, hw_source)?;
                 // Thread exercise dates into the tree grid so Bermudan exercise
                 // decisions land exactly on grid points.
-                let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
                 let tree_steps = self.effective_tree_steps(swaption);
                 let model = CalibratedHullWhiteModel::calibrate_with_times(
                     hw_params,
@@ -490,16 +501,6 @@ impl BermudanSwaptionPricer {
             ));
         }
 
-        // Get discount curve
-        let disc = market
-            .get_discount(swaption.discount_curve_id.as_str())
-            .map_err(|e| {
-                PricingError::missing_market_data_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
-
         // Calculate time to maturity
         let ttm = swaption.time_to_maturity(as_of).map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
@@ -514,21 +515,30 @@ impl BermudanSwaptionPricer {
             ));
         }
 
+        let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+        if exercise_times.is_empty() {
+            return Ok(ValuationResult::stamped(
+                swaption.id.as_str(),
+                as_of,
+                Money::new(0.0, swaption.notional.currency()),
+            ));
+        }
+
+        let disc = market
+            .get_discount(swaption.discount_curve_id.as_str())
+            .map_err(|e| {
+                PricingError::missing_market_data_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+
         let (hw_params, hw_source) = self.effective_hw_params(swaption, market, ttm)?;
         self.enforce_resolved_hw_params(swaption, hw_params, hw_source)?;
 
         // Get exercise times in years
-        let exercise_times = swaption.exercise_times(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-
-        if exercise_times.is_empty() {
-            return Err(PricingError::model_failure_with_context(
-                "No valid exercise dates for Bermudan swaption".to_string(),
-                PricingErrorContext::default(),
-            ));
-        }
-
         // Filter exercise times to be within [0, ttm]
         let valid_exercise_times: Vec<f64> = exercise_times
             .into_iter()

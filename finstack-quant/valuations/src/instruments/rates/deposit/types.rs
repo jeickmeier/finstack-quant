@@ -228,11 +228,16 @@ impl DepositBuilder {
 impl crate::instruments::common_impl::traits::Instrument for Deposit {
     impl_instrument_base!(crate::pricer::InstrumentType::Deposit);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn base_value(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        self.validate()?;
         crate::instruments::common_impl::helpers::schedule_pv_using_curve_dc(
             self,
             curves,

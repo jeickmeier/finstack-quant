@@ -180,6 +180,18 @@ impl CommoditySpreadOption {
                 self.correlation
             )));
         }
+        if !self.strike.is_finite() || self.strike <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CommoditySpreadOption strike must be finite and positive, got {}",
+                self.strike
+            )));
+        }
+        if !self.notional.is_finite() || self.notional <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CommoditySpreadOption notional must be finite and positive, got {}",
+                self.notional
+            )));
+        }
         Ok(())
     }
 }
@@ -195,6 +207,10 @@ impl CurveDependencies for CommoditySpreadOption {
 
 impl Instrument for CommoditySpreadOption {
     impl_instrument_base!(crate::pricer::InstrumentType::CommoditySpreadOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76
@@ -227,6 +243,10 @@ impl Instrument for CommoditySpreadOption {
 
     fn effective_start_date(&self) -> Option<Date> {
         None
+    }
+
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
     }
 
     fn pricing_overrides_mut(

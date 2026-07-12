@@ -279,6 +279,10 @@ impl FxSwap {
 impl crate::instruments::common_impl::traits::Instrument for FxSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::FxSwap);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<
@@ -298,6 +302,8 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         use super::pricing_helper::FxSwapPricingContext;
+
+        self.validate()?;
 
         // Validate date ordering
         if self.near_date > self.far_date {

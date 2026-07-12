@@ -183,6 +183,12 @@ pub struct FxTouchOption {
     /// Option expiry date
     #[schemars(with = "String")]
     pub expiry: Date,
+    /// First date on which barrier monitoring is active. When set, a live
+    /// valuation after this date requires `observed_touch`.
+    #[builder(optional)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub monitoring_start_date: Option<Date>,
     /// Day count convention
     pub day_count: DayCount,
     /// Domestic currency discount curve ID
@@ -256,6 +262,14 @@ impl FxTouchOption {
                 actual: self.payout_amount.currency(),
             });
         }
+        if let Some(start) = self.monitoring_start_date {
+            if start > self.expiry {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "FxTouchOption monitoring_start_date ({start}) must not be after expiry ({})",
+                    self.expiry
+                )));
+            }
+        }
         Ok(())
     }
 
@@ -292,6 +306,10 @@ impl FxTouchOption {
 
 impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
     impl_instrument_base!(crate::pricer::InstrumentType::FxTouchOption);
+
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
 
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::Black76

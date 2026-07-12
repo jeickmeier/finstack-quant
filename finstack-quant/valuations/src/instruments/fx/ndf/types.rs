@@ -851,6 +851,10 @@ impl crate::instruments::common_impl::traits::CurveDependencies for Ndf {
 impl crate::instruments::common_impl::traits::Instrument for Ndf {
     impl_instrument_base!(crate::pricer::InstrumentType::Ndf);
 
+    fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
+        self.validate()
+    }
+
     fn market_dependencies(
         &self,
     ) -> finstack_quant_core::Result<
@@ -869,6 +873,7 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
+        self.validate()?;
         // Reject economically impossible NDFs where the fixing date falls after
         // maturity. `Ndf::validate` enforces this at construction, but a direct
         // field assignment can bypass it; guarding here ensures the value path

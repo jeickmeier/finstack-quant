@@ -1,11 +1,11 @@
 //! FX Vega calculator for quanto options.
 //!
 //! Computes FX vega (FX volatility sensitivity) using a central finite
-//! difference: bump FX volatility surface up and down by an absolute amount,
-//! reprice, and return `(PV_up - PV_down) / (2 * bump)`.
+//! difference: bump FX volatility surface up and down by one vol point,
+//! reprice, and return the PV change for that one-point move.
 //!
 //! Vega is reported per 1 absolute volatility point (e.g. 20% -> 21%), matching
-//! [`bump_sizes::VOLATILITY`] semantics.
+//! the public `MetricId::FxVega` convention.
 //!
 //! # Note
 //!
@@ -52,6 +52,9 @@ impl MetricCalculator for FxVegaCalculator {
         let pv_up = option.value(&curves_up, as_of)?.amount();
         let pv_down = option.value(&curves_down, as_of)?.amount();
 
-        Ok((pv_up - pv_down) / (2.0 * bump))
+        // The scenarios are ±1 vol point.  Dividing by `2*bump` would return
+        // the derivative per unit volatility (100 vol points), not the cash
+        // P&L for the one-point move represented by this metric.
+        Ok((pv_up - pv_down) / 2.0)
     }
 }

@@ -31,6 +31,15 @@ impl MetricCalculator for AsianDeltaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let asian: &CommodityAsianOption = context.instrument_as()?;
 
+        let future_count = asian
+            .fixing_dates
+            .iter()
+            .filter(|date| **date > context.as_of)
+            .count();
+        if future_count == 0 {
+            return Ok(0.0);
+        }
+
         let bump_pct = crate::metrics::bump_sizes::SPOT; // 1% = 0.01
 
         // Get approximate forward price for bump_size calculation
@@ -87,6 +96,14 @@ pub(super) struct AsianVegaCalculator;
 impl MetricCalculator for AsianVegaCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let asian: &CommodityAsianOption = context.instrument_as()?;
+        let future_count = asian
+            .fixing_dates
+            .iter()
+            .filter(|date| **date > context.as_of)
+            .count();
+        if future_count == 0 {
+            return Ok(0.0);
+        }
 
         let vol_bump = crate::metrics::bump_sizes::VOLATILITY; // 1 vol point = 0.01
 

@@ -6,6 +6,7 @@
 
 use super::pricer::{
     collect_inputs_extended, option_currency, reject_future_discrete_dividends_for_stochastic_vol,
+    require_european,
 };
 use super::types::EquityOption;
 use crate::instruments::common_impl::parameters::OptionType;
@@ -75,6 +76,12 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
                     instrument.key(),
                 )
             })?;
+        require_european(equity_option, "Rough Heston Fourier").map_err(|e| {
+            crate::pricer::PricingError::model_failure_with_context(
+                e.to_string(),
+                crate::pricer::PricingErrorContext::from_instrument(equity_option),
+            )
+        })?;
 
         if as_of > equity_option.expiry {
             return Ok(crate::results::ValuationResult::stamped(

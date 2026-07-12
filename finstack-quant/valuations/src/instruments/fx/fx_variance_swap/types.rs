@@ -115,6 +115,41 @@ pub struct FxVarianceSwap {
 }
 
 impl FxVarianceSwap {
+    /// Validate static contract invariants shared by builders, JSON, and direct
+    /// instrument pricing.
+    pub fn validate(&self) -> Result<()> {
+        if self.base_currency == self.quote_currency {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxVarianceSwap base and quote currencies must differ".to_string(),
+            ));
+        }
+        if self.notional.currency() != self.quote_currency
+            || !self.notional.amount().is_finite()
+            || self.notional.amount() <= 0.0
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxVarianceSwap notional must be positive, finite, and in quote currency"
+                    .to_string(),
+            ));
+        }
+        if !self.strike_variance.is_finite() || self.strike_variance < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxVarianceSwap strike_variance must be finite and non-negative".to_string(),
+            ));
+        }
+        if self.start_date >= self.maturity {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxVarianceSwap start_date must precede maturity".to_string(),
+            ));
+        }
+        if self.observation_freq.count == 0 {
+            return Err(finstack_quant_core::Error::Validation(
+                "FxVarianceSwap observation frequency must be positive".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Create a canonical example FX variance swap (EUR/USD, 1Y).
     #[allow(clippy::expect_used)] // Example uses hardcoded valid values
     pub fn example() -> Self {
@@ -294,6 +329,10 @@ impl FxVarianceSwap {
 
 impl InstrumentTrait for FxVarianceSwap {
     impl_instrument_base!(crate::pricer::InstrumentType::FxVarianceSwap);
+
+    fn validate_invariants(&self) -> Result<()> {
+        self.validate()
+    }
 
     fn expiry(&self) -> Option<Date> {
         self.effective_settlement_date().ok()

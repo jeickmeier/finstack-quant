@@ -106,6 +106,10 @@ pub struct BermudanSwaptionCheyetteRoughPricer {
 struct SwapValueInputs {
     exercise_time: f64,
     swap_end_time: f64,
+    /// Curve-axis time corresponding to the valuation date. Simulation times
+    /// are relative to `as_of`, while discount curves are anchored at their
+    /// own base date.
+    as_of_curve_time: f64,
     period: f64,
     strike: f64,
     is_payer: bool,
@@ -119,7 +123,11 @@ impl BermudanSwaptionCheyetteRoughPricer {
     }
 
     /// Build the phi(t) forward curve as (time, rate) pairs from the discount curve.
-    fn build_phi_points(disc: &dyn Discounting, maturity: f64) -> Vec<(f64, f64)> {
+    fn build_phi_points(
+        disc: &dyn Discounting,
+        maturity: f64,
+        as_of_curve_time: f64,
+    ) -> Vec<(f64, f64)> {
         let num_points = 50;
         let dt = maturity / num_points as f64;
         let mut points = Vec::with_capacity(num_points + 1);
@@ -129,8 +137,8 @@ impl BermudanSwaptionCheyetteRoughPricer {
             let t = i as f64 * dt;
             // Instantaneous forward rate approximation: f(0,t) ~ -d/dt ln(P(0,t))
             let eps = 0.001_f64.min(dt * 0.5).max(1e-6);
-            let df_minus = disc.df((t - eps).max(0.0));
-            let df_plus = disc.df(t + eps);
+            let df_minus = disc.df(as_of_curve_time + (t - eps).max(0.0));
+            let df_plus = disc.df(as_of_curve_time + t + eps);
             let fwd = if df_minus > 1e-15 && df_plus > 1e-15 {
                 -(df_plus.ln() - df_minus.ln()) / (2.0 * eps)
             } else {
@@ -217,10 +225,9 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let n_periods = ((remaining / inputs.period).round() as usize).max(1);
         let actual_period = remaining / n_periods as f64;
 
-        // Market discount factor at the exercise date (curve origin for the
-        // reconstruction).  All absolute times are measured from `as_of` (0),
-        // consistent with `disc.df(.)`.
-        let df_cap_t = disc.df(inputs.exercise_time);
+        // Market discount factor at the exercise date. Simulation times are
+        // relative to `as_of`, while the curve is anchored at its own base.
+        let df_cap_t = disc.df(inputs.as_of_curve_time + inputs.exercise_time);
         if df_cap_t.abs() < 1e-15 {
             return 0.0;
         }
@@ -230,7 +237,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let mut df_end = 1.0;
         for j in 1..=n_periods {
             let t_j = inputs.exercise_time + j as f64 * actual_period;
-            let df_market_tj = disc.df(t_j);
+            let df_market_tj = disc.df(inputs.as_of_curve_time + t_j);
             let p_j = Self::reconstruct_bond(
                 kappa,
                 x_state,
@@ -267,6 +274,13 @@ impl BermudanSwaptionCheyetteRoughPricer {
         market: &MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> std::result::Result<(Money, f64), PricingError> {
+        let ttm = swaption.time_to_maturity(as_of).map_err(|e| {
+            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+        })?;
+        if ttm <= 0.0 {
+            return Ok((Money::new(0.0, swaption.notional.currency()), 0.0));
+        }
+
         let disc = market
             .get_discount(swaption.discount_curve_id.as_str())
             .map_err(|e| {
@@ -275,13 +289,6 @@ impl BermudanSwaptionCheyetteRoughPricer {
                     PricingErrorContext::default(),
                 )
             })?;
-
-        let ttm = swaption.time_to_maturity(as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
-        if ttm <= 0.0 {
-            return Ok((Money::new(0.0, swaption.notional.currency()), 0.0));
-        }
 
         // Guard: refuse uncalibrated defaults when enforcement is enabled (as
         // the pricer registry does).  kappa, eta, H, and rho fully determine
@@ -322,6 +329,20 @@ impl BermudanSwaptionCheyetteRoughPricer {
         let tenor_months = swaption.fixed_freq.months().unwrap_or(6) as f64;
         let period = tenor_months / 12.0;
 
+        let as_of_curve_time = disc
+            .day_count()
+            .signed_year_fraction(
+                disc.base_date(),
+                as_of,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
+
         // Exercise times
         let exercise_times = swaption
             .bermudan_schedule
@@ -338,7 +359,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
         }
 
         // Build Cheyette parameters
-        let phi_points = Self::build_phi_points(disc.as_ref(), swap_end_time);
+        let phi_points = Self::build_phi_points(disc.as_ref(), swap_end_time, as_of_curve_time);
 
         // Get base vol from vol surface (use ATM vol at midpoint expiry)
         let base_vol = match market.get_surface(swaption.vol_surface_id.as_str()) {
@@ -597,6 +618,7 @@ impl BermudanSwaptionCheyetteRoughPricer {
             let swap_value_inputs = SwapValueInputs {
                 exercise_time: ex_time,
                 swap_end_time,
+                as_of_curve_time,
                 period,
                 strike,
                 is_payer,
@@ -837,6 +859,7 @@ mod tests {
         let inputs = SwapValueInputs {
             exercise_time: 2.0,
             swap_end_time: 7.0,
+            as_of_curve_time: 0.0,
             period: 1.0,
             strike: 0.03,
             is_payer: true,
@@ -906,6 +929,7 @@ mod tests {
         let inputs = SwapValueInputs {
             exercise_time: 1.0,
             swap_end_time: 6.0,
+            as_of_curve_time: 0.0,
             period: 1.0,
             strike: 0.03,
             is_payer: true,

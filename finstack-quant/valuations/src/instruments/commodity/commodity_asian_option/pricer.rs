@@ -57,6 +57,27 @@ pub(crate) fn compute_pv(
         ));
     }
 
+    let future_count = inst
+        .fixing_dates
+        .iter()
+        .filter(|date| **date > as_of)
+        .count();
+    if future_count == 0 && t > 0.0 {
+        let disc_curve = market.get_discount(inst.discount_curve_id.as_str())?;
+        let average = match inst.averaging_method {
+            AveragingMethod::Arithmetic => hist_sum / total_fixings as f64,
+            AveragingMethod::Geometric => (hist_prod_log / total_fixings as f64).exp(),
+        };
+        let payoff = match inst.option_type {
+            OptionType::Call => (average - inst.strike).max(0.0),
+            OptionType::Put => (inst.strike - average).max(0.0),
+        };
+        return Ok(Money::new(
+            payoff * disc_curve.df_between_dates(as_of, inst.expiry)? * inst.quantity,
+            inst.underlying.currency,
+        ));
+    }
+
     // Handle expired / fully observed options
     if t <= 0.0 {
         let average = if hist_count > 0 {

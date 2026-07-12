@@ -22,6 +22,17 @@ use finstack_quant_core::Result;
 /// Trading days per year for equity options (market standard for theta calculations)
 const TRADING_DAYS_PER_YEAR: f64 = 252.0;
 
+/// Reject exercise styles that a selected model does not actually model.
+pub(crate) fn require_european(inst: &EquityOption, model: &str) -> Result<()> {
+    if !matches!(inst.exercise_style, ExerciseStyle::European) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{model} supports European EquityOption exercise only; got {:?}",
+            inst.exercise_style
+        )));
+    }
+    Ok(())
+}
+
 /// Present value using Black–Scholes; result currency is the instrument currency.
 pub(crate) fn compute_pv(
     inst: &EquityOption,
@@ -101,6 +112,12 @@ pub(crate) fn compute_pv(
                     }
                 })
                 .collect();
+            if exercise_times.is_empty() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option has no exercise dates remaining after valuation date"
+                        .to_string(),
+                ));
+            }
             tree.price_bermudan(&params, &exercise_times)?
         }
     };
@@ -600,6 +617,12 @@ pub(crate) fn compute_greeks(
                     }
                 })
                 .collect();
+            if exercise_times.is_empty() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Bermudan equity option has no exercise dates remaining after valuation date"
+                        .to_string(),
+                ));
+            }
 
             let price_fn =
                 |p: &OptionMarketParams| -> Result<f64> { tree.price_bermudan(p, &exercise_times) };
@@ -892,6 +915,14 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
                     instrument.key(),
                 )
             })?;
+
+        require_european(equity_option, "Heston Fourier").map_err(|e| {
+            crate::pricer::PricingError::model_failure_with_context(
+                e.to_string(),
+                crate::pricer::PricingErrorContext::from_instrument(equity_option)
+                    .model(crate::pricer::ModelKey::HestonFourier),
+            )
+        })?;
 
         if as_of > equity_option.expiry {
             return Ok(crate::results::ValuationResult::stamped(
