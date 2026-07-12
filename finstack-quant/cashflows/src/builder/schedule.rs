@@ -674,7 +674,13 @@ impl CashFlowSchedule {
     /// - `meta.issue_date` is unset
     /// - Currency mismatch between flows and notional
     pub fn outstanding_by_date(&self) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        let replay = self.replay_balances()?;
+        let issue = self.meta.issue_date.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "outstanding_by_date: schedule.meta.issue_date is required to identify the initial funding flow"
+                    .into(),
+            )
+        })?;
+        let replay = self.replay_balances(issue)?;
         let mut result = Vec::with_capacity(replay.len());
         for (idx, _, after) in replay {
             let date = self.flows[idx].date;
@@ -691,16 +697,11 @@ impl CashFlowSchedule {
 
     pub(crate) fn replay_balances(
         &self,
+        funding_anchor: Date,
     ) -> finstack_quant_core::Result<Vec<(usize, Money, Money)>> {
         if self.flows.is_empty() {
             return Ok(Vec::new());
         }
-        let issue = self.meta.issue_date.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "balance replay: schedule.meta.issue_date is required to identify the initial funding flow"
-                    .into(),
-            )
-        })?;
         let mut order: Vec<usize> = (0..self.flows.len()).collect();
         order.sort_by(|left, right| compare_flows(&self.flows[*left], &self.flows[*right]));
         let mut outstanding = self.notional.initial;
@@ -710,8 +711,12 @@ impl CashFlowSchedule {
         for idx in order {
             let flow = &self.flows[idx];
             let before = outstanding;
-            let is_initial_funding =
-                is_initial_funding_flow(flow, issue, initial_amount, initial_funding_skipped);
+            let is_initial_funding = is_initial_funding_flow(
+                flow,
+                funding_anchor,
+                initial_amount,
+                initial_funding_skipped,
+            );
             initial_funding_skipped |= is_initial_funding;
             apply_flow_to_outstanding(&mut outstanding, flow, is_initial_funding, true)?;
             replay.push((idx, before, outstanding));

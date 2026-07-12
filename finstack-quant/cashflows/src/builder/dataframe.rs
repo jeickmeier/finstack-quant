@@ -482,7 +482,18 @@ impl CashFlowSchedule {
         };
         let disc_dc_ctx = dc_ctx;
 
-        for (flow_index, outstanding_pre, _) in self.replay_balances()? {
+        // Builder schedules carry an explicit issue date. Directly constructed
+        // schedules remain supported by treating their earliest canonical flow
+        // date as the funding anchor, matching the historical DataFrame API.
+        let funding_anchor = self
+            .meta
+            .issue_date
+            .or_else(|| self.flows.iter().map(|flow| flow.date).min());
+        let Some(funding_anchor) = funding_anchor else {
+            return Ok(());
+        };
+
+        for (flow_index, outstanding_pre, _) in self.replay_balances(funding_anchor)? {
             let cf = &self.flows[flow_index];
 
             // Advance cursor past periods that end on or before this cashflow.
@@ -1089,9 +1100,20 @@ mod tests {
                 },
             )
             .expect("DataFrame with hazard curve");
-        assert_eq!(df.pvs[0], 0.0, "DefaultedNotional PV must be zero");
-        assert!((df.pvs[1] - 400.0).abs() < 1e-12);
-        assert!((df.pvs[2] - 25.0).abs() < 1e-12);
+        let pv_for = |kind| {
+            df.cf_types
+                .iter()
+                .position(|candidate| *candidate == kind)
+                .map(|index| df.pvs[index])
+                .expect("expected cashflow kind")
+        };
+        assert_eq!(
+            pv_for(CFKind::DefaultedNotional),
+            0.0,
+            "DefaultedNotional PV must be zero"
+        );
+        assert!((pv_for(CFKind::Recovery) - 400.0).abs() < 1e-12);
+        assert!((pv_for(CFKind::AccruedOnDefault) - 25.0).abs() < 1e-12);
 
         let canonical = schedule
             .pv_by_period(
