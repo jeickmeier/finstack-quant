@@ -335,6 +335,7 @@ run = "uv run python scripts/sync_instrument_schema_overrides.py"
 description = "Regenerate JSON Schema + ts-rs bindings; fail on diff"
 run = """
 cargo run --quiet -p finstack-quant-valuations --bin gen_schemas
+uv run python scripts/sync_instrument_schema_overrides.py
 cargo test --quiet -p finstack-quant-valuations --test integration --features ts_export -- --test-threads=1 schema::ts_export
 git diff --quiet finstack-quant/valuations/schemas/ finstack-quant-wasm/types/generated/ \
   || (echo 'Generated artifacts out of date. Run: mise run rust-gen-schemas && mise run wasm-gen-bindings'; exit 1)
