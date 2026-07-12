@@ -10,12 +10,29 @@ use finstack_quant_core::InputError;
 
 use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
-    adjust_period_accruals, build_dates, build_schedule_period, is_regular_period,
-    validate_unique_payment_dates, PeriodSchedule,
+    adjust_period_accruals, build_schedule_period, generate_periods, is_regular_period,
+    validate_unique_payment_dates,
 };
 use super::emission::compute_reset_date;
 
-pub use super::date_generation::SchedulePeriod;
+/// Accrual period with payment timing.
+///
+/// This is the canonical period type used across the cashflow builder and
+/// rates instruments. Fields not relevant in a given context remain at their
+/// defaults (`None` / `0.0`).
+#[derive(Debug, Clone, Copy)]
+pub struct SchedulePeriod {
+    /// Accrual start date (inclusive).
+    pub accrual_start: Date,
+    /// Accrual end date (exclusive boundary).
+    pub accrual_end: Date,
+    /// Payment date after applying payment lag.
+    pub payment_date: Date,
+    /// Optional reset/fixing date for floating legs.
+    pub reset_date: Option<Date>,
+    /// Accrual year fraction for the period (0.0 when not computed).
+    pub accrual_year_fraction: f64,
+}
 
 /// Parameters for building schedule periods.
 ///
@@ -80,22 +97,17 @@ fn enrich_period(
     Ok(period)
 }
 
-fn enrich_period_schedule(
-    schedule: PeriodSchedule,
+fn enrich_periods(
+    periods: Vec<SchedulePeriod>,
     params: &BuildPeriodsParams<'_>,
-) -> finstack_quant_core::Result<PeriodSchedule> {
+) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
     let cal = resolve_calendar_strict(params.calendar_id)?;
-    let periods = schedule
-        .periods
+    let periods = periods
         .into_iter()
         .map(|period| enrich_period(period, params, cal))
         .collect::<finstack_quant_core::Result<Vec<_>>>()?;
     validate_unique_payment_dates(&periods)?;
-    Ok(PeriodSchedule {
-        periods,
-        dates: schedule.dates,
-        first_or_last: schedule.first_or_last,
-    })
+    Ok(periods)
 }
 
 /// Build one canonical schedule period from explicit start and end dates.
@@ -158,15 +170,7 @@ pub fn build_single_period(
         params.payment_lag_days,
         cal,
     )?;
-    let payment_date = period.payment_date;
-    let schedule = PeriodSchedule {
-        periods: vec![period],
-        dates: vec![payment_date],
-        first_or_last: [payment_date].into_iter().collect(),
-    };
-    let mut enriched = enrich_period_schedule(schedule, &params)?
-        .periods
-        .into_iter();
+    let mut enriched = enrich_periods(vec![period], &params)?.into_iter();
     enriched
         .next()
         .ok_or_else(|| InputError::TooFewPoints.into())
@@ -221,7 +225,7 @@ pub fn build_single_period(
 pub fn build_periods(
     params: BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
-    let schedule = build_dates(
+    let periods = generate_periods(
         params.start,
         params.end,
         params.frequency,
@@ -231,7 +235,7 @@ pub fn build_periods(
         params.payment_lag_days,
         params.calendar_id,
     )?;
-    Ok(enrich_period_schedule(schedule, &params)?.periods)
+    enrich_periods(periods, &params)
 }
 
 #[cfg(test)]

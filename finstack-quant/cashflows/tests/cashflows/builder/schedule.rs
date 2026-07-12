@@ -66,22 +66,27 @@ fn linear_vs_step_parity() {
     let s1 = b1.build_with_curves(None).unwrap();
 
     // Step schedule equivalent
-    let sched = finstack_quant_cashflows::builder::date_generation::build_dates(
-        issue,
-        maturity,
-        Tenor::quarterly(),
-        StubKind::None,
-        BusinessDayConvention::Following,
-        false,
-        0,
-        "weekends_only",
+    let sched = finstack_quant_cashflows::builder::periods::build_periods(
+        finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+            start: issue,
+            end: maturity,
+            frequency: Tenor::quarterly(),
+            stub: StubKind::None,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only",
+            end_of_month: false,
+            day_count: DayCount::Act365F,
+            payment_lag_days: 0,
+            reset_lag_days: None,
+            adjust_accrual_dates: false,
+        },
     )
-    .unwrap()
-    .dates;
+    .unwrap();
     let delta = init.amount() / (sched.len()) as f64;
     let mut remaining = init.amount();
     let mut pairs: Vec<(Date, Money)> = Vec::new();
-    for &d in &sched {
+    for period in &sched {
+        let d = period.payment_date;
         remaining = (remaining - delta).max(0.0);
         pairs.push((d, Money::new(remaining, Currency::USD)));
     }

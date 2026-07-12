@@ -28,9 +28,8 @@ use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::calendar::resolve_calendar_strict;
-use super::date_generation::{
-    adjust_period_accruals, build_dates, index_period_schedule, SchedulePeriod,
-};
+use super::date_generation::{adjust_period_accruals, generate_periods, index_period_schedule};
+use super::periods::SchedulePeriod;
 use super::rate_helpers::ResolvedFloatingRateSpec;
 use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
@@ -114,15 +113,12 @@ impl DateWindow {
     }
 }
 
-/// Build dates and metadata using the date_generation module.
-///
-/// This helper wraps `date_generation::build_dates` / `build_dates` and
-/// extracts the `prev` map and `first_or_last` set required by the cashflow compiler.
-fn build_dates_with_meta(
+/// Build periods and compiler metadata using the private date generator.
+fn build_periods_with_meta(
     window: DateWindow,
     params: &ScheduleParams,
 ) -> finstack_quant_core::Result<ScheduleWithMeta> {
-    let mut schedule = build_dates(
+    let mut periods = generate_periods(
         window.start,
         window.end,
         params.freq,
@@ -138,11 +134,11 @@ fn build_dates_with_meta(
     // unadjusted accrual (the default).
     if params.adjust_accrual_dates {
         let cal = resolve_calendar_strict(&params.calendar_id)?;
-        for period in &mut schedule.periods {
+        for period in &mut periods {
             adjust_period_accruals(period, params.bdc, cal)?;
         }
     }
-    index_period_schedule(schedule)
+    index_period_schedule(periods, params.freq)
 }
 
 /// Compiled fixed-coupon schedule produced by [`compute_coupon_schedules`].
@@ -286,7 +282,7 @@ pub(super) fn build_fee_schedules(
                     adjust_accrual_dates: false,
                 };
                 let (dates, prev, _) =
-                    build_dates_with_meta(DateWindow::new(issue, maturity), &schedule)?;
+                    build_periods_with_meta(DateWindow::new(issue, maturity), &schedule)?;
                 if dates.is_empty() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "periodic fee ({bps} bps, {freq} on '{calendar_id}') produced an empty \
@@ -718,7 +714,7 @@ pub(super) fn compute_coupon_schedules(
         let split = select_payment_split(&payment_pieces, s, e)?;
 
         let (dates, prev, first_or_last) =
-            build_dates_with_meta(DateWindow::new(s, e), &chosen_coupon.schedule)?;
+            build_periods_with_meta(DateWindow::new(s, e), &chosen_coupon.schedule)?;
         if dates.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }

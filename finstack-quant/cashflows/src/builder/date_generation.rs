@@ -5,52 +5,16 @@
 //!
 //! ## Responsibilities
 //!
-//! - Generate period schedules with `build_dates` (strict validation)
-//! - Create `PeriodSchedule` with helper maps for previous date lookups
+//! - Generate skeletal periods for the canonical `build_periods` API
+//! - Create helper maps for compiler previous-date lookups
 //! - Apply business day adjustments using calendars
 
 use super::calendar::resolve_calendar_strict;
+use super::periods::SchedulePeriod;
 use finstack_quant_core::dates::{
     adjust, BusinessDayConvention, Date, DateExt, HolidayCalendar, ScheduleBuilder, StubKind,
     Tenor, TenorUnit,
 };
-
-/// Accrual period with payment timing.
-///
-/// This is the canonical period type used across the cashflow builder (schedule
-/// compilation) and rates instruments (enriched with reset dates and year
-/// fractions). Fields that are not relevant in a given context are left at
-/// their defaults (`None` / `0.0`).
-#[derive(Debug, Clone, Copy)]
-pub struct SchedulePeriod {
-    /// Accrual start date (inclusive).
-    pub accrual_start: Date,
-    /// Accrual end date (exclusive boundary).
-    pub accrual_end: Date,
-    /// Payment date after applying payment lag.
-    pub payment_date: Date,
-    /// Optional reset/fixing date for floating legs.
-    pub reset_date: Option<Date>,
-    /// Accrual year fraction for the period (0.0 when not computed).
-    pub accrual_year_fraction: f64,
-}
-
-/// Period schedule output with business day adjustment tracking.
-#[derive(Debug, Clone)]
-pub struct PeriodSchedule {
-    /// Generated accrual/payment periods.
-    pub periods: Vec<SchedulePeriod>,
-    /// Payment dates for each period.
-    pub dates: Vec<Date>,
-    /// Set of payment dates whose accrual period is irregular (a genuine stub).
-    ///
-    /// A period is regular when stepping one schedule tenor forward from its
-    /// accrual start (or backward from its accrual end) lands exactly on the
-    /// other boundary; all other periods are stubs. A vanilla bullet schedule
-    /// therefore has an empty set, while a short-front schedule contains only
-    /// the first payment date. See `is_regular_period`.
-    pub first_or_last: finstack_quant_core::HashSet<Date>,
-}
 
 /// Step `date` by `sign * tenor` using calendar-clamped month arithmetic.
 ///
@@ -154,7 +118,7 @@ pub(crate) fn build_schedule_period(
 }
 
 /// Payment-date indexed schedule: `(payment_dates, period_by_payment_date, stub_payment_dates)`.
-pub(crate) type IndexedPeriodSchedule = (
+pub(crate) type IndexedPeriods = (
     Vec<Date>,
     finstack_quant_core::HashMap<Date, SchedulePeriod>,
     finstack_quant_core::HashSet<Date>,
@@ -169,13 +133,15 @@ pub(crate) type IndexedPeriodSchedule = (
 /// `Following`, or a one-day stub adjacent to a holiday). A last-writer-wins
 /// map would silently drop one of the periods' coupons.
 pub(crate) fn index_period_schedule(
-    schedule: PeriodSchedule,
-) -> finstack_quant_core::Result<IndexedPeriodSchedule> {
-    let PeriodSchedule {
-        periods,
-        dates,
-        first_or_last,
-    } = schedule;
+    periods: Vec<SchedulePeriod>,
+    frequency: Tenor,
+) -> finstack_quant_core::Result<IndexedPeriods> {
+    let dates = periods.iter().map(|period| period.payment_date).collect();
+    let first_or_last = periods
+        .iter()
+        .filter(|period| !is_regular_period(period.accrual_start, period.accrual_end, frequency))
+        .map(|period| period.payment_date)
+        .collect();
     let mut period_map: finstack_quant_core::HashMap<Date, SchedulePeriod> =
         finstack_quant_core::HashMap::default();
     period_map.reserve(periods.len());
@@ -225,7 +191,7 @@ fn duplicate_payment_date_error(
     ))
 }
 
-/// Build a schedule between start/end with strict error handling.
+/// Generate skeletal periods between start/end with strict error handling.
 ///
 /// # Errors
 ///
@@ -235,30 +201,8 @@ fn duplicate_payment_date_error(
 /// - Business day adjustment fails
 /// - `payment_lag_days` is negative (payment lags are forward-only)
 ///
-/// # Example
-///
-/// ```rust
-/// use finstack_quant_core::dates::{Date, Tenor, BusinessDayConvention, StubKind, create_date};
-/// use finstack_quant_cashflows::builder::date_generation::build_dates;
-/// use time::Month;
-///
-/// let start = create_date(2025, Month::January, 15)?;
-/// let end = create_date(2025, Month::July, 15)?;
-/// let sched = build_dates(
-///     start,
-///     end,
-///     Tenor::quarterly(),
-///     StubKind::None,
-///     BusinessDayConvention::Following,
-///     false,
-///     0,
-///     "weekends_only",
-/// )?;
-/// assert!(sched.dates.len() >= 2);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
 #[allow(clippy::too_many_arguments)]
-pub fn build_dates(
+pub(crate) fn generate_periods(
     start: Date,
     end: Date,
     freq: Tenor,
@@ -267,7 +211,7 @@ pub fn build_dates(
     end_of_month: bool,
     payment_lag_days: i32,
     calendar_id: &str,
-) -> finstack_quant_core::Result<PeriodSchedule> {
+) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
     if payment_lag_days < 0 {
         return Err(finstack_quant_core::Error::Validation(format!(
             "payment_lag_days must be non-negative; got {payment_lag_days}"
@@ -283,35 +227,17 @@ pub fn build_dates(
     let dates = schedule.dates;
 
     if dates.len() < 2 {
-        return Ok(PeriodSchedule {
-            periods: Vec::new(),
-            dates: Vec::new(),
-            first_or_last: finstack_quant_core::HashSet::default(),
-        });
+        return Ok(Vec::new());
     }
 
     let mut periods = Vec::with_capacity(dates.len().saturating_sub(1));
-    let mut payment_dates = Vec::with_capacity(dates.len().saturating_sub(1));
-    let mut first_or_last = finstack_quant_core::HashSet::default();
 
     for window in dates.windows(2) {
         let period = build_schedule_period(window[0], window[1], bdc, payment_lag_days, cal)?;
-        // Tag genuine stub periods only: a period is a stub when its accrual
-        // span deviates from the schedule tenor. Positional first/last tagging
-        // mislabeled every regular first/last coupon as `CFKind::Stub` in the
-        // wire format .
-        if !is_regular_period(period.accrual_start, period.accrual_end, freq) {
-            first_or_last.insert(period.payment_date);
-        }
-        payment_dates.push(period.payment_date);
         periods.push(period);
     }
 
-    Ok(PeriodSchedule {
-        periods,
-        dates: payment_dates,
-        first_or_last,
-    })
+    Ok(periods)
 }
 
 #[cfg(test)]
@@ -325,8 +251,8 @@ mod tests {
     }
 
     #[test]
-    fn build_dates_errors_on_unknown_calendar() {
-        let res = build_dates(
+    fn generate_periods_errors_on_unknown_calendar() {
+        let res = generate_periods(
             d(2025, 1, 1),
             d(2025, 4, 1),
             Tenor::quarterly(),
@@ -341,7 +267,7 @@ mod tests {
 
     #[test]
     fn regular_schedule_has_no_stub_periods() {
-        let schedule = build_dates(
+        let periods = generate_periods(
             d(2025, 1, 15),
             d(2026, 1, 15),
             Tenor::semi_annual(),
@@ -353,16 +279,18 @@ mod tests {
         )
         .expect("schedule should build");
 
-        assert_eq!(schedule.periods.len(), 2);
+        assert_eq!(periods.len(), 2);
+        let (_, _, stubs) =
+            index_period_schedule(periods, Tenor::semi_annual()).expect("period index");
         assert!(
-            schedule.first_or_last.is_empty(),
+            stubs.is_empty(),
             "regular periods must not be tagged as stubs"
         );
     }
 
     #[test]
     fn short_front_stub_is_tagged() {
-        let schedule = build_dates(
+        let periods = generate_periods(
             d(2025, 1, 10),
             d(2026, 1, 15),
             Tenor::semi_annual(),
@@ -374,21 +302,19 @@ mod tests {
         )
         .expect("schedule should build");
 
-        let first = &schedule.periods[0];
+        let first = periods[0];
+        let (_, _, stubs) =
+            index_period_schedule(periods, Tenor::semi_annual()).expect("period index");
         assert!(
-            schedule.first_or_last.contains(&first.payment_date),
+            stubs.contains(&first.payment_date),
             "short-front stub must be tagged"
         );
-        assert_eq!(
-            schedule.first_or_last.len(),
-            1,
-            "only the genuine stub period is tagged"
-        );
+        assert_eq!(stubs.len(), 1, "only the genuine stub period is tagged");
     }
 
     #[test]
     fn negative_payment_lag_is_rejected() {
-        let res = build_dates(
+        let res = generate_periods(
             d(2025, 1, 1),
             d(2026, 1, 1),
             Tenor::quarterly(),
@@ -405,7 +331,7 @@ mod tests {
     fn duplicate_adjusted_payment_dates_are_rejected() {
         // Daily tenor across a weekend with Following: Sat and Sun both adjust
         // to Monday, colliding with the Sun->Mon period's payment date.
-        let schedule = build_dates(
+        let periods = generate_periods(
             d(2025, 1, 3), // Friday
             d(2025, 1, 6), // Monday
             Tenor::daily(),
@@ -417,7 +343,7 @@ mod tests {
         )
         .expect("raw schedule should build");
 
-        let res = super::index_period_schedule(schedule);
+        let res = super::index_period_schedule(periods, Tenor::daily());
         let err = res.expect_err("duplicate adjusted payment dates must error");
         assert!(
             err.to_string().contains("same payment date"),
@@ -427,7 +353,7 @@ mod tests {
 
     #[test]
     fn payment_lag_applies_after_business_day_adjustment() {
-        let schedule = build_dates(
+        let periods = generate_periods(
             d(2029, 5, 4),
             d(2030, 5, 4),
             Tenor::annual(),
@@ -439,6 +365,6 @@ mod tests {
         )
         .expect("schedule should build");
 
-        assert_eq!(schedule.periods[0].payment_date, d(2030, 5, 8));
+        assert_eq!(periods[0].payment_date, d(2030, 5, 8));
     }
 }

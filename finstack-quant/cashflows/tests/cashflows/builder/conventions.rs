@@ -151,27 +151,36 @@ fn test_bus_252_requires_calendar() {
 
 #[test]
 fn contractual_accrual_boundaries_are_not_business_day_adjusted() {
-    use finstack_quant_cashflows::builder::date_generation::build_dates;
-    use finstack_quant_core::dates::{BusinessDayConvention, StubKind, Tenor};
+    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 
-    let schedule = build_dates(
-        d(2024, 8, 31),
-        d(2025, 8, 31),
-        Tenor::annual(),
-        StubKind::None,
-        BusinessDayConvention::Following,
-        false,
-        0,
-        "weekends_only",
-    )
+    let periods = build_periods(BuildPeriodsParams {
+        start: d(2024, 8, 31),
+        end: d(2025, 8, 31),
+        frequency: Tenor::annual(),
+        stub: StubKind::None,
+        bdc: BusinessDayConvention::Following,
+        calendar_id: "weekends_only",
+        end_of_month: false,
+        day_count: DayCount::Act365F,
+        payment_lag_days: 0,
+        reset_lag_days: None,
+        adjust_accrual_dates: false,
+    })
     .expect("schedule should build");
 
-    assert_eq!(schedule.periods.len(), 1);
-    let period = schedule.periods[0];
+    assert_eq!(periods.len(), 1);
+    let period = periods[0];
     assert_eq!(period.accrual_start, d(2024, 8, 31));
     assert_eq!(period.accrual_end, d(2025, 8, 31));
     assert_eq!(period.payment_date, d(2025, 9, 1));
-    assert_eq!(schedule.dates, vec![d(2025, 9, 1)]);
+    assert_eq!(
+        periods
+            .iter()
+            .map(|period| period.payment_date)
+            .collect::<Vec<_>>(),
+        vec![d(2025, 9, 1)]
+    );
 }
 
 /// SOFR swap preset (ISDA 2006 §4.10 / ARRC conventions): accrual boundaries

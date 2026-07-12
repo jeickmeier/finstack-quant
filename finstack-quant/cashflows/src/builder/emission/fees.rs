@@ -337,7 +337,7 @@ pub fn emit_revolving_credit_fees(
 mod tests {
     use super::*;
     use crate::builder::compiler::PeriodicFee;
-    use crate::builder::date_generation::SchedulePeriod;
+    use crate::builder::periods::SchedulePeriod;
     use crate::builder::specs::{FeeAccrualBasis, FeeBase};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Tenor};

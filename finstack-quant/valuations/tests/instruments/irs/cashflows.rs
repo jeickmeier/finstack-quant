@@ -8,7 +8,7 @@
 //! - Cashflow schedule consistency
 
 use crate::finstack_quant_test_utils as test_utils;
-use finstack_quant_cashflows::builder::date_generation::build_dates;
+use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
@@ -836,16 +836,19 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
         .cashflow_schedule(&market, start)
         .expect("full schedule");
     // Expected schedule with payment_delay = 0 (no delay)
-    let expected = build_dates(
+    let expected = build_periods(BuildPeriodsParams {
         start,
         end,
-        Tenor::annual(),
-        StubKind::None,
-        BusinessDayConvention::ModifiedFollowing,
-        false,
-        0, // No payment delay
-        "weekends_only",
-    )
+        frequency: Tenor::annual(),
+        stub: StubKind::None,
+        bdc: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: "weekends_only",
+        end_of_month: false,
+        day_count: DayCount::Act360,
+        payment_lag_days: 0,
+        reset_lag_days: None,
+        adjust_accrual_dates: false,
+    })
     .expect("expected schedule");
     let first_payment = full_schedule
         .flows
@@ -860,7 +863,7 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
         .map(|cf| cf.date)
         .min()
         .expect("first payment");
-    assert_eq!(first_payment, expected.dates[0]);
+    assert_eq!(first_payment, expected[0].payment_date);
 }
 
 /// Test that explicit reset_lag_days: 0 is NOT overridden by convention defaults.

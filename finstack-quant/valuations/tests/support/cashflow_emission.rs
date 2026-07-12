@@ -39,7 +39,7 @@ mod accrual_context_tests {
         let mut prev_map = finstack_quant_core::HashMap::default();
         prev_map.insert(
             end,
-            crate::cashflow::builder::date_generation::SchedulePeriod {
+            crate::cashflow::builder::periods::SchedulePeriod {
                 accrual_start: start,
                 accrual_end: end,
                 payment_date: end,
@@ -118,7 +118,7 @@ mod accrual_context_tests {
         let mut prev_map = finstack_quant_core::HashMap::default();
         prev_map.insert(
             end,
-            crate::cashflow::builder::date_generation::SchedulePeriod {
+            crate::cashflow::builder::periods::SchedulePeriod {
                 accrual_start: start,
                 accrual_end: end,
                 payment_date: end,
@@ -182,7 +182,7 @@ mod accrual_context_tests {
         let mut prev_map = finstack_quant_core::HashMap::default();
         prev_map.insert(
             end,
-            crate::cashflow::builder::date_generation::SchedulePeriod {
+            crate::cashflow::builder::periods::SchedulePeriod {
                 accrual_start: start,
                 accrual_end: end,
                 payment_date: end,
@@ -296,15 +296,20 @@ mod credit_emission_tests {
         };
 
         // Generate coupon dates
-        let period_schedule = crate::cashflow::builder::date_generation::build_dates(
-            issue,
-            mat,
-            spec.freq,
-            spec.stub,
-            spec.bdc,
-            spec.end_of_month,
-            spec.payment_lag_days,
-            &spec.calendar_id,
+        let period_schedule = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: issue,
+                end: mat,
+                frequency: spec.freq,
+                stub: spec.stub,
+                bdc: spec.bdc,
+                calendar_id: &spec.calendar_id,
+                end_of_month: spec.end_of_month,
+                day_count: spec.dc,
+                payment_lag_days: spec.payment_lag_days,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )
         .expect("schedule should build");
 
@@ -341,15 +346,19 @@ mod credit_emission_tests {
 
         // Generate coupon on Oct 1 using reduced outstanding
         let mut period_map = finstack_quant_core::HashMap::default();
-        period_map.reserve(period_schedule.periods.len());
-        for p in &period_schedule.periods {
+        period_map.reserve(period_schedule.len());
+        for p in &period_schedule {
             period_map.insert(p.payment_date, *p);
         }
+        let payment_dates = period_schedule
+            .iter()
+            .map(|period| period.payment_date)
+            .collect();
         let schedule = (
             spec,
-            period_schedule.dates.clone(),
+            payment_dates,
             period_map,
-            period_schedule.first_or_last.clone(),
+            finstack_quant_core::HashSet::default(),
         );
         let mut coupons = Vec::new();
         let pik = emit_fixed_coupons_on(

@@ -47,7 +47,7 @@ fn bridge_builder_schedule_builds() {
 }
 
 #[test]
-fn bridge_date_generation_build_dates_works() {
+fn bridge_period_generation_works() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
     let maturity = Date::from_calendar_date(2026, Month::January, 15).expect("valid date");
     let params = ScheduleParams {
@@ -61,22 +61,24 @@ fn bridge_date_generation_build_dates_works() {
         adjust_accrual_dates: false,
     };
 
-    let dates = finstack_quant_cashflows::builder::date_generation::build_dates(
-        issue,
-        maturity,
-        params.freq,
-        params.stub,
-        params.bdc,
-        params.end_of_month,
-        params.payment_lag_days,
-        &params.calendar_id,
+    let periods = finstack_quant_cashflows::builder::periods::build_periods(
+        finstack_quant_cashflows::builder::periods::BuildPeriodsParams {
+            start: issue,
+            end: maturity,
+            frequency: params.freq,
+            stub: params.stub,
+            bdc: params.bdc,
+            calendar_id: &params.calendar_id,
+            end_of_month: params.end_of_month,
+            day_count: params.dc,
+            payment_lag_days: params.payment_lag_days,
+            reset_lag_days: None,
+            adjust_accrual_dates: params.adjust_accrual_dates,
+        },
     )
     .expect("bridge date generation should work");
 
-    assert!(
-        dates.dates.len() >= 2,
-        "expected issue+maturity date boundaries"
-    );
+    assert!(periods.len() >= 2, "expected multiple schedule periods");
 }
 
 #[test]

@@ -2,31 +2,50 @@
 //!
 //! Validates period generation for multi-period caps and floors.
 
-use finstack_quant_cashflows::builder::date_generation::build_dates;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+use finstack_quant_cashflows::builder::periods::{
+    build_periods, BuildPeriodsParams, SchedulePeriod,
+};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::Result;
 use time::macros::date;
+
+fn build_schedule(
+    start: Date,
+    end: Date,
+    frequency: Tenor,
+    bdc: BusinessDayConvention,
+) -> Result<Vec<SchedulePeriod>> {
+    build_periods(BuildPeriodsParams {
+        start,
+        end,
+        frequency,
+        stub: StubKind::None,
+        bdc,
+        calendar_id: "weekends_only",
+        end_of_month: false,
+        day_count: DayCount::Act360,
+        payment_lag_days: 0,
+        reset_lag_days: None,
+        adjust_accrual_dates: false,
+    })
+}
 
 #[test]
 fn test_quarterly_schedule_generation() -> Result<()> {
     let start = date!(2024 - 01 - 01);
     let end = date!(2025 - 01 - 01);
 
-    let schedule = build_dates(
+    let schedule = build_schedule(
         start,
         end,
         Tenor::quarterly(),
-        StubKind::None,
         BusinessDayConvention::ModifiedFollowing,
-        false,
-        0,
-        "weekends_only",
     )?;
 
     // Should have 4 quarterly periods
-    assert_eq!(schedule.periods.len(), 4, "Should have 4 quarterly periods");
-    assert_eq!(schedule.periods[0].accrual_start, start);
-    assert_eq!(schedule.periods.last().unwrap().accrual_end, end);
+    assert_eq!(schedule.len(), 4, "Should have 4 quarterly periods");
+    assert_eq!(schedule[0].accrual_start, start);
+    assert_eq!(schedule.last().unwrap().accrual_end, end);
     Ok(())
 }
 
@@ -35,23 +54,15 @@ fn test_semi_annual_schedule() -> Result<()> {
     let start = date!(2024 - 01 - 01);
     let end = date!(2026 - 01 - 01);
 
-    let schedule = build_dates(
+    let schedule = build_schedule(
         start,
         end,
         Tenor::semi_annual(),
-        StubKind::None,
         BusinessDayConvention::Following,
-        false,
-        0,
-        "weekends_only",
     )?;
 
     // 2 years semi-annual = 4 periods
-    assert_eq!(
-        schedule.periods.len(),
-        4,
-        "Should have 4 semi-annual periods"
-    );
+    assert_eq!(schedule.len(), 4, "Should have 4 semi-annual periods");
     Ok(())
 }
 
@@ -60,19 +71,15 @@ fn test_annual_schedule() -> Result<()> {
     let start = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
 
-    let schedule = build_dates(
+    let schedule = build_schedule(
         start,
         end,
         Tenor::annual(),
-        StubKind::None,
         BusinessDayConvention::Following,
-        false,
-        0,
-        "weekends_only",
     )?;
 
     // 5 years annual = 5 periods
-    assert_eq!(schedule.periods.len(), 5, "Should have 5 annual periods");
+    assert_eq!(schedule.len(), 5, "Should have 5 annual periods");
     Ok(())
 }
 
@@ -81,19 +88,15 @@ fn test_monthly_schedule() -> Result<()> {
     let start = date!(2024 - 01 - 01);
     let end = date!(2024 - 07 - 01);
 
-    let schedule = build_dates(
+    let schedule = build_schedule(
         start,
         end,
         Tenor::monthly(),
-        StubKind::None,
         BusinessDayConvention::Following,
-        false,
-        0,
-        "weekends_only",
     )?;
 
     // 6 months = 6 periods
-    assert_eq!(schedule.periods.len(), 6, "Should have 6 monthly periods");
+    assert_eq!(schedule.len(), 6, "Should have 6 monthly periods");
     Ok(())
 }
 
@@ -102,21 +105,17 @@ fn test_schedule_ordering() -> Result<()> {
     let start = date!(2024 - 01 - 01);
     let end = date!(2025 - 01 - 01);
 
-    let schedule = build_dates(
+    let schedule = build_schedule(
         start,
         end,
         Tenor::quarterly(),
-        StubKind::None,
         BusinessDayConvention::Following,
-        false,
-        0,
-        "weekends_only",
     )?;
 
     // Verify dates are in ascending order
-    for i in 1..schedule.dates.len() {
+    for i in 1..schedule.len() {
         assert!(
-            schedule.dates[i] > schedule.dates[i - 1],
+            schedule[i].payment_date > schedule[i - 1].payment_date,
             "Dates should be in ascending order"
         );
     }
@@ -128,26 +127,22 @@ fn test_period_coverage() -> Result<()> {
     let start = date!(2024 - 01 - 01);
     let end = date!(2025 - 01 - 01);
 
-    let schedule = build_dates(
+    let schedule = build_schedule(
         start,
         end,
         Tenor::quarterly(),
-        StubKind::None,
         BusinessDayConvention::Following,
-        false,
-        0,
-        "weekends_only",
     )?;
 
     // First period should start at start
     assert_eq!(
-        schedule.periods[0].accrual_start, start,
+        schedule[0].accrual_start, start,
         "First period should start at schedule start"
     );
 
     // Last period should end at end
     assert_eq!(
-        schedule.periods.last().unwrap().accrual_end,
+        schedule.last().unwrap().accrual_end,
         end,
         "Last period should end at schedule end"
     );
