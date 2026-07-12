@@ -281,10 +281,26 @@ pub(crate) fn lognormal_forecast_with_stream(
         );
     }
 
+    // A LogNormal level is non-negative by construction; a negative base would
+    // produce strictly negative "LogNormal" paths (mirror-lognormal), which
+    // contradicts the documented positivity and silently flips percentile
+    // meaning. Reject it rather than emit meaningless paths.
+    if base_value < 0.0 {
+        return Err(crate::error::Error::forecast(format!(
+            "LogNormal forecast requires a non-negative base value; got {base_value}. \
+             Use a Normal forecast for series that can go negative."
+        )));
+    }
+
     let mut rng = build_rng(p.seed, stream_id);
     let mut results = IndexMap::new();
     let mut prev = base_value;
-    let use_path = base_value.abs() > f64::EPSILON;
+    // Anchor the geometric walk at any strictly-positive base; a base of exactly
+    // zero uses the documented i.i.d. `exp(N(mean, std_dev))` fallback. Keying on
+    // `> 0.0` (rather than `abs() > f64::EPSILON`) removes the discontinuity where
+    // a rounding residue like 1e-17 vs 1e-15 produced forecasts orders of
+    // magnitude apart.
+    let use_path = base_value > 0.0;
 
     const EXP_CLAMP: f64 = 709.0;
 
@@ -375,7 +391,9 @@ pub(crate) fn record_independent_z_scores_for_mc(
         ForecastMethod::LogNormal => {
             let p = extract_distribution_params(params, "LogNormal")?;
             let entry = mc_z_cache.entry(node_id.clone()).or_default();
-            let use_path = base_value.abs() > f64::EPSILON;
+            // Must match `lognormal_forecast_with_stream`'s regime switch so the
+            // recorded Z-scores invert the same recurrence.
+            let use_path = base_value > 0.0;
             let mut prev = base_value;
             for pid in forecast_periods {
                 let v = *values.get(pid).ok_or_else(|| {
@@ -467,6 +485,24 @@ pub(crate) fn monte_carlo_correlated_series(
         ))
     })?;
 
+    // A zero-variance peer (e.g. std_dev = 0) records all-zero Z-scores. Mixing
+    // that into `z = rho·z_peer + sqrt(1-rho^2)·z_indep` would silently collapse
+    // the dependent node's shock variance from sigma^2 to (1-rho^2)·sigma^2 with
+    // no diagnostic. Reject it rather than produce badly understated tails.
+    if rho.abs() > 0.0
+        && !forecast_periods.is_empty()
+        && forecast_periods
+            .iter()
+            .all(|pid| peer_map.get(pid).copied() == Some(0.0))
+    {
+        return Err(Error::forecast(format!(
+            "Monte Carlo correlation peer '{peer_id}' has zero variance (e.g. std_dev = 0), so it \
+             cannot anchor the correlation for '{node_id}': the dependent node's shock variance \
+             would silently collapse to (1 - rho^2)·sigma^2. Give the peer a positive std_dev or \
+             remove the correlation."
+        )));
+    }
+
     let p = match method {
         ForecastMethod::Normal => extract_distribution_params(params, "Normal")?,
         ForecastMethod::LogNormal => extract_distribution_params(params, "LogNormal")?,
@@ -482,7 +518,10 @@ pub(crate) fn monte_carlo_correlated_series(
     let mut values = IndexMap::new();
     let mut z_out = IndexMap::new();
     let mut prev = base_value;
-    let use_path = matches!(method, ForecastMethod::LogNormal) && base_value.abs() > f64::EPSILON;
+    // Match the non-correlated LogNormal regime switch (`base > 0.0`, not an
+    // absolute-epsilon threshold) so both paths anchor the geometric walk
+    // identically.
+    let use_path = matches!(method, ForecastMethod::LogNormal) && base_value > 0.0;
 
     // Clamp kept in sync with `lognormal_forecast_with_stream`.
     const EXP_CLAMP: f64 = 709.0;

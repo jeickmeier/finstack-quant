@@ -105,6 +105,18 @@ pub(crate) fn apply_forecast_for_node(
 
     match spec.method {
         ForecastMethod::Normal | ForecastMethod::LogNormal => {
+            // Correlation (`correlation_with`) is a Monte Carlo-only feature;
+            // the single-run path produces independent draws. Warn loudly so a
+            // configured correlation is not silently ignored (which would make a
+            // one-run sanity check disagree with the MC output).
+            if let Some((peer, _rho)) = statistical::parse_correlation_params(&spec.params)? {
+                tracing::warn!(
+                    node = node_id,
+                    peer = peer.as_str(),
+                    "`correlation_with` is set but single-run evaluation ignores correlation \
+                     (only Monte Carlo honors it); this node's draws are independent here"
+                );
+            }
             let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
             let spec = ForecastSpec {
                 method: spec.method,

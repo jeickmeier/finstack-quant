@@ -19,9 +19,16 @@ use finstack_quant_core::expr::{Expr, ExprNode};
 use finstack_quant_core::math::ZERO_TOLERANCE;
 
 /// Offset a `PeriodId` by `offset` periods (positive = forward, negative = backward).
+///
+/// `max_steps` bounds the walk: stepping more than the available history can
+/// only reach a period with no data (which every caller maps to `NaN`), so the
+/// walk is clamped to `max_steps`. This prevents a pathological offset such as
+/// `lag(x, 2_000_000_000)` — capped only at `i32::MAX` upstream — from walking
+/// billions of `PeriodId::prev()` calls and effectively hanging evaluation.
 pub(crate) fn offset_period(
     period: PeriodId,
     offset: i32,
+    max_steps: usize,
     node_id: Option<&str>,
 ) -> Result<PeriodId> {
     if offset == 0 {
@@ -29,7 +36,7 @@ pub(crate) fn offset_period(
     }
 
     let mut result = period;
-    let steps = offset.unsigned_abs() as usize;
+    let steps = (offset.unsigned_abs() as usize).min(max_steps);
 
     for _ in 0..steps {
         result = if offset > 0 {
@@ -55,7 +62,12 @@ pub(crate) fn eval_lag(
         return evaluate_expr(&args[0], context, node_id);
     }
 
-    let target_period = offset_period(context.period_id, -lag_periods, node_id)?;
+    let target_period = offset_period(
+        context.period_id,
+        -lag_periods,
+        context.historical_results.len() + 1,
+        node_id,
+    )?;
 
     if let ExprNode::Column(node_name) = &args[0].node {
         if let Some(value) = get_historical_column_value(context, node_name, &target_period) {
@@ -107,7 +119,12 @@ pub(crate) fn eval_diff(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let target_period = offset_period(context.period_id, -lag_periods, node_id)?;
+    let target_period = offset_period(
+        context.period_id,
+        -lag_periods,
+        context.historical_results.len() + 1,
+        node_id,
+    )?;
 
     if let ExprNode::Column(node_name) = &args[0].node {
         let current_value = context.get_value(node_name)?;
@@ -161,7 +178,12 @@ pub(crate) fn eval_pct_change(
         return Ok(if v.is_finite() { 0.0 } else { f64::NAN });
     }
 
-    let target_period = offset_period(context.period_id, -lag_periods, node_id)?;
+    let target_period = offset_period(
+        context.period_id,
+        -lag_periods,
+        context.historical_results.len() + 1,
+        node_id,
+    )?;
 
     let (current_value, lagged_value) = if let ExprNode::Column(node_name) = &args[0].node {
         let current = context.get_value(node_name)?;
@@ -244,7 +266,12 @@ pub(crate) fn eval_growth_rate(
             return Ok(f64::NAN);
         }
 
-        let target_period = offset_period(context.period_id, -periods, node_id)?;
+        let target_period = offset_period(
+            context.period_id,
+            -periods,
+            context.historical_results.len() + 1,
+            node_id,
+        )?;
         if let Some(start_value) = get_historical_column_value(context, node_name, &target_period) {
             if start_value.abs() < ZERO_TOLERANCE {
                 tracing::warn!(
@@ -306,7 +333,12 @@ pub(crate) fn eval_shift(
         return Ok(f64::NAN);
     }
 
-    let target_period = offset_period(context.period_id, -shift_periods, node_id)?;
+    let target_period = offset_period(
+        context.period_id,
+        -shift_periods,
+        context.historical_results.len() + 1,
+        node_id,
+    )?;
 
     if let ExprNode::Column(node_name) = &args[0].node {
         if let Some(value) = get_historical_column_value(context, node_name, &target_period) {

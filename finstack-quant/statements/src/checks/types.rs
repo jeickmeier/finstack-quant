@@ -240,6 +240,7 @@ fn default_relative_tolerance() -> f64 {
 /// `materiality_threshold = 0.0`, `min_severity = Info`) are conservative
 /// — they fire on any sub-cent drift and surface every finding.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CheckConfig {
     /// Default **absolute** tolerance for equality comparisons, expressed in
     /// the same currency units as the node values being compared (e.g. 0.01

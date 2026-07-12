@@ -164,15 +164,27 @@ fn collect_identifiers_from_ast(
             // If ignoring lag, skip traversal for lag/shift functions
             // EXCEPT when the offset is a literal 0 (which means current-period dependency)
             if ignore_lag && (func == "lag" || func == "shift") {
-                // Check if second argument is literal 0 - if so, this is a current-period
-                // dependency and we should traverse the first argument
-                if args.len() >= 2 {
-                    if let StmtExpr::Literal(offset) = &args[1] {
-                        if *offset == 0.0 {
-                            // Zero offset means current period - traverse the first argument
-                            collect_identifiers_from_ast(&args[0], identifiers, ignore_lag);
+                // The lagged value (args[0]) is read from history, not the
+                // current period, so it is normally NOT a current-period
+                // dependency. Exceptions:
+                //   * a literal-0 offset reads args[0] in the current period;
+                //   * a dynamic (non-literal) offset could evaluate to 0, so
+                //     conservatively treat args[0] as a current-period dep.
+                match args.get(1) {
+                    Some(StmtExpr::Literal(offset)) if *offset == 0.0 => {
+                        collect_identifiers_from_ast(&args[0], identifiers, ignore_lag);
+                    }
+                    Some(StmtExpr::Literal(_)) => {}
+                    _ => {
+                        if let Some(first) = args.first() {
+                            collect_identifiers_from_ast(first, identifiers, ignore_lag);
                         }
                     }
+                }
+                // The offset expression and any further args ARE evaluated in
+                // the current period, so they are always dependencies.
+                for arg in args.iter().skip(1) {
+                    collect_identifiers_from_ast(arg, identifiers, ignore_lag);
                 }
                 return;
             }

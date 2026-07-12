@@ -212,8 +212,8 @@ impl Pcg64Rng {
     /// negligible for practical sample counts, but — unlike generators with
     /// explicitly partitioned counters (e.g. Philox) — there is no *hard*
     /// mathematical guarantee that two streams never share a state window.
-    /// Use `finstack_quant_core::math::random::PhiloxRng` when provable
-    /// non-overlap is required.
+    /// Use `finstack_quant_monte_carlo::rng::PhiloxRng` (a counter-based RNG
+    /// with `split(path_id)` substreams) when provable non-overlap is required.
     ///
     /// Note: `new_with_stream(seed, 0)` is not the same sequence as
     /// [`new(seed)`](Self::new); see the constructor docs.

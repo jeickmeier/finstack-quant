@@ -62,6 +62,13 @@ fn normalize_formula_aliases(
     ordered.sort_by_key(|id| std::cmp::Reverse(id.len()));
 
     for identifier in ordered {
+        // An identifier that is itself a defined node is never an alias for a
+        // different node: skip it. Otherwise a model with its own `sales` node
+        // (distinct from `revenue`) would have `sales` silently rewritten to
+        // `revenue` by the standard alias table.
+        if available_nodes.contains(&identifier) {
+            continue;
+        }
         let replacement = registry
             .normalize(&identifier)
             .or_else(|| registry.normalize_fuzzy(&identifier, available_nodes));
@@ -132,6 +139,24 @@ impl<State> ModelBuilder<State> {
     pub fn insert_node(&mut self, id: NodeId, spec: NodeSpec) -> &mut Self {
         self.nodes.insert(id, spec);
         self
+    }
+
+    /// Warn when a node-creating builder method would overwrite an existing
+    /// node with a fresh definition (silently discarding the prior values /
+    /// forecast / formula). The legitimate `value()` + `forecast()` mixed-node
+    /// pattern goes through the node-*modifying* methods, which do not call
+    /// this. `insert_node` is the explicit overwrite escape hatch.
+    fn warn_if_redefining(&self, node_id: &NodeId, method: &str) {
+        if self.nodes.contains_key(node_id) {
+            tracing::warn!(
+                node = node_id.as_str(),
+                method,
+                "node '{}' redefined by {}(); the previous definition is discarded. Use a \
+                 distinct id, or build a mixed node via value() + forecast().",
+                node_id.as_str(),
+                method
+            );
+        }
     }
 
     /// Return a read-only slice of the model's periods.
@@ -263,6 +288,7 @@ impl ModelBuilder<Ready> {
 
         let node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values_map);
 
+        self.warn_if_redefining(&node_id, "value");
         self.nodes.insert(node_id, node);
         self
     }
@@ -319,6 +345,7 @@ impl ModelBuilder<Ready> {
         let mut node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values_map);
         node.value_type = value_type;
 
+        self.warn_if_redefining(&node_id, "value_money");
         self.nodes.insert(node_id, node);
         self
     }
@@ -359,6 +386,7 @@ impl ModelBuilder<Ready> {
         let mut node = NodeSpec::new(node_id.clone(), NodeType::Value).with_values(values_map);
         node.value_type = Some(crate::types::NodeValueType::Scalar);
 
+        self.warn_if_redefining(&node_id, "value_scalar");
         self.nodes.insert(node_id, node);
         self
     }
@@ -406,6 +434,7 @@ impl ModelBuilder<Ready> {
 
         let node = NodeSpec::new(node_id.clone(), NodeType::Calculated).with_formula(formula);
 
+        self.warn_if_redefining(&node_id, "compute");
         self.nodes.insert(node_id, node);
         Ok(self)
     }
@@ -498,8 +527,12 @@ impl ModelBuilder<Ready> {
             // Set forecast on existing node
             node.forecast = Some(forecast_spec);
 
-            // Ensure node type is Mixed if it has a forecast
-            if matches!(node.node_type, NodeType::Value) {
+            // A node carrying a forecast must be Mixed so precedence resolves
+            // Value > Forecast > Formula. Upgrade both Value AND Calculated:
+            // leaving a Calculated node with a forecast would let the forecast
+            // override the formula in forecast periods while the node still
+            // claims to be formula-only.
+            if matches!(node.node_type, NodeType::Value | NodeType::Calculated) {
                 node.node_type = NodeType::Mixed;
             }
         } else {

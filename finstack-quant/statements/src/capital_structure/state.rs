@@ -57,6 +57,19 @@ pub struct CapitalStructureState {
     /// period's available-cash cap. Carried forward as a claim in the next
     /// period's amortization category and re-recorded if it remains unpaid.
     pub principal_shortfall: IndexMap<String, Money>,
+
+    /// Unpaid fee shortfall per instrument from the prior period's
+    /// available-cash cap. Carried forward as a claim in the next period's
+    /// *fee* category (kept separate from `interest_shortfall` so fee arrears
+    /// are not demoted into the interest rung) and re-recorded if unpaid.
+    pub fee_shortfall: IndexMap<String, Money>,
+
+    /// Net new funding (revolver draws + initial-exchange notional) per
+    /// instrument for the *current* period, computed by
+    /// `calculate_period_flows`. The waterfall consumes it to recover the
+    /// payable balance (`opening + funding`) and the draw-aware closing
+    /// balance. Overwritten each period; instruments with no draw record zero.
+    pub period_new_funding: IndexMap<String, Money>,
 }
 
 impl CapitalStructureState {
@@ -84,6 +97,15 @@ impl CapitalStructureState {
     /// Update closing balance for an instrument.
     pub fn set_closing_balance(&mut self, instrument_id: String, balance: Money) {
         self.closing_balances.insert(instrument_id, balance);
+    }
+
+    /// Net new funding recorded for an instrument in the current period,
+    /// defaulting to zero if not present.
+    pub fn get_period_new_funding(&self, instrument_id: &str, currency: Currency) -> Money {
+        self.period_new_funding
+            .get(instrument_id)
+            .copied()
+            .unwrap_or_else(|| Money::new(0.0, currency))
     }
 
     /// Advance state to next period: closing balances become opening balances.

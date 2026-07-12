@@ -19,6 +19,10 @@ pub(super) struct StagedInstrumentFlow {
     pub extra_principal: Money,
     /// Scheduled (contractual) principal payment
     pub scheduled_principal: Money,
+    /// Net new funding (revolver draws + initial-exchange notional) for this
+    /// period. The payable balance is `opening_balance + net_new_funding`, and
+    /// the period-close balance adds it back so in-period draws are preserved.
+    pub net_new_funding: Money,
     /// Cash coupon moved into the PIK bucket by the PIK toggle this period.
     /// Tracked so toggle-driven capitalization can be accumulated in
     /// `CapitalStructureState::cumulative_toggled_pik`.
@@ -36,13 +40,34 @@ pub(super) struct StagedInstrumentFlow {
 pub(super) fn apply_cash_cap_to_category<F>(
     staged: &mut [StagedInstrumentFlow],
     remaining_cash: &mut Money,
+    period_id: finstack_quant_core::dates::PeriodId,
+    category: &str,
+    warnings: &mut Vec<crate::evaluator::EvalWarning>,
     mut field: F,
 ) where
     F: FnMut(&mut StagedInstrumentFlow) -> &mut Money,
 {
     let planned: Vec<f64> = staged
         .iter_mut()
-        .map(|s| field(s).amount().max(0.0))
+        .map(|s| {
+            let amount = field(s).amount();
+            if amount < 0.0 {
+                // A negative outflow claim is neutralized to zero. Surface it:
+                // it usually signals an upstream sign-convention bug, and it
+                // silently changes the model's totals when a cash cap is active.
+                warnings.push(
+                    crate::evaluator::EvalWarning::CapitalStructureCashflowIgnored {
+                        period: period_id,
+                        kind: format!(
+                            "negative_{category}_neutralized(instrument={}, amount={amount:.4})",
+                            s.instrument_id
+                        ),
+                        cashflow_date: period_id.to_string(),
+                    },
+                );
+            }
+            amount.max(0.0)
+        })
         .collect();
     let allocations = allocate_pro_rata(&planned, remaining_cash);
     for (s, allocated) in staged.iter_mut().zip(allocations.into_iter()) {

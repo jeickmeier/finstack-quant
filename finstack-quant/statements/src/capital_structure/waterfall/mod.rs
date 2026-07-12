@@ -76,6 +76,15 @@ use payment_in_kind::{apply_pik_transitions, evaluate_pik_toggle, is_pik_enabled
 use payment_stack::{extra_principal_priority, priority_index, waterfall_currency};
 use period_close::update_cumulative_metrics;
 
+/// Money comparison tolerance for waterfall allocation, in currency units.
+///
+/// Allocation math is done in `f64`, so pro-rata splits leave sub-cent
+/// rounding residue. This tolerance (1e-6 ≈ a millionth of a unit) is compared
+/// against dollar magnitudes to decide whether a residual/shortfall is real;
+/// `f64::EPSILON` (~2.2e-16) is far too tight for that — any float residue
+/// would register as a genuine claim and be carried forward.
+const MONEY_TOLERANCE: f64 = 1e-6;
+
 /// Result of executing the waterfall for a single period.
 #[derive(Debug, Clone)]
 pub struct WaterfallPeriodResult {
@@ -148,6 +157,50 @@ pub fn execute_waterfall(
     contractual_flows: &IndexMap<String, CashflowBreakdown>,
 ) -> Result<WaterfallPeriodResult> {
     waterfall_spec.validate()?;
+
+    // A configured waterfall over zero instruments is a no-op, not an error: a
+    // staged model (waterfall defined before instruments are added, or all
+    // instruments matured / pre-issuance) should pass through rather than fail.
+    if contractual_flows.is_empty() {
+        return Ok(WaterfallPeriodResult {
+            flows: IndexMap::new(),
+            warnings: Vec::new(),
+            equity_distribution: None,
+        });
+    }
+
+    // Validate that configured sweep / PIK targets actually name a debt
+    // instrument. A typo (e.g. a trailing space) would otherwise silently
+    // disable the entire mechanism — no sweep, no PIK toggle — with no
+    // diagnostic, materially shifting IRRs.
+    if let Some(target) = waterfall_spec
+        .ecf_sweep
+        .as_ref()
+        .and_then(|s| s.target_instrument_id.as_ref())
+    {
+        if !contractual_flows.contains_key(target) {
+            return Err(crate::error::Error::build(format!(
+                "WaterfallSpec: `ecf_sweep.target_instrument_id` '{target}' does not match any \
+                 debt instrument; the sweep would be silently dropped. Check for typos or \
+                 trailing whitespace."
+            )));
+        }
+    }
+    if let Some(targets) = waterfall_spec
+        .pik_toggle
+        .as_ref()
+        .and_then(|p| p.target_instrument_ids.as_ref())
+    {
+        for target in targets {
+            if !contractual_flows.contains_key(target) {
+                return Err(crate::error::Error::build(format!(
+                    "WaterfallSpec: `pik_toggle.target_instrument_ids` entry '{target}' does not \
+                     match any debt instrument; that instrument would never PIK. Check for typos \
+                     or trailing whitespace."
+                )));
+            }
+        }
+    }
 
     let _span = tracing::info_span!(
         "statements.capital_structure.waterfall",
@@ -249,6 +302,12 @@ pub fn execute_waterfall(
     for (instrument_id, breakdown) in contractual_flows {
         let currency = breakdown.interest_expense_cash.currency();
         let opening_balance = state.get_opening_balance(instrument_id, currency);
+        let net_new_funding = state.get_period_new_funding(instrument_id, currency);
+        // The balance available to repay principal this period is the opening
+        // balance plus any in-period draws (a revolver can repay against cash it
+        // just drew). Used to cap principal so the available-cash pool is never
+        // over-deducted (see Step 5/6).
+        let payable_balance = (opening_balance.amount() + net_new_funding.amount()).max(0.0);
 
         let mut staged_breakdown = breakdown.clone();
         // Carry forward any unpaid interest/fee shortfall from the prior
@@ -258,7 +317,16 @@ pub fn execute_waterfall(
             .interest_shortfall
             .shift_remove(instrument_id.as_str())
         {
-            if shortfall.amount() > 0.0 && shortfall.currency() == currency {
+            // A currency mismatch here means a creditor's carried claim would be
+            // silently discarded. Instrument currency must not drift, so treat a
+            // mismatch as a hard error rather than dropping the claim.
+            if shortfall.amount() > 0.0 {
+                if shortfall.currency() != currency {
+                    return Err(crate::error::Error::currency_mismatch(
+                        currency,
+                        shortfall.currency(),
+                    ));
+                }
                 staged_breakdown.interest_expense_cash = staged_breakdown
                     .interest_expense_cash
                     .checked_add(shortfall)?;
@@ -268,16 +336,46 @@ pub fn execute_waterfall(
             .principal_shortfall
             .shift_remove(instrument_id.as_str())
         {
-            if shortfall.amount() > 0.0 && shortfall.currency() == currency {
+            if shortfall.amount() > 0.0 {
+                if shortfall.currency() != currency {
+                    return Err(crate::error::Error::currency_mismatch(
+                        currency,
+                        shortfall.currency(),
+                    ));
+                }
                 staged_breakdown.principal_payment =
                     staged_breakdown.principal_payment.checked_add(shortfall)?;
             }
         }
-        let scheduled_principal = staged_breakdown.principal_payment;
+        if let Some(shortfall) = state.fee_shortfall.shift_remove(instrument_id.as_str()) {
+            if shortfall.amount() > 0.0 {
+                if shortfall.currency() != currency {
+                    return Err(crate::error::Error::currency_mismatch(
+                        currency,
+                        shortfall.currency(),
+                    ));
+                }
+                staged_breakdown.fees = staged_breakdown.fees.checked_add(shortfall)?;
+            }
+        }
+        // Clamp scheduled principal to the payable balance so Step 5 never
+        // deducts more cash than can actually be applied (over-amortization or
+        // carried principal shortfalls can push the claim above the balance;
+        // paying more principal than is owed would destroy cash that should
+        // have flowed to equity).
+        let scheduled_principal = Money::new(
+            staged_breakdown
+                .principal_payment
+                .amount()
+                .clamp(0.0, payable_balance),
+            currency,
+        );
+        staged_breakdown.principal_payment = scheduled_principal;
         staged.push(StagedInstrumentFlow {
             instrument_id: instrument_id.clone(),
             breakdown: staged_breakdown,
             opening_balance,
+            net_new_funding,
             extra_principal: Money::new(0.0, currency),
             scheduled_principal,
             toggled_pik_moved: Money::new(0.0, currency),
@@ -361,7 +459,7 @@ pub fn execute_waterfall(
     // rounding residue may remain after the cascade.
     let mut residual = sweep_total - sweep_allocations.iter().sum::<f64>();
     for _ in 0..staged_len {
-        if residual <= f64::EPSILON {
+        if residual <= MONEY_TOLERANCE {
             break;
         }
         let remaining_capacity: f64 = staged
@@ -444,14 +542,24 @@ pub fn execute_waterfall(
         for priority in &waterfall_spec.priority_of_payments {
             match priority {
                 PaymentPriority::Fees => {
-                    apply_cash_cap_to_category(&mut staged, &mut remaining_cash, |s| {
-                        &mut s.breakdown.fees
-                    });
+                    apply_cash_cap_to_category(
+                        &mut staged,
+                        &mut remaining_cash,
+                        *_period_id,
+                        "fees",
+                        &mut warnings,
+                        |s| &mut s.breakdown.fees,
+                    );
                 }
                 PaymentPriority::Interest => {
-                    apply_cash_cap_to_category(&mut staged, &mut remaining_cash, |s| {
-                        &mut s.breakdown.interest_expense_cash
-                    });
+                    apply_cash_cap_to_category(
+                        &mut staged,
+                        &mut remaining_cash,
+                        *_period_id,
+                        "interest",
+                        &mut warnings,
+                        |s| &mut s.breakdown.interest_expense_cash,
+                    );
                 }
                 PaymentPriority::Amortization => {
                     let planned: Vec<f64> = staged
@@ -484,37 +592,64 @@ pub fn execute_waterfall(
             }
         }
 
-        // Per-instrument shortfall: planned − allocated for interest and
-        // fees. The unpaid debt service does not evaporate — it is added to
-        // accrued interest at close and carried as a claim in the next
-        // period's interest category.
+        // Per-instrument shortfall: planned − allocated. Unpaid debt service
+        // does not evaporate — it is carried as a claim in the next period.
+        // Interest and fees are tracked in *separate* buckets so a fee arrears
+        // re-enters the fee category (not demoted into interest, which ranks
+        // one rung lower and would also misclassify the accrual).
         for (idx, s) in staged.iter().enumerate() {
-            let unpaid = (planned_interest[idx]
-                - s.breakdown.interest_expense_cash.amount().max(0.0))
-                + (planned_fees[idx] - s.breakdown.fees.amount().max(0.0));
-            if unpaid > f64::EPSILON {
+            let unpaid_interest =
+                planned_interest[idx] - s.breakdown.interest_expense_cash.amount().max(0.0);
+            if unpaid_interest > MONEY_TOLERANCE {
                 let currency = s.breakdown.interest_expense_cash.currency();
-                shortfalls.insert(s.instrument_id.clone(), Money::new(unpaid, currency));
+                shortfalls.insert(
+                    s.instrument_id.clone(),
+                    Money::new(unpaid_interest, currency),
+                );
                 warnings.push(EvalWarning::CapitalStructureCashflowIgnored {
                     period: *_period_id,
                     kind: format!(
-                        "cash_shortfall(instrument={}, amount={unpaid:.4})",
+                        "interest_shortfall(instrument={}, amount={unpaid_interest:.4})",
                         s.instrument_id
                     ),
                     cashflow_date: _period_id.to_string(),
                 });
                 tracing::warn!(
                     instrument = s.instrument_id.as_str(),
-                    shortfall = unpaid,
+                    shortfall = unpaid_interest,
                     period = _period_id.to_string(),
-                    "Available cash insufficient for planned interest/fees; \
+                    "Available cash insufficient for planned interest; \
                      shortfall accrued and carried into the next period's interest claim."
+                );
+            }
+
+            let unpaid_fees = planned_fees[idx] - s.breakdown.fees.amount().max(0.0);
+            if unpaid_fees > MONEY_TOLERANCE {
+                let currency = s.breakdown.fees.currency();
+                shortfalls.insert(
+                    format!("fees::{}", s.instrument_id),
+                    Money::new(unpaid_fees, currency),
+                );
+                warnings.push(EvalWarning::CapitalStructureCashflowIgnored {
+                    period: *_period_id,
+                    kind: format!(
+                        "fee_shortfall(instrument={}, amount={unpaid_fees:.4})",
+                        s.instrument_id
+                    ),
+                    cashflow_date: _period_id.to_string(),
+                });
+                tracing::warn!(
+                    instrument = s.instrument_id.as_str(),
+                    shortfall = unpaid_fees,
+                    period = _period_id.to_string(),
+                    "Available cash insufficient for planned fees; \
+                     shortfall carried into the next period's fee claim."
                 );
             }
 
             let unpaid_principal =
                 planned_scheduled_principal[idx] - s.scheduled_principal.amount().max(0.0);
-            if unpaid_principal > f64::EPSILON {
+            if unpaid_principal > MONEY_TOLERANCE {
                 let currency = s.scheduled_principal.currency();
                 shortfalls.insert(
                     format!("principal::{}", s.instrument_id),
@@ -545,12 +680,14 @@ pub fn execute_waterfall(
     // --- Step 6: Period close ---
     //
     // For each instrument:
-    //   (a) principal_payment = scheduled + extra, capped at opening_balance.
-    //       If the cap truncates the sum, reduce `extra_principal` first
-    //       (discretionary sweep is netted before scheduled amortization is
-    //       reduced) so downstream accounting stays consistent.
-    //   (b) post_sweep_balance = opening - principal_payment (with a small
-    //       dust floor to avoid micro-residuals).
+    //   (a) principal_payment = scheduled + extra, capped at the payable
+    //       balance (opening + in-period draws). If the cap truncates the sum,
+    //       reduce `extra_principal` first (discretionary sweep is netted
+    //       before scheduled amortization) so downstream accounting stays
+    //       consistent.
+    //   (b) post_sweep_balance = opening + draws - principal_payment (with a
+    //       small dust floor to avoid micro-residuals). The draw term keeps a
+    //       revolver's in-period funding from being wiped at close.
     //   (c) PIK capitalization bookkeeping: the coupon was already moved into
     //       the PIK bucket in Step 4b when the toggle is active. The moved
     //       amount is accumulated into `state.cumulative_toggled_pik` so the
@@ -571,32 +708,39 @@ pub fn execute_waterfall(
             instrument_id,
             mut breakdown,
             opening_balance,
+            net_new_funding,
             extra_principal,
             scheduled_principal,
             toggled_pik_moved,
         } = s;
         let currency = breakdown.interest_expense_cash.currency();
 
-        // (a) Principal cap. `extra_principal` (the discretionary sweep
-        // bucket) is netted against the overshoot before scheduled
-        // amortization is reduced, so the aggregate `principal_payment` is
-        // never > opening_balance.
+        // (a) Principal cap. The payable balance is the opening balance plus
+        // any in-period draws (a revolver can repay against cash it just drew).
+        // `extra_principal` (the discretionary sweep bucket) is netted against
+        // any overshoot before scheduled amortization is reduced, so the
+        // aggregate `principal_payment` is never > payable_balance.
+        let payable_balance = (opening_balance.amount() + net_new_funding.amount()).max(0.0);
         let desired = scheduled_principal.checked_add(extra_principal)?;
-        let principal_payment = if desired.amount() > opening_balance.amount() {
-            opening_balance
+        let principal_payment = if desired.amount() > payable_balance {
+            Money::new(payable_balance, currency)
         } else {
             desired
         };
         breakdown.principal_payment = principal_payment;
 
-        let post_sweep_balance = opening_balance.checked_sub(principal_payment)?;
+        // (b) Post-payment balance = opening + draws - principal. Including the
+        // draw term is what preserves in-period funding: recomputing closing as
+        // `opening - principal` would silently wipe a revolver's new draws.
+        let post_pay_amount =
+            opening_balance.amount() + net_new_funding.amount() - principal_payment.amount();
         // Dust floor: collapse sub-cent residuals on full paydown. Currency
         // agnostic fallback; modelers in JPY should override via explicit
         // rounding upstream.
-        let post_sweep_balance = if post_sweep_balance.amount().abs() < 0.005 {
-            Money::new(0.0, post_sweep_balance.currency())
+        let post_sweep_balance = if post_pay_amount.abs() < 0.005 {
+            Money::new(0.0, currency)
         } else {
-            post_sweep_balance
+            Money::new(post_pay_amount, currency)
         };
         let fully_paid = post_sweep_balance.amount() == 0.0;
 
@@ -631,8 +775,8 @@ pub fn execute_waterfall(
             breakdown.accrued_interest = Money::new(0.0, currency);
         }
 
-        // Unpaid interest/fees from the available-cash cap accrue and are
-        // carried as a claim in the next period's interest category.
+        // Unpaid interest from the available-cash cap accrues and is carried as
+        // a claim in the next period's interest category.
         if let Some(shortfall) = shortfalls.get(instrument_id.as_str()) {
             breakdown.accrued_interest = breakdown.accrued_interest.checked_add(*shortfall)?;
             state
@@ -642,6 +786,13 @@ pub fn execute_waterfall(
         if let Some(shortfall) = shortfalls.get(format!("principal::{instrument_id}").as_str()) {
             state
                 .principal_shortfall
+                .insert(instrument_id.clone(), *shortfall);
+        }
+        // Unpaid fees are carried in their own bucket so they re-enter the fee
+        // category next period rather than being demoted into interest.
+        if let Some(shortfall) = shortfalls.get(format!("fees::{instrument_id}").as_str()) {
+            state
+                .fee_shortfall
                 .insert(instrument_id.clone(), *shortfall);
         }
 
@@ -1175,6 +1326,110 @@ mod tests {
         assert_eq!(tl.principal_payment.amount(), 30.0);
     }
 
+    // Regression (C4): over-amortization (scheduled principal > opening balance)
+    // must not destroy cash. Before the fix, Step 5 deducted the full planned
+    // scheduled principal from the available-cash pool while Step 6 clamped the
+    // paid principal to the opening balance, so `fees + interest + principal +
+    // equity` came out < available cash. This asserts strict conservation.
+    #[test]
+    fn test_over_amortization_conserves_available_cash() {
+        let period = PeriodId::quarter(2025, 1);
+        let available = 1_000.0;
+        let context = build_context(period, &[("cash_available", available)]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        // Scheduled principal (300) exceeds the opening balance (200).
+        breakdown.principal_payment = Money::new(300.0, Currency::USD);
+        contractual_flows.insert("TL-1".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        state
+            .opening_balances
+            .insert("TL-1".to_string(), Money::new(200.0, Currency::USD));
+
+        let waterfall = WaterfallSpec {
+            priority_of_payments: vec![
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+                PaymentPriority::Equity,
+            ],
+            available_cash_node: Some("cash_available".into()),
+            ecf_sweep: None,
+            pik_toggle: None,
+        };
+
+        let results = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect("waterfall should execute");
+
+        let tl = results.flows.get("TL-1").expect("TL-1");
+        // Principal is clamped to the opening balance (can't repay more than owed).
+        assert_eq!(tl.principal_payment.amount(), 200.0);
+        let equity = results.equity_distribution.expect("equity populated");
+        // Conservation: uses == sources.
+        let uses = tl.fees.amount()
+            + tl.interest_expense_cash.amount()
+            + tl.principal_payment.amount()
+            + equity.amount();
+        assert!(
+            (uses - available).abs() < 1e-6,
+            "waterfall must conserve cash: uses={uses} != available={available}"
+        );
+    }
+
+    // Regression (C5): a revolver with an in-period draw must keep the drawn
+    // balance at close. Before the fix, Step 6 recomputed closing as
+    // `opening - principal` (no draw term), wiping the draw to zero.
+    #[test]
+    fn test_revolver_in_period_draw_preserved_at_close() {
+        let period = PeriodId::quarter(2025, 1);
+        let context = build_context(period, &[]);
+
+        let mut contractual_flows: IndexMap<String, CashflowBreakdown> = IndexMap::new();
+        let mut breakdown = CashflowBreakdown::with_currency(Currency::USD);
+        // In-period repayment of 30k against a freshly-drawn balance.
+        breakdown.principal_payment = Money::new(30_000.0, Currency::USD);
+        contractual_flows.insert("REVOLVER".to_string(), breakdown);
+
+        let mut state = CapitalStructureState::new();
+        // Fully-swept revolver: opening balance is zero, but it draws 100k this
+        // period (net new funding recorded by the contractual pass).
+        state
+            .opening_balances
+            .insert("REVOLVER".to_string(), Money::new(0.0, Currency::USD));
+        state
+            .period_new_funding
+            .insert("REVOLVER".to_string(), Money::new(100_000.0, Currency::USD));
+
+        let waterfall = WaterfallSpec::default();
+
+        let results = execute_waterfall(
+            &period,
+            &context,
+            &waterfall,
+            &mut state,
+            &contractual_flows,
+        )
+        .expect("waterfall should execute");
+
+        let rev = results.flows.get("REVOLVER").expect("REVOLVER");
+        // closing = opening(0) + draws(100k) - principal(30k) = 70k.
+        assert_eq!(rev.debt_balance.amount(), 70_000.0);
+        assert_eq!(
+            state
+                .get_closing_balance("REVOLVER", Currency::USD)
+                .amount(),
+            70_000.0
+        );
+    }
+
     #[test]
     fn test_sweep_before_amortization_does_not_produce_negative_balance() {
         let period = PeriodId::quarter(2025, 1);
@@ -1638,10 +1893,13 @@ mod tests {
             .insert("TL-PIK".to_string(), Money::new(1_000.0, Currency::USD));
 
         // No MandatoryPrepayment/VoluntaryPrepayment/Sweep in the stack.
+        // (Amortization is listed because `available_cash_node` is set; it caps
+        // to zero here since the instrument has no scheduled principal.)
         let waterfall = WaterfallSpec {
             priority_of_payments: vec![
                 PaymentPriority::Fees,
                 PaymentPriority::Interest,
+                PaymentPriority::Amortization,
                 PaymentPriority::Equity,
             ],
             available_cash_node: Some("cash_available".into()),

@@ -5,7 +5,7 @@ use crate::bindings::core::dates::utils::py_to_date;
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::pandas_utils::{selected_table_to_dataframe, table_to_dataframe};
-use crate::errors::display_to_py;
+use crate::errors::{display_to_py, statements_to_py};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -142,6 +142,36 @@ impl PyStatementResult {
         self.inner.meta.warnings.len()
     }
 
+    /// Evaluation warnings as human-readable strings.
+    ///
+    /// Each entry is the debug form of an ``EvalWarning`` (division by zero,
+    /// non-finite value, skipped non-finite aggregate input, ignored
+    /// capital-structure cashflow, ...), so audit tooling can see *what* was
+    /// flagged rather than only a count.
+    #[getter]
+    fn warnings(&self) -> Vec<String> {
+        self.inner
+            .meta
+            .warnings
+            .iter()
+            .map(|w| format!("{w:?}"))
+            .collect()
+    }
+
+    /// Numeric mode stamped into the result envelope (policy visibility).
+    #[getter]
+    fn numeric_mode(&self) -> super::types::PyNumericMode {
+        super::types::PyNumericMode {
+            inner: self.inner.meta.numeric_mode,
+        }
+    }
+
+    /// Whether the evaluation ran in parallel (policy visibility).
+    #[getter]
+    fn parallel(&self) -> bool {
+        self.inner.meta.parallel
+    }
+
     /// Export to pandas long-format ``DataFrame``.
     ///
     /// Columns: ``node_id``, ``period``, ``value``, ``value_money``,
@@ -152,7 +182,7 @@ impl PyStatementResult {
     /// when full fixed-point precision is required.
     #[pyo3(text_signature = "($self)")]
     fn to_pandas_long<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = self.inner.to_table_long().map_err(display_to_py)?;
+        let table = self.inner.to_table_long().map_err(statements_to_py)?;
         selected_table_to_dataframe(
             py,
             &table,
@@ -172,7 +202,7 @@ impl PyStatementResult {
     /// Rows are node identifiers, columns are period identifiers.
     #[pyo3(text_signature = "($self)")]
     fn to_pandas_wide<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = self.inner.to_table_wide().map_err(display_to_py)?;
+        let table = self.inner.to_table_wide().map_err(statements_to_py)?;
         let df = table_to_dataframe(py, &table)?;
         df.call_method1("set_index", ("period_id",))?.getattr("T")
     }
@@ -235,7 +265,7 @@ impl PyEvaluator {
         let evaluator = &mut self.inner;
         let result = py
             .detach(|| evaluator.evaluate(model_inner))
-            .map_err(display_to_py)?;
+            .map_err(statements_to_py)?;
         Ok(PyStatementResult { inner: result })
     }
 
@@ -266,7 +296,7 @@ impl PyEvaluator {
         let evaluator = &mut self.inner;
         let result = py
             .detach(|| evaluator.evaluate_with_market(model_inner, market_inner, as_of))
-            .map_err(display_to_py)?;
+            .map_err(statements_to_py)?;
         Ok(PyStatementResult { inner: result })
     }
 }

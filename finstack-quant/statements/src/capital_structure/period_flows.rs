@@ -82,7 +82,7 @@ pub fn calculate_period_flows(
     toggled_pik_capitalized: Money,
     market_ctx: &MarketContext,
     as_of: Date,
-) -> Result<(CashflowBreakdown, Money, Vec<EvalWarning>)> {
+) -> Result<(CashflowBreakdown, Money, Money, Vec<EvalWarning>)> {
     let full_schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
     let currency = full_schedule.notional.initial.currency();
     if opening_balance.amount() != 0.0 && opening_balance.currency() != currency {
@@ -166,15 +166,35 @@ pub fn calculate_period_flows(
         adjusted_ratio.clamp(0.0, SCALE_CLAMP_MAX) + pik_part
     };
 
+    // Interest is accumulated as a *signed* per-period sum and booked as its
+    // net magnitude after the loop. Two-leg instruments (swaps) emit both legs
+    // into one schedule as opposite-signed `Fixed`/`FloatReset` flows; booking
+    // each leg's absolute value would double-count (report gross ≈ pay + receive
+    // instead of the net coupon). Single-leg loans emit positive-magnitude
+    // coupons, so netting-then-abs preserves their behavior exactly.
+    let mut net_interest_cash = 0.0_f64;
+
     // Extract flows that fall within this period
     for cf in &full_schedule.flows {
         if cf.date >= period.start && cf.date < period.end {
+            // Currency safety: every in-period flow must share the breakdown
+            // currency. Cross-currency instruments (e.g. xccy swaps) mix
+            // currencies in one schedule and require explicit FX, which this
+            // classifier does not perform. Reject rather than let `Money`
+            // arithmetic panic on a currency mismatch.
+            if cf.amount.currency() != currency {
+                return Err(crate::error::Error::currency_mismatch(
+                    currency,
+                    cf.amount.currency(),
+                ));
+            }
+
             let scaled_abs_value =
                 Money::new(cf.amount.amount().abs() * scale, cf.amount.currency());
 
             match cf.kind {
                 CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => {
-                    breakdown.interest_expense_cash += scaled_abs_value;
+                    net_interest_cash += cf.amount.amount() * scale;
                 }
                 CFKind::Amortization | CFKind::PrePayment | CFKind::RevolvingRepayment => {
                     breakdown.principal_payment += scaled_abs_value;
@@ -229,6 +249,9 @@ pub fn calculate_period_flows(
             }
         }
     }
+
+    // Book the net interest magnitude for the period (see `net_interest_cash`).
+    breakdown.interest_expense_cash = Money::new(net_interest_cash.abs(), currency);
 
     // Get closing balance from outstanding_by_date.
     // Find the most recent outstanding balance at or before period end.
@@ -331,7 +354,17 @@ pub fn calculate_period_flows(
     };
     breakdown.accrued_interest = Money::new(accrued_interest, currency);
 
-    Ok((breakdown, closing_balance, warnings))
+    // `net_new_funding` (revolver draws + initial-exchange notional in this
+    // period) is returned so the waterfall can recover the payable balance
+    // (`opening + funding`) and the draw-aware closing balance; without it the
+    // waterfall would recompute closing as `opening - principal` and silently
+    // wipe in-period draws.
+    Ok((
+        breakdown,
+        closing_balance,
+        Money::new(net_new_funding, currency),
+        warnings,
+    ))
 }
 
 #[cfg(test)]
@@ -390,7 +423,7 @@ mod tests {
         };
 
         let market_ctx = MarketContext::new();
-        let (breakdown, _, warnings) = calculate_period_flows(
+        let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(1_000_000.0, Currency::USD),
@@ -446,7 +479,7 @@ mod tests {
         };
 
         let market_ctx = MarketContext::new();
-        let (breakdown, closing_balance, warnings) = calculate_period_flows(
+        let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(0.0, Currency::USD),
@@ -495,7 +528,7 @@ mod tests {
         };
 
         let market_ctx = MarketContext::new();
-        let (breakdown, closing_balance, warnings) = calculate_period_flows(
+        let (breakdown, closing_balance, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(0.0, Currency::USD),
@@ -583,7 +616,7 @@ mod tests {
                 end,
                 is_actual: false,
             };
-            let (breakdown, closing, warnings) = calculate_period_flows(
+            let (breakdown, closing, _, warnings) = calculate_period_flows(
                 &instrument,
                 &period,
                 opening,
@@ -648,7 +681,7 @@ mod tests {
         let market_ctx = MarketContext::new();
         // Opening balance = scheduled 1.0M + 160k of toggle-capitalized PIK
         // (raw ratio 1.16, beyond the 1.10 clamp).
-        let (breakdown, _, warnings) = calculate_period_flows(
+        let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(1_160_000.0, Currency::USD),
@@ -669,7 +702,7 @@ mod tests {
         );
 
         // Without the toggled-PIK exclusion the same inputs are clamped.
-        let (clamped, _, clamp_warnings) = calculate_period_flows(
+        let (clamped, _, _, clamp_warnings) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(1_160_000.0, Currency::USD),
@@ -730,7 +763,7 @@ mod tests {
         };
 
         let market_ctx = MarketContext::new();
-        let (breakdown, closing, _) = calculate_period_flows(
+        let (breakdown, closing, _, _) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(0.0, Currency::USD),
@@ -796,7 +829,7 @@ mod tests {
         let market_ctx = MarketContext::new();
         // Stateful balance at half the schedule → interest-like flows scale
         // by 0.5, but commitment/facility fees must not.
-        let (breakdown, _, _) = calculate_period_flows(
+        let (breakdown, _, _, _) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(500_000.0, Currency::USD),
@@ -844,7 +877,7 @@ mod tests {
         };
 
         let market_ctx = MarketContext::new();
-        let (breakdown, _, warnings) = calculate_period_flows(
+        let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
             Money::new(100_000.0, Currency::USD),

@@ -98,8 +98,12 @@ pub fn validate_pik_toggle_spec(json: &str) -> Result<String, JsValue> {
 /// Evaluate a `FinancialModelSpec` and return the `StatementResult` JSON.
 #[wasm_bindgen(js_name = evaluateModel)]
 pub fn evaluate_model(model_json: &str) -> Result<String, JsValue> {
-    let model: finstack_quant_statements::FinancialModelSpec =
+    let mut model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
+    // Validate up-front so WASM rejects the same structurally-invalid specs
+    // (empty periods, invalid node ids) that the Python `from_json` path does;
+    // otherwise identical input diverges between the two bindings.
+    model.validate_semantics().map_err(to_js_err)?;
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let result = evaluator.evaluate(&model).map_err(to_js_err)?;
     serde_json::to_string(&result).map_err(to_js_err)
@@ -115,12 +119,14 @@ pub fn evaluate_model_with_market(
     market_json: &str,
     as_of: &str,
 ) -> Result<String, JsValue> {
-    let model: finstack_quant_statements::FinancialModelSpec =
+    let mut model: finstack_quant_statements::FinancialModelSpec =
         serde_json::from_str(model_json).map_err(to_js_err)?;
+    model.validate_semantics().map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    let format = time::format_description::well_known::Iso8601::DEFAULT;
-    let date = time::Date::parse(as_of, &format).map_err(to_js_err)?;
+    // Use the shared ISO date parser for a consistent `YYYY-MM-DD` grammar and
+    // error message across all wasm namespaces.
+    let date = crate::utils::parse_iso_date(as_of)?;
     let mut evaluator = finstack_quant_statements::evaluator::Evaluator::new();
     let result = evaluator
         .evaluate_with_market(&model, &market, date)
@@ -172,25 +178,15 @@ mod tests {
         assert!(round_trip.nodes.is_empty());
     }
 
-    #[cfg(target_arch = "wasm32")]
     #[test]
     fn validate_financial_model_json_rejects_empty_periods() {
-        let model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            assert!(
-                model.validate_semantics().is_err(),
-                "semantic validation should reject empty periods"
-            );
-        }
-        #[cfg(target_arch = "wasm32")]
-        {
-            let json = serde_json::to_string(&model).expect("model should serialize to JSON");
-            assert!(
-                validate_financial_model_json(&json).is_err(),
-                "semantic validation should reject empty periods"
-            );
-        }
+        // Test the Rust-level behavior natively (the previous cfg-gating made
+        // this compile out of `cargo test` and never run under wasm either).
+        let mut model = finstack_quant_statements::FinancialModelSpec::new("test", vec![]);
+        assert!(
+            model.validate_semantics().is_err(),
+            "semantic validation should reject empty periods"
+        );
     }
 
     #[test]

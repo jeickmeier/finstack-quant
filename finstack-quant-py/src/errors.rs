@@ -161,6 +161,30 @@ pub fn portfolio_to_py(e: finstack_quant_portfolio::Error) -> PyErr {
     }
 }
 
+/// Convert a `finstack_quant_statements::Error` into a Python exception.
+///
+/// Follows the binding error contract: lookup failures (missing node / data /
+/// registry metric) raise `KeyError`; core errors delegate to [`core_to_py`]
+/// (so e.g. a missing curve stays a `KeyError`); operational failures
+/// (I/O, serde, capital-structure, builder/index) raise `RuntimeError`; the
+/// remaining validation/argument errors raise `ValueError`. The full source
+/// chain is preserved via [`format_chain`].
+pub fn statements_to_py(e: finstack_quant_statements::Error) -> PyErr {
+    use finstack_quant_statements::Error as SErr;
+    match e {
+        SErr::Core(core) => core_to_py(core),
+        err @ (SErr::NodeNotFound(_) | SErr::MissingData(_) | SErr::Registry(_)) => {
+            PyKeyError::new_err(format_chain(&err))
+        }
+        err @ (SErr::Io(_)
+        | SErr::Serde(_)
+        | SErr::CapitalStructure(_)
+        | SErr::BuilderError(_)
+        | SErr::IndexError(_)) => PyRuntimeError::new_err(format_chain(&err)),
+        err => PyValueError::new_err(format_chain(&err)),
+    }
+}
+
 /// Convert any `Display`-able error into a Python `ValueError`.
 ///
 /// If the error implements `std::error::Error`, the full source chain is

@@ -205,29 +205,39 @@ fn infer_call_dimension(
         .collect::<Result<Vec<_>>>()?;
 
     match func {
+        // Dimension-preserving: the result carries the same units as its
+        // value-bearing argument(s). Includes same-unit transforms such as
+        // `diff` (difference of amounts), `std`/`rolling_std`/`ewm_std`
+        // (dispersion in the series' own units), and `min`/`max`/`median`.
         "abs" | "lag" | "shift" | "cumsum" | "cummin" | "cummax" | "rolling_mean"
-        | "rolling_sum" | "rolling_min" | "rolling_max" | "mean" | "sum" | "median" | "ttm"
-        | "ltm" | "ytd" | "qtd" | "fiscal_ytd" | "annualize" | "coalesce" => {
+        | "rolling_sum" | "rolling_min" | "rolling_max" | "mean" | "sum" | "min" | "max"
+        | "median" | "rolling_median" | "diff" | "std" | "rolling_std" | "ewm_mean" | "ewm_std"
+        | "ttm" | "ltm" | "ytd" | "qtd" | "fiscal_ytd" | "annualize" | "coalesce" => {
             combine_arg_dimensions(func, arg_dims)
         }
-        "min" | "max" => arg_dims
-            .into_iter()
-            .try_fold(Dimension::Unknown, |acc, dim| {
-                compatible_dimensions(func, acc, dim)
-            }),
-        "sign" | "diff" | "pct_change" | "cumprod" | "rolling_std" | "rolling_var"
-        | "rolling_median" | "rolling_count" | "ewm_mean" | "ewm_std" | "ewm_var" | "std"
-        | "var" | "rank" | "quantile" | "annualize_rate" | "growth_rate" => Ok(Dimension::Scalar),
+        // Genuinely scalar: ratios, counts, signs, and rates carry no currency
+        // unit regardless of input.
+        "sign" | "pct_change" | "cumprod" | "rolling_count" | "rank" | "quantile"
+        | "annualize_rate" | "growth_rate" => Ok(Dimension::Scalar),
+        // Everything else defers to `Unknown`. This deliberately includes the
+        // variance family (`var` / `rolling_var` / `ewm_var`), which yields
+        // squared units that this three-valued dimension system (Unknown /
+        // Scalar / Monetary) cannot represent — deferring neither falsely
+        // rejects nor falsely passes downstream combinations.
         _ => Ok(Dimension::Unknown),
     }
 }
 
 fn combine_arg_dimensions(context: &str, arg_dims: Vec<Dimension>) -> Result<Dimension> {
-    arg_dims
-        .into_iter()
-        .try_fold(Dimension::Unknown, |acc, dim| {
-            compatible_dimensions(context, acc, dim)
-        })
+    // Seed the fold with the FIRST argument's dimension rather than
+    // `Dimension::Unknown`. `Unknown` is absorbing in `compatible_dimensions`
+    // (`(Unknown, _) => Unknown`), so seeding with it would make the fold
+    // permanently `Unknown` and silently accept e.g. `min(usd, eur)`.
+    let mut iter = arg_dims.into_iter();
+    let Some(first) = iter.next() else {
+        return Ok(Dimension::Unknown);
+    };
+    iter.try_fold(first, |acc, dim| compatible_dimensions(context, acc, dim))
 }
 
 /// Compile binary operations.
@@ -272,14 +282,6 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
     let compiled_args: Result<Vec<_>> = args.iter().map(compile).collect();
     let compiled_args = compiled_args?;
 
-    // Handle min/max specially by transforming to nested conditionals
-    if func_name == "min" {
-        return compile_minmax_function(&compiled_args, true);
-    }
-    if func_name == "max" {
-        return compile_minmax_function(&compiled_args, false);
-    }
-
     // Map DSL function names to core Function enum
     let func = match func_name {
         "lag" => Some(Function::Lag),
@@ -310,6 +312,8 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
         "quantile" => Some(Function::Quantile),
         "sum" => Some(Function::Sum),
         "mean" => Some(Function::Mean),
+        "min" => Some(Function::Min),
+        "max" => Some(Function::Max),
         "ttm" | "ltm" => Some(Function::Ttm),
         "ytd" => Some(Function::Ytd),
         "qtd" => Some(Function::Qtd),
@@ -326,7 +330,7 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
     if let Some(f) = func {
         // Validate argument counts for custom functions
         match f {
-            Function::Sum | Function::Mean => {
+            Function::Sum | Function::Mean | Function::Min | Function::Max => {
                 if compiled_args.is_empty() {
                     return Err(crate::error::Error::eval(format!(
                         "{:?} requires at least one argument",
@@ -467,58 +471,6 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
     }
 }
 
-/// Compile min/max function by transforming to nested if-then-else.
-///
-/// # Syntax
-///
-/// For min: min(a, b) → if(a < b, a, b)
-/// For max: max(a, b) → if(a > b, a, b)
-///
-/// # NaN Handling
-///
-/// NaN values propagate through comparisons per IEEE 754:
-/// - For min: `NaN < x` is always `false`, so `min(NaN, x)` returns `x`
-/// - For max: `NaN > x` is always `false`, so `max(NaN, x)` returns `x`
-/// - The behavior depends on argument order
-///
-/// # Tie Behavior
-///
-/// When values are equal, the first value in argument order is returned.
-///
-/// # Arguments
-///
-/// * `args` - The compiled argument expressions
-/// * `use_min` - If true, compile as min (using Lt); if false, compile as max (using Gt)
-fn compile_minmax_function(args: &[Expr], use_min: bool) -> Result<Expr> {
-    let func_name = if use_min { "min" } else { "max" };
-
-    if args.is_empty() {
-        return Err(crate::error::Error::eval(format!(
-            "{}() requires at least 1 argument",
-            func_name
-        )));
-    }
-
-    if args.len() == 1 {
-        return Ok(args[0].clone());
-    }
-
-    let comparison_op = if use_min {
-        CoreBinOp::Lt
-    } else {
-        CoreBinOp::Gt
-    };
-
-    // Recursively build nested conditionals
-    let mut result = args[0].clone();
-    for arg in &args[1..] {
-        let condition = Expr::bin_op(comparison_op, result.clone(), arg.clone());
-        result = Expr::if_then_else(condition, result, arg.clone());
-    }
-
-    Ok(result)
-}
-
 /// Compile if-then-else expressions.
 fn compile_if_then_else(
     condition: &StmtExpr,
@@ -612,5 +564,24 @@ mod tests {
         let expr = compile(&ast);
 
         assert!(expr.is_ok());
+    }
+
+    // Regression (C8): `min`/`max` now compile to a single n-ary
+    // `Function::Min`/`Max` node rather than a nested if-then-else tree whose
+    // size doubled per argument (an O(2^n) memory-exhaustion DoS reachable from
+    // any inbound formula). A flat `min` over many arguments must compile to one
+    // small call node, not an exponential tree.
+    #[test]
+    fn test_minmax_compiles_to_single_narity_node_not_exponential_tree() {
+        let args = (0..40).map(|i| i.to_string()).collect::<Vec<_>>().join(",");
+        let formula = format!("min({args})");
+        let ast = parse_formula(&formula).expect("should parse");
+        let expr = compile(&ast).expect("should compile");
+        match &expr.node {
+            ExprNode::Call(Function::Min, call_args) => {
+                assert_eq!(call_args.len(), 40, "all 40 args preserved on one node");
+            }
+            other => panic!("expected a single Function::Min call node, got {other:?}"),
+        }
     }
 }

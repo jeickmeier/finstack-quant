@@ -24,15 +24,20 @@ pub fn validate_metric_definition(metric: &MetricDefinition, namespace: &str) ->
         ));
     }
 
-    // Validate ID contains only valid characters
-    if !metric
-        .id
-        .chars()
-        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
-    {
+    // Validate ID matches the DSL identifier grammar. Hyphens are intentionally
+    // excluded: the formula parser reads `roi-ttm` as the subtraction
+    // `roi - ttm`, so a hyphenated metric id would be unreferenceable (and
+    // invisible to dependency extraction). Allow only `[A-Za-z_][A-Za-z0-9_]*`.
+    let mut chars = metric.id.chars();
+    let valid = chars
+        .next()
+        .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_');
+    if !valid {
         return Err(Error::registry(format!(
-            "Invalid metric ID '{}': must contain only alphanumeric characters, underscores, or hyphens. \
-             Example valid IDs: 'gross_margin', 'debt_to_equity', 'roi-ttm'",
+            "Invalid metric ID '{}': must start with a letter or underscore and contain only \
+             letters, digits, or underscores (matching the DSL identifier grammar). \
+             Example valid IDs: 'gross_margin', 'debt_to_equity', 'roi_ttm'",
             metric.id
         )));
     }

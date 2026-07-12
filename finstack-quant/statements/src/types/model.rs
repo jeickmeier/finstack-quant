@@ -153,6 +153,14 @@ impl FinancialModelSpec {
                             node_id
                         )));
                     }
+                    if node.forecast.is_some() {
+                        return Err(Error::build(format!(
+                            "Calculated node '{}' cannot have a forecast — use Mixed type (a \
+                             Calculated node is formula-only; a forecast would override the \
+                             formula in forecast periods)",
+                            node_id
+                        )));
+                    }
                 }
                 NodeType::Mixed => {}
             }
@@ -211,10 +219,19 @@ impl FinancialModelSpec {
         match crate::evaluator::DependencyGraph::from_model(self) {
             Ok(graph) => graph.detect_cycles()?,
             Err(e) => {
-                tracing::debug!(
+                // The graph fails to build when a formula references an unknown
+                // identifier (which also means cycle detection is skipped for
+                // this model). This is tolerated rather than fatal because
+                // `with_builtin_metrics` intentionally registers `fin.*` metrics
+                // that reference user nodes which may not all be present. Surface
+                // it at `warn` (not `debug`) so a genuine typo — and the skipped
+                // cycle check — is visible rather than silent.
+                tracing::warn!(
                     model_id = %self.id,
                     error = %e,
-                    "Skipping cycle detection: dependency graph could not be built"
+                    "Skipping cycle detection: dependency graph could not be built \
+                     (a formula references an unknown identifier). Verify node references; \
+                     cycles will only be caught later, at evaluation."
                 );
             }
         }

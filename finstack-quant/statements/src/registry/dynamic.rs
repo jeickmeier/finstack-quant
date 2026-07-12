@@ -139,34 +139,41 @@ impl Registry {
             ));
         }
 
-        // Track namespace
-        self.namespaces.insert(namespace.clone());
-
         // Sort metrics by dependency order
         let sorted_metrics = self.sort_metrics_by_dependencies(&registry)?;
 
-        // Load each metric in dependency order
+        // Validate and stage into a local buffer first, committing to `self`
+        // only after the whole document passes. A failure part-way through must
+        // not leave the registry half-mutated (a stale namespace, or some
+        // metrics from a document that was rejected), which would otherwise
+        // produce spurious "Duplicate metric ID" errors on a corrected retry.
+        let mut staged: Vec<(String, StoredMetric)> = Vec::with_capacity(sorted_metrics.len());
         for metric in sorted_metrics {
-            // Validate metric
             validate_metric_definition(&metric, &namespace)?;
 
-            // Check for collisions
             let qualified_id = metric.qualified_id(&namespace);
-            if self.metrics.contains_key(&qualified_id) {
+            if self.metrics.contains_key(&qualified_id)
+                || staged.iter().any(|(id, _)| id == &qualified_id)
+            {
                 return Err(Error::registry(format!(
                     "Duplicate metric ID: '{}'. This metric is already registered in the registry.",
                     qualified_id
                 )));
             }
 
-            // Store metric
-            self.metrics.insert(
+            staged.push((
                 qualified_id,
                 StoredMetric {
                     namespace: namespace.clone(),
                     definition: metric,
                 },
-            );
+            ));
+        }
+
+        // Commit atomically.
+        self.namespaces.insert(namespace);
+        for (qualified_id, stored) in staged {
+            self.metrics.insert(qualified_id, stored);
         }
 
         Ok(())

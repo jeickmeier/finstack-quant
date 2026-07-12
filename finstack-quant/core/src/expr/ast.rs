@@ -421,6 +421,20 @@ pub enum Function {
     FiscalYtd,
     /// Return first non-NaN/non-zero value (coalesce).
     Coalesce,
+    /// Minimum of two or more values.
+    ///
+    /// Evaluated in the `statements` layer as an n-ary reducer. NaN handling
+    /// is order-dependent and follows IEEE 754 comparison semantics: with a
+    /// left-to-right fold of `if acc < arg { acc } else { arg }`, a leading
+    /// `NaN` is dropped in favor of a finite peer while a trailing `NaN`
+    /// propagates.
+    Min,
+    /// Maximum of two or more values.
+    ///
+    /// Evaluated in the `statements` layer as an n-ary reducer. NaN handling
+    /// is order-dependent and follows IEEE 754 comparison semantics (see
+    /// [`Function::Min`]).
+    Max,
     /// Absolute value helper (`abs(expr)`).
     Abs,
     /// Sign helper returning -1, 0, or 1 (`sign(expr)`).
@@ -457,6 +471,8 @@ impl Function {
                 | Function::AnnualizeRate
                 | Function::Coalesce
                 | Function::GrowthRate
+                | Function::Min
+                | Function::Max
         )
     }
 }
@@ -498,6 +514,8 @@ impl std::fmt::Display for Function {
             Self::Qtd => "qtd",
             Self::FiscalYtd => "fiscal_ytd",
             Self::Coalesce => "coalesce",
+            Self::Min => "min",
+            Self::Max => "max",
             Self::Abs => "abs",
             Self::Sign => "sign",
             Self::GrowthRate => "growth_rate",

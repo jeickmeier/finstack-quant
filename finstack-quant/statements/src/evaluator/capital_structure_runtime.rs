@@ -30,6 +30,14 @@ impl Evaluator {
             IndexMap::new();
 
         for debt_spec in &cs_spec.debt_instruments {
+            if instruments.contains_key(&debt_spec.id) {
+                return Err(crate::error::Error::build(format!(
+                    "capital structure: duplicate debt instrument id '{}'. Instrument ids must \
+                     be unique; a duplicate would silently overwrite the earlier definition and \
+                     understate debt service.",
+                    debt_spec.id
+                )));
+            }
             let instrument = integration::build_any_instrument_from_spec(debt_spec)?;
             instruments.insert(debt_spec.id.clone(), instrument);
         }
@@ -96,7 +104,7 @@ impl Evaluator {
             Arc::clone(historical),
             Arc::clone(historical_cs),
         );
-        context.capital_structure_cashflows = Some(cs_cashflows.clone());
+        context.set_capital_structure_cashflows(cs_cashflows.clone());
 
         self.evaluate_nodes_in_order(
             model,
@@ -126,7 +134,7 @@ impl Evaluator {
                     cs_cashflows.equity_distribution.insert(period_id, equity);
                 }
                 contractual_warnings.extend(waterfall_result.warnings);
-                context.capital_structure_cashflows = Some(cs_cashflows);
+                context.set_capital_structure_cashflows(cs_cashflows);
             }
         }
 
@@ -221,12 +229,10 @@ pub(crate) fn resolve_opening_balance(
         return Ok(abs_money(m));
     }
 
-    let currency = schedule
-        .flows
-        .first()
-        .map(|cf| cf.amount.currency())
-        .unwrap_or(finstack_quant_core::currency::Currency::USD);
-    Ok(Money::new(0.0, currency))
+    // Use the schedule's own notional currency rather than guessing USD: an
+    // empty-schedule non-USD instrument must not seed a USD zero balance (it can
+    // later trip the waterfall's single-currency check with a confusing error).
+    Ok(Money::new(0.0, schedule.notional.initial.currency()))
 }
 
 fn compute_contractual_flows(
@@ -259,18 +265,24 @@ fn compute_contractual_flows(
             .get(instrument_id.as_str())
             .copied()
             .unwrap_or_else(|| Money::new(0.0, opening_balance.currency()));
-        let (breakdown, closing_balance, period_warnings) = integration::calculate_period_flows(
-            instrument.as_ref(),
-            period,
-            opening_balance,
-            toggled_pik,
-            market_ctx,
-            as_of,
-        )?;
+        let (breakdown, closing_balance, net_new_funding, period_warnings) =
+            integration::calculate_period_flows(
+                instrument.as_ref(),
+                period,
+                opening_balance,
+                toggled_pik,
+                market_ctx,
+                as_of,
+            )?;
         warnings.extend(period_warnings);
 
         flows.insert(instrument_id.to_string(), breakdown.clone());
         cs_state.set_closing_balance(instrument_id.to_string(), closing_balance);
+        // Record the period's draws so the waterfall can recover the payable
+        // balance and draw-aware closing (overwritten each period).
+        cs_state
+            .period_new_funding
+            .insert(instrument_id.to_string(), net_new_funding);
     }
     Ok((flows, warnings))
 }

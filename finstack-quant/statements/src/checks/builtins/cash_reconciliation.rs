@@ -50,20 +50,22 @@ impl Check for CashReconciliation {
             let prev_pid = &periods[i - 1].id;
             let curr_pid = &periods[i].id;
 
-            // Roll-forward identities only hold for *strictly* chronologically
-            // consecutive periods. Skip any pair whose starts are not strictly
-            // ascending — out-of-order or equal-start (e.g. interleaved annual +
-            // quarterly) — so a misordered list cannot reconcile the current
-            // period against the wrong "prior" period. Emit an Info finding so
-            // the skip is visible rather than silent.
-            if periods[i].start <= periods[i - 1].start {
+            // Roll-forward identities only hold for *adjacent* periods (half-open
+            // `[start, end)`, so `prior.end == current.start`). Skip any pair
+            // that is not adjacent — non-ascending/equal-start (interleaved
+            // annual + quarterly), a gap (a period is missing between them), or
+            // an overlap (a year-end reconciled against a quarter it already
+            // contains) — so the identity is never evaluated across the wrong
+            // span. Emit an Info finding so the skip is visible rather than
+            // silent.
+            if periods[i - 1].end != periods[i].start {
                 findings.push(CheckFinding {
                     check_id: self.id().to_string(),
                     severity: Severity::Info,
                     message: format!(
-                        "Cash reconciliation skipped for {curr_pid}: period starts are not \
-                         strictly ascending relative to prior {prev_pid}; the roll-forward \
-                         identity is only evaluated for chronologically consecutive periods."
+                        "Cash reconciliation skipped for {curr_pid}: it is not adjacent to prior \
+                         {prev_pid} (gap, overlap, or out-of-order); the roll-forward identity is \
+                         only evaluated for consecutive periods."
                     ),
                     period: Some(*curr_pid),
                     materiality: None,

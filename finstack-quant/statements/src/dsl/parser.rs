@@ -92,10 +92,10 @@ fn logical_or(input: &str) -> IResult<&str, StmtExpr> {
 
 // Logical AND
 fn logical_and(input: &str) -> IResult<&str, StmtExpr> {
-    let (input, first) = comparison(input)?;
+    let (input, first) = logical_not(input)?;
     let (input, rest) = nom::multi::many0(preceded(
         delimited(multispace0, tag("and"), multispace1),
-        comparison,
+        logical_not,
     ))
     .parse(input)?;
 
@@ -104,6 +104,24 @@ fn logical_and(input: &str) -> IResult<&str, StmtExpr> {
         rest.into_iter()
             .fold(first, |acc, expr| StmtExpr::bin_op(BinOp::And, acc, expr)),
     ))
+}
+
+// Logical NOT (keyword `not`).
+//
+// Placed *below* `logical_and` and *above* `comparison` so the DSL keyword
+// `not` binds looser than comparisons — matching Python, where `not a > b`
+// means `not (a > b)`. (The C-style `!` operator stays in `unary` and binds
+// tightly.)
+fn logical_not(input: &str) -> IResult<&str, StmtExpr> {
+    with_parse_depth(input, |input| {
+        alt((
+            map(preceded((tag("not"), multispace1), logical_not), |expr| {
+                StmtExpr::unary_op(UnaryOp::Not, expr)
+            }),
+            comparison,
+        ))
+        .parse(input)
+    })
 }
 
 // Comparison operators
@@ -183,11 +201,10 @@ fn multiplicative(input: &str) -> IResult<&str, StmtExpr> {
 // Unary operators
 fn unary(input: &str) -> IResult<&str, StmtExpr> {
     with_parse_depth(input, |input| {
+        // Keyword `not` is handled at the looser `logical_not` level (Python
+        // precedence). Here `!` remains a tight, C-style unary operator.
         alt((
             map(preceded(char('!'), unary), |expr| {
-                StmtExpr::unary_op(UnaryOp::Not, expr)
-            }),
-            map(preceded((tag("not"), multispace1), unary), |expr| {
                 StmtExpr::unary_op(UnaryOp::Not, expr)
             }),
             map(preceded(char('-'), unary), |expr| {

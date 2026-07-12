@@ -20,9 +20,14 @@
 //!   roughly constant in absolute terms (e.g., a retailer's Q4 EBITDA uplift
 //!   is always ~$5 M). Use `multiplicative` when the swing scales with the
 //!   level (e.g., Q4 revenue is always ~20 % above trend). Multiplicative mode
-//!   divides by the trend component, so it will error if any trend value is
-//!   near zero. For most credit metrics that are expected to stay positive,
-//!   multiplicative is the safer default.
+//!   divides by the trend component; where a trend value is near zero the
+//!   corresponding detrended ratio falls back to the identity (`1.0`) rather
+//!   than dividing by ~0, and index normalization is skipped when the mean
+//!   index itself is near zero. This keeps a series that crosses zero (e.g.
+//!   EBITDA turning from loss to profit) from producing infinities, at the cost
+//!   of a slightly biased seasonal index near the crossing — prefer `additive`
+//!   for series that cross zero. For most credit metrics that are expected to
+//!   stay positive, multiplicative is the safer default.
 //!
 //! Unsupported parameters such as `season_start` are rejected explicitly so
 //! schema typos and unsupported calendar shifts do not become silent no-ops.

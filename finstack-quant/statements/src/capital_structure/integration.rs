@@ -150,6 +150,15 @@ pub fn aggregate_instrument_cashflows(
             map
         });
 
+        // Interest is netted as a *signed* per-period sum (native and reporting
+        // currency) and booked as its net magnitude after the flow loop. Two-leg
+        // instruments (swaps) emit both legs into one schedule as opposite-signed
+        // flows; booking each leg's absolute value double-counts (gross ≈
+        // pay + receive instead of the net coupon). Single-leg loans emit
+        // positive-magnitude coupons, so netting-then-abs preserves them exactly.
+        let mut signed_interest_native: IndexMap<PeriodId, f64> = IndexMap::new();
+        let mut signed_interest_reporting: IndexMap<PeriodId, f64> = IndexMap::new();
+
         // Classify cashflows using precise CFKind information (NO MORE HEURISTICS!)
         // Note: We use full_schedule.flows directly rather than aggregate_by_period because
         // we need access to CFKind metadata for precise classification, which is preserved
@@ -161,6 +170,19 @@ pub fn aggregate_instrument_cashflows(
                 .map(|p| p.id)
             {
                 if let Some(breakdown) = instrument_periods.get_mut(&period_id) {
+                    // Currency safety: a single instrument's breakdown holds one
+                    // currency (multi-currency support is *across* instruments via
+                    // `totals_by_currency`). A flow in a different currency (e.g. an
+                    // xccy swap leg) requires explicit FX that this per-instrument
+                    // classifier does not perform — reject rather than let `Money`
+                    // arithmetic panic on a mismatch.
+                    if cf.amount.currency() != currency {
+                        return Err(crate::error::Error::currency_mismatch(
+                            currency,
+                            cf.amount.currency(),
+                        ));
+                    }
+
                     // Keep as Money, convert to issuer perspective (absolute value)
                     let abs_value = if cf.amount.amount() < 0.0 {
                         finstack_quant_core::money::Money::new(
@@ -181,14 +203,16 @@ pub fn aggregate_instrument_cashflows(
 
                     match cf.kind {
                         CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => {
-                            // Cash interest payments (coupons, floating resets)
-                            breakdown.interest_expense_cash += abs_value;
-                            if let (Some(map), Some(money)) =
-                                (reporting_totals.as_mut(), converted_abs)
-                            {
-                                if let Some(total) = map.get_mut(&period_id) {
-                                    total.interest_expense_cash += money;
-                                }
+                            // Cash interest payments (coupons, floating resets).
+                            // Accumulate the *signed* value; the net magnitude is
+                            // booked after the flow loop. FX is linear, so the
+                            // signed reporting amount is `sign * |converted|`.
+                            let sign = if cf.amount.amount() < 0.0 { -1.0 } else { 1.0 };
+                            *signed_interest_native.entry(period_id).or_insert(0.0) +=
+                                sign * abs_value.amount();
+                            if let Some(money) = converted_abs {
+                                *signed_interest_reporting.entry(period_id).or_insert(0.0) +=
+                                    sign * money.amount();
                             }
                         }
                         CFKind::Amortization => {
@@ -278,6 +302,23 @@ pub fn aggregate_instrument_cashflows(
                             );
                         }
                     }
+                }
+            }
+        }
+
+        // Book the net interest magnitude per period. `instrument_periods` is
+        // set (each period started at zero and only this instrument writes to
+        // it); `reporting_totals` is added to (it aggregates across instruments).
+        for (period_id, net) in &signed_interest_native {
+            if let Some(breakdown) = instrument_periods.get_mut(period_id) {
+                breakdown.interest_expense_cash = Money::new(net.abs(), currency);
+            }
+        }
+        if let Some(map) = reporting_totals.as_mut() {
+            for (period_id, net) in &signed_interest_reporting {
+                if let Some(total) = map.get_mut(period_id) {
+                    let rc = total.interest_expense_cash.currency();
+                    total.interest_expense_cash += Money::new(net.abs(), rc);
                 }
             }
         }
