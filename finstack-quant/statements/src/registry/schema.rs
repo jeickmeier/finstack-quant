@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 /// }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MetricRegistry {
     /// Namespace for all metrics in this registry (e.g., "fin", "custom")
     pub namespace: String,
@@ -49,6 +50,7 @@ pub struct MetricRegistry {
 /// Each definition maps directly to a JSON object in a registry file and is
 /// converted into a [`NodeSpec`](crate::types::NodeSpec) when registered.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MetricDefinition {
     /// Unique identifier within the namespace
     pub id: String,

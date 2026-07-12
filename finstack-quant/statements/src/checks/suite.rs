@@ -185,6 +185,7 @@ impl CheckSuiteBuilder {
 /// [`FormulaCheckSpec`] entries are stored for later resolution by the
 /// analytics crate, which owns the [`FormulaCheck`](super::super) type.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CheckSuiteSpec {
     /// Suite name.
     pub name: String,
@@ -372,6 +373,7 @@ impl BuiltinCheckSpec {
 /// suite definitions (built-in + formula) can be stored as a single JSON
 /// document. Resolution into a runnable check requires the analytics crate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FormulaCheckSpec {
     /// Unique identifier for this check instance.
     pub id: String,

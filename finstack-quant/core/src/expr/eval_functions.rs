@@ -1040,7 +1040,9 @@ impl CompiledExpr {
             | Function::Annualize
             | Function::AnnualizeRate
             | Function::Coalesce
-            | Function::GrowthRate => {
+            | Function::GrowthRate
+            | Function::Min
+            | Function::Max => {
                 debug_assert!(
                     !fun.is_scalar_evaluable(),
                     "Function::is_scalar_evaluable disagrees with eval dispatch for {fun:?}"

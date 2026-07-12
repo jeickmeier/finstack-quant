@@ -7,8 +7,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// Represents parsed formula syntax before compilation to the core expression
 /// engine. Each variant captures a syntactic construct in the DSL.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+// NOTE: `StmtExpr` deliberately does NOT derive `Serialize`/`Deserialize`.
+// serde cannot represent newtype variants wrapping primitives (`Literal(f64)`,
+// `NodeRef(String)`) inside an internally-tagged enum — it fails at runtime for
+// essentially every real formula AST. Nothing serializes `StmtExpr` (formulas
+// are stored as their source string and re-parsed), so the derives were a
+// latent wire-format trap and have been removed.
+#[derive(Debug, Clone, PartialEq)]
 pub enum StmtExpr {
     /// Literal value (integer or float)
     Literal(f64),

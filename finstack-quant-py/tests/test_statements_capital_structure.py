@@ -93,7 +93,9 @@ class TestWaterfallSpec:
     def test_validate_rejects_sweep_after_equity(self) -> None:
         ecf = statements.EcfSweepSpec(ebitda_node="ebitda", sweep_percentage=0.5)
         ws = statements.WaterfallSpec(priority_of_payments=["equity", "sweep"], ecf_sweep=ecf)
-        with pytest.raises(ValueError, match=r"Sweep.*must precede.*Equity"):
+        # A sweep after equity means equity is not last, which the
+        # "Equity must be the last entry" rule rejects.
+        with pytest.raises(ValueError, match=r"Equity.*must be the last entry"):
             ws.validate()
 
     def test_json_roundtrip(self) -> None:

@@ -91,6 +91,46 @@ impl WaterfallSpec {
             }
         }
 
+        // When available-cash capping is active, every cash-consuming category
+        // must appear in the stack. A category omitted from
+        // `priority_of_payments` is never capped against available cash, so its
+        // full planned amount would still be reported as paid while the residual
+        // flows to equity — creating cash out of nothing (uses > sources).
+        if self.available_cash_node.is_some() {
+            for required in [
+                PaymentPriority::Fees,
+                PaymentPriority::Interest,
+                PaymentPriority::Amortization,
+            ] {
+                if !self.priority_of_payments.contains(&required) {
+                    return Err(Error::build(format!(
+                        "WaterfallSpec: `available_cash_node` is set, so `{required:?}` must \
+                         appear in `priority_of_payments`; otherwise its planned cash would be \
+                         paid in full without consuming available cash, breaking cash \
+                         conservation. List it explicitly (it caps to zero when there is no \
+                         such flow)."
+                    )));
+                }
+            }
+        }
+
+        // Equity, if present, must rank last: the engine distributes the
+        // post-stack residual cash to equity after every other category, so a
+        // non-terminal `Equity` position would be silently ignored.
+        if let Some(equity_pos) = self
+            .priority_of_payments
+            .iter()
+            .position(|p| *p == PaymentPriority::Equity)
+        {
+            if equity_pos != self.priority_of_payments.len() - 1 {
+                return Err(Error::build(
+                    "WaterfallSpec: `Equity` must be the last entry in `priority_of_payments`; \
+                     the engine always distributes residual cash to equity after every other \
+                     category, so a non-terminal position would be silently ignored.",
+                ));
+            }
+        }
+
         if let Some(pik) = &self.pik_toggle {
             if pik
                 .target_instrument_ids
@@ -105,31 +145,8 @@ impl WaterfallSpec {
             }
         }
 
-        if let Some(equity_pos) = self
-            .priority_of_payments
-            .iter()
-            .position(|p| *p == PaymentPriority::Equity)
-        {
-            for prepayment in [
-                PaymentPriority::MandatoryPrepayment,
-                PaymentPriority::VoluntaryPrepayment,
-                PaymentPriority::Sweep,
-            ] {
-                if let Some(prepayment_pos) = self
-                    .priority_of_payments
-                    .iter()
-                    .position(|p| *p == prepayment)
-                {
-                    if prepayment_pos > equity_pos {
-                        return Err(Error::build(format!(
-                            "WaterfallSpec: `{prepayment:?}` must precede `Equity` in \
-                             `priority_of_payments`; otherwise prepayment cash would be \
-                             distributed to equity before debt paydown."
-                        )));
-                    }
-                }
-            }
-        }
+        // (Prepayment-after-Equity is already rejected by the "Equity must be
+        // last" rule above: if Equity is terminal, no prepayment can follow it.)
 
         let Some(ecf) = &self.ecf_sweep else {
             return Ok(());
@@ -343,10 +360,12 @@ mod tests {
             ],
             ..WaterfallSpec::default()
         };
+        // A prepayment after Equity means Equity is not last, which the
+        // "Equity must be the last entry" rule rejects.
         let err = spec
             .validate()
             .expect_err("prepayment after equity must be rejected");
-        assert!(err.to_string().contains("must precede `Equity`"));
+        assert!(err.to_string().contains("must be the last entry"));
     }
 
     #[test]

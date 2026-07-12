@@ -527,7 +527,9 @@ impl DagBuilder {
                     | Function::Lead
                     | Function::Shift
                     | Function::Sum
-                    | Function::Mean => 5,
+                    | Function::Mean
+                    | Function::Min
+                    | Function::Max => 5,
                     Function::Diff | Function::PctChange => 10,
                     Function::CumSum
                     | Function::CumProd

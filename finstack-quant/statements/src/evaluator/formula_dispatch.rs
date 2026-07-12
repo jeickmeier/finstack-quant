@@ -95,7 +95,7 @@ pub(crate) fn evaluate_function(
         // compensated summation stays well-defined. Empty finite set → NaN.
         Function::Sum => {
             require_min_args("sum", args, 1, node_id)?;
-            let values = finite_arg_values(args, context, node_id)?;
+            let values = finite_arg_values(args, "sum", context, node_id)?;
             if values.is_empty() {
                 Ok(f64::NAN)
             } else {
@@ -105,12 +105,38 @@ pub(crate) fn evaluate_function(
 
         Function::Mean => {
             require_min_args("mean", args, 1, node_id)?;
-            let values = finite_arg_values(args, context, node_id)?;
+            let values = finite_arg_values(args, "mean", context, node_id)?;
             if values.is_empty() {
                 Ok(f64::NAN)
             } else {
                 Ok(kahan_sum(values.iter().copied()) / values.len() as f64)
             }
+        }
+
+        // Min/Max are n-ary reducers evaluated here (they are not
+        // scalar-evaluable in core). The left-to-right fold
+        // `acc = if acc <cmp> arg { acc } else { arg }` preserves the exact
+        // IEEE 754 / order-dependent NaN and tie semantics documented on
+        // `Function::Min`: a leading NaN is dropped for a finite peer while a
+        // trailing NaN propagates.
+        Function::Min => {
+            require_min_args("min", args, 1, node_id)?;
+            let mut acc = evaluate_expr(&args[0], context, node_id)?;
+            for arg in &args[1..] {
+                let v = evaluate_expr(arg, context, node_id)?;
+                acc = if acc < v { acc } else { v };
+            }
+            Ok(acc)
+        }
+
+        Function::Max => {
+            require_min_args("max", args, 1, node_id)?;
+            let mut acc = evaluate_expr(&args[0], context, node_id)?;
+            for arg in &args[1..] {
+                let v = evaluate_expr(arg, context, node_id)?;
+                acc = if acc > v { acc } else { v };
+            }
+            Ok(acc)
         }
 
         Function::Annualize => eval_annualize(args, context, node_id),
@@ -136,14 +162,30 @@ pub(crate) fn evaluate_function(
 
 fn finite_arg_values(
     args: &[Expr],
+    function: &str,
     context: &mut EvaluationContext,
     node_id: Option<&str>,
 ) -> Result<Vec<f64>> {
     let mut values = Vec::with_capacity(args.len());
+    let mut dropped = 0usize;
     for arg in args {
         let value = evaluate_expr(arg, context, node_id)?;
         if value.is_finite() {
             values.push(value);
+        } else {
+            dropped += 1;
+        }
+    }
+    // The skip-NaN policy is intentional, but a silently dropped line item can
+    // hide an upstream problem — surface the count as a warning.
+    if dropped > 0 {
+        if let Some(id) = node_id {
+            context.push_warning(crate::evaluator::EvalWarning::NonFiniteSkipped {
+                node_id: id.to_string(),
+                period: context.period_id,
+                function: function.to_string(),
+                count: dropped,
+            });
         }
     }
     Ok(values)

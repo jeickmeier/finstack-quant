@@ -1480,6 +1480,36 @@ class StatementResult:
         """
         ...
 
+    @property
+    def warnings(self) -> list[str]:
+        """Evaluation warnings as human-readable strings.
+
+        Returns
+        -------
+        list[str]
+        """
+        ...
+
+    @property
+    def numeric_mode(self) -> NumericMode:
+        """Numeric mode stamped into the result envelope (policy visibility).
+
+        Returns
+        -------
+        NumericMode
+        """
+        ...
+
+    @property
+    def parallel(self) -> bool:
+        """Whether the evaluation ran in parallel (policy visibility).
+
+        Returns
+        -------
+        bool
+        """
+        ...
+
     def to_pandas_long(self) -> pd.DataFrame:
         """Export results as a pandas DataFrame in long (tidy) form.
 
@@ -1786,7 +1816,9 @@ class CheckSuiteSpec:
     """A serializable suite specification describing which checks to run.
 
     Load from JSON (e.g. a team-wide check policy file) and inspect its
-    composition before passing to ``run_checks``.
+    composition (``builtin_count`` / ``formula_count``). Note: running a suite
+    is not yet exposed through the Python bindings; this type is currently for
+    loading and inspecting a policy definition only.
 
     Example
     -------
@@ -1870,7 +1902,7 @@ class CheckSuiteSpec:
 class CheckReport:
     """Validation check report aggregating results and summary statistics.
 
-    Typically produced by ``run_checks`` or similar analytics functions,
+    Loaded from JSON (``from_json``) produced by the Rust checks framework,
     then inspected via properties or rendered to text/HTML.
 
     Example

@@ -264,7 +264,7 @@ mod period_flow_waterfall_integration {
                 .copied()
                 .unwrap_or_else(|| Money::new(0.0, Currency::USD));
 
-            let (breakdown, _, warnings) = calculate_period_flows(
+            let (breakdown, _, _, warnings) = calculate_period_flows(
                 &instrument,
                 &period,
                 opening,
@@ -361,7 +361,7 @@ mod period_flow_waterfall_integration {
             .insert("TL-1".to_string(), Money::new(1_000_000.0, Currency::USD));
 
         let opening = state.opening_balances["TL-1"];
-        let (breakdown, _, warnings) = calculate_period_flows(
+        let (breakdown, _, _, warnings) = calculate_period_flows(
             &instrument,
             &period,
             opening,

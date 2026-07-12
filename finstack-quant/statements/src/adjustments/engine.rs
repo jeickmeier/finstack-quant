@@ -145,6 +145,16 @@ impl NormalizationEngine {
         period_id: PeriodId,
         results: &StatementResult,
     ) -> Result<(f64, bool)> {
+        // A negative cap value would make `|raw| > cap_limit` always true and
+        // then `signum * cap_limit` flips the adjustment's sign — silently
+        // turning an EBITDA add-back into a deduction. Reject it.
+        if cap.value < 0.0 {
+            return Err(Error::eval(format!(
+                "Adjustment cap value must be non-negative; got {}. A negative cap would flip the \
+                 adjustment's sign (turning an add-back into a deduction).",
+                cap.value
+            )));
+        }
         let cap_limit = if let Some(base_node) = &cap.base_node {
             let base_values = results
                 .nodes

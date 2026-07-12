@@ -160,6 +160,25 @@ impl EvaluationContext {
         self
     }
 
+    /// Replace the current-period capital-structure cashflows, invalidating any
+    /// memoized `cs.*` history so the next pass re-reads the new flows.
+    ///
+    /// The waterfall revises this period's cashflows after the first evaluation
+    /// pass. Aggregates such as `rolling_mean(cs.interest_expense.total, 2)`
+    /// memoize the pre-waterfall value in `sorted_history_cache`; without
+    /// draining that cache the second pass would silently reuse the stale
+    /// pre-waterfall number while a plain `cs.*` reference (which bypasses the
+    /// cache) reads the revised value, producing internally inconsistent
+    /// results. The whole cache is cleared because it is a per-period
+    /// memoization that is cheap to rebuild lazily.
+    pub(crate) fn set_capital_structure_cashflows(
+        &mut self,
+        cashflows: crate::capital_structure::CapitalStructureCashflows,
+    ) {
+        self.capital_structure_cashflows = Some(cashflows);
+        self.sorted_history_cache.borrow_mut().clear();
+    }
+
     /// Set the value for a node in the current period.
     ///
     /// Accepts any `f64` value, including `NaN`. Values are stored even when they

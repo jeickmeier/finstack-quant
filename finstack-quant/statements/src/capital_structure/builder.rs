@@ -70,6 +70,22 @@ fn push_swap(
     Ok(())
 }
 
+/// Default settlement-calendar id for a currency.
+///
+/// Maps the major currencies to their standard market calendars so a swap's
+/// coupon dates roll on the right holiday set (e.g. EUR → TARGET2, not NYSE).
+/// Unmapped currencies fall back to the US calendar.
+#[cfg(feature = "valuation-integration")]
+fn default_calendar_for(currency: finstack_quant_core::currency::Currency) -> &'static str {
+    use finstack_quant_core::currency::Currency;
+    match currency {
+        Currency::EUR => "target2",
+        Currency::GBP => "gblo",
+        Currency::JPY => "jpto",
+        _ => "usny",
+    }
+}
+
 /// Build an `InterestRateSwap` from leg parameters.
 #[cfg(feature = "valuation-integration")]
 #[allow(clippy::too_many_arguments)]
@@ -96,6 +112,11 @@ fn build_swap_internal(
         ))
     })?;
 
+    // Default the settlement calendar from the swap's currency rather than
+    // hardcoding the US calendar for every leg — a EUR swap must roll on
+    // TARGET2, not NYSE holidays.
+    let calendar_id = default_calendar_for(notional.currency()).to_string();
+
     let discount_curve_id = CurveId::new(discount_curve_id);
     let forward_curve_id = CurveId::new(forward_curve_id);
 
@@ -105,7 +126,7 @@ fn build_swap_internal(
         frequency: fixed_freq,
         day_count: fixed_dc,
         bdc,
-        calendar_id: Some("usny".to_string()),
+        calendar_id: Some(calendar_id.clone()),
         stub: StubKind::None,
         start: start_date,
         end: maturity_date,
@@ -122,7 +143,7 @@ fn build_swap_internal(
         frequency: float_freq,
         day_count: float_dc,
         bdc,
-        calendar_id: Some("usny".to_string()),
+        calendar_id: Some(calendar_id),
         stub: StubKind::None,
         reset_lag_days: 0,
         fixing_calendar_id: None,

@@ -8,7 +8,7 @@ use super::types::{PyFinancialModelSpec, PyForecastSpec};
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::dates::utils::py_to_date;
 use crate::bindings::core::money::PyMoney;
-use crate::errors::{core_to_py, display_to_py};
+use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::money::fx::FxConversionPolicy;
 use finstack_quant_statements::builder::{MixedNodeBuilder, ModelBuilder};
@@ -59,13 +59,13 @@ impl PyMetricRegistry {
     #[staticmethod]
     fn with_builtins() -> PyResult<Self> {
         let inner = finstack_quant_statements::registry::Registry::with_builtins()
-            .map_err(display_to_py)?;
+            .map_err(statements_to_py)?;
         Ok(Self { inner })
     }
 
     /// Load built-in metrics into this registry.
     fn load_builtins(&mut self) -> PyResult<()> {
-        self.inner.load_builtins().map_err(display_to_py)
+        self.inner.load_builtins().map_err(statements_to_py)
     }
 
     /// Load metrics from a JSON string.
@@ -73,12 +73,12 @@ impl PyMetricRegistry {
         self.inner
             .load_from_json_str(json)
             .map(|_| ())
-            .map_err(display_to_py)
+            .map_err(statements_to_py)
     }
 
     /// Load metrics from a JSON file path.
     fn load_from_json(&mut self, path: &str) -> PyResult<()> {
-        self.inner.load_from_json(path).map_err(display_to_py)
+        self.inner.load_from_json(path).map_err(statements_to_py)
     }
 
     /// Return whether a fully qualified metric exists.
@@ -132,7 +132,7 @@ impl PyMixedNodeBuilder {
     /// Set the fallback formula.
     fn formula(&mut self, formula: &str) -> PyResult<()> {
         let builder = self.take()?;
-        self.inner = Some(builder.formula(formula).map_err(display_to_py)?);
+        self.inner = Some(builder.formula(formula).map_err(statements_to_py)?);
         Ok(())
     }
 
@@ -146,7 +146,7 @@ impl PyMixedNodeBuilder {
     /// Build the mixed node and return a ready model builder.
     fn build(&mut self) -> PyResult<PyModelBuilder> {
         let builder = self.take()?;
-        let ready = builder.build().map_err(display_to_py)?;
+        let ready = builder.build().map_err(statements_to_py)?;
         Ok(PyModelBuilder {
             inner: Some(BuilderState::Ready(ready)),
         })
@@ -185,7 +185,7 @@ impl PyModelBuilder {
         let state = self.take_any()?;
         match state {
             BuilderState::NeedPeriods(b) => {
-                let ready = b.periods(range, actuals_until).map_err(display_to_py)?;
+                let ready = b.periods(range, actuals_until).map_err(statements_to_py)?;
                 self.inner = Some(BuilderState::Ready(ready));
                 Ok(())
             }
@@ -206,8 +206,11 @@ impl PyModelBuilder {
     ///     List of (period_string, value) tuples.
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value(&mut self, node_id: &str, values: Vec<(String, f64)>) -> PyResult<()> {
-        let state = self.take_ready()?;
+        // Parse arguments BEFORE `take_ready()` so a bad period string does not
+        // permanently consume the in-progress builder (leaving a misleading
+        // "consumed by build()" error on the next call).
         let parsed = parse_scalar_values(values)?;
+        let state = self.take_ready()?;
 
         let ready = state.value(node_id, &parsed);
         self.inner = Some(BuilderState::Ready(ready));
@@ -217,7 +220,7 @@ impl PyModelBuilder {
     /// Add a scalar value node with explicit period values.
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value_scalar(&mut self, node_id: &str, values: Vec<(String, f64)>) -> PyResult<()> {
-        let state = self.take_ready()?;
+        // Parse before `take_ready()` (see `value`).
         let parsed: Vec<(PeriodId, f64)> = values
             .into_iter()
             .map(|(p, v)| {
@@ -225,6 +228,7 @@ impl PyModelBuilder {
                 Ok((pid, v))
             })
             .collect::<PyResult<Vec<_>>>()?;
+        let state = self.take_ready()?;
 
         let ready = state.value_scalar(node_id, &parsed);
         self.inner = Some(BuilderState::Ready(ready));
@@ -234,7 +238,7 @@ impl PyModelBuilder {
     /// Add a monetary value node with explicit period values.
     #[pyo3(text_signature = "($self, node_id, values)")]
     fn value_money(&mut self, node_id: &str, values: Vec<(String, PyMoney)>) -> PyResult<()> {
-        let state = self.take_ready()?;
+        // Parse before `take_ready()` (see `value`).
         let parsed: Vec<(PeriodId, finstack_quant_core::money::Money)> = values
             .into_iter()
             .map(|(p, money)| {
@@ -242,6 +246,7 @@ impl PyModelBuilder {
                 Ok((pid, money.inner))
             })
             .collect::<PyResult<Vec<_>>>()?;
+        let state = self.take_ready()?;
 
         let ready = state.value_money(node_id, &parsed);
         self.inner = Some(BuilderState::Ready(ready));
@@ -259,7 +264,7 @@ impl PyModelBuilder {
     #[pyo3(text_signature = "($self, node_id, formula)")]
     fn compute(&mut self, node_id: &str, formula: &str) -> PyResult<()> {
         let state = self.take_ready()?;
-        let ready = state.compute(node_id, formula).map_err(display_to_py)?;
+        let ready = state.compute(node_id, formula).map_err(statements_to_py)?;
         self.inner = Some(BuilderState::Ready(ready));
         Ok(())
     }
@@ -298,7 +303,8 @@ impl PyModelBuilder {
     /// Add model-level metadata from a JSON payload.
     #[pyo3(text_signature = "($self, key, value_json)")]
     fn with_meta(&mut self, key: &str, value_json: &str) -> PyResult<()> {
-        let value: serde_json::Value = serde_json::from_str(value_json).map_err(display_to_py)?;
+        let value: serde_json::Value = serde_json::from_str(value_json)
+            .map_err(|e| serde_json_to_py(e, "invalid meta value JSON"))?;
         let state = self.take_ready()?;
         let ready = state.with_meta(key, value);
         self.inner = Some(BuilderState::Ready(ready));
@@ -318,7 +324,7 @@ impl PyModelBuilder {
     #[pyo3(text_signature = "($self)")]
     fn with_builtin_metrics(&mut self) -> PyResult<()> {
         let state = self.take_ready()?;
-        let ready = state.with_builtin_metrics().map_err(display_to_py)?;
+        let ready = state.with_builtin_metrics().map_err(statements_to_py)?;
         self.inner = Some(BuilderState::Ready(ready));
         Ok(())
     }
@@ -333,7 +339,7 @@ impl PyModelBuilder {
         let state = self.take_ready()?;
         let ready = state
             .add_metric_from_registry(qualified_id, &registry.inner)
-            .map_err(display_to_py)?;
+            .map_err(statements_to_py)?;
         self.inner = Some(BuilderState::Ready(ready));
         Ok(())
     }
@@ -378,7 +384,7 @@ impl PyModelBuilder {
                     maturity,
                     discount_curve_id,
                 )
-                .map_err(display_to_py)?,
+                .map_err(statements_to_py)?,
             ),
             BuilderState::Ready(b) => BuilderState::Ready(
                 b.add_bond(
@@ -389,7 +395,7 @@ impl PyModelBuilder {
                     maturity,
                     discount_curve_id,
                 )
-                .map_err(display_to_py)?,
+                .map_err(statements_to_py)?,
             ),
         };
         self.inner = Some(next);
@@ -438,7 +444,7 @@ impl PyModelBuilder {
                     discount_curve_id,
                     forward_curve_id,
                 )
-                .map_err(display_to_py)?,
+                .map_err(statements_to_py)?,
             ),
             BuilderState::Ready(b) => BuilderState::Ready(
                 b.add_swap(
@@ -450,7 +456,7 @@ impl PyModelBuilder {
                     discount_curve_id,
                     forward_curve_id,
                 )
-                .map_err(display_to_py)?,
+                .map_err(statements_to_py)?,
             ),
         };
         self.inner = Some(next);
@@ -472,7 +478,8 @@ impl PyModelBuilder {
     ///     JSON string matching the target instrument's serde shape.
     #[pyo3(text_signature = "($self, id, spec_json)")]
     fn add_custom_debt(&mut self, id: &str, spec_json: &str) -> PyResult<()> {
-        let spec: serde_json::Value = serde_json::from_str(spec_json).map_err(display_to_py)?;
+        let spec: serde_json::Value = serde_json::from_str(spec_json)
+            .map_err(|e| serde_json_to_py(e, "invalid debt instrument spec JSON"))?;
         let state = self.take_any()?;
         let next = match state {
             BuilderState::NeedPeriods(b) => BuilderState::NeedPeriods(b.add_custom_debt(id, spec)),
@@ -541,7 +548,7 @@ impl PyModelBuilder {
     #[pyo3(text_signature = "($self)")]
     fn build(&mut self) -> PyResult<PyFinancialModelSpec> {
         let state = self.take_ready()?;
-        let spec = state.build().map_err(display_to_py)?;
+        let spec = state.build().map_err(statements_to_py)?;
         Ok(PyFinancialModelSpec { inner: spec })
     }
 }
@@ -549,7 +556,10 @@ impl PyModelBuilder {
 impl PyModelBuilder {
     fn take_any(&mut self) -> PyResult<BuilderState> {
         self.inner.take().ok_or_else(|| {
-            crate::errors::value_error("Builder has already been consumed by build()")
+            crate::errors::value_error(
+                "Builder is no longer usable: it was consumed by build()/mixed(), or a prior \
+                 fallible call failed after taking ownership. Construct a new ModelBuilder.",
+            )
         })
     }
 

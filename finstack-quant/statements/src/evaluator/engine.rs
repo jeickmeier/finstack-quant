@@ -412,6 +412,31 @@ impl Evaluator {
         // into this prepared evaluation).
         self.compiled_cache = std::sync::Arc::clone(&prepared.compiled_cache);
 
+        // Structural guard: the prepared plan must cover exactly the model's
+        // nodes. A node present in the model but absent from the plan would be
+        // silently skipped here yet still labeled by `finalize_results`,
+        // producing a well-formed result with whole series missing. Fail loudly
+        // instead — the docs require the prepared plan and model to share
+        // structure (only node values may differ).
+        if prepared.node_to_column.len() != model.nodes.len() {
+            return Err(Error::eval(format!(
+                "evaluate_prepared: model has {} nodes but the prepared plan has {}; rebuild the \
+                 plan with `prepare` for this model (only node values may differ between prepare \
+                 and evaluate)",
+                model.nodes.len(),
+                prepared.node_to_column.len()
+            )));
+        }
+        for node_id in model.nodes.keys() {
+            if !prepared.node_to_column.contains_key(node_id) {
+                return Err(Error::eval(format!(
+                    "evaluate_prepared: model node '{}' is missing from the prepared plan; \
+                     rebuild the plan with `prepare` for this model",
+                    node_id.as_str()
+                )));
+            }
+        }
+
         let mut historical: std::sync::Arc<IndexMap<PeriodId, IndexMap<String, f64>>> =
             std::sync::Arc::new(IndexMap::new());
         let historical_cs: std::sync::Arc<

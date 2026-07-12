@@ -258,12 +258,11 @@ impl StatementResult {
 
                 if let NodeValueType::Monetary { currency } = value_type {
                     if let Some(period_map) = self.nodes.get(node_id_str) {
-                        let money_map = period_map
-                            .iter()
-                            .map(|(period_id, &v)| (*period_id, Money::new(v, *currency)))
-                            .collect();
+                        let (money_map, skipped) =
+                            monetary_map_skipping_nonfinite(period_map, *currency, node_id_str);
                         self.monetary_nodes
                             .insert(node_id_str.to_string(), money_map);
+                        self.meta.warnings.extend(skipped);
                     }
                 }
             } else if let Some(values) = &node_spec.values {
@@ -276,12 +275,11 @@ impl StatementResult {
                     );
 
                     if let Some(period_map) = self.nodes.get(node_id_str) {
-                        let money_map = period_map
-                            .iter()
-                            .map(|(period_id, &v)| (*period_id, Money::new(v, currency)))
-                            .collect();
+                        let (money_map, skipped) =
+                            monetary_map_skipping_nonfinite(period_map, currency, node_id_str);
                         self.monetary_nodes
                             .insert(node_id_str.to_string(), money_map);
+                        self.meta.warnings.extend(skipped);
                     }
                 } else {
                     self.node_value_types
@@ -323,6 +321,36 @@ impl StatementResult {
     }
 }
 
+/// Build a `PeriodId -> Money` map for a monetary node, skipping any
+/// non-finite (`NaN`/`±Inf`) cell.
+///
+/// The evaluator deliberately stores non-finite results (e.g. a division by
+/// zero) and surfaces them as warnings rather than aborting. `Money::new`
+/// asserts finiteness and would panic on those cells, so this uses
+/// `Money::try_new` and returns a `NonFiniteValue` warning per skipped cell
+/// instead. Returns the money map and the warnings for the skipped cells.
+fn monetary_map_skipping_nonfinite(
+    period_map: &IndexMap<PeriodId, f64>,
+    currency: finstack_quant_core::currency::Currency,
+    node_id: &str,
+) -> (IndexMap<PeriodId, Money>, Vec<EvalWarning>) {
+    let mut money_map = IndexMap::with_capacity(period_map.len());
+    let mut skipped = Vec::new();
+    for (period_id, &v) in period_map {
+        match Money::try_new(v, currency) {
+            Ok(money) => {
+                money_map.insert(*period_id, money);
+            }
+            Err(_) => skipped.push(EvalWarning::NonFiniteValue {
+                node_id: node_id.to_string(),
+                period: *period_id,
+                value: v,
+            }),
+        }
+    }
+    (money_map, skipped)
+}
+
 /// Warning emitted during evaluation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EvalWarning {
@@ -360,5 +388,21 @@ pub enum EvalWarning {
         kind: String,
         /// Original cashflow date as a string for diagnostics.
         cashflow_date: String,
+    },
+    /// One or more non-finite inputs were skipped by a skip-NaN aggregate
+    /// (`sum`, `mean`, ...).
+    ///
+    /// The aggregate's skip-NaN policy is intentional, but silently dropping a
+    /// broken line item can mask upstream problems (e.g. a division by zero in
+    /// one argument), so the drop is surfaced here.
+    NonFiniteSkipped {
+        /// Identifier of the node whose aggregate dropped inputs.
+        node_id: String,
+        /// Period in which the drop occurred.
+        period: PeriodId,
+        /// Name of the aggregate function that dropped values.
+        function: String,
+        /// Number of non-finite inputs dropped.
+        count: usize,
     },
 }

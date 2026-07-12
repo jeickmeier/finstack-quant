@@ -75,6 +75,8 @@ mod tests {
             Function::AnnualizeRate,
             Function::Coalesce,
             Function::GrowthRate,
+            Function::Min,
+            Function::Max,
         ] {
             let expr = Expr::call(func, vec![Expr::column("x")]);
             let err = ensure_scalar_evaluable(&expr)
