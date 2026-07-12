@@ -302,10 +302,6 @@ def run_golden(relative_path: str) -> None:
 
     if failures:
         msg = f"{len(failures)} metric(s) failed:\n" + "\n\n".join(failures)
-        if not os.environ.get("GOLDEN_IGNORE_NON_EXECUTABLE"):
-            reason = _known_non_executable().get(relative_path)
-            if reason is not None:
-                pytest.xfail(f"{reason}\n\n{msg}")
         raise AssertionError(msg)
 
 

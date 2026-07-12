@@ -403,9 +403,7 @@ class TestDiscountCurveParity:
             )
 
     @pytest.mark.parametrize("forward_floor", [float("nan"), float("inf"), -float("inf")])
-    def test_negative_rate_validation_mode_requires_finite_floor(
-        self, forward_floor: float
-    ) -> None:
+    def test_negative_rate_validation_mode_requires_finite_floor(self, forward_floor: float) -> None:
         with pytest.raises(ValueError, match="forward_floor must be finite"):
             DiscountCurve(
                 "CHF-OIS",
