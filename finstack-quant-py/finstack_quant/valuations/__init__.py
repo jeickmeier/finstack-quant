@@ -18,7 +18,6 @@ if _TYPE_CHECKING:
     import pandas as pd
 
 ValuationResult = _valuations.ValuationResult
-price_instrument_with_metrics = instruments.price_instrument_with_metrics
 CalibrationResult = _valuations.CalibrationResult
 CalibrationEnvelopeError = _valuations.CalibrationEnvelopeError
 validate_calibration_json = _valuations.validate_calibration_json
@@ -117,7 +116,6 @@ __all__: list[str] = [
     "lookback_option_price",
     "merton_jump_cos_price",
     "models",
-    "price_instrument_with_metrics",
     "quanto_option_price",
     "snowball_coupon_profile",
     "tarn_coupon_profile",

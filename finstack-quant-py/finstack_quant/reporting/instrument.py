@@ -612,11 +612,8 @@ def _price_path(
     instrument_json = json.dumps(spec_obj)
     market_arg = market.to_json() if hasattr(market, "to_json") else market
     # Lazy import keeps `import finstack_quant.reporting` light and makes the dependency explicit.
-    from finstack_quant.valuations import (
-        ValuationResult,
-        instrument_cashflows,
-        price_instrument_with_metrics,
-    )
+    from finstack_quant.valuations import ValuationResult, instrument_cashflows
+    from finstack_quant.valuations.instruments import price_instrument_with_metrics
 
     result = ValuationResult.from_json(
         price_instrument_with_metrics(instrument_json, market_arg, as_of, model=model, metrics=metrics)
