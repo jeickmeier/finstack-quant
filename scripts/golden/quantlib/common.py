@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
+from itertools import pairwise
 import json
 import math
 from pathlib import Path
@@ -76,9 +78,14 @@ def flat_discount_curve(curve_id: str, rate: float) -> dict[str, Any]:
     }
 
 
-def flat_forward_curve(curve_id: str, rate: float) -> dict[str, Any]:
+def flat_forward_curve(
+    curve_id: str,
+    rate: float,
+    *,
+    projection_dates: list[str] | None = None,
+) -> dict[str, Any]:
     """Build a Finstack flat simple forward curve."""
-    return {
+    curve = {
         "type": "forward",
         "id": curve_id,
         "base": VALUATION_DATE,
@@ -90,6 +97,17 @@ def flat_forward_curve(curve_id: str, rate: float) -> dict[str, Any]:
         "extrapolation": "flat_forward",
         "rate_calibration": None,
     }
+    if projection_dates is not None:
+        base = date.fromisoformat(VALUATION_DATE)
+        contractual_times = [
+            (date.fromisoformat(projection_date) - base).days / 360.0 for projection_date in projection_dates
+        ]
+        projection_grid = [0.0, *contractual_times, 30.0]
+        if any(right <= left for left, right in pairwise(projection_grid)):
+            msg = "projection_dates must be strictly increasing, after the valuation date, and before 30 years"
+            raise ValueError(msg)
+        curve["projection_grid"] = projection_grid
+    return curve
 
 
 def constant_vol_surface(

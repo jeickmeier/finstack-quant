@@ -148,7 +148,11 @@ def _build_optionlet_fixture(
         "market": market_snapshot(
             [
                 flat_discount_curve("USD-OIS", discount_rate),
-                flat_forward_curve("USD-TERM-3M", forward_rate),
+                flat_forward_curve(
+                    "USD-TERM-3M",
+                    forward_rate,
+                    projection_dates=["2026-07-30", "2026-10-30"],
+                ),
             ],
             surfaces=[
                 constant_vol_surface(
@@ -327,7 +331,17 @@ def build_black_cap() -> dict[str, Any]:
         "market": market_snapshot(
             [
                 flat_discount_curve("USD-OIS", discount_rate),
-                flat_forward_curve("USD-TERM-3M", forward_rate),
+                flat_forward_curve(
+                    "USD-TERM-3M",
+                    forward_rate,
+                    projection_dates=[
+                        "2026-07-30",
+                        "2026-10-30",
+                        "2027-01-30",
+                        "2027-04-30",
+                        "2027-07-30",
+                    ],
+                ),
             ],
             surfaces=[
                 constant_vol_surface(

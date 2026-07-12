@@ -905,9 +905,11 @@ pub(crate) fn emit_float_coupons_on(
                 // rate only: gearing/spread/floors/caps apply on top exactly
                 // as for projected rates. Without a series, the projection
                 // errors and routes through the fallback policy.
-                let projected = if reset_date < fwd.base_date()
-                    || (reset_date == fwd.base_date() && resolved_fixing.is_some())
-                {
+                let same_day_fixing_exists = reset_date == fwd.base_date()
+                    && resolved_fixing
+                        .as_ref()
+                        .is_some_and(|series| series.value_on_exact(reset_date).is_ok());
+                let projected = if reset_date < fwd.base_date() || same_day_fixing_exists {
                     params.validate().and_then(|()| {
                         require_fixing_value_exact(
                             resolved_fixing.as_ref(),

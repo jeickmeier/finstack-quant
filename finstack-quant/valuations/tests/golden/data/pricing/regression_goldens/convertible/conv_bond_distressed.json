@@ -6,11 +6,11 @@
     "description": "Synthetic distressed convertible bond with low-equity stress.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): two-step calibration (term_loan pattern). USD-OIS + USD-SOFR-3M calibrated; USD-CORP, USD-TREASURY, hazard curves, equity data preserved in initial_market. Expected outputs recaptured from Finstack. Re-baselined 2026-07-11 after intentional convertible lattice corrections to date-aligned forward discounting and coupon entitlement handling.",
+    "source_detail": "Finstack Quant canonical fixed-income pricing calculation on deterministic synthetic market inputs Phase-2 envelope migration (2026-05-09): two-step calibration (term_loan pattern). USD-OIS + USD-SOFR-3M calibrated; USD-CORP, USD-TREASURY, hazard curves, equity data preserved in initial_market. Expected outputs recaptured from Finstack. Re-baselined 2026-07-11 after intentional convertible lattice corrections to date-aligned forward discounting and coupon entitlement handling. Re-baselined 2026-07-12 to preserve the signed +1bp DV01 convention after day-count-aware lattice date mapping.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-01",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-07-11",
+    "last_reviewed_on": "2026-07-12",
     "review_interval_months": 6,
     "regen_command": "manual formula fixture; values captured from canonical pricing runner",
     "screenshots": []
@@ -593,7 +593,7 @@
   "expected": {
     "npv": 948047.872716489,
     "clean_price": 948047.872716489,
-    "dv01": 5.006e-09,
+    "dv01": -5.006e-09,
     "cs01": -272.317534483504
   },
   "tolerances": {

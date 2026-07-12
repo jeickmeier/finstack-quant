@@ -810,15 +810,32 @@ pub(crate) fn enumerate_exit_paths(
         return Vec::new();
     };
 
-    let mut candidates: Vec<ExitCandidate> = Vec::new();
+    let mut call_candidates: Vec<ExitCandidate> = Vec::new();
+    let mut put_candidates: Vec<ExitCandidate> = Vec::new();
 
-    let mut push_period_candidates = |start_date: Date, end_date: Date, price_pct_of_par: f64| {
-        let mut exercise_dates = vec![start_date, end_date];
+    let push_period_candidates = |candidates: &mut Vec<ExitCandidate>,
+                                  start_date: Date,
+                                  end_date: Date,
+                                  price_pct_of_par: f64| {
+        let align_to_flow_date = |boundary: Date| {
+            flows
+                .iter()
+                .map(|(date, _)| *date)
+                .filter_map(|date| {
+                    let distance = (date - boundary).whole_days().unsigned_abs();
+                    (distance <= 7).then_some((distance, date))
+                })
+                .min()
+                .map_or(boundary, |(_, date)| date)
+        };
+        let aligned_start = align_to_flow_date(start_date);
+        let aligned_end = align_to_flow_date(end_date);
+        let mut exercise_dates = vec![aligned_start, aligned_end];
         exercise_dates.extend(
             flows
                 .iter()
                 .map(|(date, _)| *date)
-                .filter(|date| *date >= start_date && *date <= end_date),
+                .filter(|date| *date >= aligned_start && *date <= aligned_end),
         );
         exercise_dates.sort_unstable();
         exercise_dates.dedup();
@@ -834,13 +851,42 @@ pub(crate) fn enumerate_exit_paths(
     };
 
     for c in &cp.calls {
-        push_period_candidates(c.start_date, c.end_date, c.price_pct_of_par);
+        push_period_candidates(
+            &mut call_candidates,
+            c.start_date,
+            c.end_date,
+            c.price_pct_of_par,
+        );
     }
     for p in &cp.puts {
-        push_period_candidates(p.start_date, p.end_date, p.price_pct_of_par);
+        push_period_candidates(
+            &mut put_candidates,
+            p.start_date,
+            p.end_date,
+            p.price_pct_of_par,
+        );
     }
 
-    candidates
+    // Adjacent step-down windows share boundary dates. At such a boundary the
+    // issuer exercises the cheapest call, while the holder exercises the most
+    // valuable put. Retaining both stale and current strikes creates
+    // economically impossible YTW paths.
+    call_candidates.sort_by(|left, right| {
+        left.date
+            .cmp(&right.date)
+            .then_with(|| left.price_pct_of_par.total_cmp(&right.price_pct_of_par))
+    });
+    call_candidates.dedup_by_key(|candidate| candidate.date);
+    put_candidates.sort_by(|left, right| {
+        left.date
+            .cmp(&right.date)
+            .then_with(|| right.price_pct_of_par.total_cmp(&left.price_pct_of_par))
+    });
+    put_candidates.dedup_by_key(|candidate| candidate.date);
+    call_candidates.extend(put_candidates);
+    
+
+    call_candidates
 }
 
 /// Solve yield-to-worst over all call/put/maturity candidates for a given flow set.
@@ -962,7 +1008,6 @@ pub(crate) fn solve_ytw_from_flows(
                 frequency: bond.cashflow_spec.frequency(),
             },
         )?;
-
         if y < best_yield {
             best_yield = y;
             best_flows = ex_flows;

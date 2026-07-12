@@ -46,12 +46,17 @@
     },
     {
       "path": "pricing/bloomberg/bond/bhccn_10_2032_callable_bloomberg.json",
-      "description": "BHCCN Bloomberg asset-swap benchmark gap",
+      "description": "BHCCN Bloomberg asset-swap and proprietary-tree benchmark gaps",
       "metrics": [
         {
           "metric": "asw_market",
           "reason": "The old projection of a historical reset was invalid; an independent Bloomberg ASW benchmark refresh is required before changing the external target.",
           "evidence": "Bloomberg ASW is 5.334% with 2bp tolerance; fixing-aware pricing using the required 2026-04-15 SOFR reset produces 5.2667175516%, a 6.73bp gap."
+        },
+        {
+          "metric": "embedded_option_value",
+          "reason": "The Bloomberg proprietary callable-tree option value cannot be reconciled by widening the source-backed tolerance.",
+          "evidence": "The corrected workout path leaves Finstack option value at -18192.897498 versus Bloomberg -19800.00, an 8.1% model gap, while OAS remains within the established 3bp convention tolerance."
         }
       ]
     },

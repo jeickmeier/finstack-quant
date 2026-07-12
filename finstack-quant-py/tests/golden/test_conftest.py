@@ -402,7 +402,7 @@ def _valid_allowlist_payload() -> dict:
         "description": "test allowlist",
         "fixtures": [
             {
-                "path": "pricing/deposit/usd_deposit_3m.json",
+                "path": "pricing/quantlib/deposit/usd_deposit_3m.json",
                 "description": "test fixture",
                 "metrics": [
                     {
@@ -417,7 +417,7 @@ def _valid_allowlist_payload() -> dict:
 
 
 def _deposit_actuals() -> tuple[str, GoldenFixture, dict[str, float]]:
-    relative = "pricing/deposit/usd_deposit_3m.json"
+    relative = "pricing/quantlib/deposit/usd_deposit_3m.json"
     fixture = GoldenFixture.from_path(fixture_path(relative))
     return relative, fixture, dict(fixture.expected)
 

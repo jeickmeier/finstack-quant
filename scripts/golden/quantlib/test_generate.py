@@ -7,8 +7,24 @@ import math
 
 import pytest
 
-from .common import SCHEMA_VERSION
+from .common import SCHEMA_VERSION, flat_forward_curve
 from .generate import generate
+
+
+def test_flat_forward_curve_records_contractual_projection_dates() -> None:
+    """Term-forward fixtures preserve their contractual reset grid."""
+    curve = flat_forward_curve(
+        "USD-SOFR-3M",
+        0.043,
+        projection_dates=["2026-08-03", "2026-11-03"],
+    )
+
+    assert curve["projection_grid"] == [
+        0.0,
+        95.0 / 360.0,
+        187.0 / 360.0,
+        30.0,
+    ]
 
 
 def test_generate_fra_is_deterministic_and_complete(tmp_path) -> None:

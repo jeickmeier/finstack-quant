@@ -99,7 +99,11 @@ def build_fra() -> dict[str, Any]:
         "model": "discounting",
         "market": market_snapshot([
             flat_discount_curve("USD-OIS", discount_rate),
-            flat_forward_curve("USD-SOFR-3M", forward_rate),
+            flat_forward_curve(
+                "USD-SOFR-3M",
+                forward_rate,
+                projection_dates=["2026-08-03", "2026-11-03"],
+            ),
         ]),
         "instrument": {
             "schema": "finstack_quant.instrument/1",
@@ -290,7 +294,14 @@ def build_sofr_future() -> dict[str, Any]:
         ),
         "kind": "pricing",
         "model": "discounting",
-        "market": market_snapshot([flat_discount_curve("USD-OIS", 0.04), flat_forward_curve("USD-SOFR-3M", 0.043)]),
+        "market": market_snapshot([
+            flat_discount_curve("USD-OIS", 0.04),
+            flat_forward_curve(
+                "USD-SOFR-3M",
+                0.043,
+                projection_dates=["2026-06-19", "2026-09-18"],
+            ),
+        ]),
         "instrument": {
             "schema": "finstack_quant.instrument/1",
             "instrument": {

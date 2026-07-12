@@ -2434,6 +2434,33 @@ fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
     );
 }
 
+#[test]
+fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
+    let issue = Date::from_calendar_date(2025, Month::June, 16).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::September, 16).unwrap();
+    let init = Money::new(1_000_000.0, Currency::USD);
+    let prior_date = Date::from_calendar_date(2025, Month::June, 13).unwrap();
+    let market = make_market_with_fixings(issue, 0.03, &[(prior_date, 0.0475)]);
+
+    let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder.principal(init, issue, maturity).floating_cf(spec);
+    let schedule = builder
+        .build_with_curves(Some(&market))
+        .expect("a reset on the curve base should remain projectable");
+
+    let rate = schedule
+        .flows
+        .iter()
+        .find(|cf| cf.kind == CFKind::FloatReset)
+        .and_then(|cf| cf.rate)
+        .expect("floating rate");
+    assert!(
+        (rate - 0.03).abs() < RATE_TOLERANCE,
+        "same-day reset should project at 3%, got {rate}"
+    );
+}
+
 /// A seasoned term-rate reset with a fixing series that lacks the exact reset
 /// date fails with a descriptive error (term resets do not carry forward).
 #[test]

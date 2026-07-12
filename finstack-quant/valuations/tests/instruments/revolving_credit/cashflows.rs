@@ -1,6 +1,8 @@
 //! Revolving credit cashflow generation tests.
 
+use finstack_quant_cashflows::builder::{sort_flows, CashFlowMeta, CashFlowSchedule, Notional};
 use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -99,4 +101,61 @@ fn test_utilization_fee_at_threshold() {
 
     // Assert
     assert!(!cashflows.flows.is_empty());
+}
+
+#[test]
+fn same_date_flows_use_the_canonical_cashflow_order() {
+    let payment_date = date!(2025 - 07 - 01);
+    let flow = |kind, amount| CashFlow {
+        date: payment_date,
+        reset_date: None,
+        amount: Money::new(amount, Currency::USD),
+        kind,
+        accrual_factor: 0.0,
+        rate: None,
+    };
+    let mut flows = vec![
+        flow(CFKind::Notional, 5.0),
+        flow(CFKind::PIK, 10.0),
+        flow(CFKind::Fee, 1.0),
+        flow(CFKind::Notional, -30.0),
+        flow(CFKind::Amortization, 20.0),
+    ];
+
+    sort_flows(&mut flows);
+
+    assert_eq!(
+        flows
+            .iter()
+            .map(|cashflow| cashflow.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            CFKind::Fee,
+            CFKind::Amortization,
+            CFKind::PIK,
+            CFKind::Notional,
+            CFKind::Notional,
+        ]
+    );
+    assert_eq!(
+        flows[3].amount.amount(),
+        -30.0,
+        "draw sorts before repayment"
+    );
+    assert_eq!(flows[4].amount.amount(), 5.0);
+
+    let schedule = CashFlowSchedule {
+        flows,
+        notional: Notional::par(100.0, Currency::USD),
+        day_count: DayCount::Act360,
+        meta: CashFlowMeta {
+            issue_date: Some(date!(2025 - 01 - 01)),
+            ..CashFlowMeta::default()
+        },
+    };
+    let outstanding = schedule.outstanding_by_date().unwrap();
+    assert_eq!(
+        outstanding,
+        vec![(payment_date, Money::new(115.0, Currency::USD))]
+    );
 }

@@ -73,7 +73,8 @@ pub use rate_helpers::{
     project_floating_rate, project_floating_rate_from_market, FloatingRateParams,
 };
 pub use schedule::{
-    CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment, PvDiscountSource,
+    sort_flows, CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment,
+    PvDiscountSource,
 };
 pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultCurve, DefaultEvent, DefaultModelSpec,

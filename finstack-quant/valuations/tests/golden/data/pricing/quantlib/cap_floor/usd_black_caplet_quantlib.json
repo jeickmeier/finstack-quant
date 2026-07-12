@@ -79,6 +79,12 @@
               0.04
             ]
           ],
+          "projection_grid": [
+            0.0,
+            0.25277777777777777,
+            0.5083333333333333,
+            30.0
+          ],
           "rate_calibration": null,
           "reset_lag": 2,
           "tenor": 0.25,

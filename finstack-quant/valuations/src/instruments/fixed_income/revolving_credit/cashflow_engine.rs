@@ -24,34 +24,11 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use crate::cashflow::builder::{
-    emit_revolving_credit_fees, CashFlowSchedule, Notional, RevolvingFeeEmissionConfig,
+    emit_revolving_credit_fees, sort_flows, CashFlowSchedule, Notional, RevolvingFeeEmissionConfig,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
 use super::types::{BaseRateSpec, DrawRepaySpec, RevolvingCredit};
-
-/// Canonical sort rank for cashflow kinds within the same date.
-///
-/// Interest/reset flows first, then fees (commitment → facility → usage),
-/// then structural flows (PIK, amortization), and finally notional exchanges last.
-/// This ordering ensures deterministic and stochastic engines produce identical
-/// cashflow sequences for the same dates.
-fn cashflow_kind_rank(kind: &CFKind) -> usize {
-    match kind {
-        CFKind::Fixed => 0,
-        CFKind::Stub => 1,
-        CFKind::FloatReset => 2,
-        CFKind::CommitmentFee => 3,
-        CFKind::FacilityFee => 4,
-        CFKind::UsageFee => 5,
-        CFKind::Fee => 6,
-        CFKind::PIK => 7,
-        CFKind::Amortization => 8,
-        CFKind::Notional => 9,
-        // Any new/unclassified CFKind goes last
-        _ => 100,
-    }
-}
 
 /// Path data from 3-factor Monte Carlo simulation.
 ///
@@ -622,12 +599,7 @@ impl<'a> CashflowEngine<'a> {
             });
         }
 
-        // Sort flows — canonical order shared with stochastic engine
-        flows.sort_by(|a, b| {
-            a.date
-                .cmp(&b.date)
-                .then_with(|| cashflow_kind_rank(&a.kind).cmp(&cashflow_kind_rank(&b.kind)))
-        });
+        sort_flows(&mut flows);
 
         Ok(CashFlowSchedule {
             flows,
@@ -830,12 +802,7 @@ impl<'a> CashflowEngine<'a> {
             });
         }
 
-        // Sort flows — canonical order matching deterministic engine
-        flows.sort_by(|a, b| {
-            a.date
-                .cmp(&b.date)
-                .then_with(|| cashflow_kind_rank(&a.kind).cmp(&cashflow_kind_rank(&b.kind)))
-        });
+        sort_flows(&mut flows);
 
         Ok(CashFlowSchedule {
             flows,

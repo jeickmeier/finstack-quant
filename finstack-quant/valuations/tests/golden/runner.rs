@@ -241,8 +241,10 @@ mod tests {
     #[test]
     fn run_golden_at_path_validates_fixture_before_execution() {
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
-        let fixture_path =
-            Path::new(manifest_dir).join("../../target/golden-test-invalid-schema.json");
+        let fixture_path = Path::new(manifest_dir).join(format!(
+            "../../target/golden-test-invalid-schema-{}.json",
+            std::process::id()
+        ));
         std::fs::write(
             &fixture_path,
             r#"{
@@ -272,6 +274,7 @@ mod tests {
         .expect("write invalid fixture");
 
         let err = run_golden_at_path(&fixture_path).expect_err("fixture validation should fail");
+        std::fs::remove_file(&fixture_path).expect("remove invalid fixture");
 
         assert!(
             err.contains("schema_version is 'finstack_quant.golden/0'"),
