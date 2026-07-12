@@ -44,9 +44,56 @@ type DateSet = finstack_quant_core::HashSet<Date>;
 type ScheduleWithMeta = (Vec<Date>, PeriodMap, DateSet);
 
 #[derive(Debug, Clone, Copy)]
-pub(super) struct DateWindow {
-    pub(super) start: Date,
-    pub(super) end: Date, // exclusive
+pub(super) enum WindowBound {
+    Issue,
+    Date(Date),
+    Maturity,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct ProgramWindow {
+    pub(super) start: WindowBound,
+    pub(super) end: WindowBound,
+}
+
+impl ProgramWindow {
+    pub(super) fn explicit(start: Date, end: Date) -> Self {
+        Self {
+            start: WindowBound::Date(start),
+            end: WindowBound::Date(end),
+        }
+    }
+
+    pub(super) fn full_horizon() -> Self {
+        Self {
+            start: WindowBound::Issue,
+            end: WindowBound::Maturity,
+        }
+    }
+
+    fn resolve(self, issue: Date, maturity: Date) -> DateWindow {
+        let resolve_bound = |bound| match bound {
+            WindowBound::Issue => issue,
+            WindowBound::Date(date) => date,
+            WindowBound::Maturity => maturity,
+        };
+        DateWindow::new(resolve_bound(self.start), resolve_bound(self.end))
+    }
+
+    fn resolve_piece(self, issue: Date, maturity: Date) -> Option<DateWindow> {
+        let window = self.resolve(issue, maturity);
+        if matches!(self.end, WindowBound::Maturity) && window.start == maturity {
+            None
+        } else {
+            Some(window)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DateWindow {
+    start: Date,
+    end: Date, // exclusive
 }
 
 impl DateWindow {
@@ -279,14 +326,14 @@ pub(super) enum CouponSpec {
 
 #[derive(Debug, Clone)]
 pub(super) struct CouponProgramPiece {
-    pub(super) window: DateWindow,
+    pub(super) window: ProgramWindow,
     pub(super) schedule: ScheduleParams,
     pub(super) coupon: CouponSpec,
 }
 
 #[derive(Debug, Clone)]
 pub(super) struct PaymentProgramPiece {
-    pub(super) window: DateWindow,
+    pub(super) window: ProgramWindow,
     pub(super) split: CouponType, // Cash | PIK | Split
 }
 
@@ -473,11 +520,21 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
         .collect()
 }
 
-fn select_coupon_piece(
-    pieces: &[CouponProgramPiece],
+struct ResolvedCouponPiece<'a> {
+    window: DateWindow,
+    piece: &'a CouponProgramPiece,
+}
+
+struct ResolvedPaymentPiece<'a> {
+    window: DateWindow,
+    piece: &'a PaymentProgramPiece,
+}
+
+fn select_coupon_piece<'a>(
+    pieces: &'a [ResolvedCouponPiece<'a>],
     start: Date,
     end: Date,
-) -> finstack_quant_core::Result<&CouponProgramPiece> {
+) -> finstack_quant_core::Result<&'a CouponProgramPiece> {
     let mut chosen = None;
     for piece in pieces {
         if piece.window.covers_range(start, end) {
@@ -487,7 +544,7 @@ fn select_coupon_piece(
                      [{start}, {end})"
                 )));
             }
-            chosen = Some(piece);
+            chosen = Some(piece.piece);
         }
     }
     chosen.ok_or_else(|| {
@@ -499,11 +556,11 @@ fn select_coupon_piece(
 }
 
 fn select_payment_split(
-    pieces: &[PaymentProgramPiece],
+    pieces: &[ResolvedPaymentPiece<'_>],
     start: Date,
     end: Date,
 ) -> finstack_quant_core::Result<CouponType> {
-    let mut chosen: Option<&PaymentProgramPiece> = None;
+    let mut chosen: Option<&ResolvedPaymentPiece<'_>> = None;
 
     for piece in pieces {
         if !piece.window.covers_range(start, end) {
@@ -526,7 +583,9 @@ fn select_payment_split(
         }
     }
 
-    Ok(chosen.map(|piece| piece.split).unwrap_or(CouponType::Cash))
+    Ok(chosen
+        .map(|piece| piece.piece.split)
+        .unwrap_or(CouponType::Cash))
 }
 
 pub(super) fn compute_coupon_schedules(
@@ -579,7 +638,16 @@ pub(super) fn compute_coupon_schedules(
     //! };
     //! // Note: compute_coupon_schedules would be called here
     //! ```
-    let coupon_pieces: &[CouponProgramPiece] = &builder.coupon_program;
+    let coupon_pieces: Vec<_> = builder
+        .coupon_program
+        .iter()
+        .filter_map(|piece| {
+            piece
+                .window
+                .resolve_piece(issue, maturity)
+                .map(|window| ResolvedCouponPiece { window, piece })
+        })
+        .collect();
 
     // If there are no coupon pieces at all and no payment windows, return empty schedules
     if coupon_pieces.is_empty() && builder.payment_program.is_empty() {
@@ -590,7 +658,16 @@ pub(super) fn compute_coupon_schedules(
     }
 
     // Payment pieces (PIK toggles) — may be sparse; missing windows default to Cash
-    let payment_pieces: &[PaymentProgramPiece] = &builder.payment_program;
+    let payment_pieces: Vec<_> = builder
+        .payment_program
+        .iter()
+        .filter_map(|piece| {
+            piece
+                .window
+                .resolve_piece(issue, maturity)
+                .map(|window| ResolvedPaymentPiece { window, piece })
+        })
+        .collect();
 
     // Validate windows are within [issue, maturity] and build boundary grid
     // Use Vec + sort_unstable for better performance than BTreeSet for small N
@@ -598,7 +675,7 @@ pub(super) fn compute_coupon_schedules(
         Vec::with_capacity(2 + coupon_pieces.len() * 2 + payment_pieces.len() * 2);
     bounds.push(issue);
     bounds.push(maturity);
-    for p in coupon_pieces {
+    for p in &coupon_pieces {
         if !p.window.is_within(issue, maturity) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "coupon window [{}, {}) is outside the instrument horizon [{issue}, {maturity}] \
@@ -609,7 +686,7 @@ pub(super) fn compute_coupon_schedules(
         bounds.push(p.window.start);
         bounds.push(p.window.end);
     }
-    for p in payment_pieces {
+    for p in &payment_pieces {
         if !p.window.is_within(issue, maturity) {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "payment window [{}, {}) is outside the instrument horizon [{issue}, {maturity}] \
@@ -637,8 +714,8 @@ pub(super) fn compute_coupon_schedules(
             continue;
         }
 
-        let chosen_coupon = select_coupon_piece(coupon_pieces, s, e)?;
-        let split = select_payment_split(payment_pieces, s, e)?;
+        let chosen_coupon = select_coupon_piece(&coupon_pieces, s, e)?;
+        let split = select_payment_split(&payment_pieces, s, e)?;
 
         let (dates, prev, first_or_last) =
             build_dates_with_meta(DateWindow::new(s, e), &chosen_coupon.schedule)?;

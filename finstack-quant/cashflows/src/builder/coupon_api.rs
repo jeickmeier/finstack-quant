@@ -6,10 +6,11 @@
 //! projection — lives in [`super::orchestrator`].
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
-use super::compiler::{CouponProgramPiece, CouponSpec, DateWindow, PaymentProgramPiece};
+use super::compiler::{
+    CouponProgramPiece, CouponSpec, PaymentProgramPiece, ProgramWindow, WindowBound,
+};
 use super::orchestrator::CashFlowBuilder;
 use super::specs::{
     CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec, ScheduleParams,
@@ -17,70 +18,42 @@ use super::specs::{
 };
 
 impl CashFlowBuilder {
-    fn issue_maturity_error(method_name: &str) -> finstack_quant_core::Error {
-        InputError::NotFound {
-            id: format!(
-                "CashFlowBuilder::{} requires principal() (issue/maturity) to be set first",
-                method_name
-            ),
-        }
-        .into()
-    }
-
-    fn issue_maturity_or_error(
-        &self,
-        method_name: &str,
-    ) -> finstack_quant_core::Result<(Date, Date)> {
-        match (self.issue, self.maturity) {
-            (Some(issue), Some(maturity)) => Ok((issue, maturity)),
-            _ => Err(Self::issue_maturity_error(method_name)),
+    fn record_error(&mut self, error: finstack_quant_core::Error) {
+        if self.pending_error.is_none() {
+            self.pending_error = Some(error);
         }
     }
 
-    fn issue_maturity_or_record_error(&mut self, method_name: &str) -> Option<(Date, Date)> {
-        if self.pending_error.is_some() {
-            return None;
-        }
-        match self.issue_maturity_or_error(method_name) {
-            Ok(v) => Some(v),
-            Err(e) => {
-                self.pending_error = Some(e);
-                None
-            }
-        }
-    }
-
-    fn push_coupon_window(
+    fn push_coupon_program(
         &mut self,
-        start: Date,
-        end: Date,
+        window: ProgramWindow,
         schedule: ScheduleParams,
         coupon: CouponSpec,
         split: CouponType,
     ) -> &mut Self {
         self.coupon_program.push(CouponProgramPiece {
-            window: DateWindow { start, end },
+            window,
             schedule,
             coupon,
         });
-        self.payment_program.push(PaymentProgramPiece {
-            window: DateWindow { start, end },
-            split,
-        });
+        self.payment_program
+            .push(PaymentProgramPiece { window, split });
         self
     }
 
     fn push_full_horizon_coupon(
         &mut self,
-        method_name: &str,
         schedule: ScheduleParams,
         coupon: CouponSpec,
         split: CouponType,
     ) -> &mut Self {
-        let Some((issue, maturity)) = self.issue_maturity_or_record_error(method_name) else {
-            return self;
-        };
-        self.push_coupon_window(issue, maturity, schedule, coupon, split)
+        self.push_coupon_program(ProgramWindow::full_horizon(), schedule, coupon, split)
+    }
+
+    fn push_payment_program(&mut self, window: ProgramWindow, split: CouponType) -> &mut Self {
+        self.payment_program
+            .push(PaymentProgramPiece { window, split });
+        self
     }
 
     fn schedule_from_floating_spec(spec: &FloatingCouponSpec) -> ScheduleParams {
@@ -128,9 +101,9 @@ impl CashFlowBuilder {
     ///
     /// # Errors
     ///
-    /// This method records a deferred error if principal dates have not been
-    /// set. Schedule generation, day-count, calendar, and coupon-split errors
-    /// are returned by [`build_with_curves`](Self::build_with_curves).
+    /// This method may be called before principal dates are set. Schedule
+    /// generation, day-count, calendar, and coupon-split errors are returned by
+    /// [`build_with_curves`](Self::build_with_curves).
     ///
     /// # Examples
     ///
@@ -165,7 +138,6 @@ impl CashFlowBuilder {
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn fixed_cf(&mut self, spec: FixedCouponSpec) -> &mut Self {
         self.push_full_horizon_coupon(
-            "fixed_cf",
             spec.schedule_params(),
             CouponSpec::Fixed { rate: spec.rate },
             spec.coupon_type,
@@ -190,10 +162,9 @@ impl CashFlowBuilder {
     ///
     /// # Errors
     ///
-    /// This method records a deferred error if principal dates have not been
-    /// set. Floating spec validation, missing forward curves, calendar errors,
-    /// and fallback-policy failures are returned by the terminal build or
-    /// project step.
+    /// This method may be called before principal dates are set. Floating spec
+    /// validation, missing forward curves, calendar errors, and fallback-policy
+    /// failures are returned by the terminal build or project step.
     ///
     /// # Examples
     ///
@@ -247,46 +218,6 @@ impl CashFlowBuilder {
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn floating_cf(&mut self, spec: FloatingCouponSpec) -> &mut Self {
         self.push_full_horizon_coupon(
-            "floating_cf",
-            Self::schedule_from_floating_spec(&spec),
-            CouponSpec::Float {
-                rate_spec: spec.rate_spec,
-            },
-            spec.coupon_type,
-        )
-    }
-
-    /// Adds a fixed coupon window with its own schedule and payment split (cash/PIK/split).
-    ///
-    /// Internal helper used by step-up and fixed-to-floating schedules. Prefer the
-    /// spec-level entry points (`fixed_cf`, `step_up_cf`, `fixed_to_float`).
-    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
-    fn add_fixed_coupon_window(
-        &mut self,
-        start: Date,
-        end: Date,
-        rate: Decimal,
-        schedule: ScheduleParams,
-        split: CouponType,
-    ) -> &mut Self {
-        self.push_coupon_window(start, end, schedule, CouponSpec::Fixed { rate }, split)
-    }
-
-    /// Adds a floating coupon window with its own schedule and payment split.
-    ///
-    /// Internal helper used by `float_margin_stepup` / `fixed_to_float` etc.
-    /// Prefer the spec-level entry points (`floating_cf`, `float_margin_stepup`,
-    /// `fixed_to_float`).
-    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
-    fn add_float_coupon_window(
-        &mut self,
-        start: Date,
-        end: Date,
-        spec: FloatingCouponSpec,
-    ) -> &mut Self {
-        self.push_coupon_window(
-            start,
-            end,
             Self::schedule_from_floating_spec(&spec),
             CouponSpec::Float {
                 rate_spec: spec.rate_spec,
@@ -377,7 +308,7 @@ impl CashFlowBuilder {
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn add_payment_window(&mut self, start: Date, end: Date, split: CouponType) -> &mut Self {
         self.payment_program.push(PaymentProgramPiece {
-            window: DateWindow { start, end },
+            window: ProgramWindow::explicit(start, end),
             split,
         });
         self
@@ -451,28 +382,35 @@ impl CashFlowBuilder {
     /// - Works with both fixed and floating coupons
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn payment_split_program(&mut self, steps: &[(Date, CouponType)]) -> &mut Self {
-        let Some((issue, maturity)) = self.issue_maturity_or_record_error("payment_split_program")
-        else {
+        if self.pending_error.is_some() {
             return self;
-        };
+        }
         if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
-            self.pending_error = Some(finstack_quant_core::Error::Validation(format!(
+            self.record_error(finstack_quant_core::Error::Validation(format!(
                 "payment_split_program steps must be strictly increasing by date; found {} \
                  followed by {}",
                 w[0].0, w[1].0
             )));
             return self;
         }
-        let mut prev = issue;
+        let mut prev = WindowBound::Issue;
         for &(end, split) in steps {
-            if prev < end {
-                let _ = self.add_payment_window(prev, end, split);
-            }
-            prev = end;
+            let _ = self.push_payment_program(
+                ProgramWindow {
+                    start: prev,
+                    end: WindowBound::Date(end),
+                },
+                split,
+            );
+            prev = WindowBound::Date(end);
         }
-        if prev < maturity {
-            let _ = self.add_payment_window(prev, maturity, CouponType::Cash);
-        }
+        let _ = self.push_payment_program(
+            ProgramWindow {
+                start: prev,
+                end: WindowBound::Maturity,
+            },
+            CouponType::Cash,
+        );
         self
     }
 }
@@ -495,9 +433,9 @@ impl CashFlowBuilder {
     ///
     /// # Errors
     ///
-    /// This method records a deferred error if principal dates have not been
-    /// set. Date generation, calendar lookup, coupon split validation, and
-    /// day-count failures are returned by [`build_with_curves`](Self::build_with_curves).
+    /// This method may be called before principal dates are set. Date
+    /// generation, calendar lookup, coupon split validation, and day-count
+    /// failures are returned by [`build_with_curves`](Self::build_with_curves).
     ///
     /// # Examples
     ///
@@ -532,7 +470,6 @@ impl CashFlowBuilder {
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn step_up_cf(&mut self, spec: StepUpCouponSpec) -> &mut Self {
         self.push_full_horizon_coupon(
-            "step_up_cf",
             spec.schedule_params(),
             CouponSpec::StepUp {
                 initial_rate: spec.initial_rate,
@@ -558,34 +495,46 @@ impl CashFlowBuilder {
         schedule: ScheduleParams,
         default_split: CouponType,
     ) -> &mut Self {
-        let Some((issue, maturity)) = self.issue_maturity_or_record_error("fixed_stepup_decimal")
-        else {
+        if self.pending_error.is_some() {
             return self;
-        };
+        }
         if steps.is_empty() {
-            self.pending_error = Some(finstack_quant_core::Error::Validation(
+            self.record_error(finstack_quant_core::Error::Validation(
                 "fixed_stepup_decimal requires at least one (date, rate) step".into(),
             ));
             return self;
         }
         if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
-            self.pending_error = Some(finstack_quant_core::Error::Validation(format!(
+            self.record_error(finstack_quant_core::Error::Validation(format!(
                 "fixed_stepup_decimal steps must be strictly increasing by date; found {} \
                  followed by {}",
                 w[0].0, w[1].0
             )));
             return self;
         }
-        let mut prev = issue;
+        let mut prev = WindowBound::Issue;
         for &(end, rate) in steps {
-            let _ = self.add_fixed_coupon_window(prev, end, rate, schedule.clone(), default_split);
-            prev = end;
+            let _ = self.push_coupon_program(
+                ProgramWindow {
+                    start: prev,
+                    end: WindowBound::Date(end),
+                },
+                schedule.clone(),
+                CouponSpec::Fixed { rate },
+                default_split,
+            );
+            prev = WindowBound::Date(end);
         }
-        if prev != maturity {
-            // If the last step didn't reach maturity, extend using last rate
-            if let Some(&(_, rate)) = steps.last() {
-                let _ = self.add_fixed_coupon_window(prev, maturity, rate, schedule, default_split);
-            }
+        if let Some(&(_, rate)) = steps.last() {
+            let _ = self.push_coupon_program(
+                ProgramWindow {
+                    start: prev,
+                    end: WindowBound::Maturity,
+                },
+                schedule,
+                CouponSpec::Fixed { rate },
+                default_split,
+            );
         }
         self
     }
@@ -600,28 +549,38 @@ impl CashFlowBuilder {
         steps: &[(Date, Decimal)],
         base_spec: FloatingCouponSpec,
     ) -> &mut Self {
-        let Some((issue, maturity)) =
-            self.issue_maturity_or_record_error("float_margin_stepup_decimal")
-        else {
-            return self;
-        };
-        let mut prev = issue;
+        let mut prev = WindowBound::Issue;
         for &(end, margin_decimal) in steps {
             let window_spec = Self::floating_spec_with_margin(&base_spec, margin_decimal);
-            let _ = self.add_float_coupon_window(prev, end, window_spec);
-            prev = end;
-        }
-        if prev != maturity {
-            let mut margin_decimal = base_spec.rate_spec.spread_bp;
-            if let Some(&(_, last_margin_decimal)) = steps.last() {
-                margin_decimal = last_margin_decimal;
-            }
-            let _ = self.add_float_coupon_window(
-                prev,
-                maturity,
-                Self::floating_spec_with_margin(&base_spec, margin_decimal),
+            let _ = self.push_coupon_program(
+                ProgramWindow {
+                    start: prev,
+                    end: WindowBound::Date(end),
+                },
+                Self::schedule_from_floating_spec(&window_spec),
+                CouponSpec::Float {
+                    rate_spec: window_spec.rate_spec,
+                },
+                window_spec.coupon_type,
             );
+            prev = WindowBound::Date(end);
         }
+        let margin = steps
+            .last()
+            .map(|(_, margin)| *margin)
+            .unwrap_or(base_spec.rate_spec.spread_bp);
+        let final_spec = Self::floating_spec_with_margin(&base_spec, margin);
+        let _ = self.push_coupon_program(
+            ProgramWindow {
+                start: prev,
+                end: WindowBound::Maturity,
+            },
+            Self::schedule_from_floating_spec(&final_spec),
+            CouponSpec::Float {
+                rate_spec: final_spec.rate_spec,
+            },
+            final_spec.coupon_type,
+        );
         self
     }
 
@@ -709,17 +668,28 @@ impl CashFlowBuilder {
         float_spec: FloatingCouponSpec,
         fixed_split: CouponType,
     ) -> &mut Self {
-        let Some((issue, maturity)) = self.issue_maturity_or_record_error("fixed_to_float") else {
-            return self;
-        };
-        let _ = self.add_fixed_coupon_window(
-            issue,
-            switch,
-            fixed_win.rate,
+        let _ = self.push_coupon_program(
+            ProgramWindow {
+                start: WindowBound::Issue,
+                end: WindowBound::Date(switch),
+            },
             fixed_win.schedule,
+            CouponSpec::Fixed {
+                rate: fixed_win.rate,
+            },
             fixed_split,
         );
-        let _ = self.add_float_coupon_window(switch, maturity, float_spec);
+        let _ = self.push_coupon_program(
+            ProgramWindow {
+                start: WindowBound::Date(switch),
+                end: WindowBound::Maturity,
+            },
+            Self::schedule_from_floating_spec(&float_spec),
+            CouponSpec::Float {
+                rate_spec: float_spec.rate_spec,
+            },
+            float_spec.coupon_type,
+        );
         self
     }
 }

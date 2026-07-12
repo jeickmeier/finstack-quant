@@ -12,12 +12,15 @@
 //! - Outstanding balance constraints
 
 use finstack_quant_cashflows::builder::{
-    CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, PrincipalEvent,
+    AmortizationSpec, CashFlowBuilder, CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec,
+    FixedWindow, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
+    OvernightIndexConstraintApplication, PrincipalEvent, ScheduleParams, StepUpCouponSpec,
 };
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use time::Month;
 
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -821,4 +824,169 @@ fn notional_event_with_negative_delta_rejected() {
         msg.contains("delta >= 0"),
         "error should describe the sign convention: {msg}"
     );
+}
+
+fn order_independence_fixed_spec() -> FixedCouponSpec {
+    FixedCouponSpec {
+        coupon_type: CouponType::Cash,
+        rate: dec!(0.05),
+        freq: Tenor::quarterly(),
+        dc: DayCount::Act360,
+        bdc: BusinessDayConvention::Following,
+        calendar_id: "weekends_only".to_string(),
+        stub: StubKind::None,
+        end_of_month: false,
+        payment_lag_days: 0,
+    }
+}
+
+fn order_independence_float_spec() -> FloatingCouponSpec {
+    FloatingCouponSpec {
+        rate_spec: FloatingRateSpec {
+            index_id: "USD-SOFR-3M".into(),
+            spread_bp: dec!(200),
+            gearing: Decimal::ONE,
+            gearing_includes_spread: true,
+            index_floor_bp: None,
+            all_in_cap_bp: None,
+            all_in_floor_bp: None,
+            index_cap_bp: None,
+            overnight_index_constraints: OvernightIndexConstraintApplication::Daily,
+            reset_freq: Tenor::quarterly(),
+            index_tenor: None,
+            reset_lag_days: 0,
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".to_string(),
+            fixing_calendar_id: None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            overnight_compounding: None,
+            overnight_basis: None,
+            fallback: FloatingRateFallback::SpreadOnly,
+        },
+        coupon_type: CouponType::Cash,
+        freq: Tenor::quarterly(),
+        stub: StubKind::None,
+    }
+}
+
+fn assert_program_order_independent<F>(
+    principal: Money,
+    issue: Date,
+    maturity: Date,
+    mut configure: F,
+) where
+    F: FnMut(&mut CashFlowBuilder),
+{
+    let mut first = CashFlowSchedule::builder();
+    let _ = first.principal(principal, issue, maturity);
+    configure(&mut first);
+
+    let mut second = CashFlowSchedule::builder();
+    configure(&mut second);
+    let _ = second.principal(principal, issue, maturity);
+
+    assert_eq!(
+        first.build_with_curves(None).unwrap().flows,
+        second.build_with_curves(None).unwrap().flows
+    );
+}
+
+#[test]
+fn principal_and_amortization_are_order_independent() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let principal = Money::new(1_000_000.0, Currency::USD);
+    let amortization = AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 };
+
+    let mut principal_first = CashFlowSchedule::builder();
+    let _ = principal_first
+        .principal(principal, issue, maturity)
+        .amortization(amortization.clone())
+        .fixed_cf(order_independence_fixed_spec());
+
+    let mut amortization_first = CashFlowSchedule::builder();
+    let _ = amortization_first
+        .amortization(amortization)
+        .fixed_cf(order_independence_fixed_spec())
+        .principal(principal, issue, maturity);
+
+    assert_eq!(
+        principal_first.build_with_curves(None).unwrap().flows,
+        amortization_first.build_with_curves(None).unwrap().flows
+    );
+}
+
+#[test]
+fn full_horizon_coupon_programs_are_order_independent() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let switch = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2027, Month::January, 15).unwrap();
+    let principal = Money::new(1_000_000.0, Currency::USD);
+
+    assert_program_order_independent(principal, issue, maturity, |builder| {
+        let _ = builder.fixed_cf(order_independence_fixed_spec());
+    });
+    assert_program_order_independent(principal, issue, maturity, |builder| {
+        let _ = builder.floating_cf(order_independence_float_spec());
+    });
+
+    let step_spec = || StepUpCouponSpec {
+        coupon_type: CouponType::Cash,
+        initial_rate: dec!(0.04),
+        step_schedule: vec![(switch, dec!(0.05))],
+        freq: Tenor::quarterly(),
+        dc: DayCount::Act360,
+        bdc: BusinessDayConvention::Following,
+        calendar_id: "weekends_only".to_string(),
+        stub: StubKind::None,
+        end_of_month: false,
+        payment_lag_days: 0,
+    };
+    assert_program_order_independent(principal, issue, maturity, |builder| {
+        let _ = builder.step_up_cf(step_spec());
+    });
+    assert_program_order_independent(principal, issue, maturity, |builder| {
+        let _ = builder.fixed_stepup_decimal(
+            &[(switch, dec!(0.04))],
+            ScheduleParams::semiannual_30360(),
+            CouponType::Cash,
+        );
+    });
+    assert_program_order_independent(principal, issue, maturity, |builder| {
+        let _ = builder
+            .fixed_cf(order_independence_fixed_spec())
+            .payment_split_program(&[(switch, CouponType::PIK)]);
+    });
+
+    let fixed_window = || FixedWindow {
+        rate: dec!(0.04),
+        schedule: ScheduleParams::semiannual_30360(),
+    };
+    assert_program_order_independent(principal, issue, maturity, |builder| {
+        let _ = builder.fixed_to_float(
+            switch,
+            fixed_window(),
+            order_independence_float_spec(),
+            CouponType::Cash,
+        );
+    });
+    assert_program_order_independent(principal, issue, maturity, |builder| {
+        let _ = builder
+            .float_margin_stepup_decimal(&[(switch, dec!(250))], order_independence_float_spec());
+    });
+}
+
+#[test]
+fn principal_does_not_clear_the_first_builder_error() {
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .fixed_stepup_decimal(&[], ScheduleParams::semiannual_30360(), CouponType::Cash)
+        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity);
+
+    let error = builder.build_with_curves(None).unwrap_err().to_string();
+    assert!(error.contains("requires at least one"), "{error}");
 }

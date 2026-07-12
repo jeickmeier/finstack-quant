@@ -333,6 +333,7 @@ fn collect_all_dates(inputs: &DateCollectionInputs<'_>) -> finstack_quant_core::
 #[derive(Debug, Clone)]
 pub struct CashFlowBuilder {
     pub(super) notional: Option<Notional>,
+    pub(super) amortization: Option<AmortizationSpec>,
     pub(super) issue: Option<Date>,
     pub(super) maturity: Option<Date>,
     /// Fee specifications. SmallVec<4> avoids heap allocation for typical instruments
@@ -350,6 +351,7 @@ impl Default for CashFlowBuilder {
     fn default() -> Self {
         Self {
             notional: None,
+            amortization: None,
             issue: None,
             maturity: None,
             fees: SmallVec::new(),

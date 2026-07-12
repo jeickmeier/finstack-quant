@@ -10,14 +10,9 @@ use crate::primitives::CFKind;
 impl CashFlowBuilder {
     /// Sets principal details and instrument horizon.
     ///
-    /// This must be called before full-horizon coupon helpers such as
-    /// [`fixed_cf`](Self::fixed_cf), [`floating_cf`](Self::floating_cf), or
-    /// [`step_up_cf`](Self::step_up_cf). Those helpers infer their start and
-    /// end dates from this principal horizon.
-    ///
-    /// Calling this method clears any previously recorded sticky builder error.
-    /// It does not clear coupons, fees, or principal events already pushed onto
-    /// the builder, so prefer creating a fresh builder for a new instrument.
+    /// Full-horizon coupons and amortization may be configured before or after
+    /// this method. Their horizon is resolved when the schedule is built.
+    /// Calling this method does not clear a previously recorded builder error.
     ///
     /// # Arguments
     ///
@@ -30,24 +25,21 @@ impl CashFlowBuilder {
     /// Mutable builder reference for fluent chaining.
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn principal(&mut self, initial: Money, issue_date: Date, maturity: Date) -> &mut Self {
-        self.pending_error = None;
         self.notional = Some(Notional {
             initial,
-            amort: AmortizationSpec::None,
+            amort: self.amortization.clone().unwrap_or(AmortizationSpec::None),
         });
         self.issue = Some(issue_date);
         self.maturity = Some(maturity);
         self
     }
 
-    /// Configures amortization on the current notional.
+    /// Configures amortization for the instrument notional.
     ///
-    /// The amortization rule is attached to the notional previously set by
-    /// [`principal`](Self::principal). If no principal has been set, this method
-    /// is a no-op; missing principal is reported later by
-    /// [`build_with_curves`](Self::build_with_curves).
+    /// This may be called before or after [`principal`](Self::principal).
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn amortization(&mut self, spec: AmortizationSpec) -> &mut Self {
+        self.amortization = Some(spec.clone());
         if let Some(n) = &mut self.notional {
             n.amort = spec;
         }
