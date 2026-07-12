@@ -59,10 +59,12 @@ fn bucketed_dv01_uses_configured_bucket_grid() {
     let market = MarketContext::new().insert(build_discount_curve(0.04));
     let pv = bond.value(&market, as_of).expect("pv");
     let mut cfg = FinstackConfig::default();
-    cfg.extensions.insert(
-        "valuations.sensitivities.v1",
-        json!({"dv01_buckets_years": [4.0, 6.0]}),
-    );
+    cfg.extensions
+        .insert(
+            "valuations.sensitivities.v1",
+            json!({"dv01_buckets_years": [4.0, 6.0]}),
+        )
+        .expect("valid extension key");
 
     let mut context =
         MetricContext::new(Arc::new(bond), Arc::new(market), as_of, pv, Arc::new(cfg));

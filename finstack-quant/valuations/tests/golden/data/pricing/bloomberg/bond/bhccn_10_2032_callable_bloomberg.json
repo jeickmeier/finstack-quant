@@ -6,7 +6,7 @@
     "description": "Bloomberg DES/YAS/OAS/ASW BHCCN USD 10% 2032 callable 1st-lien corporate bond captured from screens on 2026-05-03.",
     "valuation_date": "2026-05-01",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg DES/YAS/OAS/ASW for BHCCN 10 04/15/32 Corp, USD 144A 1st-lien callable corporate bond, settlement 2026-05-05, price 103.3975, curve 490 SOFR OIS for ASW, OAS curve S23, Treasury benchmark T 3 7/8 04/15/29. Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved.",
+    "source_detail": "Bloomberg DES/YAS/OAS/ASW for BHCCN 10 04/15/32 Corp, USD 144A 1st-lien callable corporate bond, settlement 2026-05-05, price 103.3975, curve 490 SOFR OIS for ASW, OAS curve S23, Treasury benchmark T 3 7/8 04/15/29. Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved. The ASW cashflow screen's 91,813.19 first floating interest amount over 2026-04-15 to 2027-04-19 (Act/360) and displayed 5.334% spread imply a 3.6234% reset; the fixture records that historical fixing instead of projecting it from the 2026-05-03 curve. The Bloomberg ASW target remains authoritative and the fixture is temporarily listed in known_non_executable pending an independent benchmark refresh.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-03",
     "last_reviewed_by": "jeickmeier",
@@ -113,7 +113,20 @@
           }
         }
       },
-      "market_data": [],
+      "market_data": [
+        {
+          "kind": "fixing_series",
+          "id": "FIXING:USD-SOFRRATE",
+          "currency": null,
+          "observations": [
+            [
+              "2026-04-15",
+              0.03623418536585366
+            ]
+          ],
+          "interpolation": "step"
+        }
+      ],
       "prior_market": [
         {
           "kind": "discount_curve",

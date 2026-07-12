@@ -86,6 +86,12 @@ fn kirk_price(
     t: f64,
     df: f64,
 ) -> finstack_quant_core::Result<f64> {
+    if !f1.is_finite() || f1 <= 0.0 || !f2.is_finite() || f2 <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySpreadOption '{}' requires finite positive forwards for Kirk's lognormal model, got F1={f1}, F2={f2}",
+            inst.id
+        )));
+    }
     // Get vols from surfaces
     let surface1 = market.get_surface(inst.leg1_vol_surface_id.as_str())?;
     let sigma1 = surface1.value_clamped(t, f1);

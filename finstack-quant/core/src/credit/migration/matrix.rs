@@ -33,10 +33,33 @@ use super::{error::MigrationError, scale::RatingScale};
 /// - Gupton, G. M., Finger, C. C., & Bhatia, M. (1997). *CreditMetrics —
 ///   Technical Document*. J.P. Morgan.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "TransitionMatrixWire")]
 pub struct TransitionMatrix {
     pub(crate) data: DMatrix<f64>,
     pub(crate) horizon: f64,
     pub(crate) scale: RatingScale,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TransitionMatrixWire {
+    data: DMatrix<f64>,
+    horizon: f64,
+    scale: RatingScale,
+}
+
+impl TryFrom<TransitionMatrixWire> for TransitionMatrix {
+    type Error = MigrationError;
+
+    fn try_from(wire: TransitionMatrixWire) -> Result<Self, Self::Error> {
+        let mut data = Vec::with_capacity(wire.data.len());
+        for row in 0..wire.data.nrows() {
+            for col in 0..wire.data.ncols() {
+                data.push(wire.data[(row, col)]);
+            }
+        }
+        TransitionMatrix::new(wire.scale, &data, wire.horizon)
+    }
 }
 
 impl TransitionMatrix {
@@ -138,11 +161,13 @@ impl TransitionMatrix {
             return Err(MigrationError::ScaleMismatch);
         }
         let composed = &self.data * &other.data;
-        Ok(TransitionMatrix {
-            data: composed,
-            horizon: self.horizon + other.horizon,
-            scale: self.scale.clone(),
-        })
+        let mut data = Vec::with_capacity(composed.len());
+        for row in 0..composed.nrows() {
+            for col in 0..composed.ncols() {
+                data.push(composed[(row, col)]);
+            }
+        }
+        TransitionMatrix::new(self.scale.clone(), &data, self.horizon + other.horizon)
     }
 
     /// Default probability vector: probability of reaching the default state from each row.

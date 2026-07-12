@@ -65,7 +65,7 @@ pub(crate) fn price_cap_floor(
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
     use crate::instruments::common_impl::pricing::time::{
-        rate_period_on_dates, relative_df_discount_curve,
+        rate_between_on_dates, relative_df_discount_curve,
     };
     use crate::instruments::rates::cap_floor::pricing::{black, normal};
 
@@ -152,7 +152,7 @@ pub(crate) fn price_cap_floor(
         } else if is_fixed_unpaid {
             historical_cap_floor_fixing(curves, &cap_floor.forward_curve_id, fixing_date)?
         } else {
-            rate_period_on_dates(fwd_curve.as_ref(), period.accrual_start, period.accrual_end)?
+            rate_between_on_dates(fwd_curve.as_ref(), period.accrual_start, period.accrual_end)?
         };
         let df = relative_df_discount_curve(disc_curve.as_ref(), as_of, pay)?;
         let sigma = if effective_t_fix > 0.0 {

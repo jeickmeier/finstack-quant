@@ -56,8 +56,17 @@ impl PyForwardCurve {
     ///     Interpolation style (default ``"linear"``).
     /// extrapolation : str, optional
     ///     Extrapolation policy (default ``"flat_forward"``).
+    /// projection_grid : list[float] | None, optional
+    ///     Contractual reset/end-date projection boundaries. Omit for legacy
+    ///     fixed numeric-tenor DF stepping.
+    /// reset_lag : int | None, optional
+    ///     Business days from fixing to spot. Omit for Rust curve-ID inference.
     #[new]
-    #[pyo3(signature = (id, tenor, knots, base_date, day_count=None, interp="linear", extrapolation="flat_forward"))]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserves the published Python positional constructor while appending optional curve metadata compatibly"
+    )]
+    #[pyo3(signature = (id, tenor, knots, base_date, day_count=None, interp="linear", extrapolation="flat_forward", projection_grid=None, reset_lag=None))]
     fn new(
         id: &str,
         tenor: f64,
@@ -66,6 +75,8 @@ impl PyForwardCurve {
         day_count: Option<&str>,
         interp: &str,
         extrapolation: &str,
+        projection_grid: Option<Vec<f64>>,
+        reset_lag: Option<i32>,
     ) -> PyResult<Self> {
         let base = py_to_date(base_date)?;
         let style = parse_interp_style(interp)?;
@@ -75,9 +86,13 @@ impl PyForwardCurve {
             .base_date(base)
             .knots(knots)
             .interp(style)
-            .extrapolation(extrap);
+            .extrapolation(extrap)
+            .projection_grid_opt(projection_grid);
         if let Some(day_count) = day_count {
             builder = builder.day_count(parse_day_count(day_count)?);
+        }
+        if let Some(reset_lag) = reset_lag {
+            builder = builder.reset_lag(reset_lag);
         }
 
         let curve = builder.build().map_err(core_to_py)?;
@@ -93,6 +108,12 @@ impl PyForwardCurve {
         self.inner.rate(t)
     }
 
+    /// Discount-factor-implied simple forward rate over `(t1, t2)`.
+    #[pyo3(text_signature = "(self, t1, t2)")]
+    fn rate_between(&self, t1: f64, t2: f64) -> PyResult<f64> {
+        self.inner.rate_between(t1, t2).map_err(core_to_py)
+    }
+
     /// Curve identifier string.
     #[getter]
     fn id(&self) -> &str {
@@ -103,6 +124,18 @@ impl PyForwardCurve {
     #[getter]
     fn base_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         date_to_py(py, self.inner.base_date())
+    }
+
+    /// Contractual projection boundaries, or `None` for legacy tenor stepping.
+    #[getter]
+    fn projection_grid(&self) -> Option<Vec<f64>> {
+        self.inner.projection_grid().map(<[f64]>::to_vec)
+    }
+
+    /// Business days from fixing to spot.
+    #[getter]
+    fn reset_lag(&self) -> i32 {
+        self.inner.reset_lag()
     }
 
     fn __repr__(&self) -> String {

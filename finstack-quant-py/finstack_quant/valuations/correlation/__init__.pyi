@@ -735,7 +735,15 @@ class CorrelatedBernoulli:
         p2 : float
             Marginal probability of event 2.
         correlation : float
-            Desired correlation between events.
+            Desired finite correlation in ``[-1, 1]``. Values inside that
+            domain but outside the feasible Fréchet-Hoeffding interval are
+            clamped to the nearest feasible bound.
+
+        Raises
+        ------
+        ValueError
+            If a marginal is not finite and in ``[0, 1]`` or correlation is
+            not finite and in ``[-1, 1]``.
         """
         ...
 
@@ -751,7 +759,12 @@ class CorrelatedBernoulli:
 
     @property
     def correlation(self) -> float:
-        """Correlation between events."""
+        """Effective correlation after Fréchet-Hoeffding clamping."""
+        ...
+
+    @property
+    def requested_correlation(self) -> float:
+        """Caller-requested correlation before Fréchet-Hoeffding clamping."""
         ...
 
     @property
@@ -816,6 +829,11 @@ class CorrelatedBernoulli:
         -------
         tuple[int, int]
             ``(x1, x2)`` where each is 0 or 1.
+
+        Raises
+        ------
+        ValueError
+            If ``u`` is not finite and in ``[0, 1]``.
         """
         ...
 
@@ -833,6 +851,11 @@ def correlation_bounds(p1: float, p2: float) -> tuple[float, float]:
     -------
     tuple[float, float]
         ``(rho_min, rho_max)`` — the feasible correlation range.
+
+    Raises
+    ------
+    ValueError
+        If either marginal is not finite and in ``[0, 1]``.
     """
     ...
 
@@ -852,6 +875,12 @@ def joint_probabilities(p1: float, p2: float, correlation: float) -> tuple[float
     -------
     tuple[float, float, float, float]
         ``(p11, p10, p01, p00)`` that sums to 1 and preserves marginals.
+
+    Raises
+    ------
+    ValueError
+        If either marginal is not finite and in ``[0, 1]`` or correlation is
+        not finite and in ``[-1, 1]``.
     """
     ...
 

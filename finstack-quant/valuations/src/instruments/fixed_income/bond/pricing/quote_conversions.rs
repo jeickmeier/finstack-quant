@@ -8,6 +8,7 @@
 //! All spread-style quantities exposed here use **decimal units**:
 //! `0.01` corresponds to **100 basis points**.
 use crate::constants::numerical::ZERO_TOLERANCE;
+use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::{
     bond_z_spread_compounding_frequency, z_spread_discount_factor,
@@ -259,16 +260,13 @@ pub fn par_rate_and_annuity_from_forward(
         return Ok((0.0, 0.0));
     }
 
-    let f_base = fwd.base_date();
     let f_dc = fwd.day_count();
     let spread = float_spread_bp * 1e-4;
     let mut pv_float = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut prev = schedule[0];
     for &d in &schedule[1..] {
-        let t1 = f_dc.year_fraction(f_base, prev, DayCountContext::default())?;
-        let t2 = f_dc.year_fraction(f_base, d, DayCountContext::default())?;
         let yf = f_dc.year_fraction(prev, d, DayCountContext::default())?;
-        let rate = fwd.rate_period(t1, t2) + spread;
+        let rate = rate_between_on_dates(fwd, prev, d)? + spread;
         let df = disc.df_on_date_curve(d)?;
         pv_float.add(rate * yf * df);
         prev = d;
@@ -291,18 +289,15 @@ pub fn asset_swap_forward_components(
         return Ok((0.0, fixed_ann, 0.0));
     }
 
-    let f_base = fwd.base_date();
     let f_dc = fwd.day_count();
     let spread = float_spread_bp * 1e-4;
     let mut float_pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut float_ann = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut prev = schedule[0];
     for &d in &schedule[1..] {
-        let t1 = f_dc.year_fraction(f_base, prev, DayCountContext::default())?;
-        let t2 = f_dc.year_fraction(f_base, d, DayCountContext::default())?;
         let yf = f_dc.year_fraction(prev, d, DayCountContext::default())?;
         let df = disc.df_on_date_curve(d)?;
-        float_pv.add((fwd.rate_period(t1, t2) + spread) * yf * df);
+        float_pv.add((rate_between_on_dates(fwd, prev, d)? + spread) * yf * df);
         float_ann.add(yf * df);
         prev = d;
     }
@@ -1615,9 +1610,72 @@ mod tests {
     use super::*;
     use crate::instruments::fixed_income::bond::Bond;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use time::macros::date;
+
+    #[test]
+    fn asset_swap_forward_paths_use_discount_factor_implied_rates() {
+        let base = date!(2025 - 01 - 01);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
+            .knots([(0.0, 1.0), (1.0, 0.95)])
+            .build()
+            .expect("discount curve should build");
+        let fwd = ForwardCurve::builder("USD-3M", 0.25)
+            .base_date(base)
+            .day_count(finstack_quant_core::dates::DayCount::Act360)
+            .knots([(0.0, 0.01), (1.0, 0.21)])
+            .build()
+            .expect("forward curve should build");
+        let schedule = [base, date!(2025 - 07 - 01), date!(2026 - 01 - 01)];
+        let mut expected_float_pv = 0.0;
+        let mut integrated_float_pv = 0.0;
+        for dates in schedule.windows(2) {
+            let t1 = fwd
+                .day_count()
+                .year_fraction(base, dates[0], DayCountContext::default())
+                .expect("valid start time");
+            let t2 = fwd
+                .day_count()
+                .year_fraction(base, dates[1], DayCountContext::default())
+                .expect("valid end time");
+            let yf = fwd
+                .day_count()
+                .year_fraction(dates[0], dates[1], DayCountContext::default())
+                .expect("valid accrual fraction");
+            let df = disc
+                .df_on_date_curve(dates[1])
+                .expect("valid discount factor");
+            expected_float_pv += fwd.rate_between(t1, t2).expect("valid term forward") * yf * df;
+            integrated_float_pv += fwd.rate_period(t1, t2) * yf * df;
+        }
+
+        let (float_pv, fixed_ann, _) = asset_swap_forward_components(
+            &disc,
+            &fwd,
+            finstack_quant_core::dates::DayCount::Act360,
+            None,
+            &schedule,
+            0.0,
+        )
+        .expect("asset-swap components should succeed");
+        let (par_rate, par_ann) = par_rate_and_annuity_from_forward(
+            &disc,
+            &fwd,
+            finstack_quant_core::dates::DayCount::Act360,
+            None,
+            &schedule,
+            0.0,
+        )
+        .expect("forward par rate should succeed");
+
+        assert!((expected_float_pv - integrated_float_pv).abs() > 1e-6);
+        assert!((float_pv - expected_float_pv).abs() < 1e-14);
+        assert!((par_ann - fixed_ann).abs() < 1e-14);
+        assert!((par_rate - expected_float_pv / fixed_ann).abs() < 1e-14);
+    }
 
     /// W-30: a Treasury with a LONG first coupon period (8 months on a
     /// semi-annual bond) must have its first-period stub flagged from the

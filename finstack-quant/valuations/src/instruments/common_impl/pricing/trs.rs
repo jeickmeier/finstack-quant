@@ -19,8 +19,8 @@
 //! project each period's floating rate according to the financing leg's
 //! `FinancingRateCompounding` setting:
 //!
-//! - `TermRate` — the **simple arithmetic-average forward** over the accrual
-//!   period ([`rate_period_on_dates`]), correct for a term-rate-financed TRS
+//! - `TermRate` — the **discount-factor-implied simple forward** over the accrual
+//!   period ([`rate_between_on_dates`]), correct for a term-rate-financed TRS
 //!   (e.g. 3M Term SOFR) where the period length matches the index tenor.
 //! - `OvernightCompounded` — **daily-compounds** the overnight forward via
 //!   `swap_legs::compounded_forward_projection`, `(∏(1+rᵢ·dᵢ)−1)/τ`, correct
@@ -44,12 +44,12 @@ use finstack_quant_core::money::Money;
 use rust_decimal::prelude::ToPrimitive;
 
 use crate::instruments::common_impl::pricing::time::{
-    rate_period_on_dates, relative_df_discount_curve,
+    rate_between_on_dates, relative_df_discount_curve,
 };
 
 /// Project one financing-leg accrual period's floating rate, excluding spread.
 ///
-/// `TermRate` legs use the simple arithmetic-average forward over the period;
+/// `TermRate` legs use the discount-factor-implied simple forward over the period;
 /// `OvernightCompounded` (OIS / RFR) legs daily-compound the overnight forward
 /// and return the equivalent simple rate `(∏(1+rᵢ·dᵢ)−1)/τ`, capturing the
 /// daily-compounding convexity the arithmetic average drops.
@@ -73,7 +73,18 @@ fn financing_period_rate(
     calendar_id: &str,
 ) -> finstack_quant_core::Result<f64> {
     match financing.compounding {
-        FinancingRateCompounding::TermRate => rate_period_on_dates(fwd, period_start, period_end),
+        FinancingRateCompounding::TermRate => {
+            if period_start <= as_of {
+                finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                    fixings,
+                    financing.forward_curve_id.as_str(),
+                    period_start,
+                    as_of,
+                )
+            } else {
+                rate_between_on_dates(fwd, period_start, period_end)
+            }
+        }
         FinancingRateCompounding::OvernightCompounded => {
             // The daily-compounding observation grid needs either a registered
             // holiday calendar or `None` (weekday-only stepping). The
@@ -558,7 +569,7 @@ impl TrsEngine {
 
 #[cfg(test)]
 mod tests {
-    use super::{TotalReturnLegParams, TrsEngine, TrsReturnModel};
+    use super::{financing_period_rate, TotalReturnLegParams, TrsEngine, TrsReturnModel};
     use crate::cashflow::builder::ScheduleParams;
     use crate::instruments::common_impl::parameters::legs::{
         FinancingLegSpec, FinancingRateCompounding,
@@ -566,13 +577,14 @@ mod tests {
     use crate::instruments::common_impl::parameters::trs_common::TrsScheduleSpec;
     use crate::instruments::common_impl::pricing::swap_legs;
     use crate::instruments::common_impl::pricing::time::{
-        rate_period_on_dates, relative_df_discount_curve,
+        rate_between_on_dates, relative_df_discount_curve,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{
-        BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+        BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind, Tenor,
     };
     use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
@@ -678,10 +690,11 @@ mod tests {
 
     #[test]
     fn trs_total_return_leg_uses_curve_df_between_dates() {
-        let as_of = date(2025, 1, 1);
+        let as_of = date(2024, 12, 31);
+        let start = date(2025, 1, 1);
         let end = date(2026, 1, 1);
         let schedule = TrsScheduleSpec::from_params(
-            as_of,
+            start,
             end,
             ScheduleParams {
                 freq: Tenor::quarterly(),
@@ -746,10 +759,11 @@ mod tests {
 
     #[test]
     fn trs_financing_leg_uses_curve_time_for_forward_rates() {
-        let as_of = date(2025, 1, 1);
+        let as_of = date(2024, 12, 31);
+        let start = date(2025, 1, 1);
         let end = date(2026, 1, 1);
         let schedule = TrsScheduleSpec::from_params(
-            as_of,
+            start,
             end,
             ScheduleParams {
                 freq: Tenor::quarterly(),
@@ -811,7 +825,7 @@ mod tests {
                 .day_count
                 .year_fraction(period_start, period_end, ctx_dc)
                 .expect("yf");
-            let fwd_rate = rate_period_on_dates(&fwd, period_start, period_end).expect("fwd");
+            let fwd_rate = rate_between_on_dates(&fwd, period_start, period_end).expect("fwd");
             let df = relative_df_discount_curve(&disc, as_of, period_end).expect("df");
             expected += 1_000_000.0 * fwd_rate * yf * df;
 
@@ -846,8 +860,6 @@ mod tests {
     /// from the all-projected result, and matches a hand-computed expected value.
     #[test]
     fn trs_financing_leg_ois_in_progress_splices_realized_and_projected() {
-        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-
         // Period: 2025-01-06 (Mon) → 2025-02-03 (Mon), 28 days. as_of = 2025-01-20 (Mon, mid-period).
         // Both endpoints are Mondays so ModifiedFollowing leaves them unchanged.
         // Realized fixings for Jan 6..17 (2 full weeks), projected from Jan 20 onward.
@@ -1017,15 +1029,81 @@ mod tests {
     }
 
     #[test]
+    fn trs_term_rate_started_period_requires_exact_reset_fixing() {
+        let period_start = date(2025, 1, 6);
+        let period_end = date(2025, 4, 7);
+        let as_of = date(2025, 2, 3);
+        let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
+            .base_date(period_start)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .build()
+            .expect("forward curve");
+        let financing = FinancingLegSpec {
+            discount_curve_id: CurveId::new("DISC"),
+            forward_curve_id: CurveId::new("USD-TERM-3M"),
+            spread_bp: Decimal::ZERO,
+            day_count: DayCount::Act360,
+            compounding: FinancingRateCompounding::TermRate,
+        };
+        let year_fraction = DayCount::Act360
+            .year_fraction(period_start, period_end, DayCountContext::default())
+            .expect("year fraction");
+
+        let missing = financing_period_rate(
+            &financing,
+            &fwd,
+            None,
+            period_start,
+            period_end,
+            year_fraction,
+            as_of,
+            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+        )
+        .expect_err("started term period without fixing must fail");
+        assert!(missing.to_string().contains("FIXING:USD-TERM-3M"));
+
+        let fixings =
+            ScalarTimeSeries::new("FIXING:USD-TERM-3M", vec![(period_start, 0.041)], None)
+                .expect("fixing series");
+        let observed = financing_period_rate(
+            &financing,
+            &fwd,
+            Some(&fixings),
+            period_start,
+            period_end,
+            year_fraction,
+            as_of,
+            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+        )
+        .expect("exact reset fixing");
+        assert!((observed - 0.041).abs() < 1e-14);
+
+        let future = financing_period_rate(
+            &financing,
+            &fwd,
+            None,
+            period_end,
+            period_end.add_months(3),
+            year_fraction,
+            as_of,
+            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+        )
+        .expect("future term period projects");
+        assert!(future.is_finite());
+    }
+
+    #[test]
     fn trs_financing_leg_overnight_compounding_exceeds_term_rate_on_upward_curve() {
         // On an upward-sloping forward curve, daily-compounding an OIS financing
         // leg picks up positive convexity that the simple term-rate average
         // drops. A `TermRate` and an `OvernightCompounded` leg over the same
         // curves must therefore price differently, with OIS strictly higher.
-        let as_of = date(2025, 1, 1);
+        let as_of = date(2024, 12, 31);
+        let start = date(2025, 1, 1);
         let end = date(2026, 1, 1);
         let schedule = TrsScheduleSpec::from_params(
-            as_of,
+            start,
             end,
             ScheduleParams {
                 freq: Tenor::quarterly(),

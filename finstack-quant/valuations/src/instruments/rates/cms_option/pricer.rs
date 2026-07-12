@@ -251,7 +251,7 @@ impl CmsOptionPricer {
     ///
     /// Uses curve-consistent time mapping:
     /// - Discount factors use `relative_df_discount_curve` (curve's own day_count/base_date)
-    /// - Forward rates use `rate_period_on_dates` (forward curve's own day_count/base_date)
+    /// - Forward rates use `rate_between_on_dates` (forward curve's own day_count/base_date)
     /// - Accrual fractions use `swap_day_count` for the fixed leg and
     ///   `swap_float_day_count` (if provided) for the floating leg.
     pub(crate) fn calculate_forward_swap_rate(

@@ -29,7 +29,7 @@ impl AttributionSpec {
             .map(|m| m.currency());
 
         // Build config (defaults unless overridden)
-        let config = self.build_finstack_config(instrument_ccy);
+        let config = self.build_finstack_config(instrument_ccy)?;
 
         // Determine strict validation
         let strict_validation = self

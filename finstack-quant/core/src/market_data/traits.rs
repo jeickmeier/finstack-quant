@@ -227,11 +227,11 @@ pub trait Discounting: TermStructure + Send + Sync {
 ///
 /// # Required Methods
 ///
-/// - [`rate`](Self::rate) - Returns the forward rate at time `t`
+/// - [`rate`](Self::rate) - Returns the fixed-tenor index rate resetting at time `t`
 ///
 /// # Provided Methods
 ///
-/// - [`rate_period`](Self::rate_period) - Average rate over `[t1, t2]`
+/// - [`rate_period`](Self::rate_period) - Simpson-rule integral average over `[t1, t2]`
 ///
 /// # Examples
 ///
@@ -257,7 +257,7 @@ pub trait Discounting: TermStructure + Send + Sync {
 /// assert!((curve.rate_period(0.5, 1.0) - 0.05).abs() < 1e-14); // Flat curve: period average ≈ rate
 /// ```
 pub trait Forward: TermStructure + Send + Sync {
-    /// Simple forward rate starting at time `t`.
+    /// Fixed-tenor index rate resetting at time `t`.
     ///
     /// # Arguments
     ///
@@ -265,12 +265,17 @@ pub trait Forward: TermStructure + Send + Sync {
     ///
     /// # Returns
     ///
-    /// The instantaneous forward rate at time `t`.
+    /// The index rate fixed at time `t`.
     fn rate(&self, t: f64) -> f64;
 
     // Concrete curve types can override this with analytical integration for
     // piecewise-flat/linear curves to avoid numerical quadrature.
-    /// Average rate over the period `[t1, t2]` using Simpson's rule.
+    /// Simpson-rule integral average rate over `[t1, t2]`.
+    ///
+    /// This is appropriate for averaging overnight observation sub-windows.
+    /// Implementors that expose projection discount factors should provide a
+    /// separate discount-factor-implied period-forward API for arbitrary term
+    /// projection intervals.
     ///
     /// Uses 8-interval composite Simpson's rule for accurate integration
     /// of the forward rate curve over the period, matching the concrete
@@ -283,7 +288,7 @@ pub trait Forward: TermStructure + Send + Sync {
     ///
     /// # Returns
     ///
-    /// The average forward rate over `[t1, t2]`.
+    /// The integral average forward rate over `[t1, t2]`.
     ///
     /// Returns [`f64::NAN`] if `t2 < t1` or inputs are non-finite. For
     /// `t2` equal to `t1` within ~1e-12 years, returns [`Self::rate`] at `t1`

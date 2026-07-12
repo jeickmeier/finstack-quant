@@ -101,7 +101,14 @@ class DayCount:
     ACT_365F: DayCount
     """Actual/365 Fixed."""
     ACT_365L: DayCount
-    """Actual/365 Leap (AFB)."""
+    """Actual/365L (ICMA Rule 251).
+
+    Annual periods (or periods without a supplied frequency) use denominator
+    366 exactly when February 29 falls in ``(start, end]``; otherwise 365.
+    Non-annual periods use 366 exactly when the end date's year is a leap year;
+    otherwise 365. This is explicitly not ACT/ACT AFB, which uses a different
+    sub-period-splitting algorithm.
+    """
     THIRTY_360: DayCount
     """30/360 US (Bond Basis)."""
     THIRTY_E_360: DayCount
@@ -767,7 +774,8 @@ class PeriodId:
         Parameters
         ----------
         code : str
-            Period code (e.g. ``"2025Q1"``, ``"2025M06"``).
+            Period code such as ``"2025Q1"`` or fiscal ``"FY2025W53"``.
+            Unmarked weekly identifiers remain strict ISO week-year values.
 
         Returns
         -------
@@ -892,7 +900,7 @@ class PeriodId:
 
     @property
     def year(self) -> int:
-        """Gregorian calendar year.
+        """Gregorian or fiscal year label.
 
         Returns
         -------
@@ -921,6 +929,11 @@ class PeriodId:
         ...
 
     @property
+    def is_fiscal(self) -> bool:
+        """Whether this identifier uses fiscal-year (``FY...``) semantics."""
+        ...
+
+    @property
     def periods_per_year(self) -> int:
         """Number of periods per year for this kind.
 
@@ -940,7 +953,8 @@ class PeriodId:
         Raises
         ------
         ValueError
-            If the next period overflows.
+            If the identifier is fiscal. Use :meth:`next_fiscal` with an
+            explicit :class:`FiscalConfig`.
         """
         ...
 
@@ -954,8 +968,21 @@ class PeriodId:
         Raises
         ------
         ValueError
-            If the previous period underflows.
+            If the identifier is fiscal. Use :meth:`prev_fiscal` with an
+            explicit :class:`FiscalConfig`.
         """
+        ...
+
+    def next_fiscal(self, fiscal_config: FiscalConfig) -> PeriodId:
+        """Next period using fiscal-year week/day capacity.
+
+        Weekly fiscal IDs can advance through a partial week 53 even when the
+        same-numbered ISO Gregorian year has only 52 weeks.
+        """
+        ...
+
+    def prev_fiscal(self, fiscal_config: FiscalConfig) -> PeriodId:
+        """Previous period using fiscal-year week/day capacity."""
         ...
 
     def __repr__(self) -> str: ...
@@ -1304,6 +1331,18 @@ class CalendarMetadata:
         """
         ...
 
+    @property
+    def weekend_rule(self) -> str:
+        """Weekend convention as a snake_case name.
+
+        Returns
+        -------
+        str
+            One of ``"saturday_sunday"``, ``"friday_saturday"``,
+            ``"friday_only"``, or ``"none"``.
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class HolidayCalendar:
@@ -1539,9 +1578,8 @@ class Schedule:
 class ScheduleBuilder:
     """Builder for constructing date schedules.
 
-    Unlike the Rust ``ScheduleBuilder``, the Python binding mutates the
-    builder **in place**: each setter returns ``None`` rather than ``self``.
-    Call setters sequentially on the same instance, then call ``build()``.
+    Setters mutate the builder **in place** and return that same instance,
+    matching Rust's fluent builder semantics.
 
     Parameters
     ----------
@@ -1564,13 +1602,15 @@ class ScheduleBuilder:
     ...     BusinessDayConvention,
     ...     ScheduleErrorPolicy,
     ... )
-    >>> builder = ScheduleBuilder(date(2025, 1, 15), date(2030, 1, 15))
-    >>> builder.frequency("3M")
-    >>> builder.stub_rule(StubKind.SHORT_FRONT)
-    >>> builder.adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
-    >>> builder.end_of_month(False)
-    >>> builder.error_policy(ScheduleErrorPolicy.STRICT)
-    >>> schedule = builder.build()
+    >>> schedule = (
+    ...     ScheduleBuilder(date(2025, 1, 15), date(2030, 1, 15))
+    ...     .frequency("3M")
+    ...     .stub_rule(StubKind.SHORT_FRONT)
+    ...     .adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
+    ...     .end_of_month(False)
+    ...     .error_policy(ScheduleErrorPolicy.STRICT)
+    ...     .build()
+    ... )
     >>> len(schedule) >= 20
     True
     """
@@ -1592,7 +1632,7 @@ class ScheduleBuilder:
         """
         ...
 
-    def frequency(self, freq: Union[Tenor, str]) -> None:
+    def frequency(self, freq: Union[Tenor, str]) -> ScheduleBuilder:
         """Set the coupon/roll frequency.
 
         Parameters
@@ -1602,7 +1642,7 @@ class ScheduleBuilder:
         """
         ...
 
-    def stub_rule(self, stub: StubKind) -> None:
+    def stub_rule(self, stub: StubKind) -> ScheduleBuilder:
         """Set the stub rule.
 
         Parameters
@@ -1612,7 +1652,7 @@ class ScheduleBuilder:
         """
         ...
 
-    def adjust_with(self, convention: BusinessDayConvention, calendar_id: str) -> None:
+    def adjust_with(self, convention: BusinessDayConvention, calendar_id: str) -> ScheduleBuilder:
         """Set the business-day convention and calendar for adjustment.
 
         Parameters
@@ -1624,7 +1664,7 @@ class ScheduleBuilder:
         """
         ...
 
-    def end_of_month(self, eom: bool) -> None:
+    def end_of_month(self, eom: bool) -> ScheduleBuilder:
         """Enable or disable end-of-month roll logic.
 
         Parameters
@@ -1634,23 +1674,25 @@ class ScheduleBuilder:
         """
         ...
 
-    def cds_imm(self) -> None:
-        """Enable CDS IMM date mode.
+    def cds_imm(self) -> ScheduleBuilder:
+        """Enable CDS IMM date mode and disable standard IMM mode.
         Returns
         -------
-        None
+        ScheduleBuilder
+            This builder.
         """
         ...
 
-    def imm(self) -> None:
-        """Enable IMM date mode.
+    def imm(self) -> ScheduleBuilder:
+        """Enable standard IMM date mode and disable CDS IMM mode.
         Returns
         -------
-        None
+        ScheduleBuilder
+            This builder.
         """
         ...
 
-    def error_policy(self, policy: ScheduleErrorPolicy) -> None:
+    def error_policy(self, policy: ScheduleErrorPolicy) -> ScheduleBuilder:
         """Set the error policy.
 
         Setting a policy fully replaces any previous policy; calls are

@@ -12,7 +12,9 @@ use finstack_quant_cashflows::builder::specs::{
 use finstack_quant_cashflows::builder::CashFlowSchedule;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, DateExt, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, DayCount, DayCountContext, StubKind, Tenor,
+};
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
@@ -53,7 +55,66 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
 }
 
 #[test]
-fn test_payment_frequency_can_differ_from_reset_tenor() {
+fn term_coupon_uses_the_actual_reset_date_fixing() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+    let base = Date::from_calendar_date(2025, Month::January, 1).unwrap();
+    let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::April, 15).unwrap();
+    let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
+    spec.rate_spec.reset_lag_days = 2;
+
+    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.01), (1.0, 0.21)])
+        .build()
+        .expect("ForwardCurve builder should succeed");
+    let market = MarketContext::new().insert(fwd);
+
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
+        .floating_cf(spec);
+    let schedule = builder
+        .build_with_curves(Some(&market))
+        .expect("floating schedule should build");
+    let first_float = schedule
+        .flows
+        .iter()
+        .find(|cf| cf.kind == CFKind::FloatReset)
+        .expect("expected a floating coupon");
+    let reset_date = first_float
+        .reset_date
+        .expect("floating coupon should have a reset date");
+    let fwd = market
+        .get_forward("USD-SOFR-3M")
+        .expect("forward curve should exist");
+    let reset_t = fwd
+        .day_count()
+        .year_fraction(base, reset_date, DayCountContext::default())
+        .expect("valid reset year fraction");
+    let payment_t = fwd
+        .day_count()
+        .year_fraction(base, first_float.date, DayCountContext::default())
+        .expect("valid payment year fraction");
+    let reset_fixing = fwd.rate(reset_t);
+    let integrated_average = fwd.rate_period(reset_t, payment_t);
+    let built_rate = first_float
+        .rate
+        .expect("floating coupon should store its rate");
+
+    assert_eq!(
+        reset_date,
+        Date::from_calendar_date(2025, Month::January, 13).expect("valid reset date")
+    );
+    assert!((reset_fixing - integrated_average).abs() > 1e-6);
+    assert!((built_rate - reset_fixing).abs() < RATE_TOLERANCE);
+}
+
+#[test]
+fn term_index_rate_is_invariant_to_payment_frequency() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
@@ -92,38 +153,21 @@ fn test_payment_frequency_can_differ_from_reset_tenor() {
         .get_forward("USD-SOFR-3M")
         .expect("curve should exist");
 
-    // Convention: the forward is projected over the index's underlying
-    // deposit period [accrual_start, accrual_start + index_tenor]; the reset
-    // date is flow metadata only. With reset_lag_days = 0 here the reset date
-    // equals the accrual start, so the expectation is anchored on it.
-    let expected_quarterly = finstack_quant_cashflows::builder::project_floating_rate(
-        reset_date,
-        reset_date.add_months(3),
-        fwd_curve.as_ref(),
-        &finstack_quant_cashflows::builder::FloatingRateParams::default(),
-    )
-    .expect("quarterly projection should succeed");
-
-    let incorrect_semiannual = finstack_quant_cashflows::builder::project_floating_rate(
-        reset_date,
-        reset_date.add_months(6),
-        fwd_curve.as_ref(),
-        &finstack_quant_cashflows::builder::FloatingRateParams::default(),
-    )
-    .expect("semiannual projection should succeed");
-
-    assert!(
-        (expected_quarterly - incorrect_semiannual).abs() > 1e-6,
-        "test setup must distinguish reset tenor from payment frequency"
-    );
+    // A term-index coupon fixes its curve tenor at the reset date. The payment
+    // frequency has no effect on that fixing.
+    let reset_t = fwd_curve
+        .day_count()
+        .year_fraction(issue, reset_date, DayCountContext::default())
+        .expect("valid reset year fraction");
+    let expected_reset_fixing = fwd_curve.rate(reset_t);
 
     let built_rate = first_float
         .rate
         .expect("floating coupon should store built rate");
     assert!(
-        (built_rate - expected_quarterly).abs() < RATE_TOLERANCE,
-        "built rate should use quarterly reset tenor: expected {}, got {}",
-        expected_quarterly,
+        (built_rate - expected_reset_fixing).abs() < RATE_TOLERANCE,
+        "built rate should use the reset-date fixing: expected {}, got {}",
+        expected_reset_fixing,
         built_rate
     );
 }

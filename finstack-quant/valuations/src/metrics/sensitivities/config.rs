@@ -327,17 +327,19 @@ mod tests {
     #[test]
     fn from_finstack_config_or_default_applies_valid_overrides() {
         let mut cfg = FinstackConfig::default();
-        cfg.extensions.insert(
-            SENSITIVITIES_CONFIG_KEY_V1,
-            json!({
-                "rate_bump_bp": 2.5,
-                "credit_spread_bump_bp": 3.0,
-                "spot_bump_pct": 0.02,
-                "vol_bump_pct": 0.03,
-                "dv01_buckets_years": [0.5, 1.0, 5.0],
-                "cs01_buckets_years": [1.0, 3.0, 7.0]
-            }),
-        );
+        cfg.extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({
+                    "rate_bump_bp": 2.5,
+                    "credit_spread_bump_bp": 3.0,
+                    "spot_bump_pct": 0.02,
+                    "vol_bump_pct": 0.03,
+                    "dv01_buckets_years": [0.5, 1.0, 5.0],
+                    "cs01_buckets_years": [1.0, 3.0, 7.0]
+                }),
+            )
+            .expect("valid extension key");
 
         let resolved = from_finstack_config_or_default(&cfg).expect("overrides should parse");
         assert_eq!(resolved.rate_bump_bp, 2.5);
@@ -353,7 +355,8 @@ mod tests {
         let mut bad_shape = FinstackConfig::default();
         bad_shape
             .extensions
-            .insert(SENSITIVITIES_CONFIG_KEY_V1, json!({"unexpected": 1}));
+            .insert(SENSITIVITIES_CONFIG_KEY_V1, json!({"unexpected": 1}))
+            .expect("valid extension key");
         let parse_err =
             from_finstack_config_or_default(&bad_shape).expect_err("must reject unknown fields");
         assert!(
@@ -362,10 +365,13 @@ mod tests {
         );
 
         let mut empty_grid = FinstackConfig::default();
-        empty_grid.extensions.insert(
-            SENSITIVITIES_CONFIG_KEY_V1,
-            json!({"dv01_buckets_years": []}),
-        );
+        empty_grid
+            .extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({"dv01_buckets_years": []}),
+            )
+            .expect("valid extension key");
         let empty_err = from_finstack_config_or_default(&empty_grid)
             .expect_err("must reject empty bucket grid");
         assert!(
@@ -374,10 +380,13 @@ mod tests {
         );
 
         let mut unsorted_grid = FinstackConfig::default();
-        unsorted_grid.extensions.insert(
-            SENSITIVITIES_CONFIG_KEY_V1,
-            json!({"cs01_buckets_years": [1.0, 1.0]}),
-        );
+        unsorted_grid
+            .extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({"cs01_buckets_years": [1.0, 1.0]}),
+            )
+            .expect("valid extension key");
         let unsorted_err =
             from_finstack_config_or_default(&unsorted_grid).expect_err("must reject unsorted grid");
         assert!(
@@ -391,13 +400,15 @@ mod tests {
     #[test]
     fn from_context_or_default_layers_metric_overrides_on_top_of_config() {
         let mut cfg = FinstackConfig::default();
-        cfg.extensions.insert(
-            SENSITIVITIES_CONFIG_KEY_V1,
-            json!({
-                "rate_bump_bp": 2.5,
-                "vol_bump_pct": 0.03
-            }),
-        );
+        cfg.extensions
+            .insert(
+                SENSITIVITIES_CONFIG_KEY_V1,
+                json!({
+                    "rate_bump_bp": 2.5,
+                    "vol_bump_pct": 0.03
+                }),
+            )
+            .expect("valid extension key");
         let pricing_overrides = crate::instruments::MetricPricingOverrides::default()
             .with_rate_bump(4.0)
             .with_vol_bump(0.05);

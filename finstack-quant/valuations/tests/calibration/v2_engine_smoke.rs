@@ -114,7 +114,9 @@ fn test_v2_simple_usd_calibration() {
                     base_date,
                     tenor_years: 0.25,
                     discount_curve_id: "USD-OIS".into(),
-                    method: CalibrationMethod::Bootstrap,
+                    method: CalibrationMethod::GlobalSolve {
+                        use_analytical_jacobian: false,
+                    },
                     interpolation: Default::default(),
                     conventions: Default::default(),
                 }),
@@ -131,17 +133,45 @@ fn test_v2_simple_usd_calibration() {
         prior_market: Vec::new(),
     };
 
-    // 3. Execute
+    // 3. Bootstrap is intentionally unsupported for forward curves because
+    // off-grid reset intervals couple the fitted rates through projection DFs.
+    let mut bootstrap_envelope = envelope.clone();
+    let StepParams::Forward(bootstrap_params) = &mut bootstrap_envelope.plan.steps[1].params else {
+        panic!("second step should be the forward curve");
+    };
+    bootstrap_params.method = CalibrationMethod::Bootstrap;
+    let bootstrap_error = engine::execute(&bootstrap_envelope)
+        .expect_err("forward Bootstrap must be rejected rather than silently invoking LM");
+    assert!(
+        bootstrap_error
+            .to_string()
+            .contains("requires CalibrationMethod::GlobalSolve"),
+        "unexpected Bootstrap rejection: {bootstrap_error}"
+    );
+
+    // 4. Execute the explicit global method twice to verify deterministic output.
     let result = engine::execute(&envelope).expect("Calibration failed");
+    let repeated = engine::execute(&envelope).expect("Repeated calibration failed");
 
     // Forward rate checks might need adjustment if rate changes due to different date
     // But since market data is synthetic/flat-ish, it should be robust.
 
-    // 4. Verify
+    // 5. Verify
     assert!(result.result.report.success);
+    let forward_report = result
+        .result
+        .step_reports
+        .get("step_2")
+        .expect("forward step report");
+    assert_eq!(
+        forward_report.metadata.get("method").map(String::as_str),
+        Some("global_fit_lm_weighted_lsq")
+    );
 
     let context =
         MarketContext::try_from(result.result.final_market).expect("Failed to restore context");
+    let repeated_context = MarketContext::try_from(repeated.result.final_market)
+        .expect("Failed to restore repeated context");
 
     // Check Discount Curve
     let discount = context
@@ -154,6 +184,15 @@ fn test_v2_simple_usd_calibration() {
     let forward = context
         .get_forward("USD-3M")
         .expect("Forward curve missing");
+    let repeated_forward = repeated_context
+        .get_forward("USD-3M")
+        .expect("Repeated forward curve missing");
+    assert_eq!(forward.knots(), repeated_forward.knots());
+    assert_eq!(forward.forwards(), repeated_forward.forwards());
+    assert_eq!(
+        forward.projection_grid(),
+        repeated_forward.projection_grid()
+    );
     let fwd_0 = forward.rate(0.0);
     assert!(
         (fwd_0 - 0.0530).abs() < tolerances::FWD_RATE_ABS_TOL,

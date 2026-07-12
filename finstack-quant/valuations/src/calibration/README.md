@@ -98,13 +98,36 @@ let plan = CalibrationPlan {
 };
 ```
 
+### Forward-curve method policy
+
+Forward-curve steps require
+`CalibrationMethod::GlobalSolve { use_analytical_jacobian: false }`.
+`Bootstrap` is rejected with a validation error rather than being silently
+reinterpreted. Projection discount factors chain the actual contractual
+reset/end-date grid, so calendar-adjusted periods couple adjacent reset rates
+and must be solved simultaneously.
+
+Forward-curve interpolation knots remain simple fixed-tenor rate controls.
+Calibrated curves separately store a validated contractual `projection_grid`
+containing reset/end-date boundaries. This keeps `rate(reset)` and DF-implied
+`rate_between(reset, end)` coherent for off-grid 3M periods such as 91- or
+92-day Act/360 accruals. Sparse or legacy curves without this optional grid
+retain fixed numeric-tenor stepping from zero.
+
+The global forward target enforces `CalibrationConfig::effective_rate_bounds`
+for every fitted reset-rate parameter. Until a dedicated forward solve config
+is introduced, it uses `discount_curve.weighting_scheme` and
+`discount_curve.validation_tolerance`, matching the pre-existing forward
+calibration configuration contract.
+
 ### Recommended Settings
 
 | Use Case | Solver Tolerance | Validation Tolerance | Method |
 |----------|------------------|---------------------|--------|
-| Production risk systems | `1e-12` | `1e-8` | Bootstrap |
-| Real-time pricing | `1e-6` | `1e-4` | Bootstrap |
-| Interactive exploration | `1e-4` | `1e-2` | Bootstrap |
+| Forward curves | `1e-12` | `1e-8` | GlobalSolve |
+| Discount curves | `1e-12` | `1e-8` | Bootstrap or GlobalSolve |
+| Real-time pricing | `1e-6` | `1e-4` | Target-dependent |
+| Interactive exploration | `1e-4` | `1e-2` | Target-dependent |
 | Smooth curve fitting | `1e-10` | `1e-8` | GlobalSolve |
 | Distressed credit | `1e-10` | `1e-6` | Bootstrap |
 

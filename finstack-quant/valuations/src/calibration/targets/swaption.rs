@@ -692,7 +692,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
                     DayCountContext::default(),
                 )?;
 
-                let forward_rate = fwd.rate_period(t_prev_fwd, t_pay_fwd);
+                let forward_rate = fwd.rate_between(t_prev_fwd, t_pay_fwd)?;
                 float_pv += forward_rate * accrual * disc.df(t_pay_disc);
             }
 
@@ -1489,6 +1489,116 @@ mod tests {
             "forward mismatch: actual={} expected={}",
             actual,
             expected
+        );
+    }
+
+    #[test]
+    fn forward_swap_rate_multi_curve_uses_df_implied_period_rates() {
+        let base_date = date(2024, Month::January, 2);
+        let disc = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (5.0, 0.75)])
+            .build()
+            .expect("discount curve");
+        let forward = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+            "USD-FWD", 0.25,
+        )
+        .base_date(base_date)
+        .day_count(DayCount::Act365F)
+        .knots([(0.0, 0.01), (1.0, 0.03), (2.0, 0.08), (3.0, 0.02)])
+        .projection_grid([
+            0.0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25,
+        ])
+        .build()
+        .expect("forward curve");
+        let ctx = MarketContext::new().insert(disc).insert(forward);
+
+        let mut p = params(base_date);
+        p.forward_id = Some("USD-FWD".to_string());
+        let leg = SwaptionVolTarget::default_leg_conventions(&p).expect("leg conventions");
+        let expiry_years = 1.0;
+        let tenor_years = 1.0;
+        let swap_start = base_date.add_months(12);
+        let swap_end = swap_start.add_months(12);
+        let disc = ctx.get_discount("USD-OIS").expect("discount curve");
+        let fwd = ctx.get_forward("USD-FWD").expect("forward curve");
+        let pv01 =
+            SwaptionVolTarget::calculate_pv01_proper(swap_start, swap_end, &leg, disc.as_ref())
+                .expect("pv01");
+        let schedule = crate::cashflow::builder::date_generation::build_dates(
+            swap_start,
+            swap_end,
+            leg.float_freq,
+            StubKind::None,
+            leg.float_bdc,
+            false,
+            0,
+            leg.calendar_id
+                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        )
+        .expect("floating schedule");
+        let mut expected_float_pv = 0.0;
+        let mut legacy_float_pv = 0.0;
+        for period in schedule.periods {
+            let accrual = leg
+                .float_day_count
+                .year_fraction(
+                    period.accrual_start,
+                    period.accrual_end,
+                    DayCountContext::default(),
+                )
+                .expect("accrual");
+            let t_start = fwd
+                .day_count()
+                .year_fraction(
+                    fwd.base_date(),
+                    period.accrual_start,
+                    DayCountContext::default(),
+                )
+                .expect("forward start");
+            let t_end = fwd
+                .day_count()
+                .year_fraction(
+                    fwd.base_date(),
+                    period.accrual_end,
+                    DayCountContext::default(),
+                )
+                .expect("forward end");
+            let t_pay = disc
+                .day_count()
+                .year_fraction(
+                    disc.base_date(),
+                    period.payment_date,
+                    DayCountContext::default(),
+                )
+                .expect("payment time");
+            let discount = disc.df(t_pay);
+            expected_float_pv += fwd
+                .rate_between(t_start, t_end)
+                .expect("DF-implied period rate")
+                * accrual
+                * discount;
+            legacy_float_pv += fwd.rate_period(t_start, t_end) * accrual * discount;
+        }
+        let expected = expected_float_pv / pv01;
+        let legacy = legacy_float_pv / pv01;
+        assert!(
+            (expected - legacy).abs() > 1e-8,
+            "test curve must distinguish DF-implied and integral-average rates"
+        );
+
+        let actual = SwaptionVolTarget::calculate_forward_swap_rate_years(
+            &p,
+            expiry_years,
+            tenor_years,
+            &leg,
+            &ctx,
+        )
+        .expect("multi-curve forward swap rate");
+        assert!(
+            (actual - expected).abs() < 1e-12,
+            "multi-curve forward mismatch: actual={actual}, expected={expected}, legacy={legacy}"
         );
     }
 

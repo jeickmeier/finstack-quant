@@ -166,6 +166,51 @@ fn core_dts_exposes_typed_array_math_fast_paths() {
     ));
 }
 
+#[test]
+fn forward_curve_dts_exposes_projection_grid_and_rate_between() {
+    let dts = index_dts();
+    let curve = interface_block(&dts, "ForwardCurve");
+    let constructor = interface_block(&dts, "ForwardCurveConstructor");
+
+    assert!(contains_ignoring_ws(
+        curve,
+        "readonly projectionGrid: Float64Array | null;"
+    ));
+    assert!(contains_ignoring_ws(
+        curve,
+        "rateBetween(t1: number, t2: number): number;"
+    ));
+    assert!(contains_ignoring_ws(curve, "readonly resetLag: number;"));
+    assert!(contains_ignoring_ws(
+        constructor,
+        "projectionGrid?: NumericArray | null"
+    ));
+    assert!(contains_ignoring_ws(constructor, "knots: NumericArray"));
+    assert!(contains_ignoring_ws(
+        constructor,
+        "resetLag?: number | null"
+    ));
+}
+
+#[test]
+fn discount_curve_dts_exposes_canonical_validation_and_forward_names() {
+    let dts = index_dts();
+    let curve = interface_block(&dts, "DiscountCurve ");
+    let constructor = interface_block(&dts, "DiscountCurveConstructor");
+
+    assert!(contains_signature(
+        curve,
+        "forward(t1: number, t2: number): number;"
+    ));
+    assert!(!curve.contains("forwardRate"));
+    assert!(constructor.contains("validationMode?: DiscountCurveValidationMode"));
+    assert!(constructor.contains("forwardFloor?: number | null"));
+    assert!(contains_ignoring_ws(constructor, "knots: NumericArray"));
+    assert!(dts.contains(
+        "export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_friendly';"
+    ));
+}
+
 /// M2.21 — the correlation namespace's `Vec<f64>` returns cross the WASM
 /// boundary as `Float64Array`, and the hand-written d.ts must say so.
 #[test]
@@ -316,15 +361,49 @@ fn core_daycount_dts_exposes_context_for_context_dependent_conventions() {
         day_count_ctor,
         "thirtyE360Isda(): DayCount;"
     ));
+    let day_count = interface_block(&dts, "DayCount ");
+    assert!(contains_signature(
+        day_count,
+        "calendarDays(startEpochDays: number, endEpochDays: number): bigint;"
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "ActActIsma and Bus252 require explicit context"
+    ));
+    assert!(contains_ignoring_ws(&dts, "throws when called without it"));
 }
 
 #[test]
-fn dts_documents_wasm_owned_handles_and_free_contract() {
+fn dts_documents_wasm_owned_handles_and_dispose_contract() {
     let dts = index_dts();
 
-    assert!(
-        dts.contains("WASM ownership: classes with a `free(): void` method own wasm heap memory.")
-    );
+    assert!(dts.contains("export interface WasmOwned"));
+    let owned = interface_block(&dts, "WasmOwned");
+    assert!(contains_signature(owned, "free(): void;"));
+    assert!(!owned.contains("Symbol.dispose"));
+    assert!(dts.contains("installs `[Symbol.dispose]` as an alias of `free`"));
+    assert!(!dts.contains("export { default } from './pkg/finstack_quant_wasm';"));
+    assert!(dts.contains("export default function init("));
+
+    for interface_name in [
+        "Currency ",
+        "Money ",
+        "DayCount ",
+        "DiscountCurve ",
+        "ForwardCurve ",
+        "VolCube ",
+        "FxDeltaVolSurface ",
+        "FxMatrix ",
+    ] {
+        let block = interface_block(&dts, interface_name);
+        assert!(
+            block
+                .lines()
+                .next()
+                .is_some_and(|line| line.contains("extends WasmOwned")),
+            "{interface_name} must expose wasm-bindgen ownership methods"
+        );
+    }
 
     for class_name in [
         "Performance",
@@ -333,20 +412,14 @@ fn dts_documents_wasm_owned_handles_and_free_contract() {
         "LevelsAtDate",
         "PeriodDecomposition",
         "FactorCovarianceForecast",
+        "Market",
         "Portfolio",
     ] {
-        let class_start = dts
-            .find(&format!("export declare class {class_name} {{"))
-            .unwrap_or_else(|| panic!("{class_name} class declaration missing"));
-        let class_body = &dts[class_start..];
-        let free_pos = class_body
-            .find("free(): void;")
-            .unwrap_or_else(|| panic!("{class_name}.free() declaration missing"));
-        let before_free = &class_body[..free_pos];
-
         assert!(
-            before_free.contains("Release the underlying wasm heap allocation"),
-            "{class_name}.free() must document disposal semantics"
+            dts.contains(&format!(
+                "export interface {class_name} extends WasmOwned {{}}"
+            )),
+            "{class_name} must merge the wasm ownership contract"
         );
     }
 }
@@ -374,19 +447,24 @@ fn statements_analytics_dts_matches_runtime_exports() {
         "goalSeek(modelJson: string, targetNode: string, targetPeriod: string, targetValue: number, driverNode: string, driverPeriod: string, updateModel: boolean, boundsLo?: number | null, boundsHi?: number | null): GoalSeekResult;",
     ));
     assert!(dts.contains("export interface FormulaExplanationJson"));
-    assert!(dts.contains("explainFormula(modelJson: string, resultsJson: string, nodeId: string, period: string): FormulaExplanationJson;"));
-    assert!(dts.contains(
+    assert!(contains_ignoring_ws(
+        &dts,
+        "explainFormula(modelJson: string, resultsJson: string, nodeId: string, period: string): FormulaExplanationJson;"
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
         "explainFormulaText(modelJson: string, resultsJson: string, nodeId: string, period: string): string;"
     ));
-    assert!(dts.contains(
+    assert!(contains_ignoring_ws(
+        &dts,
         "runChecks(modelJson: string, suiteSpecJson: string, resultsJson?: string | null): string;"
     ));
-    assert!(
-        dts.contains(
-            "runThreeStatementChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;"
-        )
-    );
-    assert!(dts.contains(
+    assert!(contains_ignoring_ws(
+        &dts,
+        "runThreeStatementChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;"
+    ));
+    assert!(contains_ignoring_ws(
+        &dts,
         "runCreditUnderwritingChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;"
     ));
     assert!(dts.contains("renderCheckReportText(reportJson: string): string;"));
@@ -512,6 +590,12 @@ fn core_market_data_dts_exposes_vol_cube_normal_vol_queries() {
     ));
     let constructor = interface_block(&dts, "VolCubeConstructor");
     assert!(constructor.contains("interpolationMode?: string"));
+    for input in ["expiries", "tenors", "paramsFlat", "forwards"] {
+        assert!(
+            contains_ignoring_ws(constructor, &format!("{input}: NumericArray")),
+            "VolCube constructor must accept NumericArray for {input}"
+        );
+    }
 }
 
 #[test]
@@ -521,11 +605,14 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
     // FxDeltaVolSurface instance + constructor interfaces.
     let surface = interface_block(&dts, "FxDeltaVolSurface ");
     assert!(contains_signature(surface, "readonly id: string;"));
-    assert!(contains_signature(surface, "readonly expiries: number[];"));
+    assert!(contains_signature(
+        surface,
+        "readonly expiries: Float64Array;"
+    ));
     assert!(contains_signature(surface, "readonly numExpiries: number;"));
     assert!(contains_signature(
         surface,
-        "pillarVols(expiryIdx: number): number[];"
+        "pillarVols(expiryIdx: number): Float64Array;"
     ));
     assert!(contains_signature(
         surface,
@@ -533,6 +620,18 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
     ));
 
     let ctor = interface_block(&dts, "FxDeltaVolSurfaceConstructor");
+    for input in ["expiries", "atmVols", "rr25d", "bf25d"] {
+        assert!(
+            contains_ignoring_ws(ctor, &format!("{input}: NumericArray")),
+            "FxDeltaVolSurface constructor must accept NumericArray for {input}"
+        );
+    }
+    for input in ["rr10d", "bf10d"] {
+        assert!(
+            contains_ignoring_ws(ctor, &format!("{input}?: NumericArray")),
+            "FxDeltaVolSurface optional constructor input must accept NumericArray for {input}"
+        );
+    }
     assert!(contains_signature(
         ctor,
         "deltaToStrike(delta: number, forward: number, vol: number, expiry: number, rF: number): number;"
@@ -606,12 +705,22 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
 }
 
 #[test]
+fn core_date_array_outputs_are_exact_typed_arrays() {
+    let dts = index_dts();
+    let core = interface_block(&dts, "CoreNamespace");
+    assert!(contains_signature(
+        core,
+        "dateFromEpochDays(days: number): Int32Array;"
+    ));
+}
+
+#[test]
 fn attribution_dts_matches_json_pipeline_surface() {
     // The attribution namespace previously had zero dts assertions.
     let dts = index_dts();
 
     assert!(dts.contains("export interface AttributionNamespace"));
-    assert!(dts.contains("attributePnl(params: unknown): string;"));
+    assert!(dts.contains("attributePnl(params: AttributionParams): string;"));
     assert!(dts.contains("AttributionParams: new ("));
     assert!(dts.contains("attributePnlFromSpec(specJson: string): string;"));
     assert!(dts.contains("validateAttributionJson(json: string): string;"));

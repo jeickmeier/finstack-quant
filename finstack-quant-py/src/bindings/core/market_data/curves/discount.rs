@@ -1,6 +1,6 @@
 //! Discount curve bindings.
 
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, ValidationMode};
 
 use std::sync::Arc;
 
@@ -55,8 +55,17 @@ impl PyDiscountCurve {
     ///     Extrapolation policy (default ``"flat_forward"``).
     /// day_count : str, optional
     ///     Day-count convention. When omitted, Rust infers a market default from the curve ID.
+    /// validation_mode : str, optional
+    ///     Rust validation preset: ``"market_standard"`` (default) or
+    ///     ``"negative_rate_friendly"``.
+    /// forward_floor : float | None, optional
+    ///     Required minimum implied forward for ``"negative_rate_friendly"``.
     #[new]
-    #[pyo3(signature = (id, base_date, knots, interp="monotone_convex", extrapolation="flat_forward", day_count=None))]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserves existing positional arguments and appends validation options compatibly"
+    )]
+    #[pyo3(signature = (id, base_date, knots, interp="monotone_convex", extrapolation="flat_forward", day_count=None, validation_mode="market_standard", forward_floor=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
@@ -64,6 +73,8 @@ impl PyDiscountCurve {
         interp: &str,
         extrapolation: &str,
         day_count: Option<&str>,
+        validation_mode: &str,
+        forward_floor: Option<f64>,
     ) -> PyResult<Self> {
         let base = py_to_date(base_date)?;
         let style = parse_interp_style(interp)?;
@@ -77,6 +88,31 @@ impl PyDiscountCurve {
         if let Some(day_count) = day_count {
             builder = builder.day_count(parse_day_count(day_count)?);
         }
+        builder = match validation_mode {
+            "market_standard" => {
+                if forward_floor.is_some() {
+                    return Err(crate::errors::value_error(
+                        "forward_floor is only valid with validation_mode='negative_rate_friendly'",
+                    ));
+                }
+                builder.validation(ValidationMode::MarketStandard)
+            }
+            "negative_rate_friendly" => {
+                let floor = forward_floor.ok_or_else(|| {
+                    crate::errors::value_error(
+                        "forward_floor is required with validation_mode='negative_rate_friendly'",
+                    )
+                })?;
+                builder.validation(ValidationMode::NegativeRateFriendly {
+                    forward_floor: floor,
+                })
+            }
+            other => {
+                return Err(crate::errors::value_error(format!(
+                    "unknown DiscountCurve validation_mode {other:?}; expected 'market_standard' or 'negative_rate_friendly'"
+                )));
+            }
+        };
 
         let curve = builder.build().map_err(core_to_py)?;
 

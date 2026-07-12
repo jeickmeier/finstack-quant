@@ -90,6 +90,7 @@ impl std::str::FromStr for SeniorityClass {
 /// - Schuermann, T. (2004). "What Do We Know About Loss Given Default?"
 ///   Wharton Financial Institutions Center Working Paper 04-01.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(try_from = "BetaRecoveryWire")]
 pub struct BetaRecovery {
     /// Mean recovery rate in (0, 1).
     mean: f64,
@@ -99,6 +100,31 @@ pub struct BetaRecovery {
     alpha: f64,
     /// Precomputed Beta shape parameter beta.
     beta_param: f64,
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct BetaRecoveryWire {
+    mean: f64,
+    std_dev: f64,
+    alpha: f64,
+    beta_param: f64,
+}
+
+impl TryFrom<BetaRecoveryWire> for BetaRecovery {
+    type Error = crate::Error;
+
+    fn try_from(wire: BetaRecoveryWire) -> Result<Self> {
+        let recovery = BetaRecovery::new(wire.mean, wire.std_dev)?;
+        if recovery.alpha.to_bits() != wire.alpha.to_bits()
+            || recovery.beta_param.to_bits() != wire.beta_param.to_bits()
+        {
+            return Err(crate::Error::Validation(
+                "serialized BetaRecovery shape parameters do not match mean/std_dev".to_string(),
+            ));
+        }
+        Ok(recovery)
+    }
 }
 
 impl BetaRecovery {
@@ -111,10 +137,10 @@ impl BetaRecovery {
     /// - `std_dev <= 0`
     /// - `std_dev^2 >= mean * (1 - mean)` (Beta shape parameters would be non-positive)
     pub fn new(mean: f64, std_dev: f64) -> Result<Self> {
-        if mean <= 0.0 || mean >= 1.0 {
+        if !mean.is_finite() || mean <= 0.0 || mean >= 1.0 {
             return Err(InputError::Invalid.into());
         }
-        if std_dev <= 0.0 {
+        if !std_dev.is_finite() || std_dev <= 0.0 {
             return Err(InputError::NonPositiveValue.into());
         }
         let variance = std_dev * std_dev;
@@ -221,14 +247,18 @@ impl BetaRecovery {
     /// ().
     pub fn quantile(&self, p: f64) -> Result<f64> {
         use statrs::distribution::{Beta, ContinuousCDF};
-        let p_clamped = p.clamp(1e-15, 1.0 - 1e-15);
+        if !p.is_finite() || !(0.0..=1.0).contains(&p) {
+            return Err(crate::Error::Validation(format!(
+                "BetaRecovery::quantile probability must be finite and in [0, 1], got {p}"
+            )));
+        }
         let dist = Beta::new(self.alpha, self.beta_param).map_err(|e| {
             crate::Error::Validation(format!(
                 "BetaRecovery::quantile: invalid Beta(alpha={}, beta={}): {e}",
                 self.alpha, self.beta_param
             ))
         })?;
-        Ok(dist.inverse_cdf(p_clamped))
+        Ok(dist.inverse_cdf(p))
     }
 
     /// Expected recovery rate (same as mean).
@@ -521,6 +551,31 @@ mod tests {
         let q90 = br.quantile(0.90).expect("quantile");
         assert!(q10 < q50);
         assert!(q50 < q90);
+    }
+
+    #[test]
+    fn beta_recovery_quantile_rejects_invalid_probability() {
+        let br = BetaRecovery::new(0.45, 0.20).expect("valid params");
+        for invalid in [-0.1, 1.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(br.quantile(invalid).is_err());
+        }
+    }
+
+    #[test]
+    fn beta_recovery_deserialization_rejects_inconsistent_shapes() {
+        let recovery = BetaRecovery::new(0.45, 0.20).expect("valid params");
+        let json = serde_json::to_value(recovery).expect("serialize");
+        let restored: BetaRecovery =
+            serde_json::from_value(json.clone()).expect("valid round trip");
+        assert_eq!(restored.alpha().to_bits(), recovery.alpha().to_bits());
+        assert_eq!(
+            restored.beta_param().to_bits(),
+            recovery.beta_param().to_bits()
+        );
+
+        let mut json = json;
+        json["alpha"] = serde_json::json!(-1.0);
+        assert!(serde_json::from_value::<BetaRecovery>(json).is_err());
     }
 
     #[test]

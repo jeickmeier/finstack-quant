@@ -4,16 +4,14 @@
 //! For standard FRA settlement-at-start conventions and consistent curves,
 //! this equals the forward rate over the period:
 //!
-//! par_rate = ForwardCurve::rate_period(t_start, t_end)
+//! par_rate = ForwardCurve::rate_between(t_start, t_end)
 //!
-//! Time mapping uses the instrument day-count measured from the discount
-//! curve's base date, matching the engine and other rate instruments.
+//! Time mapping uses the forward curve's own day-count convention and base
+//! date, matching the curve's calibration basis rather than the instrument or
+//! discount curve basis.
 
 use crate::instruments::rates::fra::ForwardRateAgreement;
 use crate::metrics::{MetricCalculator, MetricContext};
-
-/// Minimum period length (in year fractions) for computing par rate.
-const MIN_PERIOD_LENGTH: f64 = 1e-12;
 
 /// Par rate for FRAs (fixed rate that zeroes PV).
 pub(crate) struct FraParRateCalculator;
@@ -25,33 +23,18 @@ impl MetricCalculator for FraParRateCalculator {
         // Forward rate over [t_start, t_end]
         let fwd = context.curves.get_forward(fra.forward_curve_id.as_str())?;
 
-        // Times must be calculated using the forward curve's basis
-        let fwd_base = fwd.base_date();
-        let fwd_dc = fwd.day_count();
-
-        let t_start = fwd_dc
-            .year_fraction(
-                fwd_base,
-                fra.start_date,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(0.0);
-        let t_end = fwd_dc
-            .year_fraction(
-                fwd_base,
-                fra.maturity,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(t_start);
-
-        let period_length = t_end - t_start;
-        if period_length.abs() < MIN_PERIOD_LENGTH {
+        let period_length = (fra.maturity - fra.start_date).whole_days();
+        if period_length == 0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "FRA '{}': period length is zero or near-zero ({:.2e}); cannot compute par rate",
-                fra.id, period_length
+                "FRA '{}': period length is zero ({period_length}); cannot compute par rate",
+                fra.id
             )));
         }
 
-        Ok(fwd.rate_period(t_start, t_end))
+        crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            fwd.as_ref(),
+            fra.start_date,
+            fra.maturity,
+        )
     }
 }

@@ -32,6 +32,8 @@ use crate::{Error, Result};
 ///
 /// Generates the sequence of time indices to sample in bridge order.
 pub struct BrownianBridge {
+    /// Number of time steps this bridge was built for.
+    num_steps: usize,
     /// Construction order (indices into time grid)
     construction_order: Vec<usize>,
     /// Multipliers for conditional variance
@@ -58,6 +60,7 @@ impl BrownianBridge {
         Self::build_bridge_recursive(0, num_steps, &mut construction_order, &mut std_multipliers);
 
         Self {
+            num_steps,
             construction_order,
             std_multipliers,
         }
@@ -256,16 +259,11 @@ impl BrownianBridge {
                 num_steps + 1
             )));
         }
-        let expected_steps = if self.construction_order.is_empty() {
-            // Bridges built with num_steps 0 or 1 have no interior points.
-            num_steps.min(1)
-        } else {
-            self.construction_order.len() + 1
-        };
-        if num_steps != expected_steps {
+        if num_steps != self.num_steps {
             return Err(Error::Validation(format!(
                 "brownian bridge: z.len()={num_steps} does not match the bridge's step count \
-                 {expected_steps}"
+                 {}",
+                self.num_steps
             )));
         }
         Ok(())
@@ -398,6 +396,21 @@ mod tests {
         let mut w = vec![f64::NAN; 1];
         bridge.construct_path(&z, &mut w, 0.25).unwrap();
         assert_eq!(w, vec![0.0]);
+    }
+
+    #[test]
+    fn zero_and_one_step_bridges_validate_their_own_dimensions() {
+        let zero = BrownianBridge::new(0);
+        let mut two_points = [0.0; 2];
+        assert!(zero.construct_path(&[0.0], &mut two_points, 0.25).is_err());
+
+        let one = BrownianBridge::new(1);
+        let mut one_point = [0.0; 1];
+        assert!(one.construct_path(&[], &mut one_point, 0.25).is_err());
+
+        let mut valid = [f64::NAN; 2];
+        one.construct_path(&[2.0], &mut valid, 0.25).unwrap();
+        assert_eq!(valid, [0.0, 1.0]);
     }
 
     #[test]

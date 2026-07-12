@@ -342,8 +342,8 @@ class CreditRating:
     """Standardised credit rating category.
 
     Immutable, hashable enum-style type with class attributes for each
-    rating level. Notched ratings (e.g. ``"BBB+"``) map to the base letter
-    category.
+    rating level. Notched ratings (e.g. ``"BBB+"`` and ``"Baa1"``) preserve
+    their notch-level precision.
 
     Parameters
     ----------
@@ -356,24 +356,48 @@ class CreditRating:
     >>> from finstack_quant.core.types import CreditRating
     >>> CreditRating.AAA.name
     'AAA'
-    >>> CreditRating.from_name("bbb+") == CreditRating.BBB
+    >>> CreditRating.from_name("bbb+") == CreditRating.BBB_PLUS
     True
     """
 
     AAA: CreditRating
     """Highest quality rating."""
+    AA_PLUS: CreditRating
+    """AA+ / Aa1."""
     AA: CreditRating
     """AA category."""
+    AA_MINUS: CreditRating
+    """AA- / Aa3."""
+    A_PLUS: CreditRating
+    """A+ / A1."""
     A: CreditRating
     """Single-A category."""
+    A_MINUS: CreditRating
+    """A- / A3."""
+    BBB_PLUS: CreditRating
+    """BBB+ / Baa1."""
     BBB: CreditRating
     """BBB category."""
+    BBB_MINUS: CreditRating
+    """BBB- / Baa3."""
+    BB_PLUS: CreditRating
+    """BB+ / Ba1."""
     BB: CreditRating
     """BB category."""
+    BB_MINUS: CreditRating
+    """BB- / Ba3."""
+    B_PLUS: CreditRating
+    """B+ / B1."""
     B: CreditRating
     """B category."""
+    B_MINUS: CreditRating
+    """B- / B3."""
+    CCC_PLUS: CreditRating
+    """CCC+ / Caa1."""
     CCC: CreditRating
     """CCC category."""
+    CCC_MINUS: CreditRating
+    """CCC- / Caa3."""
     CC: CreditRating
     """CC category."""
     C: CreditRating
@@ -385,7 +409,7 @@ class CreditRating:
 
     @classmethod
     def from_name(cls, name: str) -> CreditRating:
-        """Parse a rating string (case-insensitive; notches map to the base letter).
+        """Parse a rating string case-insensitively while preserving notches.
 
         Parameters
         ----------
@@ -405,13 +429,13 @@ class CreditRating:
         --------
         >>> from finstack_quant.core.types import CreditRating
         >>> CreditRating.from_name("bbb+").name
-        'BBB'
+        'BBB+'
         """
         ...
 
     @property
     def name(self) -> str:
-        """Canonical rating name (e.g. ``"BBB"``).
+        """Canonical S&P/Fitch-style rating name (e.g. ``"BBB-"``).
 
         Returns
         -------
@@ -422,6 +446,11 @@ class CreditRating:
         >>> CreditRating.AAA.name
         'AAA'
         """
+        ...
+
+    @property
+    def warf(self) -> float:
+        """Moody's weighted-average rating factor for this exact notch."""
         ...
 
     def __repr__(self) -> str: ...

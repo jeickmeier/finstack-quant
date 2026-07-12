@@ -24,6 +24,8 @@ use finstack_quant_core::dates::{
     StubKind,
 };
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::fixings;
+use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
@@ -618,10 +620,39 @@ fn release_principal_funding_account(
 /// but on the current balances, so a net-WAC cap tracks collateral that has
 /// amortized, prepaid or defaulted heterogeneously instead of being frozen at
 /// closing. Returns `0.0` for an empty/exhausted performing pool.
+fn term_rate_for_period(
+    fwd: &ForwardCurve,
+    context: &MarketContext,
+    accrual_start: Date,
+) -> Result<f64> {
+    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")?;
+    let fixing_date = accrual_start.add_business_days(-fwd.reset_lag(), calendar)?;
+    if fixing_date < fwd.base_date() {
+        let series = fixings::get_fixing_series(context, fwd.id().as_str())?;
+        return fixings::require_fixing_value_exact(
+            Some(series),
+            fwd.id().as_str(),
+            fixing_date,
+            fwd.base_date(),
+        );
+    }
+    let reset_end =
+        crate::instruments::fixed_income::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
+            fixing_date,
+            fwd.tenor(),
+            fwd.day_count(),
+        )?;
+    crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+        fwd,
+        fixing_date,
+        reset_end,
+    )
+}
+
 fn current_collateral_wac(
     state: &SimulationState,
     context: &MarketContext,
-    pay_date: Date,
+    period_start: Date,
 ) -> Result<f64> {
     let mut weighted = 0.0_f64;
     let mut balance = 0.0_f64;
@@ -636,16 +667,7 @@ fn current_collateral_wac(
         let all_in_rate = if let Some(curve_idx) = state.pool_state.curve_indices[i] {
             let curve_id = &state.pool_state.unique_curves[curve_idx];
             let fwd = context.get_forward(curve_id)?;
-            let base = fwd.base_date();
-            let dc = fwd.day_count();
-            let t2 = dc.year_fraction(base, pay_date, DayCountContext::default())?;
-            let tenor = fwd.tenor();
-            let t1 = (t2 - tenor).max(0.0);
-            let base_rate = if t2 > 0.0 && t1 < t2 {
-                fwd.rate_period(t1, t2)
-            } else {
-                fwd.rate(0.0)
-            };
+            let base_rate = term_rate_for_period(fwd.as_ref(), context, period_start)?;
             base_rate + state.pool_state.spread_bps[i].unwrap_or(0.0) / 10_000.0
         } else {
             state.pool_state.rates[i]
@@ -668,14 +690,14 @@ fn live_afc_cap_rate(
     instrument: &StructuredCredit,
     state: &SimulationState,
     context: &MarketContext,
-    pay_date: Date,
+    period_start: Date,
 ) -> Result<f64> {
     match instrument
         .waterfall_rules
         .as_ref()
         .and_then(|rules| rules.afc.as_ref())
     {
-        Some(afc) => Ok((current_collateral_wac(state, context, pay_date)?
+        Some(afc) => Ok((current_collateral_wac(state, context, period_start)?
             - afc.net_wac_fee_bps.unwrap_or(0.0) / 10_000.0)
             .max(0.0)),
         None => Ok(0.0),
@@ -1190,7 +1212,167 @@ mod tests {
         Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::fixings::fixing_series_id;
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use time::Month;
+
+    #[test]
+    fn collateral_term_rate_is_discount_factor_implied() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
+        let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+            "USD-3M", 0.25,
+        )
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .reset_lag(2)
+        .knots([(0.0, 0.01), (1.0, 0.21)])
+        .build()
+        .expect("forward curve should build");
+        let start_date = Date::from_calendar_date(2025, Month::April, 1).expect("valid start date");
+        let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")
+            .expect("calendar");
+        let fixing_date = start_date
+            .add_business_days(-curve.reset_lag(), calendar)
+            .expect("fixing date");
+        let reset_end =
+            crate::instruments::fixed_income::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
+                fixing_date,
+                curve.tenor(),
+                curve.day_count(),
+            )
+            .expect("reset end");
+        let t1 = curve
+            .day_count()
+            .year_fraction(base, fixing_date, DayCountContext::default())
+            .expect("valid start time");
+        let t2 = curve
+            .day_count()
+            .year_fraction(base, reset_end, DayCountContext::default())
+            .expect("valid end time");
+        let expected = curve
+            .rate_between(t1, t2)
+            .expect("valid term forward interval");
+
+        let actual = term_rate_for_period(&curve, &MarketContext::new(), start_date)
+            .expect("term projection should succeed");
+
+        assert!((expected - curve.rate_period(t1, t2)).abs() > 1e-6);
+        assert!((actual - expected).abs() < 1e-14);
+    }
+
+    #[test]
+    fn collateral_term_rate_rejects_period_straddling_curve_base() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
+        let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+            "USD-3M", 0.25,
+        )
+        .base_date(base)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.03), (1.0, 0.04)])
+        .build()
+        .expect("forward curve should build");
+        let start_date =
+            Date::from_calendar_date(2024, Month::December, 1).expect("valid start date");
+        let error = term_rate_for_period(&curve, &MarketContext::new(), start_date)
+            .expect_err("straddling term period should require a fixing");
+
+        assert!(error.to_string().contains("FIXING:USD-3M"));
+    }
+
+    #[test]
+    fn collateral_term_rate_uses_past_fixing_for_future_accrual_start() {
+        let curve_base =
+            Date::from_calendar_date(2025, Month::January, 6).expect("valid curve base");
+        let accrual_start =
+            Date::from_calendar_date(2025, Month::January, 7).expect("valid accrual start");
+        let curve = ForwardCurve::builder("USD-3M", 0.25)
+            .base_date(curve_base)
+            .day_count(DayCount::Act360)
+            .reset_lag(2)
+            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .build()
+            .expect("forward curve");
+        let fixing_date =
+            Date::from_calendar_date(2025, Month::January, 3).expect("valid fixing date");
+        let series =
+            ScalarTimeSeries::new(fixing_series_id("USD-3M"), vec![(fixing_date, 0.041)], None)
+                .expect("fixing series");
+        let context = MarketContext::new().insert_series(series);
+
+        let rate = term_rate_for_period(&curve, &context, accrual_start)
+            .expect("future accrual with historical fixing");
+        assert!((rate - 0.041).abs() < 1e-14);
+    }
+
+    #[test]
+    fn collateral_wac_projects_each_assets_own_curve_tenor() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base");
+        let period_start =
+            Date::from_calendar_date(2025, Month::April, 1).expect("valid period start");
+        let maturity = Date::from_calendar_date(2030, Month::January, 1).expect("valid maturity");
+        let curve_3m = ForwardCurve::builder("USD-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .reset_lag(0)
+            .knots([(0.0, 0.02), (1.0, 0.08)])
+            .build()
+            .expect("3M curve");
+        let curve_6m = ForwardCurve::builder("USD-6M", 0.5)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .reset_lag(0)
+            .knots([(0.0, 0.03), (1.0, 0.12)])
+            .build()
+            .expect("6M curve");
+        let context = MarketContext::new()
+            .insert(curve_3m.clone())
+            .insert(curve_6m.clone());
+        let mut pool = AssetPool::new("MIXED", DealType::CLO, Currency::USD);
+        pool.assets.push(PoolAsset::floating_rate_loan(
+            "A-3M",
+            Money::new(100.0, Currency::USD),
+            "USD-3M",
+            0.0,
+            maturity,
+            DayCount::Act360,
+        ));
+        pool.assets.push(PoolAsset::floating_rate_loan(
+            "A-6M",
+            Money::new(100.0, Currency::USD),
+            "USD-6M",
+            0.0,
+            maturity,
+            DayCount::Act360,
+        ));
+        let tranche = Tranche::new(
+            "AAA",
+            0.0,
+            100.0,
+            TrancheSeniority::Senior,
+            Money::new(200.0, Currency::USD),
+            TrancheCoupon::Fixed { rate: 0.0 },
+            maturity,
+        )
+        .expect("tranche");
+        let tranches = TrancheStructure::new(vec![tranche]).expect("tranche structure");
+        let state = SimulationState::new(&pool, &tranches, base, base, 0).expect("state");
+
+        let rate_3m = term_rate_for_period(&curve_3m, &context, period_start).expect("3M rate");
+        let rate_6m = term_rate_for_period(&curve_6m, &context, period_start).expect("6M rate");
+        let actual =
+            current_collateral_wac(&state, &context, period_start).expect("collateral WAC");
+        assert!((actual - (rate_3m + rate_6m) / 2.0).abs() < 1e-14);
+
+        let shared_end =
+            Date::from_calendar_date(2025, Month::July, 1).expect("shared waterfall end");
+        let old_shared_6m = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            &curve_6m,
+            period_start,
+            shared_end,
+        )
+        .expect("old shared-window rate");
+        assert!((rate_6m - old_shared_6m).abs() > 1e-6);
+    }
 
     #[test]
     fn reinvestment_par_build_scales_inversely_with_price() {
@@ -2646,7 +2828,7 @@ fn simulate_period(
     // period's pool flows amortize it. `0.0` when no AFC rule is configured. Used
     // for both the cash *routed* to capped tranches (the per-period AFC waterfall
     // below) and the interest *recorded* (Step 5), so the two cannot diverge.
-    let live_afc_cap = live_afc_cap_rate(instrument, state, context, pay_date)?;
+    let live_afc_cap = live_afc_cap_rate(instrument, state, context, period_start)?;
 
     // Early amortization (master-trust style): once cumulative losses reach the
     // configured threshold, the revolving period ends immediately and the deal
@@ -3587,16 +3769,7 @@ fn calculate_pool_flows_with_rates(request: RatedPoolFlowRequest<'_, '_>) -> Res
     let mut resolved_rates = Vec::with_capacity(state.pool_state.unique_curves.len());
     for idx_str in &state.pool_state.unique_curves {
         let fwd = request.context.get_forward(idx_str)?;
-        let base = fwd.base_date();
-        let dc = fwd.day_count();
-        let t2 = dc.year_fraction(base, request.pay_date, DayCountContext::default())?;
-        let tenor = fwd.tenor();
-        let t1 = (t2 - tenor).max(0.0);
-        let r = if t2 > 0.0 && t1 < t2 {
-            fwd.rate_period(t1, t2)
-        } else {
-            fwd.rate(0.0)
-        };
+        let r = term_rate_for_period(fwd.as_ref(), request.context, request.prev_date)?;
         resolved_rates.push(r);
     }
 

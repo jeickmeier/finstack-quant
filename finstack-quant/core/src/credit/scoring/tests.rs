@@ -3,8 +3,9 @@
 #[cfg(test)]
 mod altman_tests {
     use crate::credit::scoring::{
-        altman_z_double_prime, altman_z_prime, altman_z_score, AltmanZDoublePrimeInput,
-        AltmanZPrimeInput, AltmanZScoreInput, CreditScoringError, ScoringZone,
+        altman_z_double_prime, altman_z_prime, altman_z_score, altman_z_score_with_pd,
+        AltmanPdCalibration, AltmanZDoublePrimeInput, AltmanZPrimeInput, AltmanZScoreInput,
+        CreditScoringError, ScoringZone,
     };
 
     /// Textbook example: healthy manufacturing firm.
@@ -26,8 +27,23 @@ mod altman_tests {
             result.score
         );
         assert_eq!(result.zone, ScoringZone::Safe);
-        assert!(result.implied_pd < 0.01);
+        assert_eq!(result.implied_pd, None);
         assert_eq!(result.model, "Altman Z-Score (1968)");
+    }
+
+    #[test]
+    fn altman_pd_requires_explicit_versioned_heuristic() {
+        let input = AltmanZScoreInput {
+            working_capital_to_total_assets: 0.10,
+            retained_earnings_to_total_assets: 0.20,
+            ebit_to_total_assets: 0.15,
+            market_equity_to_total_liabilities: 1.50,
+            sales_to_total_assets: 1.80,
+        };
+
+        let result =
+            altman_z_score_with_pd(&input, AltmanPdCalibration::HeuristicV1).expect("score");
+        assert!(result.implied_pd.is_some_and(|pd| pd < 0.01));
     }
 
     /// Distressed firm: negative working capital, low earnings, high leverage.
@@ -49,7 +65,7 @@ mod altman_tests {
             result.score
         );
         assert_eq!(result.zone, ScoringZone::Distress);
-        assert!(result.implied_pd > 0.50);
+        assert_eq!(result.implied_pd, None);
     }
 
     /// Grey zone: borderline firm.
@@ -71,7 +87,7 @@ mod altman_tests {
             result.score
         );
         assert_eq!(result.zone, ScoringZone::Grey);
-        assert!(result.implied_pd > 0.01 && result.implied_pd < 0.50);
+        assert_eq!(result.implied_pd, None);
     }
 
     /// Zone boundary: score just above safe threshold (> 2.99) is Safe.
@@ -214,7 +230,7 @@ mod altman_tests {
         let result = altman_z_double_prime(&input).unwrap();
         assert!(result.score.abs() < 1e-12, "score={}", result.score);
         assert_eq!(result.zone, ScoringZone::Distress);
-        assert!(result.implied_pd > 0.5, "implied_pd={}", result.implied_pd);
+        assert_eq!(result.implied_pd, None);
     }
 
     /// Implied PD is always in [0, 1].
@@ -228,8 +244,11 @@ mod altman_tests {
             market_equity_to_total_liabilities: 5.00,
             sales_to_total_assets: 3.00,
         };
-        let safe_result = altman_z_score(&safe_input).unwrap();
-        assert!(safe_result.implied_pd >= 0.0 && safe_result.implied_pd <= 1.0);
+        let safe_result =
+            altman_z_score_with_pd(&safe_input, AltmanPdCalibration::HeuristicV1).unwrap();
+        assert!(safe_result
+            .implied_pd
+            .is_some_and(|pd| (0.0..=1.0).contains(&pd)));
 
         // Very distressed firm
         let dist_input = AltmanZScoreInput {
@@ -239,14 +258,46 @@ mod altman_tests {
             market_equity_to_total_liabilities: 0.01,
             sales_to_total_assets: 0.10,
         };
-        let dist_result = altman_z_score(&dist_input).unwrap();
-        assert!(dist_result.implied_pd >= 0.0 && dist_result.implied_pd <= 1.0);
+        let dist_result =
+            altman_z_score_with_pd(&dist_input, AltmanPdCalibration::HeuristicV1).unwrap();
+        assert!(dist_result
+            .implied_pd
+            .is_some_and(|pd| (0.0..=1.0).contains(&pd)));
     }
 }
 
 #[cfg(test)]
 mod ohlson_tests {
     use crate::credit::scoring::{ohlson_o_score, CreditScoringError, OhlsonOScoreInput};
+
+    #[test]
+    fn o_score_rejects_non_binary_indicators() {
+        let base = OhlsonOScoreInput {
+            log_total_assets_adjusted: 8.0,
+            total_liabilities_to_total_assets: 0.4,
+            working_capital_to_total_assets: 0.2,
+            current_liabilities_to_current_assets: 0.5,
+            liabilities_exceed_assets: 0.5,
+            net_income_to_total_assets: 0.1,
+            funds_from_operations_to_total_liabilities: 0.3,
+            negative_net_income_two_years: 0.0,
+            net_income_change: 0.1,
+        };
+        assert!(ohlson_o_score(&base).is_err());
+
+        let second = OhlsonOScoreInput {
+            liabilities_exceed_assets: 1.0,
+            negative_net_income_two_years: -0.0,
+            ..base
+        };
+        assert!(ohlson_o_score(&second).is_ok());
+
+        let invalid_second = OhlsonOScoreInput {
+            negative_net_income_two_years: 2.0,
+            ..second
+        };
+        assert!(ohlson_o_score(&invalid_second).is_err());
+    }
 
     /// Ohlson O-Score: healthy firm with low leverage and good profitability.
     /// Should produce a low O-score (low PD).
@@ -265,7 +316,7 @@ mod ohlson_tests {
         };
         let result = ohlson_o_score(&input).unwrap();
         // O-score should be negative (safe), PD should be low
-        assert!(result.implied_pd < 0.50, "pd={}", result.implied_pd);
+        assert!(result.implied_pd.is_some_and(|pd| pd < 0.50));
     }
 
     /// Ohlson O-Score: distressed firm with high leverage and losses.
@@ -283,7 +334,7 @@ mod ohlson_tests {
             net_income_change: -0.50,
         };
         let result = ohlson_o_score(&input).unwrap();
-        assert!(result.implied_pd > 0.50, "pd={}", result.implied_pd);
+        assert!(result.implied_pd.is_some_and(|pd| pd > 0.50));
         // PD far above Ohlson's optimal cutoff P* = 0.038 → Distress
         // (PD-based zones per the ).
         assert_eq!(result.zone, crate::credit::scoring::ScoringZone::Distress);
@@ -311,11 +362,7 @@ mod ohlson_tests {
 
         // O ≈ −3.250 → PD ≈ 0.0373 ∈ [0.019, 0.038] → Grey.
         let grey = ohlson_o_score(&base).unwrap();
-        assert!(
-            grey.implied_pd > 0.019 && grey.implied_pd < 0.038,
-            "pd={}",
-            grey.implied_pd
-        );
+        assert!(grey.implied_pd.is_some_and(|pd| pd > 0.019 && pd < 0.038));
         assert_eq!(grey.zone, ScoringZone::Grey);
 
         // Larger firm: O ≈ −4.064 → PD ≈ 0.0169 < 0.019 → Safe.
@@ -324,7 +371,7 @@ mod ohlson_tests {
             ..base
         })
         .unwrap();
-        assert!(safe.implied_pd < 0.019, "pd={}", safe.implied_pd);
+        assert!(safe.implied_pd.is_some_and(|pd| pd < 0.019));
         assert_eq!(safe.zone, ScoringZone::Safe);
 
         // More levered firm: O ≈ −2.045 → PD ≈ 0.115 > 0.038 → Distress
@@ -334,7 +381,7 @@ mod ohlson_tests {
             ..base
         })
         .unwrap();
-        assert!(distress.implied_pd > 0.038, "pd={}", distress.implied_pd);
+        assert!(distress.implied_pd.is_some_and(|pd| pd > 0.038));
         assert!(distress.score < 0.38, "score={}", distress.score);
         assert_eq!(distress.zone, ScoringZone::Distress);
     }
@@ -355,7 +402,9 @@ mod ohlson_tests {
             net_income_change: 0.90,
         };
         let result = ohlson_o_score(&input).unwrap();
-        assert!(result.implied_pd >= 0.0 && result.implied_pd <= 1.0);
+        assert!(result
+            .implied_pd
+            .is_some_and(|pd| (0.0..=1.0).contains(&pd)));
     }
 
     /// Verify coefficient signs: higher leverage should increase PD.
@@ -380,12 +429,7 @@ mod ohlson_tests {
         };
         let result_high = ohlson_o_score(&high_leverage).unwrap();
 
-        assert!(
-            result_high.implied_pd > result_low.implied_pd,
-            "Higher leverage should increase PD: low={}, high={}",
-            result_low.implied_pd,
-            result_high.implied_pd
-        );
+        assert!(result_high.implied_pd > result_low.implied_pd);
     }
 
     #[test]
@@ -432,7 +476,7 @@ mod zmijewski_tests {
             expected_y
         );
         assert_eq!(result.zone, ScoringZone::Safe);
-        assert!(result.implied_pd < 0.10, "pd={}", result.implied_pd);
+        assert!(result.implied_pd.is_some_and(|pd| pd < 0.10));
     }
 
     /// Zmijewski score: distressed firm (negative ROA, high leverage).
@@ -448,7 +492,7 @@ mod zmijewski_tests {
         };
         let result = zmijewski_score(&input).unwrap();
         assert_eq!(result.zone, ScoringZone::Distress);
-        assert!(result.implied_pd > 0.50, "pd={}", result.implied_pd);
+        assert!(result.implied_pd.is_some_and(|pd| pd > 0.50));
     }
 
     /// PD is always in [0, 1] for probit transform.
@@ -460,7 +504,9 @@ mod zmijewski_tests {
             current_assets_to_current_liabilities: 0.01,
         };
         let result = zmijewski_score(&extreme).unwrap();
-        assert!(result.implied_pd >= 0.0 && result.implied_pd <= 1.0);
+        assert!(result
+            .implied_pd
+            .is_some_and(|pd| (0.0..=1.0).contains(&pd)));
     }
 
     /// Verify coefficient sign: higher leverage increases PD.
@@ -479,9 +525,7 @@ mod zmijewski_tests {
         let pd_high = zmijewski_score(&high).unwrap().implied_pd;
         assert!(
             pd_high > pd_low,
-            "Higher leverage should increase PD: low={}, high={}",
-            pd_low,
-            pd_high
+            "Higher leverage should increase PD: low={pd_low:?}, high={pd_high:?}",
         );
     }
 

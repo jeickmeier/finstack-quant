@@ -1,17 +1,91 @@
 {
-  "description": "Golden fixtures whose externally sourced expected values are retained as the source of truth but cannot yet be reproduced by the executable runner. Failures are reported but not fatal (Rust: pricing.rs; Python: pytest.mark.xfail strict=False). Paths are relative to tests/golden/data/.",
+  "description": "Metric-specific external benchmark gaps. Fixture loading and execution remain strict; only the named metric mismatch is reported as expected unresolved. A named metric that passes, is missing, or belongs to a missing fixture is a stale-entry failure. Paths are relative to tests/golden/data/.",
   "fixtures": [
     {
       "path": "pricing/quantlib/bond/usd_fixed_callable_8y_oas_quantlib.json",
-      "reason": "QuantLib/Finstack callable OAS is within 1.5bp, but option-adjusted DV01 differs by about 30%; tree risk parity must be aligned before this fixture can pass strictly."
+      "description": "QuantLib callable-bond option-adjusted DV01 gap",
+      "metrics": [
+        {
+          "metric": "dv01",
+          "reason": "Tree risk parity must be aligned before the option-adjusted DV01 can pass the independent QuantLib target.",
+          "evidence": "OAS is within the established 1.5bp tolerance, while option-adjusted DV01 differs from QuantLib by about 30%."
+        }
+      ]
     },
     {
       "path": "pricing/quantlib/bond/usd_floating_5y_hazard_quantlib.json",
-      "reason": "Term-index fixing/value-date conventions produce about 0.17 per 100 price drift and 28% parallel-DV01 drift; CS01 remains within the 0.5% target."
+      "description": "QuantLib credit-floater price and parallel-DV01 gaps",
+      "metrics": [
+        {
+          "metric": "dv01",
+          "reason": "Term-index fixing and value-date conventions require reconciliation with the QuantLib parallel-risk definition.",
+          "evidence": "Parallel DV01 differs by about 28%, while CS01 remains within the established 0.5% tolerance."
+        },
+        {
+          "metric": "npv",
+          "reason": "Term-index fixing and value-date conventions require reconciliation with the QuantLib floater price.",
+          "evidence": "Price differs from QuantLib by about 0.17 per 100 notional, outside the established 0.01 tolerance."
+        }
+      ]
     },
     {
       "path": "pricing/quantlib/bond/usd_floating_5y_risk_free_quantlib.json",
-      "reason": "Term-index fixing/value-date conventions produce about 0.18 per 100 price drift and 8% parallel-DV01 drift, outside vanilla floater validation targets."
+      "description": "QuantLib risk-free floater price and parallel-DV01 gaps",
+      "metrics": [
+        {
+          "metric": "dv01",
+          "reason": "Term-index fixing and value-date conventions require reconciliation with the QuantLib parallel-risk definition.",
+          "evidence": "Parallel DV01 differs by about 8%, outside the established 0.5% tolerance."
+        },
+        {
+          "metric": "npv",
+          "reason": "Term-index fixing and value-date conventions require reconciliation with the QuantLib floater price.",
+          "evidence": "Price differs from QuantLib by about 0.18 per 100 notional, outside the established 0.01 tolerance."
+        }
+      ]
+    },
+    {
+      "path": "pricing/bloomberg/bond/bhccn_10_2032_callable_bloomberg.json",
+      "description": "BHCCN Bloomberg asset-swap benchmark gap",
+      "metrics": [
+        {
+          "metric": "asw_market",
+          "reason": "The old projection of a historical reset was invalid; an independent Bloomberg ASW benchmark refresh is required before changing the external target.",
+          "evidence": "Bloomberg ASW is 5.334% with 2bp tolerance; fixing-aware pricing using the required 2026-04-15 SOFR reset produces 5.2667175516%, a 6.73bp gap."
+        }
+      ]
+    },
+    {
+      "path": "pricing/bloomberg/cap_floor/usd_cap_5y_atm_black.json",
+      "description": "USD Bloomberg cap HW1F and curve-risk benchmark gaps",
+      "metrics": [
+        {
+          "metric": "dv01",
+          "reason": "Preserve the Bloomberg DV01 pending an independent curve-risk refresh after quote-shock forward recalibration moved to GlobalSolve.",
+          "evidence": "Executable DV01 is 2089.632530 versus Bloomberg 2158.57, outside the established $25 tolerance."
+        },
+        {
+          "metric": "npv",
+          "reason": "Preserve the Bloomberg NPV pending an independent HW1F benchmark refresh after the source-backed LongFront and contractual-grid corrections.",
+          "evidence": "Executable NPV is 257842.188297 versus Bloomberg 258327.94, outside the established $1 tolerance."
+        },
+        {
+          "metric": "vega",
+          "reason": "Preserve the Bloomberg vega pending an independent HW1F benchmark refresh after the source-backed LongFront and contractual-grid corrections.",
+          "evidence": "Executable vega is 265996.256254 versus Bloomberg 265946.0, outside the established $10 tolerance."
+        }
+      ]
+    },
+    {
+      "path": "pricing/bloomberg/fra/usd_fra_3x6.json",
+      "description": "USD Bloomberg FRA combined-DV01 benchmark gap",
+      "metrics": [
+        {
+          "metric": "dv01",
+          "reason": "The external target must remain unchanged pending an independent Bloomberg combined-risk definition refresh.",
+          "evidence": "The contractual grid restores Bloomberg par rate and zero NPV, but corrected DF-chained semantics produce DV01 -251.608657 versus Bloomberg -337.37 with 0.4 tolerance, an 85.76 gap."
+        }
+      ]
     }
   ]
 }

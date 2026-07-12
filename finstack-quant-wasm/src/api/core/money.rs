@@ -30,7 +30,12 @@ pub struct Money {
 
 #[wasm_bindgen(js_class = Money)]
 impl Money {
-    /// Creates a new money value using the currency's ISO minor units and bankers rounding.
+    /// Creates a new money value without implicit currency-minor-unit rounding.
+    ///
+    /// WASM accepts a JavaScript `number` only. Its finite numeric value is
+    /// converted to Rust `Decimal` and stored without currency-minor-unit
+    /// rounding; precision already absent from the input `number` cannot be
+    /// recovered. Formatting does not mutate the stored amount.
     ///
     /// @param amount - Numeric amount in major units (must be finite).
     /// @param currency - Currency tag.

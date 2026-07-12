@@ -6,7 +6,7 @@
     "description": "Synthetic CME-style 3M SOFR quarterly future on committed USD discount and forward curves.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Finstack Quant canonical IR future calculation with explicit zero convexity adjustment Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved. Re-baselined 2026-07-11 after the intentional switch from accrual-based MTM to exchange tick economics; model rates and futures prices are unchanged.",
+    "source_detail": "Finstack Quant canonical IR future calculation with explicit zero convexity adjustment Phase-2 envelope migration (2026-05-09): Tier-A wrap. The original snapshot is preserved verbatim in initial_market with empty plan.steps; no calibration math changes. Pricing tolerance contracts preserved. Re-baselined 2026-07-11 after the intentional switch from accrual-based MTM to exchange tick economics. The forward curve now carries the contractual 2026-06-19 to 2026-09-18 projection interval, so DF-chained term projection uses the reset-date forward instead of the legacy integral-average rate_period interpretation. Analytic derivation: linear interpolation at reset t=50/360 gives F=0.04+(0.041-0.04)*(50/90)=0.0405555555556; model price is 100*(1-F)=95.9444444444, and (model_price-95.8)/0.0025*6.25*10 contracts = 3611.11111111 NPV. A +1bp forward shift changes ten contracts by -250, giving DV01=-250.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-04-30",
     "last_reviewed_by": "jeickmeier",
@@ -99,6 +99,12 @@
               0.044
             ]
           ],
+          "projection_grid": [
+            0.0,
+            0.1388888888888889,
+            0.39166666666666666,
+            2.0
+          ],
           "interp_style": "linear",
           "extrapolation": "flat_forward",
           "rate_calibration": null
@@ -143,10 +149,10 @@
     }
   },
   "expected": {
-    "npv": 2347.222222222456,
+    "npv": 3611.111111111143,
     "dv01": -249.99999999995,
     "futures_price": 95.8,
-    "implied_forward": 0.041061111111,
+    "implied_forward": 0.04055555555555556,
     "convexity_adjustment": 0.0
   },
   "tolerances": {

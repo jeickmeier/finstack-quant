@@ -382,25 +382,6 @@ impl ForwardRateAgreement {
 
         let fwd = context.get_forward(&self.forward_curve_id)?;
 
-        // Time fractions for mapping into the forward curve domain must use the
-        // forward curve's own day-count/time basis, not the instrument accrual basis.
-        let fwd_base = fwd.base_date();
-        let fwd_dc = fwd.day_count();
-        let t_start = fwd_dc
-            .year_fraction(
-                fwd_base,
-                self.start_date,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(0.0);
-        let t_end = fwd_dc
-            .year_fraction(
-                fwd_base,
-                self.maturity,
-                finstack_quant_core::dates::DayCountContext::default(),
-            )?
-            .max(t_start);
-
         // Accrual factor
         let tau = self
             .day_count
@@ -426,7 +407,11 @@ impl ForwardRateAgreement {
                 ))
             })?
         } else {
-            fwd.rate_period(t_start, t_end)
+            crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+                fwd.as_ref(),
+                self.start_date,
+                self.maturity,
+            )?
         };
 
         // Warn if forward rate is outside reasonable bounds (likely data error)
@@ -626,7 +611,7 @@ mod tests {
     use super::*;
     use crate::instruments::common_impl::traits::Instrument;
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{Date, DateExt};
+    use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use finstack_quant_core::math::interp::InterpStyle;
@@ -650,12 +635,22 @@ mod tests {
             .build()
             .expect("FRA builder should succeed in test");
 
-        let ctx = MarketContext::new().insert(disc).insert(fwd);
-
         // FRA 3M x 6M
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
         let fixing = start.add_weekdays(-2); // 2 business days before start for reset_lag
+        let t_start = fwd
+            .day_count()
+            .year_fraction(base, start, DayCountContext::default())
+            .expect("valid start time");
+        let t_end = fwd
+            .day_count()
+            .year_fraction(base, end, DayCountContext::default())
+            .expect("valid end time");
+        let par_forward = fwd
+            .rate_between(t_start, t_end)
+            .expect("valid FRA forward interval");
+        let ctx = MarketContext::new().insert(disc).insert(fwd);
         let fra = ForwardRateAgreement::builder()
             .id("FRA-3x6".into())
             .notional(Money::new(1_000_000.0, Currency::USD))
@@ -663,7 +658,7 @@ mod tests {
             .start_date(start)
             .maturity(end)
             .fixed_rate(
-                finstack_quant_core::decimal::f64_to_decimal(0.05)
+                finstack_quant_core::decimal::f64_to_decimal(par_forward)
                     .expect("fixed rate should convert in test"),
             )
             .day_count(finstack_quant_core::dates::DayCount::Act360)
@@ -704,11 +699,21 @@ mod tests {
             .build()
             .expect("FRA builder should succeed in test");
 
-        let ctx = MarketContext::new().insert(disc).insert(fwd);
-
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
         let fixing = start.add_weekdays(-2);
+        let t_start = fwd
+            .day_count()
+            .year_fraction(base, start, DayCountContext::default())
+            .expect("valid start time");
+        let t_end = fwd
+            .day_count()
+            .year_fraction(base, end, DayCountContext::default())
+            .expect("valid end time");
+        let expected_par_rate = fwd
+            .rate_between(t_start, t_end)
+            .expect("valid FRA forward interval");
+        let ctx = MarketContext::new().insert(disc).insert(fwd);
 
         let fra = ForwardRateAgreement::builder()
             .id("FRA-TEST".into())
@@ -756,11 +761,50 @@ mod tests {
             .expect("Par rate calculation failed");
 
         assert!(
-            (par_rate - fwd_rate).abs() < 1e-10,
+            (par_rate - expected_par_rate).abs() < 1e-10,
             "Par rate {} should equal forward rate {}",
             par_rate,
-            fwd_rate
+            expected_par_rate
         );
+    }
+
+    #[test]
+    fn fra_rejects_pre_curve_period_instead_of_clamping() {
+        let as_of =
+            Date::from_calendar_date(2024, Month::December, 1).expect("valid valuation date");
+        let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid start");
+        let end = Date::from_calendar_date(2025, Month::April, 1).expect("valid end");
+        let fixing = Date::from_calendar_date(2024, Month::December, 30).expect("valid fixing");
+        let disc = DiscountCurve::builder("DISC")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (2.0, 0.90)])
+            .build()
+            .expect("discount curve");
+        let fwd = ForwardCurve::builder("FWD-3M", 0.25)
+            .base_date(Date::from_calendar_date(2025, Month::February, 1).expect("curve base"))
+            .knots([(0.0, 0.05), (2.0, 0.05)])
+            .build()
+            .expect("forward curve");
+        let ctx = MarketContext::new().insert(disc).insert(fwd);
+        let fra = ForwardRateAgreement::builder()
+            .id("FRA-PRE-BASE".into())
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .fixing_date(fixing)
+            .start_date(start)
+            .maturity(end)
+            .fixed_rate(rust_decimal::Decimal::new(5, 2))
+            .day_count(DayCount::Act360)
+            .reset_lag(2)
+            .discount_curve_id("DISC".into())
+            .forward_curve_id("FWD-3M".into())
+            .side(PayReceive::Pay)
+            .build()
+            .expect("FRA");
+
+        let error = fra
+            .base_value(&ctx, as_of)
+            .expect_err("pre-base FRA period must require fixing or reject");
+        assert!(error.to_string().contains("historical fixing"));
     }
 }
 

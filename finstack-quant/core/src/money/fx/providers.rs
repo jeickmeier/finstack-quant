@@ -95,10 +95,15 @@ impl SimpleFxProvider {
     /// ]);
     /// ```
     pub fn set_quotes(&self, quotes: &[(Currency, Currency, f64)]) -> crate::Result<()> {
+        let validated = quotes
+            .iter()
+            .map(|&(from, to, rate)| {
+                super::validate_fx_rate(from, to, rate).map(|rate| ((from, to), rate))
+            })
+            .collect::<crate::Result<Vec<_>>>()?;
         let mut guard = self.quotes.write();
-        for &(from, to, rate) in quotes {
-            let rate = super::validate_fx_rate(from, to, rate)?;
-            guard.insert((from, to), rate);
+        for (pair, rate) in validated {
+            guard.insert(pair, rate);
         }
         Ok(())
     }

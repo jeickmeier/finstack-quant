@@ -106,8 +106,10 @@ impl PyTenor {
     /// Construct a tenor from a count and unit.
     #[new]
     #[pyo3(text_signature = "(count, unit)")]
-    fn new(count: u32, unit: PyRef<PyTenorUnit>) -> Self {
-        Self::from_inner(Tenor::new(count, unit.inner))
+    fn new(count: u32, unit: PyRef<PyTenorUnit>) -> PyResult<Self> {
+        Tenor::try_new(count, unit.inner)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     /// Parse a tenor string (e.g. ``"3M"``, ``"1Y"``, ``"2W"``).

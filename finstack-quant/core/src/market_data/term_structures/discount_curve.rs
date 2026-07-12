@@ -846,6 +846,7 @@ impl DiscountCurve {
     ) -> crate::Result<()> {
         use crate::market_data::bumps::BumpType;
 
+        spec.validate_finite()?;
         let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
                 reason: format!(
@@ -862,9 +863,10 @@ impl DiscountCurve {
         }
         let bump_rate = val;
 
+        let mut bumped = self.clone();
         match spec.bump_type {
             BumpType::Parallel => {
-                for (df, &t) in self.dfs.iter_mut().zip(self.knots.iter()) {
+                for (df, &t) in bumped.dfs.iter_mut().zip(bumped.knots.iter()) {
                     *df *= (-bump_rate * t).exp();
                 }
             }
@@ -881,7 +883,7 @@ impl DiscountCurve {
                     target_bucket,
                     next_bucket,
                 )?;
-                for (df, &t) in self.dfs.iter_mut().zip(self.knots.iter()) {
+                for (df, &t) in bumped.dfs.iter_mut().zip(bumped.knots.iter()) {
                     let weight = super::common::triangular_weight(
                         t,
                         prev_bucket,
@@ -892,7 +894,9 @@ impl DiscountCurve {
                 }
             }
         }
-        self.rebuild_interp()
+        bumped.rebuild_interp()?;
+        *self = bumped;
+        Ok(())
     }
 
     /// Create a new curve with a parallel rate bump applied in basis points (fallible).

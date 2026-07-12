@@ -44,12 +44,25 @@ export type {
   NotionalJson,
 } from "./types/generated/CashflowSchedule";
 //
-// WASM ownership: classes with a `free(): void` method own wasm heap memory.
-// Call `free()` when a long-lived handle is no longer needed, especially for
-// `Performance`, credit factor hierarchy handles, and `Portfolio`. Plain JSON
-// result objects, arrays, and namespace functions do not need manual disposal.
+// WASM ownership: every wasm-bindgen class exposed below owns a wasm heap
+// allocation. Call `free()` when a handle is no longer needed. On runtimes
+// that define `Symbol.dispose`, wasm-bindgen also installs
+// `instance[Symbol.dispose] === instance.free`. Plain JSON results, arrays,
+// and namespace functions do not need manual disposal.
 
-export { default } from './pkg/finstack_quant_wasm';
+/** Inputs accepted by the wasm-bindgen web initializer. */
+export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
+
+/** Initialized WebAssembly exports. */
+export type InitOutput = WebAssembly.Exports;
+
+/** Initialize the package's WebAssembly module. */
+export default function init(
+  moduleOrPath?:
+    | { module_or_path: InitInput | Promise<InitInput> }
+    | InitInput
+    | Promise<InitInput>
+): Promise<InitOutput>;
 
 // --- Calibration envelope types (generated from Rust via ts-rs) ---
 import type { CalibrationEnvelope } from './types/generated/CalibrationEnvelope';
@@ -66,7 +79,26 @@ export type { CalibrationReport } from './types/generated/CalibrationReport';
 
 // --- core -----------------------------------------------------------------
 
-export interface Currency {
+export interface WasmOwned {
+  /** Release the underlying wasm heap allocation. Do not use this handle afterward. */
+  free(): void;
+}
+
+// wasm-bindgen emits these as classes. Interface merging adds their generated
+// `free()` contract without duplicating methods. At runtime, wasm-bindgen also
+// installs `[Symbol.dispose]` as an alias of `free` when the host defines that
+// symbol; it is intentionally omitted here so ES2020 consumers do not require
+// the `esnext.disposable` TypeScript library.
+export interface Performance extends WasmOwned {}
+export interface CreditFactorModel extends WasmOwned {}
+export interface CreditCalibrator extends WasmOwned {}
+export interface LevelsAtDate extends WasmOwned {}
+export interface PeriodDecomposition extends WasmOwned {}
+export interface FactorCovarianceForecast extends WasmOwned {}
+export interface Market extends WasmOwned {}
+export interface Portfolio extends WasmOwned {}
+
+export interface Currency extends WasmOwned {
   readonly code: string;
   readonly numeric: number;
   readonly decimals: number;
@@ -79,7 +111,7 @@ export interface CurrencyConstructor {
   fromJson(json: string): Currency;
 }
 
-export interface Money {
+export interface Money extends WasmOwned {
   readonly amount: number;
   readonly currency: Currency;
   /** Lossless amount as a decimal string (exact Rust Decimal rendering). */
@@ -94,10 +126,15 @@ export interface Money {
 }
 
 export interface MoneyConstructor {
+  /**
+   * Convert the finite JavaScript number to Rust Decimal without implicit
+   * currency-minor-unit rounding. Precision absent from the input number
+   * cannot be recovered; formatting does not mutate the stored amount.
+   */
   new (amount: number, currency: Currency): Money;
 }
 
-export interface Rate {
+export interface Rate extends WasmOwned {
   readonly asDecimal: number;
   readonly asPercent: number;
   readonly asBps: number;
@@ -109,7 +146,7 @@ export interface RateConstructor {
   fromBps(bps: number): Rate;
 }
 
-export interface Bps {
+export interface Bps extends WasmOwned {
   asDecimal(): number;
   asBps(): number;
 }
@@ -118,7 +155,7 @@ export interface BpsConstructor {
   new (value: number): Bps;
 }
 
-export interface Percentage {
+export interface Percentage extends WasmOwned {
   asDecimal(): number;
   asPercent(): number;
 }
@@ -127,7 +164,11 @@ export interface PercentageConstructor {
   new (value: number): Percentage;
 }
 
-export interface DayCount {
+export interface DayCount extends WasmOwned {
+  /**
+   * ActActIsma and Bus252 require explicit context; `yearFraction` throws when called without it.
+   * Use `yearFractionWithContext` for those conventions.
+   */
   yearFraction(startEpochDays: number, endEpochDays: number): number;
   signedYearFraction(startEpochDays: number, endEpochDays: number): number;
   yearFractionWithContext(
@@ -135,7 +176,7 @@ export interface DayCount {
     endEpochDays: number,
     ctx: DayCountContext
   ): number;
-  calendarDays(startEpochDays: number, endEpochDays: number): number;
+  calendarDays(startEpochDays: number, endEpochDays: number): bigint;
   toString(): string;
 }
 
@@ -143,6 +184,11 @@ export interface DayCountConstructor {
   new (name: string): DayCount;
   act360(): DayCount;
   act365f(): DayCount;
+  /**
+   * Actual/365L (ICMA Rule 251): annual/no-frequency periods use 366 exactly
+   * when February 29 is in `(start, end]`; non-annual periods use 366 exactly
+   * when the end year is leap. This is not ACT/ACT AFB.
+   */
   act365l(): DayCount;
   thirty360(): DayCount;
   thirtyE360(): DayCount;
@@ -152,7 +198,7 @@ export interface DayCountConstructor {
   bus252(): DayCount;
 }
 
-export interface DayCountContext {
+export interface DayCountContext extends WasmOwned {
   withCalendar(calendarCode: string): DayCountContext;
   withFrequency(frequency: Tenor): DayCountContext;
   withBusBasis(busBasis: number): DayCountContext;
@@ -165,7 +211,7 @@ export interface DayCountContextConstructor {
   new (): DayCountContext;
 }
 
-export interface Tenor {
+export interface Tenor extends WasmOwned {
   readonly count: number;
   toYearsSimple(): number;
   toString(): string;
@@ -181,29 +227,36 @@ export interface TenorConstructor {
   annual(): Tenor;
 }
 
-export interface DiscountCurve {
+export type DiscountCurveValidationMode = 'market_standard' | 'negative_rate_friendly';
+
+export interface DiscountCurve extends WasmOwned {
   readonly id: string;
   readonly baseDate: string;
   df(t: number): number;
   zero(t: number): number;
-  forwardRate(t1: number, t2: number): number;
+  forward(t1: number, t2: number): number;
 }
 
 export interface DiscountCurveConstructor {
   new (
     id: string,
     baseDate: string,
-    knots: number[],
+    knots: NumericArray,
     interp?: string,
     extrapolation?: string,
-    dayCount?: string
+    dayCount?: string,
+    validationMode?: DiscountCurveValidationMode,
+    forwardFloor?: number | null
   ): DiscountCurve;
 }
 
-export interface ForwardCurve {
+export interface ForwardCurve extends WasmOwned {
   readonly id: string;
   readonly baseDate: string;
+  readonly projectionGrid: Float64Array | null;
+  readonly resetLag: number;
   rate(t: number): number;
+  rateBetween(t1: number, t2: number): number;
 }
 
 export interface ForwardCurveConstructor {
@@ -211,14 +264,16 @@ export interface ForwardCurveConstructor {
     id: string,
     tenor: number,
     baseDate: string,
-    knots: number[],
+    knots: NumericArray,
     dayCount?: string,
     interp?: string,
-    extrapolation?: string
+    extrapolation?: string,
+    projectionGrid?: NumericArray | null,
+    resetLag?: number | null
   ): ForwardCurve;
 }
 
-export interface VolCube {
+export interface VolCube extends WasmOwned {
   readonly id: string;
   readonly interpolationMode: string;
   vol(expiry: number, tenor: number, strike: number): number;
@@ -240,15 +295,15 @@ export interface VolCube {
 export interface VolCubeConstructor {
   new (
     id: string,
-    expiries: number[],
-    tenors: number[],
-    paramsFlat: number[],
-    forwards: number[],
+    expiries: NumericArray,
+    tenors: NumericArray,
+    paramsFlat: NumericArray,
+    forwards: NumericArray,
     interpolationMode?: string
   ): VolCube;
 }
 
-export interface FxConversionPolicy {
+export interface FxConversionPolicy extends WasmOwned {
   toString(): string;
 }
 
@@ -260,7 +315,7 @@ export interface FxConversionPolicyConstructor {
   fromName(name: string): FxConversionPolicy;
 }
 
-export interface FxRateResult {
+export interface FxRateResult extends WasmOwned {
   readonly rate: number;
   readonly triangulated: boolean;
 }
@@ -270,9 +325,15 @@ export interface FxRateResultConstructor {
   readonly prototype: FxRateResult;
 }
 
-export interface FxMatrix {
+export interface FxMatrix extends WasmOwned {
   setQuote(base: string, quote: string, rate: number): void;
-  setQuoteOn(base: string, quote: string, date: string, policy: FxConversionPolicy, rate: number): void;
+  setQuoteOn(
+    base: string,
+    quote: string,
+    date: string,
+    policy: FxConversionPolicy,
+    rate: number
+  ): void;
   rate(base: string, quote: string, date: string, policy: FxConversionPolicy): FxRateResult;
   rateDefault(base: string, quote: string, date: string): FxRateResult;
 }
@@ -282,24 +343,24 @@ export interface FxMatrixConstructor {
 }
 
 /** FX vol surface quoted in delta space (ATM, 25-delta RR/BF, optional 10-delta wings). */
-export interface FxDeltaVolSurface {
+export interface FxDeltaVolSurface extends WasmOwned {
   readonly id: string;
-  readonly expiries: number[];
+  readonly expiries: Float64Array;
   readonly numExpiries: number;
   /** Pillar vols at an expiry index as `[atm, put25dVol, call25dVol]`. */
-  pillarVols(expiryIdx: number): number[];
+  pillarVols(expiryIdx: number): Float64Array;
   impliedVol(expiry: number, strike: number, forward: number, rD: number, rF: number): number;
 }
 
 export interface FxDeltaVolSurfaceConstructor {
   new (
     id: string,
-    expiries: number[],
-    atmVols: number[],
-    rr25d: number[],
-    bf25d: number[],
-    rr10d?: number[],
-    bf10d?: number[]
+    expiries: NumericArray,
+    atmVols: NumericArray,
+    rr25d: NumericArray,
+    bf25d: NumericArray,
+    rr10d?: NumericArray,
+    bf10d?: NumericArray
   ): FxDeltaVolSurface;
   /** Convert a forward delta to a strike (Garman-Kohlhagen, premium-unadjusted). */
   deltaToStrike(delta: number, forward: number, vol: number, expiry: number, rF: number): number;
@@ -364,7 +425,7 @@ export interface CoreNamespace {
   DayCountContext: DayCountContextConstructor;
   Tenor: TenorConstructor;
   createDate(year: number, month: number, day: number): number;
-  dateFromEpochDays(days: number): number[];
+  dateFromEpochDays(days: number): Int32Array;
   adjust(epochDays: number, convention: string, calendarCode: string): number;
   availableCalendars(): string[];
   DiscountCurve: DiscountCurveConstructor;
@@ -947,7 +1008,7 @@ export declare const features: FeaturesNamespace;
 
 // --- valuations.correlation -------------------------------------------------
 
-export interface Copula {
+export interface Copula extends WasmOwned {
   readonly numFactors: number;
   readonly modelName: string;
   conditionalDefaultProb(
@@ -972,18 +1033,14 @@ export interface Copula {
    * non-RFL copulas.
    */
   stressCorrelationProxy(correlation: number): number;
-  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
-  free(): void;
 }
 
-export interface CopulaSpec {
+export interface CopulaSpec extends WasmOwned {
   readonly isGaussian: boolean;
   readonly isStudentT: boolean;
   readonly isRfl: boolean;
   readonly isMultiFactor: boolean;
   build(): Copula;
-  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
-  free(): void;
 }
 
 export interface CopulaSpecConstructor {
@@ -993,7 +1050,7 @@ export interface CopulaSpecConstructor {
   multiFactor(numFactors: number): CopulaSpec;
 }
 
-export interface RecoveryModel {
+export interface RecoveryModel extends WasmOwned {
   /** Expected (unconditional, Jensen-corrected) recovery rate. */
   readonly expectedRecovery: number;
   readonly lgd: number;
@@ -1004,11 +1061,9 @@ export interface RecoveryModel {
   conditionalRecovery(marketFactor: number): number;
   /** Conditional LGD (1 − conditional recovery) given the market factor. */
   conditionalLgd(marketFactor: number): number;
-  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
-  free(): void;
 }
 
-export interface RecoverySpec {
+export interface RecoverySpec extends WasmOwned {
   /**
    * Location-parameter recovery rate of this spec: the constant rate for a
    * constant spec, or the `mean` input (target recovery at factor `Z = 0`)
@@ -1018,8 +1073,6 @@ export interface RecoverySpec {
    */
   readonly expectedRecovery: number;
   build(): RecoveryModel;
-  /** Release the underlying wasm heap allocation. Do not use this handle after calling `free()`. */
-  free(): void;
 }
 
 export interface RecoverySpecConstructor {
@@ -1473,7 +1526,7 @@ export interface ValuationInstrumentsNamespace {
 
 export type FxInstrumentSpec = Record<string, unknown> | string;
 
-export interface FxInstrument {
+export interface FxInstrument extends WasmOwned {
   toJson(): string;
   price(marketJson: string, asOf: string, model?: string | null): string;
   /** WASM order keeps optional arguments trailing: metrics precedes model. */
@@ -1519,7 +1572,7 @@ export interface FxNamespace {
 
 // --- SABR (Stochastic Alpha Beta Rho) volatility -------------------------
 
-export interface SabrParameters {
+export interface SabrParameters extends WasmOwned {
   readonly alpha: number;
   readonly beta: number;
   readonly nu: number;
@@ -1536,7 +1589,7 @@ export interface SabrParametersConstructor {
   ratesDefault(): SabrParameters;
 }
 
-export interface SabrModel {
+export interface SabrModel extends WasmOwned {
   impliedVol(forward: number, strike: number, t: number): number;
   /** Parameters used by this model. */
   readonly params: SabrParameters;
@@ -1562,7 +1615,7 @@ export interface SabrSmileArbitrageResult {
   }>;
 }
 
-export interface SabrSmile {
+export interface SabrSmile extends WasmOwned {
   atmVol(): number;
   impliedVol(strike: number): number;
   generateSmile(strikes: number[]): number[];
@@ -1573,7 +1626,7 @@ export interface SabrSmileConstructor {
   new (params: SabrParameters, forward: number, t: number): SabrSmile;
 }
 
-export interface SabrCalibrator {
+export interface SabrCalibrator extends WasmOwned {
   /** Copy of this calibrator with an overridden convergence tolerance. */
   withTolerance(tolerance: number): SabrCalibrator;
   calibrate(
@@ -1657,9 +1710,9 @@ export interface CreditDerivativesNamespace {
 
 export interface ValuationsNamespace {
   /**
- * Credit-correlation infrastructure (copulas, recovery models, and matrix
- * utilities). Latent factor models are Python-only and not on this facade.
- */
+   * Credit-correlation infrastructure (copulas, recovery models, and matrix
+   * utilities). Latent factor models are Python-only and not on this facade.
+   */
   correlation: CorrelationNamespace;
   /** Structural credit models and toggle-exercise helpers. */
   credit: ValuationCreditNamespace;
@@ -1908,6 +1961,8 @@ export declare const valuations: ValuationsNamespace;
 
 // --- attribution -----------------------------------------------------------
 
+export interface AttributionParams extends WasmOwned {}
+
 export interface AttributionNamespace {
   /** Parameters constructor emitted by wasm-bindgen for attribution calls.
    *
@@ -1923,9 +1978,9 @@ export interface AttributionNamespace {
     methodJson: string,
     configJson?: string,
     fullCrossAttribution?: boolean
-  ) => unknown;
+  ) => AttributionParams;
   /** Run P&L attribution for a single instrument. */
-  attributePnl(params: unknown): string;
+  attributePnl(params: AttributionParams): string;
   /** Run attribution from a full JSON AttributionEnvelope. */
   attributePnlFromSpec(specJson: string): string;
   /** Validate an attribution specification JSON. */
@@ -1982,13 +2037,31 @@ export interface StatementsAnalyticsNamespace {
     boundsHi?: number | null
   ): GoalSeekResult;
   traceDependencies(modelJson: string, nodeId: string): string;
-  explainFormula(modelJson: string, resultsJson: string, nodeId: string, period: string): FormulaExplanationJson;
-  explainFormulaText(modelJson: string, resultsJson: string, nodeId: string, period: string): string;
+  explainFormula(
+    modelJson: string,
+    resultsJson: string,
+    nodeId: string,
+    period: string
+  ): FormulaExplanationJson;
+  explainFormulaText(
+    modelJson: string,
+    resultsJson: string,
+    nodeId: string,
+    period: string
+  ): string;
   plSummaryReport(resultsJson: string, lineItems: string[], periods: string[]): string;
   creditAssessmentReport(resultsJson: string, asOf: string): string;
   runChecks(modelJson: string, suiteSpecJson: string, resultsJson?: string | null): string;
-  runThreeStatementChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;
-  runCreditUnderwritingChecks(modelJson: string, mappingJson: string, resultsJson?: string | null): string;
+  runThreeStatementChecks(
+    modelJson: string,
+    mappingJson: string,
+    resultsJson?: string | null
+  ): string;
+  runCreditUnderwritingChecks(
+    modelJson: string,
+    mappingJson: string,
+    resultsJson?: string | null
+  ): string;
   renderCheckReportText(reportJson: string): string;
   renderCheckReportHtml(reportJson: string): string;
   // Comps — comparable company analysis

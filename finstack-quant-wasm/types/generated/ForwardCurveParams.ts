@@ -28,6 +28,10 @@ tenor_years: number,
 discount_curve_id: string,
 /**
  * Calibration method to use.
+ *
+ * Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
+ * bootstrap is rejected because contractual off-grid reset intervals
+ * couple adjacent rates through projection discount factors.
  */
 method: CalibrationMethod,
 /**

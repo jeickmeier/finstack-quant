@@ -73,10 +73,11 @@ pub struct ArbitrageCheckConfig {
     pub check_calendar_spread: bool,
     /// Run Dupire local vol density check.
     pub check_local_vol_density: bool,
-    /// Forward price, required for local vol density check.
-    /// If None, local vol density check is skipped.
+    /// Scalar forward price, broadcast across expiries when `forward_prices`
+    /// is absent.
     pub forward: Option<f64>,
-    /// Optional per-expiry forward prices used by butterfly and calendar checks.
+    /// Optional per-expiry forward prices used by butterfly, calendar, and
+    /// local-vol density checks.
     ///
     /// When supplied, this must have the same length as `surface.expiries()`.
     /// If omitted, `forward` is broadcast across expiries for backward compatibility.
@@ -198,20 +199,18 @@ pub fn check_surface(
 
     if config.check_calendar_spread && !forwards.is_empty() {
         let checker = CalendarSpreadCheck {
-            forwards,
+            forwards: forwards.clone(),
             tolerance: config.tolerance,
         };
         all_violations.extend(checker.check(surface));
     }
 
-    if config.check_local_vol_density {
-        if let Some(fwd) = config.forward {
-            let checker = LocalVolDensityCheck {
-                forward: fwd,
-                tolerance: config.tolerance,
-            };
-            all_violations.extend(checker.check(surface));
-        }
+    if config.check_local_vol_density && !forwards.is_empty() {
+        all_violations.extend(local_vol_density_violations(
+            surface,
+            &forwards,
+            config.tolerance,
+        ));
     }
 
     // Filter by minimum severity
@@ -498,7 +497,7 @@ mod tests {
     }
 
     #[test]
-    fn check_surface_keeps_local_vol_forward_contract() {
+    fn check_surface_uses_forward_prices_for_local_vol_check() {
         let surface = calendar_spread_violation_surface();
         let forwards = vec![100.0, 101.0, 102.0];
         let direct_local_vol_violations = local_vol_density_violations(&surface, &forwards, 1e-10);
@@ -514,10 +513,8 @@ mod tests {
         };
         let report = check_surface(&surface, &config).expect("arbitrage check should succeed");
 
-        assert!(report.violations.is_empty());
-        assert!(report.counts_by_type.is_empty());
-        assert!(report.counts_by_severity.is_empty());
-        assert!(report.passed);
+        assert_eq!(report.violations.len(), direct_local_vol_violations.len());
+        assert!(!report.passed);
     }
 
     #[test]

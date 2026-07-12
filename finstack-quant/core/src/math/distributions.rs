@@ -502,13 +502,13 @@ pub fn sample_beta(
     alpha: f64,
     beta: f64,
 ) -> crate::Result<f64> {
-    if alpha <= 0.0 {
+    if !alpha.is_finite() || alpha <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "Beta α parameter must be positive, got: {}",
             alpha
         )));
     }
-    if beta <= 0.0 {
+    if !beta.is_finite() || beta <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "Beta β parameter must be positive, got: {}",
             beta
@@ -524,8 +524,8 @@ pub fn sample_beta(
 
     // Use gamma ratio method: X/(X+Y) ~ Beta(α, β) where X ~ Gamma(α), Y ~ Gamma(β)
     // We use the unchecked version since we've already validated α, β > 0
-    let x = sample_gamma_unchecked(rng, alpha);
-    let y = sample_gamma_unchecked(rng, beta);
+    let x = sample_gamma_unchecked(rng, alpha)?;
+    let y = sample_gamma_unchecked(rng, beta)?;
 
     // Guard against division by zero or near-zero denominator.
     // Both gamma samples can underflow to 0 for very small shape parameters.
@@ -608,7 +608,7 @@ pub fn sample_beta(
 /// - Johnson, N. L., Kotz, S., & Balakrishnan, N. (1994). *Continuous Univariate
 ///   Distributions, Volume 1* (2nd ed.). Wiley. Chapter 19 (Exponential distribution).
 pub fn sample_exponential(rng: &mut dyn RandomNumberGenerator, lambda: f64) -> crate::Result<f64> {
-    if lambda <= 0.0 {
+    if !lambda.is_finite() || lambda <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "Exponential rate parameter λ must be positive, got: {}",
             lambda
@@ -1083,32 +1083,45 @@ pub fn lognormal_quantile(p: f64, mu: f64, sigma: f64) -> crate::Result<f64> {
 /// - Marsaglia, G., & Tsang, W. W. (2000). "A Simple Method for Generating Gamma
 ///   Variables." *ACM Transactions on Mathematical Software*, 26(3), 363-372.
 pub fn sample_gamma(rng: &mut dyn RandomNumberGenerator, shape: f64) -> crate::Result<f64> {
-    if shape <= 0.0 {
+    if !shape.is_finite() || shape <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "Gamma shape parameter must be positive, got: {}",
             shape
         )));
     }
 
-    Ok(sample_gamma_unchecked(rng, shape))
+    sample_gamma_unchecked(rng, shape)
 }
 
+const GAMMA_MAX_REJECTION_ATTEMPTS: usize = 100_000;
+
 /// Internal unchecked gamma sampling (assumes shape > 0).
-fn sample_gamma_unchecked(rng: &mut dyn RandomNumberGenerator, shape: f64) -> f64 {
+fn sample_gamma_unchecked(rng: &mut dyn RandomNumberGenerator, shape: f64) -> crate::Result<f64> {
+    sample_gamma_with_max_attempts(rng, shape, GAMMA_MAX_REJECTION_ATTEMPTS)
+}
+
+fn sample_gamma_with_max_attempts(
+    rng: &mut dyn RandomNumberGenerator,
+    shape: f64,
+    max_attempts: usize,
+) -> crate::Result<f64> {
     if shape < 1.0 {
         // Ahrens-Dieter transformation for shape < 1:
         // If X ~ Gamma(shape + 1), then X * U^(1/shape) ~ Gamma(shape)
         let u = rng.uniform();
         // Clamp u away from 0 to prevent ln(0) issues
         let u_safe = u.max(1e-300);
-        return sample_gamma_unchecked(rng, shape + 1.0) * u_safe.powf(1.0 / shape);
+        return Ok(
+            sample_gamma_with_max_attempts(rng, shape + 1.0, max_attempts)?
+                * u_safe.powf(1.0 / shape),
+        );
     }
 
     // Marsaglia-Tsang method for shape >= 1
     let d = shape - 1.0 / 3.0;
     let c = 1.0 / (9.0 * d).sqrt();
 
-    loop {
+    for _ in 0..max_attempts {
         // Generate normal variate using Box-Muller
         let x = rng.normal(0.0, 1.0);
         let v = 1.0 + c * x;
@@ -1120,7 +1133,7 @@ fn sample_gamma_unchecked(rng: &mut dyn RandomNumberGenerator, shape: f64) -> f6
 
             // Squeeze test (fast accept)
             if u < 1.0 - 0.0331 * x2 * x2 {
-                return d * v;
+                return Ok(d * v);
             }
 
             // Full rejection test
@@ -1128,11 +1141,14 @@ fn sample_gamma_unchecked(rng: &mut dyn RandomNumberGenerator, shape: f64) -> f6
             let u_safe = u.max(1e-300);
             let v_safe = v.max(1e-300);
             if u_safe.ln() < 0.5 * x2 + d * (1.0 - v_safe + v_safe.ln()) {
-                return d * v;
+                return Ok(d * v);
             }
         }
         // Reject and retry
     }
+    Err(crate::Error::Validation(format!(
+        "Gamma rejection sampler exceeded {max_attempts} attempts"
+    )))
 }
 
 // ============================================================================
@@ -1200,7 +1216,7 @@ fn sample_gamma_unchecked(rng: &mut dyn RandomNumberGenerator, shape: f64) -> f6
 /// - Johnson, N. L., Kotz, S., & Balakrishnan, N. (1994). *Continuous Univariate
 ///   Distributions, Volume 1* (2nd ed.). Wiley. Chapter 18 (Chi-squared distribution).
 pub fn sample_chi_squared(rng: &mut dyn RandomNumberGenerator, df: f64) -> crate::Result<f64> {
-    if df <= 0.0 {
+    if !df.is_finite() || df <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "Chi-squared degrees of freedom must be positive, got: {}",
             df
@@ -1209,7 +1225,7 @@ pub fn sample_chi_squared(rng: &mut dyn RandomNumberGenerator, df: f64) -> crate
 
     // χ²(k) = Gamma(k/2, 2) = 2 * Gamma(k/2, 1)
     // We use unchecked since df > 0 implies df/2 > 0
-    Ok(2.0 * sample_gamma_unchecked(rng, df / 2.0))
+    Ok(2.0 * sample_gamma_unchecked(rng, df / 2.0)?)
 }
 
 /// Probability density function (PDF) of the Chi-Squared distribution.
@@ -1294,7 +1310,7 @@ pub fn chi_squared_cdf(x: f64, df: f64) -> f64 {
     if x <= 0.0 {
         return 0.0;
     }
-    if df <= 0.0 {
+    if !df.is_finite() || df <= 0.0 {
         return 0.0;
     }
 
@@ -1430,7 +1446,7 @@ pub fn chi_squared_quantile(p: f64, df: f64) -> crate::Result<f64> {
 /// - Johnson, N. L., Kotz, S., & Balakrishnan, N. (1995). *Continuous Univariate
 ///   Distributions, Volume 2* (2nd ed.). Wiley. Chapter 28 (Student's t distribution).
 pub fn sample_student_t(rng: &mut dyn RandomNumberGenerator, df: f64) -> crate::Result<f64> {
-    if df <= 0.0 {
+    if !df.is_finite() || df <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "Student's t degrees of freedom must be positive, got: {}",
             df
@@ -1440,7 +1456,7 @@ pub fn sample_student_t(rng: &mut dyn RandomNumberGenerator, df: f64) -> crate::
     // T = Z / sqrt(V/ν) where Z ~ N(0,1), V ~ χ²(ν)
     let z = rng.normal(0.0, 1.0);
     // We use unchecked gamma since df > 0 implies df/2 > 0
-    let v = 2.0 * sample_gamma_unchecked(rng, df / 2.0);
+    let v = 2.0 * sample_gamma_unchecked(rng, df / 2.0)?;
 
     Ok(z / (v / df).sqrt())
 }
@@ -1448,6 +1464,30 @@ pub fn sample_student_t(rng: &mut dyn RandomNumberGenerator, df: f64) -> crate::
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct RejectingRng;
+
+    impl RandomNumberGenerator for RejectingRng {
+        fn uniform(&mut self) -> f64 {
+            0.5
+        }
+
+        fn normal(&mut self, _mean: f64, _std_dev: f64) -> f64 {
+            -10.0
+        }
+
+        fn bernoulli(&mut self, _p: f64) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn gamma_rejection_loop_has_a_hard_limit() {
+        let mut rng = RejectingRng;
+        let error = sample_gamma_with_max_attempts(&mut rng, 1.0, 3)
+            .expect_err("deterministic rejection must terminate");
+        assert!(error.to_string().contains("attempt"));
+    }
 
     #[test]
     fn test_binomial_probability() {
@@ -2046,6 +2086,14 @@ mod tests {
         // Invalid shape
         assert!(sample_gamma(&mut rng as &mut dyn RandomNumberGenerator, 0.0).is_err());
         assert!(sample_gamma(&mut rng as &mut dyn RandomNumberGenerator, -1.0).is_err());
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(sample_gamma(&mut rng, invalid).is_err());
+            assert!(sample_chi_squared(&mut rng, invalid).is_err());
+            assert!(sample_student_t(&mut rng, invalid).is_err());
+            assert!(sample_exponential(&mut rng, invalid).is_err());
+            assert!(sample_beta(&mut rng, invalid, 1.0).is_err());
+            assert!(sample_beta(&mut rng, 1.0, invalid).is_err());
+        }
     }
 
     // ========================================================================

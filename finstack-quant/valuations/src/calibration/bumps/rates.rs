@@ -156,7 +156,7 @@ pub(crate) fn bump_discount_curve_from_rate_calibration(
 }
 
 /// Bump a forward curve by shocking its stored market-rate calibration quotes
-/// and re-bootstrapping against the supplied market context.
+/// and globally recalibrating against the supplied market context.
 ///
 /// The provided `context` must already contain the discount curve referenced by
 /// `calibration.discount_curve_id` (in its bumped form, when bumping both curves
@@ -164,9 +164,9 @@ pub(crate) fn bump_discount_curve_from_rate_calibration(
 /// quotes; callers handling basis-tenor calibrations must rebuild the forward
 /// curve explicitly.
 ///
-/// Like [`bump_discount_curve_from_rate_calibration`], the re-bootstrap is
+/// Like [`bump_discount_curve_from_rate_calibration`], the recalibration is
 /// applied as a delta overlay on the stored curve: the bumped and unbumped
-/// bootstraps are both solved and only their forward-rate difference is added
+/// global solves are both run and only their forward-rate difference is added
 /// to the stored knots, so transcribed curves keep their base shape.
 pub(crate) fn bump_forward_curve_from_rate_calibration(
     curve: &ForwardCurve,
@@ -206,7 +206,7 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
             ForwardCurveRateQuote::Basis { .. } => {
                 return Err(finstack_quant_core::Error::Validation(format!(
                     "forward curve {} calibration uses basis quotes; \
-                     bump_forward_curve_from_rate_calibration cannot re-bootstrap them — \
+                     bump_forward_curve_from_rate_calibration cannot recalibrate them — \
                      callers must rebuild the basis curve explicitly",
                     curve.id()
                 )));
@@ -221,7 +221,9 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
         base_date: curve.base_date(),
         tenor_years: curve.tenor(),
         discount_curve_id: calibration.discount_curve_id.clone(),
-        method: CalibrationMethod::Bootstrap,
+        method: CalibrationMethod::GlobalSolve {
+            use_analytical_jacobian: false,
+        },
         interpolation: curve.interp_style(),
         conventions: RatesStepConventions {
             ois_compounding: None,
@@ -244,14 +246,20 @@ pub(crate) fn bump_forward_curve_from_rate_calibration(
         .reset_lag(curve.reset_lag())
         .day_count(curve.day_count())
         .knots(overlaid)
+        .projection_grid_opt(
+            unbumped
+                .projection_grid()
+                .map(<[f64]>::to_vec)
+                .or_else(|| curve.projection_grid().map(<[f64]>::to_vec)),
+        )
         .interp(curve.interp_style())
         .extrapolation(curve.extrapolation())
         .rate_calibration(calibration.clone())
         .build()
 }
 
-/// Bootstrap a forward curve from (optionally bumped) rate quotes using the
-/// stored curve's conventions.
+/// Globally recalibrate a forward curve from (optionally bumped) rate quotes
+/// using the stored curve's conventions.
 fn rebootstrap_forward_curve(
     curve: &ForwardCurve,
     quotes: Vec<RateQuote>,

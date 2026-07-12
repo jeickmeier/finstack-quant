@@ -4,10 +4,10 @@
 //! instruments constructed *outside* the solver to reasonable tolerances.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, Tenor};
+use finstack_quant_core::dates::{Date, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::InflationLag;
-use finstack_quant_core::market_data::term_structures::Seniority;
+use finstack_quant_core::market_data::term_structures::{DiscountCurve, Seniority};
 use finstack_quant_core::math::interp::ExtrapolationPolicy;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
@@ -20,13 +20,15 @@ use finstack_quant_valuations::calibration::api::schema::{
 };
 use finstack_quant_valuations::calibration::{CalibrationConfig, CalibrationMethod};
 use finstack_quant_valuations::instruments::rates::InflationSwap;
-use finstack_quant_valuations::instruments::ForwardRateAgreement;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
+use finstack_quant_valuations::instruments::{
+    ForwardRateAgreement, InterestRateFuture, InterestRateSwap,
+};
 use finstack_quant_valuations::market::build_cds_instrument;
 use finstack_quant_valuations::market::build_rate_instrument;
 use finstack_quant_valuations::market::conventions::ids::{
-    CdsConventionKey, CdsDocClause, InflationSwapConventionId,
+    CdsConventionKey, CdsDocClause, InflationSwapConventionId, IrFutureContractId,
 };
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 use finstack_quant_valuations::market::quotes::cds::CdsQuote;
@@ -51,6 +53,54 @@ const INFLATION_TOLERANCE_DOLLARS: f64 = 5.0;
 fn run_plan(envelope: &CalibrationEnvelope) -> MarketContext {
     let out = engine::execute(envelope).expect("calibration should succeed");
     MarketContext::try_from(out.result.final_market).expect("restore context")
+}
+
+fn forward_only_envelope(
+    base_date: Date,
+    quote: RateQuote,
+    curve_id: &str,
+    tenor_years: f64,
+) -> CalibrationEnvelope {
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(base_date)
+        .knots([(0.0, 1.0), (5.0, 0.78)])
+        .build()
+        .expect("discount curve");
+    let initial_market = MarketContext::new().insert(discount);
+    let (prior_market, mut market_data) = cal_utils::split_initial_market(&initial_market);
+    let quotes = vec![MarketQuote::Rates(quote)];
+    cal_utils::extend_market_data(&mut market_data, &quotes);
+    let mut quote_sets = HashMap::default();
+    quote_sets.insert("forward".to_string(), cal_utils::quote_set_ids(&quotes));
+
+    CalibrationEnvelope {
+        schema_url: None,
+        schema: "finstack_quant.calibration/2".to_string(),
+        plan: CalibrationPlan {
+            id: "forward-global-reprice".to_string(),
+            description: None,
+            quote_sets,
+            settings: CalibrationConfig::default(),
+            steps: vec![CalibrationStep {
+                id: "fwd".to_string(),
+                quote_set: "forward".to_string(),
+                params: StepParams::Forward(ForwardCurveParams {
+                    curve_id: curve_id.into(),
+                    currency: Currency::USD,
+                    base_date,
+                    tenor_years,
+                    discount_curve_id: "USD-OIS".into(),
+                    method: CalibrationMethod::GlobalSolve {
+                        use_analytical_jacobian: false,
+                    },
+                    interpolation: Default::default(),
+                    conventions: Default::default(),
+                }),
+            }],
+        },
+        market_data,
+        prior_market,
+    }
 }
 
 #[test]
@@ -297,23 +347,23 @@ fn forward_curve_fra_repricing() {
         RateQuote::Fra {
             id: QuoteId::new(format!(
                 "FRA-{:?}-{:?}",
-                base_date + time::Duration::days(90),
-                base_date + time::Duration::days(180)
+                base_date + time::Duration::days(91),
+                base_date + time::Duration::days(184)
             )),
             index: IndexId::new("USD-LIBOR-3M"),
-            start: Pillar::Date(base_date + time::Duration::days(90)),
-            end: Pillar::Date(base_date + time::Duration::days(180)),
+            start: Pillar::Date(base_date + time::Duration::days(91)),
+            end: Pillar::Date(base_date + time::Duration::days(184)),
             rate: 0.0470,
         },
         RateQuote::Fra {
             id: QuoteId::new(format!(
                 "FRA-{:?}-{:?}",
-                base_date + time::Duration::days(180),
-                base_date + time::Duration::days(270)
+                base_date + time::Duration::days(184),
+                base_date + time::Duration::days(276)
             )),
             index: IndexId::new("USD-LIBOR-3M"),
-            start: Pillar::Date(base_date + time::Duration::days(180)),
-            end: Pillar::Date(base_date + time::Duration::days(270)),
+            start: Pillar::Date(base_date + time::Duration::days(184)),
+            end: Pillar::Date(base_date + time::Duration::days(276)),
             rate: 0.0480,
         },
     ];
@@ -375,7 +425,9 @@ fn forward_curve_fra_repricing() {
                     base_date,
                     tenor_years: 0.25,
                     discount_curve_id: CurveId::from("USD-OIS"),
-                    method: CalibrationMethod::Bootstrap,
+                    method: CalibrationMethod::GlobalSolve {
+                        use_analytical_jacobian: false,
+                    },
                     interpolation: Default::default(),
                     conventions: Default::default(),
                 }),
@@ -393,43 +445,68 @@ fn forward_curve_fra_repricing() {
     };
 
     let ctx = run_plan(&envelope);
+    let forward = ctx
+        .get_forward("USD-SOFR-3M")
+        .expect("calibrated forward curve");
+    let build_ctx = BuildCtx::new(
+        base_date,
+        fixtures::STANDARD_NOTIONAL,
+        [
+            ("discount".to_string(), "USD-OIS".to_string()),
+            ("forward".to_string(), "USD-SOFR-3M".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+    );
 
     for q in &fra_quotes {
-        let (start, end, rate) = match q {
-            RateQuote::Fra {
-                start: Pillar::Date(s),
-                end: Pillar::Date(e),
-                rate,
-                ..
-            } => (*s, *e, *rate),
+        let rate = match q {
+            RateQuote::Fra { rate, .. } => *rate,
             _ => continue,
         };
+        let instrument = build_rate_instrument(q, &build_ctx).expect("build FRA instrument");
+        let fra = instrument
+            .as_any()
+            .downcast_ref::<ForwardRateAgreement>()
+            .expect("rate quote should build an FRA");
 
-        let day_count = finstack_quant_core::dates::DayCount::Act360;
+        let t_start = forward
+            .day_count()
+            .year_fraction(
+                forward.base_date(),
+                fra.start_date,
+                DayCountContext::default(),
+            )
+            .expect("valid FRA start time");
+        let t_end = forward
+            .day_count()
+            .year_fraction(
+                forward.base_date(),
+                fra.maturity,
+                DayCountContext::default(),
+            )
+            .expect("valid FRA end time");
+        let implied_rate = forward
+            .rate_between(t_start, t_end)
+            .expect("valid DF-implied FRA rate");
+        assert!(
+            forward
+                .knots()
+                .iter()
+                .any(|knot| (*knot - t_start).abs() < 1e-12),
+            "calibrated curve should retain actual reset time {t_start:.12}"
+        );
+        assert!(
+            (forward.rate(t_start) - rate).abs() <= tolerances::FWD_RATE_ABS_TOL,
+            "reset-date knot should retain fixed-tenor quote meaning: knot={:.12}, quote={rate:.12}",
+            forward.rate(t_start)
+        );
+        assert!(
+            (implied_rate - rate).abs() <= tolerances::FWD_RATE_ABS_TOL,
+            "DF-implied FRA rate should reprice quote: implied={implied_rate:.12}, quote={rate:.12}"
+        );
 
-        // Heuristic fixing date: T-2 if possible.
-        let fixing_date = if start >= base_date + time::Duration::days(2) {
-            start - time::Duration::days(2)
-        } else {
-            base_date
-        };
-
-        let fra = ForwardRateAgreement::builder()
-            .id(format!("FRA-{}-{}", start, end).into())
-            .notional(Money::new(fixtures::STANDARD_NOTIONAL, currency))
-            .fixing_date(fixing_date)
-            .start_date(start)
-            .maturity(end)
-            .fixed_rate(Decimal::try_from(rate).expect("valid decimal"))
-            .day_count(day_count)
-            .reset_lag(2)
-            .discount_curve_id("USD-OIS".into())
-            .forward_curve_id("USD-SOFR-3M".into())
-            .side(finstack_quant_valuations::instruments::rates::irs::PayReceive::Pay)
-            .build()
-            .unwrap();
-
-        let pv = fra.value(&ctx, base_date).unwrap();
+        let pv = instrument.value(&ctx, base_date).unwrap();
         assert!(
             pv.amount().abs() <= FRA_TOLERANCE_DOLLARS,
             "fra should reprice within ${}. PV=${:.2}",
@@ -437,6 +514,143 @@ fn forward_curve_fra_repricing() {
             pv.amount()
         );
     }
+    let final_end = fra_quotes
+        .iter()
+        .filter_map(|quote| {
+            let instrument = build_rate_instrument(quote, &build_ctx).ok()?;
+            instrument
+                .as_any()
+                .downcast_ref::<ForwardRateAgreement>()
+                .map(|fra| fra.maturity)
+        })
+        .max()
+        .expect("at least one FRA end date");
+    let final_end_time = forward
+        .day_count()
+        .year_fraction(forward.base_date(), final_end, DayCountContext::default())
+        .expect("valid final reset-grid end");
+    let projection_grid = forward
+        .projection_grid()
+        .expect("calibrated curve must carry contractual projection boundaries");
+    assert!((projection_grid[projection_grid.len() - 1] - final_end_time).abs() < 1e-12);
+}
+
+#[test]
+fn forward_curve_future_global_solve_reprices_df_implied_quote() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 2).expect("base date");
+    let quote = RateQuote::Futures {
+        id: QuoteId::new("SR3-MAR25"),
+        contract: IrFutureContractId::new("CME:SR3"),
+        expiry: Date::from_calendar_date(2025, Month::March, 17).expect("expiry"),
+        price: 95.0,
+        convexity_adjustment: Some(0.0),
+        vol_surface_id: None,
+    };
+    let envelope = forward_only_envelope(base_date, quote.clone(), "USD-SOFR-3M", 0.25);
+    let output = engine::execute(&envelope).expect("future forward calibration");
+    let report = output
+        .result
+        .step_reports
+        .get("fwd")
+        .expect("forward report");
+    assert!(report.success, "{}", report.convergence_reason);
+    assert_eq!(
+        report.metadata.get("method").map(String::as_str),
+        Some("global_fit_lm_weighted_lsq")
+    );
+    let context = MarketContext::try_from(output.result.final_market).expect("calibrated context");
+    let curve = context.get_forward("USD-SOFR-3M").expect("forward curve");
+    assert!(curve.projection_grid().is_some());
+    let build_ctx = BuildCtx::new(
+        base_date,
+        fixtures::STANDARD_NOTIONAL,
+        [
+            ("discount".to_string(), "USD-OIS".to_string()),
+            ("forward".to_string(), "USD-SOFR-3M".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    let instrument = build_rate_instrument(&quote, &build_ctx).expect("future instrument");
+    let future = instrument
+        .as_any()
+        .downcast_ref::<InterestRateFuture>()
+        .expect("interest-rate future");
+    let period_start = future.period_start.expect("resolved future period start");
+    let period_end = future.period_end.expect("resolved future period end");
+    let t_start = curve
+        .day_count()
+        .year_fraction(curve.base_date(), period_start, DayCountContext::default())
+        .expect("start time");
+    let t_end = curve
+        .day_count()
+        .year_fraction(curve.base_date(), period_end, DayCountContext::default())
+        .expect("end time");
+    let implied = curve
+        .rate_between(t_start, t_end)
+        .expect("DF-implied futures rate");
+    assert!((implied - 0.05).abs() < 1e-8);
+    let pv = instrument
+        .value(&context, base_date)
+        .expect("future repricing");
+    assert!(pv.amount().abs() <= tolerances::REPRICE_PV_ABS_TOL_DOLLARS);
+}
+
+#[test]
+fn forward_curve_swap_global_solve_reprices_df_implied_periods() {
+    let base_date = Date::from_calendar_date(2025, Month::January, 2).expect("base date");
+    let quote = RateQuote::Swap {
+        id: QuoteId::new("USD-LIBOR-3M-SWAP-1Y"),
+        index: IndexId::new("USD-LIBOR-3M"),
+        pillar: Pillar::Tenor(Tenor::parse("1Y").expect("tenor")),
+        rate: 0.05,
+        spread_decimal: None,
+    };
+    let envelope = forward_only_envelope(base_date, quote.clone(), "USD-LIBOR-3M", 0.25);
+    let output = engine::execute(&envelope).expect("swap forward calibration");
+    let report = output
+        .result
+        .step_reports
+        .get("fwd")
+        .expect("forward report");
+    assert!(report.success, "{}", report.convergence_reason);
+    assert_eq!(
+        report.metadata.get("method").map(String::as_str),
+        Some("global_fit_lm_weighted_lsq")
+    );
+    let context = MarketContext::try_from(output.result.final_market).expect("calibrated context");
+    let curve = context.get_forward("USD-LIBOR-3M").expect("forward curve");
+    assert!(curve.projection_grid().is_some());
+    let build_ctx = BuildCtx::new(
+        base_date,
+        fixtures::STANDARD_NOTIONAL,
+        [
+            ("discount".to_string(), "USD-OIS".to_string()),
+            ("forward".to_string(), "USD-LIBOR-3M".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+    );
+    let instrument = build_rate_instrument(&quote, &build_ctx).expect("swap instrument");
+    let _swap = instrument
+        .as_any()
+        .downcast_ref::<InterestRateSwap>()
+        .expect("interest-rate swap");
+    let projection_grid = curve
+        .projection_grid()
+        .expect("contractual swap projection grid");
+    for period in projection_grid.windows(2) {
+        let t_start = period[0];
+        let t_end = period[1];
+        let df_implied = curve
+            .rate_between(t_start, t_end)
+            .expect("DF-implied swap period");
+        assert!((df_implied - curve.rate(t_start)).abs() < 1e-10);
+    }
+    let pv = instrument
+        .value(&context, base_date)
+        .expect("swap repricing");
+    assert!(pv.amount().abs() <= tolerances::REPRICE_PV_ABS_TOL_DOLLARS);
 }
 
 #[test]

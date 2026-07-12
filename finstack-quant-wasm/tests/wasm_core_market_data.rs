@@ -4,8 +4,9 @@
 
 use finstack_quant_wasm::api::core::dates::{create_date, DayCount, DayCountContext, Tenor};
 use finstack_quant_wasm::api::core::market_data::{
-    FxConversionPolicy, FxDeltaVolSurface, FxMatrix,
+    DiscountCurve, ForwardCurve, FxConversionPolicy, FxDeltaVolSurface, FxMatrix, VolCube,
 };
+use js_sys::Float64Array;
 use wasm_bindgen_test::*;
 
 #[wasm_bindgen_test]
@@ -24,6 +25,62 @@ fn fx_matrix_rate_returns_structured_result() {
 
     assert!((result.rate() - 1.10).abs() < 1e-12);
     assert!(!result.triangulated());
+}
+
+#[wasm_bindgen_test]
+fn forward_curve_projection_grid_and_rate_between() {
+    let t_3m = 91.0 / 360.0;
+    let t_6m = 183.0 / 360.0;
+    let curve = ForwardCurve::new(
+        "USD-SOFR-3M",
+        0.25,
+        "2025-01-01",
+        &[0.0, 0.04, t_3m, 0.045],
+        Some("act_360".to_string()),
+        Some("linear".to_string()),
+        Some("flat_forward".to_string()),
+        Some(vec![0.0, t_3m, t_6m]),
+        Some(3),
+    )
+    .expect("forward curve");
+
+    assert!((curve.rate_between(0.0, t_3m).expect("first period") - 0.04).abs() < 1e-14);
+    assert!((curve.rate_between(t_3m, t_6m).expect("second period") - 0.045).abs() < 1e-14);
+    assert!(curve.rate_between(t_3m, t_3m).is_err());
+    assert!(curve.rate_between(t_6m, t_3m).is_err());
+
+    let grid = Float64Array::new(&curve.projection_grid());
+    assert_eq!(grid.length(), 3);
+    assert!((grid.get_index(1) - t_3m).abs() < 1e-14);
+    assert_eq!(curve.reset_lag(), 3);
+}
+
+#[wasm_bindgen_test]
+fn discount_curve_negative_rate_validation_mode_is_explicit() {
+    assert!(DiscountCurve::new(
+        "CHF-OIS",
+        "2025-01-01",
+        &[0.0, 1.0, 1.0, 1.002],
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .is_err());
+
+    let curve = DiscountCurve::new(
+        "CHF-OIS",
+        "2025-01-01",
+        &[0.0, 1.0, 1.0, 1.002],
+        None,
+        None,
+        None,
+        Some("negative_rate_friendly".to_string()),
+        Some(-0.01),
+    )
+    .expect("negative-rate-friendly curve");
+    assert!(curve.forward(0.0, 1.0).expect("negative forward") < 0.0);
 }
 
 #[wasm_bindgen_test]
@@ -96,6 +153,32 @@ fn fx_delta_vol_surface_rejects_mixed_10d_arguments() {
             assert!(msg.contains("rr10d"), "unexpected error message: {msg}");
         }
     }
+}
+
+#[wasm_bindgen_test]
+fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
+    let cev = VolCube::new(
+        "CEV",
+        &[1.0],
+        &[2.0],
+        &[0.01, 0.5, -0.2, 0.4, f64::NAN],
+        &[-0.01],
+        None,
+    )
+    .unwrap();
+    assert!(cev.vol_normal(1.0, 2.0, -0.01).is_err());
+    assert!(cev.vol_normal_clamped(1.0, 2.0, -0.01).is_nan());
+
+    let normal = VolCube::new(
+        "NORMAL",
+        &[1.0],
+        &[2.0],
+        &[0.01, 0.0, -0.2, 0.4, f64::NAN],
+        &[-0.01],
+        None,
+    )
+    .unwrap();
+    assert!(normal.vol_normal(1.0, 2.0, -0.02).unwrap().is_finite());
 }
 
 #[wasm_bindgen_test]

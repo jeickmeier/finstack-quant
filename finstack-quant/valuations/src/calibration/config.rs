@@ -374,7 +374,7 @@ impl Default for DiscountCurveSolveConfig {
 ///
 /// 1. **Step-level** (`CalibrationStep.params.method`): Per-instrument-type overrides
 /// 2. **Plan-level** (`CalibrationPlan.settings`): Plan-wide defaults
-/// 3. **Finstack config extensions** (`valuations.calibration`): application defaults
+/// 3. **Finstack config extensions** (`valuations.calibration.v2`): application defaults
 /// 4. **Global defaults** (`CalibrationConfig::default()`): fallback values
 ///
 /// Step-level settings always take precedence over plan-level settings.
@@ -501,7 +501,7 @@ fn default_fail_on_bad_fit() -> bool {
 }
 
 /// Extension section key for calibration overrides.
-pub const CALIBRATION_CONFIG_KEY: &str = "valuations.calibration";
+pub const CALIBRATION_CONFIG_KEY: &str = "valuations.calibration.v2";
 
 impl Default for CalibrationConfig {
     fn default() -> Self {
@@ -529,7 +529,7 @@ impl Default for CalibrationConfig {
 impl CalibrationConfig {
     /// Build a calibration config from a `FinstackConfig` extension section.
     ///
-    /// If the extension section `valuations.calibration` is present, its
+    /// If the extension section `valuations.calibration.v2` is present, its
     /// fields override the defaults; otherwise defaults are used.
     ///
     /// # Errors

@@ -4,7 +4,7 @@
 //! duplication across the test suite and ensure consistent test setup.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
@@ -27,10 +27,25 @@ pub fn standard_fra_dates() -> (Date, Date, Date) {
 
 /// Creates a flat forward curve at the given rate
 pub fn build_flat_forward_curve(rate: f64, base_date: Date, curve_id: &str) -> ForwardCurve {
+    let projection_grid = (0..=40)
+        .map(|quarter| {
+            DayCount::Act360
+                .year_fraction(
+                    base_date,
+                    base_date.add_months(quarter * 3),
+                    DayCountContext::default(),
+                )
+                .expect("valid quarterly projection boundary")
+        })
+        .collect::<Vec<_>>();
+    let last_time = *projection_grid
+        .last()
+        .expect("projection grid is non-empty");
     ForwardCurve::builder(curve_id, 0.25)
         .base_date(base_date)
         .day_count(DayCount::Act360)
-        .knots([(0.0, rate), (10.0, rate)])
+        .knots([(0.0, rate), (last_time, rate)])
+        .projection_grid(projection_grid)
         .interp(InterpStyle::Linear)
         .build()
         .unwrap()

@@ -223,9 +223,8 @@ impl LocalVolBuilder {
                 //     OTM the bump spans a non-trivial part of the density.
                 // 1% is a robust middle ground for liquid strike ranges. It is
                 // NOT Richardson-extrapolated; deep in the wings the round-off
-                // floor guard in `dupire_*_point` (`is_curvature_above_roundoff`)
-                // catches points where cancellation has destroyed the signal
-                // and falls back to the implied vol there.
+                // derivative tolerance in `dupire_*_point` rejects points
+                // where cancellation has destroyed the density signal.
                 let dk = match vol_model {
                     VolatilityModel::Normal => (0.01 * k.abs()).max(1e-4),
                     VolatilityModel::Black => (0.01 * k.abs()).max(1e-8),
@@ -254,26 +253,67 @@ impl LocalVolBuilder {
     }
 }
 
-/// Decide whether a finite-difference second-difference numerator carries a
-/// trustworthy curvature signal, as opposed to being dominated by round-off.
-///
-/// `numer` is `C(K-δ) - 2C(K) + C(K+δ)`; `prices` are the three call prices
-/// that formed it; `cancel_scale` is the magnitude of the O(1) terms that
-/// cancel inside the option-price formula (≈ `max(S₀, K)` for Black-Scholes,
-/// `max(|F|, |K|)` for Bachelier).
-///
-/// Each price carries an absolute round-off error of ≈ `ε · cancel_scale`
-/// (subtraction of two same-scale terms). The numerator therefore has a
-/// round-off floor of a few `ε · cancel_scale`; below it the second difference
-/// is noise. A `16×` safety factor keeps genuine deep-but-resolved curvature
-/// (numerator still ≳ 10× the floor) while rejecting the underflowed wing.
-#[inline]
-fn is_curvature_above_roundoff(numer: f64, prices: &[f64], cancel_scale: f64) -> bool {
-    // Largest price magnitude also contributes round-off; fold it in.
-    let max_price = prices.iter().fold(0.0_f64, |acc, &p| acc.max(p.abs()));
-    let scale = cancel_scale.max(max_price).max(1e-300);
-    let floor = 16.0 * f64::EPSILON * scale;
-    numer.abs() > floor
+#[derive(Debug, Clone, Copy)]
+struct DerivativeTolerances {
+    calendar: f64,
+    density: f64,
+}
+
+impl DerivativeTolerances {
+    const fn new(calendar: f64, density: f64) -> Self {
+        Self { calendar, density }
+    }
+
+    fn from_prices(prices: &[f64], cancellation_scale: f64, dt: f64, dk: f64) -> Self {
+        let max_price = prices.iter().fold(0.0_f64, |acc, &p| acc.max(p.abs()));
+        let scale = cancellation_scale
+            .abs()
+            .max(max_price)
+            .max(f64::MIN_POSITIVE);
+        let price_noise = 16.0 * f64::EPSILON * scale;
+        Self::new(price_noise / dt, price_noise / (dk * dk))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ValidatedDerivatives {
+    time_term: f64,
+    density: f64,
+}
+
+fn validate_dupire_derivatives(
+    model: &str,
+    time_term_name: &str,
+    time_term: f64,
+    density: f64,
+    tolerance: DerivativeTolerances,
+) -> Result<ValidatedDerivatives> {
+    if !time_term.is_finite() || !density.is_finite() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{model} Dupire terms must be finite: {time_term_name}={time_term}, d2C/dK2={density}"
+        )));
+    }
+
+    let time_term_invalid = time_term < -tolerance.calendar;
+    let butterfly_invalid = density <= tolerance.density;
+    if time_term_invalid || butterfly_invalid {
+        let violations = match (time_term_invalid, butterfly_invalid) {
+            (true, true) => "calendar and butterfly",
+            (true, false) => "calendar",
+            (false, true) => "butterfly",
+            (false, false) => "derivative",
+        };
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{model} Dupire {violations} arbitrage violation: {time_term_name}={time_term} \
+             (tolerance={}), d2C/dK2={density} (tolerance={})",
+            tolerance.calendar, tolerance.density
+        )));
+    }
+
+    Ok(ValidatedDerivatives {
+        time_term: if time_term < 0.0 { 0.0 } else { time_term },
+        density,
+    })
 }
 
 /// Lognormal (Black-Scholes) Dupire local variance at a single grid point.
@@ -311,40 +351,6 @@ fn dupire_lognormal_point(
     let curvature_numer = c_k_plus - 2.0 * c_k + c_k_minus;
     let d2C_dK2 = curvature_numer / (dk * dk);
 
-    if d2C_dK2 <= 0.0 {
-        tracing::warn!(
-            strike = k,
-            time = t,
-            "d²C/dK² <= 0 (butterfly arbitrage violation): falling back to implied vol"
-        );
-        let iv = implied_vol(k, t)?;
-        return Ok(iv * iv);
-    }
-
-    // Round-off floor: each discounted call price is a subtraction of two
-    // O(max(S₀,K)) terms (S₀·e^{-qT}·N(d1) − K·e^{-rT}·N(d2)) and so carries an
-    // absolute error of ~ε·max(S₀,K). Deep in the wings the prices underflow
-    // and the second difference `C(K-δ)-2C(K)+C(K+δ)` becomes pure round-off,
-    // which can land slightly positive and slip past the `d2C_dK2 <= 0` guard,
-    // yielding a garbage local vol. When the curvature numerator is below this
-    // noise floor the value is not trustworthy — fall back to the implied vol.
-    if !is_curvature_above_roundoff(curvature_numer, &[c_k_plus, c_k, c_k_minus], S0.max(k)) {
-        tracing::warn!(
-            strike = k,
-            time = t,
-            "d²C/dK² dominated by round-off (deep wing): falling back to implied vol"
-        );
-        let iv = implied_vol(k, t)?;
-        return Ok(iv * iv);
-    }
-
-    // ∂C/∂T. The caller (`from_implied_vol`) sizes `dt = (0.01·t).max(1e-6)`
-    // and short-circuits any slice with `t <= 1e-6`, so in the normal flow
-    // `t > dt` always holds and the *central* O(dt²) difference is used. The
-    // one-sided O(dt) branch is a defensive fallback only (it would engage just
-    // for a degenerate `t <= dt`, which the caller does not produce); it is
-    // kept so a direct call with a tiny `t` still returns a finite derivative
-    // rather than evaluating `bs_call` at a negative time.
     let c_t_plus = bs_call(k, t + dt)?;
     let c_t_minus = if t > dt { bs_call(k, t - dt)? } else { c_k };
     let dC_dT = if t > dt {
@@ -353,31 +359,49 @@ fn dupire_lognormal_point(
         (c_t_plus - c_k) / dt
     };
 
+    let tolerance = DerivativeTolerances::from_prices(
+        &[c_k_plus, c_k, c_k_minus, c_t_plus, c_t_minus],
+        S0.abs().max(k.abs()),
+        dt,
+        dk,
+    );
+    // In the discounted spot-measure Black formulation, raw dC/dT may be
+    // negative solely because of carry (notably high dividend yield). The
+    // no-calendar-arbitrage quantity is the complete Dupire numerator.
     let numerator = dC_dT + (r - q) * k * dC_dK + q * c_k;
+    let checked = validate_dupire_derivatives(
+        "lognormal",
+        "Dupire numerator",
+        numerator,
+        d2C_dK2,
+        tolerance,
+    )?;
+    let numerator = checked.time_term;
+    let d2C_dK2 = checked.density;
+
+    // ∂C/∂T. The caller (`from_implied_vol`) sizes `dt = (0.01·t).max(1e-6)`
+    // and short-circuits any slice with `t <= 1e-6`, so in the normal flow
+    // `t > dt` always holds and the *central* O(dt²) difference is used. The
+    // one-sided O(dt) branch is a defensive fallback only (it would engage just
+    // for a degenerate `t <= dt`, which the caller does not produce); it is
+    // kept so a direct call with a tiny `t` still returns a finite derivative
+    // rather than evaluating `bs_call` at a negative time.
     let denominator = 0.5 * k * k * d2C_dK2;
 
     if denominator.abs() < 1e-12 {
+        // The derivatives passed the arbitrage checks, but K² makes the
+        // lognormal Dupire denominator numerically singular near zero strike.
+        // This is a model-coordinate degeneracy, not an arbitrage fallback.
         let iv = implied_vol(k, t)?;
         return Ok(iv * iv);
     }
     let raw_local_var = numerator / denominator;
-    if raw_local_var < 0.0 {
-        // Dupire numerator < 0 with positive curvature (butterfly OK) typically
-        // signals calendar arbitrage (∂C/∂T < 0 in the relevant regime) on the
-        // input IV surface. The earlier `.max(0.0)` silently swallowed it; warn
-        // and fall back to the implied vol so the caller can see something is
-        // wrong with the surface rather than pricing on a frozen diffusion.
-        tracing::warn!(
-            strike = k,
-            time = t,
-            raw_local_var,
-            "Dupire local variance < 0 with d²C/dK² > 0 (likely calendar arbitrage): \
-             falling back to implied vol"
-        );
-        let iv = implied_vol(k, t)?;
-        return Ok(iv * iv);
+    if raw_local_var < -64.0 * f64::EPSILON {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "lognormal Dupire local variance is negative at K={k}, T={t}: {raw_local_var}"
+        )));
     }
-    Ok(raw_local_var)
+    Ok(raw_local_var.max(0.0))
 }
 
 /// Normal (Bachelier) Dupire local variance at a single grid point.
@@ -419,41 +443,6 @@ fn dupire_normal_point(
     let curvature_numer = c_k_plus - 2.0 * c_k + c_k_minus;
     let d2C_dK2 = curvature_numer / (dk * dk);
 
-    if d2C_dK2 <= 0.0 {
-        tracing::warn!(
-            strike = k,
-            time = t,
-            "d²C/dK² <= 0 (butterfly arbitrage violation): falling back to implied vol"
-        );
-        let iv = implied_vol(k, t)?;
-        return Ok(iv * iv);
-    }
-
-    // Round-off floor: the Bachelier call price subtracts O(max(|F|,|K|))
-    // terms, so each price carries ~ε·max(|F|,|K|) absolute error. In the deep
-    // wings the second difference degrades into round-off noise that can slip
-    // past the `d2C_dK2 <= 0` guard; fall back to the implied vol there.
-    if !is_curvature_above_roundoff(
-        curvature_numer,
-        &[c_k_plus, c_k, c_k_minus],
-        forward.abs().max(k.abs()),
-    ) {
-        tracing::warn!(
-            strike = k,
-            time = t,
-            "d²C/dK² dominated by round-off (deep wing): falling back to implied vol"
-        );
-        let iv = implied_vol(k, t)?;
-        return Ok(iv * iv);
-    }
-
-    // ∂C/∂T at FIXED forward — pure time decay, no drift contamination.
-    //
-    // As in the lognormal path: the caller sizes `dt = (0.01·t).max(1e-6)` and
-    // skips slices with `t <= 1e-6`, so `t > dt` holds in the normal flow and
-    // the *central* O(dt²) difference is used. The one-sided O(dt) branch is a
-    // defensive fallback for a degenerate `t <= dt` that the caller does not
-    // produce, kept only so a direct call with a tiny `t` stays finite.
     let c_t_plus = bach_call(k, t + dt, forward)?;
     let c_t_minus = if t > dt {
         bach_call(k, t - dt, forward)?
@@ -466,34 +455,196 @@ fn dupire_normal_point(
         (c_t_plus - c_k) / dt
     };
 
+    let tolerance = DerivativeTolerances::from_prices(
+        &[c_k_plus, c_k, c_k_minus, c_t_plus, c_t_minus],
+        forward.abs().max(k.abs()),
+        dt,
+        dk,
+    );
+    let checked = validate_dupire_derivatives("normal", "dC/dT", dC_dT, d2C_dK2, tolerance)?;
+    let dC_dT = checked.time_term;
+    let d2C_dK2 = checked.density;
+
+    // ∂C/∂T at FIXED forward — pure time decay, no drift contamination.
+    //
+    // As in the lognormal path: the caller sizes `dt = (0.01·t).max(1e-6)` and
+    // skips slices with `t <= 1e-6`, so `t > dt` holds in the normal flow and
+    // the *central* O(dt²) difference is used. The one-sided O(dt) branch is a
+    // defensive fallback for a degenerate `t <= dt` that the caller does not
+    // produce, kept only so a direct call with a tiny `t` stays finite.
     let denominator = 0.5 * d2C_dK2;
 
     if denominator.abs() < 1e-12 {
+        // Positive, arbitrage-valid density can still be too small to divide
+        // reliably in absolute rate units. Preserve the implied-vol fallback
+        // only for this non-arbitrage numerical degeneracy.
         let iv = implied_vol(k, t)?;
         return Ok(iv * iv);
     }
     let raw_local_var = dC_dT / denominator;
-    if raw_local_var < 0.0 {
-        // For Bachelier at fixed forward, ∂C/∂T is the pure time-decay term:
-        // negative means the input IV surface has calendar arbitrage at this
-        // (K, T). Warn and fall back to the implied vol rather than silently
-        // clamping to zero local variance (which would freeze the diffusion).
-        tracing::warn!(
-            strike = k,
-            time = t,
-            raw_local_var,
-            "Dupire local variance < 0 (likely calendar arbitrage in normal-vol surface): \
-             falling back to implied vol"
-        );
-        let iv = implied_vol(k, t)?;
-        return Ok(iv * iv);
-    }
     Ok(raw_local_var)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lognormal_rejects_negative_numerator_with_positive_density() {
+        let err = validate_dupire_derivatives(
+            "lognormal",
+            "Dupire numerator",
+            -2.0e-10,
+            1.0e-3,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect_err("negative Dupire numerator must be rejected");
+        assert!(err.to_string().contains("calendar"));
+    }
+
+    #[test]
+    fn lognormal_rejects_butterfly_only_violation_with_positive_calendar_derivative() {
+        let err = validate_dupire_derivatives(
+            "lognormal",
+            "Dupire numerator",
+            1.0e-3,
+            1.0e-10,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect_err("butterfly arbitrage must be rejected");
+        assert!(err.to_string().contains("butterfly"));
+    }
+
+    #[test]
+    fn lognormal_rejects_simultaneous_numerator_and_density_violations() {
+        let err = validate_dupire_derivatives(
+            "lognormal",
+            "Dupire numerator",
+            -2.0e-10,
+            -1.0e-3,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect_err("simultaneous arbitrage must be rejected");
+        let message = err.to_string();
+        assert!(message.contains("calendar"));
+        assert!(message.contains("butterfly"));
+    }
+
+    #[test]
+    fn lognormal_point_rejects_simultaneous_negative_raw_derivatives() {
+        let pathological = |strike: f64, time: f64| {
+            let atm_weight = (-(strike - 100.0).powi(2) / 0.01).exp();
+            Ok(0.01 + atm_weight * (0.50 - 0.40 * time))
+        };
+
+        let err = dupire_lognormal_point(&pathological, 100.0, 0.0, 0.0, 100.0, 1.0, 1.0, 0.01)
+            .expect_err("negative numerator and density must be rejected");
+        assert!(err.to_string().contains("butterfly"));
+    }
+
+    #[test]
+    fn lognormal_accepts_valid_and_tiny_negative_numerator() {
+        let checked = validate_dupire_derivatives(
+            "lognormal",
+            "Dupire numerator",
+            -0.5e-10,
+            2.0e-10,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect("tiny negative numerator noise is treated as zero");
+        assert!(checked.time_term.abs() < f64::EPSILON);
+        assert!((checked.density - 2.0e-10).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn lognormal_high_dividend_carry_allows_negative_raw_calendar_derivative() {
+        use crate::models::volatility::black::d1_d2;
+        use finstack_quant_core::math::norm_cdf;
+
+        let spot = 100.0;
+        let strike = 50.0;
+        let rate = 0.01;
+        let dividend = 0.20;
+        let sigma = 0.20;
+        let time = 1.0;
+        let dt = 0.01;
+        let dk = 0.5;
+        let call = |expiry: f64| {
+            let (d1, d2) = d1_d2(spot, strike, rate, sigma, expiry, dividend);
+            spot * (-dividend * expiry).exp() * norm_cdf(d1)
+                - strike * (-rate * expiry).exp() * norm_cdf(d2)
+        };
+        let raw_calendar = (call(time + dt) - call(time - dt)) / (2.0 * dt);
+        assert!(
+            raw_calendar < 0.0,
+            "regression requires negative raw dC/dT, got {raw_calendar}"
+        );
+
+        let flat_vol = |_: f64, _: f64| Ok(sigma);
+        let local_variance =
+            dupire_lognormal_point(&flat_vol, spot, rate, dividend, strike, time, dk, dt)
+                .expect("valid carry-bearing Black surface must succeed");
+        assert!(
+            (local_variance - sigma * sigma).abs() < 5.0e-4,
+            "flat Black surface should recover variance {}, got {local_variance}",
+            sigma * sigma
+        );
+    }
+
+    #[test]
+    fn normal_rejects_calendar_only_violation_with_positive_density() {
+        let err = validate_dupire_derivatives(
+            "normal",
+            "dC/dT",
+            -2.0e-10,
+            1.0e-3,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect_err("calendar arbitrage must be rejected");
+        assert!(err.to_string().contains("calendar"));
+    }
+
+    #[test]
+    fn normal_rejects_butterfly_only_violation_with_positive_calendar_derivative() {
+        let err = validate_dupire_derivatives(
+            "normal",
+            "dC/dT",
+            1.0e-3,
+            1.0e-10,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect_err("butterfly arbitrage must be rejected");
+        assert!(err.to_string().contains("butterfly"));
+    }
+
+    #[test]
+    fn normal_rejects_simultaneous_derivative_violations() {
+        let err = validate_dupire_derivatives(
+            "normal",
+            "dC/dT",
+            -2.0e-10,
+            -1.0e-3,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect_err("simultaneous arbitrage must be rejected");
+        let message = err.to_string();
+        assert!(message.contains("calendar"));
+        assert!(message.contains("butterfly"));
+    }
+
+    #[test]
+    fn normal_accepts_valid_and_tiny_negative_calendar_derivatives() {
+        let checked = validate_dupire_derivatives(
+            "normal",
+            "dC/dT",
+            -0.5e-10,
+            2.0e-10,
+            DerivativeTolerances::new(1.0e-10, 1.0e-10),
+        )
+        .expect("tiny negative calendar noise is treated as zero");
+        assert!(checked.time_term.abs() < f64::EPSILON);
+        assert!((checked.density - 2.0e-10).abs() < f64::EPSILON);
+    }
 
     #[test]
     fn test_local_vol_flat_smile() -> Result<()> {
@@ -531,20 +682,13 @@ mod tests {
         Ok(())
     }
 
-    /// Deep-wing Dupire local vol must not collapse to round-off noise.
+    /// Deep-wing density below the finite-difference tolerance is rejected.
     ///
-    /// Failure mode under test: for a deep-OTM strike the discounted call
-    /// prices `C(K-δ), C(K), C(K+δ)` underflow to ~1e-14, while each is itself
-    /// computed as a subtraction of two O(S₀) terms and so carries an absolute
-    /// round-off error of ~ε·S₀ ≈ 2e-14. The second difference
-    /// `C(K-δ) - 2C(K) + C(K+δ)` is then pure round-off — and because it can
-    /// land slightly *positive*, the old `d²C/dK² <= 0` guard did not catch it,
-    /// and Dupire returned a garbage local vol (observed: ~0.0 instead of the
-    /// true flat 0.20). The fix adds a round-off-floor guard: when
-    /// `|second difference|` is below `ROUNDOFF·ε·max(S₀,K)` the curvature is
-    /// unreliable and the point falls back to the implied vol.
+    /// A positive second difference can still be dominated by cancellation.
+    /// Treating that unresolved value as valid density—or falling back to IV—
+    /// would hide a butterfly-invalid Dupire input.
     #[test]
-    fn test_local_vol_deep_wing_no_roundoff_collapse() -> Result<()> {
+    fn test_local_vol_deep_wing_unresolved_density_is_rejected() {
         let const_vol = 0.20;
         let implied_vol_fn = |_: f64, _: f64| Ok(const_vol);
 
@@ -556,7 +700,7 @@ mod tests {
         let strikes = vec![100.0, 300.0, 500.0, 600.0];
         let times = vec![0.5, 1.0];
 
-        let lv_surface = LocalVolBuilder::from_implied_vol(
+        let err = LocalVolBuilder::from_implied_vol(
             implied_vol_fn,
             DupireParams {
                 base_date,
@@ -567,20 +711,9 @@ mod tests {
                 times: &times,
                 vol_model: VolatilityModel::Black,
             },
-        )?;
-
-        // At a deep-wing strike the flat-smile local vol must still be ~0.20,
-        // NOT collapsed to round-off noise near zero.
-        for &k in &[500.0, 600.0] {
-            let lv = lv_surface.get_vol(1.0, k)?;
-            assert!(
-                (lv - const_vol).abs() < 0.05,
-                "deep-wing local vol at K={k} collapsed to round-off noise: \
-                 got {lv}, expected ~{const_vol}"
-            );
-        }
-
-        Ok(())
+        )
+        .expect_err("unresolved deep-wing density must be rejected");
+        assert!(err.to_string().contains("butterfly"));
     }
 
     #[test]

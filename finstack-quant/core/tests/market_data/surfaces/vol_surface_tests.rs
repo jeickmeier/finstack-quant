@@ -59,6 +59,36 @@ fn test_vol_surface_value_clamped() {
 }
 
 #[test]
+fn value_clamped_handles_nan_and_singleton_axes() {
+    let one_by_one = VolSurface::builder("ONE")
+        .expiries(&[1.0])
+        .strikes(&[100.0])
+        .row(&[0.25])
+        .build()
+        .unwrap();
+    assert_eq!(one_by_one.value_clamped(2.0, 120.0), 0.25);
+    assert!(one_by_one.value_clamped(f64::NAN, 100.0).is_nan());
+    assert!(one_by_one.value_clamped(1.0, f64::NAN).is_nan());
+
+    let one_by_many = VolSurface::builder("ROW")
+        .expiries(&[1.0])
+        .strikes(&[90.0, 110.0])
+        .row(&[0.20, 0.30])
+        .build()
+        .unwrap();
+    assert!((one_by_many.value_clamped(3.0, 100.0) - 0.25).abs() < 1e-12);
+
+    let many_by_one = VolSurface::builder("COLUMN")
+        .expiries(&[1.0, 2.0])
+        .strikes(&[100.0])
+        .row(&[0.20])
+        .row(&[0.30])
+        .build()
+        .unwrap();
+    assert!((many_by_one.value_clamped(1.5, 120.0) - 0.25).abs() < 1e-12);
+}
+
+#[test]
 fn normal_vol_surface_wing_extrapolation_uses_flat_clamp() {
     let surface = VolSurface::builder("NORMAL")
         .expiries(&[1.0])

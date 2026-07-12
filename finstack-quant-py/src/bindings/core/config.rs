@@ -125,15 +125,14 @@ impl PyToleranceConfig {
     #[pyo3(signature = (rate_epsilon=None, generic_epsilon=None))]
     #[pyo3(text_signature = "(rate_epsilon=None, generic_epsilon=None)")]
     /// Create tolerance settings, optionally overriding default epsilons.
-    fn new(rate_epsilon: Option<f64>, generic_epsilon: Option<f64>) -> Self {
-        let mut inner = ToleranceConfig::default();
-        if let Some(v) = rate_epsilon {
-            inner.rate_epsilon = v;
-        }
-        if let Some(v) = generic_epsilon {
-            inner.generic_epsilon = v;
-        }
-        Self { inner }
+    fn new(rate_epsilon: Option<f64>, generic_epsilon: Option<f64>) -> PyResult<Self> {
+        let defaults = ToleranceConfig::default();
+        ToleranceConfig::new(
+            rate_epsilon.unwrap_or(defaults.rate_epsilon),
+            generic_epsilon.unwrap_or(defaults.generic_epsilon),
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     /// Epsilon used for rate-style comparisons.
@@ -223,7 +222,10 @@ impl PyFinstackConfig {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
         let value = py_to_json_value(py, value, "config extension")?;
-        self.inner.extensions.insert(key, value);
+        self.inner
+            .extensions
+            .insert(key, value)
+            .map_err(core_to_py)?;
         Ok(())
     }
 

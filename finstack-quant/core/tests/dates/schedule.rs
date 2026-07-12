@@ -790,6 +790,32 @@ fn test_imm_vs_cds_imm_difference() {
 }
 
 #[test]
+fn imm_and_cds_imm_setters_use_last_call_wins() {
+    let start = make_date(2025, 1, 15);
+    let end = make_date(2025, 9, 30);
+
+    let cds_dates = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .imm()
+        .cds_imm()
+        .build()
+        .expect("CDS IMM should win")
+        .dates;
+    let imm_dates = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .cds_imm()
+        .imm()
+        .build()
+        .expect("IMM should win")
+        .dates;
+
+    assert!(cds_dates.contains(&make_date(2025, 3, 20)));
+    assert!(!cds_dates.contains(&make_date(2025, 3, 19)));
+    assert!(imm_dates.contains(&make_date(2025, 3, 19)));
+    assert!(!imm_dates.contains(&make_date(2025, 3, 20)));
+}
+
+#[test]
 fn test_schedule_error_policy_missing_calendar_warning() {
     let start = make_date(2025, 1, 15);
     let end = make_date(2025, 3, 15);

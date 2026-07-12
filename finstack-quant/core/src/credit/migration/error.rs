@@ -131,6 +131,19 @@ pub enum MigrationError {
     #[error("scale contains no labels with known WARF factors")]
     NoWarfMapping,
 
+    /// WARF lookup input must be finite.
+    #[error("WARF value must be finite, got {0}")]
+    InvalidWarf(f64),
+
+    /// Serialized diagnostic value is invalid.
+    #[error("diagnostic '{name}' must be finite and non-negative, got {value}")]
+    InvalidDiagnostic {
+        /// Diagnostic field name.
+        name: String,
+        /// Invalid value.
+        value: f64,
+    },
+
     /// Scales do not match for a binary matrix operation.
     #[error("scale mismatch: matrices have different rating scales")]
     ScaleMismatch,

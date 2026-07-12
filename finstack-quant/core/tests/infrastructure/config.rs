@@ -9,7 +9,8 @@ fn config_extensions_roundtrip() {
     let mut cfg = FinstackConfig::default();
     cfg.rounding.mode = RoundingMode::AwayFromZero;
     cfg.extensions
-        .insert("custom.section.v1", json!({ "alpha": 1, "beta": true }));
+        .insert("custom.section.v1", json!({ "alpha": 1, "beta": true }))
+        .expect("valid extension key");
 
     let encoded = serde_json::to_string(&cfg).expect("serialize");
     let decoded: FinstackConfig = serde_json::from_str(&encoded).expect("deserialize");

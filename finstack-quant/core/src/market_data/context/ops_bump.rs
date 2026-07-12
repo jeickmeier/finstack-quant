@@ -18,6 +18,11 @@ impl MarketContext {
         price_id: &str,
         bump_pct: f64,
     ) -> Result<ContextScratchBump> {
+        if !bump_pct.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "price bump percentage must be finite, got {bump_pct}"
+            )));
+        }
         let key = CurveId::from(price_id);
         let current = self.prices.get(price_id).cloned().ok_or_else(|| {
             crate::error::InputError::NotFound {
@@ -49,6 +54,7 @@ impl MarketContext {
         surface_id: &str,
         spec: BumpSpec,
     ) -> Result<ContextScratchBump> {
+        spec.validate_finite()?;
         let key = CurveId::from(surface_id);
         let previous = self.surfaces.get(surface_id).cloned().ok_or_else(|| {
             crate::error::InputError::NotFound {
@@ -67,6 +73,7 @@ impl MarketContext {
         curve_id: &CurveId,
         spec: BumpSpec,
     ) -> Result<ContextScratchBump> {
+        spec.validate_finite()?;
         let previous = self.curves.get(curve_id.as_str()).cloned().ok_or_else(|| {
             crate::error::InputError::NotFound {
                 id: curve_id.to_string(),
@@ -168,6 +175,7 @@ impl MarketContext {
             }
             match bump {
                 MarketBump::Curve { id, spec } => {
+                    spec.validate_finite()?;
                     curve_bumps.insert(id, spec);
                 }
                 MarketBump::FxPct {
@@ -334,7 +342,7 @@ mod tests {
     use crate::market_data::bumps::{BumpMode, BumpType, BumpUnits};
     use crate::market_data::scalars::{InflationIndex, MarketScalar};
     use crate::market_data::surfaces::VolSurface;
-    use crate::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use crate::market_data::term_structures::{DiscountCurve, ForwardCurve, InflationCurve};
     use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
     use time::Month;
 
@@ -484,6 +492,23 @@ mod tests {
     }
 
     #[test]
+    fn failed_price_bump_is_atomic_for_non_finite_percentages() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut ctx = MarketContext::new().insert_price("SPOT", MarketScalar::Unitless(100.0));
+
+            let Err(error) = ctx.apply_price_bump_pct_in_place("SPOT", invalid) else {
+                panic!("non-finite price bump must fail");
+            };
+
+            assert!(error.to_string().contains("finite"));
+            match ctx.get_price("SPOT").expect("unchanged spot") {
+                MarketScalar::Unitless(value) => assert_eq!(value.to_bits(), 100.0f64.to_bits()),
+                MarketScalar::Price(_) => panic!("expected unitless price"),
+            }
+        }
+    }
+
+    #[test]
     fn scratch_surface_bump_restores_original_surface() {
         let surface =
             VolSurface::from_grid("VOL", &[0.5, 1.0], &[90.0, 100.0], &[0.2; 4]).expect("surface");
@@ -528,6 +553,70 @@ mod tests {
         assert!(
             (restored_zero - (-0.85f64.ln() / 5.0)).abs() < 1e-12,
             "restored curve should match original"
+        );
+    }
+
+    #[test]
+    fn failed_scratch_and_copy_bumps_leave_live_curves_unchanged() {
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of())
+            .knots([(0.0, 1.0), (5.0, 0.85)])
+            .build()
+            .expect("discount curve");
+        let forward = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(as_of())
+            .knots([(0.0, 0.03), (5.0, 0.04)])
+            .build()
+            .expect("forward curve");
+        let mut scratch = MarketContext::new().insert(discount).insert(forward);
+        let discount_before = scratch.get_discount("USD-OIS").expect("discount").zero(5.0);
+        let forward_before = scratch
+            .get_forward("USD-SOFR-3M")
+            .expect("forward")
+            .rate(5.0);
+
+        assert!(scratch
+            .apply_curve_bump_in_place(
+                &CurveId::from("USD-SOFR-3M"),
+                BumpSpec::parallel_bp(f64::NAN),
+            )
+            .is_err());
+        assert_eq!(
+            scratch
+                .get_forward("USD-SOFR-3M")
+                .expect("forward")
+                .rate(5.0)
+                .to_bits(),
+            forward_before.to_bits()
+        );
+
+        assert!(scratch
+            .bump([
+                MarketBump::Curve {
+                    id: CurveId::from("USD-OIS"),
+                    spec: BumpSpec::parallel_bp(1.0),
+                },
+                MarketBump::Curve {
+                    id: CurveId::from("USD-SOFR-3M"),
+                    spec: BumpSpec::parallel_bp(f64::INFINITY),
+                },
+            ])
+            .is_err());
+        assert_eq!(
+            scratch
+                .get_discount("USD-OIS")
+                .expect("discount")
+                .zero(5.0)
+                .to_bits(),
+            discount_before.to_bits()
+        );
+        assert_eq!(
+            scratch
+                .get_forward("USD-SOFR-3M")
+                .expect("forward")
+                .rate(5.0)
+                .to_bits(),
+            forward_before.to_bits()
         );
     }
 }

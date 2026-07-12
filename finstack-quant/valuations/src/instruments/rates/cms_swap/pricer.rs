@@ -18,7 +18,7 @@
 //! *Wilmott Magazine*, March, 38-44.
 
 use crate::instruments::common_impl::pricing::time::{
-    rate_period_on_dates, relative_df_discount_curve,
+    rate_between_on_dates, relative_df_discount_curve,
 };
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cms_option::pricer::convexity_adjustment;
@@ -156,7 +156,7 @@ impl CmsSwapPricer {
                             as_of,
                         )?
                     } else {
-                        rate_period_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?
+                        rate_between_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?
                     };
                     let df =
                         relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
@@ -474,7 +474,14 @@ mod tests {
             .pv_funding_leg(&swap, &market, as_of)
             .expect("funding leg PV should compute");
 
-        let expected = swap.notional.amount() * 0.05 * 0.25 * 2.0;
+        let fwd = market
+            .get_forward("USD-LIBOR-3M")
+            .expect("forward curve should exist");
+        let first_rate =
+            rate_between_on_dates(fwd.as_ref(), as_of, date(2025, 4, 1)).expect("first rate");
+        let second_rate = rate_between_on_dates(fwd.as_ref(), date(2025, 4, 1), date(2025, 7, 1))
+            .expect("second rate");
+        let expected = swap.notional.amount() * (first_rate + second_rate) * 0.25;
         assert!(
             (pv - expected).abs() < 1e-8,
             "expected funding PV {expected}, got {pv}"

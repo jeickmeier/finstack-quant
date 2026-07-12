@@ -13,7 +13,7 @@
 //! - `calculate_conversion_premium`: Conversion premium versus equity value
 //! - `calculate_accrued_interest`: Accrued coupon interest as of valuation date
 
-use finstack_quant_core::dates::{Date, DateExt, DayCount};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::PriceId;
@@ -120,6 +120,7 @@ pub(crate) struct ConvertibleBondValuator {
     base_date: Date,
     /// Day-count convention for time mapping in the tree.
     day_count: DayCount,
+    day_count_frequency: Option<Tenor>,
     /// Conversion price per share (for soft-call trigger evaluation).
     conversion_price: f64,
     /// Optional soft-call trigger condition.
@@ -163,6 +164,15 @@ impl ConvertibleBondValuator {
         })?;
 
         // Map cashflows to tree steps
+        let day_count_frequency = bond
+            .fixed_coupon
+            .as_ref()
+            .map(|coupon| coupon.freq)
+            .or_else(|| bond.floating_coupon.as_ref().map(|coupon| coupon.freq));
+        let day_count_ctx = DayCountContext {
+            frequency: day_count_frequency,
+            ..Default::default()
+        };
         let dt = time_to_maturity / steps as f64;
         let mut time_steps = Vec::with_capacity(steps + 1);
         let mut step_dates = Vec::with_capacity(steps + 1);
@@ -190,7 +200,8 @@ impl ConvertibleBondValuator {
                 bond.maturity,
                 steps,
                 cashflow_schedule.day_count,
-            );
+                day_count_ctx,
+            )?;
             *coupon_map.entry(bounded_step).or_insert(0.0) += cf.amount.amount();
         }
 
@@ -208,7 +219,8 @@ impl ConvertibleBondValuator {
                         bond.maturity,
                         steps,
                         cashflow_schedule.day_count,
-                    );
+                        day_count_ctx,
+                    )?;
 
                     // Exercise period: map all steps from start to end
                     let end_step = map_date_to_step(
@@ -217,7 +229,8 @@ impl ConvertibleBondValuator {
                         bond.maturity,
                         steps,
                         cashflow_schedule.day_count,
-                    );
+                        day_count_ctx,
+                    )?;
 
                     let reference_curve = if let Some(spec) = &call.make_whole {
                         Some((
@@ -273,7 +286,8 @@ impl ConvertibleBondValuator {
                         bond.maturity,
                         steps,
                         cashflow_schedule.day_count,
-                    );
+                        day_count_ctx,
+                    )?;
 
                     let end_step = map_date_to_step(
                         base_date,
@@ -281,7 +295,8 @@ impl ConvertibleBondValuator {
                         bond.maturity,
                         steps,
                         cashflow_schedule.day_count,
-                    );
+                        day_count_ctx,
+                    )?;
 
                     // For overlapping put windows, the holder will select the *highest*
                     // put price available at each step.
@@ -377,6 +392,7 @@ impl ConvertibleBondValuator {
             conversion_policy: bond.conversion.policy.clone(),
             base_date,
             day_count: cashflow_schedule.day_count,
+            day_count_frequency,
             conversion_price,
             soft_call_trigger: bond.soft_call_trigger.clone(),
             rf_step_dfs,
@@ -407,8 +423,12 @@ impl ConvertibleBondValuator {
     ///
     /// For `PriceTrigger`, we use a barrier approximation: the node spot price
     /// is compared against the trigger threshold.
-    fn conversion_allowed(&self, step: usize, node_spot: f64) -> bool {
-        match &self.conversion_policy {
+    fn conversion_allowed(&self, step: usize, node_spot: f64) -> Result<bool> {
+        let ctx = DayCountContext {
+            frequency: self.day_count_frequency,
+            ..Default::default()
+        };
+        let allowed = match &self.conversion_policy {
             ConversionPolicy::Voluntary => true,
             ConversionPolicy::MandatoryOn(date) => {
                 // Map the mandatory date to its nearest tree step
@@ -418,7 +438,8 @@ impl ConvertibleBondValuator {
                     self.maturity,
                     self.num_steps,
                     self.day_count,
-                );
+                    ctx,
+                )?;
                 step == target_step
             }
             ConversionPolicy::Window { start, end } => {
@@ -428,14 +449,16 @@ impl ConvertibleBondValuator {
                     self.maturity,
                     self.num_steps,
                     self.day_count,
-                );
+                    ctx,
+                )?;
                 let end_step = map_date_to_step(
                     self.base_date,
                     *end,
                     self.maturity,
                     self.num_steps,
                     self.day_count,
-                );
+                    ctx,
+                )?;
                 step >= start_step && step <= end_step
             }
             ConversionPolicy::UponEvent(event) => {
@@ -464,10 +487,12 @@ impl ConvertibleBondValuator {
                     self.maturity,
                     self.num_steps,
                     self.day_count,
-                );
+                    ctx,
+                )?;
                 step == target_step
             }
-        }
+        };
+        Ok(allowed)
     }
 
     /// Compute the conversion value at a given node, accounting for variable delivery
@@ -691,7 +716,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
                 .unwrap_or(0.0);
             let redemption_val = self.valuator.face_value;
 
-            let can_convert = self.valuator.conversion_allowed(self.steps, node_spot);
+            let can_convert = self.valuator.conversion_allowed(self.steps, node_spot)?;
 
             let (ex_coupon_total, ex_coupon_cash) = if can_convert && mandatory {
                 // Mandatory conversion: holder must convert regardless of optimality.
@@ -765,7 +790,7 @@ impl<'a> TsiveriotisZhangEngine<'a> {
 
                 // 1. Conversion (uses variable delivery for MandatoryVariable)
                 let conversion_val = self.valuator.conversion_value(node_spot);
-                let can_convert = self.valuator.conversion_allowed(step, node_spot);
+                let can_convert = self.valuator.conversion_allowed(step, node_spot)?;
 
                 let mut final_total = continuation_total;
                 let mut final_cash = continuation_cash;

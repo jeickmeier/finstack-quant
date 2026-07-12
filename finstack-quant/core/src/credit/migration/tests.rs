@@ -144,6 +144,14 @@ mod scale_tests {
             Err(MigrationError::NoWarfMapping)
         ));
     }
+
+    #[test]
+    fn rating_from_warf_rejects_non_finite_values() {
+        let scale = RatingScale::standard();
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(scale.rating_from_warf(invalid).is_err());
+        }
+    }
 }
 
 #[cfg(test)]
@@ -679,5 +687,67 @@ mod reference_matrix_tests {
                 assert!(diff < 1e-6, "semi-group ({i},{j}): diff={diff}");
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod serde_invariant_tests {
+    use crate::credit::migration::{GeneratorMatrix, RatingScale, TransitionMatrix};
+
+    fn scale() -> RatingScale {
+        RatingScale::custom(vec!["A".to_string(), "D".to_string()]).expect("scale")
+    }
+
+    #[test]
+    fn malformed_migration_types_fail_deserialization() {
+        let scale = scale();
+        let matrix =
+            TransitionMatrix::new(scale.clone(), &[0.9, 0.1, 0.0, 1.0], 1.0).expect("matrix");
+        let mut matrix_json = serde_json::to_value(&matrix).expect("serialize matrix");
+        matrix_json["horizon"] = serde_json::json!(0.0);
+        assert!(serde_json::from_value::<TransitionMatrix>(matrix_json).is_err());
+        let mut non_stochastic_json = serde_json::to_value(&matrix).expect("serialize matrix");
+        non_stochastic_json["data"] = serde_json::to_value(nalgebra::DMatrix::from_row_slice(
+            2,
+            2,
+            &[0.8, 0.1, 0.0, 1.0],
+        ))
+        .expect("serialize invalid matrix");
+        assert!(serde_json::from_value::<TransitionMatrix>(non_stochastic_json).is_err());
+
+        let mut scale_json = serde_json::to_value(&scale).expect("serialize scale");
+        scale_json["labels"] = serde_json::json!(["A", "A"]);
+        assert!(serde_json::from_value::<RatingScale>(scale_json).is_err());
+
+        let generator = GeneratorMatrix::new(scale, &[-0.1, 0.1, 0.0, 0.0]).expect("generator");
+        let mut generator_json = serde_json::to_value(&generator).expect("serialize generator");
+        generator_json["regularization_l1"] = serde_json::json!(-1.0);
+        assert!(serde_json::from_value::<GeneratorMatrix>(generator_json).is_err());
+        let mut invalid_generator_json =
+            serde_json::to_value(&generator).expect("serialize generator");
+        invalid_generator_json["data"] = serde_json::to_value(nalgebra::DMatrix::from_row_slice(
+            2,
+            2,
+            &[-0.1, 0.1, -0.1, 0.1],
+        ))
+        .expect("serialize invalid generator");
+        assert!(serde_json::from_value::<GeneratorMatrix>(invalid_generator_json).is_err());
+    }
+
+    #[test]
+    fn generator_round_trip_retains_diagnostics() {
+        let matrix = TransitionMatrix::new(scale(), &[0.9, 0.1, 0.0, 1.0], 1.0).expect("matrix");
+        let generator =
+            GeneratorMatrix::from_transition_matrix_with_tol(&matrix, 0.1).expect("generator");
+        let json = serde_json::to_string(&generator).expect("serialize");
+        let restored: GeneratorMatrix = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(
+            restored.regularization_l1().to_bits(),
+            generator.regularization_l1().to_bits()
+        );
+        assert!(
+            (restored.round_trip_error() - generator.round_trip_error()).abs() < 1e-15,
+            "round-trip diagnostic changed during serde"
+        );
     }
 }

@@ -8,7 +8,7 @@
 
 use super::common::*;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::DayCount;
+use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::Instrument;
 use time::macros::date;
@@ -18,12 +18,33 @@ fn test_at_market_fra_near_zero_pv() {
     // FRA struck at market forward rate should have ~zero PV
     let market = standard_market();
     let fra = create_standard_fra(); // 5% fixed, 5% market
+    let fwd = market.get_forward("USD_LIBOR_3M").expect("forward curve");
+    let (_, start, end) = standard_fra_dates();
+    let t_start = fwd
+        .day_count()
+        .year_fraction(fwd.base_date(), start, DayCountContext::default())
+        .expect("start time");
+    let t_end = fwd
+        .day_count()
+        .year_fraction(fwd.base_date(), end, DayCountContext::default())
+        .expect("end time");
+    let implied = fwd
+        .rate_between(t_start, t_end)
+        .expect("contractual FRA forward");
+    assert_approx_equal(
+        implied,
+        0.05,
+        1e-14,
+        "Contractual FRA grid must preserve quoted 5% forward",
+    );
 
     let pv = fra.value(&market, BASE_DATE).unwrap();
 
-    // Market standard: At-market FRA should have PV < $1 on $1M notional
-    // (< 0.01bp precision)
-    assert_near_zero(pv.amount(), 1.0, "At-market FRA should have near-zero PV");
+    assert_near_zero(
+        pv.amount(),
+        1e-8,
+        "At-market contractual-grid FRA should have zero PV",
+    );
 }
 
 #[test]

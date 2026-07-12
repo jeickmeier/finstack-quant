@@ -46,6 +46,7 @@ use super::{
 ///   Rating Drift with Continuous Observations." *Journal of Banking & Finance*,
 ///   26(2-3), 423-444.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "GeneratorMatrixWire")]
 pub struct GeneratorMatrix {
     pub(crate) data: DMatrix<f64>,
     pub(crate) scale: RatingScale,
@@ -63,6 +64,45 @@ pub struct GeneratorMatrix {
     /// generators.
     #[serde(default)]
     pub(crate) round_trip_error: f64,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GeneratorMatrixWire {
+    data: DMatrix<f64>,
+    scale: RatingScale,
+    #[serde(default)]
+    regularization_l1: f64,
+    #[serde(default)]
+    round_trip_error: f64,
+}
+
+impl TryFrom<GeneratorMatrixWire> for GeneratorMatrix {
+    type Error = MigrationError;
+
+    fn try_from(wire: GeneratorMatrixWire) -> Result<Self, Self::Error> {
+        for (name, value) in [
+            ("regularization_l1", wire.regularization_l1),
+            ("round_trip_error", wire.round_trip_error),
+        ] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(MigrationError::InvalidDiagnostic {
+                    name: name.to_string(),
+                    value,
+                });
+            }
+        }
+        let mut data = Vec::with_capacity(wire.data.len());
+        for row in 0..wire.data.nrows() {
+            for col in 0..wire.data.ncols() {
+                data.push(wire.data[(row, col)]);
+            }
+        }
+        let mut generator = GeneratorMatrix::new(wire.scale, &data)?;
+        generator.regularization_l1 = wire.regularization_l1;
+        generator.round_trip_error = wire.round_trip_error;
+        Ok(generator)
+    }
 }
 
 impl GeneratorMatrix {

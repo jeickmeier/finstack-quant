@@ -2,13 +2,15 @@
 //! and Zmijewski probit model.
 //!
 //! Each model takes an explicit input struct of financial ratios and returns
-//! a [`ScoringResult`] with raw score, zone classification, and implied PD.
+//! a [`ScoringResult`] with raw score, zone classification, and an optional
+//! implied PD. Altman requires an explicit versioned heuristic for PD output.
 //!
 //! # Models
 //!
 //! - [`altman_z_score`]: Original Altman Z-Score (1968) for public manufacturing firms.
 //! - [`altman_z_prime`]: Z'-Score variant for private firms.
-//! - [`altman_z_double_prime`]: Z''-Score variant for emerging markets / non-manufacturing.
+//! - [`altman_z_double_prime`]: Z''-Score variant for private non-manufacturing firms.
+//!   This is the constant-free model, not Altman's emerging-market EM-Score.
 //! - [`ohlson_o_score`]: Ohlson O-Score (1980) nine-predictor logistic model.
 //! - [`zmijewski_score`]: Zmijewski (1984) three-predictor probit model.
 //!
@@ -38,7 +40,8 @@ pub mod zmijewski;
 
 // Re-exports
 pub use altman::{
-    altman_z_double_prime, altman_z_prime, altman_z_score, AltmanZDoublePrimeInput,
+    altman_z_double_prime, altman_z_double_prime_with_pd, altman_z_prime, altman_z_prime_with_pd,
+    altman_z_score, altman_z_score_with_pd, AltmanPdCalibration, AltmanZDoublePrimeInput,
     AltmanZPrimeInput, AltmanZScoreInput,
 };
 pub use ohlson::{ohlson_o_score, OhlsonOScoreInput};

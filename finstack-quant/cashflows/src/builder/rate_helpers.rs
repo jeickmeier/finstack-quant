@@ -351,7 +351,7 @@ pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
 ///
 /// This is the primary rate projection function. It computes the all-in floating
 /// rate by:
-/// 1. Looking up the forward rate from the curve for the accrual period
+/// 1. Looking up the fixed-tenor index rate from the curve at the reset date
 /// 2. Applying index floor/cap to the forward rate
 /// 3. Adding spread and applying gearing
 /// 4. Applying all-in floor/cap to the final rate
@@ -359,7 +359,8 @@ pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
 /// # Arguments
 ///
 /// * `reset_date` - The rate fixing/reset date
-/// * `reset_period_end` - End of the accrual period
+/// * `reset_period_end` - Retained for compatibility; a term index projection
+///   uses the curve tenor and the reset date, not this date
 /// * `fwd` - Resolved forward curve
 /// * `params` - Floating rate parameters (spread, gearing, floors, caps)
 ///
@@ -381,8 +382,7 @@ pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
 ///   [`crate::builder::specs::FloatingRateFallback`] policy when no series
 ///   is provided. A reset exactly on the curve base date (T+0) is projected
 ///   from `t = 0`.
-/// - day-count conversion from the curve base date to the reset or accrual end
-///   date fails
+/// - day-count conversion from the curve base date to the reset date fails
 ///
 /// # References
 ///
@@ -413,7 +413,7 @@ pub(crate) fn project_fallback_rate(params: &FloatingRateParams) -> f64 {
 /// ```
 pub fn project_floating_rate(
     reset_date: Date,
-    reset_period_end: Date,
+    _reset_period_end: Date,
     fwd: &ForwardCurve,
     params: &FloatingRateParams,
 ) -> Result<f64> {
@@ -423,7 +423,7 @@ pub fn project_floating_rate(
     let fwd_dc = fwd.day_count();
     let fwd_base = fwd.base_date();
 
-    // Compute time points for the accrual period.
+    // Compute the reset time on the forward curve's day-count basis.
     //
     // Curves are defined from their base date forward. A reset exactly on the
     // base date (T+0) is projected from t = 0; a reset strictly before the
@@ -450,18 +450,9 @@ pub fn project_floating_rate(
     } else {
         fwd_dc.year_fraction(fwd_base, reset_date, DayCountContext::default())?
     };
-    let t1 = if reset_period_end <= fwd_base {
-        0.0
-    } else {
-        fwd_dc.year_fraction(fwd_base, reset_period_end, DayCountContext::default())?
-    };
-
-    // Get period forward rate (zero-length periods fall back to point rate).
-    let index_rate = if t1 > t0 {
-        fwd.rate_period(t0, t1)
-    } else {
-        fwd.rate(t0)
-    };
+    // A term-index coupon fixes the curve's quoted tenor at the actual reset
+    // date. It is not an average of the curve over the coupon accrual window.
+    let index_rate = fwd.rate(t0);
 
     // Use shared calculation logic
     Ok(calculate_floating_rate(index_rate, params))
@@ -940,6 +931,36 @@ mod tests {
             "Rate should be reasonable: {}",
             rate
         );
+    }
+
+    #[test]
+    fn term_projection_uses_the_reset_date_fixing_not_the_period_average() {
+        let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid test date");
+        let reset = Date::from_calendar_date(2025, Month::April, 1).expect("Valid test date");
+        let period_end = Date::from_calendar_date(2025, Month::July, 1).expect("Valid test date");
+        let fwd_curve = ForwardCurve::builder("TEST-INDEX", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.01), (1.0, 0.21)])
+            .build()
+            .expect("ForwardCurve builder should succeed with valid test data");
+        let params = FloatingRateParams::default();
+        let reset_t = fwd_curve
+            .day_count()
+            .year_fraction(base, reset, DayCountContext::default())
+            .expect("valid reset year fraction");
+        let period_end_t = fwd_curve
+            .day_count()
+            .year_fraction(base, period_end, DayCountContext::default())
+            .expect("valid period-end year fraction");
+        let reset_fixing = fwd_curve.rate(reset_t);
+        let integrated_average = fwd_curve.rate_period(reset_t, period_end_t);
+
+        let projected = project_floating_rate(reset, period_end, &fwd_curve, &params)
+            .expect("term projection should succeed");
+
+        assert!((reset_fixing - integrated_average).abs() > 1e-6);
+        assert!((projected - reset_fixing).abs() < 1e-14);
     }
 
     // =========================================================================

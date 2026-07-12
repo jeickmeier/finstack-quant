@@ -165,7 +165,8 @@ fn df_chains_simple_forward_periods() {
     let curve = ForwardCurve::builder("USD-SOFR6M", 0.5)
         .base_date(test_date())
         .day_count(DayCount::Act360)
-        .knots([(0.0, 0.05), (1.0, 0.05)])
+        .knots([(0.0, 0.05), (0.5, 0.05)])
+        .projection_grid([0.0, 0.5, 1.0])
         .interp(InterpStyle::Linear)
         .build()
         .unwrap();

@@ -8,19 +8,20 @@ use thiserror::Error;
 /// Provides a uniform interface across Altman Z-Score, Ohlson O-Score,
 /// and Zmijewski probit models. The `score` field contains the raw
 /// discriminant or regression output, `zone` classifies credit risk,
-/// and `implied_pd` maps the score to a probability of default.
+/// and `implied_pd` contains a probability only when the model has a native
+/// probability transform or an explicit calibration was requested.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScoringResult {
     /// The raw score value (Z, Z', Z'', O, or Zmijewski Y).
     pub score: f64,
     /// Risk zone classification (Safe/Grey/Distress).
     pub zone: ScoringZone,
-    /// Implied probability of default from the model's mapping.
+    /// Optional implied probability of default.
     ///
-    /// - Altman: empirical mapping (Altman 2002).
-    /// - Ohlson: logistic transform 1/(1+exp(-O)).
-    /// - Zmijewski: probit transform Phi(Y).
-    pub implied_pd: f64,
+    /// Altman score results leave this as `None` unless an explicit,
+    /// versioned heuristic calibration is requested. Ohlson and Zmijewski
+    /// retain their native logistic and probit probabilities.
+    pub implied_pd: Option<f64>,
     /// Name of the model that produced this result.
     pub model: &'static str,
 }
@@ -65,6 +66,15 @@ pub enum CreditScoringError {
         min: f64,
         /// Maximum allowed value (inclusive).
         max: f64,
+    },
+
+    /// A binary indicator was not exactly zero or one.
+    #[error("input field '{field}' must be exactly 0 or 1, got {value}")]
+    InvalidBinaryIndicator {
+        /// Name of the offending field.
+        field: &'static str,
+        /// The invalid indicator.
+        value: f64,
     },
 }
 

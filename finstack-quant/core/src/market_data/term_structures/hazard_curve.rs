@@ -543,6 +543,7 @@ impl HazardCurve {
     ) -> crate::Result<()> {
         use crate::market_data::bumps::BumpType;
 
+        spec.validate_finite()?;
         if !matches!(spec.bump_type, BumpType::Parallel) {
             return Err(crate::error::InputError::UnsupportedBump {
                 reason: "HazardCurve only supports Parallel bumps, not key-rate bumps".to_string(),

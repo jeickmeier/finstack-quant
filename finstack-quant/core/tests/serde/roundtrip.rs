@@ -107,3 +107,36 @@ fn schedule_spec_builds_expected_dates() {
 
     assert_eq!(schedule.dates, builder_schedule.dates);
 }
+
+#[test]
+fn schedule_spec_rejects_dual_imm_modes() {
+    let malformed = r#"{
+        "start":"2025-01-15",
+        "end":"2025-09-30",
+        "frequency":{"count":3,"unit":"Months"},
+        "stub":"ShortBack",
+        "business_day_convention":null,
+        "calendar_id":null,
+        "end_of_month":false,
+        "imm_mode":true,
+        "cds_imm_mode":true,
+        "graceful":false,
+        "allow_missing_calendar":false
+    }"#;
+    assert!(serde_json::from_str::<ScheduleSpec>(malformed).is_err());
+
+    let spec = ScheduleSpec {
+        start: Date::from_calendar_date(2025, Month::January, 15).unwrap(),
+        end: Date::from_calendar_date(2025, Month::September, 30).unwrap(),
+        frequency: Tenor::quarterly(),
+        stub: StubKind::ShortBack,
+        business_day_convention: None,
+        calendar_id: None,
+        end_of_month: false,
+        imm_mode: true,
+        cds_imm_mode: true,
+        graceful: false,
+        allow_missing_calendar: false,
+    };
+    assert!(spec.build().is_err());
+}

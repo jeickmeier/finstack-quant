@@ -137,7 +137,10 @@ mod tests {
     fn config_extension_takes_precedence() {
         let mut config = FinstackConfig::default();
         let value = serde_json::json!({"version": 1});
-        config.extensions.insert("core.dummy_registry.v1", value);
+        config
+            .extensions
+            .insert("core.dummy_registry.v1", value)
+            .expect("static extension key");
         let reg = REG
             .load_from_config(&config, validate_v1)
             .expect("config-loaded registry");
@@ -148,7 +151,10 @@ mod tests {
     fn validation_failure_is_propagated() {
         let mut config = FinstackConfig::default();
         let value = serde_json::json!({"version": 99});
-        config.extensions.insert("core.dummy_registry.v1", value);
+        config
+            .extensions
+            .insert("core.dummy_registry.v1", value)
+            .expect("static extension key");
         let err = REG
             .load_from_config(&config, validate_v1)
             .expect_err("invalid version must fail validation");

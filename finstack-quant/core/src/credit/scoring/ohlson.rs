@@ -14,6 +14,18 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{check_finite, CreditScoringError, ScoringResult, ScoringZone};
 
+fn check_binary_indicator(field: &'static str, value: f64) -> Result<(), CreditScoringError> {
+    check_finite(field, value)?;
+    if matches!(
+        value.to_bits(),
+        0 | 0x8000_0000_0000_0000 | 0x3ff0_0000_0000_0000
+    ) {
+        Ok(())
+    } else {
+        Err(CreditScoringError::InvalidBinaryIndicator { field, value })
+    }
+}
+
 /// Ohlson's published optimal probability cutoff P* = 0.038 (O ≈ −3.23),
 /// the Distress zone boundary. Source: Ohlson (1980), Table 6 — the cutoff
 /// minimizing total misclassification on the estimation sample.
@@ -133,7 +145,7 @@ pub struct OhlsonOScoreInput {
 /// assert!(result.score < -3.23);
 /// assert_eq!(result.zone, ScoringZone::Safe);
 /// // Implied PD via logistic transform: 1 / (1 + exp(-O))
-/// assert!(result.implied_pd < 0.019);
+/// assert!(result.implied_pd.is_some_and(|pd| pd < 0.019));
 /// # Ok::<_, finstack_quant_core::credit::scoring::CreditScoringError>(())
 /// ```
 pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, CreditScoringError> {
@@ -150,7 +162,7 @@ pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, Credit
         "current_liabilities_to_current_assets",
         input.current_liabilities_to_current_assets,
     )?;
-    check_finite("liabilities_exceed_assets", input.liabilities_exceed_assets)?;
+    check_binary_indicator("liabilities_exceed_assets", input.liabilities_exceed_assets)?;
     check_finite(
         "net_income_to_total_assets",
         input.net_income_to_total_assets,
@@ -159,7 +171,7 @@ pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, Credit
         "funds_from_operations_to_total_liabilities",
         input.funds_from_operations_to_total_liabilities,
     )?;
-    check_finite(
+    check_binary_indicator(
         "negative_net_income_two_years",
         input.negative_net_income_two_years,
     )?;
@@ -192,7 +204,7 @@ pub fn ohlson_o_score(input: &OhlsonOScoreInput) -> Result<ScoringResult, Credit
     Ok(ScoringResult {
         score: o,
         zone,
-        implied_pd,
+        implied_pd: Some(implied_pd),
         model: "Ohlson O-Score (1980)",
     })
 }

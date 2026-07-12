@@ -2,7 +2,7 @@
   "schema_version": "finstack_quant.credit_assumptions/1",
   "default_rating_factor_table_id": "moodys_standard",
   "default_seniority_calibration_id": "moodys_recovery_1982_2023",
-  "default_pd_master_scale_id": "sp_empirical",
+  "default_pd_master_scale_id": "sp_assumptions_v1",
   "default_downturn_lgd_id": "basel_secured",
   "default_workout_lgd_id": "standard_workout",
   "default_market_recovery_rate": 0.40,
@@ -69,9 +69,9 @@
   ],
   "pd_master_scales": [
     {
-      "ids": ["sp_empirical", "sp_corporate_default_1981_2023"],
-      "source": "S&P Global Ratings 1981-2023 one-year corporate default rate study",
-      "study_period": { "start_year": 1981, "end_year": 2023 },
+      "ids": ["sp_assumptions_v1"],
+      "deprecated_ids": ["sp_empirical", "sp_corporate_default_1981_2023"],
+      "source": "Finstack Quant library PD-band assumptions v1; agency-style labels only, not sourced empirical agency default rates",
       "grades": [
         { "label": "AAA", "upper_pd": 0.0001, "central_pd": 0.00004 },
         { "label": "AA", "upper_pd": 0.0005, "central_pd": 0.0002 },
@@ -84,9 +84,9 @@
       ]
     },
     {
-      "ids": ["moodys_empirical", "moodys_default_1983_2023"],
-      "source": "Moody's 1983-2023 one-year issuer-weighted default study",
-      "study_period": { "start_year": 1983, "end_year": 2023 },
+      "ids": ["moodys_assumptions_v1"],
+      "deprecated_ids": ["moodys_empirical", "moodys_default_1983_2023"],
+      "source": "Finstack Quant library PD-band assumptions v1; agency-style labels only, not sourced empirical agency default rates",
       "grades": [
         { "label": "Aaa", "upper_pd": 0.0001, "central_pd": 0.00003 },
         { "label": "Aa", "upper_pd": 0.0005, "central_pd": 0.0002 },

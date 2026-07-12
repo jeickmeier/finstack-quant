@@ -199,7 +199,10 @@ fn parse_iso_date(label: &str, value: &str) -> Result<Date> {
 }
 
 impl AttributionSpec {
-    pub(crate) fn build_finstack_config(&self, instrument_ccy: Option<Currency>) -> FinstackConfig {
+    pub(crate) fn build_finstack_config(
+        &self,
+        instrument_ccy: Option<Currency>,
+    ) -> Result<FinstackConfig> {
         let mut config = FinstackConfig::default();
 
         if let Some(ref cfg) = self.config {
@@ -213,11 +216,11 @@ impl AttributionSpec {
                 config.extensions.insert(
                     "valuations.sensitivities.v1",
                     json!({ "rate_bump_bp": rate_bump_bp }),
-                );
+                )?;
             }
         }
 
-        config
+        Ok(config)
     }
 }
 

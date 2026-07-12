@@ -6,7 +6,7 @@
     "description": "Bloomberg SWPM USD 2M x 5M FRA captured from screens on 2026-05-02.",
     "valuation_date": "2026-05-05",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg SWPM FRA, curve 490 USD SOFR discounting, curve 559 USD 3M CME Term SOFR projection, curve date 2026-05-02, valuation date 2026-05-05 Phase-2 envelope migration (2026-05-09): hybrid Tier-AB. The USD-SOFR discount curve is now calibrated from 12 SWPM Curve 490 input rates (deposits + OIS swaps) using the per-step ois_compounding override (CompoundedWithRateCutoff{cutoff_days: 1}). The USD-3M-CME-TERM-SOFR forward curve is a synthetic flat 3.6437% test curve that doesn't correspond to a Bloomberg-conformant calibration; it is preserved verbatim in initial_market.curves.",
+    "source_detail": "Bloomberg SWPM FRA, curve 490 USD SOFR discounting, curve 559 USD 3M CME Term SOFR projection, curve date 2026-05-02, valuation date 2026-05-05 Phase-2 envelope migration (2026-05-09): hybrid Tier-AB. The USD-SOFR discount curve is now calibrated from 12 SWPM Curve 490 input rates (deposits + OIS swaps) using the per-step ois_compounding override (CompoundedWithRateCutoff{cutoff_days: 1}). The USD-3M-CME-TERM-SOFR forward curve is a synthetic flat 3.6437% test curve that doesn't correspond to a Bloomberg-conformant calibration; it is preserved verbatim in initial_market.curves. The curve records the contractual 2026-07-06 to 2026-10-06 projection interval so DF-chained term projection preserves the quoted 3.6437% reset rate without reverting to rate_period averaging. Bloomberg par-rate and DV01 targets remain authoritative; the fixture is temporarily listed in known_non_executable because corrected combined DV01 requires an independent risk-definition refresh.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-02",
     "last_reviewed_by": "jeickmeier",
@@ -283,6 +283,12 @@
               1.0,
               0.036437
             ]
+          ],
+          "projection_grid": [
+            0.0,
+            0.18055555555555555,
+            0.4361111111111111,
+            1.0
           ],
           "interp_style": "linear",
           "extrapolation": "flat_forward",

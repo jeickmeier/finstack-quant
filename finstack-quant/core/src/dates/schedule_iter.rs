@@ -711,6 +711,7 @@ impl<'a> ScheduleBuilder<'a> {
         self.freq = Tenor::quarterly();
         self.stub = StubKind::ShortBack;
         self.cds_imm_mode = true;
+        self.imm_mode = false;
         self
     }
 
@@ -742,6 +743,7 @@ impl<'a> ScheduleBuilder<'a> {
         self.freq = Tenor::quarterly();
         self.stub = StubKind::ShortBack;
         self.imm_mode = true;
+        self.cds_imm_mode = false;
         self
     }
 
@@ -910,6 +912,11 @@ impl<'a> ScheduleBuilder<'a> {
     /// - Start date is after end date (and graceful mode is disabled)
     /// - Calendar lookup fails (and neither graceful nor `allow_missing_calendar` is enabled)
     pub fn build(self) -> crate::Result<Schedule> {
+        if self.imm_mode && self.cds_imm_mode {
+            return Err(crate::Error::Validation(
+                "standard IMM and CDS IMM modes are mutually exclusive".to_string(),
+            ));
+        }
         let error_policy = self.error_policy;
         let result = self.build_impl();
 
@@ -1056,6 +1063,7 @@ impl<'a> ScheduleBuilder<'a> {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(try_from = "ScheduleSpecWire")]
 /// Serializable specification for building a schedule.
 ///
 /// This struct captures all parameters needed to generate a schedule of dates
@@ -1091,9 +1099,56 @@ pub struct ScheduleSpec {
     pub allow_missing_calendar: bool,
 }
 
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+struct ScheduleSpecWire {
+    #[schemars(with = "String")]
+    start: Date,
+    #[schemars(with = "String")]
+    end: Date,
+    frequency: Tenor,
+    stub: StubKind,
+    business_day_convention: Option<BusinessDayConvention>,
+    calendar_id: Option<String>,
+    end_of_month: bool,
+    #[serde(default)]
+    imm_mode: bool,
+    cds_imm_mode: bool,
+    graceful: bool,
+    #[serde(default)]
+    allow_missing_calendar: bool,
+}
+
+impl TryFrom<ScheduleSpecWire> for ScheduleSpec {
+    type Error = String;
+
+    fn try_from(wire: ScheduleSpecWire) -> Result<Self, Self::Error> {
+        if wire.imm_mode && wire.cds_imm_mode {
+            return Err("standard IMM and CDS IMM modes are mutually exclusive".to_string());
+        }
+        Ok(Self {
+            start: wire.start,
+            end: wire.end,
+            frequency: wire.frequency,
+            stub: wire.stub,
+            business_day_convention: wire.business_day_convention,
+            calendar_id: wire.calendar_id,
+            end_of_month: wire.end_of_month,
+            imm_mode: wire.imm_mode,
+            cds_imm_mode: wire.cds_imm_mode,
+            graceful: wire.graceful,
+            allow_missing_calendar: wire.allow_missing_calendar,
+        })
+    }
+}
+
 impl ScheduleSpec {
     /// Reconstruct a [`Schedule`] using the persisted configuration.
     pub fn build(&self) -> crate::Result<Schedule> {
+        if self.imm_mode && self.cds_imm_mode {
+            return Err(crate::Error::Validation(
+                "standard IMM and CDS IMM modes are mutually exclusive".to_string(),
+            ));
+        }
         let mut builder = ScheduleBuilder::new(self.start, self.end)?
             .frequency(self.frequency)
             .stub_rule(self.stub)

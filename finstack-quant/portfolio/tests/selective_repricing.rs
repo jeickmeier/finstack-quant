@@ -277,10 +277,13 @@ fn selective_reprice_matches_full_reprice_when_one_curve_changes() {
 fn selective_reprice_verify_full_eval_mode_matches_full_reprice() {
     let portfolio = build_two_curve_portfolio();
     let mut config = FinstackConfig::default();
-    config.extensions.insert(
-        PORTFOLIO_SELECTIVE_REPRICING_EXTENSION_KEY,
-        serde_json::json!({ "verify_full_eval": true }),
-    );
+    config
+        .extensions
+        .insert(
+            PORTFOLIO_SELECTIVE_REPRICING_EXTENSION_KEY,
+            serde_json::json!({ "verify_full_eval": true }),
+        )
+        .expect("valid extension key");
     let options = PortfolioValuationOptions::default();
 
     let base_market = two_curve_market();

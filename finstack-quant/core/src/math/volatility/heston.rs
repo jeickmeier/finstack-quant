@@ -939,6 +939,33 @@ pub struct HestonCalibrationResult {
     pub iterations: usize,
     /// Whether the solver converged.
     pub converged: bool,
+    /// Number of fitted prices whose Black implied-vol inversion failed.
+    ///
+    /// Each failure contributes a deterministic 100-vol-point residual rather
+    /// than zero, so reported RMSE cannot be understated.
+    #[serde(default)]
+    pub implied_vol_failures: usize,
+}
+
+const IMPLIED_VOL_FAILURE_PENALTY: f64 = 1.0;
+
+fn calibration_vol_residual(
+    undiscounted_model_price: f64,
+    forward: f64,
+    strike: f64,
+    expiry: f64,
+    market_vol: f64,
+) -> (f64, bool) {
+    match crate::math::volatility::implied_vol_black(
+        undiscounted_model_price,
+        forward,
+        strike,
+        expiry,
+        true,
+    ) {
+        Ok(model_vol) if model_vol.is_finite() => (model_vol - market_vol, false),
+        _ => (IMPLIED_VOL_FAILURE_PENALTY, true),
+    }
 }
 
 /// Calibrate Heston model parameters from market implied volatilities.
@@ -1144,15 +1171,15 @@ pub fn calibrate_heston(
         rho,
     };
     let mut sse = 0.0;
+    let mut implied_vol_failures = 0usize;
     for (&t, (ks, vs)) in expiries.iter().zip(strikes.iter().zip(market_vols.iter())) {
         let fwd = spot * ((r - q) * t).exp();
         let df = (-r * t).exp();
         for (&k, &mv) in ks.iter().zip(vs.iter()) {
             let model_price = fitted.price_european(spot, k, r, q, t, true);
-            let model_vol =
-                crate::math::volatility::implied_vol_black(model_price / df, fwd, k, t, true)
-                    .unwrap_or(mv);
-            sse += (model_vol - mv) * (model_vol - mv);
+            let (residual, failed) = calibration_vol_residual(model_price / df, fwd, k, t, mv);
+            implied_vol_failures += usize::from(failed);
+            sse += residual * residual;
         }
     }
     let rmse = (sse / n_total as f64).sqrt();
@@ -1173,6 +1200,7 @@ pub fn calibrate_heston(
         rmse,
         iterations: solution.stats.iterations,
         converged,
+        implied_vol_failures,
     })
 }
 
@@ -1217,6 +1245,13 @@ fn bs_call_fallback(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_implied_vol_inversion_has_nonzero_calibration_residual() {
+        let (residual, failed) = calibration_vol_residual(-1.0, 100.0, 100.0, 1.0, 0.20);
+        assert!(failed);
+        assert!(residual.abs() >= 1.0);
+    }
 
     #[test]
     fn heston_params_validation() {

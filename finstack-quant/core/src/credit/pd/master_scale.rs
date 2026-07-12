@@ -22,13 +22,28 @@ use super::error::PdCalibrationError;
 /// ```
 /// use finstack_quant_core::credit::pd::MasterScale;
 ///
-/// let scale = MasterScale::sp_empirical().unwrap();
+/// let scale = MasterScale::sp_assumptions_v1().unwrap();
 /// let result = scale.map_pd(0.0015).unwrap();
 /// assert_eq!(result.grade, "BBB");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "MasterScaleWire")]
 pub struct MasterScale {
     grades: Vec<MasterScaleGrade>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MasterScaleWire {
+    grades: Vec<MasterScaleGrade>,
+}
+
+impl TryFrom<MasterScaleWire> for MasterScale {
+    type Error = PdCalibrationError;
+
+    fn try_from(wire: MasterScaleWire) -> Result<Self, Self::Error> {
+        MasterScale::new(wire.grades)
+    }
 }
 
 /// A single grade in a master scale.
@@ -143,20 +158,24 @@ impl MasterScale {
     ///
     /// # Errors
     ///
-    /// Returns [`PdCalibrationError::NonFiniteValue`] if the result's
-    /// `implied_pd` is NaN or infinite.
+    /// Returns [`PdCalibrationError::MissingImpliedPd`] when the scoring model
+    /// has no native or explicitly calibrated probability, or
+    /// [`PdCalibrationError::NonFiniteValue`] when it is non-finite.
     pub fn map_score(
         &self,
         result: &ScoringResult,
     ) -> Result<MasterScaleResult, PdCalibrationError> {
-        self.map_pd(result.implied_pd)
+        self.map_pd(
+            result
+                .implied_pd
+                .ok_or(PdCalibrationError::MissingImpliedPd)?,
+        )
     }
 
-    /// S&P empirical PD master scale.
+    /// Version 1 library PD-band assumptions using S&P-style labels.
     ///
-    /// Grade boundaries based on S&P Global Ratings 1981-2023 one-year
-    /// corporate default rate study. Central PDs are geometric means of
-    /// each grade's historical default rate range.
+    /// These bands are Finstack Quant library assumptions. They are not
+    /// presented as S&P empirical default rates or as an agency calibration.
     ///
     /// | Grade | Upper PD  | Central PD |
     /// |-------|-----------|------------|
@@ -168,16 +187,24 @@ impl MasterScale {
     /// | B     | 0.07      | 0.04       |
     /// | CCC   | 0.25      | 0.12       |
     /// | CC/C  | 1.0       | 0.40       |
-    pub fn sp_empirical() -> crate::Result<Self> {
+    pub fn sp_assumptions_v1() -> crate::Result<Self> {
         Self::from_registry_id(
             crate::credit::registry::embedded_registry()?.default_pd_master_scale_id(),
         )
     }
 
-    /// Moody's empirical PD master scale.
+    /// Legacy compatibility name for [`Self::sp_assumptions_v1`].
     ///
-    /// Grade boundaries based on Moody's Investors Service 1983-2023
-    /// annual default study. Uses Moody's alphanumeric notation.
+    /// Despite the historical method name, the returned bands are versioned
+    /// Finstack Quant assumptions, not sourced S&P empirical default rates.
+    pub fn sp_empirical() -> crate::Result<Self> {
+        Self::sp_assumptions_v1()
+    }
+
+    /// Version 1 library PD-band assumptions using Moody's-style labels.
+    ///
+    /// These bands are Finstack Quant library assumptions. They are not
+    /// presented as Moody's empirical default rates or as an agency calibration.
     ///
     /// | Grade | Upper PD  | Central PD |
     /// |-------|-----------|------------|
@@ -189,11 +216,23 @@ impl MasterScale {
     /// | B     | 0.08      | 0.04       |
     /// | Caa   | 0.25      | 0.13       |
     /// | Ca/C  | 1.0       | 0.45       |
+    pub fn moodys_assumptions_v1() -> crate::Result<Self> {
+        Self::from_registry_id("moodys_assumptions_v1")
+    }
+
+    /// Legacy compatibility name for [`Self::moodys_assumptions_v1`].
+    ///
+    /// Despite the historical method name, the returned bands are versioned
+    /// Finstack Quant assumptions, not sourced Moody's empirical default rates.
     pub fn moodys_empirical() -> crate::Result<Self> {
-        Self::from_registry_id("moodys_empirical")
+        Self::moodys_assumptions_v1()
     }
 
     /// Load a PD master scale from the credit assumptions registry.
+    ///
+    /// Deprecated registry aliases remain readable for backward-compatible
+    /// configuration loading and emit a warning. New configurations should
+    /// use `sp_assumptions_v1` or `moodys_assumptions_v1`.
     pub fn from_registry_id(id: &str) -> crate::Result<Self> {
         let grades = crate::credit::registry::embedded_registry()?.pd_master_scale_grades(id)?;
         Self::new(grades).map_err(|err| {

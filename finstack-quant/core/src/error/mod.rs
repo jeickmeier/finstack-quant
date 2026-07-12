@@ -200,6 +200,10 @@ pub enum Error {
     #[error("Validation error: {0}")]
     Validation(String),
 
+    /// Time-grid construction or allocation failure.
+    #[error(transparent)]
+    TimeGrid(#[from] crate::math::time_grid::TimeGridError),
+
     /// Unknown metric requested.
     ///
     /// This error occurs when attempting to compute or parse a metric ID that

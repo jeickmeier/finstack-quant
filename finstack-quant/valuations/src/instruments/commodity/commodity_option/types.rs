@@ -327,19 +327,29 @@ impl CommodityOption {
     /// When using a `PriceCurve`, this method uses `price_on_date(expiry)` which
     /// respects the curve's own day count convention rather than hard-coding Act365F.
     pub fn forward_price(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        let validate = |price: f64| {
+            if price.is_finite() && price > 0.0 {
+                Ok(price)
+            } else {
+                Err(finstack_quant_core::Error::Validation(format!(
+                    "CommodityOption '{}' requires a finite positive forward for its lognormal model, got {price}",
+                    self.id
+                )))
+            }
+        };
         // 1. Direct override takes precedence
         if let Some(price) = self.quoted_forward {
-            return Ok(price);
+            return validate(price);
         }
 
         // 2. Try to get price from PriceCurve using date-based evaluation
         if let Ok(price_curve) = market.get_price_curve(self.forward_curve_id.as_str()) {
             // At or past expiry, return spot price from curve
             if self.expiry <= as_of {
-                return Ok(price_curve.spot_price());
+                return validate(price_curve.spot_price());
             }
             // Use price_on_date to respect the curve's day count convention
-            return price_curve.price_on_date(self.expiry);
+            return validate(price_curve.price_on_date(self.expiry)?);
         }
 
         // 3. Fallback: cost-of-carry model if spot is available
@@ -349,10 +359,10 @@ impl CommodityOption {
                 .max(0.0);
             let disc = market.get_discount(self.discount_curve_id.as_str())?;
             if t <= 0.0 {
-                return Ok(spot);
+                return validate(spot);
             }
             let df = disc.df_between_dates(as_of, self.expiry)?;
-            return Ok(spot / df);
+            return validate(spot / df);
         }
 
         // 4. No PriceCurve and no spot - error with helpful message
@@ -1145,6 +1155,15 @@ mod tests {
             crate::serde_defaults::settlement_cash(),
             SettlementType::Cash
         );
+    }
+
+    #[test]
+    fn lognormal_option_rejects_signed_forward_override() {
+        let mut option = CommodityOption::example();
+        option.quoted_forward = Some(-5.0);
+        let market = MarketContext::new();
+        let as_of = option.expiry - time::Duration::days(30);
+        assert!(option.forward_price(&market, as_of).is_err());
     }
 
     #[test]

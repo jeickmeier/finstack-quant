@@ -1,4 +1,5 @@
 use crate::cashflow::{builder::CashFlowSchedule, primitives::CFKind};
+use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
     asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
 };
@@ -9,6 +10,7 @@ use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::types::CurveId;
 use rust_decimal::prelude::ToPrimitive;
@@ -249,6 +251,8 @@ fn asw_float_leg_conventions(fwd: &ForwardCurve) -> (DayCount, Tenor, BusinessDa
 struct AssetSwapForwardInputs<'a> {
     disc: &'a DiscountCurve,
     fwd: &'a ForwardCurve,
+    market: &'a MarketContext,
+    as_of: Date,
     fixed_dc: DayCount,
     fixed_frequency: Option<Tenor>,
     fixed_schedule: &'a [Date],
@@ -271,32 +275,32 @@ fn asset_swap_forward_components_split(
         return Ok((0.0, fixed_ann, 0.0));
     }
 
-    let f_base = inputs.fwd.base_date();
     let spread = inputs.float_spread_bp * 1e-4;
     let mut float_pv = finstack_quant_core::math::summation::NeumaierAccumulator::new();
     let mut float_ann = finstack_quant_core::math::summation::NeumaierAccumulator::new();
 
     let mut prev = float_schedule[0];
     for &date in &float_schedule[1..] {
-        let t1 = if prev <= f_base {
-            0.0
-        } else {
-            inputs
-                .float_dc
-                .year_fraction(f_base, prev, DayCountContext::default())?
-        };
-        let t2 = if date <= f_base {
-            0.0
-        } else {
-            inputs
-                .float_dc
-                .year_fraction(f_base, date, DayCountContext::default())?
-        };
         let yf = inputs
             .float_dc
             .year_fraction(prev, date, DayCountContext::default())?;
         let df = inputs.disc.df_on_date_curve(date)?;
-        float_pv.add((inputs.fwd.rate_period(t1, t2) + spread) * yf * df);
+        let forward = if prev < inputs.as_of {
+            let fixing_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+                inputs.fwd.id().as_str(),
+            );
+            let fixings = inputs.market.get_series(&fixing_id).map_err(|_| {
+                finstack_quant_core::Error::Validation(format!(
+                    "Seasoned asset swap requires historical fixing series '{}' for reset date {}; \
+                     started term coupons must use observed fixings, not projection",
+                    fixing_id, prev
+                ))
+            })?;
+            fixings.value_on_exact(prev)?
+        } else {
+            rate_between_on_dates(inputs.fwd, prev, date)?
+        };
+        float_pv.add((forward + spread) * yf * df);
         float_ann.add(yf * df);
         prev = date;
     }
@@ -892,6 +896,8 @@ impl MetricCalculator for AssetSwapMarketCalculator {
                             asset_swap_forward_components_split(AssetSwapForwardInputs {
                                 disc: disc.as_ref(),
                                 fwd: fwd.as_ref(),
+                                market: context.curves.as_ref(),
+                                as_of: context.as_of,
                                 fixed_dc: dc_fixed,
                                 fixed_frequency: Some(freq),
                                 fixed_schedule: &fixed_schedule,
