@@ -830,7 +830,7 @@ mod tests {
         let mut expected_swap_pv = 0.0;
         for p in periods {
             let tau = p.accrual_year_fraction;
-            let forward = crate::instruments::common_impl::pricing::time::rate_period_on_dates(
+            let forward = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
                 &fwd,
                 p.accrual_start,
                 p.accrual_end,

@@ -61,20 +61,57 @@ source of truth — tests never rewrite it to match model output. `tolerances`
 must cover every `expected` metric, each with an `abs` and/or `rel` bound; a
 `tolerance_reason` is required for any expected risk metric that is exactly zero.
 
-## Non-executable fixtures
+## Metric-specific unresolved comparisons
 
-A few Bloomberg fixtures retain screen values that the executable runner cannot
-yet reproduce. Rather than encode that status in each fixture, both layers read
-one shared allowlist, [`known_non_executable.json`](known_non_executable.json)
-(`{ "path": ..., "reason": ... }` entries, paths relative to `data/`). The Rust
-runner ([`pricing.rs`](pricing.rs)) reports their failures non-fatally; the
-Python layer turns each into `pytest.mark.xfail(strict=False)` via
-`discover_fixtures_with_marks` in `conftest.py`. Add a fixture to that one file
-to park it on both sides.
+A few externally sourced metrics retain vendor values that the executable
+runner cannot yet reproduce. Both layers read one strict shared file,
+[`known_non_executable.json`](known_non_executable.json), with paths relative
+to `data/`:
 
-To run every fixture strictly and surface the parked failures, set
-`GOLDEN_IGNORE_NON_EXECUTABLE=1` (both layers honor it) or run
-`mise run goldens-test-strict`.
+```jsonc
+{
+  "description": "why this allowlist exists",
+  "fixtures": [
+    {
+      "path": "pricing/example/vendor_fixture.json",
+      "description": "fixture-level benchmark summary",
+      "metrics": [
+        {
+          "metric": "dv01",
+          "reason": "why the vendor target must remain authoritative",
+          "evidence": "exact expected, actual, difference, and tolerance"
+        }
+      ]
+    }
+  ]
+}
+```
+
+The schema is closed at the root, fixture, and metric levels. Unknown fields,
+invalid types, blank required strings, duplicate fixture paths, and duplicate
+metric keys are fatal. Every path must resolve to a valid fixture and every
+listed metric must exist in that fixture's `expected` map.
+
+Allowlisting is comparison-specific, never fixture-wide:
+
+- fixture loading, schema validation, and execution errors remain fatal;
+- metrics not listed remain strictly asserted;
+- a listed metric mismatch is emitted as an expected-unresolved diagnostic;
+- a listed metric that now passes is a stale-entry failure;
+- missing fixtures or metrics are stale-entry failures.
+
+The Rust pricing walk implements this in `known_non_executable`,
+`unresolved_metrics_for_path`, and `classify_fixture_run` in
+[`pricing.rs`](pricing.rs). Python mirrors it in
+`_parse_unresolved_allowlist`, `_known_unresolved_metrics`, and `run_golden` in
+`finstack-quant-py/tests/golden/conftest.py`. Python does not use whole-test
+`xfail` markers.
+
+Strict mode is enabled only when `GOLDEN_IGNORE_NON_EXECUTABLE` is one of
+`1`, `true`, `yes`, or `on` (case-insensitive, surrounding whitespace ignored).
+Absent, empty, `0`, and `false` do not enable strict mode. Use
+`GOLDEN_IGNORE_NON_EXECUTABLE=1` or `mise run goldens-test-strict` to surface
+every unresolved metric as a normal failure.
 
 ## Migrating fixtures
 

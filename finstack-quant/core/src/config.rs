@@ -215,8 +215,19 @@ impl ConfigExtensions {
 
     /// Insert or replace a section by key.
     #[inline]
-    pub fn insert(&mut self, key: impl Into<String>, value: JsonValue) -> Option<JsonValue> {
-        self.inner.insert(key.into(), value)
+    pub fn insert(
+        &mut self,
+        key: impl Into<String>,
+        value: JsonValue,
+    ) -> crate::Result<Option<JsonValue>> {
+        let key = key.into();
+        if !is_valid_extension_key(&key) {
+            return Err(crate::Error::Validation(format!(
+                "invalid config extension key '{key}': keys must match \
+                 '{{crate}}.{{domain}}.v{{N}}'"
+            )));
+        }
+        Ok(self.inner.insert(key, value))
     }
 
     /// Remove a section by key.
@@ -276,7 +287,7 @@ pub struct RoundingPolicy {
 /// // Customize for stricter rate comparisons
 /// tol.rate_epsilon = 1e-14;
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, schemars::JsonSchema)]
 pub struct ToleranceConfig {
     /// Epsilon for rate comparisons (default: 1e-12).
     ///
@@ -288,6 +299,44 @@ pub struct ToleranceConfig {
     /// Used for general numerical comparisons where higher tolerance is acceptable.
     #[serde(default = "default_generic_epsilon")]
     pub generic_epsilon: f64,
+}
+
+impl ToleranceConfig {
+    /// Create validated numerical tolerances.
+    pub fn new(rate_epsilon: f64, generic_epsilon: f64) -> crate::Result<Self> {
+        for (name, value) in [
+            ("rate_epsilon", rate_epsilon),
+            ("generic_epsilon", generic_epsilon),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(crate::Error::Validation(format!(
+                    "{name} must be finite and positive, got {value}"
+                )));
+            }
+        }
+        Ok(Self {
+            rate_epsilon,
+            generic_epsilon,
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for ToleranceConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawToleranceConfig {
+            #[serde(default = "default_rate_epsilon")]
+            rate_epsilon: f64,
+            #[serde(default = "default_generic_epsilon")]
+            generic_epsilon: f64,
+        }
+
+        let raw = RawToleranceConfig::deserialize(deserializer)?;
+        Self::new(raw.rate_epsilon, raw.generic_epsilon).map_err(serde::de::Error::custom)
+    }
 }
 
 /// Default epsilon for rate comparisons: 1e-12.
@@ -607,7 +656,7 @@ pub fn results_meta_with_timestamp(
 
 #[cfg(test)]
 mod tests {
-    use super::RoundingMode;
+    use super::{ConfigExtensions, RoundingMode, ToleranceConfig};
 
     #[test]
     fn config_extensions_accept_valid_versioned_keys() {
@@ -645,6 +694,39 @@ mod tests {
                 "malformed extension key '{key}' must be rejected"
             );
         }
+    }
+
+    #[test]
+    fn config_extensions_validate_programmatic_insertion() {
+        let mut extensions = ConfigExtensions::default();
+        assert!(extensions
+            .insert("valuations.calibration.v2", serde_json::json!({}))
+            .is_ok());
+        assert!(extensions
+            .insert("not namespaced", serde_json::json!({}))
+            .is_err());
+        assert!(extensions.get("not namespaced").is_none());
+    }
+
+    #[test]
+    fn tolerance_config_rejects_invalid_values_and_roundtrips() {
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(ToleranceConfig::new(bad, 1e-10).is_err());
+            assert!(ToleranceConfig::new(1e-12, bad).is_err());
+        }
+        for json in [
+            r#"{"rate_epsilon":0.0,"generic_epsilon":1e-10}"#,
+            r#"{"rate_epsilon":1e-12,"generic_epsilon":-1.0}"#,
+        ] {
+            assert!(serde_json::from_str::<ToleranceConfig>(json).is_err());
+        }
+
+        let valid = ToleranceConfig::new(1e-12, 1e-10).unwrap();
+        let json = serde_json::to_string(&valid).unwrap();
+        assert_eq!(
+            serde_json::from_str::<ToleranceConfig>(&json).unwrap(),
+            valid
+        );
     }
 
     fn assert_parses_to(label: &str, expected: RoundingMode) {

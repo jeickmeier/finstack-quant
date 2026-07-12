@@ -267,7 +267,12 @@ impl FxDeltaVolSurfaceBuilder {
             }
         }
 
-        let has_wings = self.rr_25d.is_some() && self.bf_25d.is_some();
+        if self.rr_25d.is_some() != self.bf_25d.is_some()
+            || self.rr_10d.is_some() != self.bf_10d.is_some()
+        {
+            return Err(InputError::Invalid.into());
+        }
+        let has_wings = self.rr_25d.is_some();
 
         if let Some(ref rr) = self.rr_25d {
             if rr.len() != self.expiries.len() {
@@ -435,5 +440,29 @@ mod tests {
             surface.strikes().len() >= 5,
             "10d wings should add extra smile points"
         );
+    }
+
+    #[test]
+    fn builder_rejects_unpaired_rr_and_bf_quotes() {
+        let base = || {
+            FxDeltaVolSurfaceBuilder::new("EURUSD-VOL")
+                .spot(1.10)
+                .expiries(&[1.0])
+                .atm_vols(&[0.09])
+        };
+        assert!(base().rr_25d(&[0.01]).build().is_err());
+        assert!(base().bf_25d(&[0.005]).build().is_err());
+        assert!(base()
+            .rr_25d(&[0.01])
+            .bf_25d(&[0.005])
+            .rr_10d(&[0.02])
+            .build()
+            .is_err());
+        assert!(base()
+            .rr_25d(&[0.01])
+            .bf_25d(&[0.005])
+            .bf_10d(&[0.01])
+            .build()
+            .is_err());
     }
 }

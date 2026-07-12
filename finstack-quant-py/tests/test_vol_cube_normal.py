@@ -82,7 +82,38 @@ def test_interpolation_mode_is_exposed_and_changes_expiry_interpolation() -> Non
     assert vol_cube.vol(3.0, 2.0, FORWARD) != pytest.approx(variance_cube.vol(3.0, 2.0, FORWARD))
 
 
+def test_materialized_expiry_slice_uses_direct_vol_tenor_interpolation() -> None:
+    params = [{"alpha": 0.15, "beta": 1.0, "rho": -0.2, "nu": 0.4}] * 2
+    cube = VolCube(
+        "VAR",
+        [1.0],
+        [1.0, 4.0],
+        params,
+        [0.02, 0.05],
+        "total_variance",
+    )
+    surface = cube.materialize_expiry_slice(1.0, [FORWARD])
+    low = cube.vol(1.0, 1.0, FORWARD)
+    high = cube.vol(1.0, 4.0, FORWARD)
+
+    assert surface.value_checked(1.0, FORWARD) == pytest.approx(low)
+    assert surface.value_checked(4.0, FORWARD) == pytest.approx(high)
+    assert surface.value_checked(2.5, FORWARD) == pytest.approx((low + high) / 2.0)
+
+
 def test_non_finite_sabr_shift_is_rejected() -> None:
     params = [{"alpha": 0.2, "beta": 1.0, "rho": -0.2, "nu": 0.4, "shift": math.inf}]
     with pytest.raises(ValueError, match="shift"):
         VolCube("BAD-SHIFT", [1.0], [2.0], params, [FORWARD])
+
+
+def test_normal_sabr_rejects_nonpositive_shifted_levels_for_positive_beta() -> None:
+    cev = [{"alpha": 0.01, "beta": 0.5, "rho": -0.2, "nu": 0.4}]
+    cube = VolCube("CEV", [1.0], [2.0], cev, [-0.01])
+    with pytest.raises(ValueError, match="Invalid input data"):
+        cube.vol_normal(1.0, 2.0, -0.01)
+    assert math.isnan(cube.vol_normal_clamped(1.0, 2.0, -0.01))
+
+    normal = [{"alpha": 0.01, "beta": 0.0, "rho": -0.2, "nu": 0.4}]
+    normal_cube = VolCube("NORMAL", [1.0], [2.0], normal, [-0.01])
+    assert math.isfinite(normal_cube.vol_normal(1.0, 2.0, -0.02))

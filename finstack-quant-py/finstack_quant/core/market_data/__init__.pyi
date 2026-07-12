@@ -74,6 +74,11 @@ class DiscountCurve:
         Extrapolation policy (default ``"flat_forward"``).
     day_count : str | None
         Day-count convention. When omitted, Rust infers a market default from the curve ID.
+    validation_mode : str
+        Rust validation preset: ``"market_standard"`` (default) or
+        ``"negative_rate_friendly"``.
+    forward_floor : float | None
+        Required minimum implied forward for ``"negative_rate_friendly"``.
 
     Raises
     ------
@@ -103,6 +108,8 @@ class DiscountCurve:
         interp: str = "monotone_convex",
         extrapolation: str = "flat_forward",
         day_count: Optional[str] = None,
+        validation_mode: str = "market_standard",
+        forward_floor: float | None = None,
     ) -> None:
         """Construct a discount curve from knot points.
 
@@ -120,6 +127,10 @@ class DiscountCurve:
             Extrapolation policy (default ``"flat_forward"``).
         day_count : str | None
             Day-count convention. When omitted, Rust infers a market default from the curve ID.
+        validation_mode : str
+            Rust validation preset.
+        forward_floor : float | None
+            Required with ``validation_mode="negative_rate_friendly"``.
 
         Raises
         ------
@@ -223,6 +234,11 @@ class ForwardCurve:
         Interpolation style (default ``"linear"``).
     extrapolation : str
         Extrapolation policy (default ``"flat_forward"``).
+    projection_grid : list[float] | None, optional
+        Contractual reset/end-date projection boundaries. Omit for legacy
+        fixed numeric-tenor DF stepping.
+    reset_lag : int | None, optional
+        Business days from fixing to spot. Omit for Rust curve-ID inference.
 
     Raises
     ------
@@ -239,6 +255,8 @@ class ForwardCurve:
         day_count: str | None = None,
         interp: str = "linear",
         extrapolation: str = "flat_forward",
+        projection_grid: list[float] | None = None,
+        reset_lag: int | None = None,
     ) -> None:
         """Construct a forward rate curve from knot points.
 
@@ -258,7 +276,10 @@ class ForwardCurve:
             Interpolation style (default ``"linear"``).
         extrapolation : str
             Extrapolation policy (default ``"flat_forward"``).
-
+        projection_grid : list[float] | None, optional
+            Contractual reset/end-date projection boundaries.
+        reset_lag : int | None, optional
+            Business days from fixing to spot.
         Raises
         ------
         ValueError
@@ -281,6 +302,16 @@ class ForwardCurve:
         """
         ...
 
+    def rate_between(self, t1: float, t2: float) -> float:
+        """Discount-factor-implied simple forward rate over ``(t1, t2)``.
+
+        Raises
+        ------
+        ValueError
+            If either time is non-finite or ``t2 <= t1``.
+        """
+        ...
+
     @property
     def id(self) -> str:
         """Curve identifier string.
@@ -299,6 +330,16 @@ class ForwardCurve:
         -------
         datetime.date
         """
+        ...
+
+    @property
+    def projection_grid(self) -> list[float] | None:
+        """Contractual projection boundaries, if explicitly configured."""
+        ...
+
+    @property
+    def reset_lag(self) -> int:
+        """Business days from fixing to spot."""
         ...
 
     def __repr__(self) -> str: ...

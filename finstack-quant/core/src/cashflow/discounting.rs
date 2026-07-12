@@ -68,8 +68,10 @@
 //! let pv = npv(&curve, base_date, None, &flows)?;
 //! assert!(pv.amount() < 100.0); // Discounted value < face value
 //!
-//! // Or override with explicit day count when needed
-//! let pv_explicit = npv(&curve, base_date, Some(DayCount::Act360), &flows)?;
+//! // The legacy day-count argument is retained for compatibility but ignored:
+//! // discount coordinates always use the curve's own day count.
+//! let pv_compat = npv(&curve, base_date, Some(DayCount::Act360), &flows)?;
+//! assert_eq!(pv_compat, pv);
 //! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 //!
@@ -144,8 +146,8 @@ pub trait Discountable: Send + Sync {
     ///
     /// * `disc` - Discount curve implementing the `Discounting` trait
     /// * `base` - Valuation date
-    /// * `dc` - Day count convention: `None` uses the curve's day count (recommended),
-    ///   `Some(dc)` overrides with an explicit day count
+    /// * `dc` - Deprecated compatibility parameter. Discount-curve abscissae
+    ///   always use `disc.day_count()`; this value is ignored.
     ///
     /// # Returns
     ///
@@ -176,8 +178,8 @@ pub trait Discountable: Send + Sync {
 ///
 /// * `disc` - Discount curve implementing the `Discounting` trait
 /// * `base` - Valuation date
-/// * `dc` - Day count convention: `None` uses the curve's day count (recommended),
-///   `Some(dc)` overrides with an explicit day count
+/// * `dc` - Deprecated compatibility parameter. Discount-curve abscissae
+///   always use `disc.day_count()`; this value is ignored.
 /// * `flows` - Dated cashflows to discount
 ///
 /// # Returns
@@ -196,11 +198,9 @@ pub trait Discountable: Send + Sync {
 ///
 /// # Day Count Selection
 ///
-/// - **`None` (recommended)**: Uses the curve's internal day count. This ensures
-///   consistency between NPV calculations and metrics like par rate, so pricing
-///   at par rate yields zero PV.
-/// - **`Some(dc)`**: Overrides with an explicit day count. Use when you need a
-///   specific convention that differs from the curve's (e.g., instrument-specific accrual).
+/// Discounting always uses the curve's internal day count. The `dc` parameter
+/// is retained for source compatibility but cannot override the curve
+/// abscissa. Instrument accrual day count belongs in cashflow generation.
 ///
 /// # Example
 ///
@@ -224,11 +224,8 @@ pub trait Discountable: Send + Sync {
 ///     Money::new(100.0, Currency::USD),
 /// )];
 ///
-/// // Use curve's day count (recommended)
+/// // Uses the curve's day count.
 /// let pv = npv(&curve, base, None, &flows)?;
-///
-/// // Override with explicit day count
-/// let pv_act365 = npv(&curve, base, Some(DayCount::Act365F), &flows)?;
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn npv<D: Discounting + ?Sized>(
@@ -290,6 +287,9 @@ impl NpvOptions {
 /// "Valuation-Date Cutoff"). Use [`npv_with_options`] to opt in to the
 /// legacy include-everything behavior.
 ///
+/// The `dc` argument is deprecated compatibility input and is ignored.
+/// Discount-curve coordinates always use [`Discounting::day_count`].
+///
 /// # Errors
 ///
 /// Same error conditions as [`npv`].
@@ -308,6 +308,8 @@ pub fn npv_with_ctx<D: Discounting + ?Sized>(
 /// This is the most general entry point: it accepts a day-count context and
 /// options controlling whether flows on or before the valuation date are
 /// included (see [`NpvOptions::include_past_flows`]).
+/// The `dc` argument is deprecated compatibility input and is ignored;
+/// instrument accrual conventions belong in cashflow generation.
 ///
 /// # Errors
 ///
@@ -328,7 +330,8 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
     if flows.is_empty() {
         return Err(crate::error::InputError::TooFewPoints.into());
     }
-    let day_count = dc.unwrap_or_else(|| disc.day_count());
+    let _ = dc;
+    let day_count = disc.day_count();
     let ccy = flows[0].1.currency();
 
     // Validate all cashflows have the same currency
@@ -627,6 +630,26 @@ mod hardening_tests {
             "npv must not reuse the curve-base-anchored df lookup"
         );
     }
+
+    #[test]
+    fn npv_day_count_override_cannot_change_curve_abscissa() {
+        use crate::market_data::term_structures::DiscountCurve;
+
+        let base = create_date(2024, Month::January, 1).expect("date");
+        let pay = create_date(2025, Month::January, 1).expect("date");
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.88)])
+            .build()
+            .expect("curve");
+        let flows = vec![(pay, Money::new(100.0, Currency::USD))];
+
+        let canonical = npv(&curve, base, None, &flows).expect("canonical PV");
+        let overridden = npv(&curve, base, Some(DayCount::Act360), &flows).expect("override PV");
+
+        assert_eq!(overridden, canonical);
+    }
 }
 
 /// Compute NPV of dated `Money` flows using a discount curve.
@@ -746,7 +769,7 @@ mod tests {
     }
 
     #[test]
-    fn tuples_discountable_with_explicit_dc() {
+    fn tuples_discountable_ignores_compatibility_day_count() {
         let curve = ZeroRateCurve {
             id: CurveId::new("USD-OIS"),
         };
@@ -756,7 +779,7 @@ mod tests {
             (pay, Money::new(10.0, crate::currency::Currency::USD)),
             (pay, Money::new(5.0, crate::currency::Currency::USD)),
         ];
-        // Use explicit day count
+        // The compatibility argument is ignored for discount coordinates.
         let pv = flows
             .npv(&curve, base, Some(DayCount::Act365F))
             .expect("NPV calculation should succeed in test");

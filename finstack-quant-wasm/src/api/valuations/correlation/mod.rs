@@ -303,18 +303,18 @@ impl WasmRecoveryModel {
 ///
 /// Returns `[rho_min, rho_max]`.
 #[wasm_bindgen(js_name = correlationBounds)]
-pub fn correlation_bounds(p1: f64, p2: f64) -> Vec<f64> {
-    let (lo, hi) = corr::correlation_bounds(p1, p2);
-    vec![lo, hi]
+pub fn correlation_bounds(p1: f64, p2: f64) -> Result<Vec<f64>, JsValue> {
+    let (lo, hi) = corr::correlation_bounds(p1, p2).map_err(to_js_err)?;
+    Ok(vec![lo, hi])
 }
 
 /// Joint probabilities for two correlated Bernoulli variables.
 ///
 /// Returns `[p11, p10, p01, p00]`.
 #[wasm_bindgen(js_name = jointProbabilities)]
-pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Vec<f64> {
-    let (p11, p10, p01, p00) = corr::joint_probabilities(p1, p2, correlation);
-    vec![p11, p10, p01, p00]
+pub fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> Result<Vec<f64>, JsValue> {
+    let (p11, p10, p01, p00) = corr::joint_probabilities(p1, p2, correlation).map_err(to_js_err)?;
+    Ok(vec![p11, p10, p01, p00])
 }
 
 /// Validate a flat row-major correlation matrix.
@@ -491,14 +491,14 @@ mod tests {
 
     #[test]
     fn correlation_bounds_ordered() {
-        let b = correlation_bounds(0.05, 0.10);
+        let b = correlation_bounds(0.05, 0.10).expect("valid marginals");
         assert_eq!(b.len(), 2);
         assert!(b[0] <= b[1]);
     }
 
     #[test]
     fn joint_probabilities_sum_to_one() {
-        let j = joint_probabilities(0.05, 0.10, 0.3);
+        let j = joint_probabilities(0.05, 0.10, 0.3).expect("valid inputs");
         assert_eq!(j.len(), 4);
         let sum: f64 = j.iter().sum();
         assert!((sum - 1.0).abs() < 1e-9);

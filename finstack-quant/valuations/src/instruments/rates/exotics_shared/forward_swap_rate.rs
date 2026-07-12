@@ -1,5 +1,5 @@
 use crate::instruments::common_impl::pricing::time::{
-    rate_period_on_dates, relative_df_discount_curve,
+    rate_between_on_dates, relative_df_discount_curve,
 };
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -103,7 +103,7 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
                 inputs
                     .float_day_count
                     .year_fraction(prev_date, d, DayCountContext::default())?;
-            let fwd_rate = rate_period_on_dates(fwd_curve.as_ref(), prev_date, d)?;
+            let fwd_rate = rate_between_on_dates(fwd_curve.as_ref(), prev_date, d)?;
             let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, d)?;
             pv_float += fwd_rate * accrual * df;
             prev_date = d;

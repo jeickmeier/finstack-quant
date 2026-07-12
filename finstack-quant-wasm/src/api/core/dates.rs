@@ -174,7 +174,11 @@ impl DayCount {
         }
     }
 
-    /// Actual/365 Leap.
+    /// Actual/365L (ICMA Rule 251). Annual periods (or periods without
+    /// frequency context) use denominator 366 exactly when February 29 falls
+    /// in `(start, end]`; non-annual periods use 366 exactly when the end
+    /// date's year is a leap year. Otherwise the denominator is 365. This is
+    /// not ACT/ACT AFB.
     #[wasm_bindgen(js_name = act365l)]
     pub fn act365l() -> DayCount {
         DayCount {
@@ -237,10 +241,9 @@ impl DayCount {
     /// @returns Year fraction (`>= 0` if `end >= start`).
     /// @throws If either date is out of representable range.
     ///
-    /// For Act/Act ISMA and Bus/252, prefer `DayCount.yearFractionWithContext`
-    /// with a configured `DayCountContext` — without context, those
-    /// conventions fall back to reasonable defaults but may not match the
-    /// issuer's market convention.
+    /// Act/Act ISMA and Bus/252 require explicit frequency/calendar context.
+    /// This method throws for those conventions; call
+    /// `DayCount.yearFractionWithContext` with a configured `DayCountContext`.
     ///
     /// @example
     /// ```javascript

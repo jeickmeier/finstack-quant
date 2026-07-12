@@ -81,7 +81,9 @@ fn explanation_not_computed_by_default() {
                 base_date,
                 tenor_years: 0.25,
                 discount_curve_id: CurveId::from("USD-OIS"),
-                method: CalibrationMethod::Bootstrap,
+                method: CalibrationMethod::GlobalSolve {
+                    use_analytical_jacobian: false,
+                },
                 interpolation: Default::default(),
                 conventions: Default::default(),
             }),
@@ -133,7 +135,9 @@ fn explanation_is_present_when_enabled() {
                 base_date,
                 tenor_years: 0.25,
                 discount_curve_id: CurveId::from("USD-OIS"),
-                method: CalibrationMethod::Bootstrap,
+                method: CalibrationMethod::GlobalSolve {
+                    use_analytical_jacobian: false,
+                },
                 interpolation: Default::default(),
                 conventions: Default::default(),
             }),

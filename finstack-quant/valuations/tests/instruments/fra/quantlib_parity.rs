@@ -30,7 +30,7 @@
 #[allow(unused_imports)]
 use crate::parity::*;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
@@ -62,13 +62,26 @@ fn create_flat_forward_curve(
     curve_id: &str,
     tenor: f64,
 ) -> ForwardCurve {
-    let times = [0.0, 0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0];
-    let rates: Vec<_> = times.iter().map(|&t| (t, rate)).collect();
+    let projection_grid = (0..=40)
+        .map(|quarter| {
+            DayCount::Act360
+                .year_fraction(
+                    base_date,
+                    base_date.add_months(quarter * 3),
+                    DayCountContext::default(),
+                )
+                .expect("valid quarterly projection boundary")
+        })
+        .collect::<Vec<_>>();
+    let last_time = *projection_grid
+        .last()
+        .expect("projection grid is non-empty");
 
     ForwardCurve::builder(curve_id, tenor)
         .base_date(base_date)
         .day_count(DayCount::Act360)
-        .knots(rates)
+        .knots([(0.0, rate), (last_time, rate)])
+        .projection_grid(projection_grid)
         .interp(InterpStyle::Linear)
         .build()
         .unwrap()

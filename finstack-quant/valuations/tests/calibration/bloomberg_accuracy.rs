@@ -346,16 +346,18 @@ fn test_bloomberg_usd_ois_calibration_accuracy() {
     ];
 
     let mut cfg = FinstackConfig::default();
-    cfg.extensions.insert(
-        CALIBRATION_CONFIG_KEY,
-        serde_json::json!({
-            "solver": {
-                "method": "brent",
-                "tolerance": 1e-12,
-                "max_iterations": 200
-            }
-        }),
-    );
+    cfg.extensions
+        .insert(
+            CALIBRATION_CONFIG_KEY,
+            serde_json::json!({
+                "solver": {
+                    "method": "brent",
+                    "tolerance": 1e-12,
+                    "max_iterations": 200
+                }
+            }),
+        )
+        .expect("valid extension key");
     let mut settings =
         CalibrationConfig::from_finstack_config_or_default(&cfg).expect("valid config");
     settings.discount_curve.weighting_scheme = ResidualWeightingScheme::Equal;

@@ -167,6 +167,8 @@ pub struct ForwardCurve {
     knots: Box<[f64]>,
     /// Simple forward rates (e.g. 0.025 = 2.5 %).
     forwards: Box<[f64]>,
+    /// Optional contractual reset/end-date boundaries, separate from interpolation knots.
+    projection_grid: Option<Box<[f64]>>,
     interp: Interp,
     /// Optional market quotes used to bootstrap this curve.
     rate_calibration: Option<ForwardCurveRateCalibration>,
@@ -190,6 +192,11 @@ struct RawForwardCurve {
     pub tenor: f64,
     /// Time/value pairs used to construct the curve
     pub knot_points: Vec<(f64, f64)>,
+    /// Optional contractual reset/end-date boundaries.
+    ///
+    /// Curves without this field retain legacy fixed numeric-tenor DF stepping.
+    #[serde(default)]
+    pub projection_grid: Option<Vec<f64>>,
     /// Interpolation style
     pub interp_style: InterpStyle,
     /// Extrapolation policy
@@ -218,6 +225,7 @@ impl From<ForwardCurve> for RawForwardCurve {
             day_count: curve.day_count,
             tenor: curve.tenor,
             knot_points,
+            projection_grid: curve.projection_grid.map(Vec::from),
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
             rate_calibration: curve.rate_calibration,
@@ -235,6 +243,7 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
             .reset_lag(state.reset_lag)
             .day_count(state.day_count)
             .knots(state.knot_points)
+            .projection_grid_opt(state.projection_grid)
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
             .rate_calibration_opt(state.rate_calibration)
@@ -272,6 +281,7 @@ impl ForwardCurve {
             day_count: defaults.day_count,
             tenor: tenor_years,
             points: Vec::new(),
+            projection_grid: None,
             style: InterpStyle::Linear,
             min_forward_rate: None,
             extrapolation: ExtrapolationPolicy::FlatForward,
@@ -285,6 +295,44 @@ impl ForwardCurve {
     #[must_use]
     pub fn rate(&self, t: f64) -> f64 {
         self.interp.interp(t)
+    }
+
+    /// Simple forward rate implied by projection discount factors between `t1` and `t2`.
+    ///
+    /// This is the period rate coherent with [`Self::df`]:
+    ///
+    /// ```text
+    /// rate = (df(t1) / df(t2) - 1) / (t2 - t1)
+    /// ```
+    ///
+    /// Use this for an arbitrary term period. For an index fixing at a reset
+    /// date, use [`Self::rate`]. [`Self::rate_period`] instead returns the
+    /// Simpson-rule integral average used by overnight compounding sub-windows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either time is non-finite, `t2 <= t1`, or an
+    /// implied projection discount factor cannot be calculated.
+    #[must_use = "computed forward rate should not be discarded"]
+    pub fn rate_between(&self, t1: f64, t2: f64) -> crate::Result<f64> {
+        if !(t1.is_finite() && t2.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
+        if t2 <= t1 {
+            return Err(crate::Error::Validation(format!(
+                "ForwardCurve::rate_between requires t2 > t1; got t1={t1}, t2={t2}"
+            )));
+        }
+
+        let log_growth = self.projection_log_df(t1)? - self.projection_log_df(t2)?;
+        let rate = log_growth.exp_m1() / (t2 - t1);
+        if !rate.is_finite() {
+            return Err(crate::Error::Validation(format!(
+                "Invalid implied forward rate for {} over [{t1}, {t2}]: {rate}",
+                self.id.as_str()
+            )));
+        }
+        Ok(rate)
     }
 
     /// Reset lag in business days from fixing to spot.
@@ -315,6 +363,15 @@ impl ForwardCurve {
     #[inline]
     pub fn forwards(&self) -> &[f64] {
         &self.forwards
+    }
+
+    /// Contractual reset/end-date boundaries used for projection DFs, when present.
+    ///
+    /// This grid is independent of interpolation knots. `None` means the curve
+    /// uses legacy fixed numeric-tenor stepping from zero.
+    #[inline]
+    pub fn projection_grid(&self) -> Option<&[f64]> {
+        self.projection_grid.as_deref()
     }
 
     /// Curve identifier.
@@ -367,7 +424,11 @@ impl ForwardCurve {
         self.knots.is_empty()
     }
 
-    /// Average rate over `[t1, t2]`.
+    /// Simpson-rule integral average rate over `[t1, t2]`.
+    ///
+    /// This is appropriate for averaging short overnight observation
+    /// sub-windows, not for deriving the simple term forward over an arbitrary
+    /// projection interval. Use [`Self::rate_between`] for the latter.
     ///
     /// # NaN contract
     ///
@@ -415,31 +476,8 @@ impl ForwardCurve {
         simpson_rule(|t| self.rate(t), t1, t2, n).map_or(f64::NAN, |integral| integral / dt)
     }
 
-    /// Implied **projection discount factor** from `0` to `t` (years).
-    ///
-    /// This is a convenience for Bloomberg-style curve inspection where a projection curve
-    /// is displayed with both forward rates and an implied discount factor curve.
-    ///
-    /// The forward curve stores **simple forward rates** for a fixed tenor. We interpret the
-    /// curve as defining the simple rate for each reset interval and chain accrual
-    /// factors deterministically:
-    ///
-    /// ```text
-    /// DF(0) = 1
-    /// DF(t + dt) = DF(t) / (1 + F(t, t+tenor) * dt)
-    /// ```
-    ///
-    /// Full-tenor steps therefore use the forward quoted at the reset date. For a
-    /// final fractional stub, the same start-date forward is applied over the
-    /// shorter accrual interval (flat simple-forward stub convention).
-    ///
-    /// Notes
-    /// -----
-    /// - This is **not** a discount curve used for PV discounting; it is an *implied projection DF*.
-    /// - The stepping size uses the curve’s `tenor_years` with a final fractional step when needed.
-    /// - This is a simple-rate chaining helper, not an overnight compounded-in-arrears engine.
-    #[must_use = "computed discount factor should not be discarded"]
-    pub fn df(&self, t: f64) -> crate::Result<f64> {
+    /// Logarithm of the implied projection discount factor from zero to `t`.
+    fn projection_log_df(&self, t: f64) -> crate::Result<f64> {
         if !t.is_finite() {
             return Err(InputError::Invalid.into());
         }
@@ -449,37 +487,86 @@ impl ForwardCurve {
             )));
         }
         if t == 0.0 {
-            return Ok(1.0);
+            return Ok(0.0);
         }
 
         let tau = self.tenor;
         if !tau.is_finite() || tau <= 0.0 {
-            // Builder should prevent this; treat as invalid input defensively.
             return Err(InputError::Invalid.into());
         }
 
-        const EPS: f64 = 1e-12;
-        let mut df = 1.0_f64;
+        let mut log_df = 0.0_f64;
         let mut cur = 0.0_f64;
-
-        while cur + EPS < t {
-            let nxt = (cur + tau).min(t);
-            let dt = nxt - cur;
+        let advance = |start: f64, end: f64, log_df: &mut f64| -> crate::Result<()> {
+            let dt = end - start;
             if dt <= 0.0 {
-                break;
+                return Ok(());
             }
-            let forward = self.rate(cur);
-            let denom = 1.0 + forward * dt;
+            let forward = self.rate(start);
+            let accrual = forward * dt;
+            let denom = 1.0 + accrual;
             if !denom.is_finite() || denom <= 0.0 {
                 return Err(crate::Error::Validation(format!(
-                    "Invalid implied projection DF step for {}: t={cur:.6} -> {nxt:.6}, forward={forward:.6}, denom={denom:.6}",
+                    "Invalid implied projection DF step for {}: t={start:.6} -> {end:.6}, forward={forward:.6}, denom={denom:.6}",
                     self.id.as_str(),
                 )));
             }
-            df /= denom;
-            cur = nxt;
+            *log_df -= accrual.ln_1p();
+            Ok(())
+        };
+
+        if let Some(grid) = &self.projection_grid {
+            for &boundary in grid.iter().skip(1) {
+                if cur >= t {
+                    break;
+                }
+                let nxt = boundary.min(t);
+                advance(cur, nxt, &mut log_df)?;
+                cur = nxt;
+            }
         }
 
+        while cur < t {
+            let nxt = (cur + tau).min(t);
+            if nxt <= cur {
+                return Err(crate::Error::Validation(format!(
+                    "ForwardCurve projection step made no progress at t={cur} toward {t}"
+                )));
+            }
+            advance(cur, nxt, &mut log_df)?;
+            cur = nxt;
+        }
+        Ok(log_df)
+    }
+
+    /// Implied **projection discount factor** from `0` to `t` (years).
+    ///
+    /// This is a convenience for Bloomberg-style curve inspection where a projection curve
+    /// is displayed with both forward rates and an implied discount factor curve.
+    ///
+    /// With an explicit [`Self::projection_grid`], projection discount factors
+    /// chain the contractual reset/end intervals independently of interpolation
+    /// knots:
+    ///
+    /// ```text
+    /// DF(0) = 1
+    /// DF(reset_end) = DF(reset_start) / (1 + F(reset_start) * dt)
+    /// ```
+    ///
+    /// This preserves fixed-tenor quote meaning when calendar adjustment makes
+    /// a contractual period differ from the numeric tenor (for example, a 3M
+    /// Act/360 period spanning 91 or 92 days). Without an explicit grid, the
+    /// legacy behavior is retained: fixed numeric-tenor stepping from zero.
+    ///
+    /// Notes
+    /// -----
+    /// - This is **not** a discount curve used for PV discounting; it is an *implied projection DF*.
+    /// - Explicit contractual intervals come from `projection_grid`.
+    /// - Curves without a grid, and times beyond an explicit grid, step by `tenor_years`.
+    /// - This is a simple-rate chaining helper, not an overnight compounded-in-arrears engine.
+    #[must_use = "computed discount factor should not be discarded"]
+    pub fn df(&self, t: f64) -> crate::Result<f64> {
+        let df = self.projection_log_df(t)?.exp();
         if !df.is_finite() || df <= 0.0 {
             return Err(crate::Error::Validation(format!(
                 "Invalid implied projection DF for {} at t={t}: {df}",
@@ -527,6 +614,7 @@ impl ForwardCurve {
             .day_count(self.day_count)
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
+            .projection_grid_opt(self.projection_grid.as_deref().map(<[f64]>::to_vec))
             .rate_calibration_opt(self.rate_calibration.clone())
             .fx_policy_opt(self.fx_policy.clone())
     }
@@ -641,6 +729,7 @@ impl ForwardCurve {
     ) -> crate::Result<()> {
         use crate::market_data::bumps::BumpType;
 
+        spec.validate_finite()?;
         let (val, is_multiplicative) = spec.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
                 reason: format!(
@@ -650,14 +739,15 @@ impl ForwardCurve {
             }
         })?;
 
+        let mut bumped = self.clone();
         match spec.bump_type {
             BumpType::Parallel => {
                 if is_multiplicative {
-                    for fwd in self.forwards.iter_mut() {
+                    for fwd in bumped.forwards.iter_mut() {
                         *fwd *= val;
                     }
                 } else {
-                    for fwd in self.forwards.iter_mut() {
+                    for fwd in bumped.forwards.iter_mut() {
                         *fwd += val;
                     }
                 }
@@ -675,7 +765,7 @@ impl ForwardCurve {
                     target_bucket,
                     next_bucket,
                 )?;
-                for (fwd, &t) in self.forwards.iter_mut().zip(self.knots.iter()) {
+                for (fwd, &t) in bumped.forwards.iter_mut().zip(bumped.knots.iter()) {
                     let weight = super::common::triangular_weight(
                         t,
                         prev_bucket,
@@ -690,7 +780,9 @@ impl ForwardCurve {
                 }
             }
         }
-        self.rebuild_interp()
+        bumped.rebuild_interp()?;
+        *self = bumped;
+        Ok(())
     }
 
     /// Create a new curve with a parallel rate bump applied in basis points (fallible).
@@ -773,8 +865,21 @@ impl ForwardCurve {
         }
 
         // Thread the full metadata and override the base date.
+        let projection_grid = self.projection_grid.as_ref().map(|grid| {
+            let mut rolled = Vec::with_capacity(grid.len());
+            rolled.push(0.0);
+            rolled.extend(
+                grid.iter()
+                    .copied()
+                    .filter(|time| *time > dt_years)
+                    .map(|time| time - dt_years),
+            );
+            rolled
+        });
+
         self.metadata_builder(self.id.clone())
             .base_date(new_base)
+            .projection_grid_opt(projection_grid)
             .knots(rolled_points)
             .build()
     }
@@ -805,6 +910,7 @@ pub struct ForwardCurveBuilder {
     day_count: DayCount,
     tenor: f64,
     points: Vec<(f64, f64)>,
+    projection_grid: Option<Vec<f64>>,
     style: InterpStyle,
     min_forward_rate: Option<f64>,
     extrapolation: ExtrapolationPolicy,
@@ -836,6 +942,21 @@ impl ForwardCurveBuilder {
         I: IntoIterator<Item = (f64, f64)>,
     {
         self.points.extend(pts);
+        self
+    }
+
+    /// Set contractual reset/end-date boundaries for projection DF chaining.
+    pub fn projection_grid<I>(mut self, projection_grid: I) -> Self
+    where
+        I: IntoIterator<Item = f64>,
+    {
+        self.projection_grid = Some(projection_grid.into_iter().collect());
+        self
+    }
+
+    /// Optionally set contractual reset/end-date projection boundaries.
+    pub fn projection_grid_opt(mut self, projection_grid: Option<Vec<f64>>) -> Self {
+        self.projection_grid = projection_grid;
         self
     }
     /// Select interpolation style for this forward curve.
@@ -913,6 +1034,23 @@ impl ForwardCurveBuilder {
                 }
             }
         }
+        let projection_grid = self
+            .projection_grid
+            .map(|grid| {
+                let last_knot = *kvec.last().ok_or(InputError::TooFewPoints)?;
+                if grid.len() < 2
+                    || grid.iter().any(|time| !time.is_finite() || *time < 0.0)
+                    || grid[0].abs() > 1e-12
+                    || grid.windows(2).any(|window| window[1] <= window[0])
+                    || grid.last().is_none_or(|last| *last < last_knot)
+                {
+                    return Err(crate::Error::Validation(format!(
+                        "ForwardCurve projection_grid must start at 0, be finite, non-negative, strictly increasing, and cover the last interpolation knot ({last_knot})"
+                    )));
+                }
+                Ok(grid.into_boxed_slice())
+            })
+            .transpose()?;
         let knots = kvec.into_boxed_slice();
         let forwards = fvec.into_boxed_slice();
         // Use allow_any_values to support negative forward rates
@@ -931,6 +1069,7 @@ impl ForwardCurveBuilder {
             tenor: self.tenor,
             knots,
             forwards,
+            projection_grid,
             interp,
             rate_calibration: self.rate_calibration,
             fx_policy: self.fx_policy,
@@ -977,6 +1116,175 @@ mod tests {
     fn interpolates_rate() {
         let fc = sample_forward();
         assert!((fc.rate(0.5) - 0.035).abs() < 1e-12);
+    }
+
+    #[test]
+    fn point_average_and_discount_factor_implied_forwards_are_distinct_on_steep_curve() {
+        let fc = ForwardCurve::builder("USD-LIB3M", 0.25)
+            .base_date(
+                Date::from_calendar_date(2025, time::Month::January, 1).expect("Valid test date"),
+            )
+            .knots([(0.0, 0.01), (1.0, 0.21)])
+            .build()
+            .expect("ForwardCurve builder should succeed with valid test data");
+        let (t1, t2) = (0.25, 0.75);
+
+        let point_rate = fc.rate(t1);
+        let integrated_average = fc.rate_period(t1, t2);
+        let df_implied_rate = fc
+            .rate_between(t1, t2)
+            .expect("strictly increasing finite times should produce a forward rate");
+
+        assert!((point_rate - integrated_average).abs() > 1e-6);
+        assert!((point_rate - df_implied_rate).abs() > 1e-6);
+        assert!((integrated_average - df_implied_rate).abs() > 1e-6);
+        assert!(
+            (df_implied_rate
+                - (fc.df(t1).expect("valid DF") / fc.df(t2).expect("valid DF") - 1.0) / (t2 - t1))
+                .abs()
+                < 1e-14
+        );
+        assert!(fc.rate_between(t1, t1).is_err());
+        assert!(fc.rate_between(t2, t1).is_err());
+    }
+
+    #[test]
+    fn tiny_positive_intervals_preserve_finite_forward_rate() {
+        let curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(
+                Date::from_calendar_date(2025, time::Month::January, 1).expect("valid test date"),
+            )
+            .knots([(0.0, 0.05), (1.0, 0.05)])
+            .build()
+            .expect("flat forward curve");
+
+        for dt in [5e-13, 1e-14, 1e-16] {
+            let rate = curve
+                .rate_between(0.0, dt)
+                .expect("small positive interval");
+            assert!(rate.is_finite());
+            assert!(
+                (rate - 0.05).abs() < 1e-12,
+                "dt={dt}: expected 5%, got {rate}"
+            );
+        }
+    }
+
+    #[test]
+    fn reset_grid_preserves_off_grid_fixed_tenor_quote_meaning() {
+        let t_3m = 91.0 / 360.0;
+        let t_6m = 183.0 / 360.0;
+        let first_rate = 0.047;
+        let second_rate = 0.0485;
+        let curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(
+                Date::from_calendar_date(2025, time::Month::January, 1).expect("valid test date"),
+            )
+            .day_count(DayCount::Act360)
+            .knots([(0.0, first_rate), (t_3m, second_rate)])
+            .projection_grid([0.0, t_3m, t_6m])
+            .build()
+            .expect("off-grid reset curve should build");
+
+        assert!((curve.rate(0.0) - first_rate).abs() < 1e-14);
+        assert!((curve.rate(t_3m) - second_rate).abs() < 1e-14);
+        assert!(
+            (curve.rate_between(0.0, t_3m).expect("first reset period") - first_rate).abs() < 1e-14
+        );
+        assert!(
+            (curve.rate_between(t_3m, t_6m).expect("second reset period") - second_rate).abs()
+                < 1e-14
+        );
+    }
+
+    #[test]
+    fn contractual_projection_grid_survives_serde_round_trip() {
+        let terminal_time = 183.0 / 360.0;
+        let projection_grid = [0.0, 91.0 / 360.0, terminal_time];
+        let curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(
+                Date::from_calendar_date(2025, time::Month::January, 1).expect("valid test date"),
+            )
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.047), (91.0 / 360.0, 0.0485)])
+            .projection_grid(projection_grid)
+            .build()
+            .expect("reset-grid curve should build");
+
+        let json = serde_json::to_string(&curve).expect("serialize forward curve");
+        let restored: ForwardCurve =
+            serde_json::from_str(&json).expect("deserialize forward curve");
+
+        assert_eq!(restored.projection_grid(), Some(projection_grid.as_slice()));
+        assert_eq!(restored.knots(), curve.knots());
+        assert_eq!(restored.forwards(), curve.forwards());
+        assert!(
+            (restored
+                .rate_between(91.0 / 360.0, terminal_time)
+                .expect("restored reset period")
+                - 0.0485)
+                .abs()
+                < 1e-14
+        );
+    }
+
+    #[test]
+    fn contractual_projection_grid_rejects_invalid_boundaries_and_coverage() {
+        let base =
+            Date::from_calendar_date(2025, time::Month::January, 1).expect("valid test date");
+        for grid in [
+            vec![-0.01, 0.25, 0.5],
+            vec![0.0, f64::NAN, 0.5],
+            vec![0.0, 0.5, 0.25],
+            vec![0.1, 0.25, 0.5],
+            vec![0.0, 0.20],
+        ] {
+            let error = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+                .base_date(base)
+                .knots([(0.0, 0.047), (0.25, 0.048)])
+                .projection_grid(grid)
+                .build()
+                .expect_err("invalid contractual grid must be rejected");
+            assert!(error.to_string().contains("projection_grid"));
+        }
+    }
+
+    #[test]
+    fn legacy_sparse_serde_keeps_numeric_tenor_df_economics() {
+        let json = serde_json::json!({
+            "id": "USD-SOFR-3M",
+            "base": "2025-01-01",
+            "reset_lag": 2,
+            "day_count": "Act360",
+            "tenor": 0.25,
+            "knot_points": [[0.0, 0.04], [1.0, 0.05], [5.0, 0.06]],
+            "interp_style": "linear",
+            "extrapolation": "flat_forward"
+        });
+        let curve: ForwardCurve =
+            serde_json::from_value(json).expect("legacy sparse curve should deserialize");
+
+        assert_eq!(curve.projection_grid(), None);
+        let expected = (0..4).fold(1.0, |df, step| {
+            let reset = step as f64 * 0.25;
+            df / (1.0 + curve.rate(reset) * 0.25)
+        });
+        assert!((curve.df(1.0).expect("legacy DF") - expected).abs() < 1e-14);
+    }
+
+    #[test]
+    fn failed_bump_in_place_is_atomic() {
+        let mut curve = sample_forward();
+        let before_forwards = curve.forwards().to_vec();
+        let before_rate = curve.rate(0.5);
+
+        let error = curve
+            .bump_in_place(&crate::market_data::bumps::BumpSpec::parallel_bp(f64::NAN))
+            .expect_err("non-finite bump must fail");
+
+        assert!(error.to_string().contains("finite"));
+        assert_eq!(curve.forwards(), before_forwards.as_slice());
+        assert_eq!(curve.rate(0.5).to_bits(), before_rate.to_bits());
     }
 
     // Reversed times are a caller bug: debug builds fire a `debug_assert`,

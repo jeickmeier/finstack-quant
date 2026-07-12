@@ -175,6 +175,24 @@ mod calibration_tests {
             Err(PdCalibrationError::InvalidCorrelation { .. })
         ));
     }
+
+    #[test]
+    fn reject_non_finite_cycle_index() {
+        for cycle_index in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let params = PdCycleParams {
+                asset_correlation: 0.20,
+                cycle_index,
+            };
+            assert!(matches!(
+                ttc_to_pit(0.05, &params),
+                Err(PdCalibrationError::NonFiniteValue { .. })
+            ));
+            assert!(matches!(
+                pit_to_ttc(0.05, &params),
+                Err(PdCalibrationError::NonFiniteValue { .. })
+            ));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -614,8 +632,8 @@ mod master_scale_tests {
     use crate::credit::pd::{MasterScale, MasterScaleGrade, PdCalibrationError};
 
     #[test]
-    fn sp_empirical_mapping() {
-        let scale = MasterScale::sp_empirical().expect("registry scale");
+    fn sp_assumptions_v1_mapping() {
+        let scale = MasterScale::sp_assumptions_v1().expect("registry scale");
         assert_eq!(scale.n_grades(), 8);
 
         // AAA: PD <= 0.0001
@@ -640,12 +658,38 @@ mod master_scale_tests {
     }
 
     #[test]
-    fn moodys_empirical_mapping() {
-        let scale = MasterScale::moodys_empirical().expect("registry scale");
+    fn moodys_assumptions_v1_mapping() {
+        let scale = MasterScale::moodys_assumptions_v1().expect("registry scale");
         assert_eq!(scale.n_grades(), 8);
 
         let baa = scale.map_pd(0.003).unwrap();
         assert_eq!(baa.grade, "Baa");
+    }
+
+    #[test]
+    fn deprecated_registry_ids_resolve_to_canonical_assumptions() {
+        for (canonical, aliases) in [
+            (
+                "sp_assumptions_v1",
+                ["sp_empirical", "sp_corporate_default_1981_2023"],
+            ),
+            (
+                "moodys_assumptions_v1",
+                ["moodys_empirical", "moodys_default_1983_2023"],
+            ),
+        ] {
+            let canonical_scale =
+                MasterScale::from_registry_id(canonical).expect("canonical scale");
+            for alias in aliases {
+                let alias_scale =
+                    MasterScale::from_registry_id(alias).expect("deprecated alias must resolve");
+                assert_eq!(alias_scale.n_grades(), canonical_scale.n_grades());
+                assert_eq!(
+                    alias_scale.grades()[0].label,
+                    canonical_scale.grades()[0].label
+                );
+            }
+        }
     }
 
     #[test]
@@ -724,7 +768,9 @@ mod master_scale_tests {
 
     #[test]
     fn map_score_uses_implied_pd() {
-        use crate::credit::scoring::{altman_z_score, AltmanZScoreInput};
+        use crate::credit::scoring::{
+            altman_z_score, altman_z_score_with_pd, AltmanPdCalibration, AltmanZScoreInput,
+        };
 
         let input = AltmanZScoreInput {
             working_capital_to_total_assets: 0.10,
@@ -733,12 +779,17 @@ mod master_scale_tests {
             market_equity_to_total_liabilities: 1.50,
             sales_to_total_assets: 1.80,
         };
-        let scoring_result = altman_z_score(&input).unwrap();
         let scale = MasterScale::sp_empirical().expect("registry scale");
+        let uncalibrated = altman_z_score(&input).unwrap();
+        assert!(matches!(
+            scale.map_score(&uncalibrated),
+            Err(PdCalibrationError::MissingImpliedPd)
+        ));
+
+        let scoring_result =
+            altman_z_score_with_pd(&input, AltmanPdCalibration::HeuristicV1).unwrap();
         let mapped = scale.map_score(&scoring_result).unwrap();
-        // The implied PD from a safe Z-score (Z~3.595) maps based on the
-        // empirical PD mapping. Verify that map_score actually uses implied_pd.
-        assert_eq!(mapped.input_pd, scoring_result.implied_pd);
+        assert_eq!(Some(mapped.input_pd), scoring_result.implied_pd);
         // Safe zone has low PD, should not be in the worst grades
         assert!(
             mapped.grade_index < scale.n_grades() - 1,
@@ -768,5 +819,43 @@ mod master_scale_tests {
                 Err(PdCalibrationError::NonFiniteValue { .. })
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod serde_invariant_tests {
+    use crate::credit::pd::{
+        MasterScale, MasterScaleGrade, PdTermStructure, PdTermStructureBuilder,
+    };
+
+    #[test]
+    fn malformed_pd_types_fail_deserialization() {
+        let term = PdTermStructureBuilder::new()
+            .with_cumulative_pds(&[(1.0, 0.01), (2.0, 0.02)])
+            .build()
+            .expect("term structure");
+        let mut term_json = serde_json::to_value(&term).expect("serialize");
+        term_json["tenors"] = serde_json::json!([2.0, 1.0]);
+        assert!(serde_json::from_value::<PdTermStructure>(term_json).is_err());
+        let mut mismatched_json = serde_json::to_value(&term).expect("serialize");
+        mismatched_json["cumulative_pds"] = serde_json::json!([0.01]);
+        assert!(serde_json::from_value::<PdTermStructure>(mismatched_json).is_err());
+
+        let scale = MasterScale::new(vec![
+            MasterScaleGrade {
+                label: "A".to_string(),
+                upper_pd: 0.01,
+                central_pd: 0.005,
+            },
+            MasterScaleGrade {
+                label: "B".to_string(),
+                upper_pd: 0.10,
+                central_pd: 0.05,
+            },
+        ])
+        .expect("master scale");
+        let mut scale_json = serde_json::to_value(&scale).expect("serialize");
+        scale_json["grades"][1]["upper_pd"] = serde_json::json!(0.001);
+        assert!(serde_json::from_value::<MasterScale>(scale_json).is_err());
     }
 }

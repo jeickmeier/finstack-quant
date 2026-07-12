@@ -207,10 +207,9 @@ impl PySchedule {
 
 /// Builder for constructing date schedules.
 ///
-/// Unlike the Rust [`finstack_quant_core::dates::ScheduleBuilder`], the Python
-/// binding mutates the builder **in place**: each setter method returns
-/// ``None`` rather than ``self``. Call setters sequentially on the same
-/// instance, then call ``build()``.
+/// Like the Rust [`finstack_quant_core::dates::ScheduleBuilder`], setters are
+/// fluent. The Python binding preserves its existing in-place mutation
+/// behavior and returns the same builder instance from every setter.
 ///
 /// # Example
 ///
@@ -223,13 +222,15 @@ impl PySchedule {
 ///     ScheduleErrorPolicy,
 /// )
 ///
-/// builder = ScheduleBuilder(date(2025, 1, 15), date(2030, 1, 15))
-/// builder.frequency("3M")
-/// builder.stub_rule(StubKind.SHORT_FRONT)
-/// builder.adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
-/// builder.end_of_month(False)
-/// builder.error_policy(ScheduleErrorPolicy.STRICT)
-/// schedule = builder.build()
+/// schedule = (
+///     ScheduleBuilder(date(2025, 1, 15), date(2030, 1, 15))
+///     .frequency("3M")
+///     .stub_rule(StubKind.SHORT_FRONT)
+///     .adjust_with(BusinessDayConvention.MODIFIED_FOLLOWING, "usny")
+///     .end_of_month(False)
+///     .error_policy(ScheduleErrorPolicy.STRICT)
+///     .build()
+/// )
 /// assert len(schedule) >= 20  # ~quarterly periods over 5 years
 /// ```
 #[pyclass(
@@ -271,54 +272,72 @@ impl PyScheduleBuilder {
     }
 
     /// Set the coupon/roll frequency (accepts ``Tenor`` or a string like ``"3M"``).
-    fn frequency(&mut self, freq: &Bound<'_, PyAny>) -> PyResult<()> {
-        self.spec.frequency = extract_tenor(freq)?;
-        Ok(())
+    fn frequency<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        freq: &Bound<'_, PyAny>,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        slf.spec.frequency = extract_tenor(freq)?;
+        Ok(slf)
     }
 
     /// Set the stub rule.
-    fn stub_rule(&mut self, stub: &PyStubKind) {
-        self.spec.stub = stub.inner;
+    fn stub_rule<'py>(mut slf: PyRefMut<'py, Self>, stub: &PyStubKind) -> PyRefMut<'py, Self> {
+        slf.spec.stub = stub.inner;
+        slf
     }
 
     /// Set the business-day convention and calendar for adjustment.
-    fn adjust_with(&mut self, convention: &PyBusinessDayConvention, calendar_id: &str) {
-        self.spec.business_day_convention = Some(convention.inner);
-        self.spec.calendar_id = Some(calendar_id.to_string());
+    fn adjust_with<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        convention: &PyBusinessDayConvention,
+        calendar_id: &str,
+    ) -> PyRefMut<'py, Self> {
+        slf.spec.business_day_convention = Some(convention.inner);
+        slf.spec.calendar_id = Some(calendar_id.to_string());
+        slf
     }
 
     /// Enable or disable end-of-month roll logic.
-    fn end_of_month(&mut self, eom: bool) {
-        self.spec.end_of_month = eom;
+    fn end_of_month(mut slf: PyRefMut<'_, Self>, eom: bool) -> PyRefMut<'_, Self> {
+        slf.spec.end_of_month = eom;
+        slf
     }
 
-    /// Enable CDS IMM date mode.
-    fn cds_imm(&mut self) {
-        self.spec.cds_imm_mode = true;
+    /// Enable CDS IMM date mode and disable standard IMM mode.
+    fn cds_imm(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
+        slf.spec.cds_imm_mode = true;
+        slf.spec.imm_mode = false;
+        slf
     }
 
-    /// Enable IMM date mode.
-    fn imm(&mut self) {
-        self.spec.imm_mode = true;
+    /// Enable standard IMM date mode and disable CDS IMM mode.
+    fn imm(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
+        slf.spec.imm_mode = true;
+        slf.spec.cds_imm_mode = false;
+        slf
     }
 
     /// Set the error policy. Setting a policy fully replaces any previous
     /// policy (calls are order-independent and idempotent).
-    fn error_policy(&mut self, policy: &PyScheduleErrorPolicy) {
+    fn error_policy<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        policy: &PyScheduleErrorPolicy,
+    ) -> PyRefMut<'py, Self> {
         match policy.inner {
             ScheduleErrorPolicy::Strict => {
-                self.spec.graceful = false;
-                self.spec.allow_missing_calendar = false;
+                slf.spec.graceful = false;
+                slf.spec.allow_missing_calendar = false;
             }
             ScheduleErrorPolicy::MissingCalendarWarning => {
-                self.spec.graceful = false;
-                self.spec.allow_missing_calendar = true;
+                slf.spec.graceful = false;
+                slf.spec.allow_missing_calendar = true;
             }
             ScheduleErrorPolicy::GracefulEmpty => {
-                self.spec.graceful = true;
-                self.spec.allow_missing_calendar = false;
+                slf.spec.graceful = true;
+                slf.spec.allow_missing_calendar = false;
             }
         }
+        slf
     }
 
     /// Build the schedule.

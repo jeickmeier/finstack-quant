@@ -11,7 +11,7 @@
 //! will return an error directing the caller to the appropriate workflow.
 
 use crate::instruments::common_impl::pricing::time::{
-    rate_period_on_dates, relative_df_discount_curve,
+    rate_between_on_dates, relative_df_discount_curve,
 };
 use crate::instruments::rates::cap_floor::pricing::black::price_caplet_floorlet;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
@@ -99,7 +99,7 @@ impl MetricCalculator for ImpliedVolCalculator {
 
         // Use curve-consistent helpers for forward rate and discount factor
         // (same as in the main pricing implementation)
-        let forward_rate = rate_period_on_dates(
+        let forward_rate = rate_between_on_dates(
             forward_curve.as_ref(),
             period.accrual_start,
             period.accrual_end,

@@ -23,7 +23,8 @@
 //! - [`relative_df_discount_curve`] - compute DF from `as_of` to `target` using discount curve
 //! - [`relative_df_discounting`] - same for trait objects implementing [`Discounting`]
 //! - [`curve_time`] - compute year fraction from forward curve's base_date
-//! - [`rate_period_on_dates`] - compute average forward rate between two dates
+//! - [`rate_between_on_dates`] - compute a discount-factor-implied term forward
+//! - [`rate_period_on_dates`] - compute an integral average for overnight sub-windows
 //!
 //! # Bloomberg Validation
 //!
@@ -193,9 +194,9 @@ pub fn curve_time(fwd: &ForwardCurve, date: Date) -> Result<f64> {
     Ok(t.max(0.0))
 }
 
-/// Compute forward rate over a date interval using the forward curve's time basis.
+/// Compute the discount-factor-implied term forward over a date interval.
 ///
-/// This is the date-based equivalent of `fwd.rate_period(t1, t2)` that ensures
+/// This is the date-based equivalent of `fwd.rate_between(t1, t2)` that ensures
 /// times are computed using the curve's own day count and base date.
 ///
 /// # Arguments
@@ -206,11 +207,15 @@ pub fn curve_time(fwd: &ForwardCurve, date: Date) -> Result<f64> {
 ///
 /// # Returns
 ///
-/// Average forward rate over `[start, end]`.
+/// Simple forward rate over `[start, end]` implied by the forward curve's
+/// projection discount factors.
 ///
 /// # Errors
 ///
-/// Returns an error if time computation fails.
+/// Returns an error if `end <= start`, if `start` is before the curve base
+/// date, or if time computation fails. A period starting before the curve base
+/// is historical or straddles the projection boundary and therefore requires
+/// an observed fixing; it is never clamped to the curve base.
 ///
 /// # Example
 ///
@@ -218,11 +223,37 @@ pub fn curve_time(fwd: &ForwardCurve, date: Date) -> Result<f64> {
 /// // Instead of:
 /// // let t1 = inst.day_count.year_fraction(as_of, start, ctx)?;
 /// // let t2 = inst.day_count.year_fraction(as_of, end, ctx)?;
-/// // let fwd_rate = fwd.rate_period(t1, t2);
+/// // let fwd_rate = fwd.rate_between(t1, t2)?;
 ///
 /// // Use:
-/// let fwd_rate = rate_period_on_dates(&fwd, start, end)?;
+/// let fwd_rate = rate_between_on_dates(&fwd, start, end)?;
 /// ```
+#[inline]
+pub fn rate_between_on_dates(fwd: &ForwardCurve, start: Date, end: Date) -> Result<f64> {
+    if end <= start {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "term forward period requires end > start; got start={start}, end={end}"
+        )));
+    }
+    if start < fwd.base_date() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "term forward period starts before the '{}' curve base date {}; \
+             use the historical fixing for reset date {} instead of projection",
+            fwd.id(),
+            fwd.base_date(),
+            start
+        )));
+    }
+    let t_start = curve_time(fwd, start)?;
+    let t_end = curve_time(fwd, end)?;
+    fwd.rate_between(t_start, t_end)
+}
+
+/// Compute the Simpson-rule integral average over a date interval.
+///
+/// This helper is only appropriate for averaging overnight observation
+/// sub-windows. For an arbitrary term projection interval, use
+/// [`rate_between_on_dates`].
 #[inline]
 pub fn rate_period_on_dates(fwd: &ForwardCurve, start: Date, end: Date) -> Result<f64> {
     let t_start = curve_time(fwd, start)?;
@@ -372,6 +403,56 @@ mod tests {
             rate > 0.0 && rate < 0.1,
             "Forward rate should be reasonable: {}",
             rate
+        );
+    }
+
+    #[test]
+    fn rate_between_on_dates_matches_projection_discount_factors() {
+        let base = date(2024, 1, 1);
+        let fwd = ForwardCurve::builder("USD-TERM-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.01), (1.0, 0.21)])
+            .build()
+            .expect("forward curve should build");
+        let start = date(2024, 4, 1);
+        let end = date(2024, 7, 1);
+
+        let rate = rate_between_on_dates(&fwd, start, end).expect("should succeed");
+        let t_start = curve_time(&fwd, start).expect("valid start time");
+        let t_end = curve_time(&fwd, end).expect("valid end time");
+        let expected =
+            (fwd.df(t_start).expect("valid start DF") / fwd.df(t_end).expect("valid end DF") - 1.0)
+                / (t_end - t_start);
+
+        assert!((rate - expected).abs() < 1e-14);
+    }
+
+    #[test]
+    fn rate_between_on_dates_rejects_period_starting_before_curve_base() {
+        let base = date(2024, 1, 1);
+        let fwd = test_forward_curve(base, DayCount::Act360);
+
+        let error = rate_between_on_dates(&fwd, date(2023, 12, 1), date(2024, 2, 1))
+            .expect_err("a straddling term period requires a historical fixing");
+
+        assert!(
+            error.to_string().contains("historical fixing"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn rate_between_on_dates_rejects_period_ending_before_curve_base() {
+        let base = date(2024, 1, 1);
+        let fwd = test_forward_curve(base, DayCount::Act360);
+
+        let error = rate_between_on_dates(&fwd, date(2023, 10, 1), date(2023, 12, 1))
+            .expect_err("a historical term period requires a fixing");
+
+        assert!(
+            error.to_string().contains("historical fixing"),
+            "unexpected error: {error}"
         );
     }
 

@@ -167,6 +167,31 @@ pub struct BumpSpec {
 }
 
 impl BumpSpec {
+    /// Validate that every numeric input carried by this specification is finite.
+    ///
+    /// Call this at public mutation boundaries before cloning or mutating market
+    /// data so failed bumps cannot contaminate reusable scratch state.
+    pub fn validate_finite(&self) -> crate::Result<()> {
+        let buckets_are_finite = match self.bump_type {
+            BumpType::Parallel => true,
+            BumpType::TriangularKeyRate {
+                prev_bucket,
+                target_bucket,
+                next_bucket,
+            } => {
+                prev_bucket.is_none_or(f64::is_finite)
+                    && target_bucket.is_finite()
+                    && next_bucket.is_none_or(f64::is_finite)
+            }
+        };
+        if !self.value.is_finite() || !buckets_are_finite {
+            return Err(crate::Error::Validation(
+                "BumpSpec values and bucket coordinates must be finite".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
     /// Create an additive bump specified in basis points (e.g., 100.0 = 100bp = 1%).
     pub fn parallel_bp(bump_bp: f64) -> Self {
         Self {
@@ -316,6 +341,7 @@ impl BumpSpec {
     ///
     /// Ensure the bump type is Parallel.
     pub fn validate_parallel(&self, context: &str) -> crate::Result<()> {
+        self.validate_finite()?;
         if !matches!(self.bump_type, BumpType::Parallel) {
             return Err(crate::error::InputError::UnsupportedBump {
                 reason: format!("{} only supports Parallel bumps", context),
@@ -349,6 +375,7 @@ impl BumpSpec {
         context: &str,
         supported: &str,
     ) -> crate::Result<(f64, bool)> {
+        self.validate_finite()?;
         self.resolve_standard_values().ok_or_else(|| {
             crate::error::InputError::UnsupportedBump {
                 reason: format!(

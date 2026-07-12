@@ -23,10 +23,42 @@ use crate::HashMap;
 /// assert_eq!(scale.default_state(), Some(9)); // D
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "RatingScaleWire")]
 pub struct RatingScale {
     labels: Vec<String>,
     index_map: HashMap<String, usize>,
     default_state: Option<usize>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RatingScaleWire {
+    labels: Vec<String>,
+    index_map: HashMap<String, usize>,
+    default_state: Option<usize>,
+}
+
+impl TryFrom<RatingScaleWire> for RatingScale {
+    type Error = MigrationError;
+
+    fn try_from(wire: RatingScaleWire) -> Result<Self, Self::Error> {
+        let default_label = match wire.default_state {
+            Some(index) => Some(wire.labels.get(index).cloned().ok_or(
+                MigrationError::InvalidState {
+                    state: index,
+                    n_states: wire.labels.len(),
+                },
+            )?),
+            None => None,
+        };
+        let rebuilt = RatingScale::build(wire.labels, default_label)?;
+        if rebuilt.index_map != wire.index_map {
+            return Err(MigrationError::Internal(
+                "serialized rating-scale index map does not match labels".to_string(),
+            ));
+        }
+        Ok(rebuilt)
+    }
 }
 
 impl RatingScale {
@@ -200,6 +232,9 @@ impl RatingScale {
     /// assert_eq!(scale.rating_from_warf(400.0).unwrap(), "BBB");
     /// ```
     pub fn rating_from_warf(&self, warf: f64) -> Result<&str, MigrationError> {
+        if !warf.is_finite() {
+            return Err(MigrationError::InvalidWarf(warf));
+        }
         let mut best: Option<(f64, f64, usize)> = None; // (abs_distance, factor, index)
         for (i, label) in self.labels.iter().enumerate() {
             if let Ok(r) = label.parse::<CreditRating>() {

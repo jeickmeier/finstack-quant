@@ -154,30 +154,34 @@ Full surface: `finstack-quant-py/finstack_quant/**/*.pyi`.
 
 ### Decimal vs `float`
 
-Per `INVARIANTS.md` §1, Rust uses `Decimal` at the money/accounting boundary and `f64`
-elsewhere. Bindings expose `f64` for interop; `Money` also accepts `decimal.Decimal` on
-construction. Convert at your boundary if downstream code needs exact decimals:
+Per `INVARIANTS.md` §1, `Money` stores its amount as Rust `Decimal`. Python
+construction accepts `decimal.Decimal`, `float`, or `int`: `Decimal` inputs
+preserve full decimal precision, while `float`/`int` inputs are converted
+through Python's finite floating-point value. Use `amount_decimal` for the
+lossless stored value; `amount` is the interoperable `float` view:
 
 ```python
 from decimal import Decimal
 from finstack_quant.core.money import Money
 
-m = Money(123.45, "USD")
-d = Decimal(m.format(decimals=2, show_currency=False))
+m = Money(Decimal("123.4500000000000000001"), "USD")
+d = m.amount_decimal
 ```
 
-### Builders mutate in place
+### Builders are fluent and mutate in place
 
-Rust builders chain (`builder.frequency(x).stub_rule(y).build()`). Python builder
-methods return `None` — call setters on the same instance, then `.build()`:
+Schedule builders match Rust's fluent chaining while preserving Python's
+in-place mutation: each setter returns the same instance.
 
 ```python
 from finstack_quant.core.dates import ScheduleBuilder, StubKind
 
-b = ScheduleBuilder(start, end)
-b.frequency("3M")
-b.stub_rule(StubKind.SHORT_FRONT)
-schedule = b.build()
+schedule = (
+    ScheduleBuilder(start, end)
+    .frequency("3M")
+    .stub_rule(StubKind.SHORT_FRONT)
+    .build()
+)
 ```
 
 ### Errors

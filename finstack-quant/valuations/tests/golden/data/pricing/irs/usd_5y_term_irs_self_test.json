@@ -6,7 +6,7 @@
     "description": "Self-test fixture for term-rate IRS pricing with two-step calibration. Receives fixed at 4.25% against 3M-Term-SOFR floating, 5Y to maturity, 10M USD notional. Exercises both the discount calibration step (USD-OIS from SOFR OIS quotes with `ois_compounding = CompoundedWithRateCutoff {cutoff_days: 1}`) and the forward calibration step (USD-SOFR-3M with tenor_years=0.25 against the calibrated discount curve). The forward curve spans 10Y, the realistic horizon for floating-rate bonds, term loans, and structured products that project floating coupons over multi-year tenors.",
     "valuation_date": "2026-04-30",
     "source": "formula",
-    "source_detail": "Self-test fixture: synthetic but self-consistent. Quote set is hand-authored with simple rates (~4.0-4.5%) producing a non-trivial term-structure across both curves. Expected outputs are captured from Finstack Quant's own calibration + pricing pipeline (no vendor comparison). The contract is: re-running calibrate + price_instrument_with_metrics on this fixture must reproduce exactly these NPV / par_rate / DV01 values within solver tolerance. This guards against regressions in the discount-step bootstrap, the forward-step bootstrap (with sequential dependency on the calibrated discount curve), the OIS compounding override plumbing, and the term-rate IRS pricing kernel. Re-blessed 2026-06-16: expected outputs recaptured from the current canonical Python golden runner for this formula self-test after deterministic pricing output drift; no external benchmark source is asserted by this fixture. Re-baselined 2026-07-11 after deterministic bootstrap and cashflow refinements.",
+    "source_detail": "Self-test fixture: synthetic but self-consistent. Quote set is hand-authored with simple rates (~4.0-4.5%) producing a non-trivial term-structure across both curves. Expected outputs are analytically derived from Finstack Quant's calibrated cashflows (no vendor comparison). The forward step explicitly uses Act365F for quote times, reset times, and the calibrated curve axis. This is a term-rate IRS: each coupon uses the fixed-tenor curve rate at its business-day-adjusted reset date, F_i = forward_curve.rate(Act365F(base, reset_i)); it does not use the arbitrary-period DF-implied rate. Discounted leg identities are fixed_pv=1,895,933.659277058, float_pv=-1,940,590.487836653, annuity=fixed_pv/(10,000,000*0.0425)=4.461020374769547, NPV=fixed_pv+float_pv=-44,656.828559595, and par=-float_pv/(10,000,000*annuity)=0.043501045160254. DV01 is the symmetric +/-1bp repricing result. Arbitrary-date instruments instead use (DF_proj(t1)/DF_proj(t2)-1)/(t2-t1) on the curve's explicit day-count axis. This fixture guards the discount bootstrap, simultaneous forward global solve, OIS compounding override, and term-rate IRS pricing kernel.",
     "captured_by": "claude",
     "captured_on": "2026-05-09",
     "last_reviewed_by": "claude",
@@ -81,7 +81,11 @@
             "base_date": "2026-04-30",
             "tenor_years": 0.25,
             "discount_curve_id": "USD-OIS",
-            "method": "Bootstrap",
+            "method": {
+              "GlobalSolve": {
+                "use_analytical_jacobian": false
+              }
+            },
             "interpolation": "linear",
             "conventions": {
               "curve_day_count": "Act365F"
@@ -413,9 +417,9 @@
     }
   },
   "expected": {
-    "npv": -44661.32635873766,
-    "par_rate": 0.04350114598441511,
-    "dv01": -4449.063588989296
+    "npv": -44656.82855959516,
+    "par_rate": 0.04350104516025445,
+    "dv01": -4449.06479314567
   },
   "tolerances": {
     "npv": {

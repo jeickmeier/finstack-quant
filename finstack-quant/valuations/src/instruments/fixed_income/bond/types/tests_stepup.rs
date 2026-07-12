@@ -41,7 +41,7 @@ fn test_bond_dated_cashflows_include_floating_cfkind() {
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
     let fwd = ForwardCurve::builder("USD-LIBOR-3M", 0.25)
-        .base_date(issue)
+        .base_date(issue - time::Duration::days(7))
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.04), (2.0, 0.045)])
         .build()

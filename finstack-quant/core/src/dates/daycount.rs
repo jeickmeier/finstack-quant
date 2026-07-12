@@ -928,14 +928,26 @@ pub fn act_act_isma_year_fraction_with_reference_period(
         return Err(InputError::Invalid.into());
     }
     let coupon_length_years = period_months as f64 / 12.0;
+    let preserve_eom = reference_start == reference_start.end_of_month()
+        && reference_end == reference_end.end_of_month();
+    #[derive(Clone, Copy)]
+    struct Traversal {
+        period_months: u32,
+        coupon_length_years: f64,
+        preserve_eom: bool,
+    }
+    let traversal = Traversal {
+        period_months,
+        coupon_length_years,
+        preserve_eom,
+    };
 
     fn recurse(
         start: Date,
         end: Date,
         reference_start: Date,
         reference_end: Date,
-        period_months: u32,
-        coupon_length_years: f64,
+        traversal: Traversal,
         depth: usize,
     ) -> crate::Result<f64> {
         if start == end {
@@ -957,75 +969,71 @@ pub fn act_act_isma_year_fraction_with_reference_period(
             if reference_days <= 0.0 {
                 return Err(InputError::Invalid.into());
             }
-            return Ok((accrual_days / reference_days) * coupon_length_years);
+            return Ok((accrual_days / reference_days) * traversal.coupon_length_years);
         }
 
-        let period_months_i32 = i32::try_from(period_months).map_err(|_| InputError::Invalid)?;
+        let period_months_i32 =
+            i32::try_from(traversal.period_months).map_err(|_| InputError::Invalid)?;
+        let shift = |date: Date, months: i32| {
+            let shifted = date.add_months(months);
+            if traversal.preserve_eom {
+                shifted.end_of_month()
+            } else {
+                shifted
+            }
+        };
 
         if end <= reference_start {
-            let previous_start = reference_start.add_months(-period_months_i32);
+            let previous_start = shift(reference_start, -period_months_i32);
             return recurse(
                 start,
                 end,
                 previous_start,
                 reference_start,
-                period_months,
-                coupon_length_years,
+                traversal,
                 depth + 1,
             );
         }
 
         if start >= reference_end {
-            let next_end = reference_end.add_months(period_months_i32);
-            return recurse(
-                start,
-                end,
-                reference_end,
-                next_end,
-                period_months,
-                coupon_length_years,
-                depth + 1,
-            );
+            let next_end = shift(reference_end, period_months_i32);
+            return recurse(start, end, reference_end, next_end, traversal, depth + 1);
         }
 
         if start < reference_start {
-            let previous_start = reference_start.add_months(-period_months_i32);
+            let previous_start = shift(reference_start, -period_months_i32);
             return Ok(recurse(
                 start,
                 reference_start,
                 previous_start,
                 reference_start,
-                period_months,
-                coupon_length_years,
+                traversal,
                 depth + 1,
             )? + recurse(
                 reference_start,
                 end,
                 reference_start,
                 reference_end,
-                period_months,
-                coupon_length_years,
+                traversal,
                 depth + 1,
             )?);
         }
 
         if end > reference_end {
-            let next_end = reference_end.add_months(period_months_i32);
+            let next_end = shift(reference_end, period_months_i32);
             return Ok(recurse(
                 start,
                 reference_end,
                 reference_start,
                 reference_end,
-                period_months,
-                coupon_length_years,
+                traversal,
                 depth + 1,
             )? + recurse(
                 reference_end,
                 end,
                 reference_end,
                 next_end,
-                period_months,
-                coupon_length_years,
+                traversal,
                 depth + 1,
             )?);
         }
@@ -1033,15 +1041,7 @@ pub fn act_act_isma_year_fraction_with_reference_period(
         Err(InputError::Invalid.into())
     }
 
-    recurse(
-        start,
-        end,
-        reference_start,
-        reference_end,
-        period_months,
-        coupon_length_years,
-        0,
-    )
+    recurse(start, end, reference_start, reference_end, traversal, 0)
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -1556,6 +1556,47 @@ mod tests {
             result.is_err(),
             "far-away reference traversal should be rejected"
         );
+    }
+
+    #[test]
+    fn act_act_isma_reference_period_preserves_eom_anchor_for_full_year() {
+        let fraction = act_act_isma_year_fraction_with_reference_period(
+            date!(2024 - 02 - 29),
+            date!(2025 - 02 - 28),
+            date!(2024 - 08 - 31),
+            date!(2025 - 02 - 28),
+        )
+        .expect("EOM reference traversal should succeed");
+
+        assert_eq!(fraction, 1.0);
+    }
+
+    #[test]
+    fn act_act_isma_reference_period_preserves_eom_anchor_across_stubs() {
+        let front_stub = act_act_isma_year_fraction_with_reference_period(
+            date!(2024 - 04 - 15),
+            date!(2024 - 08 - 31),
+            date!(2024 - 08 - 31),
+            date!(2025 - 02 - 28),
+        )
+        .expect("front stub should succeed");
+        let back_stub = act_act_isma_year_fraction_with_reference_period(
+            date!(2025 - 02 - 28),
+            date!(2025 - 05 - 15),
+            date!(2024 - 08 - 31),
+            date!(2025 - 02 - 28),
+        )
+        .expect("back stub should succeed");
+
+        let expected_front = (date!(2024 - 08 - 31) - date!(2024 - 04 - 15)).whole_days() as f64
+            / (date!(2024 - 08 - 31) - date!(2024 - 02 - 29)).whole_days() as f64
+            * 0.5;
+        let expected_back = (date!(2025 - 05 - 15) - date!(2025 - 02 - 28)).whole_days() as f64
+            / (date!(2025 - 08 - 31) - date!(2025 - 02 - 28)).whole_days() as f64
+            * 0.5;
+
+        assert!((front_stub - expected_front).abs() < 1e-14);
+        assert!((back_stub - expected_back).abs() < 1e-14);
     }
 
     // -----------------------------------------------------------------------

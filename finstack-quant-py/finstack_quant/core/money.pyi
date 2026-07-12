@@ -27,15 +27,18 @@ __all__ = ["Money"]
 class Money:
     """A currency-tagged monetary amount.
 
-    Immutable value type combining a floating-point amount with an ISO-4217
-    currency. Arithmetic is checked: addition and subtraction require matching
-    currencies, and operations that would produce non-finite values are
-    rejected.
+    Immutable, Decimal-backed value type combining a precision-preserving
+    monetary amount with an ISO-4217 currency. Arithmetic is checked: addition
+    and subtraction require matching currencies, and invalid/non-finite inputs
+    are rejected. ``amount_decimal`` exposes the stored amount losslessly;
+    ``amount`` is its interoperable ``float`` view.
 
     Parameters
     ----------
-    amount : float
-        Finite monetary amount.
+    amount : decimal.Decimal | float | int
+        Finite monetary amount. ``Decimal`` preserves its full decimal
+        precision. ``float`` and ``int`` inputs are converted through their
+        finite Python ``float`` value before being stored as Rust ``Decimal``.
     currency : Currency | str
         ISO-4217 currency (object or alphabetic code string).
 

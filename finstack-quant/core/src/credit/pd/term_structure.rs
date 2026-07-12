@@ -48,11 +48,43 @@ use super::error::PdCalibrationError;
 /// assert_eq!(ts.cumulative_pds(), &[0.002, 0.008, 0.018]);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(try_from = "PdTermStructureWire")]
 pub struct PdTermStructure {
     /// Sorted tenor grid in years.
     tenors: Vec<f64>,
     /// Cumulative default probabilities at each tenor.
     cumulative_pds: Vec<f64>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct PdTermStructureWire {
+    tenors: Vec<f64>,
+    cumulative_pds: Vec<f64>,
+}
+
+impl TryFrom<PdTermStructureWire> for PdTermStructure {
+    type Error = PdCalibrationError;
+
+    fn try_from(wire: PdTermStructureWire) -> Result<Self, Self::Error> {
+        if wire.tenors.len() != wire.cumulative_pds.len() {
+            return Err(PdCalibrationError::ValueOutOfRange {
+                value: wire.cumulative_pds.len() as f64,
+                min: wire.tenors.len() as f64,
+                max: wire.tenors.len() as f64,
+            });
+        }
+        if wire.tenors.windows(2).any(|pair| pair[1] <= pair[0]) {
+            return Err(PdCalibrationError::GradesNotSorted);
+        }
+        if wire.cumulative_pds.windows(2).any(|pair| pair[1] < pair[0]) {
+            return Err(PdCalibrationError::NonMonotonicCumulativePds);
+        }
+        let points: Vec<(f64, f64)> = wire.tenors.into_iter().zip(wire.cumulative_pds).collect();
+        PdTermStructureBuilder::new()
+            .with_cumulative_pds(&points)
+            .build()
+    }
 }
 
 impl PdTermStructure {

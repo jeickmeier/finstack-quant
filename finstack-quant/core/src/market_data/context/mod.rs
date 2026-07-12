@@ -630,6 +630,7 @@ impl CurveStorage {
         original_id: &CurveId,
         spec: BumpSpec,
     ) -> Result<()> {
+        spec.validate_finite()?;
         fn bump_curve_preserving_id<C>(
             original: &C,
             original_id: &CurveId,

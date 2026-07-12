@@ -191,6 +191,18 @@ impl PyGeneratorMatrix {
     fn n_states(&self) -> usize {
         self.inner.n_states()
     }
+
+    /// L1 mass clamped by Kreinin-Sidenius regularization during extraction.
+    #[getter]
+    fn regularization_l1(&self) -> f64 {
+        self.inner.regularization_l1()
+    }
+
+    /// Infinity-norm error from reconstructing the source transition matrix.
+    #[getter]
+    fn round_trip_error(&self) -> f64 {
+        self.inner.round_trip_error()
+    }
 }
 
 #[pyclass(

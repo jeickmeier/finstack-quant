@@ -1032,8 +1032,16 @@ mod tests {
         let event_time = dc
             .year_fraction(as_of, call_date, DayCountContext::default())
             .expect("call time");
-        let step =
-            map_date_to_step(as_of, call_date, maturity, tree_steps, dc).clamp(1, tree_steps);
+        let step = map_date_to_step(
+            as_of,
+            call_date,
+            maturity,
+            tree_steps,
+            dc,
+            DayCountContext::default(),
+        )
+        .expect("map call date")
+        .clamp(1, tree_steps);
         let step_time = time_to_maturity / tree_steps as f64 * step as f64;
         assert!(
             (event_time - step_time).abs() > 1e-4,

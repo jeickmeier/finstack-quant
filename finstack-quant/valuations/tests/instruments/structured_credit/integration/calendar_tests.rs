@@ -71,7 +71,7 @@ fn create_test_market() -> MarketContext {
         .expect("Failed to create discount curve");
 
     let forward_curve = ForwardCurve::builder("SOFR-3M", 0.25)
-        .base_date(test_date())
+        .base_date(closing_date())
         .knots(vec![(0.0, 0.05), (1.0, 0.051), (2.0, 0.053), (5.0, 0.055)])
         .interp(InterpStyle::Linear)
         .build()

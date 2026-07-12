@@ -109,6 +109,15 @@ pub(crate) fn compute_pv(
     }
 
     let future_count = future_forwards.len();
+    if future_forwards
+        .iter()
+        .any(|(_, forward)| !forward.is_finite() || *forward <= 0.0)
+    {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommodityAsianOption '{}' requires finite positive forwards for its lognormal model",
+            inst.id
+        )));
+    }
 
     // With a validated fixing history, every scheduled date is either realized
     // (<= as_of) or projected (> as_of). A violation here means an internal

@@ -71,7 +71,8 @@ mod golden_tests {
         use crate::correlation::joint_probabilities;
 
         // Test with symmetric case (correlation=0)
-        let (p00, p01, p10, p11) = joint_probabilities(0.5, 0.5, 0.0);
+        let (p00, p01, p10, p11) =
+            joint_probabilities(0.5, 0.5, 0.0).expect("valid probabilities");
 
         // Check all probabilities non-negative
         assert!(p00 >= 0.0, "p00 should be >= 0");

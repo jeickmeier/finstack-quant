@@ -69,6 +69,10 @@ pub enum PdCalibrationError {
         value: f64,
     },
 
+    /// A scoring result has no calibrated or native probability.
+    #[error("scoring result has no implied PD; request an explicit calibration first")]
+    MissingImpliedPd,
+
     /// Central tendency calibration cannot include a zero annual default rate.
     ///
     /// No longer returned by [`central_tendency`](crate::credit::pd::central_tendency)

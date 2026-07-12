@@ -7,7 +7,9 @@ use finstack_quant_core::credit::migration::{
     projection, GeneratorMatrix, MigrationSimulator, RatingScale, TransitionMatrix,
 };
 use finstack_quant_core::credit::pd::{MasterScale, PdTermStructureBuilder};
-use finstack_quant_core::credit::scoring::{altman_z_score, AltmanZScoreInput};
+use finstack_quant_core::credit::scoring::{
+    altman_z_score_with_pd, AltmanPdCalibration, AltmanZScoreInput,
+};
 use rand::SeedableRng;
 use rand_pcg::Pcg64;
 
@@ -47,19 +49,22 @@ fn credit_workflow_maps_scoring_migration_and_loss_modules_together() {
     assert!(pd_1y > 0.0);
     assert!(pd_1y < term_structure.cumulative_pd(2.0));
 
-    let score = altman_z_score(&AltmanZScoreInput {
-        working_capital_to_total_assets: 0.10,
-        retained_earnings_to_total_assets: 0.20,
-        ebit_to_total_assets: 0.15,
-        market_equity_to_total_liabilities: 1.50,
-        sales_to_total_assets: 1.80,
-    })
+    let score = altman_z_score_with_pd(
+        &AltmanZScoreInput {
+            working_capital_to_total_assets: 0.10,
+            retained_earnings_to_total_assets: 0.20,
+            ebit_to_total_assets: 0.15,
+            market_equity_to_total_liabilities: 1.50,
+            sales_to_total_assets: 1.80,
+        },
+        AltmanPdCalibration::HeuristicV1,
+    )
     .unwrap();
     let mapped = MasterScale::sp_empirical()
         .unwrap()
         .map_score(&score)
         .unwrap();
-    assert_eq!(mapped.input_pd, score.implied_pd);
+    assert_eq!(Some(mapped.input_pd), score.implied_pd);
     assert!(mapped.central_pd > 0.0);
 
     let ead = EadCalculator::revolver(60.0, 40.0).unwrap().ead();

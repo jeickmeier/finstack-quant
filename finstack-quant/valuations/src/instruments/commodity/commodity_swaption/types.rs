@@ -369,6 +369,93 @@ impl CurveDependencies for CommoditySwaption {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct Black76SwaptionInputs {
+    time: f64,
+    forward: f64,
+    annuity: f64,
+    sigma: f64,
+}
+
+fn validate_black76_domain(
+    instrument_id: &InstrumentId,
+    forward: f64,
+    strike: f64,
+    time: f64,
+    sigma: Option<f64>,
+    annuity: Option<f64>,
+) -> Result<()> {
+    if !forward.is_finite() || forward <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySwaption '{instrument_id}' Black-76 forward must be finite and positive, \
+             got {forward}; use a normal or shifted model for nonpositive forwards"
+        )));
+    }
+    if !strike.is_finite() || strike <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySwaption '{instrument_id}' Black-76 strike must be finite and positive, \
+             got {strike}"
+        )));
+    }
+    if !time.is_finite() || time < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "CommoditySwaption '{instrument_id}' Black-76 time must be finite and non-negative, \
+             got {time}"
+        )));
+    }
+    if let Some(sigma) = sigma {
+        if !sigma.is_finite() || sigma < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CommoditySwaption '{instrument_id}' Black-76 sigma must be finite and \
+                 non-negative, got {sigma}"
+            )));
+        }
+    }
+    if let Some(annuity) = annuity {
+        if !annuity.is_finite() || annuity <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CommoditySwaption '{instrument_id}' Black-76 annuity must be finite and \
+                 positive, got {annuity}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+impl CommoditySwaption {
+    fn black76_inputs(&self, market: &MarketContext, as_of: Date) -> Result<Black76SwaptionInputs> {
+        let time = self.time_to_expiry(as_of)?;
+        let forward = self.forward_swap_rate(market, as_of)?;
+        validate_black76_domain(&self.id, forward, self.fixed_price, time, None, None)?;
+        let annuity = self.annuity(market, as_of)?;
+        let sigma = if time > 0.0 {
+            crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
+                &self.pricing_overrides.market_quotes,
+                market,
+                self.vol_surface_id.as_str(),
+                time,
+                self.fixed_price,
+            )?
+        } else {
+            0.0
+        };
+        validate_black76_domain(
+            &self.id,
+            forward,
+            self.fixed_price,
+            time,
+            Some(sigma),
+            Some(annuity),
+        )?;
+        Ok(Black76SwaptionInputs {
+            time,
+            forward,
+            annuity,
+            sigma,
+        })
+    }
+}
+
 impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
     impl_instrument_base!(crate::pricer::InstrumentType::CommoditySwaption);
 
@@ -395,44 +482,27 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
             return Ok(Money::new(0.0, self.underlying.currency));
         }
 
-        let t = self.time_to_expiry(as_of)?;
-        let forward = self.forward_swap_rate(market, as_of)?;
-        let annuity = self.annuity(market, as_of)?;
+        let inputs = self.black76_inputs(market, as_of)?;
 
         // At or past expiry: return intrinsic value
-        if t <= 0.0 {
+        if inputs.time <= 0.0 {
             let intrinsic = match self.option_type {
-                OptionType::Call => (forward - self.fixed_price).max(0.0),
-                OptionType::Put => (self.fixed_price - forward).max(0.0),
+                OptionType::Call => (inputs.forward - self.fixed_price).max(0.0),
+                OptionType::Put => (self.fixed_price - inputs.forward).max(0.0),
             };
             return Ok(Money::new(
-                intrinsic * annuity * self.notional,
+                intrinsic * inputs.annuity * self.notional,
                 self.underlying.currency,
             ));
         }
 
-        if !forward.is_finite() || forward <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "CommoditySwaption '{}' Black-76 forward must be finite and positive, got {forward}; use a normal or shifted model for nonpositive forwards",
-                self.id
-            )));
-        }
-
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.pricing_overrides.market_quotes,
-            market,
-            self.vol_surface_id.as_str(),
-            t,
-            self.fixed_price,
-        )?;
-
         // Black-76 on forward swap rate
         let unit_price = black76_swaption_price(
-            forward,
+            inputs.forward,
             self.fixed_price,
-            sigma,
-            t,
-            annuity,
+            inputs.sigma,
+            inputs.time,
+            inputs.annuity,
             self.option_type,
         );
 
@@ -467,51 +537,39 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_cdf;
 
-        let t = self
-            .day_count
-            .year_fraction(as_of, self.expiry, DayCountContext::default())?
-            .max(0.0);
+        let inputs = self.black76_inputs(market, as_of)?;
 
-        let forward = self.forward_swap_rate(market, as_of)?;
-        let annuity = self.annuity(market, as_of)?;
-
-        if t <= 0.0 {
+        if inputs.time <= 0.0 {
             let intrinsic = match self.option_type {
                 OptionType::Call => {
-                    if forward > self.fixed_price {
+                    if inputs.forward > self.fixed_price {
                         1.0
                     } else {
                         0.0
                     }
                 }
                 OptionType::Put => {
-                    if forward < self.fixed_price {
+                    if inputs.forward < self.fixed_price {
                         -1.0
                     } else {
                         0.0
                     }
                 }
             };
-            return Ok(Some(intrinsic * annuity * self.notional));
+            return Ok(Some(intrinsic * inputs.annuity * self.notional));
         }
 
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.pricing_overrides.market_quotes,
-            market,
-            self.vol_surface_id.as_str(),
-            t,
-            self.fixed_price,
-        )?;
-        if sigma <= 0.0 {
+        if inputs.sigma <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let d1 = crate::models::d1_black76(forward, self.fixed_price, sigma, t);
+        let d1 =
+            crate::models::d1_black76(inputs.forward, self.fixed_price, inputs.sigma, inputs.time);
         let nd1 = norm_cdf(d1);
 
         let delta_unit = match self.option_type {
-            OptionType::Call => annuity * nd1,
-            OptionType::Put => annuity * (nd1 - 1.0),
+            OptionType::Call => inputs.annuity * nd1,
+            OptionType::Put => inputs.annuity * (nd1 - 1.0),
         };
         Ok(Some(delta_unit * self.notional))
     }
@@ -527,11 +585,11 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         };
 
         let bump_pct = crate::metrics::bump_sizes::SPOT;
-        let forward_price = self.forward_swap_rate(market, as_of)?;
-        let bump_size = forward_price * bump_pct;
-        if bump_size <= 0.0 {
+        let inputs = self.black76_inputs(market, as_of)?;
+        if inputs.time <= 0.0 || inputs.sigma <= 0.0 {
             return Ok(Some(0.0));
         }
+        let bump_size = inputs.forward * bump_pct;
 
         let pv_base = self.value(market, as_of)?.amount();
 
@@ -570,30 +628,19 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
     ) -> finstack_quant_core::Result<Option<f64>> {
         use finstack_quant_core::math::special_functions::norm_pdf;
 
-        let t = self
-            .day_count
-            .year_fraction(as_of, self.expiry, DayCountContext::default())?
-            .max(0.0);
-        if t <= 0.0 {
+        let inputs = self.black76_inputs(market, as_of)?;
+        if inputs.time <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.pricing_overrides.market_quotes,
-            market,
-            self.vol_surface_id.as_str(),
-            t,
-            self.fixed_price,
-        )?;
-        if sigma <= 0.0 {
+        if inputs.sigma <= 0.0 {
             return Ok(Some(0.0));
         }
 
-        let forward = self.forward_swap_rate(market, as_of)?;
-        let annuity = self.annuity(market, as_of)?;
-        let d1 = crate::models::d1_black76(forward, self.fixed_price, sigma, t);
+        let d1 =
+            crate::models::d1_black76(inputs.forward, self.fixed_price, inputs.sigma, inputs.time);
         // Vega = annuity * F * N'(d1) * sqrt(T) * 0.01 (per vol point)
-        let vega_abs = annuity * forward * norm_pdf(d1) * t.sqrt();
+        let vega_abs = inputs.annuity * inputs.forward * norm_pdf(d1) * inputs.time.sqrt();
         Ok(Some(vega_abs * 0.01 * self.notional))
     }
 }
@@ -645,7 +692,7 @@ crate::impl_empty_cashflow_provider!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::Instrument;
+    use crate::instruments::common_impl::traits::{Instrument, OptionGreeksProvider};
 
     // -----------------------------------------------------------------------
     // Validation tests
@@ -1121,6 +1168,29 @@ mod tests {
             .day_count(DayCount::Act365F)
             .build()
             .expect("should build")
+    }
+
+    #[test]
+    fn signed_forwards_return_validation_errors_for_pv_and_all_greeks() {
+        let as_of = date(2025, 1, 2);
+        let swaption = base_swaption(OptionType::Call, 3.5);
+
+        for forward in [-1.0, 0.0] {
+            let market = build_market(as_of, forward, 0.30, 0.05);
+            let assert_validation = |result: finstack_quant_core::Result<()>| {
+                let err = result.expect_err("signed Black-76 forward must be rejected");
+                assert!(
+                    matches!(err, finstack_quant_core::Error::Validation(_)),
+                    "expected typed Validation error, got {err}"
+                );
+                assert!(err.to_string().contains("forward"));
+            };
+
+            assert_validation(swaption.base_value(&market, as_of).map(|_| ()));
+            assert_validation(swaption.option_delta(&market, as_of).map(|_| ()));
+            assert_validation(swaption.option_gamma(&market, as_of).map(|_| ()));
+            assert_validation(swaption.option_vega(&market, as_of).map(|_| ()));
+        }
     }
 
     #[test]

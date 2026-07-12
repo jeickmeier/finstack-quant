@@ -4,9 +4,9 @@
 //! calendar-aware tenor addition for accurate period end dates.
 //!
 //! For seasoned instruments (dates before the valuation date), the helpers
-//! first attempt to look up historical fixings from `MarketContext`. When
-//! fixings are not available, they gracefully fall back to forward curve
-//! projection.
+//! require historical fixings from `MarketContext`. Infallible helpers use
+//! their explicit fallback rate when a fixing is unavailable; fallible helpers
+//! return the fixing lookup error instead of re-projecting a historical reset.
 
 #![allow(dead_code)]
 
@@ -248,12 +248,13 @@ pub(crate) fn asset_all_in_rate(
     if let Some(idx) = index_id {
         let spread = spread_bps.unwrap_or(0.0) / 10_000.0;
 
-        // Seasoned path: try historical fixings for dates before valuation
+        // Seasoned path: use the historical fixing or the caller's explicit
+        // fallback. Never re-project a historical reset.
         if date < as_of {
             if let Some(fixing) = try_asset_fixing(idx, date, as_of, market) {
                 return fixing + spread;
             }
-            // Fall through to forward projection if fixings unavailable
+            return fallback_rate;
         }
 
         if let Ok(fwd) = market.get_forward(idx) {
@@ -263,9 +264,13 @@ pub(crate) fn asset_all_in_rate(
                 .year_fraction(base, date, DayCountContext::default())
                 .unwrap_or(0.0);
             let tenor = fwd.tenor();
+            if t2 + 1e-12 < tenor {
+                return fallback_rate;
+            }
             let t1 = (t2 - tenor).max(0.0);
-            let idx_rate = fwd.rate_period(t1, t2);
-            return idx_rate + spread;
+            if let Ok(idx_rate) = fwd.rate_between(t1, t2) {
+                return idx_rate + spread;
+            }
         }
     }
     fallback_rate
@@ -277,8 +282,8 @@ pub(crate) fn asset_all_in_rate(
 /// fails. Use this in valuation code paths where silent fallbacks are unacceptable.
 ///
 /// When `date < as_of` and a fixing series exists in `MarketContext`, the
-/// historical fixing rate is used instead of the forward projection.
-/// Missing fixings for past dates gracefully fall back to forward projection.
+/// historical fixing rate is used instead of forward projection. Missing
+/// fixings for past dates return an error.
 pub(crate) fn try_asset_all_in_rate(
     index_id: Option<&str>,
     spread_bps: Option<f64>,
@@ -306,8 +311,16 @@ pub(crate) fn try_asset_all_in_rate(
     let dc = fwd.day_count();
     let t2 = dc.year_fraction(base, date, DayCountContext::default())?;
     let tenor = fwd.tenor();
+    if t2 + 1e-12 < tenor {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "asset term-rate period ending {date} starts before the '{}' curve base date {}; \
+             a historical fixing is required",
+            fwd.id(),
+            base
+        )));
+    }
     let t1 = (t2 - tenor).max(0.0);
-    let idx_rate = fwd.rate_period(t1, t2);
+    let idx_rate = fwd.rate_between(t1, t2)?;
     Ok(idx_rate + spread)
 }
 
@@ -463,6 +476,37 @@ mod tests {
         assert!(try_missing_id.is_err(), "missing index id should error");
     }
 
+    #[test]
+    fn asset_rate_uses_discount_factor_implied_term_forward() {
+        let base = date!(2025 - 01 - 01);
+        let curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)
+            .base_date(base)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 0.01), (1.0, 0.21)])
+            .build()
+            .expect("forward curve should build");
+        let market = MarketContext::new().insert(curve);
+        let end = date!(2025 - 07 - 01);
+        let fwd = market
+            .get_forward("USD-SOFR-3M")
+            .expect("forward curve should exist");
+        let t2 = fwd
+            .day_count()
+            .year_fraction(base, end, DayCountContext::default())
+            .expect("valid end time");
+        let t1 = t2 - fwd.tenor();
+        let expected = fwd
+            .rate_between(t1, t2)
+            .expect("valid term forward interval");
+        let integrated_average = fwd.rate_period(t1, t2);
+
+        let actual = try_asset_all_in_rate(Some("USD-SOFR-3M"), None, end, FAR_FUTURE, &market)
+            .expect("asset term projection should succeed");
+
+        assert!((expected - integrated_average).abs() > 1e-6);
+        assert!((actual - expected).abs() < 1e-14);
+    }
+
     // -----------------------------------------------------------------------
     // Seasoned instrument tests (fixing lookup when date < as_of)
     // -----------------------------------------------------------------------
@@ -557,30 +601,17 @@ mod tests {
     }
 
     #[test]
-    fn asset_rate_falls_back_to_forward_when_date_before_as_of_but_no_fixings() {
+    fn asset_rate_requires_fixing_when_date_before_as_of() {
         // Market with forward curve but NO fixing series
         let market = sample_market();
         let date = date!(2025 - 04 - 01);
         let as_of = date!(2025 - 06 - 01);
 
         let rate = asset_all_in_rate(Some("USD-SOFR-3M"), Some(50.0), 0.08, date, as_of, &market);
-        assert!(
-            rate > 0.0,
-            "should fall back to forward projection: got {rate}"
-        );
+        assert_eq!(rate, 0.08, "infallible helper should use explicit fallback");
 
-        // Should match the FAR_FUTURE (forward-only) rate since no fixings exist
-        let forward_rate = asset_all_in_rate(
-            Some("USD-SOFR-3M"),
-            Some(50.0),
-            0.08,
-            date,
-            FAR_FUTURE,
-            &market,
-        );
-        assert!(
-            (rate - forward_rate).abs() < 1e-12,
-            "fallback should match forward-only rate: got {rate}, expected {forward_rate}"
-        );
+        let error = try_asset_all_in_rate(Some("USD-SOFR-3M"), Some(50.0), date, as_of, &market)
+            .expect_err("fallible helper should require the historical fixing");
+        assert!(error.to_string().contains("FIXING:USD-SOFR-3M"));
     }
 }

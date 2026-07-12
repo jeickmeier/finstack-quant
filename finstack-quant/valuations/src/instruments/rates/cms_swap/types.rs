@@ -18,7 +18,7 @@ use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::IRSConvention;
-use crate::instruments::common_impl::traits::Attributes;
+use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::{CalendarRegistry, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
@@ -492,7 +492,7 @@ impl CmsSwap {
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
-        use crate::instruments::common_impl::pricing::time::rate_period_on_dates;
+        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 
         let mut flows = Vec::new();
         match &self.funding_leg {
@@ -524,15 +524,25 @@ impl CmsSwap {
                 ..
             } => {
                 let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
+                let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
+                    forward_curve_id.as_str(),
+                );
+                let fixings = market.get_series(&fixing_series_id).ok();
                 let mut prev_date = self
-                    .cms_fixing_dates
-                    .first()
-                    .copied()
+                    .effective_start_date()
                     .unwrap_or_else(|| payment_dates.first().copied().unwrap_or(as_of));
                 for (i, &payment_date) in payment_dates.iter().enumerate() {
                     let accrual = accrual_fractions[i];
-                    let fwd_rate =
-                        rate_period_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?;
+                    let fwd_rate = if prev_date < as_of {
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            fixings,
+                            forward_curve_id.as_str(),
+                            prev_date,
+                            as_of,
+                        )?
+                    } else {
+                        rate_between_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?
+                    };
                     let unsigned = (fwd_rate + spread) * accrual * self.notional.amount();
                     let signed = match self.side {
                         crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
@@ -705,6 +715,8 @@ mod tests {
     use super::*;
     use crate::cashflow::CashflowProvider;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::fixings::{cms_fixing_series_id, fixing_series_id};
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use test_utils::{date, flat_discount_with_tenor, flat_forward_with_tenor, flat_vol_surface};
 
     #[test]
@@ -893,9 +905,6 @@ mod tests {
 
     #[test]
     fn cms_leg_flows_use_recorded_fixing_for_seasoned_coupon() {
-        use finstack_quant_core::market_data::fixings::cms_fixing_series_id;
-        use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
-
         let fixing = date(2024, 12, 1);
         let as_of = date(2025, 1, 1);
         let pay = date(2025, 3, 1);
@@ -954,6 +963,53 @@ mod tests {
             "seasoned flow must use recorded fixing: expected {expected}, got {}",
             flows[0].1.amount()
         );
+    }
+
+    #[test]
+    fn generated_cms_funding_flows_require_started_reset_fixing() {
+        let reset = date(2024, 12, 1);
+        let as_of = date(2025, 1, 1);
+        let pay = date(2025, 3, 1);
+        let swap = CmsSwap::builder()
+            .id(InstrumentId::new("CMS-FUNDING-SEASONED"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .side(crate::instruments::common_impl::parameters::legs::PayReceive::Pay)
+            .cms_tenor(10.0)
+            .cms_fixing_dates(vec![reset])
+            .cms_payment_dates(vec![pay])
+            .cms_accrual_fractions(vec![0.25])
+            .cms_day_count(DayCount::Act365F)
+            .funding_leg(FundingLeg::Floating {
+                spread: 0.001,
+                payment_dates: vec![pay],
+                accrual_fractions: vec![0.25],
+                day_count: DayCount::Act360,
+                forward_curve_id: CurveId::new("USD-LIBOR-3M"),
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
+            .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
+            .build()
+            .expect("CMS swap");
+        let market = recon_market(as_of);
+
+        let error = swap
+            .funding_leg_flows(&market, as_of)
+            .expect_err("started funding reset without fixing must fail");
+        assert!(error.to_string().contains("FIXING:USD-LIBOR-3M"));
+
+        let observed = 0.042;
+        let series = ScalarTimeSeries::new(
+            fixing_series_id("USD-LIBOR-3M"),
+            vec![(reset, observed)],
+            None,
+        )
+        .expect("funding fixing");
+        let flows = swap
+            .funding_leg_flows(&market.insert_series(series), as_of)
+            .expect("funding flows with fixing");
+        let expected = (observed + 0.001) * 0.25 * 1_000_000.0;
+        assert!((flows[0].1.amount() - expected).abs() < 1e-8);
     }
 
     #[test]

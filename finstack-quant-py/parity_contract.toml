@@ -123,6 +123,13 @@ public = [
 python_package = "finstack_quant.core.credit"
 public = ["scoring", "pd", "lgd", "migration"]
 
+# Member-level pinning for Python credit-migration diagnostics. Keys follow
+# the established "ClassName.canonical_member" member-contract shape; values
+# are the Python runtime names (identical snake_case for Rust/Python parity).
+[crates.core.credit_migration_members]
+"GeneratorMatrix.regularization_l1" = "regularization_l1"
+"GeneratorMatrix.round_trip_error" = "round_trip_error"
+
 [crates.core.module_symbols.rating_scales]
 python_package = "finstack_quant.core.rating_scales"
 public = [
@@ -1257,6 +1264,17 @@ modules = [
     "money",
     "types",
 ]
+# ForwardCurve is part of the agreed market_data subset. Member names are
+# explicit so Rust/Python snake_case additions are mirrored in WASM camelCase.
+discount_curve_members = ["id", "baseDate", "df", "zero", "forward"]
+discount_curve_optional_constructor_args = [
+    "interp", "extrapolation", "dayCount", "validationMode", "forwardFloor",
+]
+forward_curve_members = ["id", "baseDate", "projectionGrid", "resetLag", "rate", "rateBetween"]
+forward_curve_optional_constructor_args = [
+    "dayCount", "interp", "extrapolation", "projectionGrid", "resetLag",
+]
+vol_cube_members = ["id", "interpolationMode", "vol", "volClamped", "volNormal", "volNormalClamped"]
 excluded = [
     "cashflow",      # XIRR/NPV: deferred until concrete WASM use case
     "config",        # Configuration model is Rust-internal / Python-only

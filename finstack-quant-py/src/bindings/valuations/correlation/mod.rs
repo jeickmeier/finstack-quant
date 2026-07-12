@@ -4,7 +4,7 @@
 //! probability utilities to Python under `finstack_quant.valuations.correlation`,
 //! mirroring the Rust module [`finstack_quant_valuations::correlation`].
 
-use crate::errors::{display_to_py, value_error};
+use crate::errors::{core_to_py, display_to_py, value_error};
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule, PyType};
 
@@ -748,10 +748,10 @@ impl PyCorrelatedBernoulli {
     /// given marginal probabilities.
     #[new]
     #[pyo3(text_signature = "(p1, p2, correlation)")]
-    fn new(p1: f64, p2: f64, correlation: f64) -> Self {
-        Self {
-            inner: CorrelatedBernoulli::new(p1, p2, correlation),
-        }
+    fn new(p1: f64, p2: f64, correlation: f64) -> PyResult<Self> {
+        Ok(Self {
+            inner: CorrelatedBernoulli::new(p1, p2, correlation).map_err(core_to_py)?,
+        })
     }
 
     /// Marginal probability of event 1.
@@ -770,6 +770,12 @@ impl PyCorrelatedBernoulli {
     #[getter]
     fn correlation(&self) -> f64 {
         self.inner.correlation()
+    }
+
+    /// Caller-requested correlation before Fréchet-Hoeffding clamping.
+    #[getter]
+    fn requested_correlation(&self) -> f64 {
+        self.inner.requested_correlation()
     }
 
     /// P(X₁=1, X₂=1).
@@ -813,8 +819,8 @@ impl PyCorrelatedBernoulli {
 
     /// Sample a pair of correlated binary outcomes from a uniform ``[0,1]`` draw.
     #[pyo3(text_signature = "(self, u)")]
-    fn sample_from_uniform(&self, u: f64) -> (u8, u8) {
-        self.inner.sample_from_uniform(u)
+    fn sample_from_uniform(&self, u: f64) -> PyResult<(u8, u8)> {
+        self.inner.sample_from_uniform(u).map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {
@@ -836,8 +842,8 @@ impl PyCorrelatedBernoulli {
 /// Returns ``(rho_min, rho_max)`` — the feasible correlation range.
 #[pyfunction]
 #[pyo3(text_signature = "(p1, p2)")]
-fn correlation_bounds(p1: f64, p2: f64) -> (f64, f64) {
-    corr::correlation_bounds(p1, p2)
+fn correlation_bounds(p1: f64, p2: f64) -> PyResult<(f64, f64)> {
+    corr::correlation_bounds(p1, p2).map_err(core_to_py)
 }
 
 /// Joint probabilities for two correlated Bernoulli variables.
@@ -846,8 +852,8 @@ fn correlation_bounds(p1: f64, p2: f64) -> (f64, f64) {
 /// preserves the marginals.
 #[pyfunction]
 #[pyo3(text_signature = "(p1, p2, correlation)")]
-fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> (f64, f64, f64, f64) {
-    corr::joint_probabilities(p1, p2, correlation)
+fn joint_probabilities(p1: f64, p2: f64, correlation: f64) -> PyResult<(f64, f64, f64, f64)> {
+    corr::joint_probabilities(p1, p2, correlation).map_err(core_to_py)
 }
 
 /// Validate a correlation matrix (flattened row-major).

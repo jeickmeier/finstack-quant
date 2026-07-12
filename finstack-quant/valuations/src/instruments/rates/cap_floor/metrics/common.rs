@@ -122,7 +122,7 @@ where
             .year_fraction(context.as_of, fixing_date, dc_ctx)?
             .max(MIN_EFFECTIVE_FIXING_TIME);
 
-        let forward = crate::instruments::common_impl::pricing::time::rate_period_on_dates(
+        let forward = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
             fwd_curve.as_ref(),
             period.accrual_start,
             period.accrual_end,

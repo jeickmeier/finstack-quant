@@ -49,14 +49,11 @@ pub fn emit_inflation_coupons(
 // so that `fees.rs` can use them too. Access via `super::`.
 use super::{decimal_to_f64, f64_to_decimal};
 
-/// Compute the index maturity date from a projection start date and index tenor.
+/// Compute the index maturity date from a reset date and index tenor.
 ///
 /// For a term-rate index (e.g., 3M term SOFR / EURIBOR), the instrument
-/// references a rate whose underlying deposit period runs from the accrual
-/// start over the index tenor, so the forward is projected over
-/// `[accrual_start, accrual_start + index_tenor]` — not from the fixing date
-/// and not to the payment date. The fixing (reset) date remains flow
-/// metadata only.
+/// references the fixed-tenor rate that resets on `reset_date`. The maturity
+/// date is retained for reporting and projection-error context.
 fn compute_index_maturity(
     reset_date: Date,
     index_tenor: Tenor,
@@ -700,9 +697,8 @@ pub(crate) fn emit_float_coupons_on(
                 },
             )?;
 
-            // Compute reset date (fixing date) from accrual start. The reset
-            // date is flow metadata; term-rate projection runs over the
-            // index's underlying deposit period from the accrual start.
+            // Compute the term-index fixing date from accrual start and the
+            // configured reset lag.
             let reset_date = compute_reset_date(
                 accrual_start,
                 spec.rate_spec.reset_lag_days,
@@ -711,14 +707,14 @@ pub(crate) fn emit_float_coupons_on(
             )?;
 
             // Underlying index tenor: explicit `index_tenor` when set,
-            // falling back to the reset frequency. The forward is projected
-            // over [accrual_start, accrual_start + index_tenor] — the period
-            // the referenced deposit rate actually covers.
+            // falling back to the reset frequency. The resulting maturity is
+            // retained for error context; the term index itself fixes at
+            // `reset_date`.
             let index_tenor = spec
                 .rate_spec
                 .index_tenor
                 .unwrap_or(spec.rate_spec.reset_freq);
-            let index_maturity = compute_index_maturity(accrual_start, index_tenor)?;
+            let index_maturity = compute_index_maturity(reset_date, index_tenor)?;
 
             let runtime_spec = &schedule.runtime_spec;
             let params = &runtime_spec.params;
@@ -875,9 +871,9 @@ pub(crate) fn emit_float_coupons_on(
                 }
             } else if let Some(fwd) = resolved_curve.as_deref() {
                 // ── Standard term rate projection path ──
-                // Project the forward over the index's underlying deposit
-                // period [accrual_start, accrual_start + index_tenor]; the
-                // fixing date stays flow metadata only.
+                // Project the fixed-tenor index rate at the actual reset
+                // date. The reset lag is therefore part of the projection
+                // convention, not merely flow metadata.
                 //
                 // Seasoned coupons (projection start strictly before the
                 // curve base) resolve the realized index fixing from the
@@ -901,8 +897,8 @@ pub(crate) fn emit_float_coupons_on(
                     })
                 } else {
                     super::super::rate_helpers::project_floating_rate(
-                        accrual_start,
-                        index_maturity, // accrual_start + index tenor, not payment date
+                        reset_date,
+                        index_maturity,
                         fwd,
                         params,
                     )

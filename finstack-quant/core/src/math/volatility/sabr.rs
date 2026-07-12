@@ -353,6 +353,9 @@ impl SabrParams {
         if t <= 0.0 {
             return f64::NAN;
         }
+        if beta > 0.0 && (f <= 0.0 || k <= 0.0) {
+            return f64::NAN;
+        }
 
         // No special-case for ν → 0: as in the lognormal expansion, the general
         // formula is continuous in ν (z → 0, z/χ(z) → 1) and retains the full
@@ -1052,6 +1055,24 @@ mod tests {
         let fwd = 0.05;
         let vol = params.implied_vol_normal(fwd, fwd, 1.0);
         assert!(vol > 0.0, "Normal vol should be positive: {vol}");
+    }
+
+    #[test]
+    fn normal_sabr_requires_positive_shifted_levels_when_beta_is_positive() {
+        let cev = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+        assert!(cev.try_implied_vol_normal(-0.01, -0.01, 1.0).is_err());
+        assert!(cev.try_implied_vol_normal(0.01, 0.0, 1.0).is_err());
+
+        let shifted_to_zero = cev.with_shift(0.01);
+        assert!(shifted_to_zero
+            .try_implied_vol_normal(-0.01, -0.01, 1.0)
+            .is_err());
+
+        let normal = SabrParams::new(0.005, 0.0, -0.2, 0.4).unwrap();
+        assert!(normal
+            .try_implied_vol_normal(-0.01, -0.02, 1.0)
+            .unwrap()
+            .is_finite());
     }
 
     /// Independent textbook implementation of Hagan (2002) eq. 2.17b, used as a

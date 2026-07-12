@@ -69,7 +69,7 @@
 use super::common::{
     build_interp_allow_any_values, bump_knots_parallel, bump_knots_percentage,
     bump_knots_triangular, default_curve_base_date, infer_spot_from_knots, roll_knots,
-    split_points, validate_non_negative_knots, year_fraction_to,
+    split_points, year_fraction_to,
 };
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
@@ -496,8 +496,9 @@ impl PriceCurveBuilder {
         let (kvec, pvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
         crate::math::interp::utils::validate_knots(&kvec)?;
 
-        // Validate all prices are non-negative
-        validate_non_negative_knots(&kvec, &pvec, "Forward price")?;
+        if pvec.iter().any(|price| !price.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
 
         // Infer spot price only when the first knot is explicitly anchored at t=0.
         let spot_price = match self.spot_price {
@@ -505,11 +506,8 @@ impl PriceCurveBuilder {
             None => infer_spot_from_knots(&kvec, &pvec).ok_or(InputError::Invalid)?,
         };
 
-        if spot_price < 0.0 {
-            return Err(crate::Error::Validation(format!(
-                "Spot price must be non-negative: {:.8}",
-                spot_price
-            )));
+        if !spot_price.is_finite() {
+            return Err(InputError::Invalid.into());
         }
 
         let knots = kvec.into_boxed_slice();
@@ -619,11 +617,15 @@ mod tests {
     }
 
     #[test]
-    fn rejects_negative_prices() {
-        let result = PriceCurve::builder("WTI")
-            .knots([(0.0, 75.0), (0.5, -5.0)])
-            .build();
-        assert!(result.is_err());
+    fn permits_finite_signed_futures_prices() {
+        let base = Date::from_calendar_date(2025, time::Month::January, 1).unwrap();
+        let curve = PriceCurve::builder("POWER")
+            .base_date(base)
+            .spot_price(-10.0)
+            .knots([(0.0, -10.0), (1.0, -20.0)])
+            .build()
+            .expect("finite signed prices are valid market data");
+        assert!((curve.price(0.5) + 15.0).abs() < 1e-12);
     }
 
     #[test]

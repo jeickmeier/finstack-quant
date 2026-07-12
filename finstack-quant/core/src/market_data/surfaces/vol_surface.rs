@@ -288,6 +288,9 @@ impl VolSurface {
     /// before interpolation. This method never panics and is suitable for
     /// pricing scenarios where out-of-bounds coordinates should use edge values.
     pub fn value_clamped(&self, expiry: f64, strike: f64) -> f64 {
+        if !expiry.is_finite() || !strike.is_finite() {
+            return f64::NAN;
+        }
         // Get bounds safely using first/last with defensive fallbacks
         let (Some(&exp_min), Some(&exp_max)) = (self.expiries.first(), self.expiries.last()) else {
             return f64::NAN;
@@ -636,6 +639,7 @@ impl Bumpable for VolSurface {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
         use crate::error::InputError;
 
+        spec.validate_finite()?;
         // Only parallel bumps are supported for now
         if !matches!(
             spec.bump_type,

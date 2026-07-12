@@ -385,6 +385,16 @@ impl GlobalFitOptimizer {
                 stats.termination_reason,
                 weighted_max_abs_residual, max_residual_tolerance, weighted_l2_norm,
             );
+        } else {
+            report.convergence_reason = format!(
+                "global fit calibration failed: LM terminated with {:?}; weighted L2 norm ({:.2e}) exceeds \
+                 tolerance ({:.2e}), weighted max residual ({:.2e}) passed per-quote tolerance ({:.2e})",
+                stats.termination_reason,
+                weighted_l2_norm,
+                validation_tolerance,
+                weighted_max_abs_residual,
+                max_residual_tolerance,
+            );
         }
 
         if !calibration_success {
@@ -782,10 +792,10 @@ fn validate_global_inputs(times: &[f64], initials: &[f64], n_residuals: usize) -
     }
 
     for (idx, &t) in times.iter().enumerate() {
-        if !t.is_finite() || t <= 0.0 {
+        if !t.is_finite() || t < 0.0 {
             return Err(finstack_quant_core::Error::Calibration {
                 message: format!(
-                    "Global solve requires strictly positive finite times; got {} at index {}.",
+                    "Global solve requires non-negative finite times; got {} at index {}.",
                     t, idx
                 ),
                 category: "global_solve".to_string(),
@@ -1323,6 +1333,25 @@ mod tests {
         );
     }
 
+    #[test]
+    fn failure_reason_reports_l2_failure_when_weighted_max_passes() {
+        let target = TestTarget::from_len(4, vec![0.06; 4]);
+        let quotes = vec![0usize, 1usize, 2usize, 3usize];
+        let config = CalibrationConfig::default().with_tolerance(1.0);
+        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, Some(0.1))
+            .expect("optimization should complete");
+
+        assert!(!report.success);
+        assert!(
+            report.convergence_reason.contains("weighted L2 norm")
+                && report.convergence_reason.contains("exceeds")
+                && report.convergence_reason.contains("weighted max residual")
+                && report.convergence_reason.contains("passed"),
+            "failure reason must identify the failing and passing criteria: {}",
+            report.convergence_reason
+        );
+    }
+
     /// Item 2: `fill_penalty` must produce a residual vector that *depends on each
     /// parameter*, so the finite-difference Jacobian has a non-zero column for every
     /// parameter even when its ±h neighbourhood is also infeasible.
@@ -1486,7 +1515,7 @@ mod tests {
         match err {
             Error::Calibration { message, .. } => {
                 assert!(
-                    message.contains("strictly positive finite times")
+                    message.contains("non-negative finite times")
                         || message.contains("finite initial guesses"),
                     "unexpected message: {}",
                     message

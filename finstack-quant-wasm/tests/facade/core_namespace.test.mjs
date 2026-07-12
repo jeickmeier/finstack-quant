@@ -54,6 +54,65 @@ test('core.Money amount and lossless amountDecimal', () => {
   const converted = m.convertAtRate(eur, 0.9);
   assert.equal(converted.currency.code, 'EUR');
   assert.equal(converted.amount, 1111.104);
+  const subCent = new core.Money(1.2345, usd);
+  assert.equal(subCent.amountDecimal(), '1.2345');
+});
+
+test('core date integer widths match generated runtime types', () => {
+  const start = core.createDate(2025, 1, 1);
+  const end = core.createDate(2025, 1, 3);
+  assert.ok(core.dateFromEpochDays(start) instanceof Int32Array);
+  assert.equal(typeof core.DayCount.act360().calendarDays(start, end), 'bigint');
+});
+
+test('wasm-bindgen handles expose free and conditional Symbol.dispose', () => {
+  const usd = new core.Currency('USD');
+  assert.equal(typeof usd.free, 'function');
+  if (Symbol.dispose) {
+    assert.equal(usd[Symbol.dispose], usd.free);
+  }
+  usd.free();
+});
+
+test('DiscountCurve uses canonical forward and explicit negative-rate validation', () => {
+  assert.throws(
+    () => new core.DiscountCurve('CHF-OIS', '2025-01-01', [0, 1, 1, 1.002]),
+    /non-increasing/
+  );
+  const curve = new core.DiscountCurve(
+    'CHF-OIS',
+    '2025-01-01',
+    [0, 1, 1, 1.002],
+    undefined,
+    undefined,
+    undefined,
+    'negative_rate_friendly',
+    -0.01
+  );
+  assert.ok(curve.forward(0, 1) < 0);
+  assert.equal(curve.forwardRate, undefined);
+});
+
+test('ForwardCurve exposes resetLag without changing prior positional arguments', () => {
+  const curve = new core.ForwardCurve(
+    'USD-SOFR',
+    0.25,
+    '2025-01-01',
+    [0, 0.04, 1, 0.045],
+    'act_360',
+    'linear',
+    'flat_forward',
+    undefined,
+    3
+  );
+  assert.equal(curve.resetLag, 3);
+});
+
+test('VolCube canonical camelCase methods exist at runtime', () => {
+  const cube = new core.VolCube('NORMAL', [1], [2], [0.01, 0, -0.2, 0.4, Number.NaN], [0.02]);
+  for (const name of ['volClamped', 'volNormal', 'volNormalClamped']) {
+    assert.equal(typeof cube[name], 'function', `missing ${name}`);
+  }
 });
 
 test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {

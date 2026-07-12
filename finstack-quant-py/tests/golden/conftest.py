@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 import csv
+from dataclasses import dataclass
 from datetime import date
 from functools import cache
 import importlib
@@ -15,8 +16,7 @@ import shutil
 import subprocess
 import time
 from types import ModuleType
-
-import pytest
+import warnings
 
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.valuations import validate_calibration_json
@@ -73,6 +73,21 @@ ZERO_RISK_METRICS_REQUIRING_REASON = {
     "spread_dv01",
     "vega",
 }
+
+
+class ExpectedUnresolvedWarning(UserWarning):
+    """A metric-specific external benchmark gap matched its allowlist entry."""
+
+
+@dataclass(frozen=True)
+class UnresolvedMetric:
+    """Strictly validated unresolved metric metadata."""
+
+    metric: str
+    reason: str
+    evidence: str
+
+
 _DOMAIN_RUNNERS = {
     "analytics.benchmark": "analytics_common",
     "analytics.drawdown": "analytics_common",
@@ -130,31 +145,98 @@ def discover_fixtures(relative_dir: str) -> list[str]:
 
 
 @cache
-def _known_non_executable() -> dict[str, str]:
-    """Load the shared {fixture path: reason} allowlist of non-executable goldens.
+def _known_unresolved_metrics() -> dict[str, dict[str, UnresolvedMetric]]:
+    """Load and validate metric-specific unresolved golden comparisons."""
+    if _strict_golden_mode_enabled():
+        return {}
 
-    The same `known_non_executable.json` drives the Rust runner's non-fatal
-    handling, so the allowlist lives in one place across both languages.
-    """
     raw = json.loads(KNOWN_NON_EXECUTABLE_PATH.read_text(encoding="utf-8"))
-    return {entry["path"]: entry["reason"] for entry in raw["fixtures"]}
+    unresolved = _parse_unresolved_allowlist(raw)
+    for relative_path, metrics in unresolved.items():
+        path = fixture_path(relative_path)
+        if not path.exists():
+            msg = f"stale unresolved fixture entry {relative_path!r}: fixture does not exist"
+            raise AssertionError(msg)
+        fixture = GoldenFixture.from_path(path)
+        validate_fixture(path, fixture)
+
+        for metric in metrics:
+            if metric not in fixture.expected:
+                msg = f"unresolved metric {metric!r} is not expected by fixture {relative_path!r}"
+                raise AssertionError(msg)
+    return unresolved
 
 
-def discover_fixtures_with_marks(relative_dir: str) -> list:
-    """Discover fixtures, marking known non-executable ones as xfail(strict=False).
+def _strict_golden_mode_enabled() -> bool:
+    value = os.environ.get("GOLDEN_IGNORE_NON_EXECUTABLE")
+    return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
 
-    Setting `GOLDEN_IGNORE_NON_EXECUTABLE` skips the marks so every fixture runs
-    strictly and all failures surface (see `mise goldens-test-strict`).
-    """
-    allowlist = {} if os.environ.get("GOLDEN_IGNORE_NON_EXECUTABLE") else _known_non_executable()
-    params = []
-    for fixture in discover_fixtures(relative_dir):
-        reason = allowlist.get(fixture)
-        if reason is None:
-            params.append(fixture)
-        else:
-            params.append(pytest.param(fixture, marks=pytest.mark.xfail(reason=reason, strict=False)))
-    return params
+
+def _parse_unresolved_allowlist(raw: object) -> dict[str, dict[str, UnresolvedMetric]]:
+    root = _require_object(raw, "root")
+    _reject_unknown_fields(root, {"description", "fixtures"}, "root")
+    _required_non_empty_string(root, "description")
+    fixtures = root.get("fixtures")
+    if not isinstance(fixtures, list):
+        msg = "unresolved allowlist field 'fixtures' must be a list"
+        raise TypeError(msg)
+
+    unresolved: dict[str, dict[str, UnresolvedMetric]] = {}
+    for raw_fixture in fixtures:
+        fixture = _require_object(raw_fixture, "fixture")
+        _reject_unknown_fields(fixture, {"path", "description", "metrics"}, "fixture")
+        relative_path = _required_non_empty_string(fixture, "path")
+        _required_non_empty_string(fixture, "description")
+        if relative_path in unresolved:
+            msg = f"duplicate unresolved fixture entry {relative_path!r}"
+            raise AssertionError(msg)
+
+        raw_metrics = fixture.get("metrics")
+        if not isinstance(raw_metrics, list):
+            msg = f"unresolved fixture entry {relative_path!r} field 'metrics' must be a list"
+            raise TypeError(msg)
+        if not raw_metrics:
+            msg = f"unresolved fixture entry {relative_path!r} must contain a non-empty metrics list"
+            raise AssertionError(msg)
+
+        metrics: dict[str, UnresolvedMetric] = {}
+        for raw_metric in raw_metrics:
+            metric_entry = _require_object(raw_metric, "metric")
+            _reject_unknown_fields(metric_entry, {"metric", "reason", "evidence"}, "metric")
+            metric = _required_non_empty_string(metric_entry, "metric")
+            reason = _required_non_empty_string(metric_entry, "reason")
+            evidence = _required_non_empty_string(metric_entry, "evidence")
+            if metric in metrics:
+                msg = f"duplicate unresolved metric {metric!r} for fixture {relative_path!r}"
+                raise AssertionError(msg)
+            metrics[metric] = UnresolvedMetric(metric=metric, reason=reason, evidence=evidence)
+        unresolved[relative_path] = metrics
+    return unresolved
+
+
+def _require_object(value: object, scope: str) -> dict[str, object]:
+    if not isinstance(value, dict):
+        msg = f"unresolved allowlist {scope} must be an object, got {type(value).__name__}"
+        raise TypeError(msg)
+    return value
+
+
+def _reject_unknown_fields(entry: dict[str, object], allowed: set[str], scope: str) -> None:
+    unknown = sorted(set(entry) - allowed)
+    if unknown:
+        msg = f"unknown {scope} field {unknown[0]!r}"
+        raise AssertionError(msg)
+
+
+def _required_non_empty_string(entry: dict[str, object], key: str) -> str:
+    value = entry.get(key)
+    if not isinstance(value, str):
+        msg = f"unresolved allowlist field {key!r} must be a string"
+        raise TypeError(msg)
+    if not value.strip():
+        msg = f"unresolved allowlist field {key!r} must be a non-empty string"
+        raise AssertionError(msg)
+    return value
 
 
 def _load_runner(domain: str) -> ModuleType:
@@ -170,19 +252,41 @@ def run_golden(relative_path: str) -> None:
     path = fixture_path(relative_path)
     fixture = GoldenFixture.from_path(path)
     validate_fixture(path, fixture)
+    unresolved = _known_unresolved_metrics().get(relative_path, {})
+    invalid_metrics = set(unresolved) - set(fixture.expected)
+    if invalid_metrics:
+        metric = sorted(invalid_metrics)[0]
+        msg = f"unresolved metric {metric!r} is not expected by fixture {relative_path!r}"
+        raise AssertionError(msg)
+
     runner = _load_runner(fixture.metadata.domain)
     actuals = runner.run(fixture)
 
     failures = []
     results = []
-    for metric, expected in fixture.expected.items():
+    for metric in sorted(fixture.expected):
+        expected = fixture.expected[metric]
         if metric not in actuals:
             failures.append(f"{path}: runner did not produce metric '{metric}'")
             continue
         tolerance = fixture.tolerances[metric]
         result = compare(metric, actuals[metric], expected, tolerance)
         results.append(result)
-        if not result.passed:
+        unresolved_entry = unresolved.get(metric)
+        if result.passed and unresolved_entry is not None:
+            failures.append(
+                f"stale unresolved metric '{metric}' for {relative_path}: comparison now passes; "
+                "remove the allowlist entry"
+            )
+        elif not result.passed and unresolved_entry is not None:
+            warnings.warn(
+                f"expected unresolved metric {relative_path}::{metric}: "
+                f"{unresolved_entry.reason} Evidence: {unresolved_entry.evidence}\n"
+                f"{result.failure_message(str(path))}",
+                ExpectedUnresolvedWarning,
+                stacklevel=2,
+            )
+        elif not result.passed:
             failures.append(result.failure_message(str(path)))
 
     _write_comparison_csv(relative_path, results)

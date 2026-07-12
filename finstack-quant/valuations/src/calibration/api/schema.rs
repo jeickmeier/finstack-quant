@@ -408,6 +408,10 @@ pub struct ForwardCurveParams {
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,
     /// Calibration method to use.
+    ///
+    /// Forward curves require [`CalibrationMethod::GlobalSolve`]. Sequential
+    /// bootstrap is rejected because contractual off-grid reset intervals
+    /// couple adjacent rates through projection discount factors.
     #[serde(default)]
     pub method: CalibrationMethod,
     /// Interpolation style for the curve.

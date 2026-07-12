@@ -574,6 +574,51 @@ def test_wasm_core_market_data_types_on_facade() -> None:
     assert not missing, f"market_data WASM subset missing from core.js: {sorted(missing)}"
 
 
+def test_wasm_core_curve_member_pins_match_binding_source() -> None:
+    """Pinned curve/cube members must use their canonical wasm-bindgen JS names."""
+    block = CONTRACT["wasm_core_subset"]
+    wasm_src = (
+        CONTRACT_PATH.parent.parent / "finstack-quant-wasm" / "src" / "api" / "core" / "market_data.rs"
+    ).read_text()
+
+    for member_key in [
+        "discount_curve_members",
+        "forward_curve_members",
+        "vol_cube_members",
+    ]:
+        for js_name in block[member_key]:
+            assert (
+                f"js_name = {js_name}" in wasm_src
+                or f"pub fn {js_name}(" in wasm_src
+                or f"pub fn {re.sub(r'(?<!^)(?=[A-Z])', '_', js_name).lower()}(" in wasm_src
+            ), f"WASM binding source is missing pinned member {js_name!r}"
+
+
+def test_python_curve_phase4_members_are_live() -> None:
+    """Python mirrors the canonical Rust Phase 4 curve metadata."""
+    module = importlib.import_module("finstack_quant.core.market_data")
+    for class_name, members in {
+        "DiscountCurve": ["forward"],
+        "ForwardCurve": ["rate_between", "projection_grid", "reset_lag"],
+    }.items():
+        cls = getattr(module, class_name)
+        for member in members:
+            assert hasattr(cls, member), f"{class_name} missing {member}"
+
+
+def test_core_credit_migration_member_pins_resolve() -> None:
+    """Pinned GeneratorMatrix diagnostics must remain live Python members."""
+    members = CONTRACT["crates"]["core"]["credit_migration_members"]
+    module = importlib.import_module("finstack_quant.core.credit.migration")
+
+    for key, python_name in members.items():
+        class_name, _, canonical_member = key.partition(".")
+        cls = getattr(module, class_name, None)
+        assert cls is not None, f"credit.migration missing class {class_name}"
+        assert python_name == canonical_member
+        assert hasattr(cls, python_name), f"{class_name} missing pinned member `{python_name}`"
+
+
 def test_core_market_data_public_matches_contract() -> None:
     """``finstack_quant.core.market_data.__all__`` must match [crates.core.market_data]."""
     block = CONTRACT["crates"]["core"]["market_data"]
@@ -673,3 +718,15 @@ def test_valuations_correlation_member_pins_resolve_in_both_hosts() -> None:
             f"WASM correlation binding missing `{js_name}` (pinned as {key}); "
             f"expected `{wasm_pin}` in finstack-quant-wasm/src/api/valuations/correlation/mod.rs"
         )
+
+
+def test_correlated_bernoulli_requested_correlation_matches_rust_and_stub() -> None:
+    """Python exposes the canonical Rust requested-correlation diagnostic."""
+    module = importlib.import_module("finstack_quant.valuations.correlation")
+    assert hasattr(module.CorrelatedBernoulli, "requested_correlation")
+
+    stub = (CONTRACT_PATH.parent / "finstack_quant" / "valuations" / "correlation" / "__init__.pyi").read_text()
+    assert "def requested_correlation(self) -> float:" in stub
+
+    rust = (CONTRACT_PATH.parent.parent / "finstack-quant" / "core" / "src" / "math" / "probability.rs").read_text()
+    assert "pub fn requested_correlation(&self) -> f64" in rust

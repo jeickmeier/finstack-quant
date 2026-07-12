@@ -256,21 +256,13 @@ impl InterestRateFuture {
         &self,
         context: &MarketContext,
     ) -> finstack_quant_core::Result<f64> {
-        use finstack_quant_core::dates::DayCountContext;
-        let (fixing_date, period_start, period_end) = self.resolve_dates()?;
+        let (_fixing_date, period_start, period_end) = self.resolve_dates()?;
         let fwd = context.get_forward(&self.forward_curve_id)?;
-        let fwd_dc = fwd.day_count();
-        let fwd_base = fwd.base_date();
-        let _t_fixing = fwd_dc
-            .year_fraction(fwd_base, fixing_date, DayCountContext::default())?
-            .max(0.0);
-        let t_start = fwd_dc
-            .year_fraction(fwd_base, period_start, DayCountContext::default())?
-            .max(0.0);
-        let t_end = fwd_dc
-            .year_fraction(fwd_base, period_end, DayCountContext::default())?
-            .max(t_start);
-        Ok(fwd.rate_period(t_start, t_end))
+        crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            fwd.as_ref(),
+            period_start,
+            period_end,
+        )
     }
 
     /// Convexity adjustment applied to the model forward rate.
@@ -295,14 +287,11 @@ impl InterestRateFuture {
         let t_end = fwd_dc
             .year_fraction(as_of, period_end, DayCountContext::default())?
             .max(t_start);
-        let fwd_base = fwd.base_date();
-        let t_start_curve = fwd_dc
-            .year_fraction(fwd_base, period_start, DayCountContext::default())?
-            .max(0.0);
-        let t_end_curve = fwd_dc
-            .year_fraction(fwd_base, period_end, DayCountContext::default())?
-            .max(t_start_curve);
-        let forward_rate = fwd.rate_period(t_start_curve, t_end_curve);
+        let forward_rate = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            fwd.as_ref(),
+            period_start,
+            period_end,
+        )?;
         Ok(self.calculate_convexity_adjusted_rate(
             context,
             forward_rate,
@@ -354,7 +343,6 @@ impl InterestRateFuture {
         // Time to fixing and rate period for forward rate calculation use the forward
         // curve's day-count basis for consistency with curve construction.
         let fwd_dc = fwd.day_count();
-        let fwd_base = fwd.base_date();
         let t_fixing = fwd_dc
             .year_fraction(as_of, fixing_date, DayCountContext::default())?
             .max(0.0);
@@ -364,15 +352,12 @@ impl InterestRateFuture {
         let t_end_remaining = fwd_dc
             .year_fraction(as_of, period_end, DayCountContext::default())?
             .max(t_start_remaining);
-        let t_start_curve = fwd_dc
-            .year_fraction(fwd_base, period_start, DayCountContext::default())?
-            .max(0.0);
-        let t_end_curve = fwd_dc
-            .year_fraction(fwd_base, period_end, DayCountContext::default())?
-            .max(t_start_curve);
-
         // Forward rate over the period
-        let forward_rate = fwd.rate_period(t_start_curve, t_end_curve);
+        let forward_rate = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
+            fwd.as_ref(),
+            period_start,
+            period_end,
+        )?;
 
         // Apply convexity adjustment policy
         let adjusted_rate = if let Some(ca) = self.contract_specs.convexity_adjustment {
@@ -635,6 +620,7 @@ impl crate::instruments::common_impl::traits::CurveDependencies for InterestRate
 mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::macros::date;
 
     #[test]
@@ -777,5 +763,40 @@ mod tests {
             .expect("t2")
             .max(t1);
         assert!((later_adjustment - 0.5 * normal_vol * normal_vol * t1 * t2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn ir_future_rejects_pre_curve_or_straddling_projection_period() {
+        let future = InterestRateFuture::builder()
+            .id(InstrumentId::new("IRF-PRE-BASE"))
+            .notional(Money::new(1_000_000.0, Currency::USD))
+            .expiry(date!(2025 - 01 - 15))
+            .fixing_date_opt(Some(date!(2025 - 01 - 15)))
+            .period_start_opt(Some(date!(2025 - 01 - 17)))
+            .period_end_opt(Some(date!(2025 - 04 - 17)))
+            .quoted_price(95.0)
+            .day_count(DayCount::Act360)
+            .position(Position::Long)
+            .contract_specs(FutureContractSpecs {
+                convexity_adjustment: Some(0.0),
+                ..FutureContractSpecs::default()
+            })
+            .discount_curve_id(CurveId::new("USD-OIS"))
+            .forward_curve_id(CurveId::new("USD-SOFR-3M"))
+            .attributes(Attributes::new())
+            .build()
+            .expect("future");
+        let market = MarketContext::new().insert(
+            ForwardCurve::builder("USD-SOFR-3M", 0.25)
+                .base_date(date!(2025 - 02 - 01))
+                .knots([(0.0, 0.04), (2.0, 0.04)])
+                .build()
+                .expect("forward curve"),
+        );
+
+        let error = future
+            .model_forward_rate(&market)
+            .expect_err("pre-base futures period must not be clamped");
+        assert!(error.to_string().contains("historical fixing"));
     }
 }

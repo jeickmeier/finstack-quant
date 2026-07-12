@@ -268,6 +268,41 @@ fn test_vol_cube_materialize_expiry_slice() {
 }
 
 #[test]
+fn materialized_expiry_slice_interpolates_direct_vol_along_tenor() {
+    let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
+    let cube = VolCube::from_grid("TEST", &[1.0], &[1.0, 4.0], &[p; 2], &[0.02, 0.05])
+        .unwrap()
+        .with_interpolation_mode(
+            finstack_quant_core::market_data::surfaces::VolInterpolationMode::TotalVariance,
+        );
+    let strike = 0.03;
+    let surface = cube.materialize_expiry_slice(1.0, &[strike]).unwrap();
+    let tenor = 2.5;
+    let low = cube.vol(1.0, 1.0, strike).unwrap();
+    let high = cube.vol(1.0, 4.0, strike).unwrap();
+    assert!((surface.value_checked(1.0, strike).unwrap() - low).abs() < 1e-14);
+    assert!((surface.value_checked(4.0, strike).unwrap() - high).abs() < 1e-14);
+
+    let direct_vol_interpolation = 0.5 * (low + high);
+    let materialized = surface.value_checked(tenor, strike).unwrap();
+    assert!(
+        (materialized - direct_vol_interpolation).abs() < 1e-14,
+        "materialized tenor interpolation {materialized} must use direct vol {direct_vol_interpolation}"
+    );
+}
+
+#[test]
+fn normal_sabr_clamped_path_rejects_nonpositive_shifted_levels() {
+    let cev = SabrParams::new(0.01, 0.5, -0.2, 0.4).unwrap();
+    let cube = VolCube::from_grid("CEV", &[1.0], &[2.0], &[cev], &[-0.01]).unwrap();
+    assert!(cube.vol_normal_clamped(1.0, 2.0, -0.01).is_nan());
+
+    let normal = SabrParams::new(0.01, 0.0, -0.2, 0.4).unwrap();
+    let cube = VolCube::from_grid("NORMAL", &[1.0], &[2.0], &[normal], &[-0.01]).unwrap();
+    assert!(cube.vol_normal_clamped(1.0, 2.0, -0.02).is_finite());
+}
+
+#[test]
 fn test_vol_cube_materialize_grid_flattens_expiry_tenor_strike_order() {
     let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
     let cube = VolCube::from_grid(
@@ -465,22 +500,16 @@ fn test_vol_cube_vol_normal_atm_approximation() {
 }
 
 /// Degenerate point: beta > 0 with a cross-zero (negative forward, positive
-/// strike) quote and no shift is refused by the checked path and floored by
-/// the clamped path. The normal floor is in absolute rate units:
-/// 1e-8 * max(|F|, 1) = 1e-8 here.
+/// strike) quote and no shift is refused by both checked and clamped paths.
 #[test]
-fn test_vol_cube_vol_normal_floor_on_degenerate_point() {
+fn test_vol_cube_vol_normal_rejects_degenerate_point() {
     let p = SabrParams::new(0.035, 0.5, -0.2, 0.4).unwrap();
     let fwd = -0.01; // cross-zero vs positive strike, beta = 0.5, no shift
     let cube = VolCube::from_grid("BAD", &[1.0], &[5.0], &[p], &[fwd]).unwrap();
 
     assert!(cube.vol_normal(1.0, 5.0, 0.02).is_err());
 
-    let floored = cube.vol_normal_clamped(1.0, 5.0, 0.02);
-    assert!(
-        (floored - 1e-8).abs() < 1e-20,
-        "expected normal-vol floor 1e-8, got {floored}"
-    );
+    assert!(cube.vol_normal_clamped(1.0, 5.0, 0.02).is_nan());
 }
 
 #[test]

@@ -13,6 +13,11 @@ __all__ = ["scoring", "pd", "lgd", "migration"]
 class scoring:
     """Academic credit scoring: Altman Z-Score family, Ohlson O-Score, Zmijewski."""
 
+    class AltmanPdCalibration:
+        """Explicit versioned Altman score-to-PD heuristics."""
+
+        HEURISTIC_V1: AltmanPdCalibration
+
     @staticmethod
     def altman_z_score(
         working_capital_to_total_assets: float,
@@ -20,7 +25,8 @@ class scoring:
         ebit_to_total_assets: float,
         market_equity_to_total_liabilities: float,
         sales_to_total_assets: float,
-    ) -> tuple[float, str, float]:
+        pd_calibration: AltmanPdCalibration | None = None,
+    ) -> tuple[float, str, float | None]:
         """Original Altman Z-Score (1968) for publicly traded manufacturers.
 
         Parameters
@@ -35,12 +41,16 @@ class scoring:
             Market equity / total liabilities (X4).
         sales_to_total_assets : float
             Sales / total assets (X5).
+        pd_calibration : AltmanPdCalibration | None
+            Explicit score-to-PD mapping. ``HEURISTIC_V1`` is an uncalibrated
+            house heuristic, not an empirical Altman calibration.
 
         Returns
         -------
-        tuple[float, str, float]
+        tuple[float, str, float | None]
             ``(score, zone, implied_pd)`` where ``zone`` is one of
-            ``"safe"``, ``"grey"``, or ``"distress"``.
+            ``"safe"``, ``"grey"``, or ``"distress"``. ``implied_pd`` is
+            ``None`` unless ``pd_calibration`` is supplied.
 
         Raises
         ------
@@ -67,7 +77,8 @@ class scoring:
         ebit_to_total_assets: float,
         book_equity_to_total_liabilities: float,
         sales_to_total_assets: float,
-    ) -> tuple[float, str, float]:
+        pd_calibration: AltmanPdCalibration | None = None,
+    ) -> tuple[float, str, float | None]:
         """Altman Z'-Score (1983) for private firms.
 
         Parameters
@@ -80,9 +91,10 @@ class scoring:
 
         Returns
         -------
-        tuple[float, str, float]
+        tuple[float, str, float | None]
             ``(score, zone, implied_pd)`` where ``zone`` is ``"safe"``,
-            ``"grey"``, or ``"distress"``.
+            ``"grey"``, or ``"distress"``. PD is absent unless an explicit
+            versioned heuristic is supplied.
 
         Sources
         -------
@@ -103,10 +115,12 @@ class scoring:
         retained_earnings_to_total_assets: float,
         ebit_to_total_assets: float,
         book_equity_to_total_liabilities: float,
-    ) -> tuple[float, str, float]:
+        pd_calibration: AltmanPdCalibration | None = None,
+    ) -> tuple[float, str, float | None]:
         """Altman Z''-Score for non-manufacturing firms (non-EM model, no constant).
 
-        Returns ``(score, zone, implied_pd)``.
+        Returns ``(score, zone, implied_pd)``; PD is ``None`` unless an
+        explicit versioned heuristic is supplied.
 
         Examples
         --------
@@ -177,7 +191,8 @@ class pd:
         asset_correlation:
             Asset correlation ``rho`` in ``[0, 1)``.
         cycle_index:
-            Standardized credit cycle index ``z`` (positive = downturn).
+            Standardized credit cycle index ``z`` (negative = downturn,
+            positive = benign).
 
         Returns
         -------
@@ -204,7 +219,8 @@ class pd:
         asset_correlation:
             Asset correlation ``rho`` in ``[0, 1)``.
         cycle_index:
-            Standardized credit cycle index ``z`` (positive = downturn).
+            Standardized credit cycle index ``z`` (negative = downturn,
+            positive = benign).
 
         Returns
         -------
@@ -957,6 +973,22 @@ class migration:
             -------
             >>> gm.n_states()  # doctest: +SKIP
             8
+            """
+            ...
+
+        @property
+        def regularization_l1(self) -> float:
+            """L1 mass clamped by Kreinin-Sidenius regularization.
+
+            Returns ``0.0`` for directly constructed generators.
+            """
+            ...
+
+        @property
+        def round_trip_error(self) -> float:
+            """Infinity-norm reconstruction error against the source matrix.
+
+            Returns ``0.0`` for directly constructed generators.
             """
             ...
 

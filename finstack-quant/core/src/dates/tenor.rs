@@ -170,17 +170,7 @@ impl TryFrom<TenorDe> for Tenor {
     type Error = crate::Error;
 
     fn try_from(raw: TenorDe) -> Result<Self, Self::Error> {
-        if raw.count == 0 {
-            return Err(InputError::InvalidTenor {
-                tenor: "0".to_string(),
-                reason: "count must be positive".to_string(),
-            }
-            .into());
-        }
-        Ok(Self {
-            count: raw.count,
-            unit: raw.unit,
-        })
+        Self::try_new(raw.count, raw.unit)
     }
 }
 
@@ -202,6 +192,43 @@ impl Tenor {
     #[inline]
     pub const fn new(count: u32, unit: TenorUnit) -> Self {
         Self { count, unit }
+    }
+
+    /// Create a validated tenor.
+    ///
+    /// This is the canonical constructor for external input. It rejects zero
+    /// counts, unsupported lengths, and counts whose unit conversion would
+    /// overflow.
+    pub fn try_new(count: u32, unit: TenorUnit) -> crate::Result<Self> {
+        let max_count = match unit {
+            TenorUnit::Days => MAX_TENOR_DAYS,
+            TenorUnit::Weeks => MAX_TENOR_WEEKS,
+            TenorUnit::Months => MAX_TENOR_MONTHS,
+            TenorUnit::Years => MAX_TENOR_YEARS,
+        };
+        let conversion_ok = match unit {
+            TenorUnit::Weeks => count.checked_mul(7).is_some(),
+            TenorUnit::Years => count.checked_mul(12).is_some(),
+            TenorUnit::Days | TenorUnit::Months => true,
+        };
+        if count == 0 || count > max_count || !conversion_ok {
+            let suffix = match unit {
+                TenorUnit::Days => "D",
+                TenorUnit::Weeks => "W",
+                TenorUnit::Months => "M",
+                TenorUnit::Years => "Y",
+            };
+            return Err(InputError::InvalidTenor {
+                tenor: format!("{count}{suffix}"),
+                reason: if count == 0 {
+                    "count must be positive".to_string()
+                } else {
+                    format!("count exceeds maximum supported tenor of {MAX_TENOR_YEARS} years")
+                },
+            }
+            .into());
+        }
+        Ok(Self { count, unit })
     }
 
     /// Get the number of months if the tenor is month-based or year-based.
@@ -360,21 +387,7 @@ impl Tenor {
             .into());
         };
         let unit = TenorUnit::from_char(unit_char)?;
-        let max_count = match unit {
-            TenorUnit::Days => MAX_TENOR_DAYS,
-            TenorUnit::Weeks => MAX_TENOR_WEEKS,
-            TenorUnit::Months => MAX_TENOR_MONTHS,
-            TenorUnit::Years => MAX_TENOR_YEARS,
-        };
-        if count > max_count {
-            return Err(InputError::InvalidTenor {
-                tenor: s.to_string(),
-                reason: format!("count exceeds maximum supported tenor of {MAX_TENOR_YEARS} years"),
-            }
-            .into());
-        }
-
-        Ok(Self { count, unit })
+        Self::try_new(count, unit)
     }
 
     /// Convert tenor to a simple year fraction approximation.
@@ -856,6 +869,17 @@ mod tests {
         let err = serde_json::from_str::<Tenor>(r#"{"count":3,"unit":"months","extra":true}"#)
             .expect_err("unknown tenor fields must be rejected");
         assert!(err.to_string().contains("extra"));
+    }
+
+    #[test]
+    fn checked_constructor_rejects_zero_and_conversion_overflow() {
+        assert!(Tenor::try_new(0, TenorUnit::Months).is_err());
+        assert!(Tenor::try_new(u32::MAX, TenorUnit::Years).is_err());
+        assert!(Tenor::try_new(u32::MAX, TenorUnit::Weeks).is_err());
+        assert_eq!(
+            Tenor::try_new(3, TenorUnit::Months).unwrap(),
+            Tenor::new(3, TenorUnit::Months)
+        );
     }
 
     #[test]

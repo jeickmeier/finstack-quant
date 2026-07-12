@@ -127,6 +127,26 @@ fn simple_fx_provider_set_quotes_bulk() {
 }
 
 #[test]
+fn simple_fx_provider_set_quotes_is_atomic() {
+    let provider = SimpleFxProvider::new();
+    provider
+        .set_quote(Currency::EUR, Currency::USD, 1.10)
+        .unwrap();
+
+    assert!(provider
+        .set_quotes(&[
+            (Currency::EUR, Currency::USD, 1.20),
+            (Currency::GBP, Currency::USD, f64::NAN),
+        ])
+        .is_err());
+    assert_eq!(
+        provider.get_direct(Currency::EUR, Currency::USD),
+        Some(1.10)
+    );
+    assert_eq!(provider.get_direct(Currency::GBP, Currency::USD), None);
+}
+
+#[test]
 fn simple_fx_provider_update_existing_quote() {
     let provider = SimpleFxProvider::new();
 

@@ -54,7 +54,9 @@ fn bench_forward_curve(c: &mut Criterion) {
         base_date,
         tenor_years: 0.25,
         discount_curve_id: "USD-OIS".into(),
-        method: CalibrationMethod::Bootstrap,
+        method: CalibrationMethod::GlobalSolve {
+            use_analytical_jacobian: false,
+        },
         interpolation: Default::default(),
         conventions: Default::default(),
     };

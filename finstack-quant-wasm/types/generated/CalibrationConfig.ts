@@ -44,7 +44,7 @@ import type { ValidationMode } from "./ValidationMode";
  *
  * 1. **Step-level** (`CalibrationStep.params.method`): Per-instrument-type overrides
  * 2. **Plan-level** (`CalibrationPlan.settings`): Plan-wide defaults
- * 3. **Finstack config extensions** (`valuations.calibration`): application defaults
+ * 3. **Finstack config extensions** (`valuations.calibration.v2`): application defaults
  * 4. **Global defaults** (`CalibrationConfig::default()`): fallback values
  *
  * Step-level settings always take precedence over plan-level settings.

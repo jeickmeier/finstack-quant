@@ -7,7 +7,8 @@
 //! - [`term_structure`]: Build monotonic cumulative PD curves from transition
 //!   matrices, hazard curves, or explicit data points.
 //! - [`master_scale`]: Map continuous PDs to discrete rating grades with
-//!   configurable boundaries. Includes S&P and Moody's empirical presets.
+//!   configurable boundaries. Includes versioned library assumptions using
+//!   S&P-style and Moody's-style labels; these are not agency calibrations.
 //!
 //! # Examples
 //!

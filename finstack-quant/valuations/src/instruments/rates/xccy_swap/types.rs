@@ -671,7 +671,7 @@ impl XccySwap {
         context: &MarketContext,
         as_of: Date,
     ) -> Result<Money> {
-        use crate::instruments::common_impl::pricing::time::rate_period_on_dates;
+        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 
         self.validate_leg(leg)?;
 
@@ -774,7 +774,7 @@ impl XccySwap {
                     as_of,
                 )?
             } else {
-                rate_period_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)?
+                rate_between_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)?
             };
             if !forward_rate.is_finite() {
                 return Err(finstack_quant_core::Error::Validation(format!(

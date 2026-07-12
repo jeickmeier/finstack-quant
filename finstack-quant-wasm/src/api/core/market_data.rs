@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::surfaces::{
     FxDeltaVolSurface as RustFxDeltaVolSurface, VolCube as RustVolCube, VolInterpolationMode,
 };
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve as RustDiscountCurve, ForwardCurve as RustForwardCurve,
+    DiscountCurve as RustDiscountCurve, ForwardCurve as RustForwardCurve, ValidationMode,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::math::volatility::sabr::SabrParams;
@@ -17,6 +17,7 @@ use finstack_quant_core::money::fx::{
     FxConversionPolicy as RustFxConversionPolicy, FxMatrix as RustFxMatrix, FxQuery,
     FxRateResult as RustFxRateResult, SimpleFxProvider,
 };
+use js_sys::Float64Array;
 use wasm_bindgen::prelude::*;
 
 // ---------------------------------------------------------------------------
@@ -89,10 +90,18 @@ impl DiscountCurve {
     /// @param extrapolation - Extrapolation policy (default
     /// `"flat_forward"`). One of `"flat_zero"`, `"flat_forward"`, `"nan"`.
     /// @param dayCount - Day-count convention (defaults to curve-ID inference).
+    /// @param validationMode - Rust validation preset: `"market_standard"`
+    /// (default) or `"negative_rate_friendly"`.
+    /// @param forwardFloor - Required minimum implied forward when using
+    /// `"negative_rate_friendly"`.
     /// @returns The constructed `DiscountCurve`.
     /// @throws If `knots` length is odd, the date is malformed, the
     /// interpolation style is unknown, or any `df` is non-positive.
     #[wasm_bindgen(constructor)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserves existing positional constructor arguments and appends validation options compatibly"
+    )]
     pub fn new(
         id: &str,
         base_date: &str,
@@ -100,6 +109,8 @@ impl DiscountCurve {
         interp: Option<String>,
         extrapolation: Option<String>,
         day_count: Option<String>,
+        validation_mode: Option<String>,
+        forward_floor: Option<f64>,
     ) -> Result<DiscountCurve, JsValue> {
         let base = parse_iso_date(base_date)?;
         let style = match interp {
@@ -123,6 +134,31 @@ impl DiscountCurve {
         if let Some(ref s) = day_count {
             builder = builder.day_count(parse_day_count(s)?);
         }
+        builder = match validation_mode.as_deref().unwrap_or("market_standard") {
+            "market_standard" => {
+                if forward_floor.is_some() {
+                    return Err(to_js_err(
+                        "forwardFloor is only valid with validationMode='negative_rate_friendly'",
+                    ));
+                }
+                builder.validation(ValidationMode::MarketStandard)
+            }
+            "negative_rate_friendly" => {
+                let floor = forward_floor.ok_or_else(|| {
+                    to_js_err(
+                        "forwardFloor is required with validationMode='negative_rate_friendly'",
+                    )
+                })?;
+                builder.validation(ValidationMode::NegativeRateFriendly {
+                    forward_floor: floor,
+                })
+            }
+            other => {
+                return Err(to_js_err(format!(
+                    "unknown DiscountCurve validationMode {other:?}; expected 'market_standard' or 'negative_rate_friendly'"
+                )));
+            }
+        };
 
         let curve = builder.build().map_err(to_js_err)?;
 
@@ -142,8 +178,8 @@ impl DiscountCurve {
     }
 
     /// Continuously-compounded forward rate between `t1` and `t2`.
-    #[wasm_bindgen(js_name = forwardRate)]
-    pub fn forward_rate(&self, t1: f64, t2: f64) -> Result<f64, JsValue> {
+    #[wasm_bindgen(js_name = forward)]
+    pub fn forward(&self, t1: f64, t2: f64) -> Result<f64, JsValue> {
         self.inner.forward(t1, t2).map_err(to_js_err)
     }
 
@@ -183,7 +219,14 @@ impl ForwardCurve {
     /// * `dayCount` - Day-count convention (defaults to curve-ID inference).
     /// * `interp` - Interpolation style (default ``"linear"``).
     /// * `extrapolation` - Extrapolation policy (default ``"flat_forward"``).
+    /// * `projectionGrid` - Optional contractual reset/end boundaries.
+    /// * `resetLag` - Optional fixing-to-spot lag in business days; omit for
+    ///   Rust curve-ID inference.
     #[wasm_bindgen(constructor)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "preserves existing positional constructor arguments and appends projectionGrid compatibly"
+    )]
     pub fn new(
         id: &str,
         tenor: f64,
@@ -192,6 +235,8 @@ impl ForwardCurve {
         day_count: Option<String>,
         interp: Option<String>,
         extrapolation: Option<String>,
+        projection_grid: Option<Vec<f64>>,
+        reset_lag: Option<i32>,
     ) -> Result<ForwardCurve, JsValue> {
         let base = parse_iso_date(base_date)?;
         let style = match interp {
@@ -214,9 +259,13 @@ impl ForwardCurve {
             .base_date(base)
             .knots(pairs)
             .interp(style)
-            .extrapolation(extrap);
+            .extrapolation(extrap)
+            .projection_grid_opt(projection_grid);
         if let Some(ref s) = day_count {
             builder = builder.day_count(parse_day_count(s)?);
+        }
+        if let Some(reset_lag) = reset_lag {
+            builder = builder.reset_lag(reset_lag);
         }
 
         let curve = builder.build().map_err(to_js_err)?;
@@ -227,8 +276,15 @@ impl ForwardCurve {
     }
 
     /// Forward rate at year fraction `t`.
+    #[wasm_bindgen(js_name = rate)]
     pub fn rate(&self, t: f64) -> f64 {
         self.inner.rate(t)
+    }
+
+    /// Discount-factor-implied simple forward over `(t1, t2)`.
+    #[wasm_bindgen(js_name = rateBetween)]
+    pub fn rate_between(&self, t1: f64, t2: f64) -> Result<f64, JsValue> {
+        self.inner.rate_between(t1, t2).map_err(to_js_err)
     }
 
     /// Curve identifier.
@@ -241,6 +297,20 @@ impl ForwardCurve {
     #[wasm_bindgen(getter, js_name = baseDate)]
     pub fn base_date(&self) -> String {
         date_to_iso(self.inner.base_date())
+    }
+
+    /// Contractual projection boundaries, or `null` for legacy tenor stepping.
+    #[wasm_bindgen(getter, js_name = projectionGrid)]
+    pub fn projection_grid(&self) -> JsValue {
+        self.inner
+            .projection_grid()
+            .map_or(JsValue::NULL, |grid| Float64Array::from(grid).into())
+    }
+
+    /// Business days from fixing to spot.
+    #[wasm_bindgen(getter, js_name = resetLag)]
+    pub fn reset_lag(&self) -> i32 {
+        self.inner.reset_lag()
     }
 }
 
@@ -517,6 +587,7 @@ impl VolCube {
     ///
     /// Clamps finite `expiry` and `tenor` values to the grid edges before
     /// interpolation. Non-finite inputs return `NaN`.
+    #[wasm_bindgen(js_name = volClamped)]
     pub fn vol_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_clamped(expiry, tenor, strike)
     }
@@ -539,6 +610,7 @@ impl VolCube {
     /// Returns `Err` if `expiry` or `tenor` falls outside the grid, if the
     /// expansion yields a non-finite volatility, or for cross-zero quotes
     /// (`(F+s)(K+s) <= 0`) with `beta > 0`, which require an explicit shift.
+    #[wasm_bindgen(js_name = volNormal)]
     pub fn vol_normal(&self, expiry: f64, tenor: f64, strike: f64) -> Result<f64, JsValue> {
         self.inner
             .vol_normal(expiry, tenor, strike)
@@ -550,6 +622,7 @@ impl VolCube {
     /// Clamps finite `expiry` and `tenor` values to the grid edges; a
     /// degenerate finite expansion is floored to a small positive normal vol
     /// (absolute rate units). Non-finite inputs return `NaN`.
+    #[wasm_bindgen(js_name = volNormalClamped)]
     pub fn vol_normal_clamped(&self, expiry: f64, tenor: f64, strike: f64) -> f64 {
         self.inner.vol_normal_clamped(expiry, tenor, strike)
     }
@@ -760,6 +833,8 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
         )
         .expect("discount curve");
         assert_eq!(curve.id(), "USD-OIS");
@@ -767,7 +842,7 @@ mod tests {
         assert!((curve.df(0.5) - 0.99).abs() < 1e-6);
         assert!((curve.df(1.0) - 0.98).abs() < 1e-6);
         assert!(curve.zero(1.0) > 0.0);
-        let f = curve.forward_rate(0.5, 1.0).expect("forward rate");
+        let f = curve.forward(0.5, 1.0).expect("forward rate");
         assert!(f > 0.0);
     }
 
@@ -778,6 +853,8 @@ mod tests {
             0.25,
             "2024-01-15",
             &[0.5, 0.04, 1.0, 0.045, 2.0, 0.05],
+            None,
+            None,
             None,
             None,
             None,

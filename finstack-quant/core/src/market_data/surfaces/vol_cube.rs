@@ -562,10 +562,18 @@ impl VolCube {
         let (v, fwd) = match self.interpolation_mode {
             VolInterpolationMode::Vol => {
                 let (params, fwd, exp_c) = self.interpolate_params_clamped(expiry, tenor);
+                let shift = params.shift.unwrap_or(0.0);
+                if params.beta > 0.0 && (fwd + shift <= 0.0 || strike + shift <= 0.0) {
+                    return f64::NAN;
+                }
                 (params.implied_vol_normal(fwd, strike, exp_c), fwd)
             }
             VolInterpolationMode::TotalVariance => {
-                let (_, fwd, _) = self.interpolate_params_clamped(expiry, tenor);
+                let (params, fwd, _) = self.interpolate_params_clamped(expiry, tenor);
+                let shift = params.shift.unwrap_or(0.0);
+                if params.beta > 0.0 && (fwd + shift <= 0.0 || strike + shift <= 0.0) {
+                    return f64::NAN;
+                }
                 (
                     self.total_variance_vol(expiry, tenor, strike, true)
                         .unwrap_or(f64::NAN),
@@ -650,7 +658,10 @@ impl VolCube {
     ///
     /// The resulting surface uses the cube's tenor axis as its "expiry" axis
     /// and the supplied strikes as its strike axis. Each vol is computed by
-    /// interpolating the SABR parameters at `(expiry, tenor_j)`.
+    /// interpolating the SABR parameters at `(expiry, tenor_j)`. Because that
+    /// first axis represents tenor rather than time-to-expiry, interpolation
+    /// between materialized tenor pillars is always linear in volatility,
+    /// never total variance.
     pub fn materialize_expiry_slice(
         &self,
         expiry: f64,
@@ -671,7 +682,6 @@ impl VolCube {
         }
 
         VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols)
-            .map(|surface| surface.with_interpolation_mode(self.interpolation_mode))
     }
 
     /// Materialize an expiry slice as a **normal-vol** [`VolSurface`].
@@ -699,10 +709,8 @@ impl VolCube {
             }
         }
 
-        VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols).map(|s| {
-            s.with_quote_type(VolQuoteType::Normal)
-                .with_interpolation_mode(self.interpolation_mode)
-        })
+        VolSurface::from_grid(self.id.as_str(), &self.tenors, strikes, &vols)
+            .map(|s| s.with_quote_type(VolQuoteType::Normal))
     }
 
     /// Materialize the full grid as a flat vector in `(expiry, tenor, strike)` order.

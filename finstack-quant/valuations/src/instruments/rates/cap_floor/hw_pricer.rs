@@ -32,7 +32,7 @@
 use crate::calibration::hull_white::hw1f_caplet_forward_rate_normal_vol;
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::pricing::time::{
-    rate_period_on_dates, relative_df_discount_curve,
+    rate_between_on_dates, relative_df_discount_curve,
 };
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
@@ -193,7 +193,7 @@ impl CapFloorHullWhitePricer {
             }
 
             let forward =
-                rate_period_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)
+                rate_between_on_dates(fwd.as_ref(), period.accrual_start, period.accrual_end)
                     .map_err(|e| {
                         PricingError::model_failure_with_context(
                             e.to_string(),

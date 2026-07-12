@@ -403,7 +403,10 @@ mod tests {
         let embedded = embedded_registry().expect("registry should load").clone();
         let value = serde_json::to_value(&embedded).expect("registry should serialize");
         let mut config = FinstackConfig::default();
-        config.extensions.insert(RATING_SCALES_EXTENSION_KEY, value);
+        config
+            .extensions
+            .insert(RATING_SCALES_EXTENSION_KEY, value)
+            .expect("static extension key");
 
         let loaded = registry_from_config(&config).expect("config registry should load");
         assert_eq!(

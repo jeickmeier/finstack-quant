@@ -21,7 +21,7 @@
 use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::swap_legs::robust_relative_df;
-use crate::instruments::common_impl::pricing::time::rate_period_on_dates;
+use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 use crate::instruments::rates::xccy_swap::types::{ResettingSide, XccySwap};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -233,7 +233,7 @@ pub(crate) fn pv_mtm_reset(
                 as_of,
             )?
         } else {
-            rate_period_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?
+            rate_between_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?
         };
         let df = robust_relative_df(disc_c.as_ref(), as_of, period.payment_date)?;
         let df = require_positive_df(df, &swap.id, "constant-leg", period.payment_date)?;
@@ -310,7 +310,7 @@ pub(crate) fn pv_mtm_reset(
                 as_of,
             )?
         } else {
-            rate_period_on_dates(fwd_r.as_ref(), period.accrual_start, period.accrual_end)?
+            rate_between_on_dates(fwd_r.as_ref(), period.accrual_start, period.accrual_end)?
         };
         let spread_decimal =
             decimal_to_f64(resetting_leg.spread_bp, "XccySwap resetting leg spread_bp")? / 10_000.0;
@@ -499,7 +499,7 @@ pub(crate) fn mtm_cashflow_schedule(
                 as_of,
             )?
         } else {
-            rate_period_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?
+            rate_between_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?
         };
         let all_in = rate + spread_c;
         flows.push(CashFlow {
@@ -555,7 +555,7 @@ pub(crate) fn mtm_cashflow_schedule(
                     as_of,
                 )?
             } else {
-                crate::instruments::common_impl::pricing::time::rate_period_on_dates(
+                crate::instruments::common_impl::pricing::time::rate_between_on_dates(
                     fwd_r.as_ref(),
                     // Project over the accrual interval (index tenor), not from the
                     // observation date — see the coupon-pricing note above.

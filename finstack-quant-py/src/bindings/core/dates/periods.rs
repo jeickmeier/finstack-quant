@@ -117,7 +117,7 @@ impl PyPeriodId {
 
 #[pymethods]
 impl PyPeriodId {
-    /// Parse a period code string (e.g. ``"2025Q1"``, ``"2025M06"``).
+    /// Parse a period code string (e.g. ``"2025Q1"`` or fiscal ``"FY2025W53"``).
     #[classmethod]
     #[pyo3(text_signature = "(cls, code)")]
     fn parse(_cls: &Bound<'_, PyType>, code: &str) -> PyResult<Self> {
@@ -184,7 +184,7 @@ impl PyPeriodId {
         self.inner.to_string()
     }
 
-    /// Gregorian calendar year.
+    /// Gregorian or fiscal year label.
     #[getter]
     fn year(&self) -> i32 {
         self.inner.year
@@ -202,20 +202,46 @@ impl PyPeriodId {
         PyPeriodKind::from_inner(self.inner.kind())
     }
 
+    /// Whether this identifier uses fiscal-year (``FY...``) semantics.
+    #[getter]
+    fn is_fiscal(&self) -> bool {
+        self.inner.is_fiscal()
+    }
+
     /// Number of periods per year for this kind.
     #[getter]
     fn periods_per_year(&self) -> u16 {
         self.inner.periods_per_year()
     }
 
-    /// Next period in sequence.
+    /// Next Gregorian/ISO period in sequence.
+    ///
+    /// Fiscal identifiers require [`Self::next_fiscal`].
     fn next(&self) -> PyResult<Self> {
         self.inner.next().map(Self::from_inner).map_err(core_to_py)
     }
 
-    /// Previous period in sequence.
+    /// Previous Gregorian/ISO period in sequence.
+    ///
+    /// Fiscal identifiers require [`Self::prev_fiscal`].
     fn prev(&self) -> PyResult<Self> {
         self.inner.prev().map(Self::from_inner).map_err(core_to_py)
+    }
+
+    /// Next period using fiscal-year week/day capacity.
+    fn next_fiscal(&self, fiscal_config: &PyFiscalConfig) -> PyResult<Self> {
+        self.inner
+            .next_fiscal(fiscal_config.inner)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
+    }
+
+    /// Previous period using fiscal-year week/day capacity.
+    fn prev_fiscal(&self, fiscal_config: &PyFiscalConfig) -> PyResult<Self> {
+        self.inner
+            .prev_fiscal(fiscal_config.inner)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 
     fn __repr__(&self) -> String {

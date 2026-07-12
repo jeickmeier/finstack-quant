@@ -421,7 +421,11 @@ impl Bps {
             }
             .into());
         }
-        Ok(Self(bps.round() as i32))
+        let rounded = bps.round();
+        if rounded < i32::MIN as f64 || rounded > i32::MAX as f64 {
+            return Err(InputError::ConversionOverflow.into());
+        }
+        Ok(Self(rounded as i32))
     }
 
     /// Get the basis points as an integer
@@ -903,6 +907,14 @@ mod tests {
             assert!(Bps::try_new(bad).is_err(), "try_new must reject {bad}");
             assert!(Bps::try_from(bad).is_err(), "TryFrom must reject {bad}");
         }
+    }
+
+    #[test]
+    fn bps_try_new_rejects_values_that_round_outside_i32() {
+        assert_eq!(Bps::try_new(i32::MAX as f64).unwrap().as_bps(), i32::MAX);
+        assert_eq!(Bps::try_new(i32::MIN as f64).unwrap().as_bps(), i32::MIN);
+        assert!(Bps::try_new(i32::MAX as f64 + 1.0).is_err());
+        assert!(Bps::try_new(i32::MIN as f64 - 1.0).is_err());
     }
 
     #[test]

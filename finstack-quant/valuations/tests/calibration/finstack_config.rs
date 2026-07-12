@@ -7,20 +7,22 @@ use serde_json::json;
 #[test]
 fn calibration_config_applies_extension_overrides() {
     let mut cfg = FinstackConfig::default();
-    cfg.extensions.insert(
-        CALIBRATION_CONFIG_KEY,
-        json!({
-            "solver": {
-                "method": "brent",
-                "tolerance": 1e-8,
-                "max_iterations": 250
-            },
-            "use_parallel": true,
-            "rate_bounds_policy": "explicit",
-            "rate_bounds": { "min_rate": -0.01, "max_rate": 0.10 },
-            "calibration_method": { "GlobalSolve": { "use_analytical_jacobian": true } }
-        }),
-    );
+    cfg.extensions
+        .insert(
+            CALIBRATION_CONFIG_KEY,
+            json!({
+                "solver": {
+                    "method": "brent",
+                    "tolerance": 1e-8,
+                    "max_iterations": 250
+                },
+                "use_parallel": true,
+                "rate_bounds_policy": "explicit",
+                "rate_bounds": { "min_rate": -0.01, "max_rate": 0.10 },
+                "calibration_method": { "GlobalSolve": { "use_analytical_jacobian": true } }
+            }),
+        )
+        .expect("valid extension key");
 
     let cfg_out =
         CalibrationConfig::from_finstack_config_or_default(&cfg).expect("apply overrides");
@@ -66,12 +68,14 @@ fn calibration_config_defaults_without_extension() {
 #[test]
 fn calibration_config_rejects_unknown_fields_in_extension() {
     let mut cfg = FinstackConfig::default();
-    cfg.extensions.insert(
-        CALIBRATION_CONFIG_KEY,
-        json!({
-            "unknown_field": true
-        }),
-    );
+    cfg.extensions
+        .insert(
+            CALIBRATION_CONFIG_KEY,
+            json!({
+                "unknown_field": true
+            }),
+        )
+        .expect("valid extension key");
 
     let err = CalibrationConfig::from_finstack_config_or_default(&cfg)
         .expect_err("unknown fields should error");

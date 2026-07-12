@@ -22,6 +22,7 @@ use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, R
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -131,7 +132,20 @@ fn create_market() -> MarketContext {
         .build()
         .unwrap();
 
-    MarketContext::new().insert(discount).insert(forward)
+    let first_period_fixing = ScalarTimeSeries::new(
+        "FIXING:SOFR-3M",
+        vec![(
+            Date::from_calendar_date(2025, Month::September, 29).unwrap(),
+            0.05,
+        )],
+        None,
+    )
+    .unwrap();
+
+    MarketContext::new()
+        .insert(discount)
+        .insert(forward)
+        .insert_series(first_period_fixing)
 }
 
 /// Build a CLO with specified behavioral parameters.

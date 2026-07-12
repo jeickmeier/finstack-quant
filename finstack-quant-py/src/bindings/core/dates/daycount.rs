@@ -43,7 +43,11 @@ impl PyDayCount {
     const ACT_365F: PyDayCount = PyDayCount {
         inner: DayCount::Act365F,
     };
-    /// Actual/365 Leap (AFB).
+    /// Actual/365L (ICMA Rule 251). Annual periods (or periods without a
+    /// supplied frequency) use denominator 366 exactly when February 29 falls
+    /// in ``(start, end]``; non-annual periods use 366 exactly when the end
+    /// date's year is a leap year. Otherwise the denominator is 365. This is
+    /// explicitly not ACT/ACT AFB, which uses sub-period splitting.
     #[classattr]
     const ACT_365L: PyDayCount = PyDayCount {
         inner: DayCount::Act365L,

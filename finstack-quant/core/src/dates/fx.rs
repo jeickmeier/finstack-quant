@@ -227,12 +227,12 @@ pub fn add_joint_business_days(
 ///
 /// # Convention note
 ///
-/// The widely-cited CLS/market convention constrains USD only on the
-/// **intermediate** day(s): a USD holiday on the value date itself does not, by
-/// that convention, push out a non-USD cross's settlement. This function
-/// deliberately adopts the stricter "USD good on the value date too" variant.
-/// Choose `settlement_cal_id` accordingly, and prefer [`add_joint_business_days`]
-/// (two-calendar) when the standard convention is required.
+/// The market convention implemented by [`fx_spot_date`] is asymmetric: USD
+/// does not gate intermediate counted days, but it **does** gate the final value
+/// date. This helper is symmetric and stricter when a settlement calendar is
+/// supplied: that calendar gates every counted day, including intermediates
+/// and the final value date. Use [`fx_spot_date`] for the USD-aware market rule;
+/// use this helper only when symmetric joint-calendar counting is intended.
 ///
 /// # Arguments
 ///

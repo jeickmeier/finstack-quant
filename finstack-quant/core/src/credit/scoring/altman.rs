@@ -15,6 +15,16 @@ use serde::{Deserialize, Serialize};
 
 use super::types::{check_finite, CreditScoringError, ScoringResult, ScoringZone};
 
+/// Explicit, versioned mappings from an Altman score to a PD-like heuristic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub enum AltmanPdCalibration {
+    /// Legacy piecewise mapping retained for compatibility.
+    ///
+    /// This is an uncalibrated house heuristic, not an empirical Altman
+    /// bankruptcy-probability calibration.
+    HeuristicV1,
+}
+
 // ---------------------------------------------------------------------------
 // Input structs
 // ---------------------------------------------------------------------------
@@ -98,10 +108,9 @@ pub struct AltmanZDoublePrimeInput {
 /// - 1.81 <= Z <= 2.99: Grey
 /// - Z < 1.81: Distress
 ///
-/// Implied PD uses a piecewise empirical mapping (Altman 2002):
-/// - Safe zone: PD ~ 0.01 (1%)
-/// - Grey zone: linear interpolation between 0.01 and 0.50
-/// - Distress zone: PD ~ 0.50 + additional risk from score depth
+/// The canonical result does not contain an implied PD. Use
+/// [`altman_z_score_with_pd`] and explicitly select a versioned heuristic if
+/// a non-empirical score-to-PD mapping is required.
 ///
 /// # Errors
 ///
@@ -124,7 +133,7 @@ pub struct AltmanZDoublePrimeInput {
 /// let result = altman_z_score(&healthy)?;
 /// assert!(result.score > 2.99);
 /// assert_eq!(result.zone, ScoringZone::Safe);
-/// assert!(result.implied_pd < 0.05);
+/// assert_eq!(result.implied_pd, None);
 /// # Ok::<_, finstack_quant_core::credit::scoring::CreditScoringError>(())
 /// ```
 ///
@@ -168,14 +177,22 @@ pub fn altman_z_score(input: &AltmanZScoreInput) -> Result<ScoringResult, Credit
         + 1.0 * input.sales_to_total_assets;
 
     let zone = z_score_zone(z, 2.99, 1.81);
-    let implied_pd = z_score_implied_pd(z, 2.99, 1.81);
-
     Ok(ScoringResult {
         score: z,
         zone,
-        implied_pd,
+        implied_pd: None,
         model: "Altman Z-Score (1968)",
     })
+}
+
+/// Compute the original Altman Z-Score and apply an explicit PD heuristic.
+pub fn altman_z_score_with_pd(
+    input: &AltmanZScoreInput,
+    calibration: AltmanPdCalibration,
+) -> Result<ScoringResult, CreditScoringError> {
+    let mut result = altman_z_score(input)?;
+    result.implied_pd = Some(calibration.map(result.score, 2.99, 1.81));
+    Ok(result)
 }
 
 /// Compute the Altman Z'-Score for private firms.
@@ -234,14 +251,22 @@ pub fn altman_z_prime(input: &AltmanZPrimeInput) -> Result<ScoringResult, Credit
         + 0.998 * input.sales_to_total_assets;
 
     let zone = z_score_zone(z, 2.90, 1.23);
-    let implied_pd = z_score_implied_pd(z, 2.90, 1.23);
-
     Ok(ScoringResult {
         score: z,
         zone,
-        implied_pd,
+        implied_pd: None,
         model: "Altman Z'-Score (Private)",
     })
+}
+
+/// Compute the Altman Z'-Score and apply an explicit PD heuristic.
+pub fn altman_z_prime_with_pd(
+    input: &AltmanZPrimeInput,
+    calibration: AltmanPdCalibration,
+) -> Result<ScoringResult, CreditScoringError> {
+    let mut result = altman_z_prime(input)?;
+    result.implied_pd = Some(calibration.map(result.score, 2.90, 1.23));
+    Ok(result)
 }
 
 /// Compute the Altman Z''-Score for non-manufacturing firms.
@@ -307,14 +332,22 @@ pub fn altman_z_double_prime(
         + 1.05 * input.book_equity_to_total_liabilities;
 
     let zone = z_score_zone(z, 2.60, 1.10);
-    let implied_pd = z_score_implied_pd(z, 2.60, 1.10);
-
     Ok(ScoringResult {
         score: z,
         zone,
-        implied_pd,
+        implied_pd: None,
         model: "Altman Z''-Score (Non-Manufacturer)",
     })
+}
+
+/// Compute the Altman Z''-Score and apply an explicit PD heuristic.
+pub fn altman_z_double_prime_with_pd(
+    input: &AltmanZDoublePrimeInput,
+    calibration: AltmanPdCalibration,
+) -> Result<ScoringResult, CreditScoringError> {
+    let mut result = altman_z_double_prime(input)?;
+    result.implied_pd = Some(calibration.map(result.score, 2.60, 1.10));
+    Ok(result)
 }
 
 // ---------------------------------------------------------------------------
@@ -332,12 +365,16 @@ fn z_score_zone(z: f64, safe_threshold: f64, distress_threshold: f64) -> Scoring
     }
 }
 
-/// Map a Z-score to an implied PD using a piecewise empirical mapping.
-///
-/// - Above safe threshold: low PD (empirically ~1% for healthy firms).
-/// - In grey zone: linear interpolation between 1% and 50%.
-/// - Below distress threshold: high PD capped at 99%.
-fn z_score_implied_pd(z: f64, safe_threshold: f64, distress_threshold: f64) -> f64 {
+impl AltmanPdCalibration {
+    fn map(self, z: f64, safe_threshold: f64, distress_threshold: f64) -> f64 {
+        match self {
+            Self::HeuristicV1 => z_score_heuristic_v1(z, safe_threshold, distress_threshold),
+        }
+    }
+}
+
+/// Legacy uncalibrated house heuristic. It is not an empirical Altman mapping.
+fn z_score_heuristic_v1(z: f64, safe_threshold: f64, distress_threshold: f64) -> f64 {
     const PD_SAFE: f64 = 0.01;
     const PD_DISTRESS: f64 = 0.50;
 

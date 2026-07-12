@@ -93,7 +93,7 @@ pub fn zmijewski_score(input: &ZmijewskiInput) -> Result<ScoringResult, CreditSc
     Ok(ScoringResult {
         score: y,
         zone,
-        implied_pd,
+        implied_pd: Some(implied_pd),
         model: "Zmijewski Probit (1984)",
     })
 }

@@ -109,8 +109,25 @@ impl CreditAssumptionRegistry {
         let record = self
             .pd_master_scales
             .iter()
-            .find(|record| record.ids.iter().any(|c| c == id))
+            .find(|record| {
+                record.ids.iter().any(|candidate| candidate == id)
+                    || record
+                        .deprecated_ids
+                        .iter()
+                        .any(|candidate| candidate == id)
+            })
             .ok_or_else(|| not_found("PD master scale", id))?;
+        if record
+            .deprecated_ids
+            .iter()
+            .any(|candidate| candidate == id)
+        {
+            tracing::warn!(
+                deprecated_id = id,
+                canonical_id = first_id(&record.ids),
+                "deprecated PD master-scale registry id resolved"
+            );
+        }
         Ok(record
             .grades
             .iter()
@@ -169,12 +186,7 @@ impl CreditAssumptionRegistry {
                 .iter()
                 .map(|record| record.ids.as_slice()),
         )?;
-        validate_ids(
-            "PD master scale",
-            self.pd_master_scales
-                .iter()
-                .map(|record| record.ids.as_slice()),
-        )?;
+        validate_pd_master_scale_ids(&self.pd_master_scales)?;
         validate_ids(
             "downturn LGD preset",
             self.downturn_lgd_presets
@@ -346,6 +358,30 @@ fn validate_ids<'a>(kind: &str, records: impl Iterator<Item = &'a [String]>) -> 
     Ok(())
 }
 
+fn validate_pd_master_scale_ids(records: &[PdMasterScaleRecord]) -> Result<()> {
+    let mut seen = BTreeSet::new();
+    for record in records {
+        if record.ids.is_empty() {
+            return Err(Error::Validation(
+                "credit assumptions registry contains PD master scale without an id".to_string(),
+            ));
+        }
+        for id in record.ids.iter().chain(&record.deprecated_ids) {
+            if id.trim().is_empty() {
+                return Err(Error::Validation(
+                    "credit assumptions registry contains blank PD master scale id".to_string(),
+                ));
+            }
+            if !seen.insert(id.clone()) {
+                return Err(Error::Validation(format!(
+                    "credit assumptions registry contains duplicate PD master scale id '{id}'"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn validate_unit_interval(value: f64, label: &str) -> Result<()> {
     if (0.0..=1.0).contains(&value) {
         Ok(())
@@ -416,6 +452,8 @@ struct SeniorityClassRecord {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct PdMasterScaleRecord {
     ids: Vec<String>,
+    #[serde(default)]
+    deprecated_ids: Vec<String>,
     source: String,
     #[serde(default)]
     study_period: Option<StudyPeriod>,
@@ -464,7 +502,7 @@ mod tests {
             registry.default_seniority_calibration_id(),
             "moodys_recovery_1982_2023"
         );
-        assert_eq!(registry.default_pd_master_scale_id(), "sp_empirical");
+        assert_eq!(registry.default_pd_master_scale_id(), "sp_assumptions_v1");
         assert_eq!(registry.default_downturn_lgd_id(), "basel_secured");
         assert_eq!(registry.default_workout_lgd_id(), "standard_workout");
     }
@@ -497,13 +535,41 @@ mod tests {
         let mut config = FinstackConfig::default();
         config
             .extensions
-            .insert(CREDIT_ASSUMPTIONS_EXTENSION_KEY, value);
+            .insert(CREDIT_ASSUMPTIONS_EXTENSION_KEY, value)
+            .expect("valid extension key");
 
         let loaded = registry_from_config(&config).expect("config registry should load");
         assert_eq!(
             loaded.default_rating_factor_table_id(),
             embedded.default_rating_factor_table_id()
         );
+    }
+
+    #[test]
+    fn config_accepts_deprecated_pd_master_scale_defaults() {
+        for legacy_id in [
+            "sp_empirical",
+            "sp_corporate_default_1981_2023",
+            "moodys_empirical",
+            "moodys_default_1983_2023",
+        ] {
+            let mut registry = embedded_registry()
+                .expect("embedded registry should load")
+                .clone();
+            registry.default_pd_master_scale_id = legacy_id.to_string();
+            registry
+                .validate()
+                .expect("deprecated default id should remain valid");
+
+            let value = serde_json::to_value(&registry).expect("registry should serialize");
+            let mut config = FinstackConfig::default();
+            config
+                .extensions
+                .insert(CREDIT_ASSUMPTIONS_EXTENSION_KEY, value)
+                .expect("valid extension key");
+            let loaded = registry_from_config(&config).expect("legacy config should load");
+            assert_eq!(loaded.default_pd_master_scale_id(), legacy_id);
+        }
     }
 
     #[test]

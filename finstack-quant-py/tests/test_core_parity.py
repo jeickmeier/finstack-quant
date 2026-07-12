@@ -5,6 +5,7 @@ underlying Rust implementation.
 """
 
 from datetime import date
+from inspect import signature
 import json
 import math
 
@@ -14,8 +15,11 @@ from finstack_quant.core.currency import Currency
 from finstack_quant.core.dates import (
     DayCount,
     DayCountContext,
+    HolidayCalendar,
     PeriodId,
     SifmaSettlementClass,
+    Tenor,
+    TenorUnit,
     build_periods,
     sifma_settlement_date,
     sifma_settlement_date_for_class,
@@ -28,7 +32,20 @@ from finstack_quant.core.market_data import (
     MarketContext,
 )
 from finstack_quant.core.money import Money
-from finstack_quant.core.types import Percentage, Rate
+from finstack_quant.core.types import Bps, CreditRating, Percentage, Rate
+
+
+def test_tenor_constructor_uses_checked_rust_validation() -> None:
+    with pytest.raises(ValueError, match="count must be positive"):
+        Tenor(0, TenorUnit.MONTHS)
+    with pytest.raises(ValueError, match="exceeds maximum"):
+        Tenor(2**32 - 1, TenorUnit.YEARS)
+
+
+def test_bps_constructor_rejects_rounded_i32_overflow() -> None:
+    assert Bps(2_147_483_647).as_bps == 2_147_483_647
+    with pytest.raises(ValueError, match="overflow"):
+        Bps(2_147_483_648)
 
 
 class TestCurrencyParity:
@@ -163,6 +180,12 @@ class TestCoreTypesParity:
         assert pos_zero == neg_zero
         assert hash(pos_zero) == hash(neg_zero)
 
+    def test_credit_rating_notches_and_warf_are_preserved(self) -> None:
+        assert CreditRating.from_name("BBB+") == CreditRating.BBB_PLUS
+        assert CreditRating.from_name("Baa1") == CreditRating.BBB_PLUS
+        assert CreditRating.BBB_PLUS.name == "BBB+"
+        assert CreditRating.BBB_PLUS.warf > 0.0
+
 
 class TestDayCountParity:
     """Day-count convention calculations match Rust."""
@@ -205,6 +228,11 @@ class TestDayCountParity:
     def test_coupon_period_is_validated_by_core(self) -> None:
         with pytest.raises(Exception, match="coupon period start must be before end"):
             DayCountContext(coupon_period=(date(2025, 7, 1), date(2025, 1, 1)))
+
+    def test_calendar_metadata_exposes_weekend_rule(self) -> None:
+        metadata = HolidayCalendar("usny").metadata
+        assert metadata is not None
+        assert metadata.weekend_rule == "saturday_sunday"
 
 
 class TestPeriodParity:
@@ -343,6 +371,31 @@ class TestDiscountCurveParity:
         state = json.loads(context.to_json())
         assert state["curves"][0]["day_count"] == "Act365F"
 
+    def test_negative_rate_validation_mode_accepts_increasing_discount_factors(self) -> None:
+        knots = [(0.0, 1.0), (1.0, 1.002), (2.0, 1.004)]
+        with pytest.raises(ValueError, match="non-increasing"):
+            DiscountCurve("CHF-OIS", date(2024, 1, 1), knots)
+
+        curve = DiscountCurve(
+            "CHF-OIS",
+            date(2024, 1, 1),
+            knots,
+            validation_mode="negative_rate_friendly",
+            forward_floor=-0.01,
+        )
+        assert curve.df(2.0) == pytest.approx(1.004)
+        assert curve.forward(0.0, 1.0) < 0.0
+
+    def test_negative_rate_validation_mode_enforces_forward_floor(self) -> None:
+        with pytest.raises(ValueError, match="below minimum"):
+            DiscountCurve(
+                "CHF-OIS",
+                date(2024, 1, 1),
+                [(0.0, 1.0), (1.0, 1.02)],
+                validation_mode="negative_rate_friendly",
+                forward_floor=-0.01,
+            )
+
 
 class TestForwardCurveParity:
     """Forward curve operations match Rust."""
@@ -369,6 +422,81 @@ class TestForwardCurveParity:
             day_count="act_360",
         )
         assert curve.rate(1.0) == pytest.approx(0.045, abs=1e-10)
+
+    def test_preexisting_optional_arguments_remain_positional(self) -> None:
+        """day_count, interp, and extrapolation preserve their positional order."""
+        curve = ForwardCurve(
+            "USD-SOFR",
+            0.25,
+            [(0.0, 0.04), (1.0, 0.045)],
+            date(2024, 1, 1),
+            "act_360",
+            "linear",
+            "flat_forward",
+        )
+        assert curve.rate(1.0) == pytest.approx(0.045, abs=1e-10)
+        assert curve.projection_grid is None
+
+    def test_reset_lag_is_constructible_and_readonly(self) -> None:
+        curve = ForwardCurve(
+            "USD-SOFR",
+            0.25,
+            [(0.0, 0.04), (1.0, 0.045)],
+            date(2024, 1, 1),
+            "act_360",
+            "linear",
+            "flat_forward",
+            None,
+            3,
+        )
+        assert curve.reset_lag == 3
+        with pytest.raises(AttributeError):
+            curve.reset_lag = 2
+
+    def test_explicit_projection_grid_is_constructible_and_exposed(self) -> None:
+        """Contractual boundaries round-trip through the canonical Rust curve."""
+        last_reset = 91.0 / 360.0
+        projection_grid = [0.0, last_reset, 183.0 / 360.0]
+        curve = ForwardCurve(
+            "USD-SOFR",
+            0.25,
+            [(0.0, 0.04), (last_reset, 0.045)],
+            base_date=date(2024, 1, 1),
+            day_count="act_360",
+            projection_grid=projection_grid,
+        )
+        assert curve.projection_grid == pytest.approx(projection_grid, abs=1e-14)
+        assert curve.rate_between(0.0, last_reset) == pytest.approx(0.04, abs=1e-14)
+        assert curve.rate_between(last_reset, projection_grid[-1]) == pytest.approx(0.045, abs=1e-14)
+
+    @pytest.mark.parametrize(
+        ("t1", "t2"),
+        [(0.0, 0.0), (0.5, 0.25), (math.nan, 0.25), (0.0, math.inf)],
+    )
+    def test_rate_between_rejects_invalid_intervals(self, t1: float, t2: float) -> None:
+        curve = ForwardCurve(
+            "USD-SOFR",
+            0.25,
+            [(0.0, 0.04), (1.0, 0.045)],
+            base_date=date(2024, 1, 1),
+        )
+        with pytest.raises(ValueError, match=r"(rate_between requires|Invalid input|invalid input)"):
+            curve.rate_between(t1, t2)
+
+    def test_constructor_runtime_signature_matches_stub(self) -> None:
+        assert str(signature(ForwardCurve)) == (
+            "(id, tenor, knots, base_date, day_count=None, interp='linear', "
+            "extrapolation='flat_forward', projection_grid=None, reset_lag=None)"
+        )
+
+    def test_projection_grid_defaults_to_legacy_numeric_tenor_mode(self) -> None:
+        curve = ForwardCurve(
+            "USD-SOFR",
+            0.25,
+            [(0.0, 0.04), (1.0, 0.05), (5.0, 0.06)],
+            base_date=date(2024, 1, 1),
+        )
+        assert curve.projection_grid is None
 
 
 class TestFxMatrixParity:

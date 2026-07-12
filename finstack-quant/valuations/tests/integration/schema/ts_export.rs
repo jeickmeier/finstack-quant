@@ -11,9 +11,12 @@ use finstack_quant_valuations::calibration::api::schema::{
     SwaptionVolConvention, SwaptionVolParams, VolSurfaceParams, XccyBasisParams,
 };
 use finstack_quant_valuations::calibration::{
-    CalibrationConfig, CalibrationDiagnostics, CalibrationReport, QuoteQuality, RateBounds,
-    SolverConfig, ValidationMode,
+    CalibrationConfig, CalibrationDiagnostics, CalibrationMethod, CalibrationReport,
+    DiscountCurveSolveConfig, HazardCurveSolveConfig, InflationCurveSolveConfig, QuoteQuality,
+    RateBounds, RateBoundsPolicy, RatesStepConventions, ResidualWeightingScheme, SolverConfig,
+    ValidationMode,
 };
+use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::market::quotes::bond::BondQuote;
 use finstack_quant_valuations::market::quotes::cds::CdsQuote;
 use finstack_quant_valuations::market::quotes::cds_tranche::CDSTrancheQuote;
@@ -66,6 +69,13 @@ fn export_calibration_types() {
     let cfg = config();
 
     CalibrationConfig::export(cfg).expect("export CalibrationConfig");
+    CalibrationMethod::export(cfg).expect("export CalibrationMethod");
+    DiscountCurveSolveConfig::export(cfg).expect("export DiscountCurveSolveConfig");
+    HazardCurveSolveConfig::export(cfg).expect("export HazardCurveSolveConfig");
+    InflationCurveSolveConfig::export(cfg).expect("export InflationCurveSolveConfig");
+    RateBoundsPolicy::export(cfg).expect("export RateBoundsPolicy");
+    RatesStepConventions::export(cfg).expect("export RatesStepConventions");
+    ResidualWeightingScheme::export(cfg).expect("export ResidualWeightingScheme");
     SolverConfig::export(cfg).expect("export SolverConfig");
     RateBounds::export(cfg).expect("export RateBounds");
     ValidationMode::export(cfg).expect("export ValidationMode");
@@ -76,6 +86,7 @@ fn export_calibration_types() {
     CDSTrancheQuote::export(cfg).expect("export CDSTrancheQuote");
     FxQuote::export(cfg).expect("export FxQuote");
     VolQuote::export(cfg).expect("export VolQuote");
+    OptionType::export(cfg).expect("export OptionType");
     InflationQuote::export(cfg).expect("export InflationQuote");
     XccyQuote::export(cfg).expect("export XccyQuote");
     MarketQuote::export(cfg).expect("export MarketQuote");

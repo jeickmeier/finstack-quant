@@ -273,7 +273,7 @@ fn test_bond_floating_value() {
         .build()
         .expect("CashFlowSchedule builder should succeed with valid test data");
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(issue)
+        .base_date(issue - time::Duration::days(7))
         .knots([(0.0, 0.05), (2.0, 0.055)])
         .interp(InterpStyle::Linear)
         .build()
@@ -317,7 +317,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         .build()
         .expect("DiscountCurve builder should succeed in test");
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(issue)
+        .base_date(issue - time::Duration::days(7))
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.05), (2.0, 0.055)])
         .interp(InterpStyle::Linear)
@@ -526,7 +526,7 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
     let fwd_curve = ForwardCurve::builder("USD-SOFR", 0.25)
-        .base_date(issue)
+        .base_date(issue - time::Duration::days(7))
         .day_count(DayCount::Act360)
         .knots([(0.0, 0.03), (1.0, 0.035)])
         .build()

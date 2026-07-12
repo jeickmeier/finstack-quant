@@ -74,6 +74,7 @@ pub struct PdCycleParams {
 pub fn ttc_to_pit(pd_ttc: f64, params: &PdCycleParams) -> Result<f64, PdCalibrationError> {
     validate_pd(pd_ttc)?;
     validate_correlation(params.asset_correlation)?;
+    validate_cycle_index(params.cycle_index)?;
 
     let rho = params.asset_correlation;
     let z = params.cycle_index;
@@ -97,6 +98,7 @@ pub fn ttc_to_pit(pd_ttc: f64, params: &PdCycleParams) -> Result<f64, PdCalibrat
 pub fn pit_to_ttc(pd_pit: f64, params: &PdCycleParams) -> Result<f64, PdCalibrationError> {
     validate_pd(pd_pit)?;
     validate_correlation(params.asset_correlation)?;
+    validate_cycle_index(params.cycle_index)?;
 
     let rho = params.asset_correlation;
     let z = params.cycle_index;
@@ -107,6 +109,13 @@ pub fn pit_to_ttc(pd_pit: f64, params: &PdCycleParams) -> Result<f64, PdCalibrat
 
     let pd_ttc = norm_cdf(inv_pit * sqrt_one_minus_rho + sqrt_rho * z);
     Ok(pd_ttc)
+}
+
+fn validate_cycle_index(cycle_index: f64) -> Result<(), PdCalibrationError> {
+    if !cycle_index.is_finite() {
+        return Err(PdCalibrationError::NonFiniteValue { value: cycle_index });
+    }
+    Ok(())
 }
 
 /// Calibrate the central tendency (long-run average PD) from observed

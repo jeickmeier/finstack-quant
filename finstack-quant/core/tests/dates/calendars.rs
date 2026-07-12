@@ -561,6 +561,40 @@ fn mainland_calendars_use_published_2022_closure_boundaries() {
 }
 
 #[test]
+fn mainland_calendars_include_historical_official_one_off_closures() {
+    let closures = [
+        make_date(2009, 10, 8),
+        make_date(2010, 9, 23),
+        make_date(2010, 9, 24),
+        make_date(2015, 9, 3),
+        make_date(2015, 9, 4),
+    ];
+    let adjacent_business_days = [
+        make_date(2009, 9, 30),
+        make_date(2009, 10, 9),
+        make_date(2010, 9, 21),
+        make_date(2010, 9, 27),
+        make_date(2015, 9, 2),
+        make_date(2015, 9, 7),
+    ];
+
+    for (name, calendar) in [
+        ("sse", &Sse as &dyn HolidayCalendar),
+        ("cnbe", &Cnbe as &dyn HolidayCalendar),
+    ] {
+        for date in closures {
+            assert!(calendar.is_holiday(date), "{name} must close on {date}");
+        }
+        for date in adjacent_business_days {
+            assert!(
+                calendar.is_business_day(date),
+                "{name} must remain open on published boundary {date}"
+            );
+        }
+    }
+}
+
+#[test]
 fn test_cny_early_years_1970s() {
     check_cny_dates(&[(1970, 2, 6), (1975, 2, 11), (1980, 2, 16), (1989, 2, 6)]);
 }

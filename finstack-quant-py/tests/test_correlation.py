@@ -113,13 +113,32 @@ class TestCorrelatedBernoulli:
         cb = CorrelatedBernoulli(0.2, 0.8, 0.1)
         assert cb.p1 == pytest.approx(0.2)
         assert cb.p2 == pytest.approx(0.8)
+        assert cb.requested_correlation == pytest.approx(0.1)
         assert cb.correlation == pytest.approx(0.1, abs=0.05)
+
+    def test_requested_and_effective_correlation_expose_clamping(self) -> None:
+        cb = CorrelatedBernoulli(0.05, 0.95, 0.9)
+        assert cb.requested_correlation == pytest.approx(0.9)
+        assert cb.correlation < cb.requested_correlation
 
     def test_conditional_probabilities(self) -> None:
         """Conditional P(X2=1|X1=1) = p11 / p1 when p1 > 0."""
         cb = CorrelatedBernoulli(0.5, 0.5, 0.5)
         p_cond = cb.conditional_p2_given_x1()
         assert 0.0 <= p_cond <= 1.0
+
+    @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
+    def test_non_finite_inputs_raise_value_error(self, invalid: float) -> None:
+        with pytest.raises(ValueError, match=r"(?i)marginal p1.*finite"):
+            CorrelatedBernoulli(invalid, 0.5, 0.0)
+        with pytest.raises(ValueError, match=r"(?i)correlation.*finite"):
+            CorrelatedBernoulli(0.5, 0.5, invalid)
+
+    def test_invalid_uniform_raises_value_error(self) -> None:
+        cb = CorrelatedBernoulli(0.5, 0.5, 0.0)
+        for invalid in (-0.1, 1.1, float("nan")):
+            with pytest.raises(ValueError, match=r"(?i)uniform.*finite"):
+                cb.sample_from_uniform(invalid)
 
 
 class TestJointProbabilities:
