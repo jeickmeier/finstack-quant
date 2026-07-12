@@ -783,22 +783,22 @@ mod tests {
         // Build a simple schedule with one historical and one future cashflow
         let base = d(2025, 4, 1);
         let flows = vec![
-            CashFlow {
-                date: d(2025, 3, 15), // historical
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 5, 15), // future
-                reset_date: None,
-                amount: Money::new(200.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 3, 15),
+                None,
+                Money::new(100.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 5, 15),
+                None,
+                Money::new(200.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
         ];
         let schedule = CashFlowSchedule {
             flows,
@@ -849,23 +849,23 @@ mod tests {
         let initial_amount = 1_000_000.0;
         let flows = vec![
             // Initial funding (negative from lender perspective - money out)
-            CashFlow {
-                date: issue,
-                reset_date: None,
-                amount: Money::new(-initial_amount, Currency::USD),
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                issue,
+                None,
+                Money::new(-initial_amount, Currency::USD),
+                CFKind::Notional,
+                0.0,
+                None,
+            ),
             // First coupon
-            CashFlow {
-                date: d(2025, 4, 15),
-                reset_date: None,
-                amount: Money::new(12_500.0, Currency::USD), // 5% quarterly
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: Some(0.05),
-            },
+            CashFlow::new(
+                d(2025, 4, 15),
+                None,
+                Money::new(12_500.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                Some(0.05),
+            ),
         ];
         let schedule = CashFlowSchedule {
             flows,
@@ -927,14 +927,14 @@ mod tests {
     #[test]
     fn dataframe_omits_undrawn_notionals_without_facility_limit() {
         let base = d(2025, 4, 1);
-        let flows = vec![CashFlow {
-            date: d(2025, 5, 15),
-            reset_date: None,
-            amount: Money::new(200.0, Currency::USD),
-            kind: CFKind::Fixed,
-            accrual_factor: 0.25,
-            rate: None,
-        }];
+        let flows = vec![CashFlow::new(
+            d(2025, 5, 15),
+            None,
+            Money::new(200.0, Currency::USD),
+            CFKind::Fixed,
+            0.25,
+            None,
+        )];
         let schedule = CashFlowSchedule {
             flows,
             notional: Notional::par(1_000.0, Currency::USD),
@@ -973,14 +973,14 @@ mod tests {
 
         let base = d(2025, 1, 1);
         let boundary = d(2025, 4, 1); // == Q1 end == Q2 start
-        let flows = vec![CashFlow {
-            date: boundary,
-            reset_date: None,
-            amount: Money::new(100.0, Currency::USD),
-            kind: CFKind::Fixed,
-            accrual_factor: 0.25,
-            rate: None,
-        }];
+        let flows = vec![CashFlow::new(
+            boundary,
+            None,
+            Money::new(100.0, Currency::USD),
+            CFKind::Fixed,
+            0.25,
+            None,
+        )];
         let schedule = CashFlowSchedule {
             flows: flows.clone(),
             notional: Notional::par(1_000.0, Currency::USD),
@@ -1026,22 +1026,22 @@ mod tests {
     fn dataframe_sorts_public_flows_before_period_bucketing() {
         let base = d(2025, 1, 1);
         let flows = vec![
-            CashFlow {
-                date: d(2025, 5, 15),
-                reset_date: None,
-                amount: Money::new(200.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 2, 15),
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 5, 15),
+                None,
+                Money::new(200.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 2, 15),
+                None,
+                Money::new(100.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
         ];
         let schedule = CashFlowSchedule {
             flows,
@@ -1078,14 +1078,14 @@ mod tests {
     fn dataframe_rejects_invalid_period_contract() {
         let base = d(2025, 1, 1);
         let schedule = CashFlowSchedule {
-            flows: vec![CashFlow {
-                date: d(2025, 2, 15),
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            }],
+            flows: vec![CashFlow::new(
+                d(2025, 2, 15),
+                None,
+                Money::new(100.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            )],
             notional: Notional::par(1_000.0, Currency::USD),
             day_count: DayCount::Act365F,
             meta: CashFlowMeta::default(),
@@ -1131,30 +1131,30 @@ mod tests {
     fn dataframe_credit_pv_matches_canonical_credit_event_logic() {
         let base = d(2025, 1, 1);
         let flows = vec![
-            CashFlow {
-                date: d(2025, 6, 1),
-                reset_date: None,
-                amount: Money::new(1_000.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 7, 1),
-                reset_date: None,
-                amount: Money::new(400.0, Currency::USD),
-                kind: CFKind::Recovery,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 7, 1),
-                reset_date: None,
-                amount: Money::new(25.0, Currency::USD),
-                kind: CFKind::AccruedOnDefault,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 6, 1),
+                None,
+                Money::new(1_000.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 7, 1),
+                None,
+                Money::new(400.0, Currency::USD),
+                CFKind::Recovery,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 7, 1),
+                None,
+                Money::new(25.0, Currency::USD),
+                CFKind::AccruedOnDefault,
+                0.0,
+                None,
+            ),
         ];
         let schedule = CashFlowSchedule {
             flows,
@@ -1230,22 +1230,22 @@ mod tests {
         let base = d(2025, 1, 1);
         let initial = 1_000_000.0;
         let flows = vec![
-            CashFlow {
-                date: d(2025, 2, 15), // outside the (Q2-only) reporting window
-                reset_date: None,
-                amount: Money::new(200_000.0, Currency::USD),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 5, 15), // inside Q2
-                reset_date: None,
-                amount: Money::new(10_000.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: Some(0.05),
-            },
+            CashFlow::new(
+                d(2025, 2, 15),
+                None,
+                Money::new(200_000.0, Currency::USD),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 5, 15),
+                None,
+                Money::new(10_000.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                Some(0.05),
+            ),
         ];
         let schedule = CashFlowSchedule {
             flows,
@@ -1303,32 +1303,32 @@ mod tests {
         let initial = 1_000_000.0;
         let flows = vec![
             // Pre-issue principal draw (delayed-funding structure)
-            CashFlow {
-                date: d(2025, 1, 5),
-                reset_date: None,
-                amount: Money::new(-100_000.0, Currency::USD),
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 1, 5),
+                None,
+                Money::new(-100_000.0, Currency::USD),
+                CFKind::Notional,
+                0.0,
+                None,
+            ),
             // Real initial funding flow on the issue date
-            CashFlow {
-                date: issue,
-                reset_date: None,
-                amount: Money::new(-initial, Currency::USD),
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                issue,
+                None,
+                Money::new(-initial, Currency::USD),
+                CFKind::Notional,
+                0.0,
+                None,
+            ),
             // First coupon
-            CashFlow {
-                date: d(2025, 4, 15),
-                reset_date: None,
-                amount: Money::new(12_500.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: Some(0.05),
-            },
+            CashFlow::new(
+                d(2025, 4, 15),
+                None,
+                Money::new(12_500.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                Some(0.05),
+            ),
         ];
         let meta = CashFlowMeta {
             issue_date: Some(issue),
@@ -1395,14 +1395,14 @@ mod tests {
         // A requested-but-missing forward curve must error instead of
         // silently disabling floating decomposition.
         let base = d(2025, 1, 1);
-        let flows = vec![CashFlow {
-            date: d(2025, 7, 1),
-            reset_date: Some(d(2025, 4, 1)),
-            amount: Money::new(100.0, Currency::USD),
-            kind: CFKind::FloatReset,
-            accrual_factor: 0.25,
-            rate: Some(0.05),
-        }];
+        let flows = vec![CashFlow::new(
+            d(2025, 7, 1),
+            Some(d(2025, 4, 1)),
+            Money::new(100.0, Currency::USD),
+            CFKind::FloatReset,
+            0.25,
+            Some(0.05),
+        )];
         let schedule = CashFlowSchedule {
             flows,
             notional: Notional::par(1_000.0, Currency::USD),
@@ -1446,22 +1446,22 @@ mod tests {
 
         let base = d(2025, 4, 1);
         let flows = vec![
-            CashFlow {
-                date: d(2025, 2, 15), // historical
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 5, 15), // future
-                reset_date: None,
-                amount: Money::new(200.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 2, 15),
+                None,
+                Money::new(100.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 5, 15),
+                None,
+                Money::new(200.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
         ];
         let schedule = CashFlowSchedule {
             flows,
@@ -1529,14 +1529,14 @@ mod tests {
         // Dated strictly inside Q2 [Apr 1, Jul 1): under half-open bucketing a
         // flow on the final period end would fall outside all periods and skip
         // the day-count path entirely.
-        let flows = vec![CashFlow {
-            date: d(2025, 5, 15),
-            reset_date: None,
-            amount: Money::new(100.0, Currency::USD),
-            kind: CFKind::Fixed,
-            accrual_factor: 0.5,
-            rate: Some(0.04),
-        }];
+        let flows = vec![CashFlow::new(
+            d(2025, 5, 15),
+            None,
+            Money::new(100.0, Currency::USD),
+            CFKind::Fixed,
+            0.5,
+            Some(0.04),
+        )];
         let schedule = CashFlowSchedule {
             flows,
             notional: Notional::par(1_000.0, Currency::USD),

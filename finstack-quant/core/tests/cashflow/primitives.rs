@@ -9,9 +9,9 @@
 //!
 //! - ISDA 2006 Definitions (cashflow semantics)
 
-use finstack_quant_core::cashflow::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::{CFKind, CashFlow, CashFlowAccrual};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use time::Month;
 
@@ -33,6 +33,7 @@ fn valid_cashflow() -> CashFlow {
         kind: CFKind::Fixed,
         accrual_factor: 0.5,
         rate: Some(0.05),
+        accrual: None,
     }
 }
 
@@ -49,6 +50,7 @@ fn cashflow_fixed_construction() {
         kind: CFKind::Fixed,
         accrual_factor: 0.25,
         rate: Some(0.05),
+        accrual: None,
     };
 
     assert_eq!(cf.date, d(2025, 1, 15));
@@ -70,6 +72,7 @@ fn cashflow_floating_construction() {
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: None,
+        accrual: None,
     };
 
     assert_eq!(cf.kind, CFKind::FloatReset);
@@ -305,6 +308,7 @@ fn cashflow_rejects_reset_date_after_payment() {
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: None,
+        accrual: None,
     };
     assert!(
         cf.validate().is_err(),
@@ -324,6 +328,7 @@ fn cashflow_accepts_reset_date_before_payment() {
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: None,
+        accrual: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -342,6 +347,7 @@ fn cashflow_accepts_reset_date_equal_to_payment() {
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: None,
+        accrual: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -358,6 +364,7 @@ fn cashflow_accepts_no_reset_date() {
         kind: CFKind::Fixed,
         accrual_factor: 0.25,
         rate: Some(0.05),
+        accrual: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -378,6 +385,7 @@ fn cashflow_valid_with_all_fields_populated() {
         kind: CFKind::FloatReset,
         accrual_factor: 0.25,
         rate: Some(0.0325),
+        accrual: None,
     };
     assert!(
         cf.validate().is_ok(),
@@ -397,9 +405,57 @@ fn cashflow_multiple_invalid_fields_first_error_wins() {
         kind: CFKind::Fixed,
         accrual_factor: f64::INFINITY, // Invalid
         rate: Some(f64::NAN),          // Also invalid
+        accrual: None,
     };
     assert!(
         cf.validate().is_err(),
         "Cashflow with multiple invalid fields should be rejected"
     );
+}
+
+#[test]
+fn constructor_defaults_accrual_to_none() {
+    let flow = CashFlow::new(
+        d(2025, 6, 15),
+        None,
+        Money::new(25_000.0, Currency::EUR),
+        CFKind::Fixed,
+        0.25,
+        Some(0.0325),
+    );
+    assert!(flow.accrual.is_none());
+}
+
+#[test]
+fn legacy_json_round_trips_without_accrual_field() {
+    let flow = valid_cashflow();
+    let legacy = serde_json::to_value(flow).unwrap();
+    assert!(legacy.get("accrual").is_none());
+
+    let decoded: CashFlow = serde_json::from_value(legacy.clone()).unwrap();
+    assert_eq!(serde_json::to_value(decoded).unwrap(), legacy);
+}
+
+#[test]
+fn accrual_metadata_round_trips() {
+    let accrual = CashFlowAccrual {
+        start: d(2025, 3, 15),
+        end: d(2025, 6, 15),
+        day_count: DayCount::Act360,
+        projected_index_rate: Some(0.031),
+    };
+    let flow = CashFlow::new(
+        d(2025, 6, 15),
+        Some(d(2025, 3, 13)),
+        Money::new(12_500.0, Currency::USD),
+        CFKind::FloatReset,
+        0.25,
+        Some(0.036),
+    )
+    .with_accrual(accrual);
+
+    let encoded = serde_json::to_string(&flow).unwrap();
+    let decoded: CashFlow = serde_json::from_str(&encoded).unwrap();
+    assert_eq!(decoded, flow);
+    assert_eq!(decoded.accrual, Some(accrual));
 }

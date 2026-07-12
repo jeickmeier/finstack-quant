@@ -334,6 +334,17 @@
       "additionalProperties": false,
       "description": "A single dated cash-flow (payment or reset).\n\nRepresents a monetary flow at a specific date with metadata\nfor proper classification and risk calculation.",
       "properties": {
+        "accrual": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CashFlowAccrual"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional contractual accrual metadata owned by this flow."
+        },
         "accrual_factor": {
           "description": "Accrual factor used for coupon amount and sensitivity.",
           "format": "double",
@@ -374,6 +385,38 @@
         "amount",
         "kind",
         "accrual_factor"
+      ],
+      "type": "object"
+    },
+    "CashFlowAccrual": {
+      "additionalProperties": false,
+      "description": "Contractual accrual metadata attached to one cashflow.",
+      "properties": {
+        "day_count": {
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day-count convention used for the accrual factor."
+        },
+        "end": {
+          "description": "Contractual accrual-period end date.",
+          "type": "string"
+        },
+        "projected_index_rate": {
+          "description": "Projected index rate before spread, gearing, caps, or floors.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "start": {
+          "description": "Contractual accrual-period start date.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start",
+        "end",
+        "day_count"
       ],
       "type": "object"
     },

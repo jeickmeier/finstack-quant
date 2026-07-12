@@ -1240,14 +1240,14 @@ impl CashflowProvider for InflationLinkedBond {
                 raw_principal_ratio.max(1.0)
             }
         };
-        detailed_flows.push(crate::cashflow::primitives::CashFlow {
-            date: self.maturity,
-            reset_date: None,
-            amount: self.notional * principal_ratio,
-            kind: crate::cashflow::primitives::CFKind::Notional,
-            accrual_factor: 0.0,
-            rate: None,
-        });
+        detailed_flows.push(crate::cashflow::primitives::CashFlow::new(
+            self.maturity,
+            None,
+            self.notional * principal_ratio,
+            crate::cashflow::primitives::CFKind::Notional,
+            0.0,
+            None,
+        ));
 
         detailed_flows.sort_by(|a, b| match a.date.cmp(&b.date) {
             core::cmp::Ordering::Equal => crate::cashflow::builder::schedule::kind_rank(a.kind)

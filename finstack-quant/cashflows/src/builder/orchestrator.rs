@@ -248,14 +248,14 @@ fn initialize_build_state(
     let mut flows: Vec<CashFlow> = Vec::with_capacity(estimated_flows);
 
     if notional.initial.amount() != 0.0 {
-        flows.push(CashFlow {
-            date: issue,
-            reset_date: None,
-            amount: notional.initial * -1.0,
-            kind: CFKind::Notional,
-            accrual_factor: 0.0,
-            rate: None,
-        });
+        flows.push(CashFlow::new(
+            issue,
+            None,
+            notional.initial * -1.0,
+            CFKind::Notional,
+            0.0,
+            None,
+        ));
     }
 
     let mut outstanding = f64_to_decimal(notional.initial.amount())?;
@@ -269,14 +269,14 @@ fn initialize_build_state(
                 CFKind::Amortization => ev.cash.amount(),
                 _ => -ev.cash.amount(),
             };
-            flows.push(CashFlow {
-                date: ev.date,
-                reset_date: None,
-                amount: Money::new(flow_amount, ev.cash.currency()),
-                kind: ev.kind,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                ev.date,
+                None,
+                Money::new(flow_amount, ev.cash.currency()),
+                ev.kind,
+                0.0,
+                None,
+            ));
             outstanding += f64_to_decimal(ev.delta.amount())?;
         }
     }
@@ -484,14 +484,14 @@ impl CompiledCashFlowPlan {
         // delayed-funding structures) are not dropped.
         for (fee_date, amount) in &self.fixed_fees {
             if *fee_date <= self.issue && amount.amount() != 0.0 {
-                state.flows.push(CashFlow {
-                    date: *fee_date,
-                    reset_date: None,
-                    amount: *amount,
-                    kind: CFKind::Fee,
-                    accrual_factor: 0.0,
-                    rate: None,
-                });
+                state.flows.push(CashFlow::new(
+                    *fee_date,
+                    None,
+                    *amount,
+                    CFKind::Fee,
+                    0.0,
+                    None,
+                ));
             }
         }
         // Principal redemption pays on the business-day-adjusted maturity using

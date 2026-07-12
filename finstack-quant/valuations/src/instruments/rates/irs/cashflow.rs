@@ -497,14 +497,14 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         } else {
             spread_bp * crate::constants::ONE_BASIS_POINT
         };
-        flows.push(CashFlow {
-            date: period.payment_date,
-            reset_date: None,
-            amount: Money::new(coupon_amount, irs.notional.currency()),
-            kind: CFKind::FloatReset,
-            accrual_factor: period.accrual_year_fraction,
-            rate: Some(all_in_rate),
-        });
+        flows.push(CashFlow::new(
+            period.payment_date,
+            None,
+            Money::new(coupon_amount, irs.notional.currency()),
+            CFKind::FloatReset,
+            period.accrual_year_fraction,
+            Some(all_in_rate),
+        ));
     }
 
     Ok(crate::cashflow::traits::schedule_from_classified_flows(
@@ -582,17 +582,17 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
             } else {
                 CFKind::Fixed
             };
-            Ok(CashFlow {
-                date: period.payment_date,
-                reset_date: None,
-                amount: Money::new(
+            Ok(CashFlow::new(
+                period.payment_date,
+                None,
+                Money::new(
                     irs.notional.amount() * rate * period.accrual_year_fraction,
                     irs.notional.currency(),
                 ),
                 kind,
-                accrual_factor: period.accrual_year_fraction,
-                rate: Some(rate),
-            })
+                period.accrual_year_fraction,
+                Some(rate),
+            ))
         })
         .collect::<Result<Vec<_>>>()?;
     Ok(crate::cashflow::traits::schedule_from_classified_flows(
@@ -751,14 +751,14 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
                 PayReceive::Receive => cf.amount,
                 PayReceive::Pay => cf.amount * -1.0,
             };
-            all_flows.push(CashFlow {
-                date: cf.date,
-                reset_date: cf.reset_date,
-                amount: amt,
-                kind: cf.kind, // Preserve precise CFKind
-                accrual_factor: cf.accrual_factor,
-                rate: cf.rate,
-            });
+            all_flows.push(CashFlow::new(
+                cf.date,
+                cf.reset_date,
+                amt,
+                cf.kind,
+                cf.accrual_factor,
+                cf.rate,
+            ));
         }
     }
 
@@ -769,14 +769,14 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
                 PayReceive::Receive => cf.amount * -1.0,
                 PayReceive::Pay => cf.amount,
             };
-            all_flows.push(CashFlow {
-                date: cf.date,
-                reset_date: cf.reset_date,
-                amount: amt,
-                kind: cf.kind, // Preserve precise CFKind
-                accrual_factor: cf.accrual_factor,
-                rate: cf.rate,
-            });
+            all_flows.push(CashFlow::new(
+                cf.date,
+                cf.reset_date,
+                amt,
+                cf.kind,
+                cf.accrual_factor,
+                cf.rate,
+            ));
         }
     }
 

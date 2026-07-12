@@ -9,7 +9,7 @@
 //! - [`CashFlow`]: Single dated payment with classification
 //! - [`CFKind`]: Cashflow type enumeration (fixed, floating, principal, etc.)
 
-use crate::dates::Date;
+use crate::dates::{Date, DayCount};
 use crate::error::{InputError, NonFiniteKind};
 use crate::money::Money;
 
@@ -310,6 +310,25 @@ impl CFKind {
     }
 }
 
+/// Contractual accrual metadata attached to one cashflow.
+#[derive(
+    Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct CashFlowAccrual {
+    /// Contractual accrual-period start date.
+    #[schemars(with = "String")]
+    pub start: Date,
+    /// Contractual accrual-period end date.
+    #[schemars(with = "String")]
+    pub end: Date,
+    /// Day-count convention used for the accrual factor.
+    pub day_count: DayCount,
+    /// Projected index rate before spread, gearing, caps, or floors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projected_index_rate: Option<f64>,
+}
+
 /// A single dated cash-flow (payment or reset).
 ///
 /// Represents a monetary flow at a specific date with metadata
@@ -341,9 +360,39 @@ pub struct CashFlow {
     /// this may represent a time-weighted average rate across sub-periods.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate: Option<f64>,
+    /// Optional contractual accrual metadata owned by this flow.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accrual: Option<CashFlowAccrual>,
 }
 
 impl CashFlow {
+    /// Construct a cashflow without optional contractual accrual metadata.
+    pub fn new(
+        date: Date,
+        reset_date: Option<Date>,
+        amount: Money,
+        kind: CFKind,
+        accrual_factor: f64,
+        rate: Option<f64>,
+    ) -> Self {
+        Self {
+            date,
+            reset_date,
+            amount,
+            kind,
+            accrual_factor,
+            rate,
+            accrual: None,
+        }
+    }
+
+    /// Attach contractual accrual metadata to this flow.
+    #[must_use]
+    pub fn with_accrual(mut self, accrual: CashFlowAccrual) -> Self {
+        self.accrual = Some(accrual);
+        self
+    }
+
     /// Validate cashflow amount and fields.
     ///
     /// Zero amounts are valid: floored coupons (e.g. a floating coupon with
@@ -366,25 +415,18 @@ impl CashFlow {
     ///
     /// let date = Date::from_calendar_date(2025, Month::January, 15).expect("Valid date");
     /// let amount = Money::new(100.0, Currency::USD);
-    /// let cf = CashFlow {
-    ///     date,
-    ///     reset_date: None,
-    ///     amount,
-    ///     kind: CFKind::Fixed,
-    ///     accrual_factor: 0.0,
-    ///     rate: None,
-    /// };
+    /// let cf = CashFlow::new(date, None, amount, CFKind::Fixed, 0.0, None);
     /// assert!(cf.validate().is_ok());
     ///
     /// // Zero amounts are valid (e.g. floored coupons).
-    /// let zero_cf = CashFlow {
+    /// let zero_cf = CashFlow::new(
     ///     date,
-    ///     reset_date: None,
-    ///     amount: Money::new(0.0, Currency::USD),
-    ///     kind: CFKind::Fixed,
-    ///     accrual_factor: 0.0,
-    ///     rate: None,
-    /// };
+    ///     None,
+    ///     Money::new(0.0, Currency::USD),
+    ///     CFKind::Fixed,
+    ///     0.0,
+    ///     None,
+    /// );
     /// assert!(zero_cf.validate().is_ok());
     /// ```
     ///
@@ -428,6 +470,22 @@ impl CashFlow {
                 return Err(crate::Error::Validation(
                     "CashFlow: reset_date must not be after payment date".into(),
                 ));
+            }
+        }
+
+        if let Some(accrual) = self.accrual {
+            if accrual.start >= accrual.end {
+                return Err(crate::Error::Validation(
+                    "CashFlow: accrual start must be before accrual end".into(),
+                ));
+            }
+            if let Some(projected_index_rate) = accrual.projected_index_rate {
+                if !projected_index_rate.is_finite() {
+                    return Err(InputError::NonFiniteValue {
+                        kind: non_finite_kind(projected_index_rate),
+                    }
+                    .into());
+                }
             }
         }
 
@@ -480,15 +538,10 @@ mod tests {
 
     #[test]
     fn cashflow_size_is_reasonable() {
-        // With simplified structure (removed rate_base field): 56 bytes
-        // - date: 4 bytes (Date is i32 internally)
-        // - reset_date: Option<Date> = 8 bytes (4 + 1 discriminant + padding)
-        // - amount: Money = 16 bytes (f64 + Currency enum)
-        // - kind: CFKind = 2 bytes (enum)
-        // - accrual_factor: f64 = 8 bytes
-        // - rate: Option<f64> = 16 bytes (8 + 1 discriminant + padding)
-        // Total with alignment: 56 bytes
-        assert!(size_of::<CashFlow>() <= 56);
+        // The optional, inline accrual value keeps CashFlow copyable without a
+        // heap allocation. Guard against accidental future growth.
+        let size = size_of::<CashFlow>();
+        assert!(size <= 104, "CashFlow grew to {size} bytes");
     }
 
     #[test]
@@ -503,6 +556,7 @@ mod tests {
             kind: CFKind::Fixed,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(cf.date, date);
         assert_eq!(cf.amount, amount);
@@ -541,6 +595,7 @@ mod tests {
             kind: CFKind::Notional,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(princ.kind, CFKind::Notional);
         assert!(princ.validate().is_ok());
@@ -552,6 +607,7 @@ mod tests {
             kind: CFKind::Fee,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(fee.kind, CFKind::Fee);
         assert!(fee.validate().is_ok());
@@ -563,6 +619,7 @@ mod tests {
             kind: CFKind::PIK,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(pik.kind, CFKind::PIK);
         assert!(pik.validate().is_ok());
@@ -574,6 +631,7 @@ mod tests {
             kind: CFKind::Amortization,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(amort.kind, CFKind::Amortization);
         assert!(amort.validate().is_ok());
@@ -588,6 +646,7 @@ mod tests {
             kind: CFKind::Fixed,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert!(zero_cf.validate().is_ok());
     }
@@ -631,6 +690,7 @@ mod tests {
             kind: CFKind::InitialMarginPost,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(im_post.kind, CFKind::InitialMarginPost);
         assert!(im_post.validate().is_ok());
@@ -643,6 +703,7 @@ mod tests {
             kind: CFKind::InitialMarginReturn,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(im_return.kind, CFKind::InitialMarginReturn);
         assert!(im_return.validate().is_ok());
@@ -655,6 +716,7 @@ mod tests {
             kind: CFKind::VariationMarginReceive,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(vm_receive.kind, CFKind::VariationMarginReceive);
         assert!(vm_receive.validate().is_ok());
@@ -667,6 +729,7 @@ mod tests {
             kind: CFKind::VariationMarginPay,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(vm_pay.kind, CFKind::VariationMarginPay);
         assert!(vm_pay.validate().is_ok());
@@ -679,6 +742,7 @@ mod tests {
             kind: CFKind::MarginInterest,
             accrual_factor: 0.25,
             rate: Some(0.05),
+            accrual: None,
         };
         assert_eq!(margin_int.kind, CFKind::MarginInterest);
         assert!(margin_int.validate().is_ok());
@@ -691,6 +755,7 @@ mod tests {
             kind: CFKind::CollateralSubstitutionIn,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(sub_in.kind, CFKind::CollateralSubstitutionIn);
         assert!(sub_in.validate().is_ok());
@@ -703,6 +768,7 @@ mod tests {
             kind: CFKind::CollateralSubstitutionOut,
             accrual_factor: 0.0,
             rate: None,
+            accrual: None,
         };
         assert_eq!(sub_out.kind, CFKind::CollateralSubstitutionOut);
         assert!(sub_out.validate().is_ok());

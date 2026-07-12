@@ -253,14 +253,14 @@ impl<'a> CashflowEngine<'a> {
         if self.facility.commitment_date > self.as_of
             && !rc.is_effectively_zero(self.facility.drawn_amount.amount(), ZeroKind::Money(ccy))
         {
-            flows.push(CashFlow {
-                date: self.facility.commitment_date,
-                reset_date: None,
-                amount: self.facility.drawn_amount * -1.0,
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                self.facility.commitment_date,
+                None,
+                self.facility.drawn_amount * -1.0,
+                CFKind::Notional,
+                0.0,
+                None,
+            ));
         }
 
         // Generate interest and fee cashflows with intra-period event slicing
@@ -497,68 +497,68 @@ impl<'a> CashflowEngine<'a> {
             };
 
             if !rc.is_effectively_zero_money(total_interest.amount(), ccy) {
-                flows.push(CashFlow {
-                    date: payment_date,
-                    reset_date: reset_date_opt,
-                    amount: total_interest,
-                    kind: match &self.facility.base_rate_spec {
+                flows.push(CashFlow::new(
+                    payment_date,
+                    reset_date_opt,
+                    total_interest,
+                    match &self.facility.base_rate_spec {
                         BaseRateSpec::Fixed { .. } => CFKind::Fixed,
                         BaseRateSpec::Floating(_) => CFKind::FloatReset,
                     },
-                    accrual_factor: total_accrual,
-                    rate: avg_interest_rate,
-                });
+                    total_accrual,
+                    avg_interest_rate,
+                ));
             }
 
             if !rc.is_effectively_zero_money(total_commitment_fee.amount(), ccy) {
-                flows.push(CashFlow {
-                    date: payment_date,
-                    reset_date: None,
-                    amount: total_commitment_fee,
-                    kind: CFKind::CommitmentFee,
-                    accrual_factor: total_accrual,
-                    rate: avg_commitment_fee_rate,
-                });
+                flows.push(CashFlow::new(
+                    payment_date,
+                    None,
+                    total_commitment_fee,
+                    CFKind::CommitmentFee,
+                    total_accrual,
+                    avg_commitment_fee_rate,
+                ));
             }
 
             if !rc.is_effectively_zero_money(total_usage_fee.amount(), ccy) {
-                flows.push(CashFlow {
-                    date: payment_date,
-                    reset_date: None,
-                    amount: total_usage_fee,
-                    kind: CFKind::UsageFee,
-                    accrual_factor: total_accrual,
-                    rate: avg_usage_fee_rate,
-                });
+                flows.push(CashFlow::new(
+                    payment_date,
+                    None,
+                    total_usage_fee,
+                    CFKind::UsageFee,
+                    total_accrual,
+                    avg_usage_fee_rate,
+                ));
             }
 
             if !rc.is_effectively_zero_money(total_facility_fee.amount(), ccy) {
-                flows.push(CashFlow {
-                    date: payment_date,
-                    reset_date: None,
-                    amount: total_facility_fee,
-                    kind: CFKind::FacilityFee,
-                    accrual_factor: total_accrual,
-                    rate: Some(self.facility.fees.facility_fee_bp * 1e-4),
-                });
+                flows.push(CashFlow::new(
+                    payment_date,
+                    None,
+                    total_facility_fee,
+                    CFKind::FacilityFee,
+                    total_accrual,
+                    Some(self.facility.fees.facility_fee_bp * 1e-4),
+                ));
             }
         }
 
         // Add principal flows from draw/repay events
         for event in draw_repay_events.iter() {
             if event.date > self.as_of {
-                flows.push(CashFlow {
-                    date: event.date,
-                    reset_date: None,
-                    amount: if event.is_draw {
+                flows.push(CashFlow::new(
+                    event.date,
+                    None,
+                    if event.is_draw {
                         event.amount * -1.0
                     } else {
                         event.amount
                     },
-                    kind: CFKind::Notional,
-                    accrual_factor: 0.0,
-                    rate: None,
-                });
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ));
             }
         }
 
@@ -589,14 +589,14 @@ impl<'a> CashflowEngine<'a> {
         if self.facility.maturity > self.as_of
             && !rc.is_effectively_zero(final_balance_for_terminal.amount(), ZeroKind::Money(ccy))
         {
-            flows.push(CashFlow {
-                date: self.facility.maturity,
-                reset_date: None,
-                amount: final_balance_for_terminal,
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                self.facility.maturity,
+                None,
+                final_balance_for_terminal,
+                CFKind::Notional,
+                0.0,
+                None,
+            ));
         }
 
         sort_flows(&mut flows);
@@ -635,14 +635,14 @@ impl<'a> CashflowEngine<'a> {
         if self.facility.commitment_date > self.as_of
             && !rc.is_effectively_zero(self.facility.drawn_amount.amount(), ZeroKind::Money(ccy))
         {
-            flows.push(CashFlow {
-                date: self.facility.commitment_date,
-                reset_date: None,
-                amount: self.facility.drawn_amount * -1.0,
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                self.facility.commitment_date,
+                None,
+                self.facility.drawn_amount * -1.0,
+                CFKind::Notional,
+                0.0,
+                None,
+            ));
         }
 
         // Track previous utilization for principal flows
@@ -722,17 +722,17 @@ impl<'a> CashflowEngine<'a> {
 
             // Add interest cashflows if non-zero
             if payment_date > self.as_of && !rc.is_effectively_zero_money(interest.amount(), ccy) {
-                flows.push(CashFlow {
-                    date: payment_date,
-                    reset_date: fixing_date,
-                    amount: interest,
-                    kind: match &self.facility.base_rate_spec {
+                flows.push(CashFlow::new(
+                    payment_date,
+                    fixing_date,
+                    interest,
+                    match &self.facility.base_rate_spec {
                         BaseRateSpec::Fixed { .. } => CFKind::Fixed,
                         BaseRateSpec::Floating(_) => CFKind::FloatReset,
                     },
-                    accrual_factor: dt,
-                    rate: Some(interest_rate),
-                });
+                    dt,
+                    Some(interest_rate),
+                ));
             }
 
             // Calculate and emit fee cashflows using centralized functions.
@@ -767,14 +767,14 @@ impl<'a> CashflowEngine<'a> {
             {
                 let principal_change = self.facility.commitment_amount * utilization_change;
                 // Draw (increase) is negative for lender, repay (decrease) is positive
-                flows.push(CashFlow {
-                    date: principal_date,
-                    reset_date: None,
-                    amount: principal_change * -1.0,
-                    kind: CFKind::Notional,
-                    accrual_factor: 0.0,
-                    rate: None,
-                });
+                flows.push(CashFlow::new(
+                    principal_date,
+                    None,
+                    principal_change * -1.0,
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ));
             }
 
             prev_utilization = utilization_end;
@@ -792,14 +792,14 @@ impl<'a> CashflowEngine<'a> {
         if self.facility.maturity > self.as_of
             && !rc.is_effectively_zero(final_balance.amount(), ZeroKind::Money(ccy))
         {
-            flows.push(CashFlow {
-                date: self.facility.maturity,
-                reset_date: None,
-                amount: final_balance,
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                self.facility.maturity,
+                None,
+                final_balance,
+                CFKind::Notional,
+                0.0,
+                None,
+            ));
         }
 
         sort_flows(&mut flows);

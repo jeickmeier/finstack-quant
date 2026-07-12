@@ -43,14 +43,14 @@ fn emit_revolving_fee_on(
     let rate = decimal_to_f64(fee_bp_dec * BP_TO_RATE)?;
 
     if fee_amt != 0.0 {
-        Ok(Some(CashFlow {
-            date: d,
-            reset_date: None,
-            amount: Money::new(fee_amt, ccy),
+        Ok(Some(CashFlow::new(
+            d,
+            None,
+            Money::new(fee_amt, ccy),
             kind,
-            accrual_factor: year_fraction,
-            rate: Some(rate),
-        }))
+            year_fraction,
+            Some(rate),
+        )))
     } else {
         Ok(None)
     }
@@ -241,29 +241,21 @@ pub(in crate::builder) fn emit_fees_on(
             // Any non-zero fee amount is emitted: negative-bps fees (rebates)
             // flow through as negative cashflows, matching fixed-fee behavior.
             if fee_amt != 0.0 {
-                new_flows.push(CashFlow {
-                    date: d,
-                    reset_date: None,
-                    amount: Money::new(fee_amt, ccy),
-                    kind: CFKind::Fee,
-                    accrual_factor: yf,
-                    rate: Some(rate),
-                });
+                new_flows.push(CashFlow::new(
+                    d,
+                    None,
+                    Money::new(fee_amt, ccy),
+                    CFKind::Fee,
+                    yf,
+                    Some(rate),
+                ));
             }
         }
     }
 
     for (fd, amt) in fixed_fees {
         if *fd == d && amt.amount() != 0.0 {
-            new_flows.push(CashFlow {
-                date: d,
-                reset_date: None,
-                amount: *amt,
-                kind: CFKind::Fee,
-                // Fixed fees don't have an accrual period - use 0.0
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            new_flows.push(CashFlow::new(d, None, *amt, CFKind::Fee, 0.0, None));
         }
     }
     Ok(())

@@ -775,13 +775,15 @@ mod tests {
     ) -> CashFlowSchedule {
         let flows: Vec<CashFlow> = coupon_dates
             .iter()
-            .map(|(date, af)| CashFlow {
-                date: *date,
-                amount: Money::new(25000.0, Currency::USD), // $25k coupon
-                kind: CFKind::Fixed,
-                accrual_factor: *af,
-                rate: Some(0.05),
-                reset_date: None,
+            .map(|(date, af)| {
+                CashFlow::new(
+                    *date,
+                    None,
+                    Money::new(25000.0, Currency::USD),
+                    CFKind::Fixed,
+                    *af,
+                    Some(0.05),
+                )
             })
             .collect();
 
@@ -822,14 +824,14 @@ mod tests {
 
         schedule.flows.insert(
             0,
-            CashFlow {
-                date: make_date(2025, 1, 15),
-                amount: Money::new(-1_000_000.0, Currency::USD),
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-                reset_date: None,
-            },
+            CashFlow::new(
+                make_date(2025, 1, 15),
+                None,
+                Money::new(-1_000_000.0, Currency::USD),
+                CFKind::Notional,
+                0.0,
+                None,
+            ),
         );
 
         let cfg = AccrualConfig::default();

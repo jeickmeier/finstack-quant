@@ -202,14 +202,14 @@ mod period_flow_waterfall_integration {
                 2 => Month::August,
                 _ => Month::November,
             };
-            flows.push(CashFlow {
-                date: Date::from_calendar_date(year, month, 15).expect("valid date"),
-                reset_date: None,
-                amount: Money::new(-notional * rate_q, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: Some(rate_q * 4.0),
-            });
+            flows.push(CashFlow::new(
+                Date::from_calendar_date(year, month, 15).expect("valid date"),
+                None,
+                Money::new(-notional * rate_q, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                Some(rate_q * 4.0),
+            ));
         }
         let instrument = ScheduleInstrument {
             schedule: CashFlowSchedule {
@@ -327,23 +327,22 @@ mod period_flow_waterfall_integration {
         let instrument = ScheduleInstrument {
             schedule: CashFlowSchedule {
                 flows: vec![
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::February, 15)
-                            .expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(-10_000.0, Currency::USD),
-                        kind: CFKind::Fixed,
-                        accrual_factor: 0.25,
-                        rate: Some(0.04),
-                    },
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(50_000.0, Currency::USD),
-                        kind: CFKind::Amortization,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    },
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                        None,
+                        Money::new(-10_000.0, Currency::USD),
+                        CFKind::Fixed,
+                        0.25,
+                        Some(0.04),
+                    ),
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                        None,
+                        Money::new(50_000.0, Currency::USD),
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    ),
                 ],
                 notional: Notional::par(1_000_000.0, Currency::USD),
                 day_count: DayCount::Act365F,
@@ -422,23 +421,22 @@ mod period_flow_waterfall_integration {
         let instrument: Arc<dyn CashflowProvider + Send + Sync> = Arc::new(ScheduleInstrument {
             schedule: CashFlowSchedule {
                 flows: vec![
-                    CashFlow {
-                        date: issue,
-                        reset_date: None,
-                        amount: Money::new(-1_000_000.0, Currency::USD),
-                        kind: CFKind::Notional,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    },
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::November, 15)
-                            .expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(-20_000.0, Currency::USD),
-                        kind: CFKind::Fixed,
-                        accrual_factor: 0.25,
-                        rate: Some(0.08),
-                    },
+                    CashFlow::new(
+                        issue,
+                        None,
+                        Money::new(-1_000_000.0, Currency::USD),
+                        CFKind::Notional,
+                        0.0,
+                        None,
+                    ),
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::November, 15).expect("valid date"),
+                        None,
+                        Money::new(-20_000.0, Currency::USD),
+                        CFKind::Fixed,
+                        0.25,
+                        Some(0.08),
+                    ),
                 ],
                 notional: Notional::par(1_000_000.0, Currency::USD),
                 day_count: DayCount::Act365F,

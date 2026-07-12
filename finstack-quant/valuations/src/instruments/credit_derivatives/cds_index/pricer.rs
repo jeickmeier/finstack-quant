@@ -833,13 +833,10 @@ impl CDSIndexPricer {
                 };
                 let projected_premium = flow.amount.amount().abs() * projected_survival;
                 if projected_premium.abs() > f64::EPSILON {
-                    projected_flows.push(CashFlow {
-                        amount: Money::new(
-                            projected_premium * premium_sign,
-                            flow.amount.currency(),
-                        ),
-                        ..flow
-                    });
+                    let mut projected_flow = flow;
+                    projected_flow.amount =
+                        Money::new(projected_premium * premium_sign, flow.amount.currency());
+                    projected_flows.push(projected_flow);
                 }
                 if delta_default > 0.0 {
                     let default_date =
@@ -848,28 +845,28 @@ impl CDSIndexPricer {
                         default_date,
                         cds.protection.settlement_delay,
                     );
-                    projected_flows.push(CashFlow {
-                        date: settlement_date,
-                        reset_date: None,
-                        amount: Money::new(
+                    projected_flows.push(CashFlow::new(
+                        settlement_date,
+                        None,
+                        Money::new(
                             cds.notional.amount()
                                 * loss_given_default
                                 * conditional_default
                                 * protection_sign,
                             cds.notional.currency(),
                         ),
-                        kind: CFKind::DefaultedNotional,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    });
+                        CFKind::DefaultedNotional,
+                        0.0,
+                        None,
+                    ));
                 }
                 previous_premium_date = flow.date;
                 prev_survival = current_survival;
             } else if flow.kind == CFKind::Fee {
-                projected_flows.push(CashFlow {
-                    amount: Money::new(flow.amount.amount() * premium_sign, flow.amount.currency()),
-                    ..flow
-                });
+                let mut projected_flow = flow;
+                projected_flow.amount =
+                    Money::new(flow.amount.amount() * premium_sign, flow.amount.currency());
+                projected_flows.push(projected_flow);
             }
         }
 

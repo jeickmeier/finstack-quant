@@ -405,14 +405,14 @@ mod tests {
 
         let instrument = SignedFlowInstrument {
             schedule: CashFlowSchedule {
-                flows: vec![CashFlow {
-                    date: Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    reset_date: None,
-                    amount: Money::new(-50_000.0, Currency::USD),
-                    kind: CFKind::Fixed,
-                    accrual_factor: 0.25,
-                    rate: None,
-                }],
+                flows: vec![CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(-50_000.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )],
                 notional: Notional::par(1_000_000.0, Currency::USD),
                 day_count: DayCount::Act365F,
                 meta: CashFlowMeta {
@@ -451,23 +451,22 @@ mod tests {
         let instrument = SignedFlowInstrument {
             schedule: CashFlowSchedule {
                 flows: vec![
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::February, 15)
-                            .expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(-50_000.0, Currency::USD),
-                        kind: CFKind::Fixed,
-                        accrual_factor: 0.25,
-                        rate: None,
-                    },
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(-100_000.0, Currency::USD),
-                        kind: CFKind::Amortization,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    },
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                        None,
+                        Money::new(-50_000.0, Currency::USD),
+                        CFKind::Fixed,
+                        0.25,
+                        None,
+                    ),
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                        None,
+                        Money::new(-100_000.0, Currency::USD),
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    ),
                 ],
                 notional: Notional::par(1_000_000.0, Currency::USD),
                 day_count: DayCount::Act365F,
@@ -510,14 +509,14 @@ mod tests {
 
         let instrument = SignedFlowInstrument {
             schedule: CashFlowSchedule {
-                flows: vec![CashFlow {
-                    date: Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    reset_date: None,
-                    amount: Money::new(-100_000.0, Currency::USD),
-                    kind: CFKind::RevolvingDraw,
-                    accrual_factor: 0.0,
-                    rate: None,
-                }],
+                flows: vec![CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(-100_000.0, Currency::USD),
+                    CFKind::RevolvingDraw,
+                    0.0,
+                    None,
+                )],
                 notional: Notional::par(0.0, Currency::USD),
                 day_count: DayCount::Act365F,
                 meta: CashFlowMeta {
@@ -570,22 +569,22 @@ mod tests {
         let mut flows = Vec::new();
         let mut outstanding = 1_000_000.0;
         for q in 2..=4 {
-            flows.push(CashFlow {
-                date: q_start(q),
-                reset_date: None,
-                amount: Money::new(-outstanding * 0.01, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: Some(0.04),
-            });
-            flows.push(CashFlow {
-                date: q_start(q),
-                reset_date: None,
-                amount: Money::new(100_000.0, Currency::USD),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                q_start(q),
+                None,
+                Money::new(-outstanding * 0.01, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                Some(0.04),
+            ));
+            flows.push(CashFlow::new(
+                q_start(q),
+                None,
+                Money::new(100_000.0, Currency::USD),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ));
             outstanding -= 100_000.0;
         }
         let instrument = SignedFlowInstrument {
@@ -661,14 +660,14 @@ mod tests {
 
         let instrument = SignedFlowInstrument {
             schedule: CashFlowSchedule {
-                flows: vec![CashFlow {
-                    date: Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    reset_date: None,
-                    amount: Money::new(-20_000.0, Currency::USD),
-                    kind: CFKind::Fixed,
-                    accrual_factor: 0.25,
-                    rate: Some(0.08),
-                }],
+                flows: vec![CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(-20_000.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.25,
+                    Some(0.08),
+                )],
                 notional: Notional::par(1_000_000.0, Currency::USD),
                 day_count: DayCount::Act365F,
                 meta: CashFlowMeta {
@@ -733,23 +732,22 @@ mod tests {
         let instrument = SignedFlowInstrument {
             schedule: CashFlowSchedule {
                 flows: vec![
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::February, 15)
-                            .expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(-100_000.0, Currency::USD),
-                        kind: CFKind::RevolvingDraw,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    },
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(30_000.0, Currency::USD),
-                        kind: CFKind::RevolvingRepayment,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    },
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                        None,
+                        Money::new(-100_000.0, Currency::USD),
+                        CFKind::RevolvingDraw,
+                        0.0,
+                        None,
+                    ),
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::March, 15).expect("valid date"),
+                        None,
+                        Money::new(30_000.0, Currency::USD),
+                        CFKind::RevolvingRepayment,
+                        0.0,
+                        None,
+                    ),
                 ],
                 // Scheduled balance is 500k — the stateful balance (zero,
                 // fully swept upstream) takes precedence.
@@ -798,24 +796,22 @@ mod tests {
         let instrument = SignedFlowInstrument {
             schedule: CashFlowSchedule {
                 flows: vec![
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::February, 15)
-                            .expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(-5_000.0, Currency::USD),
-                        kind: CFKind::CommitmentFee,
-                        accrual_factor: 0.25,
-                        rate: None,
-                    },
-                    CashFlow {
-                        date: Date::from_calendar_date(2025, Month::February, 15)
-                            .expect("valid date"),
-                        reset_date: None,
-                        amount: Money::new(-2_000.0, Currency::USD),
-                        kind: CFKind::FacilityFee,
-                        accrual_factor: 0.25,
-                        rate: None,
-                    },
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                        None,
+                        Money::new(-5_000.0, Currency::USD),
+                        CFKind::CommitmentFee,
+                        0.25,
+                        None,
+                    ),
+                    CashFlow::new(
+                        Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                        None,
+                        Money::new(-2_000.0, Currency::USD),
+                        CFKind::FacilityFee,
+                        0.25,
+                        None,
+                    ),
                 ],
                 notional: Notional::par(1_000_000.0, Currency::USD),
                 day_count: DayCount::Act365F,
@@ -859,14 +855,14 @@ mod tests {
 
         let instrument = SignedFlowInstrument {
             schedule: CashFlowSchedule {
-                flows: vec![CashFlow {
-                    date: Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
-                    reset_date: None,
-                    amount: Money::new(-50_000.0, Currency::USD),
-                    kind: CFKind::Fixed,
-                    accrual_factor: 0.25,
-                    rate: None,
-                }],
+                flows: vec![CashFlow::new(
+                    Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
+                    None,
+                    Money::new(-50_000.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.25,
+                    None,
+                )],
                 notional: Notional::par(0.01, Currency::USD),
                 day_count: DayCount::Act365F,
                 meta: CashFlowMeta {

@@ -231,34 +231,34 @@ pub(crate) fn build_reference_tranche_schedule(
 
     for cf in tranche_cashflows {
         if cf.interest.abs() > f64::EPSILON {
-            flows.push(CashFlow {
-                date: cf.payment_date,
-                reset_date: None,
-                amount: Money::new(cf.interest, tranche.current_face.currency()),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.0,
-                rate: Some(tranche.coupon),
-            });
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.interest, tranche.current_face.currency()),
+                CFKind::Fixed,
+                0.0,
+                Some(tranche.coupon),
+            ));
         }
         if cf.scheduled_principal.abs() > f64::EPSILON {
-            flows.push(CashFlow {
-                date: cf.payment_date,
-                reset_date: None,
-                amount: Money::new(cf.scheduled_principal, tranche.current_face.currency()),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.scheduled_principal, tranche.current_face.currency()),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ));
         }
         if cf.prepayment_principal.abs() > f64::EPSILON {
-            flows.push(CashFlow {
-                date: cf.payment_date,
-                reset_date: None,
-                amount: Money::new(cf.prepayment_principal, tranche.current_face.currency()),
-                kind: CFKind::PrePayment,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.prepayment_principal, tranche.current_face.currency()),
+                CFKind::PrePayment,
+                0.0,
+                None,
+            ));
         }
     }
 

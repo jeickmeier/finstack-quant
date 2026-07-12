@@ -671,22 +671,22 @@ impl CashflowProvider for Repo {
         let cash_outflow = Money::new(-self.cash_amount.amount(), self.cash_amount.currency());
         let total_repayment = self.total_repayment()?;
         let flows = vec![
-            crate::cashflow::primitives::CashFlow {
-                date: adj_start,
-                reset_date: None,
-                amount: cash_outflow,
-                kind: crate::cashflow::primitives::CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            crate::cashflow::primitives::CashFlow {
-                date: adj_maturity,
-                reset_date: None,
-                amount: total_repayment,
-                kind: crate::cashflow::primitives::CFKind::Fixed,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            crate::cashflow::primitives::CashFlow::new(
+                adj_start,
+                None,
+                cash_outflow,
+                crate::cashflow::primitives::CFKind::Notional,
+                0.0,
+                None,
+            ),
+            crate::cashflow::primitives::CashFlow::new(
+                adj_maturity,
+                None,
+                total_repayment,
+                crate::cashflow::primitives::CFKind::Fixed,
+                0.0,
+                None,
+            ),
         ];
 
         let schedule = crate::cashflow::traits::schedule_from_classified_flows(

@@ -491,22 +491,22 @@ impl CashflowProvider for Deposit {
         let r = decimal_to_f64(r, "Deposit quote_rate")?;
         let redemption = self.notional * (1.0 + r * yf);
         let flows = vec![
-            crate::cashflow::primitives::CashFlow {
-                date: effective_start,
-                reset_date: None,
-                amount: self.notional * -1.0,
-                kind: crate::cashflow::primitives::CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            crate::cashflow::primitives::CashFlow {
-                date: effective_end,
-                reset_date: None,
-                amount: redemption,
-                kind: crate::cashflow::primitives::CFKind::Fixed,
-                accrual_factor: yf,
-                rate: Some(r),
-            },
+            crate::cashflow::primitives::CashFlow::new(
+                effective_start,
+                None,
+                self.notional * -1.0,
+                crate::cashflow::primitives::CFKind::Notional,
+                0.0,
+                None,
+            ),
+            crate::cashflow::primitives::CashFlow::new(
+                effective_end,
+                None,
+                redemption,
+                crate::cashflow::primitives::CFKind::Fixed,
+                yf,
+                Some(r),
+            ),
         ];
 
         let schedule = crate::cashflow::traits::schedule_from_classified_flows(

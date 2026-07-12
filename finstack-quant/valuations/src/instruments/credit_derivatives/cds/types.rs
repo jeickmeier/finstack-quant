@@ -986,17 +986,17 @@ impl CreditDefaultSwap {
         let flows = payment_accruals
             .into_iter()
             .map(|(end, accrual)| {
-                Ok(finstack_quant_core::cashflow::CashFlow {
-                    date: end,
-                    reset_date: None,
-                    amount: Money::new(
+                Ok(finstack_quant_core::cashflow::CashFlow::new(
+                    end,
+                    None,
+                    Money::new(
                         self.notional.amount() * spread * accrual,
                         self.notional.currency(),
                     ),
-                    kind: finstack_quant_core::cashflow::CFKind::Fixed,
-                    accrual_factor: accrual,
-                    rate: Some(spread),
-                })
+                    finstack_quant_core::cashflow::CFKind::Fixed,
+                    accrual,
+                    Some(spread),
+                ))
             })
             .collect::<finstack_quant_core::Result<Vec<_>>>()?;
 
@@ -1130,14 +1130,14 @@ impl crate::cashflow::traits::CashflowProvider for CreditDefaultSwap {
         if let Some((dt, amount)) = self.upfront {
             schedule
                 .flows
-                .push(finstack_quant_core::cashflow::CashFlow {
-                    date: dt,
-                    reset_date: None,
+                .push(finstack_quant_core::cashflow::CashFlow::new(
+                    dt,
+                    None,
                     amount,
-                    kind: finstack_quant_core::cashflow::CFKind::Fee,
-                    accrual_factor: 0.0,
-                    rate: None,
-                });
+                    finstack_quant_core::cashflow::CFKind::Fee,
+                    0.0,
+                    None,
+                ));
             schedule.flows.sort_by_key(|cf| cf.date);
         }
 

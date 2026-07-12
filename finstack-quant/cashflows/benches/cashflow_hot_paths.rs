@@ -148,18 +148,18 @@ fn make_unsorted_flows(n: usize, base: Date) -> Vec<CashFlow> {
         .map(|i| {
             // Interleave dates to produce a partially-unsorted sequence.
             let offset = ((i * 17 + 3) % n) as i64 * 90;
-            CashFlow {
-                date: base + time::Duration::days(offset),
-                reset_date: None,
-                amount: Money::new(1_000.0 + (i as f64 * 13.7), Currency::USD),
-                kind: if i % 5 == 0 {
+            CashFlow::new(
+                base + time::Duration::days(offset),
+                None,
+                Money::new(1_000.0 + (i as f64 * 13.7), Currency::USD),
+                if i % 5 == 0 {
                     CFKind::Amortization
                 } else {
                     CFKind::Fixed
                 },
-                accrual_factor: 0.25,
-                rate: Some(0.06),
-            }
+                0.25,
+                Some(0.06),
+            )
         })
         .collect()
 }
@@ -170,14 +170,14 @@ fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
     let flows: Vec<CashFlow> = (0..n_periods)
         .map(|i| {
             let days = ((i + 1) as i64) * 90;
-            CashFlow {
-                date: base + time::Duration::days(days),
-                reset_date: None,
-                amount: Money::new(per, Currency::USD),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.25,
-                rate: None,
-            }
+            CashFlow::new(
+                base + time::Duration::days(days),
+                None,
+                Money::new(per, Currency::USD),
+                CFKind::Amortization,
+                0.25,
+                None,
+            )
         })
         .collect();
 

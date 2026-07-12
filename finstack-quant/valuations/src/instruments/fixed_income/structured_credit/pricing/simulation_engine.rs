@@ -2793,26 +2793,26 @@ impl<'a> SimulationState<'a> {
 
             for (date, amount) in &res.interest_flows {
                 if amount.amount() > 0.0 {
-                    res.detailed_flows.push(CashFlow {
-                        date: *date,
-                        reset_date: None,
-                        amount: *amount,
-                        kind: CFKind::Fixed,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    });
+                    res.detailed_flows.push(CashFlow::new(
+                        *date,
+                        None,
+                        *amount,
+                        CFKind::Fixed,
+                        0.0,
+                        None,
+                    ));
                 }
             }
             for (date, amount) in &res.principal_flows {
                 if amount.amount() > 0.0 {
-                    res.detailed_flows.push(CashFlow {
-                        date: *date,
-                        reset_date: None,
-                        amount: *amount,
-                        kind: CFKind::Amortization,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    });
+                    res.detailed_flows.push(CashFlow::new(
+                        *date,
+                        None,
+                        *amount,
+                        CFKind::Amortization,
+                        0.0,
+                        None,
+                    ));
                 }
             }
             // Include write-down flows in detailed_flows so NPV and
@@ -2821,14 +2821,14 @@ impl<'a> SimulationState<'a> {
             // classified as DefaultedNotional (negative = loss to holder).
             for (date, amount) in &res.writedown_flows {
                 if amount.amount() > 0.0 {
-                    res.detailed_flows.push(CashFlow {
-                        date: *date,
-                        reset_date: None,
-                        amount: Money::new(-amount.amount(), amount.currency()),
-                        kind: CFKind::DefaultedNotional,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    });
+                    res.detailed_flows.push(CashFlow::new(
+                        *date,
+                        None,
+                        Money::new(-amount.amount(), amount.currency()),
+                        CFKind::DefaultedNotional,
+                        0.0,
+                        None,
+                    ));
                 }
             }
 

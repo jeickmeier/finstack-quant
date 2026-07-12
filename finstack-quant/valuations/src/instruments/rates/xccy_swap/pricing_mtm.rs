@@ -463,26 +463,26 @@ pub(crate) fn mtm_cashflow_schedule(
     };
 
     // Initial principal exchanges.
-    flows.push(CashFlow {
-        date: constant_leg.start,
-        reset_date: None,
-        amount: Money::new(
+    flows.push(CashFlow::new(
+        constant_leg.start,
+        None,
+        Money::new(
             constant_leg.side.initial_principal_sign() * n_c,
             constant_leg.currency,
         ),
-        kind: CFKind::Notional,
-        accrual_factor: 0.0,
-        rate: None,
-    });
+        CFKind::Notional,
+        0.0,
+        None,
+    ));
     let cf_initial_amount = resetting_leg.side.initial_principal_sign() * n_r_initial;
-    flows.push(CashFlow {
-        date: resetting_leg.start,
-        reset_date: None,
-        amount: Money::new(cf_initial_amount, resetting_leg.currency),
-        kind: CFKind::Notional,
-        accrual_factor: 0.0,
-        rate: None,
-    });
+    flows.push(CashFlow::new(
+        resetting_leg.start,
+        None,
+        Money::new(cf_initial_amount, resetting_leg.currency),
+        CFKind::Notional,
+        0.0,
+        None,
+    ));
 
     let spread_c =
         decimal_to_f64(constant_leg.spread_bp, "XccySwap constant leg spread_bp")? / 10_000.0;
@@ -502,17 +502,17 @@ pub(crate) fn mtm_cashflow_schedule(
             rate_between_on_dates(fwd_c.as_ref(), period.accrual_start, period.accrual_end)?
         };
         let all_in = rate + spread_c;
-        flows.push(CashFlow {
-            date: period.payment_date,
-            reset_date: period.reset_date,
-            amount: Money::new(
+        flows.push(CashFlow::new(
+            period.payment_date,
+            period.reset_date,
+            Money::new(
                 constant_leg.side.coupon_sign() * n_c * all_in * period.accrual_year_fraction,
                 constant_leg.currency,
             ),
-            kind: CFKind::FloatReset,
-            accrual_factor: period.accrual_year_fraction,
-            rate: Some(all_in),
-        });
+            CFKind::FloatReset,
+            period.accrual_year_fraction,
+            Some(all_in),
+        ));
     }
 
     let spread_decimal =
@@ -567,14 +567,14 @@ pub(crate) fn mtm_cashflow_schedule(
                 * n_r_j
                 * (rate_r + spread_decimal)
                 * period.accrual_year_fraction;
-            flows.push(CashFlow {
-                date: period.payment_date,
-                reset_date: period.reset_date,
-                amount: Money::new(coupon_amount, resetting_leg.currency),
-                kind: CFKind::FloatReset,
-                accrual_factor: period.accrual_year_fraction,
-                rate: Some(rate_r + spread_decimal),
-            });
+            flows.push(CashFlow::new(
+                period.payment_date,
+                period.reset_date,
+                Money::new(coupon_amount, resetting_leg.currency),
+                CFKind::FloatReset,
+                period.accrual_year_fraction,
+                Some(rate_r + spread_decimal),
+            ));
         }
 
         // Rebalancing at the START of this period (j ≥ 1 only).
@@ -582,14 +582,14 @@ pub(crate) fn mtm_cashflow_schedule(
             let delta_n_r = n_r_j - n_r_prev;
             let rebal_amount = resetting_leg.side.initial_principal_sign() * delta_n_r;
             if rebal_amount != 0.0 {
-                flows.push(CashFlow {
-                    date: period.accrual_start,
-                    reset_date: None,
-                    amount: Money::new(rebal_amount, resetting_leg.currency),
-                    kind: CFKind::Notional,
-                    accrual_factor: 0.0,
-                    rate: None,
-                });
+                flows.push(CashFlow::new(
+                    period.accrual_start,
+                    None,
+                    Money::new(rebal_amount, resetting_leg.currency),
+                    CFKind::Notional,
+                    0.0,
+                    None,
+                ));
             }
         }
 
@@ -597,26 +597,26 @@ pub(crate) fn mtm_cashflow_schedule(
     }
 
     // Final principal exchanges; the resetting leg uses its last marked notional.
-    flows.push(CashFlow {
-        date: constant_leg.end,
-        reset_date: None,
-        amount: Money::new(
+    flows.push(CashFlow::new(
+        constant_leg.end,
+        None,
+        Money::new(
             constant_leg.side.final_principal_sign() * n_c,
             constant_leg.currency,
         ),
-        kind: CFKind::Notional,
-        accrual_factor: 0.0,
-        rate: None,
-    });
+        CFKind::Notional,
+        0.0,
+        None,
+    ));
     let cf_final_amount = resetting_leg.side.final_principal_sign() * n_r_prev;
-    flows.push(CashFlow {
-        date: resetting_leg.end,
-        reset_date: None,
-        amount: Money::new(cf_final_amount, resetting_leg.currency),
-        kind: CFKind::Notional,
-        accrual_factor: 0.0,
-        rate: None,
-    });
+    flows.push(CashFlow::new(
+        resetting_leg.end,
+        None,
+        Money::new(cf_final_amount, resetting_leg.currency),
+        CFKind::Notional,
+        0.0,
+        None,
+    ));
 
     flows.sort_by(|a, b| a.date.cmp(&b.date));
 

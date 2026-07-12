@@ -132,26 +132,26 @@ pub fn emit_default_on(
         let recovery_amt = defaulted * event.recovery_rate;
 
         // Default cashflow
-        out.push(CashFlow {
-            date: d,
-            reset_date: None,
-            amount: Money::new(defaulted, ccy),
-            kind: CFKind::DefaultedNotional,
-            accrual_factor: 0.0,
-            rate: None,
-        });
+        out.push(CashFlow::new(
+            d,
+            None,
+            Money::new(defaulted, ccy),
+            CFKind::DefaultedNotional,
+            0.0,
+            None,
+        ));
         *outstanding -= defaulted;
 
         // Recovery cashflow (on future date)
         if let Some(recovery_date) = recovery_date {
-            out.push(CashFlow {
-                date: recovery_date,
-                reset_date: None,
-                amount: Money::new(recovery_amt, ccy),
-                kind: CFKind::Recovery,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            out.push(CashFlow::new(
+                recovery_date,
+                None,
+                Money::new(recovery_amt, ccy),
+                CFKind::Recovery,
+                0.0,
+                None,
+            ));
             // Note: We do NOT add recovery back to outstanding here.
             // Recovery is a future cash inflow that doesn't restore the
             // principal base for interest calculations. The outstanding
@@ -163,14 +163,14 @@ pub fn emit_default_on(
         // pays accrued premium from last payment date to default date.
         if let Some(accrued_amt) = event.accrued_on_default {
             if accrued_amt > 0.0 {
-                out.push(CashFlow {
-                    date: d,
-                    reset_date: None,
-                    amount: Money::new(accrued_amt, ccy),
-                    kind: CFKind::AccruedOnDefault,
-                    accrual_factor: 0.0,
-                    rate: None,
-                });
+                out.push(CashFlow::new(
+                    d,
+                    None,
+                    Money::new(accrued_amt, ccy),
+                    CFKind::AccruedOnDefault,
+                    0.0,
+                    None,
+                ));
             }
         }
     }
@@ -237,14 +237,14 @@ pub fn emit_prepayment_on(
     let amount = prepayment_amount.min(*outstanding);
     if amount > 0.0 {
         *outstanding -= amount;
-        out.push(CashFlow {
-            date: d,
-            reset_date: None,
-            amount: Money::new(amount, ccy),
-            kind: CFKind::PrePayment,
-            accrual_factor: 0.0,
-            rate: None,
-        });
+        out.push(CashFlow::new(
+            d,
+            None,
+            Money::new(amount, ccy),
+            CFKind::PrePayment,
+            0.0,
+            None,
+        ));
     }
     Ok(())
 }

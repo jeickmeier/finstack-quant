@@ -481,8 +481,8 @@ impl CashFlowSchedule {
     /// let base = Date::from_calendar_date(2025, Month::January, 1).expect("Valid date");
     /// let notional = Notional { initial: Money::new(100.0, Currency::USD), amort: Default::default() };
     /// let flows = vec![
-    ///   CashFlow { date: base, reset_date: None, amount: Money::new(10.0, Currency::USD), kind: CFKind::Amortization, accrual_factor: 0.0, rate: None },
-    ///   CashFlow { date: base, reset_date: None, amount: Money::new(5.0, Currency::USD), kind: CFKind::PIK, accrual_factor: 0.0, rate: None },
+    ///   CashFlow::new(base, None, Money::new(10.0, Currency::USD), CFKind::Amortization, 0.0, None),
+    ///   CashFlow::new(base, None, Money::new(5.0, Currency::USD), CFKind::PIK, 0.0, None),
     /// ];
     /// let s = CashFlowSchedule { flows, notional, day_count: finstack_quant_core::dates::DayCount::Act365F, meta: CashFlowMeta::default() };
     /// let path = s.outstanding_path_per_flow().expect("valid schedule");
@@ -521,22 +521,8 @@ impl CashFlowSchedule {
     ///
     /// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
     /// let flows = vec![
-    ///     CashFlow {
-    ///         date,
-    ///         reset_date: None,
-    ///         amount: Money::new(50_000.0, Currency::USD),
-    ///         kind: CFKind::Fixed,
-    ///         accrual_factor: 0.5,
-    ///         rate: Some(0.05),
-    ///     },
-    ///     CashFlow {
-    ///         date,
-    ///         reset_date: None,
-    ///         amount: Money::new(100_000.0, Currency::USD),
-    ///         kind: CFKind::Amortization,
-    ///         accrual_factor: 0.0,
-    ///         rate: None,
-    ///     },
+    ///     CashFlow::new(date, None, Money::new(50_000.0, Currency::USD), CFKind::Fixed, 0.5, Some(0.05)),
+    ///     CashFlow::new(date, None, Money::new(100_000.0, Currency::USD), CFKind::Amortization, 0.0, None),
     /// ];
     /// let schedule = CashFlowSchedule {
     ///     flows,
@@ -1182,14 +1168,14 @@ mod tests {
     use time::Month;
 
     fn flow(date: Date, amount: f64, kind: CFKind) -> CashFlow {
-        CashFlow {
+        CashFlow::new(
             date,
-            reset_date: None,
-            amount: Money::new(amount, Currency::USD),
+            None,
+            Money::new(amount, Currency::USD),
             kind,
-            accrual_factor: 0.0,
-            rate: None,
-        }
+            0.0,
+            None,
+        )
     }
 
     #[test]

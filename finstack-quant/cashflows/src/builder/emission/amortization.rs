@@ -45,14 +45,14 @@ fn emit_principal_repayment(
         return Ok(());
     }
 
-    new_flows.push(CashFlow {
-        date: d,
-        reset_date: None,
-        amount: Money::new(decimal_to_f64(pay)?, ccy),
-        kind: CFKind::Amortization,
-        accrual_factor: 0.0,
-        rate: None,
-    });
+    new_flows.push(CashFlow::new(
+        d,
+        None,
+        Money::new(decimal_to_f64(pay)?, ccy),
+        CFKind::Amortization,
+        0.0,
+        None,
+    ));
     *outstanding -= pay;
     Ok(())
 }

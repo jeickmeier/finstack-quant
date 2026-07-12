@@ -841,22 +841,22 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
 
     let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
         flows: vec![
-            CashFlow {
-                date: default_date,
-                reset_date: None,
-                amount: Money::new(500.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: recovery_date,
-                reset_date: None,
-                amount: Money::new(200.0, Currency::USD),
-                kind: CFKind::Recovery,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                default_date,
+                None,
+                Money::new(500.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                recovery_date,
+                None,
+                Money::new(200.0, Currency::USD),
+                CFKind::Recovery,
+                0.0,
+                None,
+            ),
         ],
         notional: Notional::par(1_000.0, Currency::USD),
         day_count: DayCount::Act365F,
@@ -902,22 +902,22 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
 
     let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
         flows: vec![
-            CashFlow {
-                date: default_date,
-                reset_date: None,
-                amount: Money::new(500.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: recovery_date,
-                reset_date: None,
-                amount: Money::new(200.0, Currency::USD),
-                kind: CFKind::Recovery,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                default_date,
+                None,
+                Money::new(500.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                recovery_date,
+                None,
+                Money::new(200.0, Currency::USD),
+                CFKind::Recovery,
+                0.0,
+                None,
+            ),
         ],
         notional: Notional::par(1_000.0, Currency::USD),
         day_count: DayCount::Act365F,

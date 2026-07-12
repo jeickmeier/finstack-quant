@@ -317,8 +317,8 @@
         }
       ]
     },
-    "SABRParameters2": {
-      "description": "Public SABR parameters for swaption volatility modeling.",
+    "SABRParameters": {
+      "description": "SABR model parameters",
       "properties": {
         "alpha": {
           "description": "Initial volatility (alpha)",
@@ -666,7 +666,7 @@
             "sabr_params": {
               "anyOf": [
                 {
-                  "$ref": "#/$defs/SABRParameters2"
+                  "$ref": "#/$defs/SABRParameters"
                 },
                 {
                   "type": "null"

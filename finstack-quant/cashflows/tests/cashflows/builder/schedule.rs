@@ -563,14 +563,14 @@ fn outstanding_by_date_dedup_and_values() {
 fn outstanding_by_date_includes_prepayment() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
-        flows: vec![CashFlow {
-            date: prepay_date,
-            reset_date: None,
-            amount: Money::new(250.0, Currency::USD),
-            kind: CFKind::PrePayment,
-            accrual_factor: 0.0,
-            rate: None,
-        }],
+        flows: vec![CashFlow::new(
+            prepay_date,
+            None,
+            Money::new(250.0, Currency::USD),
+            CFKind::PrePayment,
+            0.0,
+            None,
+        )],
         notional: finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
         day_count: DayCount::Act365F,
         meta: finstack_quant_cashflows::builder::schedule::CashFlowMeta {
@@ -594,22 +594,22 @@ fn outstanding_by_date_includes_defaulted_notional() {
     let recovery_date = Date::from_calendar_date(2025, Month::September, 15).unwrap();
     let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
         flows: vec![
-            CashFlow {
-                date: default_date,
-                reset_date: None,
-                amount: Money::new(300.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: recovery_date,
-                reset_date: None,
-                amount: Money::new(120.0, Currency::USD),
-                kind: CFKind::Recovery,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                default_date,
+                None,
+                Money::new(300.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                recovery_date,
+                None,
+                Money::new(120.0, Currency::USD),
+                CFKind::Recovery,
+                0.0,
+                None,
+            ),
         ],
         notional: finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
         day_count: DayCount::Act365F,
@@ -662,14 +662,14 @@ fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
 fn outstanding_by_date_requires_issue_date() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
-        flows: vec![CashFlow {
-            date: prepay_date,
-            reset_date: None,
-            amount: Money::new(250.0, Currency::USD),
-            kind: CFKind::PrePayment,
-            accrual_factor: 0.0,
-            rate: None,
-        }],
+        flows: vec![CashFlow::new(
+            prepay_date,
+            None,
+            Money::new(250.0, Currency::USD),
+            CFKind::PrePayment,
+            0.0,
+            None,
+        )],
         notional: finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
         day_count: DayCount::Act365F,
         meta: finstack_quant_cashflows::builder::schedule::CashFlowMeta::default(),
@@ -1276,22 +1276,22 @@ fn test_weighted_average_life_two_amort() {
     let d2 = Date::from_calendar_date(2027, Month::January, 15).unwrap();
 
     let flows = vec![
-        CashFlow {
-            date: d1,
-            reset_date: None,
-            amount: Money::new(500.0, Currency::USD),
-            kind: CFKind::Amortization,
-            accrual_factor: 0.0,
-            rate: None,
-        },
-        CashFlow {
-            date: d2,
-            reset_date: None,
-            amount: Money::new(500.0, Currency::USD),
-            kind: CFKind::Amortization,
-            accrual_factor: 0.0,
-            rate: None,
-        },
+        CashFlow::new(
+            d1,
+            None,
+            Money::new(500.0, Currency::USD),
+            CFKind::Amortization,
+            0.0,
+            None,
+        ),
+        CashFlow::new(
+            d2,
+            None,
+            Money::new(500.0, Currency::USD),
+            CFKind::Amortization,
+            0.0,
+            None,
+        ),
     ];
 
     let schedule = CashFlowSchedule {
@@ -1323,14 +1323,14 @@ fn test_weighted_average_life_bullet() {
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
     let maturity = Date::from_calendar_date(2030, Month::January, 15).unwrap();
 
-    let flows = vec![CashFlow {
-        date: maturity,
-        reset_date: None,
-        amount: Money::new(1_000_000.0, Currency::USD),
-        kind: CFKind::Notional,
-        accrual_factor: 0.0,
-        rate: None,
-    }];
+    let flows = vec![CashFlow::new(
+        maturity,
+        None,
+        Money::new(1_000_000.0, Currency::USD),
+        CFKind::Notional,
+        0.0,
+        None,
+    )];
 
     let schedule = CashFlowSchedule {
         flows,
@@ -1385,32 +1385,32 @@ fn test_weighted_average_life_ignores_coupons() {
 
     let flows = vec![
         // Coupon at 6m - should be ignored
-        CashFlow {
-            date: d1,
-            reset_date: None,
-            amount: Money::new(25_000.0, Currency::USD),
-            kind: CFKind::Fixed,
-            accrual_factor: 0.5,
-            rate: Some(0.05),
-        },
+        CashFlow::new(
+            d1,
+            None,
+            Money::new(25_000.0, Currency::USD),
+            CFKind::Fixed,
+            0.5,
+            Some(0.05),
+        ),
         // Coupon at 1y - should be ignored
-        CashFlow {
-            date: d2,
-            reset_date: None,
-            amount: Money::new(25_000.0, Currency::USD),
-            kind: CFKind::Fixed,
-            accrual_factor: 0.5,
-            rate: Some(0.05),
-        },
+        CashFlow::new(
+            d2,
+            None,
+            Money::new(25_000.0, Currency::USD),
+            CFKind::Fixed,
+            0.5,
+            Some(0.05),
+        ),
         // Single principal redemption at maturity - only this counts
-        CashFlow {
-            date: maturity,
-            reset_date: None,
-            amount: Money::new(1_000_000.0, Currency::USD),
-            kind: CFKind::Notional,
-            accrual_factor: 0.0,
-            rate: None,
-        },
+        CashFlow::new(
+            maturity,
+            None,
+            Money::new(1_000_000.0, Currency::USD),
+            CFKind::Notional,
+            0.0,
+            None,
+        ),
     ];
 
     let schedule = CashFlowSchedule {

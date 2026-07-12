@@ -1109,14 +1109,14 @@ mod period_contract_tests {
     #[test]
     fn pv_by_period_errors_on_nan_discount_curve() {
         let base = d(2025, 1, 1);
-        let flows = vec![CashFlow {
-            date: d(2025, 6, 1),
-            reset_date: None,
-            amount: Money::new(100.0, Currency::USD),
-            kind: CFKind::Fixed,
-            accrual_factor: 0.5,
-            rate: None,
-        }];
+        let flows = vec![CashFlow::new(
+            d(2025, 6, 1),
+            None,
+            Money::new(100.0, Currency::USD),
+            CFKind::Fixed,
+            0.5,
+            None,
+        )];
         let periods = vec![period(PeriodId::annual(2025), base, d(2026, 1, 1))];
         let disc = NanDiscount { base };
 
@@ -1139,30 +1139,30 @@ mod period_contract_tests {
         // the DataFrame convention); they still appear in nominal aggregation.
         let base = d(2025, 4, 1);
         let flows = vec![
-            CashFlow {
-                date: d(2025, 2, 1), // historical
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
-            CashFlow {
-                date: base, // exactly on base: also historical by convention
-                reset_date: None,
-                amount: Money::new(50.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 6, 1), // future
-                reset_date: None,
-                amount: Money::new(200.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.25,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 2, 1),
+                None,
+                Money::new(100.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
+            CashFlow::new(
+                base,
+                None,
+                Money::new(50.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 6, 1),
+                None,
+                Money::new(200.0, Currency::USD),
+                CFKind::Fixed,
+                0.25,
+                None,
+            ),
         ];
         let periods = vec![period(PeriodId::annual(2025), d(2025, 1, 1), d(2026, 1, 1))];
         let disc = UnitDiscount { base };
@@ -1250,36 +1250,36 @@ mod credit_pv_tests {
     }
 
     fn flow(date: Date, amount: f64, kind: CFKind) -> CashFlow {
-        CashFlow {
+        CashFlow::new(
             date,
-            reset_date: None,
-            amount: Money::new(amount, Currency::USD),
+            None,
+            Money::new(amount, Currency::USD),
             kind,
-            accrual_factor: 0.0,
-            rate: None,
-        }
+            0.0,
+            None,
+        )
     }
 
     #[test]
     fn rejects_defaulted_notional_with_recovery_rate() {
         let base = d(2025, 1, 1);
         let flows = vec![
-            CashFlow {
-                date: d(2025, 6, 1),
-                reset_date: None,
-                amount: Money::new(100_000.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 12, 1),
-                reset_date: None,
-                amount: Money::new(900_000.0, Currency::USD),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 6, 1),
+                None,
+                Money::new(100_000.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 12, 1),
+                None,
+                Money::new(900_000.0, Currency::USD),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ),
         ];
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };
@@ -1311,22 +1311,22 @@ mod credit_pv_tests {
     fn allows_defaulted_notional_without_recovery_rate() {
         let base = d(2025, 1, 1);
         let flows = vec![
-            CashFlow {
-                date: d(2025, 6, 1),
-                reset_date: None,
-                amount: Money::new(100_000.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: d(2025, 12, 1),
-                reset_date: None,
-                amount: Money::new(900_000.0, Currency::USD),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                d(2025, 6, 1),
+                None,
+                Money::new(100_000.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                d(2025, 12, 1),
+                None,
+                Money::new(900_000.0, Currency::USD),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ),
         ];
         let periods = vec![make_period(base, d(2026, 1, 1))];
         let disc = FlatDiscount { base };

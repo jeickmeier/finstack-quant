@@ -210,14 +210,7 @@ pub fn schedule_from_dated_flows(
     let kind = opts.kind.unwrap_or(CFKind::Fixed);
     let cf_flows: Vec<CashFlow> = flows
         .into_iter()
-        .map(|(date, amount)| CashFlow {
-            date,
-            reset_date: None,
-            amount,
-            kind,
-            accrual_factor: 0.0,
-            rate: None,
-        })
+        .map(|(date, amount)| CashFlow::new(date, None, amount, kind, 0.0, None))
         .collect();
 
     let notional = resolve_notional(opts.notional_hint, first_currency);
@@ -260,22 +253,8 @@ pub fn schedule_from_dated_flows(
 ///
 /// let date = Date::from_calendar_date(2025, Month::June, 15).expect("valid date");
 /// let flows = vec![
-///     CashFlow {
-///         date,
-///         reset_date: None,
-///         amount: Money::new(50_000.0, Currency::USD),
-///         kind: CFKind::Fixed,
-///         accrual_factor: 0.5,
-///         rate: Some(0.05),
-///     },
-///     CashFlow {
-///         date,
-///         reset_date: None,
-///         amount: Money::new(10_000.0, Currency::USD),
-///         kind: CFKind::PIK,
-///         accrual_factor: 0.5,
-///         rate: Some(0.01),
-///     },
+///     CashFlow::new(date, None, Money::new(50_000.0, Currency::USD), CFKind::Fixed, 0.5, Some(0.05)),
+///     CashFlow::new(date, None, Money::new(10_000.0, Currency::USD), CFKind::PIK, 0.5, Some(0.01)),
 /// ];
 /// let schedule = schedule_from_classified_flows(
 ///     flows,
@@ -407,22 +386,22 @@ mod tests {
     fn schedule_from_classified_flows_preserves_kinds() {
         let date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let flows = vec![
-            CashFlow {
+            CashFlow::new(
                 date,
-                reset_date: None,
-                amount: Money::new(20.0, Currency::USD),
-                kind: CFKind::PrePayment,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
+                None,
+                Money::new(20.0, Currency::USD),
+                CFKind::PrePayment,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
                 date,
-                reset_date: None,
-                amount: Money::new(-5.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+                None,
+                Money::new(-5.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
         ];
 
         let schedule = schedule_from_classified_flows(
@@ -463,14 +442,14 @@ mod tests {
     #[test]
     fn schedule_from_classified_flows_with_meta_preserves_notional_and_meta() {
         let date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-        let flows = vec![CashFlow {
+        let flows = vec![CashFlow::new(
             date,
-            reset_date: None,
-            amount: Money::new(25.0, Currency::USD),
-            kind: CFKind::Fee,
-            accrual_factor: 0.0,
-            rate: None,
-        }];
+            None,
+            Money::new(25.0, Currency::USD),
+            CFKind::Fee,
+            0.0,
+            None,
+        )];
         let notional = Notional::par(250.0, Currency::USD);
         let meta = CashFlowMeta {
             representation: CashflowRepresentation::Contractual,

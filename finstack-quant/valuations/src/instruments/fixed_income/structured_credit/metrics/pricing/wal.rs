@@ -242,30 +242,30 @@ mod tests {
             MetricContext::default_config(),
         );
         context.tagged_cashflows = Some(vec![
-            CashFlow {
-                date: Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
-                reset_date: None,
-                amount: Money::new(10.0, Currency::USD),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            },
-            CashFlow {
-                date: Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
-                reset_date: None,
-                amount: Money::new(50.0, Currency::USD),
-                kind: CFKind::PrePayment,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                None,
+                Money::new(10.0, Currency::USD),
+                CFKind::Fixed,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                None,
+                Money::new(100.0, Currency::USD),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ),
+            CashFlow::new(
+                Date::from_calendar_date(2027, Month::January, 1).expect("valid date"),
+                None,
+                Money::new(50.0, Currency::USD),
+                CFKind::PrePayment,
+                0.0,
+                None,
+            ),
         ]);
 
         let wal = WalCalculator.calculate(&mut context).expect("wal");
@@ -296,24 +296,24 @@ mod tests {
             MetricContext::default_config(),
         );
         context.tagged_cashflows = Some(vec![
-            CashFlow {
-                date: Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
-                reset_date: None,
-                amount: Money::new(100.0, Currency::USD),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                Date::from_calendar_date(2026, Month::January, 1).expect("valid date"),
+                None,
+                Money::new(100.0, Currency::USD),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ),
             // A large write-down much later: if counted as principal it would
             // drag WAL far above 1y.
-            CashFlow {
-                date: Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
-                reset_date: None,
-                amount: Money::new(-500.0, Currency::USD),
-                kind: CFKind::DefaultedNotional,
-                accrual_factor: 0.0,
-                rate: None,
-            },
+            CashFlow::new(
+                Date::from_calendar_date(2030, Month::January, 1).expect("valid date"),
+                None,
+                Money::new(-500.0, Currency::USD),
+                CFKind::DefaultedNotional,
+                0.0,
+                None,
+            ),
         ]);
 
         let wal = WalCalculator.calculate(&mut context).expect("wal");

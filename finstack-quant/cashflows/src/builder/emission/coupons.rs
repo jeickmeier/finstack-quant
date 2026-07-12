@@ -34,14 +34,14 @@ pub fn emit_inflation_coupons(
     out_flows: &mut Vec<CashFlow>,
 ) {
     for &(date, amount, accrual_factor, real_coupon_rate) in coupons {
-        out_flows.push(CashFlow {
+        out_flows.push(CashFlow::new(
             date,
-            reset_date: None,
-            amount: Money::new(amount, ccy),
-            kind: CFKind::InflationCoupon,
+            None,
+            Money::new(amount, ccy),
+            CFKind::InflationCoupon,
             accrual_factor,
-            rate: Some(real_coupon_rate),
-        });
+            Some(real_coupon_rate),
+        ));
     }
 }
 
@@ -335,14 +335,14 @@ pub(crate) fn emit_fixed_coupons_on(
             // emit instead of being silently dropped.
             if cash_pct_f64 > 0.0 {
                 let kind = if is_stub { CFKind::Stub } else { CFKind::Fixed };
-                out_flows.push(CashFlow {
-                    date: d,
-                    reset_date: None,
-                    amount: Money::new(cash_amt, ccy),
+                out_flows.push(CashFlow::new(
+                    d,
+                    None,
+                    Money::new(cash_amt, ccy),
                     kind,
-                    accrual_factor: yf,
-                    rate: Some(rate_f64),
-                });
+                    yf,
+                    Some(rate_f64),
+                ));
             }
 
             pik_to_add += add_pik_flow_if_nonzero(out_flows, d, pik_amt, ccy, Some(rate_f64), yf)?;
@@ -969,14 +969,14 @@ pub(crate) fn emit_float_coupons_on(
             // For 100% PIK coupons, only the PIK flow is emitted, which is intentional
             // since the schedule structure (dates, accrual factors) is preserved in PIK flows.
             if cash_pct_f64 > 0.0 {
-                out_flows.push(CashFlow {
-                    date: d,
-                    reset_date: Some(reset_date),
-                    amount: Money::new(cash_amt, ccy),
-                    kind: CFKind::FloatReset,
-                    accrual_factor: yf,
-                    rate: Some(total_rate),
-                });
+                out_flows.push(CashFlow::new(
+                    d,
+                    Some(reset_date),
+                    Money::new(cash_amt, ccy),
+                    CFKind::FloatReset,
+                    yf,
+                    Some(total_rate),
+                ));
             }
 
             pik_to_add +=

@@ -42,26 +42,26 @@ pub fn generate_margin_cashflows(
         if effective_collateral_value < call_trigger {
             let deficit = required_collateral - effective_collateral_value;
             // Need to deliver additional collateral
-            cashflows.push(CashFlow {
-                date: *date,
-                reset_date: None,
-                amount: Money::new(deficit, currency),
-                kind: CFKind::VariationMarginPay,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            cashflows.push(CashFlow::new(
+                *date,
+                None,
+                Money::new(deficit, currency),
+                CFKind::VariationMarginPay,
+                0.0,
+                None,
+            ));
             margin_balance += deficit;
         } else if effective_collateral_value > required_collateral && i > 0 {
             let excess = effective_collateral_value - required_collateral;
             // Return excess collateral (not on first day)
-            cashflows.push(CashFlow {
-                date: *date,
-                reset_date: None,
-                amount: Money::new(excess, currency),
-                kind: CFKind::VariationMarginReceive,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            cashflows.push(CashFlow::new(
+                *date,
+                None,
+                Money::new(excess, currency),
+                CFKind::VariationMarginReceive,
+                0.0,
+                None,
+            ));
             margin_balance -= excess;
         }
     }
@@ -111,14 +111,14 @@ pub fn generate_margin_interest_cashflows(
 
             if interest.abs() > 0.01 {
                 // Only generate if material
-                cashflows.push(CashFlow {
-                    date: curr.0,
-                    reset_date: None,
-                    amount: Money::new(interest, currency),
-                    kind: CFKind::MarginInterest,
-                    accrual_factor: year_fraction,
-                    rate: Some(rate),
-                });
+                cashflows.push(CashFlow::new(
+                    curr.0,
+                    None,
+                    Money::new(interest, currency),
+                    CFKind::MarginInterest,
+                    year_fraction,
+                    Some(rate),
+                ));
             }
         }
     }
@@ -143,14 +143,14 @@ pub fn margin_calls_to_cashflows(calls: &[MarginCall]) -> Vec<CashFlow> {
                 super::MarginCallType::Substitution => CFKind::CollateralSubstitutionOut,
             };
 
-            CashFlow {
-                date: call.settlement_date,
-                reset_date: Some(call.call_date),
-                amount: call.amount,
+            CashFlow::new(
+                call.settlement_date,
+                Some(call.call_date),
+                call.amount,
                 kind,
-                accrual_factor: 0.0,
-                rate: None,
-            }
+                0.0,
+                None,
+            )
         })
         .collect()
 }

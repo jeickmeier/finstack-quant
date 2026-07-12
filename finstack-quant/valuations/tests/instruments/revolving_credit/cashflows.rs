@@ -106,13 +106,15 @@ fn test_utilization_fee_at_threshold() {
 #[test]
 fn same_date_flows_use_the_canonical_cashflow_order() {
     let payment_date = date!(2025 - 07 - 01);
-    let flow = |kind, amount| CashFlow {
-        date: payment_date,
-        reset_date: None,
-        amount: Money::new(amount, Currency::USD),
-        kind,
-        accrual_factor: 0.0,
-        rate: None,
+    let flow = |kind, amount| {
+        CashFlow::new(
+            payment_date,
+            None,
+            Money::new(amount, Currency::USD),
+            kind,
+            0.0,
+            None,
+        )
     };
     let mut flows = vec![
         flow(CFKind::Notional, 5.0),

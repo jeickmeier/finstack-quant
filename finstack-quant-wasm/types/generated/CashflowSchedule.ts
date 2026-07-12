@@ -12,6 +12,14 @@ export interface CashFlowJson {
   kind: string;
   accrual_factor: number;
   rate?: number | null;
+  accrual?: CashFlowAccrualJson | null;
+}
+
+export interface CashFlowAccrualJson {
+  start: string;
+  end: string;
+  day_count: string;
+  projected_index_rate?: number | null;
 }
 
 export interface CashFlowMetaJson {

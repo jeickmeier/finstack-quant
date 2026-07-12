@@ -33,14 +33,14 @@ pub(in crate::builder) fn add_pik_flow_if_nonzero(
         )));
     }
     if pik_amt > 0.0 {
-        flows.push(CashFlow {
+        flows.push(CashFlow::new(
             date,
-            reset_date: None,
-            amount: Money::new(pik_amt, ccy),
-            kind: CFKind::PIK,
+            None,
+            Money::new(pik_amt, ccy),
+            CFKind::PIK,
             accrual_factor,
             rate,
-        });
+        ));
         Ok(pik_amt)
     } else {
         Ok(0.0)

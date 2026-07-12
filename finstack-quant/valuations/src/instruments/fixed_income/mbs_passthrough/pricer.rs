@@ -207,34 +207,34 @@ pub(crate) fn build_projected_schedule(
 
     for cf in projected {
         if cf.interest.abs() > f64::EPSILON {
-            flows.push(CashFlow {
-                date: cf.payment_date,
-                reset_date: None,
-                amount: Money::new(cf.interest, mbs.current_face.currency()),
-                kind: CFKind::Fixed,
-                accrual_factor: 0.0,
-                rate: Some(mbs.pass_through_rate),
-            });
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.interest, mbs.current_face.currency()),
+                CFKind::Fixed,
+                0.0,
+                Some(mbs.pass_through_rate),
+            ));
         }
         if cf.scheduled_principal.abs() > f64::EPSILON {
-            flows.push(CashFlow {
-                date: cf.payment_date,
-                reset_date: None,
-                amount: Money::new(cf.scheduled_principal, mbs.current_face.currency()),
-                kind: CFKind::Amortization,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.scheduled_principal, mbs.current_face.currency()),
+                CFKind::Amortization,
+                0.0,
+                None,
+            ));
         }
         if cf.prepayment.abs() > f64::EPSILON {
-            flows.push(CashFlow {
-                date: cf.payment_date,
-                reset_date: None,
-                amount: Money::new(cf.prepayment, mbs.current_face.currency()),
-                kind: CFKind::PrePayment,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            flows.push(CashFlow::new(
+                cf.payment_date,
+                None,
+                Money::new(cf.prepayment, mbs.current_face.currency()),
+                CFKind::PrePayment,
+                0.0,
+                None,
+            ));
         }
     }
 

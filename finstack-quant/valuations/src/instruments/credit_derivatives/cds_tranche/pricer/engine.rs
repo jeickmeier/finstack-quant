@@ -357,17 +357,14 @@ impl CDSTranchePricer {
 
             if premium_amount.abs() > f64::EPSILON {
                 rows.push(ProjectedDiscountedRow {
-                    cashflow: CashFlow {
-                        date: payment_date,
-                        reset_date: None,
-                        amount: Money::new(
-                            premium_amount * premium_sign,
-                            tranche.notional.currency(),
-                        ),
-                        kind: CFKind::Fixed,
-                        accrual_factor: accrual_period,
-                        rate: Some(coupon),
-                    },
+                    cashflow: CashFlow::new(
+                        payment_date,
+                        None,
+                        Money::new(premium_amount * premium_sign, tranche.notional.currency()),
+                        CFKind::Fixed,
+                        accrual_period,
+                        Some(coupon),
+                    ),
                     discount_at: DiscountAt::PaymentDate,
                 });
             }
@@ -375,17 +372,17 @@ impl CDSTranchePricer {
             let default_amount = tranche_notional * delta_el_fraction;
             if default_amount.abs() > f64::EPSILON {
                 rows.push(ProjectedDiscountedRow {
-                    cashflow: CashFlow {
-                        date: payment_date,
-                        reset_date: None,
-                        amount: Money::new(
+                    cashflow: CashFlow::new(
+                        payment_date,
+                        None,
+                        Money::new(
                             default_amount * protection_sign,
                             tranche.notional.currency(),
                         ),
-                        kind: CFKind::DefaultedNotional,
-                        accrual_factor: 0.0,
-                        rate: None,
-                    },
+                        CFKind::DefaultedNotional,
+                        0.0,
+                        None,
+                    ),
                     // Discount the loss increment at the time the underlying
                     // defaults actually occur, not the period end. With
                     // `mid_period_protection`, the within-period loss is
@@ -416,14 +413,14 @@ impl CDSTranchePricer {
 
         if let Some((date, amount)) = tranche.upfront.filter(|(date, _)| *date >= as_of) {
             rows.push(ProjectedDiscountedRow {
-                cashflow: CashFlow {
+                cashflow: CashFlow::new(
                     date,
-                    reset_date: None,
-                    amount: Money::new(amount.amount() * premium_sign, amount.currency()),
-                    kind: CFKind::Fee,
-                    accrual_factor: 0.0,
-                    rate: None,
-                },
+                    None,
+                    Money::new(amount.amount() * premium_sign, amount.currency()),
+                    CFKind::Fee,
+                    0.0,
+                    None,
+                ),
                 discount_at: DiscountAt::PaymentDate,
             });
         }

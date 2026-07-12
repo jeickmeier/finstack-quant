@@ -567,14 +567,14 @@ fn build_commitment_fee_flows(
             let fee_rate = f64::from(ddtl.commitment_fee_bp) * 1e-4;
             let fee_amt = base * fee_rate * yf;
             if fee_amt > 0.0 {
-                flows.push(CashFlow {
-                    date: d,
-                    reset_date: None,
-                    amount: Money::new(fee_amt, loan.currency),
-                    kind: CFKind::CommitmentFee,
-                    accrual_factor: 0.0,
-                    rate: Some(fee_rate),
-                });
+                flows.push(CashFlow::new(
+                    d,
+                    None,
+                    Money::new(fee_amt, loan.currency),
+                    CFKind::CommitmentFee,
+                    0.0,
+                    Some(fee_rate),
+                ));
             }
         }
         prev = d;

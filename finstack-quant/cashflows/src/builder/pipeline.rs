@@ -153,14 +153,14 @@ impl<'a> DateProcessor<'a> {
                     CFKind::Amortization => ev.cash.amount(),
                     _ => -ev.cash.amount(),
                 };
-                state.flows.push(CashFlow {
-                    date: d,
-                    reset_date: None,
-                    amount: Money::new(flow_amount, ev.cash.currency()),
-                    kind: ev.kind,
-                    accrual_factor: 0.0,
-                    rate: None,
-                });
+                state.flows.push(CashFlow::new(
+                    d,
+                    None,
+                    Money::new(flow_amount, ev.cash.currency()),
+                    ev.kind,
+                    0.0,
+                    None,
+                ));
                 state.outstanding += f64_to_decimal(ev.delta.amount())?;
                 if state.outstanding < Decimal::ZERO {
                     return Err(finstack_quant_core::Error::Validation(format!(
@@ -183,14 +183,14 @@ impl<'a> DateProcessor<'a> {
     fn handle_maturity(&self, d: Date, state: &mut BuildState) -> finstack_quant_core::Result<()> {
         if d == self.ctx.maturity && state.outstanding > Decimal::ZERO {
             let outstanding_f64 = finstack_quant_core::decimal::decimal_to_f64(state.outstanding)?;
-            state.flows.push(CashFlow {
-                date: self.ctx.redemption_date,
-                reset_date: None,
-                amount: Money::new(outstanding_f64, self.ctx.ccy),
-                kind: CFKind::Notional,
-                accrual_factor: 0.0,
-                rate: None,
-            });
+            state.flows.push(CashFlow::new(
+                self.ctx.redemption_date,
+                None,
+                Money::new(outstanding_f64, self.ctx.ccy),
+                CFKind::Notional,
+                0.0,
+                None,
+            ));
             state.outstanding = Decimal::ZERO;
         }
         Ok(())
