@@ -191,22 +191,26 @@ impl SwaptionHullWhitePricer {
             .as_deref()
             .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
 
-        let sched = crate::cashflow::builder::build_dates(
-            swaption.swap_start,
-            swaption.swap_end,
-            swaption.underlying_fixed_frequency(),
-            StubKind::None,
-            BusinessDayConvention::ModifiedFollowing,
-            false,
-            0,
-            calendar_id,
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: swaption.swap_start,
+                end: swaption.swap_end,
+                frequency: swaption.underlying_fixed_frequency(),
+                stub: StubKind::None,
+                bdc: BusinessDayConvention::ModifiedFollowing,
+                calendar_id,
+                end_of_month: false,
+                day_count: swaption.underlying_day_count(),
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )
         .map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        let dates = &sched.dates;
-        if dates.len() < 2 {
+        if periods.is_empty() {
             return Err(PricingError::model_failure_with_context(
                 "Swap schedule has fewer than 2 dates".to_string(),
                 PricingErrorContext::default(),
@@ -214,20 +218,24 @@ impl SwaptionHullWhitePricer {
         }
 
         // Compute payment times and accrual fractions
-        let mut payment_times = Vec::with_capacity(dates.len() - 1);
-        let mut accrual_fractions = Vec::with_capacity(dates.len() - 1);
-        let mut prev = dates[0];
-        for &d in dates.iter().skip(1) {
+        let mut payment_times = Vec::with_capacity(periods.len());
+        let mut accrual_fractions = Vec::with_capacity(periods.len());
+        for period in periods {
             let t = swaption
                 .day_count
-                .year_fraction(as_of, d, ctx)
+                .year_fraction(as_of, period.payment_date, ctx)
                 .map_err(|e| {
                     PricingError::model_failure_with_context(
                         e.to_string(),
                         PricingErrorContext::default(),
                     )
                 })?;
-            let accrual = year_fraction(swaption.underlying_day_count(), prev, d).map_err(|e| {
+            let accrual = year_fraction(
+                swaption.underlying_day_count(),
+                period.accrual_start,
+                period.accrual_end,
+            )
+            .map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),
@@ -235,7 +243,6 @@ impl SwaptionHullWhitePricer {
             })?;
             payment_times.push(t);
             accrual_fractions.push(accrual);
-            prev = d;
         }
 
         let swap_start_time = swaption

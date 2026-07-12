@@ -795,25 +795,30 @@ impl InflationLinkedBond {
             return Ok(0.0);
         }
         // Reconstruct the date schedule
-        let sched = crate::cashflow::builder::build_dates(
-            self.issue_date,
-            self.maturity,
-            self.frequency,
-            self.stub,
-            self.bdc,
-            false,
-            0,
-            self.calendar_id
-                .as_deref()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: self.issue_date,
+                end: self.maturity,
+                frequency: self.frequency,
+                stub: self.stub,
+                bdc: self.bdc,
+                calendar_id: self
+                    .calendar_id
+                    .as_deref()
+                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                end_of_month: false,
+                day_count: self.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )?;
-        let periods = &sched.periods;
         if periods.is_empty() {
             return Ok(0.0);
         }
 
         // Find the active period
-        for period in periods {
+        for period in &periods {
             let start = period.accrual_start;
             let end = period.accrual_end;
             if start <= as_of && as_of < end {
@@ -866,23 +871,27 @@ impl InflationLinkedBond {
             .as_deref()
             .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
 
-        let sched = crate::cashflow::builder::build_dates(
-            self.issue_date,
-            self.maturity,
-            self.frequency,
-            self.stub,
-            self.bdc,
-            false,
-            0,
-            cal_id,
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: self.issue_date,
+                end: self.maturity,
+                frequency: self.frequency,
+                stub: self.stub,
+                bdc: self.bdc,
+                calendar_id: cal_id,
+                end_of_month: false,
+                day_count: self.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )?;
-        let periods = &sched.periods;
         if periods.is_empty() {
             return Ok(vec![]);
         }
 
         let mut flows = Vec::with_capacity(periods.len() + 1);
-        for period in periods {
+        for period in &periods {
             if period.payment_date < as_of {
                 continue;
             }
@@ -1181,23 +1190,28 @@ impl CashflowProvider for InflationLinkedBond {
             ));
         }
         let inflation_source = self.inflation_source(curves)?;
-        let sched = crate::cashflow::builder::build_dates(
-            self.issue_date,
-            self.maturity,
-            self.frequency,
-            self.stub,
-            self.bdc,
-            false,
-            0,
-            self.calendar_id
-                .as_deref()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: self.issue_date,
+                end: self.maturity,
+                frequency: self.frequency,
+                stub: self.stub,
+                bdc: self.bdc,
+                calendar_id: self
+                    .calendar_id
+                    .as_deref()
+                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                end_of_month: false,
+                day_count: self.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )?;
-        let periods = &sched.periods;
 
         let mut detailed_flows = Vec::with_capacity(periods.len() + 1);
         let mut coupon_rows = Vec::with_capacity(periods.len());
-        for period in periods {
+        for period in &periods {
             let accrual_factor = self
                 .day_count
                 .year_fraction(

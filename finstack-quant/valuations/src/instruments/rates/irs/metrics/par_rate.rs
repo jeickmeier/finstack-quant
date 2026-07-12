@@ -114,21 +114,25 @@ impl MetricCalculator for ParRateCalculator {
                 }
                 let disc = context.curves.get_discount(&irs.fixed.discount_curve_id)?;
                 let fixed = irs.resolved_fixed_leg()?;
-                let sched = crate::cashflow::builder::build_dates(
-                    fixed.start,
-                    fixed.end,
-                    fixed.frequency,
-                    fixed.stub,
-                    fixed.bdc,
-                    fixed.end_of_month,
-                    fixed.payment_lag_days,
-                    fixed
-                        .calendar_id
-                        .as_deref()
-                        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                let periods = crate::cashflow::builder::periods::build_periods(
+                    crate::cashflow::builder::periods::BuildPeriodsParams {
+                        start: fixed.start,
+                        end: fixed.end,
+                        frequency: fixed.frequency,
+                        stub: fixed.stub,
+                        bdc: fixed.bdc,
+                        calendar_id: fixed
+                            .calendar_id
+                            .as_deref()
+                            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                        end_of_month: fixed.end_of_month,
+                        day_count: fixed.day_count,
+                        payment_lag_days: fixed.payment_lag_days,
+                        reset_lag_days: None,
+                        adjust_accrual_dates: false,
+                    },
                 )?;
-                let dates: Vec<Date> = sched.dates;
-                if dates.is_empty() {
+                if periods.is_empty() {
                     return Err(finstack_quant_core::Error::Validation(
                         "Par rate calculation failed: swap schedule has no dates.".into(),
                     ));
@@ -139,11 +143,14 @@ impl MetricCalculator for ParRateCalculator {
                     as_of,
                     fixed.start,
                 )?;
-                let last_date = dates.last().copied().ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(
-                        "Par rate calculation failed: swap schedule has no dates.".into(),
-                    )
-                })?;
+                let last_date = periods
+                    .last()
+                    .map(|period| period.payment_date)
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "Par rate calculation failed: swap schedule has no dates.".into(),
+                        )
+                    })?;
                 let pn = crate::instruments::rates::irs::pricer::robust_relative_df(
                     &disc, as_of, last_date,
                 )?;

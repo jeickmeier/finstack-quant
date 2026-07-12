@@ -286,20 +286,26 @@ impl ForwardCurveTarget {
                             pq.quote.id()
                         ))
                     })?;
-                let schedule = crate::cashflow::builder::date_generation::build_dates(
-                    swap.float.start,
-                    swap.float.end,
-                    swap.float.frequency,
-                    swap.float.stub,
-                    swap.float.bdc,
-                    swap.float.end_of_month,
-                    swap.float.payment_lag_days,
-                    swap.float
-                        .calendar_id
-                        .as_deref()
-                        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                let schedule = crate::cashflow::builder::periods::build_periods(
+                    crate::cashflow::builder::periods::BuildPeriodsParams {
+                        start: swap.float.start,
+                        end: swap.float.end,
+                        frequency: swap.float.frequency,
+                        stub: swap.float.stub,
+                        bdc: swap.float.bdc,
+                        calendar_id: swap
+                            .float
+                            .calendar_id
+                            .as_deref()
+                            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                        end_of_month: swap.float.end_of_month,
+                        day_count: finstack_quant_core::dates::DayCount::Act365F,
+                        payment_lag_days: swap.float.payment_lag_days,
+                        reset_lag_days: None,
+                        adjust_accrual_dates: false,
+                    },
                 )?;
-                if schedule.periods.is_empty() {
+                if schedule.is_empty() {
                     return Err(finstack_quant_core::Error::Calibration {
                         message: format!(
                             "Forward swap quote {} produced an empty floating schedule",
@@ -309,7 +315,6 @@ impl ForwardCurveTarget {
                     });
                 }
                 Ok(schedule
-                    .periods
                     .into_iter()
                     .map(|period| (period.accrual_start, period.accrual_end))
                     .collect())

@@ -312,15 +312,20 @@ impl BermudanSchedule {
         swap_end: Date,
         fixed_freq: Tenor,
     ) -> finstack_quant_core::Result<Self> {
-        let sched = crate::cashflow::builder::build_dates(
-            first_exercise,
-            swap_end,
-            fixed_freq,
-            StubKind::None,
-            BusinessDayConvention::ModifiedFollowing, // Market standard per ISDA
-            false,
-            0,
-            crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: first_exercise,
+                end: swap_end,
+                frequency: fixed_freq,
+                stub: StubKind::None,
+                bdc: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID,
+                end_of_month: false,
+                day_count: finstack_quant_core::dates::DayCount::Act365F,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )?;
         // Exercise dates are all coupon dates except the last one (maturity),
         // but always include the first_exercise date when it is before swap_end.
@@ -329,10 +334,10 @@ impl BermudanSchedule {
             exercise_dates.push(first_exercise);
         }
         exercise_dates.extend(
-            sched
-                .dates
+            periods
                 .into_iter()
-                .filter(|&d| d > first_exercise && d < swap_end),
+                .map(|period| period.payment_date)
+                .filter(|&date| date > first_exercise && date < swap_end),
         );
         Ok(Self::new(exercise_dates))
     }

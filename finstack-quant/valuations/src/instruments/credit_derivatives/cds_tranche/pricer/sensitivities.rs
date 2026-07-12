@@ -2,7 +2,6 @@ use super::config::{
     CDSTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_MAX_ITER, PAR_SPREAD_TOLERANCE,
 };
 use super::registry::JumpToDefaultResult;
-use crate::cashflow::builder::build_dates;
 use crate::cashflow::primitives::CFKind;
 use crate::constants::BASIS_POINTS_PER_UNIT;
 use crate::instruments::credit_derivatives::cds_tranche::CDSTranche;
@@ -337,20 +336,27 @@ impl CDSTranchePricer {
             }
             out
         } else {
-            build_dates(
-                start_date,
-                tranche.maturity,
-                tranche.frequency,
-                self.params.schedule_stub,
-                tranche.bdc,
-                false,
-                0,
-                tranche
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-            )?
-            .dates
+            let periods = crate::cashflow::builder::periods::build_periods(
+                crate::cashflow::builder::periods::BuildPeriodsParams {
+                    start: start_date,
+                    end: tranche.maturity,
+                    frequency: tranche.frequency,
+                    stub: self.params.schedule_stub,
+                    bdc: tranche.bdc,
+                    calendar_id: tranche
+                        .calendar_id
+                        .as_deref()
+                        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                    end_of_month: false,
+                    day_count: tranche.day_count,
+                    payment_lag_days: 0,
+                    reset_lag_days: None,
+                    adjust_accrual_dates: false,
+                },
+            )?;
+            std::iter::once(start_date)
+                .chain(periods.into_iter().map(|period| period.payment_date))
+                .collect()
         };
 
         Ok(dates)

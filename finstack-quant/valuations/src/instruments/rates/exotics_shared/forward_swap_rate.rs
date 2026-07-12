@@ -108,27 +108,31 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
         .market
         .get_discount(inputs.discount_curve_id.as_ref())?;
 
-    let sched_fixed = crate::cashflow::builder::build_dates(
-        inputs.start,
-        inputs.end,
-        inputs.fixed_freq,
-        inputs.stub,
-        inputs.business_day_convention,
-        inputs.end_of_month,
-        inputs.payment_lag_days,
-        inputs.calendar_id,
+    let sched_fixed = crate::cashflow::builder::periods::build_periods(
+        crate::cashflow::builder::periods::BuildPeriodsParams {
+            start: inputs.start,
+            end: inputs.end,
+            frequency: inputs.fixed_freq,
+            stub: inputs.stub,
+            bdc: inputs.business_day_convention,
+            calendar_id: inputs.calendar_id,
+            end_of_month: inputs.end_of_month,
+            day_count: inputs.fixed_day_count,
+            payment_lag_days: inputs.payment_lag_days,
+            reset_lag_days: None,
+            adjust_accrual_dates: false,
+        },
     )?;
 
     let mut annuity = 0.0;
-    let mut prev_date = inputs.start;
-    for &d in sched_fixed.dates.iter().skip(1) {
-        let accrual =
-            inputs
-                .fixed_day_count
-                .year_fraction(prev_date, d, DayCountContext::default())?;
-        let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, d)?;
+    for period in &sched_fixed {
+        let accrual = inputs.fixed_day_count.year_fraction(
+            period.accrual_start,
+            period.accrual_end,
+            DayCountContext::default(),
+        )?;
+        let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, period.payment_date)?;
         annuity += accrual * df;
-        prev_date = d;
     }
 
     if annuity.abs() < 1e-10 {
@@ -150,31 +154,36 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
         if inputs.enforce_forward_tenor {
             validate_term_curve_tenor(fwd_curve.as_ref(), inputs.float_freq, "CMS reference swap")?;
         }
-        let sched_float = crate::cashflow::builder::build_dates(
-            inputs.start,
-            inputs.end,
-            inputs.float_freq,
-            inputs.stub,
-            inputs.business_day_convention,
-            inputs.end_of_month,
-            inputs.payment_lag_days,
-            inputs.calendar_id,
+        let sched_float = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: inputs.start,
+                end: inputs.end,
+                frequency: inputs.float_freq,
+                stub: inputs.stub,
+                bdc: inputs.business_day_convention,
+                calendar_id: inputs.calendar_id,
+                end_of_month: inputs.end_of_month,
+                day_count: inputs.float_day_count,
+                payment_lag_days: inputs.payment_lag_days,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )?;
 
         let mut pv_float = 0.0;
-        let mut prev_date = inputs.start;
-        for &d in &sched_float.dates {
-            if d == inputs.start {
-                continue;
-            }
-            let accrual =
-                inputs
-                    .float_day_count
-                    .year_fraction(prev_date, d, DayCountContext::default())?;
-            let fwd_rate = rate_between_on_dates(fwd_curve.as_ref(), prev_date, d)?;
-            let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, d)?;
+        for period in &sched_float {
+            let accrual = inputs.float_day_count.year_fraction(
+                period.accrual_start,
+                period.accrual_end,
+                DayCountContext::default(),
+            )?;
+            let fwd_rate = rate_between_on_dates(
+                fwd_curve.as_ref(),
+                period.accrual_start,
+                period.accrual_end,
+            )?;
+            let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, period.payment_date)?;
             pv_float += fwd_rate * accrual * df;
-            prev_date = d;
         }
 
         let rate = pv_float / annuity;

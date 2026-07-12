@@ -649,26 +649,31 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         if let Some(ref forward_id) = params.forward_id {
             let fwd = context.get_forward(forward_id)?;
 
-            let float_sched = crate::cashflow::builder::date_generation::build_dates(
-                swap_start,
-                swap_end,
-                leg_conv.float_freq,
-                StubKind::None,
-                leg_conv.float_bdc,
-                false,
-                0,
-                leg_conv
-                    .calendar_id
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+            let float_periods = crate::cashflow::builder::periods::build_periods(
+                crate::cashflow::builder::periods::BuildPeriodsParams {
+                    start: swap_start,
+                    end: swap_end,
+                    frequency: leg_conv.float_freq,
+                    stub: StubKind::None,
+                    bdc: leg_conv.float_bdc,
+                    calendar_id: leg_conv
+                        .calendar_id
+                        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                    end_of_month: false,
+                    day_count: leg_conv.float_day_count,
+                    payment_lag_days: 0,
+                    reset_lag_days: None,
+                    adjust_accrual_dates: false,
+                },
             )?;
-            if float_sched.periods.is_empty() {
+            if float_periods.is_empty() {
                 return Err(finstack_quant_core::Error::Input(
                     finstack_quant_core::InputError::Invalid,
                 ));
             }
 
             let mut float_pv = 0.0_f64;
-            for period in float_sched.periods {
+            for period in float_periods {
                 let accrual = leg_conv.float_day_count.year_fraction(
                     period.accrual_start,
                     period.accrual_end,
@@ -726,26 +731,31 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
         leg_conv: &SwaptionLegConventions<'_>,
         disc: &dyn finstack_quant_core::market_data::traits::Discounting,
     ) -> Result<f64> {
-        let sched = crate::cashflow::builder::date_generation::build_dates(
-            start,
-            end,
-            leg_conv.fixed_freq,
-            StubKind::None,
-            leg_conv.fixed_bdc,
-            false,
-            0,
-            leg_conv
-                .calendar_id
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start,
+                end,
+                frequency: leg_conv.fixed_freq,
+                stub: StubKind::None,
+                bdc: leg_conv.fixed_bdc,
+                calendar_id: leg_conv
+                    .calendar_id
+                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                end_of_month: false,
+                day_count: leg_conv.fixed_day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )?;
-        if sched.periods.is_empty() {
+        if periods.is_empty() {
             return Err(finstack_quant_core::Error::Input(
                 finstack_quant_core::InputError::Invalid,
             ));
         }
 
         let mut pv01 = 0.0_f64;
-        for period in sched.periods {
+        for period in periods {
             let dcf = leg_conv.fixed_day_count.year_fraction(
                 period.accrual_start,
                 period.accrual_end,
@@ -1526,21 +1536,27 @@ mod tests {
         let pv01 =
             SwaptionVolTarget::calculate_pv01_proper(swap_start, swap_end, &leg, disc.as_ref())
                 .expect("pv01");
-        let schedule = crate::cashflow::builder::date_generation::build_dates(
-            swap_start,
-            swap_end,
-            leg.float_freq,
-            StubKind::None,
-            leg.float_bdc,
-            false,
-            0,
-            leg.calendar_id
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+        let schedule = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: swap_start,
+                end: swap_end,
+                frequency: leg.float_freq,
+                stub: StubKind::None,
+                bdc: leg.float_bdc,
+                calendar_id: leg
+                    .calendar_id
+                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
+                end_of_month: false,
+                day_count: leg.float_day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            },
         )
         .expect("floating schedule");
         let mut expected_float_pv = 0.0;
         let mut legacy_float_pv = 0.0;
-        for period in schedule.periods {
+        for period in schedule {
             let accrual = leg
                 .float_day_count
                 .year_fraction(
