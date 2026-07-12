@@ -83,6 +83,16 @@ impl ResolvedFloatingRateFallback {
             Self::FixedRate(index_rate) => Some(calculate_floating_rate(*index_rate, params)),
         }
     }
+
+    /// Return the index component represented by this fallback policy.
+    #[must_use]
+    pub fn fallback_index_rate(&self) -> Option<f64> {
+        match self {
+            Self::Error => None,
+            Self::SpreadOnly => Some(0.0),
+            Self::FixedRate(index_rate) => Some(*index_rate),
+        }
+    }
 }
 
 /// Validated runtime floating-rate configuration used by coupon emission.
@@ -417,9 +427,13 @@ pub fn project_floating_rate(
     fwd: &ForwardCurve,
     params: &FloatingRateParams,
 ) -> Result<f64> {
-    // Validate parameters before projection
     params.validate()?;
+    let index_rate = project_index_rate(reset_date, fwd)?;
+    Ok(calculate_floating_rate(index_rate, params))
+}
 
+/// Project the raw term-index rate at a reset date before coupon adjustments.
+pub(crate) fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result<f64> {
     let fwd_dc = fwd.day_count();
     let fwd_base = fwd.base_date();
 
@@ -454,8 +468,7 @@ pub fn project_floating_rate(
     // date. It is not an average of the curve over the coupon accrual window.
     let index_rate = fwd.rate(t0);
 
-    // Use shared calculation logic
-    Ok(calculate_floating_rate(index_rate, params))
+    Ok(index_rate)
 }
 
 /// Project floating rate by looking up the forward curve from market context.

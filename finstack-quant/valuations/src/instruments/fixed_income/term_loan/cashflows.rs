@@ -4,7 +4,7 @@
 //! amortization, and fees) via the unified `CashFlowBuilder` so date logic and
 //! floating-rate conventions stay consistent across instruments.
 
-use crate::cashflow::builder::schedule::CashFlowSchedule;
+use crate::cashflow::builder::schedule::{merge_cashflow_schedules, CashFlowSchedule};
 use crate::cashflow::builder::specs::{
     CouponType, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec,
 };
@@ -435,16 +435,15 @@ pub(crate) fn generate_cashflows(
         if ddtl.commitment_fee_bp != 0 {
             let commitment_fees = build_commitment_fee_flows(loan, ddtl, draw_stop, &schedule)?;
             if !commitment_fees.is_empty() {
-                schedule.flows.extend(commitment_fees);
-                schedule.flows.sort_by(|a, b| {
-                    use core::cmp::Ordering;
-                    match a.date.cmp(&b.date) {
-                        Ordering::Less => Ordering::Less,
-                        Ordering::Greater => Ordering::Greater,
-                        Ordering::Equal => crate::cashflow::builder::schedule::kind_rank(a.kind)
-                            .cmp(&crate::cashflow::builder::schedule::kind_rank(b.kind)),
-                    }
-                });
+                let notional = schedule.notional.clone();
+                let day_count = schedule.day_count;
+                let fee_schedule = CashFlowSchedule {
+                    flows: commitment_fees,
+                    notional: notional.clone(),
+                    day_count,
+                    meta: schedule.meta.clone(),
+                };
+                schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count)?;
             }
         }
     }

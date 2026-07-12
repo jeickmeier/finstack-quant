@@ -5,12 +5,12 @@
       "oneOf": [
         {
           "const": "Linear",
-          "description": "Linear accrual (simple interest interpolation).\n\n`Accrued = Coupon × (elapsed / period)`",
+          "description": "Linear accrual (simple interest interpolation).\n\n`Accrued = Coupon \u00d7 (elapsed / period)`",
           "type": "string"
         },
         {
           "const": "Compounded",
-          "description": "Compounded accrual.\n\n`Accrued = N × expm1(f × ln1p(r))`\n\nwhich is the numerically stable form of\n`N × [(1 + r)^f − 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = −N × expm1((1 − f) × ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`−C × (1 − f)`); use [`AccrualMethod::Linear`] for those markets.",
+          "description": "Compounded accrual.\n\n`Accrued = N \u00d7 expm1(f \u00d7 ln1p(r))`\n\nwhich is the numerically stable form of\n`N \u00d7 [(1 + r)^f \u2212 1]`, where `r = coupon_amount / notional`\nand `f = elapsed / period` (time fraction within the current\ncoupon period).\n\n**Note:** ICMA Rule 251.1 prescribes *linear* accrual for bond\nAI calculations. This variant uses true exponential compounding\nand should not be cited as ICMA-style. It is intended for\ninstruments that genuinely compound within a coupon period\n(e.g. some leveraged loans).\n\n**Ex-coupon window convention:** inside an ex-coupon window the\naccrued interest is the negative rebate of the *remaining* stub,\ncompounded on the same basis:\n\n`Accrued = \u2212N \u00d7 expm1((1 \u2212 f) \u00d7 ln1p(r))`\n\nwhere `f = elapsed / period`. ICMA Rule 251.1 (and the UK DMO\ngilt convention) prescribe a *linear* ex-coupon rebate\n(`\u2212C \u00d7 (1 \u2212 f)`); use [`AccrualMethod::Linear`] for those markets.",
           "type": "string"
         }
       ]
@@ -20,7 +20,7 @@
       "oneOf": [
         {
           "const": "None",
-          "description": "No amortization – principal remains constant until final redemption.",
+          "description": "No amortization \u2013 principal remains constant until final redemption.",
           "type": "string"
         },
         {
@@ -149,7 +149,7 @@
       "oneOf": [
         {
           "const": "Fixed",
-          "description": "Fixed-rate coupon cash-flow.\n\nPeriodic interest payment calculated as: `notional × rate × accrual_factor`.\nThe `rate` field on [`CashFlow`] stores the coupon rate used.",
+          "description": "Fixed-rate coupon cash-flow.\n\nPeriodic interest payment calculated as: `notional \u00d7 rate \u00d7 accrual_factor`.\nThe `rate` field on [`CashFlow`] stores the coupon rate used.",
           "type": "string"
         },
         {
@@ -219,7 +219,7 @@
         },
         {
           "const": "Recovery",
-          "description": "Recovery cashflow from defaulted principal.\n\nAmount recovered through workout, liquidation, or settlement of defaulted\ndebt. Typically expressed as a percentage of defaulted notional\n(recovery rate × defaulted amount).",
+          "description": "Recovery cashflow from defaulted principal.\n\nAmount recovered through workout, liquidation, or settlement of defaulted\ndebt. Typically expressed as a percentage of defaulted notional\n(recovery rate \u00d7 defaulted amount).",
           "type": "string"
         },
         {
@@ -422,40 +422,8 @@
     },
     "CashFlowMeta": {
       "additionalProperties": false,
-      "description": "Metadata for cashflow schedules (calendar IDs, facility limits, contract dates,\nand true accrual periods).\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
+      "description": "Metadata shared by an entire cashflow schedule.\n\nTracks referenced calendar IDs, optional facility limits, and the instrument's\nissue date for use by downstream engines (e.g., accrual calculation).",
       "properties": {
-        "accrual_day_counts": {
-          "default": [],
-          "description": "Per-flow day-count conventions aligned with the sorted flow vector.\n\nThis preserves heterogeneous legs and avoids applying the schedule's\nrepresentative day count to every coupon during accrual calculation.",
-          "items": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "type": "array"
-        },
-        "accrual_periods": {
-          "default": [],
-          "description": "Contractual accrual periods aligned with the sorted flow vector.",
-          "items": {
-            "maxItems": 2,
-            "minItems": 2,
-            "prefixItems": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "type": [
-              "array",
-              "null"
-            ]
-          },
-          "type": "array"
-        },
         "calendar_ids": {
           "description": "Holiday calendar IDs used for schedule adjustments.",
           "items": {
@@ -743,7 +711,7 @@
     },
     "FloatingRateSpec": {
       "additionalProperties": false,
-      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date — a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
+      "description": "Canonical floating rate specification for all instruments.\n\nUsed by bonds, swaps, credit facilities, and structured products.\nAll instruments should compose this type rather than defining their own\nfloating rate specifications.\n\n# Rate Calculation\n\nThe all-in rate is computed as:\n1. Look up forward rate from `index_id` curve for the accrual period\n2. Apply `index_floor_bp` to index rate (if specified) - applied BEFORE adding spread\n3. Add `spread_bp` to get base rate\n4. Multiply by `gearing` (typically 1.0)\n5. Apply `all_in_cap_bp` to final rate (if specified) - applied AFTER spread and gearing\n\nFormula: `cap(gearing * (floor(index) + spread))`\n\n# Negative Rate Handling\n\nNegative index rates are supported and will flow through calculations\nunless constrained by floors. For markets with negative rates (EUR, JPY, CHF):\n\n- Set `index_floor_bp: Some(0.0)` to floor the index at zero\n- Set `all_in_floor_bp: Some(0.0)` to floor the total coupon at zero\n- Omit floors to allow negative coupons (rare but valid in some structures)\n\nThe implementation does not reject negative rates; the policy is controlled\nby the floor configuration.\n\n# Seasoned Instruments (Historical Fixings)\n\nHistorical fixings **are supported** via the `MarketContext`: store a\n`ScalarTimeSeries` under the canonical id `FIXING:{index_id}` (see\n`finstack_quant_core::market_data::fixings`) containing realized index\nobservations. Observation dates strictly before the forward curve base\ndate then resolve from that series instead of the curve:\n\n- **Overnight observations** (compounded/averaged paths) use LOCF lookup\n  (last observation carried forward), matching RFR publication\n  conventions where a fixing carries over non-publication days\n  (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 \u00a77.1(g)). A partially\n  seasoned compounding window seamlessly mixes realized fixings and\n  curve-projected forwards with identical `(rate, days)` weighting.\n- **Term-rate resets** use exact-date lookup on the (business-day\n  adjusted) reset date \u2014 a term rate fixes on a specific published date.\n  The fixing is the index rate only; gearing/spread/floors/caps apply on\n  top exactly as for projected rates.\n\nAn observation exactly on the curve base date prefers a published\nsame-day fixing when the series has one, otherwise projects from `t = 0`.\n\nThe [`FloatingRateFallback`] policy applies only when **no** fixing\nseries is provided: `Error` (the default) fails the build with a\ndescriptive message naming the date, index, and expected series id;\n`FixedRate(r)` uses `r` as the index rate for the affected coupon;\n`SpreadOnly` projects spread-only.\n\n# Example\n\n```rust\nuse finstack_quant_core::dates::{DayCount, Tenor, BusinessDayConvention};\nuse finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};\nuse rust_decimal_macros::dec;\n\n// 3M SOFR + 200bps with 0% floor\nlet spec = FloatingRateSpec {\n    index_id: \"USD-SOFR-3M\".into(),\n    spread_bp: dec!(200.0),\n    gearing: dec!(1.0),\n    gearing_includes_spread: true,\n    index_floor_bp: Some(dec!(0.0)),\n    all_in_floor_bp: None,\n    all_in_cap_bp: None,\n    index_cap_bp: None,\n    overnight_index_constraints: OvernightIndexConstraintApplication::Daily,\n    reset_freq: Tenor::quarterly(),\n    index_tenor: None,\n    reset_lag_days: 2,\n    dc: DayCount::Act360,\n    bdc: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: \"weekends_only\".to_string(),\n    fixing_calendar_id: None,\n    end_of_month: false,\n    payment_lag_days: 0,\n    overnight_compounding: None,\n    overnight_basis: None,\n    fallback: Default::default(),\n};\n```",
       "properties": {
         "all_in_cap_bp": {
           "default": null,
@@ -980,16 +948,16 @@
       "type": "object"
     },
     "OvernightCompoundingMethod": {
-      "description": "Compounding method for overnight rate indices (SOFR, ESTR, SONIA).\n\nControls how daily overnight fixings are aggregated into a period rate\nfor floating rate coupons. The choice of compounding method affects both\nthe accrued amount and the payment timing/certainty.\n\n# Market Conventions\n\n| Index | Standard Method | Lookback | Reference |\n|-------|----------------|----------|-----------|\n| USD SOFR | CompoundedInArrears | 2 BD | ISDA 2021 |\n| EUR €STR | CompoundedWithObservationShift | 2 BD | ECB |\n| GBP SONIA | CompoundedWithObservationShift | 5 BD | BoE |\n| JPY TONA | CompoundedInArrears | 2 BD | BoJ |\n\n# Reference\n\n- ISDA (2021). \"IBOR Fallbacks Supplement.\" Section 7.\n- ARRC (2020). \"SOFR: A User's Guide.\" Federal Reserve Bank of New York.\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#isda-2006-definitions`",
+      "description": "Compounding method for overnight rate indices (SOFR, ESTR, SONIA).\n\nControls how daily overnight fixings are aggregated into a period rate\nfor floating rate coupons. The choice of compounding method affects both\nthe accrued amount and the payment timing/certainty.\n\n# Market Conventions\n\n| Index | Standard Method | Lookback | Reference |\n|-------|----------------|----------|-----------|\n| USD SOFR | CompoundedInArrears | 2 BD | ISDA 2021 |\n| EUR \u20acSTR | CompoundedWithObservationShift | 2 BD | ECB |\n| GBP SONIA | CompoundedWithObservationShift | 5 BD | BoE |\n| JPY TONA | CompoundedInArrears | 2 BD | BoJ |\n\n# Reference\n\n- ISDA (2021). \"IBOR Fallbacks Supplement.\" Section 7.\n- ARRC (2020). \"SOFR: A User's Guide.\" Federal Reserve Bank of New York.\n- `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- `docs/REFERENCES.md#isda-2006-definitions`",
       "oneOf": [
         {
           "const": "SimpleAverage",
-          "description": "Arithmetic (non-compounded) average of daily overnight fixings,\nweighted by accrual days: `Rate = (Σ rᵢ·dᵢ) / D`.\n\nThis is a fully supported convention. It is the correct choice for\ninstruments that contractually specify a simple-average overnight\nindex (some bilateral loans and older FRNs) rather than the\ncompounded ISDA 2021 convention. Use [`Self::CompoundedInArrears`]\nfor standard SOFR/ESTR/TONA legs.",
+          "description": "Arithmetic (non-compounded) average of daily overnight fixings,\nweighted by accrual days: `Rate = (\u03a3 r\u1d62\u00b7d\u1d62) / D`.\n\nThis is a fully supported convention. It is the correct choice for\ninstruments that contractually specify a simple-average overnight\nindex (some bilateral loans and older FRNs) rather than the\ncompounded ISDA 2021 convention. Use [`Self::CompoundedInArrears`]\nfor standard SOFR/ESTR/TONA legs.",
           "type": "string"
         },
         {
           "const": "CompoundedInArrears",
-          "description": "Compounded in arrears with daily compounding (ISDA 2021 standard).\n\n```text\nRate = [∏(1 + r_i × d_i/360) - 1] × 360/D\n```",
+          "description": "Compounded in arrears with daily compounding (ISDA 2021 standard).\n\n```text\nRate = [\u220f(1 + r_i \u00d7 d_i/360) - 1] \u00d7 360/D\n```",
           "type": "string"
         },
         {
@@ -1019,7 +987,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nUses the rate from `lockout_days` business days before period end for all\nremaining days in the period. With fixings `b_1..b_n` (where `b_n` is one\nbusiness day before the exclusive period end), the cut-off fixing is\n`b_{n-lockout+1}` per ISDA 2021 Definitions §7 (rate cut-off) and the\nARRC SOFR FRN conventions.",
+          "description": "Compounded in arrears with lockout (rate cut-off near end of period).\n\nUses the rate from `lockout_days` business days before period end for all\nremaining days in the period. With fixings `b_1..b_n` (where `b_n` is one\nbusiness day before the exclusive period end), the cut-off fixing is\n`b_{n-lockout+1}` per ISDA 2021 Definitions \u00a77 (rate cut-off) and the\nARRC SOFR FRN conventions.",
           "properties": {
             "CompoundedWithLockout": {
               "additionalProperties": false,
@@ -1044,7 +1012,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Compounded in arrears with observation shift.\n\nBoth observation dates AND weights are shifted back by `shift_days`\nbusiness days. This is the ISDA 2021 recommended convention for SOFR\nand the standard for GBP SONIA and EUR €STR.",
+          "description": "Compounded in arrears with observation shift.\n\nBoth observation dates AND weights are shifted back by `shift_days`\nbusiness days. This is the ISDA 2021 recommended convention for SOFR\nand the standard for GBP SONIA and EUR \u20acSTR.",
           "properties": {
             "CompoundedWithObservationShift": {
               "additionalProperties": false,
@@ -1089,7 +1057,7 @@
       "oneOf": [
         {
           "const": "Full",
-          "description": "From issue (or `as_of`) up to — but not including — maturity (default).\nThe floor applies to any early issuer-called redemption during the\nbond's life, but not to redemption at maturity.",
+          "description": "From issue (or `as_of`) up to \u2014 but not including \u2014 maturity (default).\nThe floor applies to any early issuer-called redemption during the\nbond's life, but not to redemption at maturity.",
           "type": "string"
         },
         {
@@ -1139,7 +1107,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Minimum money-on-money multiple (e.g. `1.25` = 1.25× invested capital).\n\nOn an early issuer-called redemption at time `t`, the redemption price is\nthe minimum amount such that `(received_cashflows + redemption) / V0 >=\nmultiple`, where `V0` is the invested capital defined by [`IssuePrice`].\nThe floor binds only on early redemptions, not at maturity.",
+          "description": "Minimum money-on-money multiple (e.g. `1.25` = 1.25\u00d7 invested capital).\n\nOn an early issuer-called redemption at time `t`, the redemption price is\nthe minimum amount such that `(received_cashflows + redemption) / V0 >=\nmultiple`, where `V0` is the invested capital defined by [`IssuePrice`].\nThe floor binds only on early redemptions, not at maturity.",
           "properties": {
             "Moic": {
               "format": "double",
@@ -1169,7 +1137,7 @@
     },
     "ReturnFloorSpec": {
       "additionalProperties": false,
-      "description": "Guaranteed minimum-return call protection on a bond or loan.\n\nAttaching this spec declares that on any early issuer-called or prepaid\nredemption within the protection window, the redemption price will be\nfloored so the investor's realized return meets the target. This is the\nstandard private-credit loan model (often called a \"prepayment premium\" or\n\"call protection\" in credit agreements). The floor is anchored at the issue\ndate and issue price `V0`. The spec is lowered into a concrete call schedule\nat pricing time; see `bond/pricing/return_floor.rs`.\n\n**Call-protection only**: the floor applies to EARLY issuer redemptions\nwithin the [`ProtectionWindow`] and never at maturity. The held-to-maturity\npath is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /\n[`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case\nreturn across all paths including the unfloored maturity path.\n\n# Mathematical Foundation\n\nLet:\n- `V0` = invested capital (issue price).\n- `t` = early-redemption date.\n- `cash_through(t)` = sum of positive cashflows received by the holder in\n  the half-open interval `(issue, t]` (coupons and amortization; excludes\n  the redemption itself).\n- `yf(a, b)` = year fraction from date `a` to date `b` under `Act/365F`.\n\n**MOIC floor** — minimum money-on-invested-capital multiple `m`:\n\n```text\nR(t) = m · V0 − cash_through(t)\n```\n\nThe required redemption at `t` is `max(R(t), contractual_call(t), V0)`.\n\n**XIRR floor** — minimum annualized IRR `r`:\n\n```text\nR(t) = (1 + r)^yf(issue, t) · (V0 − Σ_{q ≤ t} coupon_q / (1 + r)^yf(issue, q))\n```\n\nThe day-count convention for `yf` defaults to `Act/365F`, matching\n[`finstack_quant_core::cashflow::xirr`] so the verification metrics\nreproduce the floor target exactly.\n\nBoth floors are then clamped to `max(R(t), 100.0)` (never below par) and\ndivided by the outstanding notional at `t`.\n\n# Limitations (v1)\n\n- **Floating-rate coupons**: forward-projected using the yield curve at\n  pricing time. Path-accurate LSMC (where rate paths determine both coupon\n  magnitudes and call-trigger probabilities simultaneously) is deferred to v2.\n- **Make-whole calls**: contractual make-whole provisions cannot compose\n  with a return floor in v1 — attempting this returns a validation error.\n  Make-whole effective prices are path-dependent and cannot be pre-computed\n  statically when lowering the floor.\n- **Amortizing bonds (to-worst)**: the `MoicToWorst` / `XirrToWorst`\n  metrics use the initial notional as the redemption basis rather than the\n  outstanding notional at the exit date. This is exact for bullet bonds but\n  overstates the redemption for amortizing structures (TODO v2).\n- **`min_moic` / `min_xirr` shortcuts**: these set\n  [`ProtectionWindow::Full`] (prepayable across the bond's entire life).\n  Narrow the window via [`ReturnFloorSpec::window`] if a no-call period\n  applies.\n\n# Invariants\n\n- MOIC multiple must be positive (`> 0`).\n- XIRR rate must be finite and greater than `-1` (i.e., `-100%`).\n- A [`ProtectionWindow::Between`] window must have `start < end`.\n\n# References\n\n- **MOIC**: Standard private-equity and private-credit return metric.\n  MOIC = total distributions / invested capital. See e.g. Rosenbaum, J. &\n  Pearl, J. (2013). *Investment Banking: Valuation, Leveraged Buyouts, and\n  Mergers & Acquisitions* (2nd ed.). Wiley Finance.\n- **XIRR / IRR**: Internal rate of return. See Brealey, R. A., Myers, S.\n  C. & Allen, F. (2023). *Principles of Corporate Finance* (14th ed.).\n  McGraw-Hill. Chapter 5 (\"Net Present Value and Other Investment Criteria\").\n- **Call-protection / prepayment premiums**: Standard private-credit\n  agreement term. LSTA (Loan Syndications and Trading Association).\n  *The Handbook of Loan Syndications and Trading* (2nd ed.). Chapter on\n  loan documentation and call protection.\n- **Act/365F day count**: ISDA 2006 Definitions, Section 4.16(f).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    ReturnFloorSpec, IssuePrice,\n};\nuse finstack_quant_core::types::Rate;\n\n// 1.20× MOIC floor at par, full protection window\nlet spec = ReturnFloorSpec::moic(1.20);\nassert!(spec.validate().is_ok());\n\n// 10% XIRR floor with 98 OID, validated\nlet spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0))\n    .issue_price(IssuePrice::PctOfPar(98.0));\nassert!(spec.validate().is_ok());\n```\n\nAttach to a bond using the fluent builder:\n\n```rust,ignore\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    Bond, ReturnFloorSpec, ProtectionWindow,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse time::macros::date;\n\n// 5-year loan with 1.25× MOIC floor active after a 2-year no-call period.\nlet loan = Bond::fixed(\n    \"LOAN-001\",\n    Money::new(1_000_000.0, Currency::USD),\n    0.10,\n    date!(2025 - 01 - 01),\n    date!(2030 - 01 - 01),\n    \"USD-OIS\",\n)?\n.with_return_floor(\n    ReturnFloorSpec::moic(1.25)\n        .window(ProtectionWindow::From(date!(2027 - 01 - 01))),\n);\n# Ok::<(), Box<dyn std::error::Error>>(())\n```",
+      "description": "Guaranteed minimum-return call protection on a bond or loan.\n\nAttaching this spec declares that on any early issuer-called or prepaid\nredemption within the protection window, the redemption price will be\nfloored so the investor's realized return meets the target. This is the\nstandard private-credit loan model (often called a \"prepayment premium\" or\n\"call protection\" in credit agreements). The floor is anchored at the issue\ndate and issue price `V0`. The spec is lowered into a concrete call schedule\nat pricing time; see `bond/pricing/return_floor.rs`.\n\n**Call-protection only**: the floor applies to EARLY issuer redemptions\nwithin the [`ProtectionWindow`] and never at maturity. The held-to-maturity\npath is unfloored. Use [`crate::metrics::MetricId::MoicToWorst`] /\n[`crate::metrics::MetricId::XirrToWorst`] to see the honest worst-case\nreturn across all paths including the unfloored maturity path.\n\n# Mathematical Foundation\n\nLet:\n- `V0` = invested capital (issue price).\n- `t` = early-redemption date.\n- `cash_through(t)` = sum of positive cashflows received by the holder in\n  the half-open interval `(issue, t]` (coupons and amortization; excludes\n  the redemption itself).\n- `yf(a, b)` = year fraction from date `a` to date `b` under `Act/365F`.\n\n**MOIC floor** \u2014 minimum money-on-invested-capital multiple `m`:\n\n```text\nR(t) = m \u00b7 V0 \u2212 cash_through(t)\n```\n\nThe required redemption at `t` is `max(R(t), contractual_call(t), V0)`.\n\n**XIRR floor** \u2014 minimum annualized IRR `r`:\n\n```text\nR(t) = (1 + r)^yf(issue, t) \u00b7 (V0 \u2212 \u03a3_{q \u2264 t} coupon_q / (1 + r)^yf(issue, q))\n```\n\nThe day-count convention for `yf` defaults to `Act/365F`, matching\n[`finstack_quant_core::cashflow::xirr`] so the verification metrics\nreproduce the floor target exactly.\n\nBoth floors are then clamped to `max(R(t), 100.0)` (never below par) and\ndivided by the outstanding notional at `t`.\n\n# Limitations (v1)\n\n- **Floating-rate coupons**: forward-projected using the yield curve at\n  pricing time. Path-accurate LSMC (where rate paths determine both coupon\n  magnitudes and call-trigger probabilities simultaneously) is deferred to v2.\n- **Make-whole calls**: contractual make-whole provisions cannot compose\n  with a return floor in v1 \u2014 attempting this returns a validation error.\n  Make-whole effective prices are path-dependent and cannot be pre-computed\n  statically when lowering the floor.\n- **Amortizing bonds (to-worst)**: the `MoicToWorst` / `XirrToWorst`\n  metrics use the initial notional as the redemption basis rather than the\n  outstanding notional at the exit date. This is exact for bullet bonds but\n  overstates the redemption for amortizing structures (TODO v2).\n- **`min_moic` / `min_xirr` shortcuts**: these set\n  [`ProtectionWindow::Full`] (prepayable across the bond's entire life).\n  Narrow the window via [`ReturnFloorSpec::window`] if a no-call period\n  applies.\n\n# Invariants\n\n- MOIC multiple must be positive (`> 0`).\n- XIRR rate must be finite and greater than `-1` (i.e., `-100%`).\n- A [`ProtectionWindow::Between`] window must have `start < end`.\n\n# References\n\n- **MOIC**: Standard private-equity and private-credit return metric.\n  MOIC = total distributions / invested capital. See e.g. Rosenbaum, J. &\n  Pearl, J. (2013). *Investment Banking: Valuation, Leveraged Buyouts, and\n  Mergers & Acquisitions* (2nd ed.). Wiley Finance.\n- **XIRR / IRR**: Internal rate of return. See Brealey, R. A., Myers, S.\n  C. & Allen, F. (2023). *Principles of Corporate Finance* (14th ed.).\n  McGraw-Hill. Chapter 5 (\"Net Present Value and Other Investment Criteria\").\n- **Call-protection / prepayment premiums**: Standard private-credit\n  agreement term. LSTA (Loan Syndications and Trading Association).\n  *The Handbook of Loan Syndications and Trading* (2nd ed.). Chapter on\n  loan documentation and call protection.\n- **Act/365F day count**: ISDA 2006 Definitions, Section 4.16(f).\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    ReturnFloorSpec, IssuePrice,\n};\nuse finstack_quant_core::types::Rate;\n\n// 1.20\u00d7 MOIC floor at par, full protection window\nlet spec = ReturnFloorSpec::moic(1.20);\nassert!(spec.validate().is_ok());\n\n// 10% XIRR floor with 98 OID, validated\nlet spec = ReturnFloorSpec::xirr(Rate::from_percent(10.0))\n    .issue_price(IssuePrice::PctOfPar(98.0));\nassert!(spec.validate().is_ok());\n```\n\nAttach to a bond using the fluent builder:\n\n```rust,ignore\nuse finstack_quant_valuations::instruments::fixed_income::bond::{\n    Bond, ReturnFloorSpec, ProtectionWindow,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\nuse time::macros::date;\n\n// 5-year loan with 1.25\u00d7 MOIC floor active after a 2-year no-call period.\nlet loan = Bond::fixed(\n    \"LOAN-001\",\n    Money::new(1_000_000.0, Currency::USD),\n    0.10,\n    date!(2025 - 01 - 01),\n    date!(2030 - 01 - 01),\n    \"USD-OIS\",\n)?\n.with_return_floor(\n    ReturnFloorSpec::moic(1.25)\n        .window(ProtectionWindow::From(date!(2027 - 01 - 01))),\n);\n# Ok::<(), Box<dyn std::error::Error>>(())\n```",
       "properties": {
         "day_count": {
           "anyOf": [

@@ -1,6 +1,7 @@
 //! Fee cashflow emission (periodic, commitment, usage, facility).
 
 use crate::primitives::{CFKind, CashFlow};
+use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -241,14 +242,22 @@ pub(in crate::builder) fn emit_fees_on(
             // Any non-zero fee amount is emitted: negative-bps fees (rebates)
             // flow through as negative cashflows, matching fixed-fee behavior.
             if fee_amt != 0.0 {
-                new_flows.push(CashFlow::new(
-                    d,
-                    None,
-                    Money::new(fee_amt, ccy),
-                    CFKind::Fee,
-                    yf,
-                    Some(rate),
-                ));
+                new_flows.push(
+                    CashFlow::new(
+                        d,
+                        None,
+                        Money::new(fee_amt, ccy),
+                        CFKind::Fee,
+                        yf,
+                        Some(rate),
+                    )
+                    .with_accrual(CashFlowAccrual {
+                        start: period.accrual_start,
+                        end: period.accrual_end,
+                        day_count: pf.dc,
+                        projected_index_rate: None,
+                    }),
+                );
             }
         }
     }
@@ -401,6 +410,11 @@ mod tests {
         assert_eq!(flows.len(), 1);
         let fee = flows[0].amount.amount();
         assert!((fee - 1250.0).abs() < 0.01, "Expected ~1250.0, got {}", fee);
+        let accrual = flows[0]
+            .accrual
+            .expect("periodic fee should own its accrual metadata");
+        assert_eq!((accrual.start, accrual.end), (start, end));
+        assert_eq!(accrual.day_count, DayCount::Act360);
     }
 
     #[test]

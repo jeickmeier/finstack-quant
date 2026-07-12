@@ -235,6 +235,10 @@ fn test_floating_rate_fallback_spread_only_no_curve() {
             "Rate should be 0.02 (spread-only), got {}",
             rate
         );
+        assert_eq!(
+            cf.accrual.and_then(|accrual| accrual.projected_index_rate),
+            Some(0.0)
+        );
     }
 }
 
@@ -279,6 +283,10 @@ fn test_floating_rate_fallback_fixed_rate() {
             (rate - 0.065).abs() < 1e-10,
             "Rate should be 0.065 (fixed index 4.5% + 200bp spread), got {}",
             rate
+        );
+        assert_eq!(
+            cf.accrual.and_then(|accrual| accrual.projected_index_rate),
+            Some(0.045)
         );
     }
 }
@@ -371,11 +379,16 @@ fn test_floating_rate_default_fallback_with_curve() {
     // Rate should be ~3% index + 2% spread = ~5%
     for cf in &float_flows {
         let rate = cf.rate.expect("FloatReset should have a rate");
+        let index_rate = cf
+            .accrual
+            .and_then(|accrual| accrual.projected_index_rate)
+            .expect("projected index rate should be stored on the flow");
         assert!(
             rate > 0.04 && rate < 0.06,
             "Rate should be ~5% (index + spread), got {}",
             rate
         );
+        assert!((rate - index_rate - 0.02).abs() < 1e-10);
     }
 }
 
@@ -429,6 +442,10 @@ fn test_pik_flow_metadata() {
             cf.accrual_factor > 0.0,
             "PIK flow accrual_factor should be > 0.0, got {}",
             cf.accrual_factor
+        );
+        assert_eq!(
+            cf.accrual.and_then(|accrual| accrual.projected_index_rate),
+            Some(0.0)
         );
     }
 

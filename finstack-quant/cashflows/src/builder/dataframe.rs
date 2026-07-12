@@ -110,10 +110,11 @@ fn compute_notional_columns(
 /// Compute floating rate decomposition (base rate and spread) for a cashflow.
 ///
 /// Returns `(base_rate, spread)` where:
-/// - `base_rate` is the forward rate at reset time
+/// - `base_rate` is the index rate stored when the cashflow was projected
 /// - `spread` is the difference between the all-in rate and base rate
 ///
-/// Both are `None` if the cashflow is not a floating rate reset or if no forward curve is provided.
+/// Both are `None` if the cashflow is not a floating rate reset or has no
+/// projected index-rate metadata.
 ///
 /// # References
 ///
@@ -123,41 +124,20 @@ fn compute_notional_columns(
 /// - Andersen & Piterbarg, *Interest Rate Modeling, Vol I* (2010), §6.3.
 fn compute_floating_decomposition(
     cf: &finstack_quant_core::cashflow::CashFlow,
-    fwd: Option<&std::sync::Arc<finstack_quant_core::market_data::term_structures::ForwardCurve>>,
-    _base: Date,
-    period_start: Date,
-    dc_ctx: DayCountContext<'_>,
-) -> finstack_quant_core::Result<(Option<f64>, Option<f64>)> {
+) -> (Option<f64>, Option<f64>) {
     use crate::primitives::CFKind;
 
     // Only compute for floating rate resets with a forward curve
     if !matches!(cf.kind, CFKind::FloatReset) {
-        return Ok((None, None));
+        return (None, None);
     }
 
-    let Some(fwd) = fwd else {
-        return Ok((None, None));
-    };
-
-    // Compute reset and payment times from the forward curve's own base.
-    let reset_t = if let Some(reset_date) = cf.reset_date {
-        fwd.day_count()
-            .signed_year_fraction(fwd.base_date(), reset_date, dc_ctx)?
-    } else {
-        fwd.day_count()
-            .signed_year_fraction(fwd.base_date(), period_start, dc_ctx)?
-    };
-    let end_t = fwd
-        .day_count()
-        .signed_year_fraction(fwd.base_date(), cf.date, dc_ctx)?;
-    let base_rate = if end_t > reset_t {
-        fwd.rate_period(reset_t, end_t)
-    } else {
-        fwd.rate(reset_t)
+    let Some(base_rate) = cf.accrual.and_then(|accrual| accrual.projected_index_rate) else {
+        return (None, None);
     };
     let spread = cf.rate.map(|rate| rate - base_rate);
 
-    Ok((Some(base_rate), spread))
+    (Some(base_rate), spread)
 }
 
 /// Options for period-aligned DataFrame exports.
@@ -456,18 +436,6 @@ impl CashFlowSchedule {
         } else {
             None
         };
-        // Propagate forward-curve lookup failures: silently disabling the
-        // requested floating decomposition would emit None columns without
-        // any signal. `None` is only valid when no forward_curve_id was given.
-        let forward_arc_opt = if options.include_floating_decomposition {
-            match options.forward_curve_id {
-                Some(fid) => Some(market.get_forward(fid)?),
-                None => None,
-            }
-        } else {
-            None
-        };
-
         // Prefer explicit facility_limit; fallback to schedule meta (e.g., RCF commitment)
         let facility_limit = options.facility_limit.or(self.meta.facility_limit);
         let capacity = self.flows.len();
@@ -541,7 +509,6 @@ impl CashFlowSchedule {
             end_is_termination_date: false,
         };
         let disc_dc_ctx = dc_ctx;
-        let fwd_dc_ctx = dc_ctx;
 
         let n_flows = self.flows.len();
         for iter_pos in 0..n_flows {
@@ -719,13 +686,7 @@ impl CashFlowSchedule {
 
             // Floating decomposition (base rate and spread)
             let (base_rate_opt, spread_opt) = if options.include_floating_decomposition {
-                compute_floating_decomposition(
-                    cf,
-                    forward_arc_opt.as_ref(),
-                    base,
-                    period.start,
-                    fwd_dc_ctx,
-                )?
+                compute_floating_decomposition(cf)
             } else {
                 (None, None)
             };
@@ -748,7 +709,7 @@ mod tests {
         CashFlowMeta, CashFlowSchedule, PvCreditAdjustment, PvDiscountSource,
     };
     use crate::builder::Notional;
-    use finstack_quant_core::cashflow::CashFlow;
+    use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{DayCount, Period, PeriodId};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -1391,18 +1352,22 @@ mod tests {
     }
 
     #[test]
-    fn dataframe_errors_on_missing_forward_curve() {
-        // A requested-but-missing forward curve must error instead of
-        // silently disabling floating decomposition.
+    fn dataframe_uses_stored_index_rate_without_curve_lookup() {
         let base = d(2025, 1, 1);
         let flows = vec![CashFlow::new(
-            d(2025, 7, 1),
+            d(2025, 6, 30),
             Some(d(2025, 4, 1)),
             Money::new(100.0, Currency::USD),
             CFKind::FloatReset,
             0.25,
-            Some(0.05),
-        )];
+            Some(0.0525),
+        )
+        .with_accrual(CashFlowAccrual {
+            start: d(2025, 4, 1),
+            end: d(2025, 7, 1),
+            day_count: DayCount::Act360,
+            projected_index_rate: Some(0.0375),
+        })];
         let schedule = CashFlowSchedule {
             flows,
             notional: Notional::par(1_000.0, Currency::USD),
@@ -1418,22 +1383,22 @@ mod tests {
             .expect("DiscountCurve builder should succeed");
         let market = MarketContext::new().insert(curve);
 
-        let result = schedule.to_period_dataframe(
-            &quarters_2025(),
-            &market,
-            "USD-OIS",
-            PeriodDataFrameOptions {
-                as_of: Some(base),
-                day_count: Some(DayCount::Act365F),
-                include_floating_decomposition: true,
-                forward_curve_id: Some("MISSING-FWD"),
-                ..Default::default()
-            },
-        );
-        assert!(
-            result.is_err(),
-            "missing forward curve must not silently disable floating decomposition"
-        );
+        let frame = schedule
+            .to_period_dataframe(
+                &quarters_2025(),
+                &market,
+                "USD-OIS",
+                PeriodDataFrameOptions {
+                    as_of: Some(base),
+                    day_count: Some(DayCount::Act365F),
+                    include_floating_decomposition: true,
+                    forward_curve_id: Some("MISSING-FWD"),
+                    ..Default::default()
+                },
+            )
+            .expect("stored projection metadata avoids a second curve policy");
+        assert_eq!(frame.base_rates, Some(vec![Some(0.0375)]));
+        assert_eq!(frame.spreads, Some(vec![Some(0.015)]));
     }
 
     #[test]

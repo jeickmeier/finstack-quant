@@ -308,14 +308,14 @@ pub fn accrued_interest_amount(
     let outstanding_path = schedule.outstanding_by_date()?;
     let period_inputs = build_period_inputs(schedule, &periods, &outstanding_path, cfg.frequency)?;
 
-    // Locate active period and compute accrued in that period.
-    if let Some((inputs, elapsed_yf)) =
-        find_active_period_and_elapsed(&period_inputs, as_of, schedule.day_count, cfg)?
-    {
-        accrue_in_period(inputs, elapsed_yf, &cfg.method)
-    } else {
-        Ok(0.0)
+    // Multiple legs may share a payment date while retaining distinct accrual
+    // periods or day counts. Accrue each active identity independently.
+    let active = find_active_periods_and_elapsed(&period_inputs, as_of, cfg)?;
+    let mut accrued = finstack_quant_core::math::summation::NeumaierAccumulator::default();
+    for (inputs, elapsed_yf) in active {
+        accrued.add(accrue_in_period(inputs, elapsed_yf, &cfg.method)?);
     }
+    Ok(accrued.total())
 }
 
 /// Aggregated coupon information for a single payment date.
@@ -354,6 +354,7 @@ struct CouponPeriod {
 struct PeriodInputs {
     start: Date,
     end: Date,
+    dc: DayCount,
     notional_start: f64,
     coupon_total: f64,
     total_yf: f64,
@@ -382,7 +383,7 @@ fn derive_horizon_start(
     })
 }
 
-/// Build coupon buckets grouped by date from the schedule.
+/// Build coupon buckets grouped by payment date and full accrual identity.
 fn build_coupon_periods(
     schedule: &CashFlowSchedule,
     cfg: &AccrualConfig,
@@ -410,11 +411,13 @@ fn build_coupon_periods(
 
     let mut buckets: Vec<CouponBucket> = Vec::new();
 
-    // Cash and PIK coupon flows are grouped by payment date.
+    // Cash and PIK legs combine only when their payment date and contractual
+    // accrual identity match. Same-date legs with different periods or day
+    // counts remain separate contributions.
     for &i in &coupon_idx {
         let cf = &schedule.flows[i];
-        let true_period = schedule.meta.accrual_periods.get(i).copied().flatten();
-        let flow_day_count = schedule.meta.accrual_day_counts.get(i).copied().flatten();
+        let true_period = cf.accrual.map(|accrual| (accrual.start, accrual.end));
+        let flow_day_count = cf.accrual.map(|accrual| accrual.day_count);
 
         let cf_af = if cf.accrual_factor > 0.0 {
             if !cf.accrual_factor.is_finite() {
@@ -434,60 +437,44 @@ fn build_coupon_periods(
             None
         };
 
-        if let Some(last) = buckets.last_mut() {
-            if last.date == cf.date {
-                if cf.kind == CFKind::PIK {
-                    last.pik_amount += cf.amount.amount();
-                } else {
-                    last.cash_amount += cf.amount.amount();
-                    if last.accrual_start.is_none() {
-                        last.accrual_start = true_period.map(|(start, _)| start);
-                    }
-                    if last.accrual_end.is_none() {
-                        last.accrual_end = true_period.map(|(_, end)| end);
-                    }
-                    if let Some(flow_dc) = flow_day_count {
-                        match last.accrual_day_count {
-                            None => last.accrual_day_count = Some(flow_dc),
-                            Some(existing) if existing != flow_dc => {
-                                last.accrual_day_count = None;
-                            }
-                            _ => {}
-                        }
-                    }
-                    if last.accrual_factor.is_none() {
-                        last.accrual_factor = cf_af;
-                    }
-                    if last.rate.is_none() {
-                        last.rate = cf.rate;
-                    }
-                }
-                continue;
+        let matching_bucket = buckets.iter_mut().find(|bucket| {
+            bucket.date == cf.date
+                && bucket.accrual_start == true_period.map(|(start, _)| start)
+                && bucket.accrual_end == true_period.map(|(_, end)| end)
+                && bucket.accrual_day_count == flow_day_count
+        });
+        if let Some(bucket) = matching_bucket {
+            if cf.kind == CFKind::PIK {
+                bucket.pik_amount += cf.amount.amount();
+            } else {
+                bucket.cash_amount += cf.amount.amount();
             }
+            if bucket.accrual_factor.is_none() {
+                bucket.accrual_factor = cf_af;
+            }
+            if bucket.rate.is_none() {
+                bucket.rate = cf.rate;
+            }
+            continue;
         }
 
-        buckets.push(if cf.kind == CFKind::PIK {
-            CouponBucket {
-                date: cf.date,
-                accrual_start: true_period.map(|(start, _)| start),
-                accrual_end: true_period.map(|(_, end)| end),
-                accrual_day_count: flow_day_count,
-                cash_amount: 0.0,
-                pik_amount: cf.amount.amount(),
-                accrual_factor: None,
-                rate: None,
-            }
-        } else {
-            CouponBucket {
-                date: cf.date,
-                accrual_start: true_period.map(|(start, _)| start),
-                accrual_end: true_period.map(|(_, end)| end),
-                accrual_day_count: flow_day_count,
-                cash_amount: cf.amount.amount(),
-                pik_amount: 0.0,
-                accrual_factor: cf_af,
-                rate: cf.rate,
-            }
+        buckets.push(CouponBucket {
+            date: cf.date,
+            accrual_start: true_period.map(|(start, _)| start),
+            accrual_end: true_period.map(|(_, end)| end),
+            accrual_day_count: flow_day_count,
+            cash_amount: if cf.kind == CFKind::PIK {
+                0.0
+            } else {
+                cf.amount.amount()
+            },
+            pik_amount: if cf.kind == CFKind::PIK {
+                cf.amount.amount()
+            } else {
+                0.0
+            },
+            accrual_factor: cf_af,
+            rate: cf.rate,
         });
     }
 
@@ -598,6 +585,7 @@ fn build_period_inputs(
         result.push(PeriodInputs {
             start: p.start,
             end: p.end,
+            dc: p.dc,
             notional_start,
             coupon_total,
             total_yf,
@@ -629,12 +617,12 @@ fn build_period_inputs(
 /// Market standard (e.g. UK gilts): the buyer does not receive the imminent
 /// coupon, so the seller compensates the buyer for the remaining stub via
 /// **negative accrued interest**.
-fn find_active_period_and_elapsed<'a>(
+fn find_active_periods_and_elapsed<'a>(
     periods: &'a [PeriodInputs],
     as_of: Date,
-    dc: DayCount,
     cfg: &AccrualConfig,
-) -> finstack_quant_core::Result<Option<(&'a PeriodInputs, f64)>> {
+) -> finstack_quant_core::Result<Vec<(&'a PeriodInputs, f64)>> {
+    let mut active = Vec::new();
     for inputs in periods {
         if inputs.start <= as_of && as_of < inputs.end {
             let dc_ctx = DayCountContext {
@@ -644,12 +632,15 @@ fn find_active_period_and_elapsed<'a>(
                 coupon_period: Some((inputs.start, inputs.end)),
                 ..Default::default()
             };
-            let dc_elapsed = dc.year_fraction(inputs.start, as_of, dc_ctx)?.max(0.0);
+            let dc_elapsed = inputs
+                .dc
+                .year_fraction(inputs.start, as_of, dc_ctx)?
+                .max(0.0);
 
             // Rescale onto the `total_yf` basis under a single day-count
             // context so stub reference-period choices cancel instead of
             // mixing builder and elapsed bases.
-            let dc_total = dc.year_fraction(inputs.start, inputs.end, dc_ctx)?;
+            let dc_total = inputs.dc.year_fraction(inputs.start, inputs.end, dc_ctx)?;
             let elapsed = if dc_total.is_finite() && dc_total > 0.0 {
                 inputs.total_yf * dc_elapsed / dc_total
             } else {
@@ -670,15 +661,16 @@ fn find_active_period_and_elapsed<'a>(
                     )));
                 }
                 if as_of >= ex_date && as_of < inputs.end {
-                    return Ok(Some((inputs, (elapsed - inputs.total_yf).min(0.0))));
+                    active.push((inputs, (elapsed - inputs.total_yf).min(0.0)));
+                    continue;
                 }
             }
 
-            return Ok(Some((inputs, elapsed)));
+            active.push((inputs, elapsed));
         }
     }
 
-    Ok(None)
+    Ok(active)
 }
 
 /// Apply the chosen accrual method to a single period.
@@ -760,7 +752,7 @@ fn accrue_in_period(
 mod tests {
     use super::*;
     use crate::builder::{CashFlowSchedule, Notional};
-    use finstack_quant_core::cashflow::CashFlow;
+    use finstack_quant_core::cashflow::{CashFlow, CashFlowAccrual};
     use finstack_quant_core::currency::Currency;
     use time::Month;
 
@@ -863,6 +855,58 @@ mod tests {
         assert_eq!(periods.len(), 2);
         assert_eq!(periods[0].end, make_date(2025, 7, 1));
         assert_eq!(periods[1].end, make_date(2026, 1, 1));
+    }
+
+    #[test]
+    fn same_date_distinct_accrual_identities_sum_independently() {
+        let issue = make_date(2025, 1, 1);
+        let second_start = make_date(2025, 2, 1);
+        let as_of = make_date(2025, 4, 1);
+        let end = make_date(2025, 7, 1);
+        let flows = vec![
+            CashFlow::new(
+                end,
+                None,
+                Money::new(30_000.0, Currency::USD),
+                CFKind::Fixed,
+                0.5,
+                Some(0.06),
+            )
+            .with_accrual(CashFlowAccrual {
+                start: issue,
+                end,
+                day_count: DayCount::Thirty360,
+                projected_index_rate: None,
+            }),
+            CashFlow::new(
+                end,
+                None,
+                Money::new(20_000.0, Currency::USD),
+                CFKind::Fixed,
+                150.0 / 365.0,
+                Some(0.048666666666666664),
+            )
+            .with_accrual(CashFlowAccrual {
+                start: second_start,
+                end,
+                day_count: DayCount::Act365F,
+                projected_index_rate: None,
+            }),
+        ];
+        let schedule = CashFlowSchedule {
+            flows,
+            notional: Notional::par(1_000_000.0, Currency::USD),
+            day_count: DayCount::Thirty360,
+            meta: crate::builder::CashFlowMeta {
+                issue_date: Some(issue),
+                ..Default::default()
+            },
+        };
+
+        let accrued = accrued_interest_amount(&schedule, as_of, &AccrualConfig::default())
+            .expect("both legs accrue");
+        let expected = 30_000.0 * 90.0 / 180.0 + 20_000.0 * 59.0 / 150.0;
+        assert!((accrued - expected).abs() < 1e-9, "{accrued} != {expected}");
     }
 
     #[test]
@@ -979,6 +1023,7 @@ mod tests {
         PeriodInputs {
             start: make_date(2025, 1, 1),
             end: make_date(2025, 7, 5),
+            dc: DayCount::Thirty360,
             notional_start: 1_000_000.0,
             coupon_total: 25_000.0,
             total_yf: 0.5,
@@ -993,14 +1038,12 @@ mod tests {
 
         // 2025-07-03: 30/360 elapsed = 182/360 > total_yf = 0.5.
         // dc_total = 184/360, so elapsed is rescaled to 0.5 × 182/184.
-        let (active, elapsed) = find_active_period_and_elapsed(
-            &periods,
-            make_date(2025, 7, 3),
-            DayCount::Thirty360,
-            &cfg,
-        )
-        .expect("ok")
-        .expect("active period");
+        let (active, elapsed) =
+            find_active_periods_and_elapsed(&periods, make_date(2025, 7, 3), &cfg)
+                .expect("ok")
+                .into_iter()
+                .next()
+                .expect("active period");
 
         let expected = 0.5 * (182.0 / 360.0) / (184.0 / 360.0);
         assert!(
@@ -1025,6 +1068,7 @@ mod tests {
         let inputs = PeriodInputs {
             start: make_date(2025, 1, 1),
             end: make_date(2025, 7, 1),
+            dc: DayCount::Act365F,
             notional_start: 1_000_000.0,
             coupon_total: 37_500.0,
             total_yf: 0.75,
@@ -1032,14 +1076,12 @@ mod tests {
         let periods = [inputs.clone()];
         let cfg = AccrualConfig::default();
 
-        let (_active, elapsed) = find_active_period_and_elapsed(
-            &periods,
-            make_date(2025, 4, 1),
-            DayCount::Act365F,
-            &cfg,
-        )
-        .expect("ok")
-        .expect("active period");
+        let (_active, elapsed) =
+            find_active_periods_and_elapsed(&periods, make_date(2025, 4, 1), &cfg)
+                .expect("ok")
+                .into_iter()
+                .next()
+                .expect("active period");
         let expected = inputs.total_yf * 90.0 / 181.0;
 
         assert!(
@@ -1054,14 +1096,12 @@ mod tests {
         let periods = [inputs];
         let cfg = ex_coupon_cfg(7); // ex-date 2025-06-28
 
-        let (active, elapsed_yf) = find_active_period_and_elapsed(
-            &periods,
-            make_date(2025, 7, 3),
-            DayCount::Thirty360,
-            &cfg,
-        )
-        .expect("ok")
-        .expect("active period");
+        let (active, elapsed_yf) =
+            find_active_periods_and_elapsed(&periods, make_date(2025, 7, 3), &cfg)
+                .expect("ok")
+                .into_iter()
+                .next()
+                .expect("active period");
 
         assert!(
             elapsed_yf <= 0.0,
@@ -1080,6 +1120,7 @@ mod tests {
         PeriodInputs {
             start: make_date(2025, 1, 1),
             end: make_date(2025, 7, 1),
+            dc: DayCount::Thirty360,
             notional_start: 1_000_000.0,
             coupon_total: 25_000.0,
             total_yf: 0.5,
@@ -1198,6 +1239,7 @@ mod tests {
         let inputs = PeriodInputs {
             start: make_date(2025, 1, 1),
             end: make_date(2025, 2, 1),
+            dc: DayCount::Act365F,
             notional_start: 1_000_000.0,
             coupon_total: 4_166.67,
             total_yf: 1.0 / 12.0,
@@ -1205,13 +1247,8 @@ mod tests {
         let periods = [inputs];
         let cfg = ex_coupon_cfg(45);
 
-        let err = find_active_period_and_elapsed(
-            &periods,
-            make_date(2025, 1, 1),
-            DayCount::Act365F,
-            &cfg,
-        )
-        .expect_err("ex-coupon window before period start must be rejected");
+        let err = find_active_periods_and_elapsed(&periods, make_date(2025, 1, 1), &cfg)
+            .expect_err("ex-coupon window before period start must be rejected");
         assert!(err.to_string().contains("ex-coupon"));
     }
 

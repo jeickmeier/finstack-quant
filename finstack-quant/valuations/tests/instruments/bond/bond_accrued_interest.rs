@@ -362,7 +362,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     let coupon_info: Vec<CouponInfo> = {
         use finstack_quant_cashflows::primitives::CFKind;
         let mut out: Vec<CouponInfo> = Vec::new();
-        for (idx, cf) in schedule.flows.iter().enumerate() {
+        for cf in &schedule.flows {
             if !matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {
                 continue;
             }
@@ -371,7 +371,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
             } else {
                 None
             };
-            let accrual_period = schedule.meta.accrual_periods.get(idx).copied().flatten();
+            let accrual_period = cf.accrual.map(|accrual| (accrual.start, accrual.end));
             if let Some(last) = out.last_mut() {
                 if last.0 == cf.date {
                     last.1 += cf.amount.amount();

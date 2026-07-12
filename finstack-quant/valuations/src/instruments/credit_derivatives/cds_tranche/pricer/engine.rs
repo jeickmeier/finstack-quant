@@ -198,8 +198,6 @@ impl CDSTranchePricer {
                         facility_limit: None,
                         issue_date: tranche.contractual_effective_date(as_of),
                         maturity_date: Some(tranche.maturity),
-                        accrual_periods: Vec::new(),
-                        accrual_day_counts: Vec::new(),
                     }),
                     ..Default::default()
                 },
@@ -224,8 +222,6 @@ impl CDSTranchePricer {
                     facility_limit: None,
                     issue_date: tranche.contractual_effective_date(valuation_date),
                     maturity_date: Some(tranche.maturity),
-                    accrual_periods: Vec::new(),
-                    accrual_day_counts: Vec::new(),
                 }),
                 ..Default::default()
             },

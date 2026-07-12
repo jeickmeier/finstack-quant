@@ -249,8 +249,6 @@ pub(crate) fn build_projected_schedule(
                 facility_limit: None,
                 issue_date: Some(mbs.issue_date),
                 maturity_date: None,
-                accrual_periods: Vec::new(),
-                accrual_day_counts: Vec::new(),
             }),
             ..Default::default()
         },

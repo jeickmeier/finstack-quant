@@ -28,8 +28,6 @@ export interface CashFlowMetaJson {
   facility_limit?: MoneyJson | null;
   issue_date?: string | null;
   maturity_date?: string | null;
-  accrual_periods?: Array<[string, string] | null>;
-  accrual_day_counts?: Array<string | null>;
 }
 
 export interface NotionalJson {

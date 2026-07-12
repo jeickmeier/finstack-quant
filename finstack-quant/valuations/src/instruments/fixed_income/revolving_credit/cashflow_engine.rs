@@ -616,8 +616,6 @@ impl<'a> CashflowEngine<'a> {
                 // by the accrual engine when issue_date is absent.
                 issue_date: Some(self.facility.commitment_date),
                 maturity_date: None,
-                accrual_periods: Vec::new(),
-                accrual_day_counts: Vec::new(),
             },
         })
     }
@@ -819,8 +817,6 @@ impl<'a> CashflowEngine<'a> {
                 // by the accrual engine when issue_date is absent.
                 issue_date: Some(self.facility.commitment_date),
                 maturity_date: None,
-                accrual_periods: Vec::new(),
-                accrual_day_counts: Vec::new(),
             },
         })
     }

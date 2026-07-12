@@ -561,6 +561,14 @@ fn test_commitment_fees_use_correct_kind() {
         !commitment_fees.is_empty(),
         "Commitment fees should use CFKind::CommitmentFee"
     );
+    assert!(
+        schedule
+            .flows
+            .iter()
+            .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+            .all(|cf| cf.accrual.is_some()),
+        "merging the commitment-fee leg must preserve coupon accrual metadata"
+    );
 
     // No generic Fee kind should be used for commitment fees
     let generic_fees: Vec<_> = schedule
