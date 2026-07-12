@@ -363,7 +363,7 @@ export interface FxDeltaVolSurface extends WasmOwned {
   readonly numExpiries: number;
   /** Pillar vols at an expiry index as `[atm, put25dVol, call25dVol]`. */
   pillarVols(expiryIdx: number): Float64Array;
-  impliedVol(expiry: number, strike: number, forward: number, rD: number, rF: number): number;
+  impliedVol(expiry: number, strike: number, forward: number): number;
 }
 
 export interface FxDeltaVolSurfaceConstructor {

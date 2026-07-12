@@ -618,7 +618,7 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
     ));
     assert!(contains_signature(
         surface,
-        "impliedVol(expiry: number, strike: number, forward: number, rD: number, rF: number): number;"
+        "impliedVol(expiry: number, strike: number, forward: number): number;"
     ));
 
     let ctor = interface_block(&dts, "FxDeltaVolSurfaceConstructor");
@@ -636,11 +636,11 @@ fn core_market_data_dts_exposes_fx_surface_and_rate_result() {
     }
     assert!(contains_signature(
         ctor,
-        "deltaToStrike(delta: number, forward: number, vol: number, expiry: number, rF: number): number;"
+        "deltaToStrike(delta: number, forward: number, vol: number, expiry: number): number;"
     ));
     assert!(contains_signature(
         ctor,
-        "strikeToDelta(strike: number, forward: number, vol: number, expiry: number, rF: number): number;"
+        "strikeToDelta(strike: number, forward: number, vol: number, expiry: number): number;"
     ));
 
     // Registered on the core namespace.
