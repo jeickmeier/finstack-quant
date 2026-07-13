@@ -29,7 +29,6 @@
 //! - `docs/REFERENCES.md#hull-options-futures`
 
 use finstack_quant_core::dates::{Date, DayCountContext};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
@@ -471,71 +470,6 @@ pub(crate) fn project_index_rate(reset_date: Date, fwd: &ForwardCurve) -> Result
     Ok(index_rate)
 }
 
-/// Project floating rate by looking up the forward curve from market context.
-///
-/// This is a convenience wrapper around [`project_floating_rate`] that handles
-/// the curve lookup from a `MarketContext`.
-///
-/// # Arguments
-///
-/// * `reset_date` - The rate fixing/reset date
-/// * `reset_period_end` - End of the accrual period
-/// * `index_id` - Forward curve identifier (e.g., "USD-SOFR-3M")
-/// * `params` - Floating rate parameters
-/// * `market` - Market context containing forward curves
-///
-/// # Returns
-///
-/// All-in projected coupon rate as a decimal.
-///
-/// # Errors
-///
-/// Returns an error if the forward curve cannot be found in `market`, if
-/// `params` fails validation, or if the underlying time conversion fails.
-///
-/// # References
-///
-/// - `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::dates::{Date, DayCount};
-/// use finstack_quant_core::market_data::context::MarketContext;
-/// use finstack_quant_core::market_data::term_structures::ForwardCurve;
-/// use finstack_quant_cashflows::builder::rate_helpers::{
-///     project_floating_rate_from_market, FloatingRateParams
-/// };
-/// use time::Month;
-///
-/// let reset = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-/// let period_end = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
-///
-/// let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-///     .base_date(reset)
-///     .day_count(DayCount::Act360)
-///     .knots([(0.0, 0.03), (1.0, 0.04)])
-///     .build()
-///     .expect("curve");
-/// let market = MarketContext::new().insert(fwd);
-///
-/// let params = FloatingRateParams::with_spread(200.0);
-/// let rate = project_floating_rate_from_market(
-///     reset, period_end, "USD-SOFR-3M", &params, &market
-/// )?;
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub fn project_floating_rate_from_market(
-    reset_date: Date,
-    reset_period_end: Date,
-    index_id: &str,
-    params: &FloatingRateParams,
-    market: &MarketContext,
-) -> Result<f64> {
-    let fwd = market.get_forward(index_id)?;
-    project_floating_rate(reset_date, reset_period_end, fwd.as_ref(), params)
-}
-
 /// Compute a compounded overnight rate for a single accrual period.
 ///
 /// Implements the ISDA 2021 compounded-in-arrears formula:
@@ -742,6 +676,17 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
     use time::Month;
+
+    fn project_floating_rate_from_market(
+        reset_date: Date,
+        reset_period_end: Date,
+        index_id: &str,
+        params: &FloatingRateParams,
+        market: &MarketContext,
+    ) -> Result<f64> {
+        let fwd = market.get_forward(index_id)?;
+        project_floating_rate(reset_date, reset_period_end, fwd.as_ref(), params)
+    }
 
     fn create_test_market(base_date: Date) -> MarketContext {
         let fwd_curve = ForwardCurve::builder("USD-SOFR-3M", 0.25)

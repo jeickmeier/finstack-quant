@@ -63,9 +63,7 @@ pub use orchestrator::{CashFlowBuilder, PrincipalEvent};
 // Re-export common types
 pub use dataframe::{PeriodDataFrame, PeriodDataFrameOptions};
 pub use periods::SchedulePeriod;
-pub use rate_helpers::{
-    project_floating_rate, project_floating_rate_from_market, FloatingRateParams,
-};
+pub use rate_helpers::{project_floating_rate, FloatingRateParams};
 pub use schedule::{
     sort_flows, CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment,
     PvDiscountSource,
