@@ -76,6 +76,7 @@ test('FxOption.greeks returns a plain object keyed by metric name', () => {
     'golden',
     'data',
     'pricing',
+    'regression_goldens',
     'fx_option',
     'gk_eurusd_atm_3m.json'
   );
