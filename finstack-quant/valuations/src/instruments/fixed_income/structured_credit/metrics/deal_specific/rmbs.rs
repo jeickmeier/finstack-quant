@@ -1,9 +1,9 @@
 //! RMBS-specific metrics (LTV, FICO, WAL with PSA adjustments).
 
+use crate::cashflow::builder::schedule::weighted_average_life_from_principal;
 use crate::instruments::fixed_income::structured_credit::pricing::run_simulation;
 use crate::instruments::fixed_income::structured_credit::{DealType, StructuredCredit};
 use crate::metrics::MetricContext;
-use finstack_quant_core::dates::{DayCount, DayCountContext};
 
 /// RMBS Weighted Average LTV calculator
 pub struct RmbsLtvCalculator {
@@ -79,28 +79,11 @@ impl crate::metrics::MetricCalculator for RmbsWalCalculator {
         }
 
         let tranche_flows = run_simulation(rmbs, context.curves.as_ref(), context.as_of)?;
-        let mut weighted_principal_time = 0.0;
-        let mut total_principal = 0.0;
-
-        for flows in tranche_flows.values() {
-            for (date, amount) in &flows.principal_flows {
-                if *date <= context.as_of || amount.amount() <= 0.0 {
-                    continue;
-                }
-                let years = DayCount::Act365F.year_fraction(
-                    context.as_of,
-                    *date,
-                    DayCountContext::default(),
-                )?;
-                weighted_principal_time += amount.amount() * years;
-                total_principal += amount.amount();
-            }
-        }
-
-        if total_principal <= f64::EPSILON {
-            Ok(0.0)
-        } else {
-            Ok(weighted_principal_time / total_principal)
-        }
+        weighted_average_life_from_principal(
+            tranche_flows
+                .values()
+                .flat_map(|flows| flows.principal_flows.iter().copied()),
+            context.as_of,
+        )
     }
 }

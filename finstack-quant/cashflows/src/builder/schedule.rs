@@ -1406,4 +1406,65 @@ mod tests {
             "WAL should be closer to Act/365F value than 30/360 value"
         );
     }
+
+    #[test]
+    fn wal_kernel_combines_same_date_principal() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let payment = Date::from_calendar_date(2026, Month::July, 1).expect("valid date");
+        let expected = DayCount::Act365F
+            .year_fraction(as_of, payment, DayCountContext::default())
+            .expect("year fraction");
+
+        let wal = weighted_average_life_from_principal(
+            [
+                (payment, Money::new(40.0, Currency::USD)),
+                (payment, Money::new(60.0, Currency::USD)),
+            ],
+            as_of,
+        )
+        .expect("WAL succeeds");
+
+        assert!((wal - expected).abs() < 1e-12);
+    }
+
+    #[test]
+    fn wal_kernel_rejects_mixed_currencies() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let first = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+        let second = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
+
+        let error = weighted_average_life_from_principal(
+            [
+                (first, Money::new(40.0, Currency::USD)),
+                (second, Money::new(60.0, Currency::EUR)),
+            ],
+            as_of,
+        )
+        .expect_err("mixed currencies must fail");
+
+        assert!(matches!(
+            error,
+            finstack_quant_core::Error::CurrencyMismatch {
+                expected: Currency::USD,
+                actual: Currency::EUR,
+            }
+        ));
+    }
+
+    #[test]
+    fn wal_kernel_returns_zero_without_future_principal() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let past = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+
+        let wal = weighted_average_life_from_principal(
+            [
+                (past, Money::new(100.0, Currency::USD)),
+                (as_of, Money::new(100.0, Currency::USD)),
+            ],
+            as_of,
+        )
+        .expect("WAL succeeds");
+
+        assert_eq!(wal, 0.0);
+    }
 }

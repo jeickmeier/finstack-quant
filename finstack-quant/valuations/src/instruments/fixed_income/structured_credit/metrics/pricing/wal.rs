@@ -93,10 +93,12 @@ impl MetricCalculator for WalCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::pricer::InstrumentType;
     use finstack_quant_core::cashflow::{CFKind, CashFlow};
     use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::money::Money;
     use std::sync::Arc;
@@ -246,5 +248,47 @@ mod tests {
             (wal - 1.0).abs() < 1e-2,
             "wal={wal}: write-down must not be weighted as principal"
         );
+    }
+
+    #[test]
+    fn tranche_and_schedule_wal_share_the_canonical_kernel() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let first = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+        let second = Date::from_calendar_date(2027, Month::January, 1).expect("valid date");
+        let principal_flows = vec![
+            (first, Money::new(40.0, Currency::USD)),
+            (second, Money::new(60.0, Currency::USD)),
+        ];
+        let zero = Money::new(0.0, Currency::USD);
+        let tranche = TrancheCashflows {
+            tranche_id: "A".to_string(),
+            cashflows: principal_flows.clone(),
+            detailed_flows: Vec::new(),
+            interest_flows: Vec::new(),
+            principal_flows: principal_flows.clone(),
+            pik_flows: Vec::new(),
+            writedown_flows: Vec::new(),
+            final_balance: zero,
+            total_interest: zero,
+            total_principal: Money::new(100.0, Currency::USD),
+            total_pik: zero,
+            total_writedown: zero,
+        };
+        let schedule = CashFlowSchedule {
+            flows: principal_flows
+                .iter()
+                .map(|(date, amount)| {
+                    CashFlow::new(*date, None, *amount, CFKind::Amortization, 0.0, None)
+                })
+                .collect(),
+            notional: Notional::par(100.0, Currency::USD),
+            day_count: DayCount::Thirty360,
+            meta: CashFlowMeta::default(),
+        };
+
+        let tranche_wal = calculate_tranche_wal(&tranche, as_of).expect("tranche WAL");
+        let schedule_wal = schedule.weighted_average_life(as_of).expect("schedule WAL");
+
+        assert_eq!(tranche_wal, schedule_wal);
     }
 }

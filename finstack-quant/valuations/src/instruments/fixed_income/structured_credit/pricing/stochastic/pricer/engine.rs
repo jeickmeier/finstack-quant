@@ -2,6 +2,7 @@
 
 use super::config::{PricingMode, StochasticPricerConfig};
 use super::result::{StochasticPricingResult, TranchePricingResult};
+use crate::cashflow::builder::schedule::weighted_average_life_from_principal;
 use crate::correlation::{CopulaSpec, LatentFactorSpec, RecoverySpec};
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
     run_simulation_with_source, PerNameDefaultEngine, PerNamePeriodInput, PeriodPoolShock,
@@ -932,25 +933,13 @@ impl PathTrancheMetrics {
             }
         }
 
-        let mut principal = 0.0;
-        let mut weighted_principal_time = 0.0;
-        for (date, amount) in &cashflows.principal_flows {
-            if *date <= as_of || amount.amount() <= 0.0 {
-                continue;
-            }
-            let t = DayCount::Act365F.year_fraction(as_of, *date, DayCountContext::default())?;
-            principal += amount.amount();
-            weighted_principal_time += amount.amount() * t;
-        }
+        let wal =
+            weighted_average_life_from_principal(cashflows.principal_flows.iter().copied(), as_of)?;
 
         Ok(Self {
             pv,
             loss: cashflows.total_writedown.amount(),
-            wal: if principal > f64::EPSILON {
-                weighted_principal_time / principal
-            } else {
-                0.0
-            },
+            wal,
             duration: if positive_pv > f64::EPSILON {
                 weighted_duration / positive_pv
             } else {
@@ -1194,7 +1183,7 @@ mod tests {
     };
     use crate::instruments::fixed_income::structured_credit::{
         AssetPool, DealType, DefaultModelSpec, PoolAsset, RecoveryModelSpec, Tranche,
-        TrancheCoupon, TrancheSeniority, TrancheStructure,
+        TrancheCashflows, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
@@ -1215,6 +1204,41 @@ mod tests {
                 .build()
                 .expect("curve"),
         )
+    }
+
+    #[test]
+    fn path_metrics_wal_matches_the_canonical_kernel() {
+        let as_of = test_date();
+        let first = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let second = Date::from_calendar_date(2026, Month::January, 1).expect("valid date");
+        let principal_flows = vec![
+            (first, Money::new(40.0, Currency::USD)),
+            (second, Money::new(60.0, Currency::USD)),
+        ];
+        let zero = Money::new(0.0, Currency::USD);
+        let cashflows = TrancheCashflows {
+            tranche_id: "A".to_string(),
+            cashflows: principal_flows.clone(),
+            detailed_flows: Vec::new(),
+            interest_flows: Vec::new(),
+            principal_flows,
+            pik_flows: Vec::new(),
+            writedown_flows: Vec::new(),
+            final_balance: zero,
+            total_interest: zero,
+            total_principal: Money::new(100.0, Currency::USD),
+            total_pik: zero,
+            total_writedown: zero,
+        };
+
+        let metrics =
+            PathTrancheMetrics::from_cashflows(&cashflows, as_of, test_discount_curve().as_ref())
+                .expect("path metrics");
+        let expected =
+            weighted_average_life_from_principal(cashflows.principal_flows.iter().copied(), as_of)
+                .expect("canonical WAL");
+
+        assert_eq!(metrics.wal, expected);
     }
 
     fn test_instrument() -> StructuredCredit {
