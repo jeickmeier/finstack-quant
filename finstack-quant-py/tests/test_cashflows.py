@@ -188,6 +188,90 @@ def test_cashflows_builds_step_up_with_payment_program() -> None:
     assert any(flow["kind"] == "PIK" for flow in schedule["flows"])
 
 
+def test_cashflows_builds_fixed_to_float_and_explicit_windows() -> None:
+    floating = json.loads(_floating_cashflow_spec())["coupon_program"][0]["spec"]
+    floating["rate_spec"]["index_id"] = "TEST-INDEX"
+    floating["rate_spec"]["fallback"] = "SpreadOnly"
+    schedule = {
+        key: floating[key]
+        for key in (
+            "freq",
+            "dc",
+            "bdc",
+            "calendar_id",
+            "stub",
+            "end_of_month",
+            "payment_lag_days",
+        )
+    }
+    base = {
+        "notional": {
+            "initial": {"amount": "1000000", "currency": "USD"},
+            "amort": "None",
+        },
+        "issue": "2025-01-01",
+        "maturity": "2027-01-01",
+    }
+
+    fixed_to_float = {
+        **base,
+        "coupon_program": [
+            {
+                "kind": "fixed_to_float",
+                "switch": "2026-01-01",
+                "fixed": {"rate": "0.04", "schedule": schedule},
+                "floating": floating,
+                "fixed_split": "Cash",
+            }
+        ],
+    }
+    built = json.loads(build_cashflow_schedule_json(json.dumps(fixed_to_float)))
+    assert {flow["kind"] for flow in built["flows"]} >= {"Fixed", "FloatReset"}
+
+    explicit_windows = {
+        **base,
+        "coupon_program": [
+            {
+                "kind": "fixed_window",
+                "start": "2025-01-01",
+                "end": "2026-01-01",
+                "spec": {"coupon_type": "Cash", "rate": "0.04", **schedule},
+            },
+            {
+                "kind": "floating_window",
+                "start": "2026-01-01",
+                "end": "2027-01-01",
+                "spec": floating,
+            },
+        ],
+    }
+    built = json.loads(build_cashflow_schedule_json(json.dumps(explicit_windows)))
+    assert {flow["kind"] for flow in built["flows"]} >= {"Fixed", "FloatReset"}
+
+
+def test_cashflows_reports_overlapping_payment_windows() -> None:
+    spec = json.loads(_cashflow_spec())
+    spec["issue"] = "2025-01-01"
+    spec["maturity"] = "2027-01-01"
+    spec["payment_program"] = [
+        {
+            "kind": "window",
+            "start": "2025-01-01",
+            "end": "2026-06-01",
+            "split": "PIK",
+        },
+        {
+            "kind": "window",
+            "start": "2026-01-01",
+            "end": "2027-01-01",
+            "split": "Cash",
+        },
+    ]
+
+    with pytest.raises(ValueError, match="overlapping payment windows"):
+        build_cashflow_schedule_json(json.dumps(spec))
+
+
 def test_cashflows_accrued_interest_accepts_config_json() -> None:
     schedule_json = build_cashflow_schedule_json(_cashflow_spec())
 

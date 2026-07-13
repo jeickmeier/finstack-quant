@@ -463,12 +463,14 @@ impl AmortizationSpec {
 ///     all_in_floor_bp: None,
 ///     all_in_cap_bp: None,
 ///     index_cap_bp: None,
+///     overnight_index_constraints: Default::default(),
 ///     reset_freq: Tenor::quarterly(),
+///     index_tenor: None,
 ///     reset_lag_days: 2,
-///     dc: DayCount::Act360,
-///     bdc: BusinessDayConvention::ModifiedFollowing,
-///     calendar_id: None,
 ///     fixing_calendar_id: None,
+///     overnight_compounding: None,
+///     overnight_basis: None,
+///     fallback: Default::default(),
 /// };
 ///
 /// let spec = TermLoanSpec {

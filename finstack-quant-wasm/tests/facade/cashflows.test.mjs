@@ -106,6 +106,76 @@ test('cashflows end-to-end build/validate/flows/accrual from JSON spec', () => {
   assert.equal(cashflows.bondFromCashflowsJson, undefined);
 });
 
+test('cashflows facade builds fixed-to-float and preserves Rust window errors', () => {
+  const schedule = {
+    freq: { count: 3, unit: 'months' },
+    dc: 'Act360',
+    bdc: 'following',
+    calendar_id: 'weekends_only',
+    stub: 'None',
+    end_of_month: false,
+    payment_lag_days: 0,
+  };
+  const floating = {
+    rate_spec: {
+      index_id: 'TEST-INDEX',
+      spread_bp: '150',
+      reset_freq: { count: 3, unit: 'months' },
+      reset_lag_days: 0,
+      fallback: 'SpreadOnly',
+    },
+    coupon_type: 'Cash',
+    ...schedule,
+  };
+  const base = {
+    notional: {
+      initial: { amount: '1000000', currency: 'USD' },
+      amort: 'None',
+    },
+    issue: '2025-01-01',
+    maturity: '2027-01-01',
+  };
+  const fixedToFloat = JSON.stringify({
+    ...base,
+    coupon_program: [
+      {
+        kind: 'fixed_to_float',
+        switch: '2026-01-01',
+        fixed: { rate: '0.04', schedule },
+        floating,
+        fixed_split: 'Cash',
+      },
+    ],
+  });
+  const built = JSON.parse(cashflows.buildCashflowScheduleJson(fixedToFloat, null));
+  const kinds = new Set(built.flows.map((flow) => flow.kind));
+  assert.ok(kinds.has('Fixed'));
+  assert.ok(kinds.has('FloatReset'));
+
+  const overlapping = JSON.stringify({
+    ...base,
+    coupon_program: [{ kind: 'fixed', spec: { coupon_type: 'Cash', rate: '0.04', ...schedule } }],
+    payment_program: [
+      {
+        kind: 'window',
+        start: '2025-01-01',
+        end: '2026-06-01',
+        split: 'PIK',
+      },
+      {
+        kind: 'window',
+        start: '2026-01-01',
+        end: '2027-01-01',
+        split: 'Cash',
+      },
+    ],
+  });
+  assert.throws(
+    () => cashflows.buildCashflowScheduleJson(overlapping, null),
+    /overlapping payment windows/
+  );
+});
+
 test('cashflows rejects malformed schedule JSON', () => {
   assert.throws(() => cashflows.validateCashflowScheduleJson('{not json'), /invalid/);
 });

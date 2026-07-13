@@ -82,7 +82,7 @@ fn default_settlement_days() -> u32 {
 /// ```rust
 /// use finstack_quant_valuations::instruments::fixed_income::term_loan::RateSpec;
 /// use finstack_quant_cashflows::builder::FloatingRateSpec;
-/// use finstack_quant_core::dates::{DayCount, BusinessDayConvention, Tenor};
+/// use finstack_quant_core::dates::Tenor;
 /// use finstack_quant_core::types::CurveId;
 /// use rust_decimal_macros::dec;
 ///
@@ -99,12 +99,7 @@ fn default_settlement_days() -> u32 {
 ///     reset_freq: Tenor::quarterly(),
 ///     index_tenor: None,
 ///     reset_lag_days: 2,
-///     dc: DayCount::Act360,
-///     bdc: BusinessDayConvention::ModifiedFollowing,
-///     calendar_id: "weekends_only".to_string(),
 ///     fixing_calendar_id: None,
-///     end_of_month: false,
-///     payment_lag_days: 0,
 ///     overnight_compounding: None,
 ///     overnight_basis: None,
 ///     fallback: Default::default(),

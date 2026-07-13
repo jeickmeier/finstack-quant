@@ -119,6 +119,55 @@ fn step_up_cashflow_spec_json() -> String {
     .to_string()
 }
 
+fn canonical_schedule_params_json() -> serde_json::Value {
+    serde_json::json!({
+        "freq": {"count": 3, "unit": "months"},
+        "dc": "Act360",
+        "bdc": "following",
+        "calendar_id": "weekends_only",
+        "stub": "None",
+        "end_of_month": false,
+        "payment_lag_days": 0,
+    })
+}
+
+fn canonical_floating_coupon_json() -> serde_json::Value {
+    serde_json::json!({
+        "rate_spec": {
+            "index_id": "TEST-INDEX",
+            "spread_bp": "150",
+            "reset_freq": {"count": 3, "unit": "months"},
+            "reset_lag_days": 0,
+            "fallback": "SpreadOnly",
+        },
+        "coupon_type": "Cash",
+        "freq": {"count": 3, "unit": "months"},
+        "dc": "Act360",
+        "bdc": "following",
+        "calendar_id": "weekends_only",
+        "stub": "None",
+        "end_of_month": false,
+        "payment_lag_days": 0,
+    })
+}
+
+fn canonical_program_spec_json(
+    coupon_program: serde_json::Value,
+    payment_program: serde_json::Value,
+) -> String {
+    serde_json::json!({
+        "notional": {
+            "initial": {"amount": "1000000", "currency": "USD"},
+            "amort": "None",
+        },
+        "issue": "2025-01-01",
+        "maturity": "2027-01-01",
+        "coupon_program": coupon_program,
+        "payment_program": payment_program,
+    })
+    .to_string()
+}
+
 fn floating_market_context_json() -> String {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
@@ -202,6 +251,94 @@ fn cashflows_json_bridge_builds_step_up_with_payment_program() {
         .expect("flows array")
         .iter()
         .any(|flow| flow["kind"] == "PIK"));
+}
+
+#[wasm_bindgen_test]
+fn cashflows_json_bridge_builds_fixed_to_float_and_explicit_windows() {
+    let fixed_to_float = canonical_program_spec_json(
+        serde_json::json!([{
+            "kind": "fixed_to_float",
+            "switch": "2026-01-01",
+            "fixed": {"rate": "0.04", "schedule": canonical_schedule_params_json()},
+            "floating": canonical_floating_coupon_json(),
+            "fixed_split": "Cash",
+        }]),
+        serde_json::json!([]),
+    );
+    let schedule = cashflows::build_cashflow_schedule_json(&fixed_to_float, None)
+        .expect("fixed-to-float schedule builds");
+    let schedule: serde_json::Value = serde_json::from_str(&schedule).expect("schedule parses");
+    let kinds: std::collections::HashSet<_> = schedule["flows"]
+        .as_array()
+        .expect("flows array")
+        .iter()
+        .filter_map(|flow| flow["kind"].as_str())
+        .collect();
+    assert!(kinds.contains("Fixed"));
+    assert!(kinds.contains("FloatReset"));
+
+    let explicit_windows = canonical_program_spec_json(
+        serde_json::json!([
+            {
+                "kind": "fixed_window",
+                "start": "2025-01-01",
+                "end": "2026-01-01",
+                "spec": {
+                    "coupon_type": "Cash",
+                    "rate": "0.04",
+                    "freq": {"count": 3, "unit": "months"},
+                    "dc": "Act360",
+                    "bdc": "following",
+                    "calendar_id": "weekends_only",
+                    "stub": "None",
+                },
+            },
+            {
+                "kind": "floating_window",
+                "start": "2026-01-01",
+                "end": "2027-01-01",
+                "spec": canonical_floating_coupon_json(),
+            },
+        ]),
+        serde_json::json!([]),
+    );
+    cashflows::build_cashflow_schedule_json(&explicit_windows, None)
+        .expect("explicit fixed/floating windows build");
+}
+
+#[wasm_bindgen_test]
+fn cashflows_json_bridge_reports_overlapping_payment_windows() {
+    let spec = canonical_program_spec_json(
+        serde_json::json!([{
+            "kind": "fixed",
+            "spec": {
+                "coupon_type": "Cash",
+                "rate": "0.04",
+                "freq": {"count": 3, "unit": "months"},
+                "dc": "Act360",
+                "bdc": "following",
+                "calendar_id": "weekends_only",
+                "stub": "None",
+            },
+        }]),
+        serde_json::json!([
+            {
+                "kind": "window",
+                "start": "2025-01-01",
+                "end": "2026-06-01",
+                "split": "PIK",
+            },
+            {
+                "kind": "window",
+                "start": "2026-01-01",
+                "end": "2027-01-01",
+                "split": "Cash",
+            },
+        ]),
+    );
+    let error = cashflows::build_cashflow_schedule_json(&spec, None)
+        .expect_err("overlapping payment windows fail");
+    assert!(format!("{error:?}").contains("overlapping payment windows"));
 }
 
 #[wasm_bindgen_test]

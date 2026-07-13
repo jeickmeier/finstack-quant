@@ -434,7 +434,7 @@ impl Bond {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
     /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
+    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
     /// use finstack_quant_valuations::instruments::Bond;
     /// use rust_decimal_macros::dec;
     /// use time::macros::date;
@@ -446,13 +446,16 @@ impl Bond {
     /// let fixed_spec = FixedCouponSpec {
     ///     coupon_type: CouponType::Cash,
     ///     rate: dec!(0.06),
-    ///     freq: Tenor::semi_annual(),
-    ///     dc: DayCount::Act365F,
-    ///     bdc: BusinessDayConvention::Following,
-    ///     calendar_id: "weekends_only".to_string(),
-    ///     stub: StubKind::None,
-    ///     end_of_month: false,
-    ///     payment_lag_days: 0,
+    ///     schedule: ScheduleParams {
+    ///         freq: Tenor::semi_annual(),
+    ///         dc: DayCount::Act365F,
+    ///         bdc: BusinessDayConvention::Following,
+    ///         calendar_id: "weekends_only".to_string(),
+    ///         stub: StubKind::None,
+    ///         end_of_month: false,
+    ///         payment_lag_days: 0,
+    ///         adjust_accrual_dates: false,
+    ///     },
     /// };
     /// let schedule = CashFlowSchedule::builder()
     ///     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)

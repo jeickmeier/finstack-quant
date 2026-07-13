@@ -994,7 +994,7 @@ fn main() {
     println!("\nDone! Updated 70 instrument schema files.");
 
     // =========================================================================
-    // Non-instrument schemas (calibration, attribution, cashflow, margin, results)
+    // Non-instrument schemas owned by valuations (calibration, market, results)
     // =========================================================================
     println!("\nGenerating non-instrument schemas...\n");
 

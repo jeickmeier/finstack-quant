@@ -305,16 +305,19 @@ impl CashflowScheduleBuildSpec {
     ///   },
     ///   "issue": "2024-08-31",
     ///   "maturity": "2025-08-31",
-    ///   "fixed_coupons": [{
-    ///     "coupon_type": "Cash",
-    ///     "rate": "0.06",
-    ///     "freq": { "count": 12, "unit": "months" },
-    ///     "dc": "Thirty360",
-    ///     "bdc": "following",
-    ///     "calendar_id": "weekends_only",
-    ///     "stub": "None",
-    ///     "end_of_month": false,
-    ///     "payment_lag_days": 0
+    ///   "coupon_program": [{
+    ///     "kind": "fixed",
+    ///     "spec": {
+    ///       "coupon_type": "Cash",
+    ///       "rate": "0.06",
+    ///       "freq": { "count": 12, "unit": "months" },
+    ///       "dc": "Thirty360",
+    ///       "bdc": "following",
+    ///       "calendar_id": "weekends_only",
+    ///       "stub": "None",
+    ///       "end_of_month": false,
+    ///       "payment_lag_days": 0
+    ///     }
     ///   }]
     /// }"#;
     ///
@@ -433,16 +436,19 @@ impl CashflowScheduleBuildSpec {
 ///   },
 ///   "issue": "2024-08-31",
 ///   "maturity": "2025-08-31",
-///   "fixed_coupons": [{
-///     "coupon_type": "Cash",
-///     "rate": "0.06",
-///     "freq": { "count": 12, "unit": "months" },
-///     "dc": "Thirty360",
-///     "bdc": "following",
-///     "calendar_id": "weekends_only",
-///     "stub": "None",
-///     "end_of_month": false,
-///     "payment_lag_days": 0
+///   "coupon_program": [{
+///     "kind": "fixed",
+///     "spec": {
+///       "coupon_type": "Cash",
+///       "rate": "0.06",
+///       "freq": { "count": 12, "unit": "months" },
+///       "dc": "Thirty360",
+///       "bdc": "following",
+///       "calendar_id": "weekends_only",
+///       "stub": "None",
+///       "end_of_month": false,
+///       "payment_lag_days": 0
+///     }
 ///   }]
 /// }"#;
 ///
@@ -499,7 +505,7 @@ pub fn build_cashflow_schedule_json(spec_json: &str, market_json: Option<&str>) 
 ///   },
 ///   "issue": "2024-08-31",
 ///   "maturity": "2025-08-31",
-///   "fixed_coupons": []
+///   "coupon_program": []
 /// }"#;
 ///
 /// let schedule_json = build_cashflow_schedule_json(spec_json, None)?;
@@ -552,7 +558,7 @@ pub fn validate_cashflow_schedule(schedule: &mut CashFlowSchedule) -> Result<()>
 ///   },
 ///   "issue": "2024-08-31",
 ///   "maturity": "2025-08-31",
-///   "fixed_coupons": []
+///   "coupon_program": []
 /// }"#;
 ///
 /// let schedule_json = build_cashflow_schedule_json(spec_json, None)?;
@@ -609,16 +615,19 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
 ///   },
 ///   "issue": "2024-08-31",
 ///   "maturity": "2025-08-31",
-///   "fixed_coupons": [{
-///     "coupon_type": "Cash",
-///     "rate": "0.06",
-///     "freq": { "count": 12, "unit": "months" },
-///     "dc": "Thirty360",
-///     "bdc": "following",
-///     "calendar_id": "weekends_only",
-///     "stub": "None",
-///     "end_of_month": false,
-///     "payment_lag_days": 0
+///   "coupon_program": [{
+///     "kind": "fixed",
+///     "spec": {
+///       "coupon_type": "Cash",
+///       "rate": "0.06",
+///       "freq": { "count": 12, "unit": "months" },
+///       "dc": "Thirty360",
+///       "bdc": "following",
+///       "calendar_id": "weekends_only",
+///       "stub": "None",
+///       "end_of_month": false,
+///       "payment_lag_days": 0
+///     }
 ///   }]
 /// }"#;
 ///
