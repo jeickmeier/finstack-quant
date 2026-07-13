@@ -45,7 +45,8 @@ Rationale: instantiating 72 low-level calibration contracts or printing error cl
 | monte_carlo fns | `price_heston_call/put`, `finite_diff_delta(_crn)`, `finite_diff_gamma(_crn)`, `Estimate` | 07_advanced_quant/monte_carlo |
 | features fns | `neutralize`, `normalize_signal`, `transform_panel`, `transform_timeseries_pairwise`, `transform_cross_sectional_grouped` | 03_analytics/feature_transforms |
 | covenants fns | `cov_lite`, `lbo_standard`, `project_finance`, `real_estate`, `evaluate_engine`, `validate_covenant_*` | 04_statement_modeling/models/covenant_monitoring |
-| cashflows json fns | `build_cashflow_schedule(_envelope)_json`, `validate_*`, `accrued_interest_json`, `bond_from_cashflows_json`, `dated_flows_json` | 02_pricing/instruments/complex_cashflows |
+| cashflows json fns | `build_cashflow_schedule_json`, `validate_cashflow_schedule_json`, `accrued_interest_json`, `dated_flows_json` | 02_pricing/instruments/complex_cashflows |
+| valuations instrument JSON fns | `bond_from_cashflows_json` | 02_pricing/instruments/complex_cashflows |
 | portfolio gaps | `historical_var_decomposition` + enums/result types | 05_portfolio and 06_scenarios |
 | statements_analytics gaps | `render_check_report_html`, `run_credit_underwriting_checks`, `CheckReport`, `CorkscrewReport`, lease specs, scorecard | 04_statement_modeling |
 | margin gaps | `ExposureProfile`, `VmResult`, `XvaResult`, `XvaNettingSet`, `CsaTerms`, `ClearingStatus`, `MarginCallType`, `MarginTenor`, `MarginFundingCost`, `ExcessCollateral`, `Haircut01`, `CONSTANTS` | 07_advanced_quant/margin_collateral_and_xva |

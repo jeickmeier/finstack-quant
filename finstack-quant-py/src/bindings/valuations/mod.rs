@@ -122,6 +122,30 @@ fn validate_instrument_json(json: &str) -> PyResult<String> {
     serde_json::to_string_pretty(&parsed).map_err(display_to_py)
 }
 
+/// Construct tagged bond instrument JSON from a cashflow schedule.
+#[pyfunction]
+#[pyo3(
+    signature = (instrument_id, schedule_json, discount_curve_id, quoted_clean = None),
+    text_signature = "(instrument_id, schedule_json, discount_curve_id, quoted_clean=None)"
+)]
+fn bond_from_cashflows_json(
+    py: Python<'_>,
+    instrument_id: &str,
+    schedule_json: &str,
+    discount_curve_id: &str,
+    quoted_clean: Option<f64>,
+) -> PyResult<String> {
+    py.detach(|| {
+        finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
+            instrument_id,
+            schedule_json,
+            discount_curve_id,
+            quoted_clean,
+        )
+        .map_err(crate::errors::core_to_py)
+    })
+}
+
 // ---------------------------------------------------------------------------
 // Module registration
 // ---------------------------------------------------------------------------
@@ -205,10 +229,14 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     )?;
 
     m.add_function(wrap_pyfunction!(validate_instrument_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
+    m.getattr("bond_from_cashflows_json")?
+        .setattr("__module__", "finstack_quant.valuations.instruments")?;
     pricing::register(py, &m)?;
     let all = PyList::new(
         py,
         [
+            "bond_from_cashflows_json",
             "instrument_cashflows_json",
             "list_standard_metrics",
             "list_standard_metrics_grouped",

@@ -108,67 +108,21 @@ fn accrued_interest_json(
     })
 }
 
-/// Construct a tagged Bond instrument JSON from a cashflow schedule.
-///
-/// Convenience wrapper that crosses crates: it materializes a
-/// `finstack_quant_valuations::instruments::fixed_income::bond::Bond` from the
-/// supplied schedule and wraps it in the tagged `InstrumentJson` envelope.
-///
-/// Parameters
-/// ----------
-/// instrument_id : str
-///     Identifier for the Bond instrument.
-/// schedule_json : str
-///     JSON-encoded `CashFlowSchedule`.
-/// discount_curve_id : str
-///     Identifier of the discount curve used for pricing.
-/// quoted_clean : float, optional
-///     Clean quoted price as a percentage of par; this pins price-driven valuation.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-encoded tagged `InstrumentJson::Bond`.
-#[pyfunction]
-#[pyo3(
-    signature = (instrument_id, schedule_json, discount_curve_id, quoted_clean = None),
-    text_signature = "(instrument_id, schedule_json, discount_curve_id, quoted_clean=None)"
-)]
-fn bond_from_cashflows_json(
-    py: Python<'_>,
-    instrument_id: &str,
-    schedule_json: &str,
-    discount_curve_id: &str,
-    quoted_clean: Option<f64>,
-) -> PyResult<String> {
-    py.detach(|| {
-        finstack_quant_valuations::bond_from_cashflows_json(
-            instrument_id,
-            schedule_json,
-            discount_curve_id,
-            quoted_clean,
-        )
-        .map_err(crate::errors::core_to_py)
-    })
-}
-
 /// Register the `finstack_quant.cashflows` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = PyModule::new(py, "cashflows")?;
     m.setattr(
         "__doc__",
-        "Cashflow schedule JSON construction, validation, and bond conversion.",
+        "Cashflow schedule JSON construction and validation.",
     )?;
 
     m.add_function(wrap_pyfunction!(accrued_interest_json, &m)?)?;
-    m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
     m.add_function(wrap_pyfunction!(build_cashflow_schedule_json, &m)?)?;
     m.add_function(wrap_pyfunction!(dated_flows_json, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
 
     for name in [
         "accrued_interest_json",
-        "bond_from_cashflows_json",
         "build_cashflow_schedule_json",
         "dated_flows_json",
         "validate_cashflow_schedule_json",
@@ -181,7 +135,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         py,
         [
             "accrued_interest_json",
-            "bond_from_cashflows_json",
             "build_cashflow_schedule_json",
             "dated_flows_json",
             "validate_cashflow_schedule_json",

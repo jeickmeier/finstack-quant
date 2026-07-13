@@ -179,11 +179,18 @@ class TestCashflowsNamespace:
         """Cashflows should expose the JSON bridge functions."""
         from finstack_quant.cashflows import (  # noqa: F401
             accrued_interest_json,
-            bond_from_cashflows_json,
             build_cashflow_schedule_json,
             dated_flows_json,
             validate_cashflow_schedule_json,
         )
+
+    def test_bond_conversion_belongs_to_valuations(self) -> None:
+        """Bond construction should live with valuation instruments."""
+        from finstack_quant import cashflows
+        from finstack_quant.valuations.instruments import bond_from_cashflows_json  # noqa: F401
+
+        assert not hasattr(cashflows, "bond_from_cashflows_json")
+        assert "bond_from_cashflows_json" not in cashflows.__all__
 
 
 class TestCorrelationNamespace:

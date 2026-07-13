@@ -3,6 +3,7 @@ from __future__ import annotations
 from finstack_quant.core.market_data import MarketContext
 
 __all__ = [
+    "bond_from_cashflows_json",
     "instrument_cashflows_json",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
@@ -10,6 +11,37 @@ __all__ = [
     "price_instrument_with_metrics",
     "validate_instrument_json",
 ]
+
+def bond_from_cashflows_json(
+    instrument_id: str,
+    schedule_json: str,
+    discount_curve_id: str,
+    quoted_clean: float | None = None,
+) -> str:
+    """Construct tagged bond instrument JSON from a cashflow schedule.
+
+    Parameters
+    ----------
+    instrument_id : str
+        Identifier for the bond instrument.
+    schedule_json : str
+        JSON-encoded ``CashFlowSchedule``.
+    discount_curve_id : str
+        Discount curve ID required for pricing.
+    quoted_clean : float, optional
+        Clean quoted price as a percent of par.
+
+    Returns
+    -------
+    str
+        JSON-encoded tagged ``InstrumentJson::Bond``.
+
+    Raises
+    ------
+    ValueError
+        If the schedule is invalid or bond construction fails.
+    """
+    ...
 
 def validate_instrument_json(json: str) -> str:
     """Validate tagged instrument JSON and return canonical JSON.

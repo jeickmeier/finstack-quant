@@ -60,32 +60,3 @@ pub fn accrued_interest_json(
     finstack_quant_cashflows::accrued_interest_json(schedule_json, as_of, config_json.as_deref())
         .map_err(to_js_err)
 }
-
-/// Create tagged Bond instrument JSON from a cashflow schedule JSON string.
-///
-/// Convenience wrapper that crosses crates: it materializes a
-/// `finstack_quant_valuations::instruments::fixed_income::bond::Bond` from the
-/// supplied schedule and wraps it in the tagged `InstrumentJson` envelope.
-///
-/// @param instrument_id - Identifier for the Bond instrument.
-/// @param schedule_json - JSON-encoded `CashFlowSchedule`.
-/// @param discount_curve_id - Identifier of the discount curve used for pricing.
-/// @param quoted_clean - Optional clean price as percentage of par; this is a
-///   price-driving override, not yield calibration.
-/// @returns JSON-encoded tagged `InstrumentJson::Bond`.
-/// @throws If the schedule JSON is malformed or bond construction fails.
-#[wasm_bindgen(js_name = bondFromCashflowsJson)]
-pub fn bond_from_cashflows_json(
-    instrument_id: &str,
-    schedule_json: &str,
-    discount_curve_id: &str,
-    quoted_clean: Option<f64>,
-) -> Result<String, JsValue> {
-    finstack_quant_valuations::bond_from_cashflows_json(
-        instrument_id,
-        schedule_json,
-        discount_curve_id,
-        quoted_clean,
-    )
-    .map_err(to_js_err)
-}

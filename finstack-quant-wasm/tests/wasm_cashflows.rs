@@ -2,7 +2,10 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::{cashflows, valuations::pricing::price_instrument};
+use finstack_quant_wasm::api::{
+    cashflows,
+    valuations::pricing::{bond_from_cashflows_json, price_instrument},
+};
 use wasm_bindgen_test::*;
 
 fn cashflow_spec_json() -> String {
@@ -153,7 +156,7 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
     assert!(cashflows::accrued_interest_json(&schedule_json, "2025-02-28", None).unwrap() > 0.0);
 
     let instrument_json =
-        cashflows::bond_from_cashflows_json("CUSTOM-CF", &schedule_json, "USD-OIS", Some(99.0))
+        bond_from_cashflows_json("CUSTOM-CF", &schedule_json, "USD-OIS", Some(99.0))
             .expect("bond JSON");
     let result_json = price_instrument(
         &instrument_json,
@@ -218,7 +221,7 @@ fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean() {
     );
 
     let instrument_json =
-        cashflows::bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", &schedule_json, "USD-OIS", None)
+        bond_from_cashflows_json("CUSTOM-CF-NO-QUOTE", &schedule_json, "USD-OIS", None)
             .expect("bond JSON");
     let instrument: serde_json::Value = serde_json::from_str(&instrument_json).unwrap();
     assert_eq!(instrument["spec"]["id"], "CUSTOM-CF-NO-QUOTE");

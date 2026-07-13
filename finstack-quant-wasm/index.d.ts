@@ -1387,27 +1387,6 @@ export interface CashflowsNamespace {
    */
   accruedInterestJson(scheduleJson: string, asOf: string, configJson?: string | null): number;
 
-  /**
-   * Construct a tagged Bond instrument JSON from a cashflow schedule.
-   *
-   * Convenience wrapper that crosses crates: it materializes a
-   * `finstack_quant_valuations::instruments::fixed_income::bond::Bond` from the
-   * supplied schedule and wraps it in the tagged `InstrumentJson` envelope.
-   *
-   * @param instrumentId    Identifier for the Bond instrument.
-   * @param scheduleJson    JSON-encoded `CashFlowSchedule`.
-   * @param discountCurveId Identifier of the discount curve used for pricing.
-   * @param quotedClean     Optional clean price as percentage of par; this is
-   *                        a price-driving override, not yield calibration.
-   * @returns               JSON-encoded tagged `InstrumentJson::Bond`.
-   * @throws                If the schedule JSON is malformed or bond construction fails.
-   */
-  bondFromCashflowsJson(
-    instrumentId: string,
-    scheduleJson: string,
-    discountCurveId: string,
-    quotedClean?: number | null
-  ): string;
 }
 
 export declare const cashflows: CashflowsNamespace;
@@ -1448,6 +1427,13 @@ export declare class Market {
 }
 
 export interface ValuationInstrumentsNamespace {
+  /** Construct tagged Bond instrument JSON from a cashflow schedule. */
+  bondFromCashflowsJson(
+    instrumentId: string,
+    scheduleJson: string,
+    discountCurveId: string,
+    quotedClean?: number | null
+  ): string;
   validateInstrumentJson(json: string): string;
   priceInstrument(instrumentJson: string, marketJson: string, asOf: string, model: string): string;
   priceInstrumentWithMetrics(

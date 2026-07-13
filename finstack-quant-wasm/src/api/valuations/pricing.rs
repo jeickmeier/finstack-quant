@@ -125,6 +125,23 @@ pub fn validate_instrument_json(json: &str) -> Result<String, JsValue> {
     finstack_quant_valuations::pricer::validate_instrument_json(json).map_err(|e| to_js_error(&e))
 }
 
+/// Construct tagged bond instrument JSON from a cashflow schedule.
+#[wasm_bindgen(js_name = bondFromCashflowsJson)]
+pub fn bond_from_cashflows_json(
+    instrument_id: &str,
+    schedule_json: &str,
+    discount_curve_id: &str,
+    quoted_clean: Option<f64>,
+) -> Result<String, JsValue> {
+    finstack_quant_valuations::instruments::fixed_income::bond::bond_from_cashflows_json(
+        instrument_id,
+        schedule_json,
+        discount_curve_id,
+        quoted_clean,
+    )
+    .map_err(to_js_err)
+}
+
 /// Price an instrument from its tagged JSON and return a ValuationResult JSON.
 ///
 /// Pass `model = "default"` to use the instrument-native default model.

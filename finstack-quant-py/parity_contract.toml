@@ -205,7 +205,7 @@ rust_lib   = "finstack-quant/cashflows/src/lib.rs"
 python_package = "finstack_quant.cashflows"
 visibility = "pub"
 status = "exists"
-note = "First binding slice is JSON-only: schedule build/validate/flows/accrual and custom-cashflow bond JSON creation."
+note = "JSON-only schedule build, validation, dated-flow, and accrual surface."
 
 [crates.cashflows.modules]
 json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the full canonical coupon_program and payment_program builder surface; legacy fixed_coupons/floating_coupons arrays are input-only" }
@@ -214,12 +214,6 @@ aggregation = { python = "finstack_quant.cashflows.aggregation", status = "missi
 builder     = { python = "finstack_quant.cashflows.builder",     status = "missing", note = "Every public coupon and payment-program builder instruction travels through the canonical JSON program; no typed Python surface" }
 primitives  = { python = "finstack_quant.cashflows.primitives",  status = "missing", note = "CashFlow/CFKind primitives travel as JSON; no typed Python surface yet" }
 traits      = { python = "finstack_quant.cashflows.traits",      status = "missing", note = "Rust-side trait surface; not meaningful as a Python module" }
-
-# Cross-crate symbols surfaced under finstack_quant.cashflows whose canonical Rust
-# home is a different crate. Parity audits must resolve these against the
-# listed crate, not finstack-quant-cashflows.
-[crates.cashflows.cross_crate]
-bond_from_cashflows_json = { rust_crate = "finstack-quant-valuations", rust_lib = "finstack-quant/valuations/src/lib.rs", note = "Canonical finstack_quant_valuations::bond_from_cashflows_json, exposed under finstack_quant.cashflows (Python) and cashflows.bondFromCashflowsJson (WASM) as a convenience bridge" }
 
 # ---------------------------------------------------------------------------
 # WASM cashflows facade subset + symbol-level triplet pinning.
@@ -231,7 +225,6 @@ rust_module_root = "../finstack-quant-wasm/src/api/cashflows/"
 js_export_file   = "../finstack-quant-wasm/exports/cashflows.js"
 root_exports = [
     "accruedInterestJson",
-    "bondFromCashflowsJson",
     "buildCashflowScheduleJson",
     "datedFlowsJson",
     "validateCashflowScheduleJson",
@@ -239,7 +232,6 @@ root_exports = [
 
 [wasm_cashflows_subset.python_js_map]
 accrued_interest_json = "accruedInterestJson"
-bond_from_cashflows_json = "bondFromCashflowsJson"
 build_cashflow_schedule_json = "buildCashflowScheduleJson"
 dated_flows_json = "datedFlowsJson"
 validate_cashflow_schedule_json = "validateCashflowScheduleJson"
@@ -454,6 +446,7 @@ public = [
 [crates.valuations.instruments]
 python_package = "finstack_quant.valuations.instruments"
 public = [
+    "bond_from_cashflows_json",
     "instrument_cashflows_json",
     "list_standard_metrics",
     "list_standard_metrics_grouped",
@@ -1227,6 +1220,7 @@ dry_run = "dryRun"
 
 # Python twins that live below the valuations root after API consolidation.
 [wasm_valuations_subset.python_path_js_map]
+"instruments.bond_from_cashflows_json" = "bondFromCashflowsJson"
 "instruments.instrument_cashflows_json" = "instrumentCashflowsJson"
 
 # Nested facade exports pinned per namespace. These are intentional WASM
@@ -1277,6 +1271,7 @@ fx = [
     "QuantoOption",
 ]
 instruments = [
+    "bondFromCashflowsJson",
     "instrumentCashflowsWithMarket",
     "listStandardMetrics",
     "listStandardMetricsGrouped",

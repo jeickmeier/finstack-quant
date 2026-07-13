@@ -438,17 +438,9 @@ def test_python_cashflows_surface_matches_contract() -> None:
     assert not missing, f"finstack_quant.cashflows symbols not callable: {missing}"
 
 
-def test_cashflows_cross_crate_symbols_recorded() -> None:
-    """Cross-crate cashflows symbols must be pinned with their canonical crate."""
-    cross = CONTRACT["crates"]["cashflows"]["cross_crate"]
-    assert set(cross) == {"bond_from_cashflows_json"}
-    entry = cross["bond_from_cashflows_json"]
-    assert entry["rust_crate"] == "finstack-quant-valuations"
-    rust_lib = (CONTRACT_PATH.parent / ".." / entry["rust_lib"]).resolve()
-    assert rust_lib.exists(), f"cross_crate rust_lib path missing: {rust_lib}"
-    assert "bond_from_cashflows_json" in rust_lib.read_text(), (
-        "canonical bond_from_cashflows_json not found in declared rust_lib"
-    )
+def test_cashflows_has_no_cross_crate_symbols() -> None:
+    """Cashflows must not own helpers from other crates."""
+    assert "cross_crate" not in CONTRACT["crates"]["cashflows"]
 
 
 WASM_NAMESPACE_SUBSETS = [
@@ -519,13 +511,21 @@ def test_wasm_valuations_nested_exports_match_contract() -> None:
         )
 
 
-def test_wasm_valuations_python_js_map_matches_root_exports() -> None:
-    """Pinned python->js map must resolve to root exports on the WASM facade."""
+def test_wasm_valuations_python_js_map_matches_facade_exports() -> None:
+    """Pinned Python-to-JS mappings must resolve at their declared facade level."""
     block = CONTRACT["wasm_valuations_subset"]
     root_exports = set(block["root_exports"])
-    mappings = block["python_js_map"] | block.get("python_path_js_map", {})
-    for python_name, js_name in mappings.items():
+    for python_name, js_name in block["python_js_map"].items():
         assert js_name in root_exports, f"python_js_map[{python_name!r}] -> {js_name!r} not in root_exports"
+
+    nested_exports = block.get("nested_exports", {})
+    for python_path, js_name in block.get("python_path_js_map", {}).items():
+        if js_name in root_exports:
+            continue
+        namespace = python_path.partition(".")[0]
+        assert js_name in nested_exports.get(namespace, []), (
+            f"python_path_js_map[{python_path!r}] -> {js_name!r} not in root_exports or nested_exports[{namespace!r}]"
+        )
 
 
 def test_wasm_valuations_python_twins_resolve() -> None:

@@ -255,6 +255,13 @@ fn cashflows_dts_matches_json_bridge_surface() {
     assert!(!dts.contains("validateCashflowScheduleEnvelopeJson"));
     assert!(dts.contains("datedFlowsJson(scheduleJson: string): string;"));
     assert!(dts.contains("accruedInterestJson("));
+    let cashflows_start = dts.find("export interface CashflowsNamespace").unwrap();
+    let cashflows_end = dts[cashflows_start..]
+        .find("export declare const cashflows")
+        .unwrap()
+        + cashflows_start;
+    assert!(!dts[cashflows_start..cashflows_end].contains("bondFromCashflowsJson("));
+    assert!(dts.contains("export interface ValuationInstrumentsNamespace"));
     assert!(dts.contains("bondFromCashflowsJson("));
     assert!(dts.contains("export declare const cashflows: CashflowsNamespace;"));
     let generated = include_str!("../types/generated/CashflowSchedule.ts");

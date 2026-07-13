@@ -9,12 +9,11 @@ import pytest
 
 from finstack_quant.cashflows import (
     accrued_interest_json,
-    bond_from_cashflows_json,
     build_cashflow_schedule_json,
     dated_flows_json,
     validate_cashflow_schedule_json,
 )
-from finstack_quant.valuations.instruments import price_instrument
+from finstack_quant.valuations.instruments import bond_from_cashflows_json, price_instrument
 
 
 def _cashflow_spec() -> str:

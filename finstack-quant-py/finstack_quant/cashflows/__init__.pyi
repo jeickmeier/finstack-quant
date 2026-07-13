@@ -1,16 +1,14 @@
-"""Cashflow schedule JSON construction, validation, and bond conversion.
+"""Cashflow schedule JSON construction and validation.
 
 JSON-first bindings for ``finstack-quant-cashflows``. Build schedules from a
 ``CashflowScheduleBuildSpec``, validate canonical payloads, extract dated flows,
-compute accrued interest, or wrap a schedule as a tagged bond instrument for
-the valuation engine.
+and compute accrued interest.
 """
 
 from __future__ import annotations
 
 __all__ = [
     "accrued_interest_json",
-    "bond_from_cashflows_json",
     "build_cashflow_schedule_json",
     "dated_flows_json",
     "validate_cashflow_schedule_json",
@@ -131,46 +129,4 @@ def accrued_interest_json(schedule_json: str, as_of: str, config_json: str | Non
     --------
     >>> from finstack_quant.cashflows import accrued_interest_json
     >>> ai = accrued_interest_json(schedule_json, "2025-06-15")  # doctest: +SKIP
-    """
-
-def bond_from_cashflows_json(
-    instrument_id: str,
-    schedule_json: str,
-    discount_curve_id: str,
-    quoted_clean: float | None = None,
-) -> str:
-    """Construct a tagged bond instrument JSON from a cashflow schedule.
-
-    Convenience wrapper that materializes a
-    ``finstack_quant_valuations::instruments::fixed_income::bond::Bond`` from
-    the supplied schedule and wraps it in the tagged ``InstrumentJson`` envelope.
-
-    Parameters
-    ----------
-    instrument_id : str
-        Identifier for the bond instrument (used in valuation results and metrics).
-    schedule_json : str
-        JSON-encoded ``CashFlowSchedule``.
-    discount_curve_id : str
-        Discount curve ID required in ``MarketContext`` for pricing (e.g.
-        ``"USD-OIS"``).
-    quoted_clean : float, optional
-        Clean quoted price as a percent of par (e.g. ``99.5`` for 99.5% of par).
-        When supplied, it is a price-driving override; it does not calibrate
-        yield during construction.
-
-    Returns
-    -------
-    str
-        JSON-encoded tagged ``InstrumentJson::Bond``.
-
-    Raises
-    ------
-    ValueError
-        If the schedule is invalid or bond construction fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.cashflows import bond_from_cashflows_json
-    >>> bond_json = bond_from_cashflows_json("BOND_A", schedule_json, "USD-OIS", quoted_clean=99.5)  # doctest: +SKIP
     """

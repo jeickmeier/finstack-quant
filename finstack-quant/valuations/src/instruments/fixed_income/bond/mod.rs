@@ -108,6 +108,7 @@
 
 pub mod cashflow_spec;
 pub mod cashflows;
+mod json;
 pub(crate) mod metrics;
 /// Bond pricing engines including tree-based and analytical methods.
 pub mod pricing;
@@ -116,6 +117,7 @@ mod types;
 // Re-export cashflow accrual types for convenience
 pub use crate::cashflow::accrual::AccrualMethod;
 pub use cashflow_spec::{BondBuilderParams, CashflowSpec, FloatingConventionParams};
+pub use json::bond_from_cashflows_json;
 #[doc(hidden)]
 pub use metrics::price_yield_spread::asw::{
     asw_market_with_forward, asw_market_with_forward_config, asw_par_with_forward,

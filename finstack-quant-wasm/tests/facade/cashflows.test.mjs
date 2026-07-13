@@ -32,7 +32,7 @@ if (!existsSync(WASM_BG)) {
 
 const facade = await import('../../index.js');
 const init = facade.default;
-const { cashflows } = facade;
+const { cashflows, valuations } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
@@ -64,7 +64,6 @@ const cashflowSpec = JSON.stringify({
 
 const EXPORTED_KEYS = [
   'accruedInterestJson',
-  'bondFromCashflowsJson',
   'buildCashflowScheduleJson',
   'datedFlowsJson',
   'validateCashflowScheduleJson',
@@ -101,9 +100,10 @@ test('cashflows end-to-end build/validate/flows/accrual from JSON spec', () => {
   assert.ok(accrued > 0);
 
   const instrument = JSON.parse(
-    cashflows.bondFromCashflowsJson('CUSTOM-CF', scheduleJson, 'USD-OIS', 99.0)
+    valuations.instruments.bondFromCashflowsJson('CUSTOM-CF', scheduleJson, 'USD-OIS', 99.0)
   );
   assert.equal(instrument.type, 'bond');
+  assert.equal(cashflows.bondFromCashflowsJson, undefined);
 });
 
 test('cashflows rejects malformed schedule JSON', () => {
