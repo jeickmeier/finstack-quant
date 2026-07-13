@@ -1263,12 +1263,6 @@ impl CashflowProvider for InflationLinkedBond {
             None,
         ));
 
-        detailed_flows.sort_by(|a, b| match a.date.cmp(&b.date) {
-            core::cmp::Ordering::Equal => crate::cashflow::builder::schedule::kind_rank(a.kind)
-                .cmp(&crate::cashflow::builder::schedule::kind_rank(b.kind)),
-            other => other,
-        });
-
         let schedule = crate::cashflow::builder::CashFlowSchedule {
             flows: detailed_flows,
             notional: crate::cashflow::builder::Notional::par(

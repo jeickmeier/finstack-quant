@@ -946,9 +946,6 @@ impl CashflowProvider for XccySwap {
         leg1_schedule.flows.extend(leg1_principal.flows);
         leg1_schedule.flows.extend(leg2_schedule.flows);
         leg1_schedule.flows.extend(leg2_principal.flows);
-        leg1_schedule
-            .flows
-            .sort_by(|lhs, rhs| lhs.date.cmp(&rhs.date));
         leg1_schedule.notional = Notional::par(0.0, self.reporting_currency);
         Ok(leg1_schedule.normalize_public(
             as_of,

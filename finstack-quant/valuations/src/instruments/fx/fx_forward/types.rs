@@ -758,9 +758,6 @@ impl CashflowProvider for FxForward {
         let mut base_schedule = self.single_leg_schedule(as_of, base_amount)?;
         let quote_schedule = self.single_leg_schedule(as_of, quote_amount)?;
         base_schedule.flows.extend(quote_schedule.flows);
-        base_schedule
-            .flows
-            .sort_by(|lhs, rhs| lhs.date.cmp(&rhs.date));
         base_schedule.notional = Notional::par(0.0, self.base_currency);
         let representation = if self.contract_rate.is_some() {
             crate::cashflow::builder::CashflowRepresentation::Contractual

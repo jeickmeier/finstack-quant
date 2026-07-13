@@ -600,9 +600,6 @@ impl CashflowProvider for CommoditySwap {
             &self.floating_leg_flows(market, as_of)?,
         )?;
         fixed_schedule.flows.extend(floating_schedule.flows);
-        fixed_schedule
-            .flows
-            .sort_by(|lhs, rhs| lhs.date.cmp(&rhs.date));
         fixed_schedule.notional = Notional::par(0.0, self.underlying.currency);
         Ok(fixed_schedule.normalize_public(
             as_of,
