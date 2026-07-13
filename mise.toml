@@ -49,7 +49,7 @@ depends = ["rust-test", "python-test-all", "wasm-test"]
 description = "Run golden tests (Rust + Python layers)"
 run = """
 cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
-mise run python-build -- --release &&
+mise run python-build &&
 uv run pytest finstack-quant-py/tests/golden -v
 """
 
@@ -58,7 +58,7 @@ description = "Run golden tests ignoring known_non_executable.json (surface ever
 env = { GOLDEN_IGNORE_NON_EXECUTABLE = "1" }
 run = """
 cargo test -p finstack-quant-valuations --test golden -- --include-ignored &&
-mise run python-build -- --release &&
+mise run python-build &&
 uv run pytest finstack-quant-py/tests/golden -v
 """
 
@@ -184,30 +184,30 @@ flag "--release" help="Build with release profile (slower compile, faster runtim
 run = 'uv run maturin develop{% if usage.release %} --release{% endif %}'
 
 [tasks.python-test]
-description = "Build release Python bindings, then run fast Python tests"
+description = "Build dev Python bindings, then run fast Python tests"
 run = """
-mise run python-build -- --release
+mise run python-build
 uv run pytest -v -m 'not slow'
 """
 
 [tasks.python-test-slow]
-description = "Build release Python bindings, then run slow Python tests"
+description = "Build dev Python bindings, then run slow Python tests"
 run = """
-mise run python-build -- --release
+mise run python-build
 uv run pytest -v -m slow
 """
 
 [tasks.python-test-all]
-description = "Build release Python bindings, then run the full Python test suite"
+description = "Build dev Python bindings, then run the full Python test suite"
 run = """
-mise run python-build -- --release
+mise run python-build
 uv run pytest -v
 """
 
 [tasks.python-test-cov]
-description = "Build release Python bindings, then run Python tests with HTML coverage report"
+description = "Build dev Python bindings, then run Python tests with HTML coverage report"
 run = """
-mise run python-build -- --release
+mise run python-build
 uv run pytest -v --cov=finstack-quant-py/finstack_quant --cov-report=term-missing --cov-report=html:target/python-cov
 """
 

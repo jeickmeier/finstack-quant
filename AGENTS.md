@@ -14,7 +14,7 @@
 
 - `uv` is the Python package manager; use `uv run` when running Python functions
 - Tasks are defined in `mise.toml`; invoke them with `mise run <task>` (or `mise r <task>`). List everything with `mise tasks`. Common ones: `mise run all-fmt`, `mise run all-lint`, `mise run all-test`, `mise run python-build` (dev profile, fast compile), `mise run python-build -- --release` (release; faster runtime).
-- `mise run python-build` passes `--release` through to `maturin develop`; release is slower to compile but faster at runtime. Python test tasks rebuild the extension with `--release` before running pytest. Use `mise run python-sync` first (or whenever Python deps change) to refresh the `uv` virtualenv.
+- Python test tasks rebuild the extension with the fast dev profile before running pytest. Use `mise run python-build -- --release` only for release validation, performance-sensitive runs, or when explicitly requested. Use `mise run python-sync` first (or whenever Python deps change) to refresh the `uv` virtualenv.
 - Pre-commit runs `cargo clippy` and `cargo deny check` (Rust supply-chain: advisories + licenses + bans)
 - CI additionally runs OSV-Scanner across `Cargo.lock`, `uv.lock`, and `package-lock.json` for cross-ecosystem CVE coverage
 - Clippy runs with `-D warnings`; all warnings are treated as errors
