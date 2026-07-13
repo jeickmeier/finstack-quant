@@ -57,12 +57,15 @@ impl MetricCalculator for WalCalculator {
         // cashflows are not cached into the metric context.
         if let Some(flows) = context.tagged_cashflows.as_ref() {
             return weighted_average_life_from_principal(
-                flows.iter().filter_map(|flow| {
-                    matches!(
-                        flow.kind,
-                        CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
-                    )
-                    .then(|| {
+                flows
+                    .iter()
+                    .filter(|&flow| {
+                        matches!(
+                            flow.kind,
+                            CFKind::Amortization | CFKind::Notional | CFKind::PrePayment
+                        )
+                    })
+                    .map(|flow| {
                         (
                             flow.date,
                             finstack_quant_core::money::Money::new(
@@ -70,8 +73,7 @@ impl MetricCalculator for WalCalculator {
                                 flow.amount.currency(),
                             ),
                         )
-                    })
-                }),
+                    }),
                 context.as_of,
             );
         }
