@@ -10,8 +10,8 @@ use finstack_quant_core::InputError;
 
 use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
-    adjust_period_accruals, build_schedule_period, generate_periods, is_regular_period,
-    validate_unique_payment_dates,
+    adjust_period_accruals, build_schedule_period, generate_periods_with_adjustment,
+    is_regular_period, validate_unique_payment_dates,
 };
 use super::emission::compute_reset_date;
 
@@ -225,7 +225,7 @@ pub fn build_single_period(
 pub fn build_periods(
     params: BuildPeriodsParams<'_>,
 ) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
-    let periods = generate_periods(
+    let periods = generate_periods_with_adjustment(
         params.start,
         params.end,
         params.frequency,
@@ -234,6 +234,7 @@ pub fn build_periods(
         params.end_of_month,
         params.payment_lag_days,
         params.calendar_id,
+        params.adjust_accrual_dates,
     )?;
     enrich_periods(periods, &params)
 }

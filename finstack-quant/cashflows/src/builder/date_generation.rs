@@ -240,6 +240,43 @@ pub(crate) fn generate_periods(
     Ok(periods)
 }
 
+/// Generate skeletal periods and apply the optional accrual-boundary policy.
+///
+/// This is the shared date-generation stage used by both the public period API
+/// and the cashflow compiler. Enrichment (day counts and reset dates) remains
+/// the responsibility of the caller because the compiler needs its raw
+/// periods for coupon-specific metadata.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn generate_periods_with_adjustment(
+    start: Date,
+    end: Date,
+    freq: Tenor,
+    stub: StubKind,
+    bdc: BusinessDayConvention,
+    end_of_month: bool,
+    payment_lag_days: i32,
+    calendar_id: &str,
+    adjust_accrual_dates: bool,
+) -> finstack_quant_core::Result<Vec<SchedulePeriod>> {
+    let mut periods = generate_periods(
+        start,
+        end,
+        freq,
+        stub,
+        bdc,
+        end_of_month,
+        payment_lag_days,
+        calendar_id,
+    )?;
+    if adjust_accrual_dates {
+        let cal = resolve_calendar_strict(calendar_id)?;
+        for period in &mut periods {
+            adjust_period_accruals(period, bdc, cal)?;
+        }
+    }
+    Ok(periods)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

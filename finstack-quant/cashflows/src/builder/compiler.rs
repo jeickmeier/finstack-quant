@@ -28,7 +28,7 @@ use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
 
 use super::calendar::resolve_calendar_strict;
-use super::date_generation::{adjust_period_accruals, generate_periods, index_period_schedule};
+use super::date_generation::{generate_periods_with_adjustment, index_period_schedule};
 use super::periods::SchedulePeriod;
 use super::rate_helpers::ResolvedFloatingRateSpec;
 use super::specs::{
@@ -118,7 +118,7 @@ fn build_periods_with_meta(
     window: DateWindow,
     params: &ScheduleParams,
 ) -> finstack_quant_core::Result<ScheduleWithMeta> {
-    let mut periods = generate_periods(
+    let periods = generate_periods_with_adjustment(
         window.start,
         window.end,
         params.freq,
@@ -127,17 +127,8 @@ fn build_periods_with_meta(
         params.end_of_month,
         params.payment_lag_days,
         &params.calendar_id,
+        params.adjust_accrual_dates,
     )?;
-    // Swap convention (ISDA 2006 §4.10; ARRC SOFR conventions): roll both
-    // accrual boundaries with the schedule's BDC before year fractions and
-    // overnight observation windows are derived. Bond schedules keep
-    // unadjusted accrual (the default).
-    if params.adjust_accrual_dates {
-        let cal = resolve_calendar_strict(&params.calendar_id)?;
-        for period in &mut periods {
-            adjust_period_accruals(period, params.bdc, cal)?;
-        }
-    }
     index_period_schedule(periods, params.freq)
 }
 
