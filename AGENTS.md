@@ -63,5 +63,6 @@
 
 - Preferred flow: Audit/Review → Plan → Implement (in that order)
 - When a plan file exists: do NOT edit the plan file; do not recreate todos that already exist; mark todos as `in_progress` when starting each one
+- During a plan, validate each completed task with the smallest targeted tests and focused lint/type checks that cover its changes. Run full test suites only once, at the very end of the plan, after targeted checks are clean.
 - User reports issues by pasting terminal output (clippy, cargo deny, test failures) rather than describing them
 - When moving files, use `mv` in terminal and update all import references; then lint and format
