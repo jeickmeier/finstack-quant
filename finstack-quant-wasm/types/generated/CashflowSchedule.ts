@@ -101,7 +101,7 @@ export interface DatedFlowJson {
 }
 
 export interface AccrualConfigJson {
-  method: "linear" | "compounded";
+  method: "Linear" | "Compounded";
   ex_coupon?: { days_before_coupon: number; calendar_id?: string | null } | null;
   include_pik: boolean;
   frequency?: { count: number; unit: string } | null;

@@ -232,10 +232,8 @@ js_export_file   = "../finstack-quant-wasm/exports/cashflows.js"
 root_exports = [
     "accruedInterestJson",
     "bondFromCashflowsJson",
-    "buildCashflowScheduleEnvelopeJson",
     "buildCashflowScheduleJson",
     "datedFlowsJson",
-    "validateCashflowScheduleEnvelopeJson",
     "validateCashflowScheduleJson",
 ]
 
@@ -243,10 +241,8 @@ root_exports = [
 accrued_interest_json = "accruedInterestJson"
 bond_from_cashflows_json = "bondFromCashflowsJson"
 build_cashflow_schedule_json = "buildCashflowScheduleJson"
-build_cashflow_schedule_envelope_json = "buildCashflowScheduleEnvelopeJson"
 dated_flows_json = "datedFlowsJson"
 validate_cashflow_schedule_json = "validateCashflowScheduleJson"
-validate_cashflow_schedule_envelope_json = "validateCashflowScheduleEnvelopeJson"
 
 # ---------------------------------------------------------------------------
 # finstack-quant-covenants  →  finstack_quant.covenants

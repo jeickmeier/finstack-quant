@@ -10,10 +10,8 @@ import pytest
 from finstack_quant.cashflows import (
     accrued_interest_json,
     bond_from_cashflows_json,
-    build_cashflow_schedule_envelope_json,
     build_cashflow_schedule_json,
     dated_flows_json,
-    validate_cashflow_schedule_envelope_json,
     validate_cashflow_schedule_json,
 )
 from finstack_quant.valuations.instruments import price_instrument
@@ -139,10 +137,6 @@ def test_cashflows_namespace_build_validate_accrual_and_price_bond() -> None:
     assert schedule["meta"]["issue_date"] == "2024-08-31"
 
     assert json.loads(validate_cashflow_schedule_json(schedule_json)) == schedule
-    envelope = json.loads(build_cashflow_schedule_envelope_json(_cashflow_spec()))
-    assert envelope["schema_version"] == "finstack_quant.cashflows.schedule/1"
-    assert envelope["schedule"] == schedule
-    assert json.loads(validate_cashflow_schedule_envelope_json(json.dumps(envelope))) == envelope
     flows = json.loads(dated_flows_json(schedule_json))
     assert len(flows) == len(schedule["flows"])
     assert accrued_interest_json(schedule_json, "2025-02-28") > 0.0
@@ -235,6 +229,14 @@ def test_cashflows_reject_malformed_json_and_invalid_dates() -> None:
     # (finstack-quant-py/src/errors.rs `core_to_py`).
     with pytest.raises(ValueError, match="invalid cashflow schedule JSON"):
         validate_cashflow_schedule_json("{not json")
+
+    with pytest.raises(ValueError, match="invalid cashflow schedule JSON"):
+        validate_cashflow_schedule_json(
+            json.dumps({
+                "schema_version": "finstack_quant.cashflows.schedule/1",
+                "schedule": json.loads(schedule_json),
+            })
+        )
 
     with pytest.raises(ValueError, match="invalid ISO date"):
         accrued_interest_json(schedule_json, "2025-02-30")

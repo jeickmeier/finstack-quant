@@ -1355,16 +1355,6 @@ export interface CashflowsNamespace {
   buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;
 
   /**
-   * Build a stamped cashflow schedule envelope from a `CashflowScheduleBuildSpec` JSON string.
-   *
-   * @param specJson    JSON-encoded `CashflowScheduleBuildSpec`.
-   * @param marketJson  Optional JSON-encoded market context for floating-rate lookups.
-   * @returns           JSON-encoded `CashflowScheduleEnvelope`.
-   * @throws            If the spec or market JSON is malformed, or schedule construction fails.
-   */
-  buildCashflowScheduleEnvelopeJson(specJson: string, marketJson?: string | null): string;
-
-  /**
    * Validate a cashflow schedule JSON string and return it canonicalized.
    *
    * @param scheduleJson JSON-encoded `CashFlowSchedule`.
@@ -1372,15 +1362,6 @@ export interface CashflowsNamespace {
    * @throws             If the schedule JSON is malformed or fails validation.
    */
   validateCashflowScheduleJson(scheduleJson: string): string;
-
-  /**
-   * Validate a cashflow schedule envelope JSON string and return it canonicalized.
-   *
-   * @param envelopeJson JSON-encoded `CashflowScheduleEnvelope`.
-   * @returns            Canonicalized JSON-encoded `CashflowScheduleEnvelope`.
-   * @throws             If the envelope JSON is malformed or fails validation.
-   */
-  validateCashflowScheduleEnvelopeJson(envelopeJson: string): string;
 
   /**
    * Extract dated flows from a cashflow schedule.

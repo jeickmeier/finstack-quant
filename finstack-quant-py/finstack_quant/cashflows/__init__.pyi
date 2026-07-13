@@ -11,10 +11,8 @@ from __future__ import annotations
 __all__ = [
     "accrued_interest_json",
     "bond_from_cashflows_json",
-    "build_cashflow_schedule_envelope_json",
     "build_cashflow_schedule_json",
     "dated_flows_json",
-    "validate_cashflow_schedule_envelope_json",
     "validate_cashflow_schedule_json",
 ]
 
@@ -51,33 +49,6 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     >>> schedule_json = build_cashflow_schedule_json(spec_json)  # doctest: +SKIP
     """
 
-def build_cashflow_schedule_envelope_json(spec_json: str, market_json: str | None = None) -> str:
-    """Build a stamped cashflow schedule envelope from a JSON spec.
-
-    Parameters
-    ----------
-    spec_json : str
-        JSON-encoded ``CashflowScheduleBuildSpec``.
-    market_json : str, optional
-        JSON-encoded ``MarketContext`` for floating-rate lookups.
-
-    Returns
-    -------
-    str
-        JSON-encoded ``CashflowScheduleEnvelope`` wrapping the schedule with
-        build metadata and schema version.
-
-    Raises
-    ------
-    ValueError
-        If the spec or market JSON is invalid or construction fails.
-
-    Examples
-    --------
-    >>> from finstack_quant.cashflows import build_cashflow_schedule_envelope_json
-    >>> envelope_json = build_cashflow_schedule_envelope_json(spec_json)  # doctest: +SKIP
-    """
-
 def validate_cashflow_schedule_json(schedule_json: str) -> str:
     """Validate and canonicalize a ``CashFlowSchedule`` JSON payload.
 
@@ -100,30 +71,6 @@ def validate_cashflow_schedule_json(schedule_json: str) -> str:
     --------
     >>> from finstack_quant.cashflows import validate_cashflow_schedule_json
     >>> canonical = validate_cashflow_schedule_json(schedule_json)  # doctest: +SKIP
-    """
-
-def validate_cashflow_schedule_envelope_json(envelope_json: str) -> str:
-    """Validate and canonicalize a ``CashflowScheduleEnvelope`` JSON payload.
-
-    Parameters
-    ----------
-    envelope_json : str
-        JSON-encoded ``CashflowScheduleEnvelope``.
-
-    Returns
-    -------
-    str
-        Canonical re-serialized envelope JSON.
-
-    Raises
-    ------
-    ValueError
-        If ``envelope_json`` is malformed or fails validation.
-
-    Examples
-    --------
-    >>> from finstack_quant.cashflows import validate_cashflow_schedule_envelope_json
-    >>> canonical = validate_cashflow_schedule_envelope_json(envelope_json)  # doctest: +SKIP
     """
 
 def dated_flows_json(schedule_json: str) -> str:

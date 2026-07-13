@@ -65,10 +65,8 @@ const cashflowSpec = JSON.stringify({
 const EXPORTED_KEYS = [
   'accruedInterestJson',
   'bondFromCashflowsJson',
-  'buildCashflowScheduleEnvelopeJson',
   'buildCashflowScheduleJson',
   'datedFlowsJson',
-  'validateCashflowScheduleEnvelopeJson',
   'validateCashflowScheduleJson',
 ];
 
@@ -93,15 +91,6 @@ test('cashflows end-to-end build/validate/flows/accrual from JSON spec', () => {
 
   const validated = cashflows.validateCashflowScheduleJson(scheduleJson);
   assert.deepEqual(JSON.parse(validated), schedule);
-
-  const envelopeJson = cashflows.buildCashflowScheduleEnvelopeJson(cashflowSpec, null);
-  const envelope = JSON.parse(envelopeJson);
-  assert.equal(envelope.schema_version, 'finstack_quant.cashflows.schedule/1');
-  assert.deepEqual(envelope.schedule, schedule);
-  assert.deepEqual(
-    JSON.parse(cashflows.validateCashflowScheduleEnvelopeJson(envelopeJson)),
-    envelope
-  );
 
   const flows = JSON.parse(cashflows.datedFlowsJson(scheduleJson));
   assert.equal(flows.length, schedule.flows.length);

@@ -11,16 +11,12 @@ use crate::builder::{
     Notional, ScheduleParams, StepUpCouponSpec,
 };
 use crate::primitives::{is_cash_settlement_kind, CFKind};
-use finstack_quant_core::config::{rounding_context_from, FinstackConfig, RoundingContext};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use rust_decimal::Decimal;
 use serde::Deserializer;
-
-/// Schema version used by stamped cashflow schedule envelopes.
-pub const CASHFLOW_SCHEDULE_SCHEMA_VERSION: &str = "finstack_quant.cashflows.schedule/1";
 
 /// Specification for building a [`CashFlowSchedule`] from JSON.
 #[derive(Debug, Clone, serde::Serialize, schemars::JsonSchema)]
@@ -273,40 +269,6 @@ pub struct DatedFlowJson {
     pub amount: Money,
 }
 
-/// Version-stamped cashflow schedule payload for durable JSON examples.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct CashflowScheduleEnvelope {
-    /// Envelope schema version.
-    pub schema_version: String,
-    /// Rounding and tolerance context active at serialization time.
-    pub rounding_context: RoundingContext,
-    /// Canonical cashflow schedule.
-    pub schedule: CashFlowSchedule,
-}
-
-impl CashflowScheduleEnvelope {
-    /// Build an envelope from a canonical schedule using deterministic default config.
-    pub fn from_schedule(schedule: CashFlowSchedule) -> Self {
-        let config = FinstackConfig::default();
-        Self {
-            schema_version: CASHFLOW_SCHEDULE_SCHEMA_VERSION.to_string(),
-            rounding_context: rounding_context_from(&config),
-            schedule,
-        }
-    }
-
-    fn validate_schema_version(&self) -> Result<()> {
-        if self.schema_version != CASHFLOW_SCHEDULE_SCHEMA_VERSION {
-            return Err(Error::Validation(format!(
-                "unsupported cashflow schedule envelope schema_version '{}'; expected '{}'",
-                self.schema_version, CASHFLOW_SCHEDULE_SCHEMA_VERSION
-            )));
-        }
-        Ok(())
-    }
-}
-
 impl CashflowScheduleBuildSpec {
     /// Build a canonical cashflow schedule.
     ///
@@ -498,20 +460,6 @@ pub fn build_cashflow_schedule_json(spec_json: &str, market_json: Option<&str>) 
     serialize_json(&schedule, "cashflow schedule")
 }
 
-/// Build a stamped schedule envelope from JSON and return canonical envelope JSON.
-pub fn build_cashflow_schedule_envelope_json(
-    spec_json: &str,
-    market_json: Option<&str>,
-) -> Result<String> {
-    let spec: CashflowScheduleBuildSpec = serde_json::from_str(spec_json).map_err(|err| {
-        Error::Validation(format!("invalid cashflow schedule build spec JSON: {err}"))
-    })?;
-    let market = parse_optional_market(market_json)?;
-    let schedule = spec.build(market.as_ref())?;
-    let envelope = CashflowScheduleEnvelope::from_schedule(schedule);
-    serialize_json(&envelope, "cashflow schedule envelope")
-}
-
 /// Validate a schedule JSON payload and return canonical schedule JSON.
 ///
 /// Canonicalization parses the payload as [`CashFlowSchedule`] and serializes
@@ -570,18 +518,6 @@ pub fn validate_cashflow_schedule(schedule: &mut CashFlowSchedule) -> Result<()>
     sort_schedule_with_metadata(schedule);
     schedule.validate()?;
     validate_schedule_economic_invariants(schedule)
-}
-
-/// Validate a stamped schedule envelope JSON payload and return canonical JSON.
-pub fn validate_cashflow_schedule_envelope_json(envelope_json: &str) -> Result<String> {
-    let envelope: CashflowScheduleEnvelope =
-        serde_json::from_str(envelope_json).map_err(|err| {
-            Error::Validation(format!("invalid cashflow schedule envelope JSON: {err}"))
-        })?;
-    envelope.validate_schema_version()?;
-    let mut envelope = envelope;
-    validate_cashflow_schedule(&mut envelope.schedule)?;
-    serialize_json(&envelope, "cashflow schedule envelope")
 }
 
 /// Extract dated amounts from a schedule JSON payload.

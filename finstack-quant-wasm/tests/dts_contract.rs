@@ -249,15 +249,16 @@ fn cashflows_dts_matches_json_bridge_surface() {
     assert!(dts.contains(
         "buildCashflowScheduleJson(specJson: string, marketJson?: string | null): string;"
     ));
-    assert!(dts.contains(
-        "buildCashflowScheduleEnvelopeJson(specJson: string, marketJson?: string | null): string;"
-    ));
     assert!(dts.contains("validateCashflowScheduleJson(scheduleJson: string): string;"));
-    assert!(dts.contains("validateCashflowScheduleEnvelopeJson(envelopeJson: string): string;"));
+    assert!(!dts.contains("CashflowScheduleEnvelope"));
+    assert!(!dts.contains("buildCashflowScheduleEnvelopeJson"));
+    assert!(!dts.contains("validateCashflowScheduleEnvelopeJson"));
     assert!(dts.contains("datedFlowsJson(scheduleJson: string): string;"));
     assert!(dts.contains("accruedInterestJson("));
     assert!(dts.contains("bondFromCashflowsJson("));
     assert!(dts.contains("export declare const cashflows: CashflowsNamespace;"));
+    let generated = include_str!("../types/generated/CashflowSchedule.ts");
+    assert!(generated.contains("method: \"Linear\" | \"Compounded\";"));
 }
 
 #[test]
