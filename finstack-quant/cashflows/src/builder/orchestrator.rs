@@ -499,11 +499,15 @@ impl CompiledCashFlowPlan {
         // else first floating schedule). Without any coupon leg there is no
         // resolved calendar, so the raw maturity date is kept.
         let redemption_date = if let Some(schedule) = self.fixed_schedules.first() {
-            finstack_quant_core::dates::adjust(self.maturity, schedule.spec.bdc, schedule.calendar)?
+            finstack_quant_core::dates::adjust(
+                self.maturity,
+                schedule.spec.schedule.bdc,
+                schedule.calendar,
+            )?
         } else if let Some(schedule) = self.float_schedules.first() {
             finstack_quant_core::dates::adjust(
                 self.maturity,
-                schedule.spec.rate_spec.bdc,
+                schedule.spec.schedule.bdc,
                 schedule.calendar,
             )?
         } else {

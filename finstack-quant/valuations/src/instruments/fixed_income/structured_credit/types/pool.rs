@@ -79,7 +79,7 @@ impl PoolAsset {
                     })?,
                     None,
                     None,
-                    spec.dc,
+                    spec.schedule.dc,
                 )),
                 crate::instruments::fixed_income::bond::CashflowSpec::Floating(spec) => {
                     Err(finstack_quant_core::Error::Validation(format!(

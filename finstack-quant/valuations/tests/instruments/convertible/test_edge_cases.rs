@@ -199,13 +199,23 @@ fn test_time_mapping_with_quarterly_coupons() {
     let fixed_coupon = FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: rust_decimal::Decimal::try_from(0.06).expect("valid"),
-        freq: Tenor::quarterly(),
-        dc: DayCount::Act365F,
-        bdc: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
-        stub: StubKind::None,
-        end_of_month: false,
-        payment_lag_days: 0,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+
+            dc: DayCount::Act365F,
+
+            bdc: BusinessDayConvention::Following,
+
+            calendar_id: "weekends_only".to_string(),
+
+            stub: StubKind::None,
+
+            end_of_month: false,
+
+            payment_lag_days: 0,
+
+            adjust_accrual_dates: false,
+        },
     };
 
     let bond = finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBond {

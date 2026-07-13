@@ -726,13 +726,23 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: Decimal::try_from(0.05).expect("valid"),
-        freq: Tenor::semi_annual(),
-        dc: DayCount::Act360,
-        bdc: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: "weekends_only".to_string(),
-        stub: StubKind::None,
-        end_of_month: false,
-        payment_lag_days: 0,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::semi_annual(),
+
+            dc: DayCount::Act360,
+
+            bdc: BusinessDayConvention::ModifiedFollowing,
+
+            calendar_id: "weekends_only".to_string(),
+
+            stub: StubKind::None,
+
+            end_of_month: false,
+
+            payment_lag_days: 0,
+
+            adjust_accrual_dates: false,
+        },
     };
 
     let init = Money::new(1_000_000.0, Currency::USD);
@@ -830,13 +840,16 @@ fn order_independence_fixed_spec() -> FixedCouponSpec {
     FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: dec!(0.05),
-        freq: Tenor::quarterly(),
-        dc: DayCount::Act360,
-        bdc: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
-        stub: StubKind::None,
-        end_of_month: false,
-        payment_lag_days: 0,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+        },
     }
 }
 
@@ -855,19 +868,22 @@ fn order_independence_float_spec() -> FloatingCouponSpec {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: FloatingRateFallback::SpreadOnly,
         },
         coupon_type: CouponType::Cash,
-        freq: Tenor::quarterly(),
-        stub: StubKind::None,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+        },
     }
 }
 
@@ -936,13 +952,23 @@ fn full_horizon_coupon_programs_are_order_independent() {
         coupon_type: CouponType::Cash,
         initial_rate: dec!(0.04),
         step_schedule: vec![(switch, dec!(0.05))],
-        freq: Tenor::quarterly(),
-        dc: DayCount::Act360,
-        bdc: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
-        stub: StubKind::None,
-        end_of_month: false,
-        payment_lag_days: 0,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+
+            dc: DayCount::Act360,
+
+            bdc: BusinessDayConvention::Following,
+
+            calendar_id: "weekends_only".to_string(),
+
+            stub: StubKind::None,
+
+            end_of_month: false,
+
+            payment_lag_days: 0,
+
+            adjust_accrual_dates: false,
+        },
     };
     assert_program_order_independent(principal, issue, maturity, |builder| {
         let _ = builder.step_up_cf(step_spec());

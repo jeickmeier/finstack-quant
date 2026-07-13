@@ -28,13 +28,23 @@ fn bridge_builder_schedule_builds() {
     let fixed_spec = FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: rust_decimal_macros::dec!(0.05),
-        freq: Tenor::semi_annual(),
-        dc: DayCount::Act365F,
-        bdc: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
-        stub: StubKind::None,
-        end_of_month: false,
-        payment_lag_days: 0,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::semi_annual(),
+
+            dc: DayCount::Act365F,
+
+            bdc: BusinessDayConvention::Following,
+
+            calendar_id: "weekends_only".to_string(),
+
+            stub: StubKind::None,
+
+            end_of_month: false,
+
+            payment_lag_days: 0,
+
+            adjust_accrual_dates: false,
+        },
     };
 
     let schedule = CashFlowSchedule::builder()

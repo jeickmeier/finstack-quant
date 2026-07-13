@@ -560,8 +560,6 @@
             "unit": "months"
           },
           "reset_lag_days": 2,
-          "dc": "Act360",
-          "calendar_id": "weekends_only",
           "fixing_calendar_id": "weekends_only"
         }
       },

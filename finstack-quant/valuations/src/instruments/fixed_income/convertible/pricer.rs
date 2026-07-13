@@ -167,8 +167,12 @@ impl ConvertibleBondValuator {
         let day_count_frequency = bond
             .fixed_coupon
             .as_ref()
-            .map(|coupon| coupon.freq)
-            .or_else(|| bond.floating_coupon.as_ref().map(|coupon| coupon.freq));
+            .map(|coupon| coupon.schedule.freq)
+            .or_else(|| {
+                bond.floating_coupon
+                    .as_ref()
+                    .map(|coupon| coupon.schedule.freq)
+            });
         let day_count_ctx = DayCountContext {
             frequency: day_count_frequency,
             ..Default::default()
@@ -1395,8 +1399,8 @@ pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result
     let frequency = bond
         .fixed_coupon
         .as_ref()
-        .map(|c| c.freq)
-        .or_else(|| bond.floating_coupon.as_ref().map(|c| c.freq));
+        .map(|c| c.schedule.freq)
+        .or_else(|| bond.floating_coupon.as_ref().map(|c| c.schedule.freq));
 
     let mut period_start = bond.issue_date;
     for cf in &coupons {
@@ -1515,13 +1519,23 @@ mod tests {
         let fixed_coupon = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         };
 
         ConvertibleBond {
@@ -1862,13 +1876,17 @@ mod tests {
         let fixed_coupon = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Thirty360, // US corporate convention
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+                dc: DayCount::Thirty360,
+                // US corporate convention
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         };
 
         let bond = ConvertibleBond {

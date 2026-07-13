@@ -46,15 +46,10 @@ fn build_floating_loan(
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
-            payment_lag_days: 0,
         }))
         .frequency(Tenor::quarterly())
         .day_count(DayCount::Act360)

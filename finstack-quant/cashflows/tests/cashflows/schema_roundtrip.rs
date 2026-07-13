@@ -9,10 +9,11 @@
 use finstack_quant_cashflows::builder::specs::{
     AmortizationSpec, CouponType, DefaultEvent, DefaultModelSpec, FeeSpec, FeeTier,
     FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec, Notional, PrepaymentCurve,
-    PrepaymentModelSpec, RecoveryModelSpec, ScheduleParams,
+    PrepaymentModelSpec, RecoveryModelSpec, ScheduleParams, StepUpCouponSpec,
 };
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount};
 use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -319,14 +320,14 @@ fn test_fixed_coupon_spec() {
 
     // Day count should be 30/360 (standard for USD corporate bonds)
     assert_eq!(
-        spec.dc,
+        spec.schedule.dc,
         DayCount::Thirty360,
         "Fixed coupon day count should be 30/360"
     );
 
     // Business day convention should be Modified Following (market standard)
     assert_eq!(
-        spec.bdc,
+        spec.schedule.bdc,
         BusinessDayConvention::ModifiedFollowing,
         "Fixed coupon BDC should be Modified Following"
     );
@@ -338,6 +339,23 @@ fn test_fixed_coupon_spec() {
     );
 
     test_roundtrip::<CashflowEnvelope<FixedCouponSpecPayload>>(json);
+
+    let mut adjusted: serde_json::Value = serde_json::from_str(json).expect("valid example");
+    adjusted["fixed_coupon_spec"]["adjust_accrual_dates"] = json!(true);
+    let adjusted: CashflowEnvelope<FixedCouponSpecPayload> =
+        serde_json::from_value(adjusted).expect("adjusted schedule deserializes");
+    assert!(
+        adjusted
+            .payload
+            .fixed_coupon_spec
+            .schedule
+            .adjust_accrual_dates
+    );
+    assert_eq!(
+        serde_json::to_value(adjusted).expect("adjusted schedule serializes")["fixed_coupon_spec"]
+            ["adjust_accrual_dates"],
+        json!(true)
+    );
 }
 
 #[test]
@@ -377,7 +395,7 @@ fn test_floating_coupon_spec() {
 
     // Day count should be Act/360 (standard for EUR EURIBOR)
     assert_eq!(
-        spec.rate_spec.dc,
+        spec.schedule.dc,
         DayCount::Act360,
         "Floating rate day count should be Act/360"
     );
@@ -406,6 +424,42 @@ fn test_floating_coupon_spec() {
         expected_value, reserialized_value,
         "Roundtrip mismatch for envelope"
     );
+
+    let mut adjusted: serde_json::Value = serde_json::from_str(json).expect("valid example");
+    adjusted["floating_coupon_spec"]["adjust_accrual_dates"] = json!(true);
+    let adjusted: CashflowEnvelope<FloatingCouponSpecPayload> =
+        serde_json::from_value(adjusted).expect("adjusted schedule deserializes");
+    assert!(
+        adjusted
+            .payload
+            .floating_coupon_spec
+            .schedule
+            .adjust_accrual_dates
+    );
+    assert_eq!(
+        serde_json::to_value(adjusted).expect("adjusted schedule serializes")
+            ["floating_coupon_spec"]["adjust_accrual_dates"],
+        json!(true)
+    );
+}
+
+#[test]
+fn test_step_up_coupon_preserves_adjusted_accruals() {
+    let spec = StepUpCouponSpec {
+        coupon_type: CouponType::Cash,
+        initial_rate: Decimal::new(5, 2),
+        step_schedule: Vec::<(Date, Decimal)>::new(),
+        schedule: ScheduleParams {
+            adjust_accrual_dates: true,
+            ..ScheduleParams::semiannual_30360()
+        },
+    };
+
+    let encoded = serde_json::to_value(&spec).expect("step-up schedule serializes");
+    assert_eq!(encoded["adjust_accrual_dates"], json!(true));
+    let decoded: StepUpCouponSpec =
+        serde_json::from_value(encoded).expect("step-up schedule deserializes");
+    assert!(decoded.schedule.adjust_accrual_dates);
 }
 
 #[test]
@@ -565,15 +619,15 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
                 "index_id": "USD-SOFR-3M",
                 "spread_bp": "100",
                 "reset_freq": {"count": 3, "unit": "months"},
-                "reset_lag_days": 0,
-                "dc": "Act360",
-                "bdc": "following",
-                "calendar_id": "weekends_only",
-                "end_of_month": false,
-                "payment_lag_days": 0
+                "reset_lag_days": 0
             },
             "freq": {"count": 3, "unit": "months"},
-            "stub": "None"
+            "dc": "Act360",
+            "bdc": "following",
+            "calendar_id": "weekends_only",
+            "stub": "None",
+            "end_of_month": false,
+            "payment_lag_days": 0
         }]
     });
 

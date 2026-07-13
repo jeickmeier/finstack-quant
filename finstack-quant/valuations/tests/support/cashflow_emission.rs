@@ -26,13 +26,17 @@ mod accrual_context_tests {
         let spec = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.05).expect("valid rate"),
-            freq: finstack_quant_core::dates::Tenor::new(6, finstack_quant_core::dates::TenorUnit::Months), // Semi-annual
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: finstack_quant_core::dates::Tenor::new(6, finstack_quant_core::dates::TenorUnit::Months),
+                // Semi-annual
             dc: DayCount::ActActIsma,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false
+            },
         };
 
         let dates = vec![end];
@@ -99,19 +103,22 @@ mod accrual_context_tests {
                     finstack_quant_core::dates::TenorUnit::Months,
                 ),
                 reset_lag_days: 2,
-                dc: DayCount::ActActIsma,
-                bdc: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
                 fixing_calendar_id: None,
-                end_of_month: false,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: finstack_quant_cashflows::builder::FloatingRateFallback::SpreadOnly,
-                payment_lag_days: 0,
             },
             coupon_type: CouponType::Cash,
-            freq: finstack_quant_core::dates::Tenor::new(3, finstack_quant_core::dates::TenorUnit::Months),
-            stub: StubKind::None,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: finstack_quant_core::dates::Tenor::new(3, finstack_quant_core::dates::TenorUnit::Months),
+                dc: DayCount::ActActIsma,
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false
+            },
         };
 
         let dates = vec![end];
@@ -169,13 +176,25 @@ mod accrual_context_tests {
         let spec = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.05).expect("valid rate"),
-            freq: finstack_quant_core::dates::Tenor::new(7, finstack_quant_core::dates::TenorUnit::Days),
-            dc: DayCount::Bus252,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "NYSE".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+
+                freq: finstack_quant_core::dates::Tenor::new(7, finstack_quant_core::dates::TenorUnit::Days),
+
+                dc: DayCount::Bus252,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "NYSE".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false
+
+            },
         };
 
         let dates = vec![end];
@@ -286,13 +305,25 @@ mod credit_emission_tests {
         let spec = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid rate"),
-            freq: Tenor::quarterly(),
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+
+                freq: Tenor::quarterly(),
+
+                dc: DayCount::Act360,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false
+
+            },
         };
 
         // Generate coupon dates
@@ -821,3 +852,6 @@ mod credit_emission_tests {
         assert_eq!(flows[1].kind, CFKind::Recovery);
     }
 }
+
+
+

@@ -1317,7 +1317,7 @@ mod tests {
         use crate::builder::specs::{
             FloatingRateFallback, FloatingRateSpec, OvernightIndexConstraintApplication,
         };
-        use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+        use finstack_quant_core::dates::Tenor;
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
@@ -1333,12 +1333,7 @@ mod tests {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "usny".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
@@ -1360,7 +1355,7 @@ mod tests {
         use crate::builder::specs::{
             FloatingRateFallback, FloatingRateSpec, OvernightIndexConstraintApplication,
         };
-        use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+        use finstack_quant_core::dates::Tenor;
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
@@ -1376,12 +1371,7 @@ mod tests {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
@@ -1399,7 +1389,7 @@ mod tests {
         use crate::builder::specs::{
             FloatingRateFallback, FloatingRateSpec, OvernightIndexConstraintApplication,
         };
-        use finstack_quant_core::dates::{BusinessDayConvention, DayCount, Tenor};
+        use finstack_quant_core::dates::Tenor;
         use rust_decimal_macros::dec;
 
         let spec = FloatingRateSpec {
@@ -1415,12 +1405,7 @@ mod tests {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 2,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: FloatingRateFallback::SpreadOnly,

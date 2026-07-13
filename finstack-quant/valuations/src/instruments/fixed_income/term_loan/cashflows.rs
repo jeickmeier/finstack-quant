@@ -293,15 +293,25 @@ pub(crate) fn generate_cashflows(
             let spec = FixedCouponSpec {
                 coupon_type: loan.coupon_type,
                 rate: rate_decimal,
-                freq: loan.frequency,
-                dc: loan.day_count,
-                bdc: loan.bdc,
-                calendar_id: loan.calendar_id.clone().unwrap_or_else(|| {
-                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
-                }),
-                stub: loan.stub,
-                end_of_month: false,
-                payment_lag_days: 0,
+                schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                    freq: loan.frequency,
+
+                    dc: loan.day_count,
+
+                    bdc: loan.bdc,
+
+                    calendar_id: loan.calendar_id.clone().unwrap_or_else(|| {
+                        crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
+                    }),
+
+                    stub: loan.stub,
+
+                    end_of_month: false,
+
+                    payment_lag_days: 0,
+
+                    adjust_accrual_dates: false,
+                },
             };
             let _ = builder.fixed_cf(spec);
         }
@@ -361,20 +371,23 @@ pub(crate) fn generate_cashflows(
                     reset_freq: loan.frequency,
                     index_tenor: None,
                     reset_lag_days: spec.reset_lag_days,
+                    fixing_calendar_id: spec.fixing_calendar_id.clone(),
+                    overnight_compounding: spec.overnight_compounding,
+                    overnight_basis: spec.overnight_basis,
+                    fallback: spec.fallback.clone(),
+                },
+                schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                    freq: loan.frequency,
                     dc: loan.day_count,
                     bdc: loan.bdc,
                     calendar_id: loan.calendar_id.clone().unwrap_or_else(|| {
                         crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
                     }),
-                    fixing_calendar_id: spec.fixing_calendar_id.clone(),
+                    stub: loan.stub,
                     end_of_month: false,
                     payment_lag_days: 0,
-                    overnight_compounding: spec.overnight_compounding,
-                    overnight_basis: spec.overnight_basis,
-                    fallback: spec.fallback.clone(),
+                    adjust_accrual_dates: false,
                 },
-                freq: loan.frequency,
-                stub: loan.stub,
             };
             let _ = builder.float_margin_stepup_decimal(&steps, base_spec);
         }

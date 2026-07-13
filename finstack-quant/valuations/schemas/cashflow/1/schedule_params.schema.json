@@ -54,6 +54,7 @@
       "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
     },
     "end_of_month": {
+      "default": false,
       "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
       "type": "boolean"
     },
@@ -62,6 +63,7 @@
       "description": "Accrual and payment frequency used to generate the schedule boundaries."
     },
     "payment_lag_days": {
+      "default": 0,
       "description": "Payment lag in business days after the adjusted accrual end date.",
       "format": "int32",
       "type": "integer"
@@ -75,9 +77,7 @@
   "required": [
     "freq",
     "dc",
-    "calendar_id",
-    "end_of_month",
-    "payment_lag_days"
+    "calendar_id"
   ],
   "title": "Schedule Parameters",
   "type": "object"

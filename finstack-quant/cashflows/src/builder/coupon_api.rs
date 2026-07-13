@@ -56,22 +56,6 @@ impl CashFlowBuilder {
         self
     }
 
-    fn schedule_from_floating_spec(spec: &FloatingCouponSpec) -> ScheduleParams {
-        ScheduleParams {
-            freq: spec.freq,
-            dc: spec.rate_spec.dc,
-            bdc: spec.rate_spec.bdc,
-            calendar_id: spec.rate_spec.calendar_id.clone(),
-            stub: spec.stub,
-            end_of_month: spec.rate_spec.end_of_month,
-            payment_lag_days: spec.rate_spec.payment_lag_days,
-            // Bond/FRN convention by default: accrual boundaries unadjusted.
-            // Swap-style adjusted accrual is reachable via explicit
-            // `ScheduleParams` (e.g. the swap presets) on windowed APIs.
-            adjust_accrual_dates: false,
-        }
-    }
-
     fn floating_spec_with_margin(
         spec: &FloatingCouponSpec,
         spread_bp: Decimal,
@@ -108,7 +92,7 @@ impl CashFlowBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
+    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     /// use finstack_quant_core::money::Money;
@@ -122,13 +106,7 @@ impl CashFlowBuilder {
     ///     .fixed_cf(FixedCouponSpec {
     ///         coupon_type: CouponType::Cash,
     ///         rate: dec!(0.05),
-    ///         freq: Tenor::semi_annual(),
-    ///         dc: DayCount::Thirty360,
-    ///         bdc: BusinessDayConvention::Following,
-    ///         calendar_id: "weekends_only".to_string(),
-    ///         stub: StubKind::None,
-    ///         end_of_month: false,
-    ///         payment_lag_days: 0,
+    ///         schedule: ScheduleParams::semiannual_30360(),
     ///     })
     ///     .build_with_curves(None)
     ///     .expect("fixed schedule builds");
@@ -138,7 +116,7 @@ impl CashFlowBuilder {
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn fixed_cf(&mut self, spec: FixedCouponSpec) -> &mut Self {
         self.push_full_horizon_coupon(
-            spec.schedule_params(),
+            spec.schedule.clone(),
             CouponSpec::Fixed { rate: spec.rate },
             spec.coupon_type,
         )
@@ -171,7 +149,7 @@ impl CashFlowBuilder {
     /// ```rust
     /// use finstack_quant_cashflows::builder::{
     ///     CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingRateFallback,
-    ///     FloatingRateSpec, OvernightIndexConstraintApplication,
+    ///     FloatingRateSpec, OvernightIndexConstraintApplication, ScheduleParams,
     /// };
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -201,24 +179,18 @@ impl CashFlowBuilder {
     ///             reset_freq: Tenor::quarterly(),
     ///             index_tenor: None,
     ///             reset_lag_days: 2,
-    ///             dc: DayCount::Act360,
-    ///             bdc: BusinessDayConvention::ModifiedFollowing,
-    ///             calendar_id: "weekends_only".to_string(),
     ///             fixing_calendar_id: None,
-    ///             end_of_month: false,
-    ///             payment_lag_days: 0,
     ///             overnight_compounding: None,
     ///             overnight_basis: None,
     ///             fallback: FloatingRateFallback::SpreadOnly,
     ///         },
-    ///         freq: Tenor::quarterly(),
-    ///         stub: StubKind::None,
+    ///         schedule: ScheduleParams::quarterly_act360(),
     ///     });
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn floating_cf(&mut self, spec: FloatingCouponSpec) -> &mut Self {
         self.push_full_horizon_coupon(
-            Self::schedule_from_floating_spec(&spec),
+            spec.schedule.clone(),
             CouponSpec::Float {
                 rate_spec: spec.rate_spec,
             },
@@ -331,7 +303,7 @@ impl CashFlowBuilder {
     /// use finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention, StubKind};
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_cashflows::builder::{
-    ///     CashFlowSchedule, FixedCouponSpec, CouponType
+    ///     CashFlowSchedule, FixedCouponSpec, CouponType, ScheduleParams
     /// };
     /// use rust_decimal_macros::dec;
     /// use time::Month;
@@ -353,13 +325,7 @@ impl CashFlowBuilder {
     /// let fixed_spec = FixedCouponSpec {
     ///     coupon_type: CouponType::Cash,  // Will be overridden by payment program
     ///     rate: dec!(0.10),  // 10% PIK toggle
-    ///     freq: Tenor::semi_annual(),
-    ///     dc: DayCount::Thirty360,
-    ///     bdc: BusinessDayConvention::Following,
-    ///     calendar_id: "weekends_only".to_string(),
-    ///     end_of_month: false,
-    ///     payment_lag_days: 0,
-    ///     stub: StubKind::None,
+    ///     schedule: ScheduleParams::semiannual_30360(),
     /// };
     ///
     /// let schedule = CashFlowSchedule::builder()
@@ -440,7 +406,7 @@ impl CashFlowBuilder {
     /// # Examples
     ///
     /// ```rust
-    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, StepUpCouponSpec};
+    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, ScheduleParams, StepUpCouponSpec};
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     /// use finstack_quant_core::money::Money;
@@ -458,19 +424,13 @@ impl CashFlowBuilder {
     ///         coupon_type: CouponType::Cash,
     ///         initial_rate: dec!(0.04),
     ///         step_schedule: vec![(step, dec!(0.05))],
-    ///         freq: Tenor::semi_annual(),
-    ///         dc: DayCount::Thirty360,
-    ///         bdc: BusinessDayConvention::Following,
-    ///         calendar_id: "weekends_only".to_string(),
-    ///         stub: StubKind::None,
-    ///         end_of_month: false,
-    ///         payment_lag_days: 0,
+    ///         schedule: ScheduleParams::semiannual_30360(),
     ///     });
     /// ```
     #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
     pub fn step_up_cf(&mut self, spec: StepUpCouponSpec) -> &mut Self {
         self.push_full_horizon_coupon(
-            spec.schedule_params(),
+            spec.schedule.clone(),
             CouponSpec::StepUp {
                 initial_rate: spec.initial_rate,
                 step_schedule: spec.step_schedule,
@@ -557,7 +517,7 @@ impl CashFlowBuilder {
                     start: prev,
                     end: WindowBound::Date(end),
                 },
-                Self::schedule_from_floating_spec(&window_spec),
+                window_spec.schedule.clone(),
                 CouponSpec::Float {
                     rate_spec: window_spec.rate_spec,
                 },
@@ -575,7 +535,7 @@ impl CashFlowBuilder {
                 start: prev,
                 end: WindowBound::Maturity,
             },
-            Self::schedule_from_floating_spec(&final_spec),
+            final_spec.schedule.clone(),
             CouponSpec::Float {
                 rate_spec: final_spec.rate_spec,
             },
@@ -637,18 +597,12 @@ impl CashFlowBuilder {
     ///         reset_freq: Tenor::quarterly(),
     ///         index_tenor: None,
     ///         reset_lag_days: 2,
-    ///         dc: DayCount::Act360,
-    ///         bdc: BusinessDayConvention::ModifiedFollowing,
-    ///         calendar_id: "weekends_only".to_string(),
     ///         fixing_calendar_id: None,
-    ///         end_of_month: false,
-    ///         payment_lag_days: 0,
     ///         overnight_compounding: None,
     ///         overnight_basis: None,
     ///         fallback: Default::default(),
     ///     },
-    ///     freq: Tenor::quarterly(),
-    ///     stub: StubKind::ShortFront,
+    ///     schedule: ScheduleParams::quarterly_act360(),
     /// };
     ///
     /// let schedule = CashFlowSchedule::builder()
@@ -684,7 +638,7 @@ impl CashFlowBuilder {
                 start: WindowBound::Date(switch),
                 end: WindowBound::Maturity,
             },
-            Self::schedule_from_floating_spec(&float_spec),
+            float_spec.schedule.clone(),
             CouponSpec::Float {
                 rate_spec: float_spec.rate_spec,
             },

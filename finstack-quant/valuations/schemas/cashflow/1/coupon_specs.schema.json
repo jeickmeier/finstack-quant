@@ -87,13 +87,17 @@
   "additionalProperties": false,
   "description": "Fixed and floating coupon specifications for cashflow generation. Rust types: CouponType, FixedCouponSpec, FloatingRateSpec, FloatingCouponSpec from finstack_quant_valuations::cashflow::builder::specs::coupon",
   "properties": {
+    "adjust_accrual_dates": {
+      "description": "Whether accrual-period boundaries are business-day adjusted with `bdc`.\n\n- `false` (default, bond convention): accrual periods run between the\n  unadjusted schedule anchors; only payment dates roll.\n- `true` (swap convention, ISDA 2006 §4.10 / ARRC SOFR conventions):\n  both accrual-period boundaries are rolled with `bdc` before year\n  fractions and overnight observation windows are computed. The swap\n  presets ([`Self::usd_sofr_swap`], [`Self::eur_estr_swap`],\n  [`Self::gbp_sonia_swap`], [`Self::jpy_tona_swap`]) set this to\n  `true`.\n\nSerialized only when `true`, so existing wire payloads are unchanged.",
+      "type": "boolean"
+    },
     "bdc": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
       "default": "modified_following",
-      "description": "Business-day convention applied when adjusting coupon schedule dates."
+      "description": "Business-day convention applied when rolling **payment dates** onto\nvalid business days.\n\nAccrual boundaries are left unadjusted (bond/ICMA convention) unless\n[`Self::adjust_accrual_dates`] is `true`, in which case the same\nconvention also rolls both accrual-period boundaries (swap/ISDA 2006\n§4.10 convention)."
     },
     "calendar_id": {
-      "description": "Holiday calendar identifier used with `bdc`.\n\nUse `\"weekends_only\"` when only weekend adjustment is required.",
+      "description": "Holiday calendar identifier used together with `bdc`.\n\nUse `\"weekends_only\"` when only Saturday/Sunday adjustment is needed.",
       "type": "string"
     },
     "coupon_type": {
@@ -103,16 +107,16 @@
     },
     "dc": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-      "description": "Day-count convention used to convert each accrual period into a year\nfraction."
+      "description": "Day-count convention used to convert each generated accrual period into a\nyear fraction."
     },
     "end_of_month": {
       "default": false,
-      "description": "Whether end-of-month rolling should be preserved during schedule\ngeneration.",
+      "description": "Whether end-of-month rolling should be preserved when generating the\nschedule.",
       "type": "boolean"
     },
     "freq": {
       "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
-      "description": "Coupon accrual and payment frequency."
+      "description": "Accrual and payment frequency used to generate the schedule boundaries."
     },
     "payment_lag_days": {
       "default": 0,
@@ -131,7 +135,7 @@
     "stub": {
       "$ref": "#/$defs/StubKind",
       "default": "ShortFront",
-      "description": "Stub rule used when the issue-to-maturity span is not an exact multiple\nof `freq`."
+      "description": "Stub-handling rule used when the start/end dates do not fit an exact\nwhole number of periods."
     }
   },
   "required": [

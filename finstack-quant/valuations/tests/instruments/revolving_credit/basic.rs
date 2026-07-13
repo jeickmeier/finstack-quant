@@ -462,15 +462,10 @@ fn test_term_forward_with_floor() {
                 reset_freq: Tenor::quarterly(),
                 index_tenor: None,
                 reset_lag_days: 2,
-                dc: DayCount::Act360,
-                bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
                 fixing_calendar_id: None,
-                end_of_month: false,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
-                payment_lag_days: 0,
             },
         ))
         .day_count(DayCount::Act360)
@@ -502,15 +497,10 @@ fn test_term_forward_with_floor() {
                 reset_freq: Tenor::quarterly(),
                 index_tenor: None,
                 reset_lag_days: 2,
-                dc: DayCount::Act360,
-                bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
                 fixing_calendar_id: None,
-                end_of_month: false,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
-                payment_lag_days: 0,
             },
         ))
         .day_count(DayCount::Act360)

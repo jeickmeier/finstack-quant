@@ -268,7 +268,10 @@ mod tests {
         .expect("Bond::with_convention should succeed for EOM bond");
 
         if let CashflowSpec::Fixed(spec) = &bond.cashflow_spec {
-            assert!(spec.end_of_month, "EOM bonds should enable EOM roll");
+            assert!(
+                spec.schedule.end_of_month,
+                "EOM bonds should enable EOM roll"
+            );
         } else {
             panic!("Expected fixed cashflow spec");
         }
@@ -415,13 +418,23 @@ mod tests {
         let spec = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.05).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "USGS".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::ModifiedFollowing,
+
+                calendar_id: "USGS".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         };
 
         let bond = Bond::builder()
@@ -437,8 +450,8 @@ mod tests {
             .expect("should succeed");
 
         if let CashflowSpec::Fixed(s) = &bond.cashflow_spec {
-            assert_eq!(s.calendar_id, "USGS".to_string());
-            assert_eq!(s.bdc, BusinessDayConvention::ModifiedFollowing);
+            assert_eq!(s.schedule.calendar_id, "USGS".to_string());
+            assert_eq!(s.schedule.bdc, BusinessDayConvention::ModifiedFollowing);
         } else {
             panic!("Expected Fixed cashflow spec");
         }
@@ -452,13 +465,23 @@ mod tests {
         let spec_short = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.05).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::ShortFront,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         };
 
         let bond_short_front = Bond::builder()
@@ -474,20 +497,30 @@ mod tests {
             .expect("should succeed");
 
         if let CashflowSpec::Fixed(s) = &bond_short_front.cashflow_spec {
-            assert_eq!(s.stub, StubKind::ShortFront);
+            assert_eq!(s.schedule.stub, StubKind::ShortFront);
         }
 
         // Long back stub
         let spec_long = FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::try_from(0.05).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::LongBack,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::LongBack,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         };
 
         let bond_long_back = Bond::builder()
@@ -503,7 +536,7 @@ mod tests {
             .expect("should succeed");
 
         if let CashflowSpec::Fixed(s) = &bond_long_back.cashflow_spec {
-            assert_eq!(s.stub, StubKind::LongBack);
+            assert_eq!(s.schedule.stub, StubKind::LongBack);
         }
     }
 

@@ -577,6 +577,14 @@ impl XccySwap {
                     reset_freq: leg.frequency,
                     index_tenor: None,
                     reset_lag_days: leg.reset_lag_days.unwrap_or_default(),
+                    fixing_calendar_id: None,
+                    overnight_compounding: None,
+                    overnight_basis: None,
+                    fallback: FloatingRateFallback::Error,
+                },
+                coupon_type: CouponType::Cash,
+                schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                    freq: leg.frequency,
                     dc: leg.day_count,
                     bdc: leg.bdc,
                     calendar_id: match leg.calendar_id.as_deref() {
@@ -596,16 +604,11 @@ impl XccySwap {
                             )))
                         }
                     },
-                    fixing_calendar_id: None,
+                    stub: leg.stub,
                     end_of_month: false,
                     payment_lag_days: leg.payment_lag_days,
-                    overnight_compounding: None,
-                    overnight_basis: None,
-                    fallback: FloatingRateFallback::Error,
+                    adjust_accrual_dates: false,
                 },
-                coupon_type: CouponType::Cash,
-                freq: leg.frequency,
-                stub: leg.stub,
             });
         let mut schedule = builder.build_with_curves(Some(market))?;
         schedule

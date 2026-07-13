@@ -70,15 +70,10 @@ fn build_seasoned_floating_facility(
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
-            payment_lag_days: 0,
         }))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())
@@ -234,15 +229,10 @@ fn test_fixings_respect_floor() {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
-            payment_lag_days: 0,
         }))
         .day_count(DayCount::Act360)
         .frequency(Tenor::quarterly())

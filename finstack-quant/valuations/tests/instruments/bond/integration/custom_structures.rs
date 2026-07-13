@@ -32,13 +32,23 @@ fn test_pik_bond() {
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::PIK,
             rate: rust_decimal::Decimal::try_from(0.08).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         })
         .build_with_curves(None)
         .unwrap();

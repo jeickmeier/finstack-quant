@@ -44,7 +44,7 @@
 //! ## Building a Cashflow Schedule
 //!
 //! ```rust
-//! use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
+//! use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 //! use finstack_quant_core::money::Money;
@@ -60,13 +60,7 @@
 //!     .fixed_cf(FixedCouponSpec {
 //!         coupon_type: CouponType::Cash,
 //!         rate: dec!(0.05),
-//!         freq: Tenor::semi_annual(),
-//!         dc: DayCount::Thirty360,
-//!         bdc: BusinessDayConvention::Following,
-//!         calendar_id: "weekends_only".to_string(),
-//!         stub: StubKind::None,
-//!         end_of_month: false,
-//!         payment_lag_days: 0,
+//!         schedule: ScheduleParams::semiannual_30360(),
 //!     })
 //!     .build_with_curves(None)?;
 //!

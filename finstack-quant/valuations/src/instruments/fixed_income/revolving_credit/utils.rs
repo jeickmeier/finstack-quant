@@ -104,9 +104,10 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
                     .frequency(spec.reset_freq)
                     .stub_rule(facility.stub);
 
-            let cal =
-                crate::cashflow::builder::calendar::resolve_calendar_strict(&spec.calendar_id)?;
-            reset_builder = reset_builder.adjust_with(spec.bdc, cal);
+            if let Some(cal) = resolve_facility_calendar(&facility.attributes) {
+                reset_builder =
+                    reset_builder.adjust_with(BusinessDayConvention::ModifiedFollowing, cal);
+            }
 
             let reset_schedule = reset_builder.build()?;
             Ok(Some(reset_schedule.into_iter().collect()))
@@ -119,6 +120,7 @@ pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec
 pub(super) fn floating_fixing_date(
     spec: &crate::cashflow::builder::FloatingRateSpec,
     reset_effective_date: Date,
+    attrs: &Attributes,
 ) -> Result<Date> {
     if spec.reset_lag_days < 0 {
         return Err(finstack_quant_core::Error::Validation(format!(
@@ -129,25 +131,11 @@ pub(super) fn floating_fixing_date(
     let calendar_id = spec
         .fixing_calendar_id
         .as_deref()
-        .unwrap_or(spec.calendar_id.as_str());
+        .or_else(|| attrs.get_meta("calendar_id"))
+        .or_else(|| attrs.get_meta("calendar"))
+        .unwrap_or("weekends_only");
     let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
     reset_effective_date.add_business_days(-spec.reset_lag_days, calendar)
-}
-
-/// Apply the floating coupon payment lag without shifting accrual boundaries.
-pub(super) fn floating_payment_date(
-    spec: &crate::cashflow::builder::FloatingRateSpec,
-    accrual_end: Date,
-) -> Result<Date> {
-    if spec.payment_lag_days < 0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "RevolvingCredit payment_lag_days must be non-negative, got {}",
-            spec.payment_lag_days
-        )));
-    }
-    let calendar =
-        crate::cashflow::builder::calendar::resolve_calendar_strict(spec.calendar_id.as_str())?;
-    accrual_end.add_business_days(spec.payment_lag_days, calendar)
 }
 
 /// Project floating rate for revolving credit facility using resolved curve.
@@ -160,9 +148,9 @@ pub(super) fn project_floating_rate_with_curve(
     reset_date: finstack_quant_core::dates::Date,
     spec: &crate::cashflow::builder::FloatingRateSpec,
     fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
-    _attrs: &Attributes,
+    attrs: &Attributes,
 ) -> Result<f64> {
-    let reset_end = compute_reset_period_end(reset_date, spec)?;
+    let reset_end = compute_reset_period_end(reset_date, spec, attrs)?;
     let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
 
     // Delegate to centralized projection
@@ -237,6 +225,7 @@ pub(super) fn apply_draw_repay_event(
 pub(super) fn compute_reset_period_end(
     reset_date: Date,
     spec: &crate::cashflow::builder::FloatingRateSpec,
+    attrs: &Attributes,
 ) -> Result<Date> {
     let reset_freq = spec.index_tenor.as_ref().unwrap_or(&spec.reset_freq);
     // Compute unadjusted end date based on frequency
@@ -248,11 +237,13 @@ pub(super) fn compute_reset_period_end(
         TenorUnit::Days => reset_date + time::Duration::days(reset_freq.count() as i64),
     };
 
-    if spec.end_of_month && reset_date == reset_date.end_of_month() {
-        reset_end = reset_end.end_of_month();
+    if let Some(calendar) = resolve_facility_calendar(attrs) {
+        reset_end = finstack_quant_core::dates::adjust(
+            reset_end,
+            BusinessDayConvention::ModifiedFollowing,
+            calendar,
+        )?;
     }
-    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(&spec.calendar_id)?;
-    reset_end = finstack_quant_core::dates::adjust(reset_end, spec.bdc, calendar)?;
 
     Ok(reset_end)
 }
@@ -267,7 +258,7 @@ mod tests {
     use rust_decimal::Decimal;
     use time::Month;
 
-    fn reset_spec(tenor: Tenor, calendar_id: &str) -> crate::cashflow::builder::FloatingRateSpec {
+    fn reset_spec(tenor: Tenor) -> crate::cashflow::builder::FloatingRateSpec {
         crate::cashflow::builder::FloatingRateSpec {
             index_id: "TEST-INDEX".into(),
             spread_bp: Decimal::ZERO,
@@ -281,12 +272,7 @@ mod tests {
             reset_freq: tenor,
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: calendar_id.to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
@@ -428,12 +414,7 @@ mod tests {
                 reset_freq: Tenor::quarterly(),
                 index_tenor: None,
                 reset_lag_days: 2,
-                dc: DayCount::Act360,
-                bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
                 fixing_calendar_id: None,
-                end_of_month: false,
-                payment_lag_days: 0,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
@@ -467,12 +448,7 @@ mod tests {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 2,
             overnight_compounding: None,
             overnight_basis: None,
             fallback: Default::default(),
@@ -486,14 +462,6 @@ mod tests {
         let rate = project_floating_rate_with_curve(reset, &spec, &forward, &Attributes::new())
             .expect("projected coupon");
         assert!((rate - 0.02).abs() < 1e-12, "all-in cap must bind: {rate}");
-        assert_eq!(
-            floating_payment_date(
-                &spec,
-                Date::from_calendar_date(2025, Month::January, 3).expect("date")
-            )
-            .expect("lagged date"),
-            Date::from_calendar_date(2025, Month::January, 7).expect("date")
-        );
     }
 
     #[test]
@@ -531,14 +499,11 @@ mod tests {
     fn test_compute_reset_period_end_monthly() {
         let reset_date =
             Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
-        let spec = reset_spec(
-            finstack_quant_core::dates::Tenor::new(
-                3,
-                finstack_quant_core::dates::TenorUnit::Months,
-            ),
-            "weekends_only",
-        );
-        let reset_end = compute_reset_period_end(reset_date, &spec)
+        let spec = reset_spec(finstack_quant_core::dates::Tenor::new(
+            3,
+            finstack_quant_core::dates::TenorUnit::Months,
+        ));
+        let reset_end = compute_reset_period_end(reset_date, &spec, &Attributes::new())
             .expect("Reset period end calculation should succeed");
 
         // 3 months from Jan 15 should be Apr 15
@@ -550,11 +515,11 @@ mod tests {
     fn test_compute_reset_period_end_daily() {
         let reset_date =
             Date::from_calendar_date(2025, Month::January, 15).expect("Valid test date");
-        let spec = reset_spec(
-            finstack_quant_core::dates::Tenor::new(90, finstack_quant_core::dates::TenorUnit::Days),
-            "weekends_only",
-        );
-        let reset_end = compute_reset_period_end(reset_date, &spec)
+        let spec = reset_spec(finstack_quant_core::dates::Tenor::new(
+            90,
+            finstack_quant_core::dates::TenorUnit::Days,
+        ));
+        let reset_end = compute_reset_period_end(reset_date, &spec, &Attributes::new())
             .expect("Reset period end calculation should succeed");
 
         // 90 days from Jan 15
@@ -570,13 +535,14 @@ mod tests {
             1,
             finstack_quant_core::dates::TenorUnit::Months,
         );
-        let weekends_spec = reset_spec(tenor, "weekends_only");
-        let wmr_spec = reset_spec(tenor, "USNY");
+        let spec = reset_spec(tenor);
+        let weekends_attrs = Attributes::new().with_meta("calendar_id", "weekends_only");
+        let usny_attrs = Attributes::new().with_meta("calendar_id", "USNY");
 
-        let end_no_cal = compute_reset_period_end(reset_date, &weekends_spec)
+        let end_no_cal = compute_reset_period_end(reset_date, &spec, &weekends_attrs)
             .expect("Reset period end calculation should succeed");
 
-        let end_with_cal = compute_reset_period_end(reset_date, &wmr_spec)
+        let end_with_cal = compute_reset_period_end(reset_date, &spec, &usny_attrs)
             .expect("Reset period end calculation should succeed");
 
         // Both should succeed (calendar adjustment may or may not change date)

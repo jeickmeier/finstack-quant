@@ -21,20 +21,20 @@
               "count": 3,
               "unit": "months"
             },
+            "bdc": "following",
+            "calendar_id": "weekends_only",
+            "dc": "Act360",
+            "end_of_month": false,
+            "payment_lag_days": 0,
             "rate_spec": {
               "all_in_cap_bp": null,
               "all_in_floor_bp": null,
-              "bdc": "following",
-              "calendar_id": "weekends_only",
-              "dc": "Act360",
-              "end_of_month": false,
               "fixing_calendar_id": "weekends_only",
               "gearing": "1",
               "gearing_includes_spread": true,
               "index_cap_bp": null,
               "index_floor_bp": null,
               "index_id": "USD-SOFR-3M",
-              "payment_lag_days": 0,
               "reset_freq": {
                 "count": 3,
                 "unit": "months"

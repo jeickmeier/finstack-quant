@@ -2,6 +2,7 @@
 
 use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use rust_decimal::Decimal;
+
 /// Canonical schedule-generation parameters for coupons and periodic fees.
 ///
 /// This type controls how accrual boundaries and payment dates are generated.
@@ -34,8 +35,10 @@ pub struct ScheduleParams {
     pub stub: StubKind,
     /// Whether end-of-month rolling should be preserved when generating the
     /// schedule.
+    #[serde(default)]
     pub end_of_month: bool,
     /// Payment lag in business days after the adjusted accrual end date.
+    #[serde(default)]
     pub payment_lag_days: i32,
     /// Whether accrual-period boundaries are business-day adjusted with `bdc`.
     ///

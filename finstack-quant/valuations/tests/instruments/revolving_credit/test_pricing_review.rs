@@ -145,15 +145,10 @@ fn test_floating_rcf_declares_forward_dependency() {
                 reset_freq: Tenor::quarterly(),
                 index_tenor: None,
                 reset_lag_days: 2,
-                dc: DayCount::Act360,
-                bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
                 fixing_calendar_id: None,
-                end_of_month: false,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
-                payment_lag_days: 0,
             },
         ))
         .day_count(DayCount::Act360)
@@ -206,15 +201,10 @@ fn test_floating_rcf_dv01_bumps_forward_curve() {
                 reset_freq: Tenor::quarterly(),
                 index_tenor: None,
                 reset_lag_days: 2,
-                dc: DayCount::Act360,
-                bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
                 fixing_calendar_id: None,
-                end_of_month: false,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
-                payment_lag_days: 0,
             },
         ))
         .day_count(DayCount::Act360)

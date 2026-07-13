@@ -224,12 +224,12 @@ impl Bond {
         let mut cashflow_spec =
             CashflowSpec::fixed_rate(coupon_rate, convention.frequency(), convention.day_count())?;
         if let CashflowSpec::Fixed(spec) = &mut cashflow_spec {
-            spec.bdc = convention.business_day_convention();
-            spec.calendar_id = convention
+            spec.schedule.bdc = convention.business_day_convention();
+            spec.schedule.calendar_id = convention
                 .calendar_id()
                 .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID)
                 .to_string();
-            spec.end_of_month =
+            spec.schedule.end_of_month =
                 issue.end_of_month() == issue && maturity.end_of_month() == maturity;
         }
         let bond = Self::builder()
@@ -784,19 +784,22 @@ impl Bond {
                 reset_freq: Tenor::quarterly(),
                 index_tenor: None,
                 reset_lag_days: 2,
-                dc: DayCount::Act360,
-                bdc: BusinessDayConvention::ModifiedFollowing,
-                calendar_id: "weekends_only".to_string(),
                 fixing_calendar_id: None,
-                end_of_month: false,
-                payment_lag_days: 0,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
             },
             coupon_type: CouponType::Cash,
-            freq: Tenor::quarterly(),
-            stub: StubKind::ShortFront,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::quarterly(),
+                dc: DayCount::Act360,
+                bdc: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::ShortFront,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         });
 
         let bond = Self::builder()
@@ -890,13 +893,16 @@ impl Bond {
         let base = CashflowSpec::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::new(4, 2),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Thirty360,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+                dc: DayCount::Thirty360,
+                bdc: BusinessDayConvention::ModifiedFollowing,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::ShortFront,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         });
 
         let cashflow_spec = CashflowSpec::Amortizing {

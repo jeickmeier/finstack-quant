@@ -225,7 +225,7 @@ fn test_recovery_spec_json_format() {
 
 fn build_full_feature_structured_credit() -> StructuredCredit {
     use finstack_quant_core::currency::Currency;
-    use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, Tenor};
+    use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::types::CreditRating;
     use finstack_quant_core::types::{CurveId, InstrumentId};
 
@@ -333,15 +333,10 @@ fn build_full_feature_structured_credit() -> StructuredCredit {
         reset_freq: Tenor::quarterly(),
         index_tenor: None,
         reset_lag_days: 2,
-        dc: DayCount::Act360,
-        bdc: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: "usny".to_string(),
         fixing_calendar_id: Some("usny".to_string()),
-        end_of_month: false,
         overnight_compounding: None,
         overnight_basis: None,
         fallback: Default::default(),
-        payment_lag_days: 0,
     };
 
     let mut senior = Tranche::new(

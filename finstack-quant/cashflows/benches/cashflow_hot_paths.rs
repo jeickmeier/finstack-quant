@@ -87,13 +87,23 @@ fn make_fixed_schedule(base: Date, years: i32, freq: Tenor) -> CashFlowSchedule 
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: dec!(0.06),
-            freq,
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::ModifiedFollowing,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         })
         .build_with_curves(None)
         .unwrap()
@@ -414,13 +424,23 @@ fn bench_build_fixed_schedule(c: &mut Criterion) {
                     .fixed_cf(FixedCouponSpec {
                         coupon_type: CouponType::Cash,
                         rate: dec!(0.06),
-                        freq: black_box(freq),
-                        dc: DayCount::Act365F,
-                        bdc: BusinessDayConvention::ModifiedFollowing,
-                        calendar_id: "weekends_only".to_string(),
-                        stub: StubKind::None,
-                        end_of_month: false,
-                        payment_lag_days: 0,
+                        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                            freq: black_box(freq),
+
+                            dc: DayCount::Act365F,
+
+                            bdc: BusinessDayConvention::ModifiedFollowing,
+
+                            calendar_id: "weekends_only".to_string(),
+
+                            stub: StubKind::None,
+
+                            end_of_month: false,
+
+                            payment_lag_days: 0,
+
+                            adjust_accrual_dates: false,
+                        },
                     })
                     .build_with_curves(None)
                     .unwrap()

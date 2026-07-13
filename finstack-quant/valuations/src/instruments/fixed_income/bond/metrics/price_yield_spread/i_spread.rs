@@ -156,8 +156,8 @@ impl MetricCalculator for ISpreadCalculator {
             if let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) =
                 &bond.cashflow_spec
             {
-                fixed_leg_day_count = spec.dc;
-                fixed_leg_frequency = spec.freq;
+                fixed_leg_day_count = spec.schedule.dc;
+                fixed_leg_frequency = spec.schedule.freq;
             }
         }
         let dates: Vec<Date> = finstack_quant_core::dates::ScheduleBuilder::new(

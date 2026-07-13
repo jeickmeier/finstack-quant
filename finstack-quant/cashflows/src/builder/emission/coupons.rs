@@ -309,12 +309,12 @@ pub(crate) fn emit_fixed_coupons_on(
             // period itself (exact ISMA accrual). For stubs the adjacent
             // regular period is not available here, so core's frequency-based
             // quasi-coupon subdivision is used instead (coupon_period: None).
-            let yf = spec.dc.year_fraction(
+            let yf = spec.schedule.dc.year_fraction(
                 accrual_start,
                 accrual_end,
                 finstack_quant_core::dates::DayCountContext {
                     calendar: Some(calendar),
-                    frequency: Some(spec.freq),
+                    frequency: Some(spec.schedule.freq),
                     bus_basis: None,
                     coupon_period: (!is_stub).then_some((accrual_start, accrual_end)),
                     end_is_termination_date: is_termination_date,
@@ -345,7 +345,7 @@ pub(crate) fn emit_fixed_coupons_on(
                         .with_accrual(CashFlowAccrual {
                             start: accrual_start,
                             end: accrual_end,
-                            day_count: spec.dc,
+                            day_count: spec.schedule.dc,
                             projected_index_rate: None,
                         }),
                 );
@@ -358,7 +358,7 @@ pub(crate) fn emit_fixed_coupons_on(
                     flow.accrual = Some(CashFlowAccrual {
                         start: accrual_start,
                         end: accrual_end,
-                        day_count: spec.dc,
+                        day_count: spec.schedule.dc,
                         projected_index_rate: None,
                     });
                 }
@@ -725,12 +725,12 @@ pub(crate) fn emit_float_coupons_on(
             // period, not the reset cadence. Regular periods use the accrual
             // period itself as the ICMA reference period; stubs fall back to
             // core's frequency-based quasi-coupon subdivision.
-            let yf = spec.rate_spec.dc.year_fraction(
+            let yf = spec.schedule.dc.year_fraction(
                 accrual_start,
                 accrual_end,
                 finstack_quant_core::dates::DayCountContext {
                     calendar: Some(calendar),
-                    frequency: Some(spec.freq),
+                    frequency: Some(spec.schedule.freq),
                     bus_basis: None,
                     coupon_period: (!is_stub).then_some((accrual_start, accrual_end)),
                     end_is_termination_date: is_termination_date,
@@ -742,7 +742,7 @@ pub(crate) fn emit_float_coupons_on(
             let reset_date = compute_reset_date(
                 accrual_start,
                 spec.rate_spec.reset_lag_days,
-                spec.rate_spec.bdc,
+                spec.schedule.bdc,
                 schedule.fixing_calendar,
             )?;
 
@@ -863,7 +863,7 @@ pub(crate) fn emit_float_coupons_on(
                                     spec.rate_spec
                                         .fixing_calendar_id
                                         .as_deref()
-                                        .unwrap_or(&spec.rate_spec.calendar_id),
+                                        .unwrap_or(&spec.schedule.calendar_id),
                                 )));
                                 }
 
@@ -1020,7 +1020,7 @@ pub(crate) fn emit_float_coupons_on(
                     .with_accrual(CashFlowAccrual {
                         start: accrual_start,
                         end: accrual_end,
-                        day_count: spec.rate_spec.dc,
+                        day_count: spec.schedule.dc,
                         projected_index_rate,
                     }),
                 );
@@ -1033,7 +1033,7 @@ pub(crate) fn emit_float_coupons_on(
                     flow.accrual = Some(CashFlowAccrual {
                         start: accrual_start,
                         end: accrual_end,
-                        day_count: spec.rate_spec.dc,
+                        day_count: spec.schedule.dc,
                         projected_index_rate,
                     });
                 }

@@ -257,7 +257,7 @@ impl Bond {
         let (coupon_rate, coupon_type, coupon_frequency) = match &self.cashflow_spec {
             CashflowSpec::Fixed(spec) => {
                 let rate = spec.rate.to_f64().unwrap_or(0.0);
-                let freq = (1.0 / spec.freq.to_years_simple()).round() as usize;
+                let freq = (1.0 / spec.schedule.freq.to_years_simple()).round() as usize;
                 (rate, spec.coupon_type, freq)
             }
             CashflowSpec::Floating(_) => {
@@ -266,7 +266,7 @@ impl Bond {
             CashflowSpec::StepUp(spec) => {
                 // Use initial_rate for Merton MC calibration
                 let rate = spec.initial_rate.to_f64().unwrap_or(0.0);
-                let freq = (1.0 / spec.freq.to_years_simple()).round() as usize;
+                let freq = (1.0 / spec.schedule.freq.to_years_simple()).round() as usize;
                 (rate, spec.coupon_type, freq)
             }
             // The Merton MC engine simulates a constant notional with full

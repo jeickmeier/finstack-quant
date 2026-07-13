@@ -453,13 +453,23 @@ impl ConvertibleBond {
             .fixed_coupon_opt(Some(FixedCouponSpec {
                 coupon_type: CouponType::Cash,
                 rate: coupon_rate,
-                freq: Tenor::semi_annual(),
-                dc: DayCount::Thirty360,
-                bdc: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
-                stub: StubKind::None,
-                end_of_month: false,
-                payment_lag_days: 0,
+                schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                    freq: Tenor::semi_annual(),
+
+                    dc: DayCount::Thirty360,
+
+                    bdc: BusinessDayConvention::Following,
+
+                    calendar_id: "weekends_only".to_string(),
+
+                    stub: StubKind::None,
+
+                    end_of_month: false,
+
+                    payment_lag_days: 0,
+
+                    adjust_accrual_dates: false,
+                },
             }))
             .floating_coupon_opt(None)
             .attributes(Attributes::new())
@@ -533,13 +543,23 @@ impl ConvertibleBond {
             .fixed_coupon_opt(Some(FixedCouponSpec {
                 coupon_type: CouponType::Cash,
                 rate: coupon_rate,
-                freq: Tenor::semi_annual(),
-                dc: DayCount::Thirty360,
-                bdc: BusinessDayConvention::Following,
-                calendar_id: "weekends_only".to_string(),
-                stub: StubKind::None,
-                end_of_month: false,
-                payment_lag_days: 0,
+                schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                    freq: Tenor::semi_annual(),
+
+                    dc: DayCount::Thirty360,
+
+                    bdc: BusinessDayConvention::Following,
+
+                    calendar_id: "weekends_only".to_string(),
+
+                    stub: StubKind::None,
+
+                    end_of_month: false,
+
+                    payment_lag_days: 0,
+
+                    adjust_accrual_dates: false,
+                },
             }))
             .floating_coupon_opt(None)
             .attributes(Attributes::new())

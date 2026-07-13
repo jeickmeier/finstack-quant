@@ -48,13 +48,23 @@ fn convertible_with_credit() -> Arc<dyn Instrument> {
     let fixed_coupon = FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: rust_decimal::Decimal::from_f64_retain(0.05).unwrap(),
-        freq: Tenor::semi_annual(),
-        dc: DayCount::Act365F,
-        bdc: BusinessDayConvention::Following,
-        calendar_id: "weekends_only".to_string(),
-        stub: StubKind::None,
-        end_of_month: false,
-        payment_lag_days: 0,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::semi_annual(),
+
+            dc: DayCount::Act365F,
+
+            bdc: BusinessDayConvention::Following,
+
+            calendar_id: "weekends_only".to_string(),
+
+            stub: StubKind::None,
+
+            end_of_month: false,
+
+            payment_lag_days: 0,
+
+            adjust_accrual_dates: false,
+        },
     };
     Arc::new(ConvertibleBond {
         id: "CONV-CREDIT-ATTR".to_string().into(),

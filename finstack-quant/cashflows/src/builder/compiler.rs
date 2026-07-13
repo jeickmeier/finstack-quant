@@ -464,7 +464,11 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
 
         fn into_fixed_schedule(self, input: &StepUpCompileInput<'_>) -> FixedSchedule {
             FixedSchedule {
-                spec: FixedCouponSpec::from_parts(input.split, self.rate, input.schedule.clone()),
+                spec: FixedCouponSpec {
+                    coupon_type: input.split,
+                    rate: self.rate,
+                    schedule: input.schedule.clone(),
+                },
                 calendar: input.calendar,
                 dates: self.dates,
                 prev: self.prev,
@@ -613,7 +617,7 @@ pub(super) fn compute_coupon_schedules(
     //! Example:
     //! ```rust
     //! use finstack_quant_core::dates::{Date, Tenor, DayCount, BusinessDayConvention};
-    //! use finstack_quant_cashflows::builder::{FixedCouponSpec, CouponType};
+    //! use finstack_quant_cashflows::builder::{FixedCouponSpec, CouponType, ScheduleParams};
     //! use finstack_quant_core::dates::StubKind;
     //! use rust_decimal_macros::dec;
     //! use time::Month;
@@ -624,13 +628,7 @@ pub(super) fn compute_coupon_schedules(
     //! let fixed_spec = FixedCouponSpec {
     //!     coupon_type: CouponType::Cash,
     //!     rate: dec!(0.05),
-    //!     freq: Tenor::semi_annual(),
-    //!     dc: DayCount::Thirty360,
-    //!     bdc: BusinessDayConvention::Following,
-    //!     calendar_id: "usny".to_string(),
-    //!     end_of_month: false,
-    //!     payment_lag_days: 0,
-    //!     stub: StubKind::None,
+    //!     schedule: ScheduleParams::semiannual_30360(),
     //! };
     //! // Note: compute_coupon_schedules would be called here
     //! ```
@@ -722,8 +720,11 @@ pub(super) fn compute_coupon_schedules(
 
         match &chosen_coupon.coupon {
             CouponSpec::Fixed { rate } => {
-                let spec =
-                    FixedCouponSpec::from_parts(split, *rate, chosen_coupon.schedule.clone());
+                let spec = FixedCouponSpec {
+                    coupon_type: split,
+                    rate: *rate,
+                    schedule: chosen_coupon.schedule.clone(),
+                };
                 fixed_schedules.push(FixedSchedule {
                     spec,
                     calendar,
@@ -756,16 +757,15 @@ pub(super) fn compute_coupon_schedules(
                 let spec = FloatingCouponSpec {
                     rate_spec: rate_spec.clone(),
                     coupon_type: split,
-                    freq: chosen_coupon.schedule.freq,
-                    stub: chosen_coupon.schedule.stub,
+                    schedule: chosen_coupon.schedule.clone(),
                 };
                 let runtime_spec = ResolvedFloatingRateSpec::try_from(&spec.rate_spec)?;
-                let calendar = resolve_calendar_strict(&spec.rate_spec.calendar_id)?;
+                let calendar = resolve_calendar_strict(&spec.schedule.calendar_id)?;
                 let fixing_calendar_id = spec
                     .rate_spec
                     .fixing_calendar_id
                     .as_deref()
-                    .unwrap_or(&spec.rate_spec.calendar_id);
+                    .unwrap_or(&spec.schedule.calendar_id);
                 let fixing_calendar = resolve_calendar_strict(fixing_calendar_id)?;
                 float_schedules.push(FloatSchedule {
                     spec,
@@ -805,13 +805,16 @@ mod tests {
         FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: rust_decimal_macros::dec!(0.05),
-            freq: Tenor::annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: ScheduleParams {
+                freq: Tenor::annual(),
+                dc: DayCount::Act365F,
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         }
     }
 

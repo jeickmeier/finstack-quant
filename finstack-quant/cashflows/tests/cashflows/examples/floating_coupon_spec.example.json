@@ -15,18 +15,18 @@
         "unit": "months"
       },
       "reset_lag_days": 2,
-      "dc": "Act360",
-      "bdc": "modified_following",
-      "calendar_id": "EUR",
-      "fixing_calendar_id": null,
-      "end_of_month": false,
-      "payment_lag_days": 0
+      "fixing_calendar_id": null
     },
     "coupon_type": "Cash",
     "freq": {
       "count": 6,
       "unit": "months"
     },
-    "stub": "None"
+    "dc": "Act360",
+    "bdc": "modified_following",
+    "calendar_id": "EUR",
+    "stub": "None",
+    "end_of_month": false,
+    "payment_lag_days": 0
   }
 }

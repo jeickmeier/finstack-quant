@@ -286,12 +286,7 @@ impl<'a> CashflowEngine<'a> {
         for i in 0..(self.payment_dates.len() - 1) {
             let period_start = self.payment_dates[i];
             let period_end = self.payment_dates[i + 1];
-            let payment_date = match &self.facility.base_rate_spec {
-                BaseRateSpec::Floating(spec) => {
-                    super::utils::floating_payment_date(spec, period_end)?
-                }
-                BaseRateSpec::Fixed { .. } => period_end,
-            };
+            let payment_date = period_end;
 
             // Apply as_of filtering for non-principal cashflows
             if payment_date <= self.as_of {
@@ -387,7 +382,11 @@ impl<'a> CashflowEngine<'a> {
                     reset_date_opt = match (&self.facility.base_rate_spec, sub_reset_effective_date)
                     {
                         (BaseRateSpec::Floating(spec), Some(date)) => {
-                            Some(super::utils::floating_fixing_date(spec, date)?)
+                            Some(super::utils::floating_fixing_date(
+                                spec,
+                                date,
+                                &self.facility.attributes,
+                            )?)
                         }
                         _ => None,
                     };
@@ -403,8 +402,11 @@ impl<'a> CashflowEngine<'a> {
                     BaseRateSpec::Floating(spec) => {
                         let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
                         let reset_effective = sub_reset_effective_date.unwrap_or(period_start);
-                        let fixing_date =
-                            super::utils::floating_fixing_date(spec, reset_effective)?;
+                        let fixing_date = super::utils::floating_fixing_date(
+                            spec,
+                            reset_effective,
+                            &self.facility.attributes,
+                        )?;
 
                         let coupon_rate = if fixing_date < self.as_of {
                             let fixing_rate =
@@ -654,12 +656,7 @@ impl<'a> CashflowEngine<'a> {
         for i in 0..(path.payment_dates.len() - 1) {
             let period_start = path.payment_dates[i];
             let period_end = path.payment_dates[i + 1];
-            let payment_date = match &self.facility.base_rate_spec {
-                BaseRateSpec::Floating(spec) => {
-                    super::utils::floating_payment_date(spec, period_end)?
-                }
-                BaseRateSpec::Fixed { .. } => period_end,
-            };
+            let payment_date = period_end;
 
             // Get path values at this step (step function - use period start)
             let utilization_start = path.utilization_path[i].clamp(0.0, 1.0);
@@ -691,7 +688,11 @@ impl<'a> CashflowEngine<'a> {
                                 .copied()
                         })
                         .unwrap_or(period_start);
-                    let fixing_date = super::utils::floating_fixing_date(spec, reset_effective)?;
+                    let fixing_date = super::utils::floating_fixing_date(
+                        spec,
+                        reset_effective,
+                        &self.facility.attributes,
+                    )?;
                     let base_rate = if fixing_date < self.as_of {
                         finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                             self.fixing_series,

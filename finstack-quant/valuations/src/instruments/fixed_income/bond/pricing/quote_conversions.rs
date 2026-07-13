@@ -1512,8 +1512,8 @@ fn par_swap_rate_from_discount(
         if let crate::instruments::fixed_income::bond::CashflowSpec::Fixed(spec) =
             &bond.cashflow_spec
         {
-            fixed_leg_day_count = spec.dc;
-            fixed_leg_frequency = spec.freq;
+            fixed_leg_day_count = spec.schedule.dc;
+            fixed_leg_frequency = spec.schedule.freq;
         }
     }
 
@@ -1571,10 +1571,10 @@ fn price_from_asw_market(
     let (coupon, freq, stub, bdc, calendar_id) = match &bond.cashflow_spec {
         CashflowSpec::Fixed(spec) => (
             spec.rate.to_f64().unwrap_or(0.0),
-            spec.freq,
-            spec.stub,
-            spec.bdc,
-            Some(spec.calendar_id.as_str()),
+            spec.schedule.freq,
+            spec.schedule.stub,
+            spec.schedule.bdc,
+            Some(spec.schedule.calendar_id.as_str()),
         ),
         _ => return Err(finstack_quant_core::InputError::Invalid.into()),
     };

@@ -682,15 +682,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 reset_freq: float.frequency,
                 index_tenor: None,
                 reset_lag_days: float.reset_lag_days,
-                dc: float.day_count,
-                bdc: float.bdc,
-                calendar_id: float
-                    .calendar_id
-                    .clone()
-                    .unwrap_or_else(|| "weekends_only".to_string()),
                 fixing_calendar_id: float.fixing_calendar_id.clone(),
-                end_of_month: float.end_of_month,
-                payment_lag_days: float.payment_lag_days,
                 overnight_compounding: builder_overnight_method(float.compounding.clone())?,
                 overnight_basis: None,
                 fallback: if curves.is_some() {
@@ -700,8 +692,19 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 },
             },
             coupon_type: crate::cashflow::builder::CouponType::Cash,
-            freq: float.frequency,
-            stub: float.stub,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: float.frequency,
+                dc: float.day_count,
+                bdc: float.bdc,
+                calendar_id: float
+                    .calendar_id
+                    .clone()
+                    .unwrap_or_else(|| "weekends_only".to_string()),
+                stub: float.stub,
+                end_of_month: float.end_of_month,
+                payment_lag_days: float.payment_lag_days,
+                adjust_accrual_dates: false,
+            },
         });
     let mut sched = float_b.build_with_curves(curves)?;
     // IRS do not exchange notionals; return coupon-only schedule as documented.

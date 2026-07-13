@@ -142,11 +142,11 @@ pub(crate) fn finalize_flows(
 
     let mut cals: Vec<String> = fixed
         .iter()
-        .map(|schedule| schedule.spec.calendar_id.clone())
+        .map(|schedule| schedule.spec.schedule.calendar_id.clone())
         .chain(
             floating
                 .iter()
-                .map(|schedule| schedule.spec.rate_spec.calendar_id.clone()),
+                .map(|schedule| schedule.spec.schedule.calendar_id.clone()),
         )
         .collect();
     cals.sort_unstable();
@@ -160,9 +160,9 @@ pub(crate) fn finalize_flows(
     };
 
     let out_dc = if let Some(schedule) = fixed.first() {
-        schedule.spec.dc
+        schedule.spec.schedule.dc
     } else if let Some(schedule) = floating.first() {
-        schedule.spec.rate_spec.dc
+        schedule.spec.schedule.dc
     } else {
         DayCount::Act365F
     };
@@ -489,7 +489,7 @@ impl CashFlowSchedule {
     /// use finstack_quant_core::currency::Currency;
     /// use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     /// use finstack_quant_core::money::Money;
-    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec};
+    /// use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams};
     /// use rust_decimal_macros::dec;
     /// use time::Month;
     ///
@@ -501,13 +501,7 @@ impl CashFlowSchedule {
     /// let spec = FixedCouponSpec {
     ///     coupon_type: CouponType::Cash,
     ///     rate: dec!(0.05),
-    ///     freq: Tenor::semi_annual(),
-    ///     dc: DayCount::Act365F,
-    ///     bdc: BusinessDayConvention::Following,
-    ///     calendar_id: "weekends_only".to_string(),
-    ///     end_of_month: false,
-    ///     payment_lag_days: 0,
-    ///     stub: StubKind::None,
+    ///     schedule: ScheduleParams::semiannual_30360(),
     /// };
     ///
     /// let schedule = CashFlowSchedule::builder()

@@ -74,13 +74,23 @@ fn test_all_flows_preserve_currency() {
     let fixed = FixedCouponSpec {
         rate: Decimal::try_from(0.05).expect("valid"), // 5%
         coupon_type: CouponType::Cash,
-        freq: Tenor::semi_annual(),
-        dc: DayCount::Thirty360,
-        bdc: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: "weekends_only".to_string(),
-        stub: StubKind::ShortFront,
-        end_of_month: false,
-        payment_lag_days: 0,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::semi_annual(),
+
+            dc: DayCount::Thirty360,
+
+            bdc: BusinessDayConvention::ModifiedFollowing,
+
+            calendar_id: "weekends_only".to_string(),
+
+            stub: StubKind::ShortFront,
+
+            end_of_month: false,
+
+            payment_lag_days: 0,
+
+            adjust_accrual_dates: false,
+        },
     };
 
     let mut builder = CashFlowSchedule::builder();

@@ -223,12 +223,7 @@
                 "index_cap_bp": null,
                 "reset_freq": {"count": 3, "unit": "months"},
                 "reset_lag_days": 2,
-                "dc": "Act360",
-                "bdc": "modified_following",
-                "calendar_id": "usny",
-                "fixing_calendar_id": "usny",
-                "end_of_month": false,
-                "payment_lag_days": 0
+                "fixing_calendar_id": "usny"
               }
             },
             "oc_trigger": null,

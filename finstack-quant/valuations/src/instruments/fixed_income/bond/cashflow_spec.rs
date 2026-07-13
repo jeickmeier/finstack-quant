@@ -206,13 +206,23 @@ impl CashflowSpec {
         Ok(Self::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate,
-            freq,
-            dc,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+
+                dc,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::ShortFront,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         }))
     }
 
@@ -231,13 +241,23 @@ impl CashflowSpec {
         Ok(Self::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate,
-            freq,
-            dc,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+
+                dc,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::ShortFront,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         }))
     }
 
@@ -340,19 +360,22 @@ impl CashflowSpec {
                 reset_freq: freq,
                 index_tenor: None,
                 reset_lag_days,
-                dc,
-                bdc: BusinessDayConvention::Following,
-                calendar_id,
                 fixing_calendar_id: None,
-                end_of_month: false,
-                payment_lag_days: 0,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
             },
             coupon_type: CouponType::Cash,
-            freq,
-            stub: StubKind::ShortFront,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+                dc,
+                bdc: BusinessDayConvention::Following,
+                calendar_id,
+                stub: StubKind::ShortFront,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         })
     }
 
@@ -445,19 +468,22 @@ impl CashflowSpec {
                 reset_freq: freq,
                 index_tenor: None,
                 reset_lag_days,
-                dc,
-                bdc: BusinessDayConvention::Following,
-                calendar_id,
                 fixing_calendar_id: None,
-                end_of_month: false,
-                payment_lag_days: 0,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
             },
             coupon_type: CouponType::Cash,
-            freq,
-            stub: StubKind::ShortFront,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+                dc,
+                bdc: BusinessDayConvention::Following,
+                calendar_id,
+                stub: StubKind::ShortFront,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         }))
     }
 
@@ -487,19 +513,22 @@ impl CashflowSpec {
                 reset_freq: freq,
                 index_tenor: None,
                 reset_lag_days,
-                dc,
-                bdc: BusinessDayConvention::Following,
-                calendar_id,
                 fixing_calendar_id: None,
-                end_of_month: false,
-                payment_lag_days: 0,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
             },
             coupon_type: CouponType::Cash,
-            freq,
-            stub: StubKind::ShortFront,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+                dc,
+                bdc: BusinessDayConvention::Following,
+                calendar_id,
+                stub: StubKind::ShortFront,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         })
     }
 
@@ -526,13 +555,23 @@ impl CashflowSpec {
         Self::Fixed(FixedCouponSpec {
             coupon_type,
             rate,
-            freq,
-            dc,
-            bdc,
-            calendar_id,
-            stub,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+
+                dc,
+
+                bdc,
+
+                calendar_id,
+
+                stub,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         })
     }
 
@@ -568,19 +607,22 @@ impl CashflowSpec {
                 reset_freq: params.freq,
                 index_tenor: None,
                 reset_lag_days: params.reset_lag_days,
-                dc: params.dc,
-                bdc: params.bdc,
-                calendar_id: params.calendar_id,
                 fixing_calendar_id: None,
-                end_of_month: false,
                 overnight_compounding: None,
                 overnight_basis: None,
                 fallback: Default::default(),
-                payment_lag_days: 0,
             },
             coupon_type: params.coupon_type,
-            freq: params.freq,
-            stub: params.stub,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: params.freq,
+                dc: params.dc,
+                bdc: params.bdc,
+                calendar_id: params.calendar_id,
+                stub: params.stub,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         })
     }
 
@@ -643,13 +685,23 @@ impl CashflowSpec {
             coupon_type: CouponType::Cash,
             initial_rate: initial,
             step_schedule,
-            freq,
-            dc,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq,
+
+                dc,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::ShortFront,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         }))
     }
 
@@ -768,9 +820,9 @@ impl CashflowSpec {
     /// For amortizing bonds, returns the frequency from the base specification.
     pub fn frequency(&self) -> Tenor {
         match self {
-            Self::Fixed(spec) => spec.freq,
-            Self::Floating(spec) => spec.freq,
-            Self::StepUp(spec) => spec.freq,
+            Self::Fixed(spec) => spec.schedule.freq,
+            Self::Floating(spec) => spec.schedule.freq,
+            Self::StepUp(spec) => spec.schedule.freq,
             Self::Amortizing { base, .. } => base.frequency(),
         }
     }
@@ -784,9 +836,9 @@ impl CashflowSpec {
     /// For amortizing bonds, returns the day count from the base specification.
     pub fn day_count(&self) -> DayCount {
         match self {
-            Self::Fixed(spec) => spec.dc,
-            Self::Floating(spec) => spec.rate_spec.dc,
-            Self::StepUp(spec) => spec.dc,
+            Self::Fixed(spec) => spec.schedule.dc,
+            Self::Floating(spec) => spec.schedule.dc,
+            Self::StepUp(spec) => spec.schedule.dc,
             Self::Amortizing { base, .. } => base.day_count(),
         }
     }
@@ -821,13 +873,23 @@ impl Default for CashflowSpec {
         Self::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: Decimal::ZERO,
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Thirty360,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Thirty360,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::ShortFront,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         })
     }
 }
@@ -865,8 +927,8 @@ mod tests {
             CashflowSpec::StepUp(spec) => {
                 assert_eq!(spec.initial_rate, Decimal::try_from(0.03).unwrap());
                 assert_eq!(spec.step_schedule.len(), 2);
-                assert_eq!(spec.freq, Tenor::semi_annual());
-                assert_eq!(spec.dc, DayCount::Thirty360);
+                assert_eq!(spec.schedule.freq, Tenor::semi_annual());
+                assert_eq!(spec.schedule.dc, DayCount::Thirty360);
             }
             other => panic!("Expected StepUp variant, got {:?}", other),
         }

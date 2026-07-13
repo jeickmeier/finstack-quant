@@ -1,6 +1,6 @@
 //! Coupon specification types for fixed and floating rate coupons.
 
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::InputError;
 use rust_decimal::Decimal;
@@ -85,75 +85,9 @@ pub struct FixedCouponSpec {
     pub coupon_type: CouponType,
     /// Coupon rate as a decimal (e.g., 0.05 for 5%). Uses Decimal for exact representation.
     pub rate: Decimal,
-    /// Coupon accrual and payment frequency.
-    pub freq: Tenor,
-    /// Day-count convention used to convert each accrual period into a year
-    /// fraction.
-    pub dc: DayCount,
-    /// Business-day convention applied when adjusting coupon schedule dates.
-    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
-    pub bdc: BusinessDayConvention,
-    /// Holiday calendar identifier used with `bdc`.
-    ///
-    /// Use `"weekends_only"` when only weekend adjustment is required.
-    pub calendar_id: String,
-    /// Stub rule used when the issue-to-maturity span is not an exact multiple
-    /// of `freq`.
-    #[serde(default = "crate::serde_defaults::stub_short_front")]
-    pub stub: StubKind,
-    /// Whether end-of-month rolling should be preserved during schedule
-    /// generation.
-    #[serde(default)]
-    pub end_of_month: bool,
-    /// Payment lag in business days after the adjusted accrual end date.
-    #[serde(default)]
-    pub payment_lag_days: i32,
-}
-
-impl FixedCouponSpec {
-    /// Repack a per-window `(split, rate, ScheduleParams)` triple into a
-    /// `FixedCouponSpec`.
-    ///
-    /// `FixedCouponSpec` flattens the schedule conventions inline, whereas the
-    /// compiler/builder carry them as a separate `ScheduleParams`. This pairs
-    /// with [`Self::schedule_params`] to convert between the two
-    /// representations when the builder splits a full-horizon leg into
-    /// per-window pieces (step-up, fixed-to-float).
-    pub(crate) fn from_parts(
-        coupon_type: CouponType,
-        rate: Decimal,
-        schedule: ScheduleParams,
-    ) -> Self {
-        Self {
-            coupon_type,
-            rate,
-            freq: schedule.freq,
-            dc: schedule.dc,
-            bdc: schedule.bdc,
-            calendar_id: schedule.calendar_id,
-            stub: schedule.stub,
-            end_of_month: schedule.end_of_month,
-            payment_lag_days: schedule.payment_lag_days,
-        }
-    }
-
-    /// Extract the schedule-generation conventions as a standalone
-    /// [`ScheduleParams`]. Inverse of [`Self::from_parts`]; used by the builder
-    /// to feed full-horizon coupon legs into the windowed compiler.
-    pub(crate) fn schedule_params(&self) -> ScheduleParams {
-        ScheduleParams {
-            freq: self.freq,
-            dc: self.dc,
-            bdc: self.bdc,
-            calendar_id: self.calendar_id.clone(),
-            stub: self.stub,
-            end_of_month: self.end_of_month,
-            payment_lag_days: self.payment_lag_days,
-            // Bond convention: accrual boundaries stay unadjusted; only
-            // payment dates roll (ICMA practice).
-            adjust_accrual_dates: false,
-        }
-    }
+    /// Accrual and payment schedule conventions.
+    #[serde(flatten)]
+    pub schedule: ScheduleParams,
 }
 
 /// Compounding method for overnight rate indices (SOFR, ESTR, SONIA).
@@ -384,7 +318,7 @@ impl OvernightIndexConstraintApplication {
 /// # Example
 ///
 /// ```rust
-/// use finstack_quant_core::dates::{DayCount, Tenor, BusinessDayConvention};
+/// use finstack_quant_core::dates::Tenor;
 /// use finstack_quant_cashflows::builder::{FloatingRateSpec, OvernightIndexConstraintApplication};
 /// use rust_decimal_macros::dec;
 ///
@@ -402,12 +336,7 @@ impl OvernightIndexConstraintApplication {
 ///     reset_freq: Tenor::quarterly(),
 ///     index_tenor: None,
 ///     reset_lag_days: 2,
-///     dc: DayCount::Act360,
-///     bdc: BusinessDayConvention::ModifiedFollowing,
-///     calendar_id: "weekends_only".to_string(),
 ///     fixing_calendar_id: None,
-///     end_of_month: false,
-///     payment_lag_days: 0,
 ///     overnight_compounding: None,
 ///     overnight_basis: None,
 ///     fallback: Default::default(),
@@ -489,27 +418,11 @@ pub struct FloatingRateSpec {
     #[serde(default = "default_reset_lag")]
     pub reset_lag_days: i32,
 
-    /// Day count convention for accrual calculations.
-    pub dc: DayCount,
-
-    /// Business day convention for date adjustments.
-    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
-    pub bdc: BusinessDayConvention,
-
-    /// Calendar for business day adjustments (accrual/payment).
-    pub calendar_id: String,
-
     /// Optional calendar for rate fixing (reset lag).
     ///
-    /// If not provided, defaults to `calendar_id`.
+    /// If not provided, defaults to the coupon schedule calendar.
     #[serde(default)]
     pub fixing_calendar_id: Option<String>,
-    /// End-of-month rolling.
-    #[serde(default)]
-    pub end_of_month: bool,
-    /// Payment lag in business days after accrual end.
-    #[serde(default)]
-    pub payment_lag_days: i32,
 
     /// Overnight compounding method for overnight rate indices (SOFR, ESTR, SONIA).
     ///
@@ -600,12 +513,9 @@ pub struct FloatingCouponSpec {
     #[serde(default)]
     pub coupon_type: CouponType,
 
-    /// Payment frequency (may differ from reset frequency in rate_spec).
-    pub freq: Tenor,
-
-    /// Stub rule for payment schedule generation.
-    #[serde(default = "crate::serde_defaults::stub_short_front")]
-    pub stub: StubKind,
+    /// Accrual and payment schedule conventions.
+    #[serde(flatten)]
+    pub schedule: ScheduleParams,
 }
 
 /// Step-up/step-down coupon specification.
@@ -621,8 +531,7 @@ pub struct FloatingCouponSpec {
 ///
 /// ```rust
 /// use finstack_quant_core::dates::{Date, DayCount, Tenor, BusinessDayConvention, StubKind};
-/// use finstack_quant_cashflows::builder::StepUpCouponSpec;
-/// use finstack_quant_cashflows::builder::CouponType;
+/// use finstack_quant_cashflows::builder::{CouponType, ScheduleParams, StepUpCouponSpec};
 /// use rust_decimal_macros::dec;
 /// use time::Month;
 ///
@@ -633,13 +542,16 @@ pub struct FloatingCouponSpec {
 ///         (Date::from_calendar_date(2027, Month::January, 1).unwrap(), dec!(0.04)),
 ///         (Date::from_calendar_date(2029, Month::January, 1).unwrap(), dec!(0.05)),
 ///     ],
-///     freq: Tenor::semi_annual(),
-///     dc: DayCount::Thirty360,
-///     bdc: BusinessDayConvention::Following,
-///     calendar_id: "weekends_only".to_string(),
-///     stub: StubKind::None,
-///     end_of_month: false,
-///     payment_lag_days: 0,
+///     schedule: ScheduleParams {
+///         freq: Tenor::semi_annual(),
+///         dc: DayCount::Thirty360,
+///         bdc: BusinessDayConvention::Following,
+///         calendar_id: "weekends_only".to_string(),
+///         stub: StubKind::None,
+///         end_of_month: false,
+///         payment_lag_days: 0,
+///         adjust_accrual_dates: false,
+///     },
 /// };
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -661,24 +573,9 @@ pub struct StepUpCouponSpec {
     /// convention for step-up bonds).
     #[schemars(with = "Vec<(String, Decimal)>")]
     pub step_schedule: Vec<(Date, Decimal)>,
-    /// Payment frequency.
-    pub freq: Tenor,
-    /// Day count convention.
-    pub dc: DayCount,
-    /// Business day convention.
-    #[serde(default = "crate::serde_defaults::bdc_modified_following")]
-    pub bdc: BusinessDayConvention,
-    /// Calendar ID for business day adjustment.
-    pub calendar_id: String,
-    /// Stub convention.
-    #[serde(default = "crate::serde_defaults::stub_short_front")]
-    pub stub: StubKind,
-    /// Whether to apply end-of-month rule.
-    #[serde(default)]
-    pub end_of_month: bool,
-    /// Payment lag in business days after accrual end.
-    #[serde(default)]
-    pub payment_lag_days: i32,
+    /// Accrual and payment schedule conventions.
+    #[serde(flatten)]
+    pub schedule: ScheduleParams,
 }
 
 impl StepUpCouponSpec {
@@ -696,22 +593,5 @@ impl StepUpCouponSpec {
             }
         }
         Ok(())
-    }
-
-    /// Extract the schedule-generation conventions shared by every step
-    /// window as a standalone [`ScheduleParams`]. The compiler then derives
-    /// per-rate `FixedCouponSpec` windows from the `step_schedule`.
-    pub(crate) fn schedule_params(&self) -> ScheduleParams {
-        ScheduleParams {
-            freq: self.freq,
-            dc: self.dc,
-            bdc: self.bdc,
-            calendar_id: self.calendar_id.clone(),
-            stub: self.stub,
-            end_of_month: self.end_of_month,
-            payment_lag_days: self.payment_lag_days,
-            // Bond convention: accrual boundaries stay unadjusted.
-            adjust_accrual_dates: false,
-        }
     }
 }

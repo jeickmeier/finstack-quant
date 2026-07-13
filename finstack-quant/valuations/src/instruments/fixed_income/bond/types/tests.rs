@@ -107,13 +107,23 @@ fn test_bond_builder_with_custom_cashflows() {
                 pik_pct: Decimal::try_from(0.5).expect("valid"),
             },
             rate: Decimal::try_from(0.06).expect("valid"),
-            freq: Tenor::quarterly(),
-            dc: DayCount::Thirty360,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::quarterly(),
+
+                dc: DayCount::Thirty360,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         })
         .build_with_curves(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
@@ -172,14 +182,18 @@ fn test_bond_with_cashflows_method() {
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
-            rate: Decimal::try_from(0.055).expect("valid"), // Different from default spec
-            freq: Tenor::quarterly(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            rate: Decimal::try_from(0.055).expect("valid"),
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                // Different from default spec
+                freq: Tenor::quarterly(),
+                dc: DayCount::Act365F,
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         })
         .build_with_curves(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
@@ -221,14 +235,19 @@ fn test_custom_cashflows_override_regular_generation() {
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::Cash,
-            rate: Decimal::try_from(0.05).expect("valid"), // Different rate
-            freq: Tenor::semi_annual(),                    // Different frequency
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            rate: Decimal::try_from(0.05).expect("valid"),
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                // Different rate
+                freq: Tenor::semi_annual(),
+                // Different frequency
+                dc: DayCount::Act365F,
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         })
         .build_with_curves(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");

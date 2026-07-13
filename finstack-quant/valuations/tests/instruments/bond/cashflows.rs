@@ -255,13 +255,23 @@ fn test_pik_cashflows() {
         .fixed_cf(FixedCouponSpec {
             coupon_type: CouponType::PIK,
             rate: rust_decimal::Decimal::try_from(0.08).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::None,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         })
         .build_with_curves(None)
         .unwrap();
@@ -325,13 +335,23 @@ fn test_cashflows_with_short_front_stub() {
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
             rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
-            freq: Tenor::semi_annual(),
-            dc: DayCount::Act365F,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::ShortFront,
-            end_of_month: false,
-            payment_lag_days: 0,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                freq: Tenor::semi_annual(),
+
+                dc: DayCount::Act365F,
+
+                bdc: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".to_string(),
+
+                stub: StubKind::ShortFront,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+            },
         }))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
@@ -544,14 +564,19 @@ fn test_actact_isma_daycount_context() {
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
-            rate: rust_decimal::Decimal::try_from(0.06).expect("valid"), // 6% coupon
-            freq: Tenor::semi_annual(),
-            dc: DayCount::ActActIsma, // ISMA convention requires frequency context
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            rate: rust_decimal::Decimal::try_from(0.06).expect("valid"),
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                // 6% coupon
+                freq: Tenor::semi_annual(),
+                dc: DayCount::ActActIsma,
+                // ISMA convention requires frequency context
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "weekends_only".to_string(),
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         }))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())
@@ -627,14 +652,20 @@ fn test_bus252_daycount_with_calendar() {
         .maturity(maturity)
         .cashflow_spec(CashflowSpec::Fixed(FixedCouponSpec {
             coupon_type: CouponType::Cash,
-            rate: rust_decimal::Decimal::try_from(0.05).expect("valid"), // 5% coupon
-            freq: Tenor::quarterly(),
-            dc: DayCount::Bus252, // Requires calendar context
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "USNY".to_string(), // New York calendar
-            stub: StubKind::None,
-            end_of_month: false,
-            payment_lag_days: 0,
+            rate: rust_decimal::Decimal::try_from(0.05).expect("valid"),
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                // 5% coupon
+                freq: Tenor::quarterly(),
+                dc: DayCount::Bus252,
+                // Requires calendar context
+                bdc: BusinessDayConvention::Following,
+                calendar_id: "USNY".to_string(),
+                // New York calendar
+                stub: StubKind::None,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+            },
         }))
         .discount_curve_id("USD-OIS".into())
         .pricing_overrides(PricingOverrides::default())

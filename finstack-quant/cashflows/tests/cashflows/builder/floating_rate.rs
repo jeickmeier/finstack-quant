@@ -38,19 +38,22 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: None,
             overnight_basis: None,
             fallback,
         },
         coupon_type: CouponType::Cash,
-        freq: Tenor::quarterly(),
-        stub: StubKind::None,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+        },
     }
 }
 
@@ -123,7 +126,7 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
     let init = Money::new(1_000_000.0, Currency::USD);
 
     let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
-    spec.freq = Tenor::semi_annual();
+    spec.schedule.freq = Tenor::semi_annual();
     spec.rate_spec.reset_freq = Tenor::quarterly();
 
     let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
@@ -1031,19 +1034,22 @@ fn make_overnight_float_spec(
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::Following,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: Some(method),
             overnight_basis: None,
             fallback,
         },
         coupon_type: CouponType::Cash,
-        freq: Tenor::quarterly(),
-        stub: StubKind::None,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::Following,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::None,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+        },
     }
 }
 
@@ -1599,19 +1605,22 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
         },
         coupon_type: CouponType::Cash,
-        freq: Tenor::quarterly(),
-        stub: StubKind::ShortBack,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+            dc: DayCount::Act360,
+            bdc,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::ShortBack,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+        },
     };
 
     // Schedule 1: Saturday start with Unadjusted BDC (accrual_start = Saturday)
@@ -1712,19 +1721,22 @@ fn test_overnight_empty_fixing_window_errors() {
             reset_freq: Tenor::quarterly(),
             index_tenor: None,
             reset_lag_days: 0,
-            dc: DayCount::Act360,
-            bdc: BusinessDayConvention::Unadjusted,
-            calendar_id: "weekends_only".to_string(),
             fixing_calendar_id: None,
-            end_of_month: false,
-            payment_lag_days: 0,
             overnight_compounding: Some(OvernightCompoundingMethod::CompoundedInArrears),
             overnight_basis: None,
             fallback: FloatingRateFallback::Error,
         },
         coupon_type: CouponType::Cash,
-        freq: Tenor::quarterly(),
-        stub: StubKind::ShortFront,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: Tenor::quarterly(),
+            dc: DayCount::Act360,
+            bdc: BusinessDayConvention::Unadjusted,
+            calendar_id: "weekends_only".to_string(),
+            stub: StubKind::ShortFront,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+        },
     };
 
     let mut b = CashFlowSchedule::builder();
@@ -1923,7 +1935,7 @@ fn build_single_overnight_coupon(
     market: &finstack_quant_core::market_data::context::MarketContext,
 ) -> finstack_quant_core::Result<f64> {
     let mut spec = make_overnight_float_spec(method, FloatingRateFallback::Error, dec!(0.0));
-    spec.stub = StubKind::ShortFront;
+    spec.schedule.stub = StubKind::ShortFront;
 
     let mut b = CashFlowSchedule::builder();
     let _ = b
@@ -2424,7 +2436,7 @@ fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
         dec!(0.0),
     );
     spec.rate_spec.index_floor_bp = Some(dec!(0.0));
-    spec.stub = StubKind::ShortFront;
+    spec.schedule.stub = StubKind::ShortFront;
 
     let mut b = CashFlowSchedule::builder();
     let _ = b

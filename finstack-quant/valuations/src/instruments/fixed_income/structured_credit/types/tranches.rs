@@ -193,7 +193,7 @@ impl TrancheCoupon {
                 let calendar_id = spec
                     .fixing_calendar_id
                     .as_deref()
-                    .unwrap_or(spec.calendar_id.as_str());
+                    .unwrap_or("weekends_only");
                 let canonical_calendar_id = if calendar_id == "weekends_only" {
                     "weekends"
                 } else {
@@ -953,12 +953,7 @@ mod tests {
                     reset_freq: finstack_quant_core::dates::Tenor::quarterly(),
                     index_tenor: None,
                     reset_lag_days: 2,
-                    dc: finstack_quant_core::dates::DayCount::Act360,
-                    bdc: finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-                    calendar_id: "weekends_only".to_string(),
                     fixing_calendar_id: None,
-                    end_of_month: false,
-                    payment_lag_days: 0,
                     overnight_compounding: None,
                     overnight_basis: None,
                     fallback: Default::default(),

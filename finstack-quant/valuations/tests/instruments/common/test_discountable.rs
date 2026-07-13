@@ -58,13 +58,23 @@ fn test_schedule_discountable_simple() {
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: dec!(0.05),
-        freq: params.freq,
-        dc: params.dc,
-        bdc: params.bdc,
-        calendar_id: params.calendar_id.clone(),
-        stub: params.stub,
-        end_of_month: params.end_of_month,
-        payment_lag_days: params.payment_lag_days,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: params.freq,
+
+            dc: params.dc,
+
+            bdc: params.bdc,
+
+            calendar_id: params.calendar_id.clone(),
+
+            stub: params.stub,
+
+            end_of_month: params.end_of_month,
+
+            payment_lag_days: params.payment_lag_days,
+
+            adjust_accrual_dates: false,
+        },
     };
 
     let schedule = CashFlowSchedule::builder()
@@ -111,13 +121,23 @@ fn test_npv_zero_rate() {
     let fixed = FixedCouponSpec {
         coupon_type: CouponType::Cash,
         rate: dec!(0.05),
-        freq: params.freq,
-        dc: params.dc,
-        bdc: params.bdc,
-        calendar_id: params.calendar_id.clone(),
-        stub: params.stub,
-        end_of_month: params.end_of_month,
-        payment_lag_days: params.payment_lag_days,
+        schedule: finstack_quant_cashflows::builder::ScheduleParams {
+            freq: params.freq,
+
+            dc: params.dc,
+
+            bdc: params.bdc,
+
+            calendar_id: params.calendar_id.clone(),
+
+            stub: params.stub,
+
+            end_of_month: params.end_of_month,
+
+            payment_lag_days: params.payment_lag_days,
+
+            adjust_accrual_dates: false,
+        },
     };
 
     let schedule = CashFlowSchedule::builder()
