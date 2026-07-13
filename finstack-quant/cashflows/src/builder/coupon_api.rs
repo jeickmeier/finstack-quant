@@ -67,6 +67,35 @@ impl CashFlowBuilder {
 }
 
 impl CashFlowBuilder {
+    /// Adds a fixed coupon over the half-open window `[start, end)`.
+    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
+    pub fn add_fixed_window(&mut self, start: Date, end: Date, spec: FixedCouponSpec) -> &mut Self {
+        self.push_coupon_program(
+            ProgramWindow::explicit(start, end),
+            spec.schedule,
+            CouponSpec::Fixed { rate: spec.rate },
+            spec.coupon_type,
+        )
+    }
+
+    /// Adds a floating coupon over the half-open window `[start, end)`.
+    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
+    pub fn add_floating_window(
+        &mut self,
+        start: Date,
+        end: Date,
+        spec: FloatingCouponSpec,
+    ) -> &mut Self {
+        self.push_coupon_program(
+            ProgramWindow::explicit(start, end),
+            spec.schedule,
+            CouponSpec::Float {
+                rate_spec: spec.rate_spec,
+            },
+            spec.coupon_type,
+        )
+    }
+
     /// Adds a fixed coupon specification.
     ///
     /// The coupon leg spans the full principal horizon set by

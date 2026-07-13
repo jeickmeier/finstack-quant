@@ -44,17 +44,20 @@ const cashflowSpec = JSON.stringify({
   },
   issue: '2024-08-31',
   maturity: '2025-08-31',
-  fixed_coupons: [
+  coupon_program: [
     {
-      coupon_type: 'Cash',
-      rate: '0.06',
-      freq: { count: 12, unit: 'months' },
-      dc: 'Thirty360',
-      bdc: 'following',
-      calendar_id: 'weekends_only',
-      stub: 'None',
-      end_of_month: false,
-      payment_lag_days: 0,
+      kind: 'fixed',
+      spec: {
+        coupon_type: 'Cash',
+        rate: '0.06',
+        freq: { count: 12, unit: 'months' },
+        dc: 'Thirty360',
+        bdc: 'following',
+        calendar_id: 'weekends_only',
+        stub: 'None',
+        end_of_month: false,
+        payment_lag_days: 0,
+      },
     },
   ],
 });

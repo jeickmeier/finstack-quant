@@ -122,16 +122,19 @@ fn fixed_schedule_build_spec() -> serde_json::Value {
         },
         "issue": "2024-08-31",
         "maturity": "2025-08-31",
-        "fixed_coupons": [{
-            "coupon_type": "Cash",
-            "rate": "0.06",
-            "freq": {"count": 12, "unit": "months"},
-            "dc": "Thirty360",
-            "bdc": "following",
-            "calendar_id": "weekends_only",
-            "stub": "None",
-            "end_of_month": false,
-            "payment_lag_days": 0
+        "coupon_program": [{
+            "kind": "fixed",
+            "spec": {
+                "coupon_type": "Cash",
+                "rate": "0.06",
+                "freq": {"count": 12, "unit": "months"},
+                "dc": "Thirty360",
+                "bdc": "following",
+                "calendar_id": "weekends_only",
+                "stub": "None",
+                "end_of_month": false,
+                "payment_lag_days": 0
+            }
         }]
     })
 }
@@ -613,21 +616,24 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
         },
         "issue": "2025-01-15",
         "maturity": "2026-01-15",
-        "floating_coupons": [{
-            "coupon_type": "Cash",
-            "rate_spec": {
+        "coupon_program": [{
+            "kind": "floating",
+            "spec": {
+              "coupon_type": "Cash",
+              "rate_spec": {
                 "index_id": "USD-SOFR-3M",
                 "spread_bp": "100",
                 "reset_freq": {"count": 3, "unit": "months"},
                 "reset_lag_days": 0
-            },
-            "freq": {"count": 3, "unit": "months"},
-            "dc": "Act360",
-            "bdc": "following",
-            "calendar_id": "weekends_only",
-            "stub": "None",
-            "end_of_month": false,
-            "payment_lag_days": 0
+              },
+              "freq": {"count": 3, "unit": "months"},
+              "dc": "Act360",
+              "bdc": "following",
+              "calendar_id": "weekends_only",
+              "stub": "None",
+              "end_of_month": false,
+              "payment_lag_days": 0
+            }
         }]
     });
 
@@ -664,4 +670,74 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
         first_coupon.amount.amount()
     );
     assert_eq!(first_coupon.amount.currency(), Currency::USD);
+}
+
+#[test]
+fn legacy_coupon_arrays_deserialize_but_serialize_canonically() {
+    let legacy = json!({
+        "notional": {
+            "initial": {"amount": "1000000", "currency": "USD"},
+            "amort": "None"
+        },
+        "issue": "2024-01-01",
+        "maturity": "2025-01-01",
+        "fixed_coupons": [{
+            "coupon_type": "Cash",
+            "rate": "0.06",
+            "freq": {"count": 12, "unit": "months"},
+            "dc": "Thirty360",
+            "bdc": "following",
+            "calendar_id": "weekends_only",
+            "stub": "None"
+        }]
+    });
+
+    let spec: finstack_quant_cashflows::CashflowScheduleBuildSpec =
+        serde_json::from_value(legacy).expect("legacy input remains readable");
+    let canonical = serde_json::to_value(spec).expect("canonical spec serializes");
+    assert!(canonical.get("coupon_program").is_some());
+    assert!(canonical.get("fixed_coupons").is_none());
+    assert!(canonical.get("floating_coupons").is_none());
+}
+
+#[test]
+fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
+    let spec = json!({
+        "notional": {
+            "initial": {"amount": "1000000", "currency": "USD"},
+            "amort": "None"
+        },
+        "issue": "2024-01-01",
+        "maturity": "2026-01-01",
+        "coupon_program": [{
+            "kind": "step_up",
+            "spec": {
+                "coupon_type": "Cash",
+                "initial_rate": "0.06",
+                "step_schedule": [["2025-01-01", "0.07"]],
+                "freq": {"count": 12, "unit": "months"},
+                "dc": "Thirty360",
+                "bdc": "following",
+                "calendar_id": "weekends_only",
+                "stub": "None"
+            }
+        }],
+        "payment_program": [{
+            "kind": "program",
+            "steps": [
+                {"date": "2025-01-01", "split": "PIK"},
+                {"date": "2026-01-01", "split": "Cash"}
+            ]
+        }]
+    });
+
+    let schedule_json =
+        finstack_quant_cashflows::build_cashflow_schedule_json(&spec.to_string(), None)
+            .expect("canonical programs build");
+    let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
+        serde_json::from_str(&schedule_json).expect("schedule deserializes");
+    assert!(schedule
+        .flows
+        .iter()
+        .any(|flow| flow.kind == finstack_quant_cashflows::primitives::CFKind::PIK));
 }

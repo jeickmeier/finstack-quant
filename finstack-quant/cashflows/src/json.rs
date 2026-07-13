@@ -6,19 +6,24 @@
 
 use crate::accrual::{accrued_interest_amount, AccrualConfig};
 use crate::builder::schedule::sort_schedule_with_metadata;
-use crate::builder::{CashFlowSchedule, FeeSpec, FixedCouponSpec, FloatingCouponSpec, Notional};
+use crate::builder::{
+    CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec,
+    Notional, ScheduleParams, StepUpCouponSpec,
+};
 use crate::primitives::{is_cash_settlement_kind, CFKind};
 use finstack_quant_core::config::{rounding_context_from, FinstackConfig, RoundingContext};
 use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
+use rust_decimal::Decimal;
+use serde::Deserializer;
 
 /// Schema version used by stamped cashflow schedule envelopes.
 pub const CASHFLOW_SCHEDULE_SCHEMA_VERSION: &str = "finstack_quant.cashflows.schedule/1";
 
 /// Specification for building a [`CashFlowSchedule`] from JSON.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, serde::Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CashflowScheduleBuildSpec {
     /// Principal amount and amortization behavior.
@@ -29,18 +34,216 @@ pub struct CashflowScheduleBuildSpec {
     /// Contract maturity date.
     #[schemars(with = "String")]
     pub maturity: Date,
-    /// Fixed coupon legs to add to the schedule.
+    /// Coupon instructions, applied in order through the canonical builder.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fixed_coupons: Vec<FixedCouponSpec>,
-    /// Floating coupon legs to add to the schedule.
+    pub coupon_program: Vec<CouponLegSpec>,
+    /// Payment-split instructions, applied after coupon instructions.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub floating_coupons: Vec<FloatingCouponSpec>,
+    pub payment_program: Vec<PaymentProgramSpec>,
     /// Fee legs to add to the schedule.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fees: Vec<FeeSpec>,
     /// Explicit principal events to add after the base principal setup.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub principal_events: Vec<PrincipalEventSpec>,
+}
+
+/// One canonical coupon-program instruction.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum CouponLegSpec {
+    /// Full-horizon fixed coupon leg.
+    Fixed {
+        /// Canonical fixed coupon specification.
+        spec: FixedCouponSpec,
+    },
+    /// Full-horizon floating coupon leg.
+    Floating {
+        /// Canonical floating coupon specification.
+        spec: FloatingCouponSpec,
+    },
+    /// Full-horizon fixed step-up coupon leg.
+    StepUp {
+        /// Canonical step-up coupon specification.
+        spec: StepUpCouponSpec,
+    },
+    /// Fixed coupon over an explicit half-open date window.
+    FixedWindow {
+        #[schemars(with = "String")]
+        /// Inclusive window start.
+        start: Date,
+        #[schemars(with = "String")]
+        /// Exclusive window end.
+        end: Date,
+        /// Fixed coupon specification for the window.
+        spec: FixedCouponSpec,
+    },
+    /// Floating coupon over an explicit half-open date window.
+    FloatingWindow {
+        #[schemars(with = "String")]
+        /// Inclusive window start.
+        start: Date,
+        #[schemars(with = "String")]
+        /// Exclusive window end.
+        end: Date,
+        /// Floating coupon specification for the window.
+        spec: FloatingCouponSpec,
+    },
+    /// Fixed coupons followed by floating coupons at `switch`.
+    FixedToFloat {
+        #[schemars(with = "String")]
+        /// Date on which the floating leg begins.
+        switch: Date,
+        /// Fixed-rate quote and schedule before the switch.
+        fixed: FixedWindow,
+        /// Floating coupon specification after the switch.
+        floating: FloatingCouponSpec,
+        /// Settlement behavior for the fixed leg.
+        fixed_split: CouponType,
+    },
+    /// Consecutive fixed-rate windows driven by dated rate steps.
+    FixedRateProgram {
+        /// Dated rate steps in strictly increasing order.
+        steps: Vec<RateStepSpec>,
+        /// Shared schedule conventions for every fixed-rate window.
+        schedule: ScheduleParams,
+        #[serde(default)]
+        /// Default settlement behavior for the generated windows.
+        default_split: CouponType,
+    },
+    /// Consecutive floating-rate windows driven by dated margin steps.
+    FloatingMarginProgram {
+        /// Dated floating-margin steps in strictly increasing order.
+        steps: Vec<RateStepSpec>,
+        /// Base floating specification whose spread is replaced by each step.
+        base: FloatingCouponSpec,
+    },
+}
+
+/// A dated decimal step used by coupon programs.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RateStepSpec {
+    /// Boundary date at which the step ends or changes.
+    #[schemars(with = "String")]
+    pub date: Date,
+    /// Fixed rate or floating margin, according to the parent instruction.
+    pub rate: Decimal,
+}
+
+/// One canonical payment-split instruction.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PaymentProgramSpec {
+    /// Apply a split over one explicit half-open date window.
+    Window {
+        #[schemars(with = "String")]
+        /// Inclusive window start.
+        start: Date,
+        #[schemars(with = "String")]
+        /// Exclusive window end.
+        end: Date,
+        /// Settlement behavior active in the window.
+        split: CouponType,
+    },
+    /// Apply consecutive payment splits from dated boundaries.
+    Program {
+        /// Dated settlement steps in strictly increasing order.
+        steps: Vec<PaymentStepSpec>,
+    },
+}
+
+/// A dated payment-split step.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PaymentStepSpec {
+    /// Boundary date for the payment split.
+    #[schemars(with = "String")]
+    pub date: Date,
+    /// Settlement behavior active for the step.
+    pub split: CouponType,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CanonicalBuildSpec {
+    notional: Notional,
+    issue: Date,
+    maturity: Date,
+    #[serde(default)]
+    coupon_program: Vec<CouponLegSpec>,
+    #[serde(default)]
+    payment_program: Vec<PaymentProgramSpec>,
+    #[serde(default)]
+    fees: Vec<FeeSpec>,
+    #[serde(default)]
+    principal_events: Vec<PrincipalEventSpec>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LegacyBuildSpec {
+    notional: Notional,
+    issue: Date,
+    maturity: Date,
+    #[serde(default)]
+    fixed_coupons: Vec<FixedCouponSpec>,
+    #[serde(default)]
+    floating_coupons: Vec<FloatingCouponSpec>,
+    #[serde(default)]
+    fees: Vec<FeeSpec>,
+    #[serde(default)]
+    principal_events: Vec<PrincipalEventSpec>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum BuildSpecInput {
+    Canonical(CanonicalBuildSpec),
+    Legacy(LegacyBuildSpec),
+}
+
+impl<'de> serde::Deserialize<'de> for CashflowScheduleBuildSpec {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let input = BuildSpecInput::deserialize(deserializer)?;
+        Ok(match input {
+            BuildSpecInput::Canonical(spec) => Self {
+                notional: spec.notional,
+                issue: spec.issue,
+                maturity: spec.maturity,
+                coupon_program: spec.coupon_program,
+                payment_program: spec.payment_program,
+                fees: spec.fees,
+                principal_events: spec.principal_events,
+            },
+            BuildSpecInput::Legacy(spec) => {
+                let mut coupon_program =
+                    Vec::with_capacity(spec.fixed_coupons.len() + spec.floating_coupons.len());
+                coupon_program.extend(
+                    spec.fixed_coupons
+                        .into_iter()
+                        .map(|spec| CouponLegSpec::Fixed { spec }),
+                );
+                coupon_program.extend(
+                    spec.floating_coupons
+                        .into_iter()
+                        .map(|spec| CouponLegSpec::Floating { spec }),
+                );
+                Self {
+                    notional: spec.notional,
+                    issue: spec.issue,
+                    maturity: spec.maturity,
+                    coupon_program,
+                    payment_program: Vec::new(),
+                    fees: spec.fees,
+                    principal_events: spec.principal_events,
+                }
+            }
+        })
+    }
 }
 
 /// JSON representation of an explicit principal event.
@@ -167,11 +370,60 @@ impl CashflowScheduleBuildSpec {
             .principal(self.notional.initial, self.issue, self.maturity)
             .amortization(self.notional.amort.clone());
 
-        for spec in &self.fixed_coupons {
-            let _ = builder.fixed_cf(spec.clone());
+        for instruction in &self.coupon_program {
+            match instruction {
+                CouponLegSpec::Fixed { spec } => {
+                    let _ = builder.fixed_cf(spec.clone());
+                }
+                CouponLegSpec::Floating { spec } => {
+                    let _ = builder.floating_cf(spec.clone());
+                }
+                CouponLegSpec::StepUp { spec } => {
+                    let _ = builder.step_up_cf(spec.clone());
+                }
+                CouponLegSpec::FixedWindow { start, end, spec } => {
+                    let _ = builder.add_fixed_window(*start, *end, spec.clone());
+                }
+                CouponLegSpec::FloatingWindow { start, end, spec } => {
+                    let _ = builder.add_floating_window(*start, *end, spec.clone());
+                }
+                CouponLegSpec::FixedToFloat {
+                    switch,
+                    fixed,
+                    floating,
+                    fixed_split,
+                } => {
+                    let _ = builder.fixed_to_float(
+                        *switch,
+                        fixed.clone(),
+                        floating.clone(),
+                        *fixed_split,
+                    );
+                }
+                CouponLegSpec::FixedRateProgram {
+                    steps,
+                    schedule,
+                    default_split,
+                } => {
+                    let steps: Vec<_> = steps.iter().map(|step| (step.date, step.rate)).collect();
+                    let _ = builder.fixed_stepup_decimal(&steps, schedule.clone(), *default_split);
+                }
+                CouponLegSpec::FloatingMarginProgram { steps, base } => {
+                    let steps: Vec<_> = steps.iter().map(|step| (step.date, step.rate)).collect();
+                    let _ = builder.float_margin_stepup_decimal(&steps, base.clone());
+                }
+            }
         }
-        for spec in &self.floating_coupons {
-            let _ = builder.floating_cf(spec.clone());
+        for instruction in &self.payment_program {
+            match instruction {
+                PaymentProgramSpec::Window { start, end, split } => {
+                    let _ = builder.add_payment_window(*start, *end, *split);
+                }
+                PaymentProgramSpec::Program { steps } => {
+                    let steps: Vec<_> = steps.iter().map(|step| (step.date, step.split)).collect();
+                    let _ = builder.payment_split_program(&steps);
+                }
+            }
         }
         for spec in &self.fees {
             let _ = builder.fee(spec.clone());

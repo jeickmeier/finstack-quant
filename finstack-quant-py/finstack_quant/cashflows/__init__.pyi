@@ -24,8 +24,10 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     Parameters
     ----------
     spec_json : str
-        JSON-encoded ``CashflowScheduleBuildSpec`` describing coupons, principal,
-        day-count, and schedule rules.
+        JSON-encoded ``CashflowScheduleBuildSpec`` with canonical
+        ``coupon_program`` and ``payment_program`` instructions, principal,
+        fees, and schedule rules. Legacy ``fixed_coupons`` and
+        ``floating_coupons`` arrays are accepted for input only.
     market_json : str, optional
         JSON-encoded ``MarketContext`` for floating-rate index lookups. Omit
         when the schedule uses fixed coupons only.

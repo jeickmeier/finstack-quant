@@ -35,6 +35,59 @@ export interface NotionalJson {
   amort: unknown;
 }
 
+export type CouponTypeJson =
+  | "Cash"
+  | "PIK"
+  | { Split: { cash_pct: string; pik_pct: string } };
+
+export interface RateStepJson {
+  date: string;
+  rate: string;
+}
+
+export type CouponLegJson =
+  | { kind: "fixed"; spec: unknown }
+  | { kind: "floating"; spec: unknown }
+  | { kind: "step_up"; spec: unknown }
+  | { kind: "fixed_window"; start: string; end: string; spec: unknown }
+  | { kind: "floating_window"; start: string; end: string; spec: unknown }
+  | {
+      kind: "fixed_to_float";
+      switch: string;
+      fixed: unknown;
+      floating: unknown;
+      fixed_split: CouponTypeJson;
+    }
+  | {
+      kind: "fixed_rate_program";
+      steps: RateStepJson[];
+      schedule: unknown;
+      default_split?: CouponTypeJson;
+    }
+  | { kind: "floating_margin_program"; steps: RateStepJson[]; base: unknown };
+
+export type PaymentProgramJson =
+  | {
+      kind: "window";
+      start: string;
+      end: string;
+      split: CouponTypeJson;
+    }
+  | {
+      kind: "program";
+      steps: Array<{ date: string; split: CouponTypeJson }>;
+    };
+
+export interface CashflowScheduleBuildSpecJson {
+  notional: NotionalJson;
+  issue: string;
+  maturity: string;
+  coupon_program?: CouponLegJson[];
+  payment_program?: PaymentProgramJson[];
+  fees?: unknown[];
+  principal_events?: unknown[];
+}
+
 export interface CashFlowScheduleJson {
   flows: CashFlowJson[];
   notional: NotionalJson;

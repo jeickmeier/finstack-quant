@@ -27,17 +27,20 @@ def _cashflow_spec() -> str:
         },
         "issue": "2024-08-31",
         "maturity": "2025-08-31",
-        "fixed_coupons": [
+        "coupon_program": [
             {
-                "coupon_type": "Cash",
-                "rate": "0.06",
-                "freq": {"count": 12, "unit": "months"},
-                "dc": "Thirty360",
-                "bdc": "following",
-                "calendar_id": "weekends_only",
-                "stub": "None",
-                "end_of_month": False,
-                "payment_lag_days": 0,
+                "kind": "fixed",
+                "spec": {
+                    "coupon_type": "Cash",
+                    "rate": "0.06",
+                    "freq": {"count": 12, "unit": "months"},
+                    "dc": "Thirty360",
+                    "bdc": "following",
+                    "calendar_id": "weekends_only",
+                    "stub": "None",
+                    "end_of_month": False,
+                    "payment_lag_days": 0,
+                },
             }
         ],
     })
@@ -81,31 +84,34 @@ def _floating_cashflow_spec() -> str:
         },
         "issue": "2025-01-15",
         "maturity": "2026-01-15",
-        "floating_coupons": [
+        "coupon_program": [
             {
-                "rate_spec": {
-                    "index_id": "USD-SOFR-3M",
-                    "spread_bp": "150.0",
-                    "gearing": "1.0",
-                    "gearing_includes_spread": True,
-                    "index_floor_bp": None,
-                    "all_in_floor_bp": None,
-                    "all_in_cap_bp": None,
-                    "index_cap_bp": None,
-                    "reset_freq": {"count": 3, "unit": "months"},
-                    "reset_lag_days": 0,
-                    "fixing_calendar_id": None,
-                    "overnight_compounding": None,
-                    "overnight_basis": None,
+                "kind": "floating",
+                "spec": {
+                    "rate_spec": {
+                        "index_id": "USD-SOFR-3M",
+                        "spread_bp": "150.0",
+                        "gearing": "1.0",
+                        "gearing_includes_spread": True,
+                        "index_floor_bp": None,
+                        "all_in_floor_bp": None,
+                        "all_in_cap_bp": None,
+                        "index_cap_bp": None,
+                        "reset_freq": {"count": 3, "unit": "months"},
+                        "reset_lag_days": 0,
+                        "fixing_calendar_id": None,
+                        "overnight_compounding": None,
+                        "overnight_basis": None,
+                    },
+                    "coupon_type": "Cash",
+                    "freq": {"count": 3, "unit": "months"},
+                    "dc": "Act360",
+                    "bdc": "following",
+                    "calendar_id": "weekends_only",
+                    "stub": "None",
+                    "end_of_month": False,
+                    "payment_lag_days": 0,
                 },
-                "coupon_type": "Cash",
-                "freq": {"count": 3, "unit": "months"},
-                "dc": "Act360",
-                "bdc": "following",
-                "calendar_id": "weekends_only",
-                "stub": "None",
-                "end_of_month": False,
-                "payment_lag_days": 0,
             }
         ],
     })
@@ -157,6 +163,36 @@ def test_cashflows_builds_floating_schedule_with_market_json() -> None:
     float_flows = [flow for flow in schedule["flows"] if flow["kind"] == "FloatReset"]
     assert float_flows
     assert all(flow["rate"] > 0.015 for flow in float_flows)
+
+
+def test_cashflows_builds_step_up_with_payment_program() -> None:
+    spec = json.loads(_cashflow_spec())
+    spec["issue"] = "2024-01-01"
+    spec["maturity"] = "2026-01-01"
+    fixed = spec["coupon_program"][0]["spec"]
+    initial_rate = fixed.pop("rate")
+    spec["coupon_program"] = [
+        {
+            "kind": "step_up",
+            "spec": {
+                **fixed,
+                "initial_rate": initial_rate,
+                "step_schedule": [["2025-01-01", "0.07"]],
+            },
+        }
+    ]
+    spec["payment_program"] = [
+        {
+            "kind": "program",
+            "steps": [
+                {"date": "2025-01-01", "split": "PIK"},
+                {"date": "2026-01-01", "split": "Cash"},
+            ],
+        }
+    ]
+
+    schedule = json.loads(build_cashflow_schedule_json(json.dumps(spec)))
+    assert any(flow["kind"] == "PIK" for flow in schedule["flows"])
 
 
 def test_cashflows_accrued_interest_accepts_config_json() -> None:

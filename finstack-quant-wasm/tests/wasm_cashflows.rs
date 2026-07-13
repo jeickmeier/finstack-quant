@@ -13,16 +13,19 @@ fn cashflow_spec_json() -> String {
         },
         "issue": "2024-08-31",
         "maturity": "2025-08-31",
-        "fixed_coupons": [{
-            "coupon_type": "Cash",
-            "rate": "0.06",
-            "freq": {"count": 12, "unit": "months"},
-            "dc": "Thirty360",
-            "bdc": "following",
-            "calendar_id": "weekends_only",
-            "stub": "None",
-            "end_of_month": false,
-            "payment_lag_days": 0,
+        "coupon_program": [{
+            "kind": "fixed",
+            "spec": {
+              "coupon_type": "Cash",
+              "rate": "0.06",
+              "freq": {"count": 12, "unit": "months"},
+              "dc": "Thirty360",
+              "bdc": "following",
+              "calendar_id": "weekends_only",
+              "stub": "None",
+              "end_of_month": false,
+              "payment_lag_days": 0,
+            },
         }],
     })
     .to_string()
@@ -49,8 +52,10 @@ fn floating_cashflow_spec_json() -> String {
         },
         "issue": "2025-01-15",
         "maturity": "2026-01-15",
-        "floating_coupons": [{
-            "rate_spec": {
+        "coupon_program": [{
+            "kind": "floating",
+            "spec": {
+              "rate_spec": {
                 "index_id": "USD-SOFR-3M",
                 "spread_bp": "150.0",
                 "gearing": "1.0",
@@ -64,15 +69,48 @@ fn floating_cashflow_spec_json() -> String {
                 "fixing_calendar_id": null,
                 "overnight_compounding": null,
                 "overnight_basis": null,
+              },
+              "coupon_type": "Cash",
+              "freq": {"count": 3, "unit": "months"},
+              "dc": "Act360",
+              "bdc": "following",
+              "calendar_id": "weekends_only",
+              "stub": "None",
+              "end_of_month": false,
+              "payment_lag_days": 0,
             },
-            "coupon_type": "Cash",
-            "freq": {"count": 3, "unit": "months"},
-            "dc": "Act360",
-            "bdc": "following",
-            "calendar_id": "weekends_only",
-            "stub": "None",
-            "end_of_month": false,
-            "payment_lag_days": 0,
+        }],
+    })
+    .to_string()
+}
+
+fn step_up_cashflow_spec_json() -> String {
+    serde_json::json!({
+        "notional": {
+            "initial": {"amount": "1000000", "currency": "USD"},
+            "amort": "None",
+        },
+        "issue": "2024-01-01",
+        "maturity": "2026-01-01",
+        "coupon_program": [{
+            "kind": "step_up",
+            "spec": {
+                "coupon_type": "Cash",
+                "initial_rate": "0.06",
+                "step_schedule": [["2025-01-01", "0.07"]],
+                "freq": {"count": 12, "unit": "months"},
+                "dc": "Thirty360",
+                "bdc": "following",
+                "calendar_id": "weekends_only",
+                "stub": "None",
+            },
+        }],
+        "payment_program": [{
+            "kind": "program",
+            "steps": [
+                {"date": "2025-01-01", "split": "PIK"},
+                {"date": "2026-01-01", "split": "Cash"},
+            ],
         }],
     })
     .to_string()
@@ -168,6 +206,20 @@ fn cashflows_json_bridge_builds_floating_schedule_with_market_json() {
     assert!(float_flows
         .iter()
         .all(|flow| flow["rate"].as_f64().unwrap() > 0.015));
+}
+
+#[wasm_bindgen_test]
+fn cashflows_json_bridge_builds_step_up_with_payment_program() {
+    let schedule_json =
+        cashflows::build_cashflow_schedule_json(&step_up_cashflow_spec_json(), None)
+            .expect("step-up schedule builds");
+    let schedule: serde_json::Value =
+        serde_json::from_str(&schedule_json).expect("schedule JSON parses");
+    assert!(schedule["flows"]
+        .as_array()
+        .expect("flows array")
+        .iter()
+        .any(|flow| flow["kind"] == "PIK"));
 }
 
 #[wasm_bindgen_test]

@@ -163,7 +163,8 @@ pub use json::{
     accrued_interest_json, build_cashflow_schedule_envelope_json, build_cashflow_schedule_json,
     dated_flows_json, validate_cashflow_schedule, validate_cashflow_schedule_envelope_json,
     validate_cashflow_schedule_json, CashflowScheduleBuildSpec, CashflowScheduleEnvelope,
-    DatedFlowJson, PrincipalEventSpec, CASHFLOW_SCHEDULE_SCHEMA_VERSION,
+    CouponLegSpec, DatedFlowJson, PaymentProgramSpec, PaymentStepSpec, PrincipalEventSpec,
+    RateStepSpec, CASHFLOW_SCHEDULE_SCHEMA_VERSION,
 };
 pub use traits::{
     schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider, ScheduleBuildOpts,

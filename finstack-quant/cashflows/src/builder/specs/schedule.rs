@@ -479,7 +479,8 @@ impl ScheduleParams {
 }
 
 /// Fixed-rate coupon window with a shared schedule.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct FixedWindow {
     /// Annual coupon rate as a decimal, for example `0.05` for 5%.
     pub rate: Decimal,

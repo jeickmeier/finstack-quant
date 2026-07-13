@@ -208,10 +208,10 @@ status = "exists"
 note = "First binding slice is JSON-only: schedule build/validate/flows/accrual and custom-cashflow bond JSON creation."
 
 [crates.cashflows.modules]
-json        = { python = "finstack_quant.cashflows",             status = "exists", note = "build_cashflow_schedule_json, build_cashflow_schedule_envelope_json, validate_cashflow_schedule_json, validate_cashflow_schedule_envelope_json, dated_flows_json, accrued_interest_json, bond_from_cashflows_json exposed flat on finstack_quant.cashflows" }
+json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the full canonical coupon_program and payment_program builder surface; legacy fixed_coupons/floating_coupons arrays are input-only" }
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "missing", note = "Accrual engine reachable only via accrued_interest_json on the JSON bridge" }
 aggregation = { python = "finstack_quant.cashflows.aggregation", status = "missing", note = "Period aggregation not yet bound; use the JSON bridge schedule output" }
-builder     = { python = "finstack_quant.cashflows.builder",     status = "missing", note = "Builder/spec types travel as JSON via build_cashflow_schedule_json; no typed Python surface yet" }
+builder     = { python = "finstack_quant.cashflows.builder",     status = "missing", note = "Every public coupon and payment-program builder instruction travels through the canonical JSON program; no typed Python surface" }
 primitives  = { python = "finstack_quant.cashflows.primitives",  status = "missing", note = "CashFlow/CFKind primitives travel as JSON; no typed Python surface yet" }
 traits      = { python = "finstack_quant.cashflows.traits",      status = "missing", note = "Rust-side trait surface; not meaningful as a Python module" }
 
