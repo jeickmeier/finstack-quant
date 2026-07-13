@@ -211,7 +211,7 @@ mod generated_schema_contract {
     }
 
     fn cashflow_schema_root() -> PathBuf {
-        schema_root().join("cashflow").join("1")
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../cashflows/schemas/cashflow/1")
     }
 
     fn common_schema_uri(filename: &str) -> String {
@@ -271,16 +271,9 @@ mod generated_schema_contract {
     }
 
     fn generated_standalone_schema_paths() -> Vec<PathBuf> {
-        [
+        let mut paths: Vec<_> = [
             ("calibration/3", "calibration"),
             ("results/1", "valuation_result"),
-            ("cashflow/1", "coupon_specs"),
-            ("cashflow/1", "amortization_spec"),
-            ("cashflow/1", "schedule_params"),
-            ("cashflow/1", "fee_specs"),
-            ("cashflow/1", "default_model_spec"),
-            ("cashflow/1", "prepayment_model_spec"),
-            ("cashflow/1", "recovery_model_spec"),
             ("market/1", "market_quote"),
         ]
         .into_iter()
@@ -289,7 +282,13 @@ mod generated_schema_contract {
                 .join(subdir)
                 .join(format!("{filename}.schema.json"))
         })
-        .collect()
+        .collect();
+        paths.extend(
+            CASHFLOW_SCHEMA_FILES
+                .iter()
+                .map(|(_, filename)| cashflow_schema_root().join(filename)),
+        );
+        paths
     }
 
     fn read_schema(path: &Path) -> Value {
@@ -710,10 +709,7 @@ mod generated_schema_contract {
 
     #[test]
     fn generated_schedule_params_use_short_field_names() {
-        let path = schema_root()
-            .join("cashflow")
-            .join("1")
-            .join("schedule_params.schema.json");
+        let path = cashflow_schema_root().join("schedule_params.schema.json");
         let schema = read_schema(&path);
         assert!(
             schema.pointer("/properties/freq").is_some(),

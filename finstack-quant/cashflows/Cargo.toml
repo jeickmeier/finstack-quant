@@ -12,6 +12,7 @@ autobenches = false
 [dependencies]
 finstack-quant-core = { path = "../core", version = "0.6.0" }
 indexmap = { workspace = true, features = ["serde"] }
+jsonschema = { version = "0.28", default-features = false }
 rust_decimal = { workspace = true }
 schemars = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -19,6 +20,10 @@ serde_json = { workspace = true }
 smallvec = { version = "1.15", default-features = false, features = ["serde"] }
 time = { workspace = true }
 tracing = { version = "0.1", default-features = false, features = ["attributes"] }
+
+[[bin]]
+name = "gen_cashflow_schemas"
+path = "src/bin/gen_schemas.rs"
 
 [dev-dependencies]
 criterion = { workspace = true }

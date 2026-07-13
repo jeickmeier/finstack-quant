@@ -14,7 +14,6 @@ use std::sync::OnceLock;
 
 const JSON_SCHEMA_DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 const COMMON_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/common/1/";
-const CASHFLOW_SCHEMA_BASE: &str = "https://finstack_quant.dev/schemas/cashflow/1/";
 
 /// Parse embedded JSON schema at compile time, returning a Result.
 /// The JSON is embedded via `include_str!` so the content is always present,
@@ -190,59 +189,6 @@ fn common_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonsch
     .collect()
 }
 
-fn cashflow_schema_resource(
-    filename: &'static str,
-    raw: &'static str,
-) -> finstack_quant_core::Result<(String, jsonschema::Resource)> {
-    let schema = serde_json::from_str::<Value>(raw).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!(
-            "invalid cashflow schema JSON at {filename}: {e}"
-        ))
-    })?;
-    let resource = jsonschema::Resource::from_contents(schema).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!(
-            "invalid cashflow schema resource at {filename}: {e}"
-        ))
-    })?;
-    Ok((format!("{CASHFLOW_SCHEMA_BASE}{filename}"), resource))
-}
-
-fn cashflow_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
-    [
-        (
-            "amortization_spec.schema.json",
-            include_str!("../schemas/cashflow/1/amortization_spec.schema.json"),
-        ),
-        (
-            "coupon_specs.schema.json",
-            include_str!("../schemas/cashflow/1/coupon_specs.schema.json"),
-        ),
-        (
-            "default_model_spec.schema.json",
-            include_str!("../schemas/cashflow/1/default_model_spec.schema.json"),
-        ),
-        (
-            "fee_specs.schema.json",
-            include_str!("../schemas/cashflow/1/fee_specs.schema.json"),
-        ),
-        (
-            "prepayment_model_spec.schema.json",
-            include_str!("../schemas/cashflow/1/prepayment_model_spec.schema.json"),
-        ),
-        (
-            "recovery_model_spec.schema.json",
-            include_str!("../schemas/cashflow/1/recovery_model_spec.schema.json"),
-        ),
-        (
-            "schedule_params.schema.json",
-            include_str!("../schemas/cashflow/1/schedule_params.schema.json"),
-        ),
-    ]
-    .into_iter()
-    .map(|(filename, raw)| cashflow_schema_resource(filename, raw))
-    .collect()
-}
-
 fn embedded_instrument_schema_resources(
 ) -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
     let mut resources = std::collections::BTreeMap::new();
@@ -270,7 +216,7 @@ fn embedded_instrument_schema_resources(
 
 fn external_schema_resources() -> finstack_quant_core::Result<Vec<(String, jsonschema::Resource)>> {
     let mut resources = common_schema_resources()?;
-    resources.extend(cashflow_schema_resources()?);
+    resources.extend(finstack_quant_cashflows::schema::resources()?);
     resources.extend(embedded_instrument_schema_resources()?);
     Ok(resources)
 }

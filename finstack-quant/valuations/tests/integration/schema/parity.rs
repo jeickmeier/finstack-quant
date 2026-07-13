@@ -187,7 +187,8 @@ const CANONICAL_AMORTIZATION_VARIANTS: &[&str] = &[
 
 #[test]
 fn test_amortization_spec_schema_parity() {
-    let schema_json = include_str!("../../../schemas/cashflow/1/amortization_spec.schema.json");
+    let schema_json =
+        include_str!("../../../../cashflows/schemas/cashflow/1/amortization_spec.schema.json");
     let schema: Value = serde_json::from_str(schema_json).expect("Schema JSON should be valid");
 
     // Try top-level oneOf (standalone schema), then $defs

@@ -17,7 +17,7 @@ INSTRUMENT_ENVELOPE_SCHEMA_PATH = (
 )
 SCHEMA_RESOURCE_DIRS = (
     WORKSPACE_ROOT / "finstack-quant/valuations/schemas/common/1",
-    WORKSPACE_ROOT / "finstack-quant/valuations/schemas/cashflow/1",
+    WORKSPACE_ROOT / "finstack-quant/cashflows/schemas/cashflow/1",
     WORKSPACE_ROOT / "finstack-quant/valuations/schemas/instruments/1",
 )
 

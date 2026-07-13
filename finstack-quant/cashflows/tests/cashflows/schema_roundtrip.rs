@@ -1,6 +1,7 @@
 //! Cashflow schema and example parity tests.
 //!
-//! Validates that all example JSON files under `schemas/cashflow/1/examples/`
+//! Validates cashflow JSON examples and the crate-owned schemas under
+//! `schemas/cashflow/1/`.
 //! can be deserialized into the corresponding Rust types and re-serialized
 //! back to equivalent JSON.
 //!
@@ -23,6 +24,16 @@ struct CashflowEnvelope<T> {
     schema: String,
     #[serde(flatten)]
     payload: T,
+}
+
+#[test]
+fn cashflows_owns_seven_resolvable_schema_resources() {
+    let resources = finstack_quant_cashflows::schema::resources()
+        .expect("embedded cashflow schemas are valid resources");
+    assert_eq!(resources.len(), 7);
+    assert!(resources
+        .iter()
+        .all(|(uri, _)| uri.starts_with(finstack_quant_cashflows::schema::CASHFLOW_SCHEMA_BASE)));
 }
 
 // Payload wrapper types for each spec

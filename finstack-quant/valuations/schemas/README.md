@@ -28,7 +28,6 @@ schemas/
     exotics/               # Asian, barrier, lookback, basket options
   calibration/2/           # Frozen calibration schema (v2)
   calibration/3/           # Current calibration schema (v3)
-  cashflow/1/              # Cashflow component specs (v1)
   factor_model/1/          # Credit factor-model schemas (v1)
   market/1/                # Market quote schemas (v1)
   results/1/               # Valuation result schema (v1)
@@ -125,7 +124,7 @@ Generated schemas use canonical external refs for repeated shapes:
 - `common/1/*.schema.json` covers shared core types such as money, currency,
   IDs, attributes, pricing overrides, tenors, dates, decimals, day-count
   conventions, and business-day conventions.
-- `cashflow/1/*.schema.json` covers standalone cashflow component specs. The
+- `../../cashflows/schemas/cashflow/1/*.schema.json` covers standalone cashflow component specs. The
   generator only externalizes unambiguous cashflow definitions; overloaded names
   such as instrument-specific `AmortizationSpec` remain local.
 
@@ -187,7 +186,7 @@ jsonschema.validate(instance, schema)
 ```
 
 For schemas containing external `$ref`s, configure your validator with the
-referenced files from `common/1`, `cashflow/1`, and the relevant instrument
+referenced files from `common/1`, the cashflows-owned schema directory, and the relevant instrument
 schema directories. Validating `instrument.schema.json` requires registering all
 per-instrument schema files as resources.
 

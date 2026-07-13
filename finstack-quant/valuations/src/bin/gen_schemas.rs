@@ -100,29 +100,14 @@ fn common_schema_ref(def_name: &str) -> Option<String> {
     common_schema_filename(def_name).map(|filename| format!("{COMMON_SCHEMA_BASE}{filename}"))
 }
 
-fn cashflow_schema_filename(def_name: &str) -> Option<&'static str> {
-    match def_name {
-        "DefaultModelSpec" => Some("default_model_spec.schema.json"),
-        "FeeSpec" => Some("fee_specs.schema.json"),
-        "FixedCouponSpec" => Some("coupon_specs.schema.json"),
-        "PrepaymentModelSpec" => Some("prepayment_model_spec.schema.json"),
-        "RecoveryModelSpec" => Some("recovery_model_spec.schema.json"),
-        "ScheduleParams" => Some("schedule_params.schema.json"),
-        _ => None,
-    }
-}
-
-fn cashflow_schema_ref(def_name: &str) -> Option<String> {
-    cashflow_schema_filename(def_name)
-        .map(|filename| format!("https://finstack_quant.dev/schemas/cashflow/1/{filename}"))
-}
-
 fn external_schema_ref(def_name: &str) -> Option<String> {
-    common_schema_ref(def_name).or_else(|| cashflow_schema_ref(def_name))
+    common_schema_ref(def_name)
+        .or_else(|| finstack_quant_cashflows::schema::definition_uri(def_name))
 }
 
 fn is_externalized_def(def_name: &str) -> bool {
-    common_schema_filename(def_name).is_some() || cashflow_schema_filename(def_name).is_some()
+    common_schema_filename(def_name).is_some()
+        || finstack_quant_cashflows::schema::definition_uri(def_name).is_some()
 }
 
 fn rewrite_common_refs(value: &mut Value) {
@@ -1027,50 +1012,6 @@ fn main() {
         finstack_quant_valuations::results::ValuationResult,
         "results/1",
         "valuation_result"
-    );
-
-    // Cashflow specs — use public re-exports from finstack_quant_cashflows::builder
-    gen_standalone_schema!(
-        "coupon_specs",
-        finstack_quant_cashflows::builder::FixedCouponSpec,
-        "cashflow/1",
-        "coupon_specs"
-    );
-    gen_standalone_schema!(
-        "amortization_spec",
-        finstack_quant_cashflows::builder::AmortizationSpec,
-        "cashflow/1",
-        "amortization_spec"
-    );
-    gen_standalone_schema!(
-        "schedule_params",
-        finstack_quant_cashflows::builder::ScheduleParams,
-        "cashflow/1",
-        "schedule_params"
-    );
-    gen_standalone_schema!(
-        "fee_specs",
-        finstack_quant_cashflows::builder::FeeSpec,
-        "cashflow/1",
-        "fee_specs"
-    );
-    gen_standalone_schema!(
-        "default_model_spec",
-        finstack_quant_cashflows::builder::DefaultModelSpec,
-        "cashflow/1",
-        "default_model_spec"
-    );
-    gen_standalone_schema!(
-        "prepayment_model_spec",
-        finstack_quant_cashflows::builder::PrepaymentModelSpec,
-        "cashflow/1",
-        "prepayment_model_spec"
-    );
-    gen_standalone_schema!(
-        "recovery_model_spec",
-        finstack_quant_cashflows::builder::RecoveryModelSpec,
-        "cashflow/1",
-        "recovery_model_spec"
     );
 
     // Market quotes
