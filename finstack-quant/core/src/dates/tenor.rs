@@ -7,15 +7,13 @@
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_core::dates::{Tenor, TenorUnit, Date, DayCount, DayCountContext};
-//! use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar};
-//! use time::Month;
+//! use finstack_quant_core::dates::{Tenor, TenorUnit};
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
 //! // Parse a tenor string
 //! let tenor = Tenor::parse("3M")?;
-//! assert_eq!(tenor.count, 3);
-//! assert_eq!(tenor.unit, TenorUnit::Months);
+//! assert_eq!(tenor.count(), 3);
+//! assert_eq!(tenor.unit(), TenorUnit::Months);
 //!
 //! // Convert to years with default settings (simple approximation)
 //! let years = tenor.to_years_simple();
@@ -125,13 +123,13 @@ impl TenorUnit {
 /// # fn main() -> finstack_quant_core::Result<()> {
 ///
 /// let tenor = Tenor::new(3, TenorUnit::Months);
-/// assert_eq!(tenor.count, 3);
-/// assert_eq!(tenor.unit, TenorUnit::Months);
+/// assert_eq!(tenor.count(), 3);
+/// assert_eq!(tenor.unit(), TenorUnit::Months);
 ///
 /// // Parse from string
 /// let parsed = Tenor::parse("6M")?;
-/// assert_eq!(parsed.count, 6);
-/// assert_eq!(parsed.unit, TenorUnit::Months);
+/// assert_eq!(parsed.count(), 6);
+/// assert_eq!(parsed.unit(), TenorUnit::Months);
 /// # Ok(())
 /// # }
 /// ```
