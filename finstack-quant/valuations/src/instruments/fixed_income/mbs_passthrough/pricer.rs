@@ -47,6 +47,14 @@ pub struct MbsCashflow {
     pub smm: f64,
 }
 
+/// One MBS projection with its canonical schedule and row diagnostics.
+pub(crate) struct MbsProjection {
+    /// Canonical projected schedule consumed by pricing and export paths.
+    pub(crate) schedule: CashFlowSchedule,
+    /// Pool-state diagnostics aligned by payment date with schedule rows.
+    pub(crate) diagnostics: Vec<MbsCashflow>,
+}
+
 /// Derive the SIFMA Good Delivery settlement date for a given accrual period.
 pub(crate) fn sifma_settlement_for_period(period_end: Date) -> Result<Date> {
     use finstack_quant_core::dates::{
@@ -202,7 +210,27 @@ pub(crate) fn build_projected_schedule(
     as_of: Date,
     max_periods: Option<u32>,
 ) -> Result<CashFlowSchedule> {
-    let projected = generate_cashflows(mbs, as_of, max_periods)?;
+    Ok(project_cashflows(mbs, as_of, max_periods)?.schedule)
+}
+
+/// Project an MBS once and retain both schedule rows and pool diagnostics.
+pub(crate) fn project_cashflows(
+    mbs: &AgencyMbsPassthrough,
+    as_of: Date,
+    max_periods: Option<u32>,
+) -> Result<MbsProjection> {
+    let diagnostics = generate_cashflows(mbs, as_of, max_periods)?;
+    let schedule = schedule_from_projection(mbs, &diagnostics);
+    Ok(MbsProjection {
+        schedule,
+        diagnostics,
+    })
+}
+
+fn schedule_from_projection(
+    mbs: &AgencyMbsPassthrough,
+    projected: &[MbsCashflow],
+) -> CashFlowSchedule {
     let mut flows = Vec::with_capacity(projected.len() * 3);
 
     for cf in projected {
@@ -238,7 +266,7 @@ pub(crate) fn build_projected_schedule(
         }
     }
 
-    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+    crate::cashflow::traits::schedule_from_classified_flows(
         flows,
         mbs.day_count,
         crate::cashflow::traits::ScheduleBuildOpts {
@@ -252,7 +280,7 @@ pub(crate) fn build_projected_schedule(
             }),
             ..Default::default()
         },
-    ))
+    )
 }
 
 fn end_of_month(date: Date) -> Result<Date> {

@@ -27,6 +27,7 @@
 //! engine does not yet expose a stable per-tranche balance hook for this path.
 //! Consumers should not treat `null` as missing data for non-CMO instruments.
 
+use finstack_quant_cashflows::aggregation::credit_adjusted_cashflow_pv;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext};
@@ -38,7 +39,7 @@ use serde::Serialize;
 
 use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond;
 use crate::instruments::fixed_income::mbs_passthrough::{
-    generate_cashflows as mbs_generate_cashflows, AgencyMbsPassthrough,
+    pricer::project_cashflows as project_mbs_cashflows, AgencyMbsPassthrough,
 };
 use crate::instruments::json_loader::InstrumentEnvelope;
 use crate::pricer::{shared_standard_registry, ModelKey, PricerKey};
@@ -206,31 +207,28 @@ fn build_envelope(
     };
     let recovery_rate = hazard_arc.as_ref().map(|h| h.recovery_rate());
 
-    // --- Build schedule ---
-    let schedule = instrument.cashflow_schedule(market, as_of_date)?;
-
-    // --- Pre-compute instrument-specific side data ---
-    let mbs_state: Option<std::collections::HashMap<Date, MbsState>> = instrument
-        .as_any()
-        .downcast_ref::<AgencyMbsPassthrough>()
-        .and_then(|mbs| {
-            mbs_generate_cashflows(mbs, as_of_date, None)
-                .ok()
-                .map(|rows| {
-                    rows.into_iter()
-                        .map(|r| {
-                            (
-                                r.payment_date,
-                                MbsState {
-                                    smm: r.smm,
-                                    beginning_balance: r.beginning_balance,
-                                    ending_balance: r.ending_balance,
-                                },
-                            )
-                        })
-                        .collect()
+    // --- Build one schedule, retaining MBS diagnostics from the same projection. ---
+    let (schedule, mbs_state) =
+        if let Some(mbs) = instrument.as_any().downcast_ref::<AgencyMbsPassthrough>() {
+            let projection = project_mbs_cashflows(mbs, as_of_date, Some(mbs.wam + 12))?;
+            let states = projection
+                .diagnostics
+                .into_iter()
+                .map(|row| {
+                    (
+                        row.payment_date,
+                        MbsState {
+                            smm: row.smm,
+                            beginning_balance: row.beginning_balance,
+                            ending_balance: row.ending_balance,
+                        },
+                    )
                 })
-        });
+                .collect();
+            (projection.schedule, Some(states))
+        } else {
+            (instrument.cashflow_schedule(market, as_of_date)?, None)
+        };
     let inflation_bond: Option<&InflationLinkedBond> =
         instrument.as_any().downcast_ref::<InflationLinkedBond>();
 
@@ -323,19 +321,13 @@ fn build_envelope(
             (df, sp, cond_pd)
         };
 
-        let pv = if settled {
-            // Settled flows (date <= as_of) carry no present value under the
-            // holder-view semantics used by `base_value`.
-            0.0
-        } else {
-            compute_pv(
-                flow.kind,
-                flow.amount.amount(),
-                discount_factor,
-                survival_probability,
-                recovery_rate,
-            )?
-        };
+        let pv = credit_adjusted_cashflow_pv(
+            flow,
+            discount_factor,
+            survival_probability.unwrap_or(1.0),
+            recovery_rate,
+            as_of_date,
+        )?;
 
         let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.date));
 
@@ -421,43 +413,6 @@ struct MbsState {
     smm: f64,
     beginning_balance: f64,
     ending_balance: f64,
-}
-
-/// Per-flow PV using the same `CFKind` semantics as
-/// [`finstack_quant_cashflows::aggregation::credit_adjusted_period_pv`]. Inlined to
-/// avoid promoting the pub(crate) helper.
-fn compute_pv(
-    kind: CFKind,
-    amount: f64,
-    df: f64,
-    sp: Option<f64>,
-    recovery_rate: Option<f64>,
-) -> Result<f64> {
-    // Hazard mode off → simple DF discounting.
-    let Some(sp) = sp else {
-        return Ok(amount * df);
-    };
-    if !sp.is_finite() || !(0.0..=1.0).contains(&sp) {
-        return Err(Error::Validation(format!(
-            "invalid survival probability {sp}; expected value in [0, 1]"
-        )));
-    }
-
-    // DefaultedNotional is zeroed (already defaulted, handled via Recovery).
-    if kind == CFKind::DefaultedNotional {
-        return Ok(0.0);
-    }
-
-    // Recovery / AccruedOnDefault: realised post-default cashflows. No SP adjustment.
-    if matches!(kind, CFKind::Recovery | CFKind::AccruedOnDefault) {
-        return Ok(amount * df);
-    }
-
-    let recovery_term = match (recovery_rate, kind) {
-        (Some(r), CFKind::Amortization | CFKind::Notional | CFKind::PrePayment) => r * (1.0 - sp),
-        _ => 0.0,
-    };
-    Ok(amount * df * (sp + recovery_term))
 }
 
 fn sum_pvs<I>(pvs: I) -> f64
@@ -675,8 +630,17 @@ mod tests {
     }
 
     #[test]
-    fn compute_pv_rejects_survival_probability_outside_unit_interval() {
-        let err = compute_pv(CFKind::Notional, 100.0, 0.95, Some(-0.01), Some(0.4))
+    fn row_pv_rejects_survival_probability_outside_unit_interval() {
+        let date = Date::from_calendar_date(2026, Month::January, 15).expect("date");
+        let flow = finstack_quant_cashflows::CashFlow::new(
+            date,
+            None,
+            Money::new(100.0, Currency::USD),
+            CFKind::Notional,
+            0.0,
+            None,
+        );
+        let err = credit_adjusted_cashflow_pv(&flow, 0.95, -0.01, Some(0.4), date)
             .expect_err("negative survival probability should be rejected");
 
         let msg = err.to_string();

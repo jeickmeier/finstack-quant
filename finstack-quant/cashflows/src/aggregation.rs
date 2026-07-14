@@ -544,6 +544,57 @@ pub(crate) fn credit_adjusted_period_pv(
     cf.amount.amount() * pv_factor
 }
 
+/// Present value one cashflow under payment-date recovery semantics.
+///
+/// This is the checked row-level counterpart to the aggregate credit PV APIs.
+/// It applies the same cash/non-cash classification, historical-flow cutoff,
+/// survival weighting, and principal recovery treatment used by periodized
+/// valuation.
+///
+/// # Errors
+///
+/// Returns a validation error when the discount factor, survival probability,
+/// recovery rate, or cashflow amount is non-finite, or when a probability lies
+/// outside `[0, 1]`.
+pub fn credit_adjusted_cashflow_pv(
+    cashflow: &CashFlow,
+    discount_factor: f64,
+    survival_probability: f64,
+    recovery_rate: Option<f64>,
+    base: Date,
+) -> finstack_quant_core::Result<f64> {
+    if !cashflow.amount.amount().is_finite() {
+        return Err(finstack_quant_core::Error::Validation(
+            "cashflow amount must be finite".into(),
+        ));
+    }
+    if !discount_factor.is_finite() || discount_factor < 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "discount factor must be finite and non-negative; got {discount_factor}"
+        )));
+    }
+    if !survival_probability.is_finite() || !(0.0..=1.0).contains(&survival_probability) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "survival probability must be finite and in [0, 1]; got {survival_probability}"
+        )));
+    }
+    if let Some(recovery_rate) = recovery_rate {
+        if !recovery_rate.is_finite() || !(0.0..=1.0).contains(&recovery_rate) {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "recovery rate must be finite and in [0, 1]; got {recovery_rate}"
+            )));
+        }
+    }
+
+    Ok(credit_adjusted_period_pv(
+        cashflow,
+        discount_factor,
+        survival_probability,
+        recovery_rate,
+        base,
+    ))
+}
+
 /// Recovery-leg timing convention for credit-adjusted PV aggregation.
 ///
 /// Controls how the recovery cashflow `r · (1 − sp)` on surviving principal
