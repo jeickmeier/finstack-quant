@@ -715,7 +715,7 @@ mod tests {
     #[test]
     fn row_pv_rejects_survival_probability_outside_unit_interval() {
         let date = Date::from_calendar_date(2026, Month::January, 15).expect("date");
-        let flow = finstack_quant_cashflows::CashFlow::new(
+        let flow = finstack_quant_cashflows::primitives::CashFlow::new(
             date,
             None,
             Money::new(100.0, Currency::USD),
