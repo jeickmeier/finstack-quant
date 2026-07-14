@@ -7,6 +7,7 @@ export const instruments = {
   priceInstrumentWithMetrics: wasm.priceInstrumentWithMetrics,
   priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
   priceInstrumentWithMetricsAndMarket: wasm.priceInstrumentWithMetricsAndMarket,
+  instrumentCashflowsJson: wasm.instrumentCashflowsJson,
   instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
   listStandardMetrics: wasm.listStandardMetrics,
   listStandardMetricsGrouped: wasm.listStandardMetricsGrouped,

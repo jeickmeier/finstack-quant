@@ -32,7 +32,6 @@ export const valuations = {
     return wasm.dependencyGraphJson(json);
   },
   Market: wasm.Market,
-  instrumentCashflowsJson: wasm.instrumentCashflowsJson,
   bsPrice: wasm.bsPrice,
   bsGreeks: wasm.bsGreeks,
   bsImpliedVol: wasm.bsImpliedVol,

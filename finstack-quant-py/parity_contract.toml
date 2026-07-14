@@ -1163,7 +1163,6 @@ root_exports = [
     "cmsSpreadOptionIntrinsic",
     "dependencyGraphJson",
     "dryRun",
-    "instrumentCashflowsJson",
     "inverseFloaterCouponProfile",
     "lookbackOptionPrice",
     "mertonJumpCosPrice",
@@ -1272,6 +1271,7 @@ fx = [
 ]
 instruments = [
     "bondFromCashflowsJson",
+    "instrumentCashflowsJson",
     "instrumentCashflowsWithMarket",
     "listStandardMetrics",
     "listStandardMetricsGrouped",

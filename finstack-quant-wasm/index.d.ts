@@ -1460,6 +1460,16 @@ export interface ValuationInstrumentsNamespace {
     pricingOptions?: string | null,
     marketHistory?: string | null
   ): string;
+  /**
+   * Per-flow cashflow envelope using serialized market JSON.
+   * `model` must be `"discounting"` or `"hazard_rate"`.
+   */
+  instrumentCashflowsJson(
+    instrumentJson: string,
+    marketJson: string,
+    asOf: string,
+    model: string
+  ): string;
   instrumentCashflowsWithMarket(
     instrumentJson: string,
     market: Market,
@@ -1761,17 +1771,6 @@ export interface ValuationsNamespace {
    */
   dependencyGraphJson(envelope: CalibrationEnvelope | string): string;
   Market: typeof Market;
-  /**
-   * Per-flow cashflow envelope (DF / survival / PV) for a discountable
-   * instrument. `model` must be `"discounting"` or `"hazard_rate"`; the
-   * envelope's `total_pv` reconciles with `base_value` for supported pairs.
-   */
-  instrumentCashflowsJson(
-    instrumentJson: string,
-    marketJson: string,
-    asOf: string,
-    model: string
-  ): string;
   /** Per-unit Black-Scholes / Garman-Kohlhagen price of a European option.
    *  All rates are continuously compounded decimals; `sigma` is annualized vol;
    *  `t` is years to expiry. */
