@@ -1241,15 +1241,14 @@ impl CashflowProvider for InflationLinkedBond {
             None,
         ));
 
-        let schedule = crate::cashflow::builder::CashFlowSchedule {
-            flows: detailed_flows,
-            notional: crate::cashflow::builder::Notional::par(
-                self.notional.amount(),
-                self.notional.currency(),
-            ),
-            day_count: self.day_count,
-            meta: Default::default(),
-        };
+        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+            detailed_flows,
+            self.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                ..Default::default()
+            },
+        );
         Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Projected,
