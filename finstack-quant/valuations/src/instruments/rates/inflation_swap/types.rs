@@ -1,6 +1,6 @@
 //! Zero-coupon Inflation Swap types and pricing implementation.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
@@ -534,11 +534,6 @@ impl CashflowProvider for InflationSwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let payment_date = self.adjusted_payment_date(self.maturity)?;
-        let anchor = if as_of < payment_date {
-            as_of
-        } else {
-            payment_date - time::Duration::days(1)
-        };
         let fixed_amount = self.fixed_leg_amount()?;
         let inflation_amount = self.inflation_leg_amount(curves, as_of)?;
         let (fixed_signed, inflation_signed) = match self.side {
@@ -546,22 +541,19 @@ impl CashflowProvider for InflationSwap {
             PayReceive::Receive => (fixed_amount.amount(), -inflation_amount.amount()),
         };
         let ccy = self.notional.currency();
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::new(0.0, ccy), anchor, payment_date);
-        let _ = builder.add_principal_event(
-            payment_date,
-            Money::new(0.0, ccy),
-            Some(Money::new(-fixed_signed, ccy)),
-            CFKind::Notional,
+        let mut schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            vec![
+                (payment_date, Money::new(fixed_signed, ccy)),
+                (payment_date, Money::new(inflation_signed, ccy)),
+            ],
+            self.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                kind: Some(CFKind::Notional),
+                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                ..Default::default()
+            },
         );
-        let _ = builder.add_principal_event(
-            payment_date,
-            Money::new(0.0, ccy),
-            Some(Money::new(-inflation_signed, ccy)),
-            CFKind::Notional,
-        );
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(self.notional.amount(), ccy);
         schedule.day_count = self.day_count;
         Ok(schedule.normalize_public(
             as_of,
@@ -969,24 +961,22 @@ impl CashflowProvider for YoYInflationSwap {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let anchor = if as_of < self.maturity {
-            as_of
-        } else {
-            self.maturity - time::Duration::days(1)
-        };
-        let mut builder = CashFlowSchedule::builder();
         let ccy = self.notional.currency();
-        let _ = builder.principal(Money::new(0.0, ccy), anchor, self.maturity);
-        for (pay, amount) in self.signed_period_flows(curves, as_of)? {
-            let _ = builder.add_principal_event(
-                pay,
-                Money::new(0.0, ccy),
-                Some(Money::new(-amount.amount(), ccy)),
-                CFKind::Notional,
-            );
-        }
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(self.notional.amount(), ccy);
+        let flows = self
+            .signed_period_flows(curves, as_of)?
+            .into_iter()
+            .map(|(pay, amount)| (pay, Money::new(amount.amount(), ccy)))
+            .collect();
+        let mut schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            flows,
+            self.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                kind: Some(CFKind::Notional),
+                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                ..Default::default()
+            },
+        );
         schedule.day_count = self.day_count;
         Ok(schedule.normalize_public(
             as_of,

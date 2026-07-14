@@ -4,7 +4,7 @@
 //! commodity forward contracts. Pricing uses curve-based forward interpolation
 //! with optional quoted price override.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
@@ -502,21 +502,16 @@ impl CashflowProvider for CommodityForward {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let invoice = self.contractual_invoice_amount(market, as_of)?;
-        let anchor = if as_of < self.maturity {
-            as_of
-        } else {
-            self.maturity - time::Duration::days(1)
-        };
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::new(0.0, invoice.currency()), anchor, self.maturity);
-        let _ = builder.add_principal_event(
-            self.maturity,
-            Money::new(0.0, invoice.currency()),
-            Some(Money::new(-invoice.amount(), invoice.currency())),
-            CFKind::Notional,
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            vec![(self.maturity, invoice)],
+            finstack_quant_core::dates::DayCount::Act365F,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(Money::new(invoice.amount().abs(), invoice.currency())),
+                kind: Some(CFKind::Notional),
+                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                ..Default::default()
+            },
         );
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(invoice.amount().abs(), invoice.currency());
         Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Projected,

@@ -4,7 +4,7 @@
 //! currency pairs. Pricing uses covered interest rate parity (CIRP) with
 //! optional contract rate override.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
@@ -557,31 +557,13 @@ impl FxForward {
             .unwrap_or_else(|| self.market_forward_rate(market, as_of))
     }
 
-    fn settlement_anchor(&self, as_of: Date) -> Date {
-        if as_of < self.maturity {
-            as_of
-        } else {
-            self.maturity - time::Duration::days(1)
-        }
-    }
-
     fn single_leg_schedule(
         &self,
         as_of: Date,
         amount: Money,
-    ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let mut builder = CashFlowSchedule::builder();
-        let anchor = self.settlement_anchor(as_of);
-        let _ = builder.principal(Money::new(0.0, amount.currency()), anchor, self.maturity);
-        let _ = builder.add_principal_event(
-            self.maturity,
-            Money::new(0.0, amount.currency()),
-            Some(Money::new(-amount.amount(), amount.currency())),
-            CFKind::Notional,
-        );
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(amount.amount().abs(), amount.currency());
-        Ok(schedule)
+    ) -> finstack_quant_core::Result<(Date, Money)> {
+        let _ = as_of;
+        Ok((self.maturity, amount))
     }
 }
 
@@ -755,16 +737,30 @@ impl CashflowProvider for FxForward {
         let base_amount = Money::new(self.notional.amount(), self.base_currency);
         let quote_amount = Money::new(-self.notional.amount() * contract_rate, self.quote_currency);
 
-        let mut base_schedule = self.single_leg_schedule(as_of, base_amount)?;
+        let base_flow = self.single_leg_schedule(as_of, base_amount)?;
         let quote_schedule = self.single_leg_schedule(as_of, quote_amount)?;
-        base_schedule.flows.extend(quote_schedule.flows);
-        base_schedule.notional = Notional::par(0.0, self.base_currency);
-        let representation = if self.contract_rate.is_some() {
-            crate::cashflow::builder::CashflowRepresentation::Contractual
-        } else {
-            crate::cashflow::builder::CashflowRepresentation::Projected
-        };
-        Ok(base_schedule.normalize_public(as_of, representation))
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            vec![base_flow, quote_schedule],
+            finstack_quant_core::dates::DayCount::Act365F,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(Money::new(0.0, self.base_currency)),
+                kind: Some(CFKind::Notional),
+                representation: if self.contract_rate.is_some() {
+                    crate::cashflow::builder::CashflowRepresentation::Contractual
+                } else {
+                    crate::cashflow::builder::CashflowRepresentation::Projected
+                },
+                ..Default::default()
+            },
+        );
+        Ok(schedule.normalize_public(
+            as_of,
+            if self.contract_rate.is_some() {
+                crate::cashflow::builder::CashflowRepresentation::Contractual
+            } else {
+                crate::cashflow::builder::CashflowRepresentation::Projected
+            },
+        ))
     }
 }
 

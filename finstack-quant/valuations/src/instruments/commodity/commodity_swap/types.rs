@@ -4,7 +4,7 @@
 //! price exchange contracts. One party pays a fixed price per unit while
 //! the other pays a floating price based on an index.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
@@ -442,31 +442,12 @@ impl CommoditySwap {
         Ok(dates)
     }
 
-    fn leg_schedule_from_amounts(
-        &self,
-        as_of: Date,
-        maturity: Date,
-        flows: &[(Date, Money)],
-    ) -> Result<CashFlowSchedule> {
-        let anchor = if as_of < maturity {
-            as_of
-        } else {
-            maturity - time::Duration::days(1)
-        };
+    fn leg_schedule_from_amounts(&self, flows: &[(Date, Money)]) -> Result<Vec<(Date, Money)>> {
         let ccy = self.underlying.currency;
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::new(0.0, ccy), anchor, maturity);
-        for (date, amount) in flows {
-            let _ = builder.add_principal_event(
-                *date,
-                Money::new(0.0, ccy),
-                Some(Money::new(-amount.amount(), ccy)),
-                CFKind::Notional,
-            );
-        }
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(0.0, ccy);
-        Ok(schedule)
+        Ok(flows
+            .iter()
+            .map(|(date, amount)| (*date, Money::new(amount.amount(), ccy)))
+            .collect())
     }
 
     fn fixed_leg_flows(&self) -> Result<Vec<(Date, Money)>> {
@@ -592,16 +573,22 @@ impl CashflowProvider for CommoditySwap {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let mut fixed_schedule =
-            self.leg_schedule_from_amounts(as_of, self.maturity, &self.fixed_leg_flows()?)?;
-        let floating_schedule = self.leg_schedule_from_amounts(
-            as_of,
-            self.maturity,
-            &self.floating_leg_flows(market, as_of)?,
-        )?;
-        fixed_schedule.flows.extend(floating_schedule.flows);
-        fixed_schedule.notional = Notional::par(0.0, self.underlying.currency);
-        Ok(fixed_schedule.normalize_public(
+        let flows = self
+            .leg_schedule_from_amounts(&self.fixed_leg_flows()?)?
+            .into_iter()
+            .chain(self.leg_schedule_from_amounts(&self.floating_leg_flows(market, as_of)?)?)
+            .collect();
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            flows,
+            finstack_quant_core::dates::DayCount::Act365F,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(Money::new(0.0, self.underlying.currency)),
+                kind: Some(CFKind::Notional),
+                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                ..Default::default()
+            },
+        );
+        Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Projected,
         ))

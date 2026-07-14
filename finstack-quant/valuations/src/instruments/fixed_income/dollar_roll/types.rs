@@ -3,7 +3,7 @@
 //! A dollar roll is a simultaneous sale and purchase of agency MBS TBAs
 //! for different settlement months, used for financing and carry trades.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
@@ -305,30 +305,26 @@ impl CashflowProvider for DollarRoll {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let front_date = self.front_settle_date()?;
         let back_date = self.back_settle_date()?;
-        let anchor = self.trade_date.unwrap_or_else(|| {
-            if as_of < front_date {
-                as_of
-            } else {
-                front_date - time::Duration::days(1)
-            }
-        });
         let ccy = self.notional.currency();
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::new(0.0, ccy), anchor, back_date);
-        let _ = builder.add_principal_event(
-            front_date,
-            Money::new(0.0, ccy),
-            Some(Money::new(-self.trade_cash_amount(self.front_price), ccy)),
-            CFKind::Notional,
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            vec![
+                (
+                    front_date,
+                    Money::new(self.trade_cash_amount(self.front_price), ccy),
+                ),
+                (
+                    back_date,
+                    Money::new(-self.trade_cash_amount(self.back_price), ccy),
+                ),
+            ],
+            finstack_quant_core::dates::DayCount::Act365F,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                kind: Some(CFKind::Notional),
+                representation: crate::cashflow::builder::CashflowRepresentation::Contractual,
+                ..Default::default()
+            },
         );
-        let _ = builder.add_principal_event(
-            back_date,
-            Money::new(0.0, ccy),
-            Some(Money::new(self.trade_cash_amount(self.back_price), ccy)),
-            CFKind::Notional,
-        );
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(self.notional.amount(), ccy);
         Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Contractual,

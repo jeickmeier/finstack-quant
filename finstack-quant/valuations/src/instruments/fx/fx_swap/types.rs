@@ -266,22 +266,16 @@ impl FxSwap {
         payment_date: Date,
         amount: Money,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let anchor = if as_of < payment_date {
-            as_of
-        } else {
-            payment_date - time::Duration::days(1)
-        };
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::new(0.0, amount.currency()), anchor, payment_date);
-        let _ = builder.add_principal_event(
-            payment_date,
-            Money::new(0.0, amount.currency()),
-            Some(Money::new(-amount.amount(), amount.currency())),
-            CFKind::Notional,
-        );
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(amount.amount().abs(), amount.currency());
-        Ok(schedule)
+        let _ = as_of;
+        Ok(crate::cashflow::traits::schedule_from_dated_flows(
+            vec![(payment_date, amount)],
+            finstack_quant_core::dates::DayCount::Act365F,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())),
+                kind: Some(CFKind::Notional),
+                ..Default::default()
+            },
+        ))
     }
 }
 

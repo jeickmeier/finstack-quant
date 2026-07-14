@@ -4,7 +4,7 @@
 //! restricted currencies. Supports both pre-fixing (forward rate estimation)
 //! and post-fixing (observed rate) valuation modes.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
@@ -981,22 +981,17 @@ impl CashflowProvider for Ndf {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let settlement_amount = self.settlement_amount_for_schedule(market, as_of)?;
-        let anchor = if as_of < self.maturity {
-            as_of
-        } else {
-            self.maturity - time::Duration::days(1)
-        };
         let ccy = self.settlement_currency;
-        let mut builder = CashFlowSchedule::builder();
-        let _ = builder.principal(Money::new(0.0, ccy), anchor, self.maturity);
-        let _ = builder.add_principal_event(
-            self.maturity,
-            Money::new(0.0, ccy),
-            Some(Money::new(-settlement_amount, ccy)),
-            CFKind::Notional,
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            vec![(self.maturity, Money::new(settlement_amount, ccy))],
+            finstack_quant_core::dates::DayCount::Act365F,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(Money::new(0.0, ccy)),
+                kind: Some(CFKind::Notional),
+                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                ..Default::default()
+            },
         );
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(0.0, ccy);
         Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Projected,

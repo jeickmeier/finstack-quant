@@ -13,7 +13,7 @@
 //! Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps,
 //! and Floors." *Wilmott Magazine*, March, 38-44.
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
 use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
@@ -645,37 +645,23 @@ impl CashflowProvider for CmsSwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
-        let maturity = self
-            .cms_payment_dates
-            .last()
-            .copied()
-            .unwrap_or(self.cms_fixing_dates.first().copied().unwrap_or(as_of));
-        let anchor = if as_of < maturity {
-            as_of
-        } else {
-            maturity - time::Duration::days(1)
-        };
-        let mut builder = CashFlowSchedule::builder();
         let ccy = self.notional.currency();
-        let _ = builder.principal(Money::new(0.0, ccy), anchor, maturity);
-        for (date, amount) in self.cms_leg_flows(market, as_of)? {
-            let _ = builder.add_principal_event(
-                date,
-                Money::new(0.0, ccy),
-                Some(Money::new(-amount.amount(), ccy)),
-                CFKind::Notional,
-            );
-        }
-        for (date, amount) in self.funding_leg_flows(market, as_of)? {
-            let _ = builder.add_principal_event(
-                date,
-                Money::new(0.0, ccy),
-                Some(Money::new(-amount.amount(), ccy)),
-                CFKind::Notional,
-            );
-        }
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(self.notional.amount(), ccy);
+        let flows = self
+            .cms_leg_flows(market, as_of)?
+            .into_iter()
+            .chain(self.funding_leg_flows(market, as_of)?)
+            .map(|(date, amount)| (date, Money::new(amount.amount(), ccy)))
+            .collect();
+        let mut schedule = crate::cashflow::traits::schedule_from_dated_flows(
+            flows,
+            self.cms_day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(self.notional),
+                kind: Some(CFKind::Notional),
+                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                ..Default::default()
+            },
+        );
         schedule.day_count = self.cms_day_count;
         Ok(schedule.normalize_public(
             as_of,
