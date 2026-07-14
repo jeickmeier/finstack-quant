@@ -25,6 +25,7 @@
         },
         "cashflow_spec": {
           "Fixed": {
+            "adjust_accrual_dates": true,
             "bdc": "following",
             "calendar_id": "weekends_only",
             "coupon_type": "Cash",
@@ -48,6 +49,7 @@
           "currency": "USD"
         },
         "pricing_overrides": {
+          "bond_risk_basis": "callable_oas",
           "implied_volatility": 0.01,
           "mean_reversion": 0.03,
           "oas_quote_compounding": "continuous",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813
@@ -9,15 +10,13 @@ import QuantLib as ql  # type: ignore[import-not-found]  # noqa: N813
 from .common import SCHEMA_VERSION, VALUATION_DATE, central_difference, market_snapshot, metadata, ql_date, tolerance
 
 
-def _bond_discount_curve(curve_id: str, rate: float) -> dict[str, Any]:
-    """Build the 30/360 flat curve used by fixed-bond parity."""
-    import math
-
+def _bond_discount_curve(curve_id: str, rate: float, *, day_count: str = "Thirty360") -> dict[str, Any]:
+    """Build the continuously compounded flat curve used by bond parity."""
     return {
         "type": "discount",
         "id": curve_id,
         "base": VALUATION_DATE,
-        "day_count": "Thirty360",
+        "day_count": day_count,
         "knot_points": [[0.0, 1.0], [30.0, math.exp(-rate * 30.0)]],
         "interp_style": "log_linear",
         "extrapolation": "flat_forward",
@@ -91,6 +90,7 @@ def build_fixed_risk_free_bond() -> dict[str, Any]:
                             "bdc": "following",
                             "calendar_id": "weekends_only",
                             "stub": "ShortFront",
+                            "adjust_accrual_dates": True,
                         }
                     },
                     "discount_curve_id": "USD-OIS",
@@ -216,16 +216,17 @@ def _floating_bond_spec(*, credit_curve_id: str | None) -> dict[str, Any]:
                             "index_cap_bp": None,
                             "reset_freq": {"count": 3, "unit": "months"},
                             "reset_lag_days": 2,
-                            "dc": "Act360",
-                            "bdc": "following",
-                            "calendar_id": "weekends_only",
                             "fixing_calendar_id": "weekends_only",
-                            "end_of_month": False,
-                            "payment_lag_days": 0,
                         },
                         "coupon_type": "Cash",
                         "freq": {"count": 3, "unit": "months"},
+                        "dc": "Act360",
+                        "bdc": "following",
+                        "calendar_id": "weekends_only",
                         "stub": "ShortFront",
+                        "end_of_month": False,
+                        "payment_lag_days": 0,
+                        "adjust_accrual_dates": True,
                     }
                 },
                 "discount_curve_id": "USD-OIS",
@@ -245,29 +246,47 @@ def _quantlib_floating_bond_npv(discount: float, projection: float, hazard: floa
     discount_handle = ql.YieldTermStructureHandle(
         ql.FlatForward(evaluation_date, discount, ql.Actual365Fixed(), ql.Continuous)
     )
+    calendar = ql.WeekendsOnly()
+    projection_day_count = ql.Actual360()
+    schedule = ql.Schedule(
+        ql.Date(6, 5, 2026),
+        ql.Date(6, 5, 2031),
+        ql.Period(3, ql.Months),
+        calendar,
+        ql.Following,
+        ql.Following,
+        ql.DateGeneration.Backward,
+        False,
+    )
+
+    # Finstack's ForwardCurve stores simple index forwards. Construct the
+    # independent QuantLib projection curve from the same quote basis so that a
+    # parallel bump means the same thing in both engines.
+    projection_dates = [evaluation_date]
+    projection_dfs = [1.0]
+    previous_date = evaluation_date
+    projection_df = 1.0
+    for date in schedule:
+        if date <= evaluation_date:
+            continue
+        accrual = projection_day_count.yearFraction(previous_date, date)
+        projection_df /= 1.0 + projection * accrual
+        projection_dates.append(date)
+        projection_dfs.append(projection_df)
+        previous_date = date
     projection_handle = ql.YieldTermStructureHandle(
-        ql.FlatForward(evaluation_date, projection, ql.Actual365Fixed(), ql.Continuous)
+        ql.DiscountCurve(projection_dates, projection_dfs, ql.Actual365Fixed(), calendar)
     )
     index = ql.IborIndex(
         "USD-Term-SOFR-3M",
         ql.Period(3, ql.Months),
         2,
         ql.USDCurrency(),
-        ql.WeekendsOnly(),
+        calendar,
         ql.Following,
         False,
-        ql.Actual360(),
+        projection_day_count,
         projection_handle,
-    )
-    schedule = ql.Schedule(
-        ql.Date(6, 5, 2026),
-        ql.Date(6, 5, 2031),
-        ql.Period(3, ql.Months),
-        ql.WeekendsOnly(),
-        ql.Following,
-        ql.Following,
-        ql.DateGeneration.Backward,
-        False,
     )
     bond = ql.FloatingRateBond(
         2,
@@ -317,7 +336,7 @@ def build_floating_risk_free_bond() -> dict[str, Any]:
         "kind": "pricing",
         "model": "discounting",
         "market": market_snapshot([
-            _bond_discount_curve("USD-OIS", discount_rate),
+            _bond_discount_curve("USD-OIS", discount_rate, day_count="Act365F"),
             {
                 "type": "forward",
                 "id": "USD-SOFR-3M",
@@ -466,6 +485,7 @@ def build_fixed_callable_oas_bond() -> dict[str, Any]:
         "mean_reversion": mean_reversion,
         "tree_discount_curve_id": "USD-OIS",
         "oas_quote_compounding": "continuous",
+        "bond_risk_basis": "callable_oas",
     }
     spec["call_put"] = {
         "calls": [

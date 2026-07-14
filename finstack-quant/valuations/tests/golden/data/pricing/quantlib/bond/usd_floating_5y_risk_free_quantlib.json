@@ -1,7 +1,7 @@
 {
   "expected": {
-    "dv01": -0.0016499744931763871,
-    "npv": 105.87186338839075
+    "dv01": -0.0015537638855462887,
+    "npv": 106.03642910217685
   },
   "instrument": {
     "instrument": {
@@ -15,15 +15,16 @@
         },
         "cashflow_spec": {
           "Floating": {
+            "adjust_accrual_dates": true,
+            "bdc": "following",
+            "calendar_id": "weekends_only",
             "coupon_type": "Cash",
+            "dc": "Act360",
+            "end_of_month": false,
             "freq": {
               "count": 3,
               "unit": "months"
             },
-            "bdc": "following",
-            "calendar_id": "weekends_only",
-            "dc": "Act360",
-            "end_of_month": false,
             "payment_lag_days": 0,
             "rate_spec": {
               "all_in_cap_bp": null,
@@ -69,7 +70,7 @@
         {
           "allow_non_monotonic": false,
           "base": "2026-04-30",
-          "day_count": "Thirty360",
+          "day_count": "Act365F",
           "extrapolation": "flat_forward",
           "id": "USD-OIS",
           "interp_style": "log_linear",

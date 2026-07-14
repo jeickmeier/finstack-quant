@@ -222,7 +222,6 @@ impl TreePricer {
         } else {
             bond
         };
-
         if as_of >= bond.maturity {
             // The contractual maturity can roll to a later business-day
             // payment date. Once the option exercise period has ended there

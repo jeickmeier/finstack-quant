@@ -1069,7 +1069,7 @@
           "vol_model": "black",
           "mean_reversion": 0.0,
           "tree_discount_curve_id": "USD-OAS-S23",
-          "oas_quote_compounding": "continuous",
+          "oas_quote_compounding": "semi_annual",
           "oas_price_basis": "forward_accrued_clean"
         },
         "call_put": {

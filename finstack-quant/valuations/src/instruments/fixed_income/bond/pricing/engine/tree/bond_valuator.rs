@@ -50,6 +50,10 @@ pub struct BondValuator {
     /// from the holder's perspective. Index `i` corresponds to time step `i`.
     /// Default value is 0.0.
     pub(super) cashflow_vec: Vec<f64>,
+    /// Base-curve-timing-adjusted cashflow pieces and their event-minus-step
+    /// time offsets. The offsets let OAS discounting preserve each original
+    /// cashflow date even when a uniform tree grid is used.
+    cashflow_components: Vec<Vec<(f64, f64)>>,
     /// Call prices indexed by time step (sparse via Option for memory efficiency).
     /// `Some(price)` indicates a call option is exercisable at that step.
     /// Price is computed as `outstanding_principal × (price_pct / 100)`.
@@ -399,6 +403,7 @@ impl BondValuator {
 
         // Pre-allocate vectors for O(1) access during backward induction
         let mut cashflow_vec = vec![0.0; num_steps];
+        let mut cashflow_components = vec![Vec::new(); num_steps];
         for (date, amount) in &flows {
             if *date > as_of {
                 let time_frac = dc_curve.year_fraction(
@@ -415,12 +420,14 @@ impl BondValuator {
                 // receipt and exercise decision.
                 if exercise_dates.contains(date) {
                     let step = Self::nearest_step(&time_steps, time_frac).clamp(1, num_steps - 1);
-                    cashflow_vec[step] += Self::value_at_step_time(
+                    let adjusted_amount = Self::value_at_step_time(
                         amount.amount(),
                         time_frac,
                         time_steps[step],
                         discount_curve.as_ref(),
                     );
+                    cashflow_vec[step] += adjusted_amount;
+                    cashflow_components[step].push((adjusted_amount, time_frac - time_steps[step]));
                 } else {
                     // Distributed mapping: spread cashflow between the two
                     // nearest time steps to reduce discretization error and
@@ -448,22 +455,28 @@ impl BondValuator {
                     // booked at t=0, so a coupon inside the first time step
                     // keeps its full (1 - weight) share.
                     if step_idx < num_steps {
-                        cashflow_vec[step_idx] += Self::value_at_step_time(
+                        let adjusted_amount = Self::value_at_step_time(
                             amount.amount() * (1.0 - weight),
                             time_frac,
                             time_steps[step_idx],
                             discount_curve.as_ref(),
                         );
+                        cashflow_vec[step_idx] += adjusted_amount;
+                        cashflow_components[step_idx]
+                            .push((adjusted_amount, time_frac - time_steps[step_idx]));
                     }
 
                     // Distribute to step_idx + 1 (weight: weight)
                     if step_idx + 1 < num_steps {
-                        cashflow_vec[step_idx + 1] += Self::value_at_step_time(
+                        let adjusted_amount = Self::value_at_step_time(
                             amount.amount() * weight,
                             time_frac,
                             time_steps[step_idx + 1],
                             discount_curve.as_ref(),
                         );
+                        cashflow_vec[step_idx + 1] += adjusted_amount;
+                        cashflow_components[step_idx + 1]
+                            .push((adjusted_amount, time_frac - time_steps[step_idx + 1]));
                     }
                 }
             }
@@ -568,6 +581,7 @@ impl BondValuator {
         Ok(Self {
             bond,
             cashflow_vec,
+            cashflow_components,
             call_vec,
             put_vec,
             outstanding_principal_vec,
@@ -584,6 +598,24 @@ impl BondValuator {
     #[inline]
     fn cashflow_at(&self, step: usize) -> f64 {
         self.cashflow_vec.get(step).copied().unwrap_or(0.0)
+    }
+
+    /// Cashflow at a tree step with continuous OAS timing preserved at each
+    /// original event date.
+    #[inline]
+    fn cashflow_at_oas(&self, step: usize, oas_rate: f64) -> f64 {
+        if oas_rate.abs() <= f64::EPSILON {
+            return self.cashflow_at(step);
+        }
+        self.cashflow_components
+            .get(step)
+            .map(|components| {
+                components
+                    .iter()
+                    .map(|(amount, event_minus_step)| amount * (-oas_rate * event_minus_step).exp())
+                    .sum()
+            })
+            .unwrap_or(0.0)
     }
 
     /// Check if there's a call option at this time step.
@@ -646,7 +678,7 @@ impl BondValuator {
         let comp = hw_tree.config().compounding;
         let oas_rate = oas_bp / 10_000.0;
 
-        let terminal_cf = self.cashflow_at(final_step);
+        let terminal_cf = self.cashflow_at_oas(final_step, oas_rate);
         let terminal_values = vec![terminal_cf; hw_tree.num_nodes(final_step)];
 
         hw_tree.backward_induction(&terminal_values, |step, _node_idx, continuation| {
@@ -655,7 +687,7 @@ impl BondValuator {
             // over this step's (possibly non-uniform) interval.
             let oas_adjusted = continuation * comp.df(oas_rate, hw_tree.dt_at_step(step));
 
-            let coupon = self.cashflow_at(step);
+            let coupon = self.cashflow_at_oas(step, oas_rate);
             let mut principal_value = oas_adjusted;
 
             if let Some(put_price) = self.put_at(step) {
@@ -692,15 +724,17 @@ impl BondValuator {
 }
 
 impl TreeValuator for BondValuator {
-    fn value_at_maturity(&self, _state: &NodeState) -> Result<f64> {
+    fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let final_step = self.time_steps.len() - 1;
-        let cashflow = self.cashflow_at(final_step);
+        let oas_rate = state.get_var_or(crate::models::short_rate_keys::OAS, 0.0) / 10_000.0;
+        let cashflow = self.cashflow_at_oas(final_step, oas_rate);
         Ok(cashflow)
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
         let step = state.step;
-        let coupon = self.cashflow_at(step);
+        let oas_rate = state.get_var_or(crate::models::short_rate_keys::OAS, 0.0) / 10_000.0;
+        let coupon = self.cashflow_at_oas(step, oas_rate);
 
         // Call/put exercise logic:
         // - Coupon is ALWAYS paid on coupon dates regardless of exercise decision

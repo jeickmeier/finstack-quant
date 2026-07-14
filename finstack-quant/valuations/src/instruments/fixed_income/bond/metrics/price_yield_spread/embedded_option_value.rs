@@ -1,9 +1,8 @@
 //! Embedded option value calculator for callable/putable bonds.
 //!
-//! Computes the theoretical value of embedded call or put options by pricing
-//! the bond twice using a short-rate tree:
+//! Computes the theoretical value of embedded call or put options by pricing:
 //! 1. With call/put constraints → P_embedded
-//! 2. Without call/put constraints → P_straight
+//! 2. Without call/put constraints on the tree calibration curve → P_straight
 //!
 //! The embedded option value is the difference between these prices.
 //!
@@ -52,17 +51,15 @@
 //! ```
 
 use crate::instruments::fixed_income::bond::pricing::engine::tree::{bond_tree_config, TreePricer};
-use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_oas;
 use crate::instruments::fixed_income::bond::pricing::settlement::settlement_date;
-use crate::instruments::fixed_income::bond::CallPutSchedule;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 
 /// Calculates the embedded option value for callable/putable bonds.
 ///
-/// Uses tree-based pricing to compute the difference between:
+/// Computes the difference between:
 /// - The option-embedded bond price (with call/put exercise decisions)
-/// - The straight bond price (without embedded options)
+/// - The deterministic straight-bond price on the same tree calibration curve
 ///
 /// # Returns
 ///
@@ -148,13 +145,52 @@ impl MetricCalculator for EmbeddedOptionValueCalculator {
             0.0
         };
 
-        let price_with_options = price_from_oas(bond, market, quote_date, oas_decimal)?;
+        let tree_config = bond_tree_config(bond)?;
+        let continuous_oas = tree_config
+            .oas_quote_compounding
+            .continuous_from_quote_decimal(oas_decimal);
+        let pricer = TreePricer::with_config(tree_config.clone());
+        let oas_bp = oas_decimal * 10_000.0;
+        let price_with_options = pricer.price_at_oas(bond, market, quote_date, oas_bp)?;
         let mut straight_bond = bond.clone();
-        straight_bond.call_put = Some(CallPutSchedule::default());
-        let price_straight = price_from_oas(&straight_bond, market, quote_date, oas_decimal)?;
+        straight_bond.call_put = None;
+        if let Some(curve_id) = tree_config.tree_discount_curve_id {
+            straight_bond.discount_curve_id = curve_id;
+        }
+        let price_straight = straight_price_at_continuous_spread(
+            &straight_bond,
+            market,
+            quote_date,
+            continuous_oas,
+        )?;
 
         Ok(price_with_options - price_straight)
     }
+}
+
+fn straight_price_at_continuous_spread(
+    bond: &Bond,
+    market: &finstack_quant_core::market_data::context::MarketContext,
+    quote_date: finstack_quant_core::dates::Date,
+    spread: f64,
+) -> finstack_quant_core::Result<f64> {
+    use finstack_quant_core::dates::DayCountContext;
+    use finstack_quant_core::math::summation::NeumaierAccumulator;
+
+    let curve = market.get_discount(&bond.discount_curve_id)?;
+    let flows = bond.pricing_dated_cashflows(market, quote_date)?;
+    let mut pv = NeumaierAccumulator::new();
+    for (date, amount) in flows {
+        if date <= quote_date {
+            continue;
+        }
+        let time = curve
+            .day_count()
+            .year_fraction(quote_date, date, DayCountContext::default())?;
+        let df = curve.df_between_dates(quote_date, date)? * (-spread * time).exp();
+        pv.add(amount.amount() * df);
+    }
+    Ok(pv.total())
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 use crate::cashflow::{builder::CashFlowSchedule, primitives::CFKind};
-use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-    asset_swap_forward_components, fixed_leg_annuity, par_rate_and_annuity_from_discount,
+    asset_swap_forward_components, asset_swap_projection_rate, fixed_leg_annuity,
+    par_rate_and_annuity_from_discount,
 };
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::fixed_income::bond::CashflowSpec;
@@ -300,7 +300,7 @@ fn asset_swap_forward_components_split(
             })?;
             fixings.value_on_exact(prev)?
         } else {
-            rate_between_on_dates(inputs.fwd, prev, date)?
+            asset_swap_projection_rate(inputs.fwd, prev, date)?
         };
         float_pv.add((forward + spread) * yf * df);
         float_ann.add(yf * df);

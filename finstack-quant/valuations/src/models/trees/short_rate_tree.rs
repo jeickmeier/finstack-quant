@@ -1488,9 +1488,9 @@ impl ShortRateTree {
     /// Backward induction over the Black-Karasinski trinomial lattice.
     ///
     /// Honors the per-node transition probabilities, the Hull & White edge
-    /// branch switching, and the configured per-node compounding. The OAS is
-    /// applied as a parallel shift (in bp) to the node short rate before
-    /// discounting, matching the recombining-engine convention.
+    /// branch switching, and the configured per-node compounding. OAS is an
+    /// independently compounded continuous spread, so periodic node-rate
+    /// conventions do not distort its discount factor.
     fn price_bk_trinomial<V: TreeValuator>(
         &self,
         lattice: &BkTrinomialLattice,
@@ -1561,14 +1561,14 @@ impl ShortRateTree {
                     }
                 }
 
-                let r = self.rates[step][j] + oas_shift;
-                let continuation = expected_value * comp.df(r, dt);
+                let r = self.rates[step][j];
+                let continuation = expected_value * comp.df(r, dt) * (-oas_shift * dt).exp();
                 let state = NodeState::with_cached(
                     step,
                     time_t,
                     initial_vars,
                     market_context,
-                    cached_for(r),
+                    cached_for(r + oas_shift),
                 );
                 scratch.push(valuator.value_at_node(&state, continuation, dt)?);
             }
@@ -1642,11 +1642,11 @@ impl TreeModel for ShortRateTree {
         let rate_gen: Box<dyn Fn(usize, usize) -> f64> =
             Box::new(move |step: usize, node: usize| -> f64 {
                 let r = if step < rates_clone2.len() && node < rates_clone2[step].len() {
-                    rates_clone2[step][node] + oas / 10000.0
+                    rates_clone2[step][node]
                 } else {
                     return 0.0;
                 };
-                compounding.to_continuous(r, dt_pricing)
+                compounding.to_continuous(r, dt_pricing) + oas / 10000.0
             });
 
         // Set up branching probabilities based on tree type
