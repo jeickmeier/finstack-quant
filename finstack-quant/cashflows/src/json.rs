@@ -168,7 +168,7 @@ struct CanonicalBuildSpec {
 #[derive(serde::Deserialize)]
 #[serde(untagged)]
 enum CouponLegSpecInput {
-    Canonical(CouponLegSpec),
+    Canonical(Box<CouponLegSpec>),
     LegacyFixedRateProgram(LegacyFixedRateProgram),
 }
 
@@ -196,7 +196,7 @@ fn canonicalize_coupon_program(
     let mut canonical = Vec::with_capacity(instructions.len());
     for instruction in instructions {
         match instruction {
-            CouponLegSpecInput::Canonical(instruction) => canonical.push(instruction),
+            CouponLegSpecInput::Canonical(instruction) => canonical.push(*instruction),
             CouponLegSpecInput::LegacyFixedRateProgram(program) => {
                 let LegacyFixedRateProgram {
                     kind: LegacyFixedRateProgramKind::FixedRateProgram,
