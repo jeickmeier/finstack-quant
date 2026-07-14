@@ -11,8 +11,8 @@
 //!   separately; the forward rate is taken directly from the forward curve for the accrual period.
 
 use crate::cashflow::builder::{
-    CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
-    Notional,
+    schedule::merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
+    FloatingRateFallback, FloatingRateSpec, Notional,
 };
 use crate::cashflow::primitives::CFKind;
 use crate::impl_instrument_base;
@@ -650,9 +650,9 @@ impl XccySwap {
                 CFKind::Notional,
             );
         }
-        let mut schedule = builder.build_with_curves(None)?;
-        schedule.notional = Notional::par(leg.notional.amount(), leg.currency);
-        Ok(schedule)
+        Ok(builder
+            .build_with_curves(None)?
+            .with_notional(Notional::par(leg.notional.amount(), leg.currency)))
     }
 
     /// Calculate the present value of a leg and convert that PV at valuation-date spot.
@@ -923,29 +923,29 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
         // PV cashflow stream but emits records instead of summing.
         if let NotionalExchange::MtmResetting { resetting_side } = self.notional_exchange {
             self.validate()?;
-            let mut schedule =
+            let schedule =
                 crate::instruments::rates::xccy_swap::pricing_mtm::mtm_cashflow_schedule(
                     self,
                     resetting_side,
                     market,
                     as_of,
                 )?;
-            schedule.notional = Notional::par(0.0, self.reporting_currency);
             return Ok(schedule
+                .with_notional(Notional::par(0.0, self.reporting_currency))
                 .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected));
         }
 
-        let mut leg1_schedule = self.leg_coupon_schedule(&self.leg1, market)?;
+        let leg1_schedule = self.leg_coupon_schedule(&self.leg1, market)?;
         let leg2_schedule = self.leg_coupon_schedule(&self.leg2, market)?;
         let leg1_principal = self.leg_principal_schedule(&self.leg1, anchor)?;
         let leg2_principal = self.leg_principal_schedule(&self.leg2, anchor)?;
 
-        leg1_schedule.flows.extend(leg1_principal.flows);
-        leg1_schedule.flows.extend(leg2_schedule.flows);
-        leg1_schedule.flows.extend(leg2_principal.flows);
-        leg1_schedule.notional = Notional::par(0.0, self.reporting_currency);
-        Ok(leg1_schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(merge_cashflow_schedules(
+            [leg1_schedule, leg1_principal, leg2_schedule, leg2_principal],
+            Notional::par(0.0, self.reporting_currency),
+            self.leg1.day_count,
+        )?
+        .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

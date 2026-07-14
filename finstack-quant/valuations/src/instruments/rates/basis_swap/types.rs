@@ -27,8 +27,8 @@ use finstack_quant_core::{
 
 // Import shared swap leg pricing utilities
 use crate::cashflow::builder::{
-    CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
-    Notional,
+    schedule::merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
+    FloatingRateFallback, FloatingRateSpec, Notional,
 };
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
@@ -643,18 +643,16 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
         market: &MarketContext,
         _as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let mut primary = self.floating_leg_schedule(&self.primary_leg, market)?;
-        let mut reference = self.floating_leg_schedule(&self.reference_leg, market)?;
-        for cf in &mut reference.flows {
-            cf.amount *= -1.0;
-        }
-        primary.flows.extend(reference.flows);
-        primary.notional = Notional::par(self.notional.amount(), self.notional.currency());
-        primary.day_count = self.primary_leg.day_count;
-        Ok(
-            primary
-                .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected),
-        )
+        let primary = self.floating_leg_schedule(&self.primary_leg, market)?;
+        let reference = self
+            .floating_leg_schedule(&self.reference_leg, market)?
+            .scale_amounts(-1.0)?;
+        Ok(merge_cashflow_schedules(
+            [primary, reference],
+            Notional::par(self.notional.amount(), self.notional.currency()),
+            self.primary_leg.day_count,
+        )?
+        .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

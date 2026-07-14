@@ -25,7 +25,8 @@ use rust_decimal::Decimal;
 
 use crate::cashflow::builder::{
     periods::{build_periods, BuildPeriodsParams, SchedulePeriod},
-    CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec,
+    schedule::merge_cashflow_schedules,
+    CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, Notional,
 };
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap, PayReceive};
@@ -735,62 +736,24 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
     curves: Option<&MarketContext>,
     as_of: Option<Date>,
 ) -> Result<CashFlowSchedule> {
-    use finstack_quant_core::cashflow::{CFKind, CashFlow};
-
     let fixed_sched = fixed_leg_schedule(irs)?;
     let float_sched = match as_of {
         Some(as_of_date) => float_leg_schedule_with_curves_as_of(irs, curves, Some(as_of_date))?,
         None => float_leg_schedule_with_curves(irs, curves)?,
     };
 
-    // Combine flows from both legs with proper CFKind classification
-    let mut all_flows: Vec<CashFlow> =
-        Vec::with_capacity(fixed_sched.flows.len() + float_sched.flows.len());
-
-    // Add fixed leg flows
-    for cf in fixed_sched.flows {
-        if cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub {
-            let amt = match irs.side {
-                PayReceive::Receive => cf.amount,
-                PayReceive::Pay => cf.amount * -1.0,
-            };
-            all_flows.push(CashFlow::new(
-                cf.date,
-                cf.reset_date,
-                amt,
-                cf.kind,
-                cf.accrual_factor,
-                cf.rate,
-            ));
-        }
-    }
-
-    // Add floating leg flows
-    for cf in float_sched.flows {
-        if cf.kind == CFKind::FloatReset {
-            let amt = match irs.side {
-                PayReceive::Receive => cf.amount * -1.0,
-                PayReceive::Pay => cf.amount,
-            };
-            all_flows.push(CashFlow::new(
-                cf.date,
-                cf.reset_date,
-                amt,
-                cf.kind,
-                cf.accrual_factor,
-                cf.rate,
-            ));
-        }
-    }
-
-    Ok(crate::cashflow::traits::schedule_from_classified_flows(
-        all_flows,
+    let (fixed_sign, floating_sign) = match irs.side {
+        PayReceive::Receive => (1.0, -1.0),
+        PayReceive::Pay => (-1.0, 1.0),
+    };
+    merge_cashflow_schedules(
+        [
+            fixed_sched.scale_amounts(fixed_sign)?,
+            float_sched.scale_amounts(floating_sign)?,
+        ],
+        Notional::par(irs.notional.amount(), irs.notional.currency()),
         irs.fixed.day_count,
-        crate::cashflow::traits::ScheduleBuildOpts {
-            notional_hint: Some(irs.notional),
-            ..Default::default()
-        },
-    ))
+    )
 }
 
 #[cfg(test)]

@@ -12,7 +12,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 
-use crate::cashflow::builder::{CashFlowSchedule, Notional};
+use crate::cashflow::builder::{schedule::merge_cashflow_schedules, CashFlowSchedule, Notional};
 use crate::cashflow::primitives::CFKind;
 use crate::impl_instrument_base;
 
@@ -384,7 +384,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
         let near_quote = self.base_notional.amount() * ctx.contract_near_rate;
         let far_quote = self.base_notional.amount() * ctx.contract_far_rate;
 
-        let mut near_base = self.single_cashflow_schedule(
+        let near_base = self.single_cashflow_schedule(
             as_of,
             self.near_date,
             Money::new(base_amount, self.base_currency),
@@ -405,12 +405,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
             Money::new(far_quote, self.quote_currency),
         )?;
 
-        near_base.flows.extend(near_quote_schedule.flows);
-        near_base.flows.extend(far_base_schedule.flows);
-        near_base.flows.extend(far_quote_schedule.flows);
-        near_base.notional = Notional::par(0.0, self.base_currency);
-        Ok(near_base
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(merge_cashflow_schedules(
+            [
+                near_base,
+                near_quote_schedule,
+                far_base_schedule,
+                far_quote_schedule,
+            ],
+            Notional::par(0.0, self.base_currency),
+            finstack_quant_core::dates::DayCount::Act365F,
+        )?
+        .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

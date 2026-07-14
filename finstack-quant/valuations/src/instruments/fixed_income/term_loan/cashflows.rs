@@ -437,7 +437,7 @@ pub(crate) fn generate_cashflows(
             if !commitment_fees.is_empty() {
                 let notional = schedule.notional.clone();
                 let day_count = schedule.day_count;
-                let mut fee_schedule = crate::cashflow::traits::schedule_from_classified_flows(
+                let fee_schedule = crate::cashflow::traits::schedule_from_classified_flows(
                     commitment_fees,
                     day_count,
                     crate::cashflow::traits::ScheduleBuildOpts {
@@ -445,8 +445,8 @@ pub(crate) fn generate_cashflows(
                         meta: Some(schedule.meta.clone()),
                         ..Default::default()
                     },
-                );
-                fee_schedule.notional = notional.clone();
+                )
+                .with_notional(notional.clone());
                 schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count)?;
             }
         }
@@ -454,7 +454,6 @@ pub(crate) fn generate_cashflows(
 
     // Keep the full engine schedule here; `TermLoan::cashflow_schedule()` applies
     // the public signed canonical schedule projection on top of this internal representation.
-    schedule.day_count = loan.day_count;
     Ok(schedule)
 }
 

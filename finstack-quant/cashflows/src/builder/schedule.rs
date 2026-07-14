@@ -527,6 +527,29 @@ impl CashFlowSchedule {
         self
     }
 
+    /// Replace the representative schedule notional without changing rows.
+    #[must_use]
+    pub fn with_notional(mut self, notional: Notional) -> Self {
+        self.notional = notional;
+        self
+    }
+
+    /// Scale every cashflow amount while preserving classification and metadata.
+    ///
+    /// This is primarily used to apply leg direction before schedules are
+    /// composed. A non-finite scale is rejected.
+    pub fn scale_amounts(mut self, scale: f64) -> finstack_quant_core::Result<Self> {
+        if !scale.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(
+                "cashflow amount scale must be finite".to_string(),
+            ));
+        }
+        for flow in &mut self.flows {
+            flow.amount *= scale;
+        }
+        Ok(self)
+    }
+
     /// Returns the list of dates for all flows in schedule order.
     pub fn dates(&self) -> Vec<Date> {
         self.flows.iter().map(|cf| cf.date).collect()
@@ -857,7 +880,8 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
 
 /// Merge multiple schedules into one deterministic composite schedule.
 ///
-/// Concatenates flows from every input schedule, deduplicates the union of
+/// Concatenates flows from every input schedule, including mixed-currency
+/// rows, deduplicates the union of
 /// their `meta.calendar_ids`, and reduces remaining metadata fields with the
 /// rules listed below. The combined flow list is then re-sorted via
 /// [`sort_flows`] so the resulting schedule is in canonical order.
@@ -866,8 +890,9 @@ fn merge_matching_option<T: Copy + PartialEq>(current: &mut Option<Option<T>>, v
 ///
 /// * `schedules` - Iterable of [`CashFlowSchedule`] values to combine.
 /// * `notional` - Notional stamped on the merged schedule. The caller is
-///   responsible for choosing a notional that makes sense for the composite
-///   (this function does not aggregate input notionals).
+///   responsible for choosing a representative notional that makes sense for
+///   the composite (this function does not aggregate input notionals or require
+///   row currencies to match it).
 /// * `day_count` - Day count convention attached to the merged schedule.
 ///
 /// # Returns
@@ -893,7 +918,6 @@ pub fn merge_cashflow_schedules<I>(
 where
     I: IntoIterator<Item = CashFlowSchedule>,
 {
-    let expected_ccy = notional.initial.currency();
     let mut flows = Vec::new();
     let mut calendar_ids = Vec::new();
     let mut facility_limit: Option<Option<Money>> = None;
@@ -902,17 +926,6 @@ where
     let mut representation: Option<CashflowRepresentation> = None;
 
     for schedule in schedules {
-        // Reject any flow whose currency does not match the merged-notional
-        // currency. Silent stamping of a wrong notional currency on
-        // mismatched flows would corrupt downstream PV/aggregation.
-        for cf in &schedule.flows {
-            if cf.amount.currency() != expected_ccy {
-                return Err(finstack_quant_core::Error::CurrencyMismatch {
-                    expected: expected_ccy,
-                    actual: cf.amount.currency(),
-                });
-            }
-        }
         merge_matching(
             &mut representation,
             schedule.meta.representation,
@@ -1332,6 +1345,47 @@ mod tests {
             merged.flows[1].accrual.map(|accrual| accrual.day_count),
             Some(DayCount::Thirty360)
         );
+    }
+
+    #[test]
+    fn merge_cashflow_schedules_preserves_mixed_currency_rows() {
+        let date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let usd = CashFlowSchedule::from_parts(
+            vec![flow(date, 100.0, CFKind::Notional)],
+            Notional::par(100.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta::default(),
+        );
+        let eur = CashFlowSchedule::from_parts(
+            vec![CashFlow::new(
+                date,
+                None,
+                Money::new(-90.0, Currency::EUR),
+                CFKind::Notional,
+                0.0,
+                None,
+            )],
+            Notional::par(90.0, Currency::EUR),
+            DayCount::Act365F,
+            CashFlowMeta::default(),
+        );
+
+        let merged = merge_cashflow_schedules(
+            [usd, eur],
+            Notional::par(0.0, Currency::USD),
+            DayCount::Act365F,
+        )
+        .expect("mixed-currency composites are valid schedules");
+
+        assert_eq!(merged.flows.len(), 2);
+        assert!(merged
+            .flows
+            .iter()
+            .any(|flow| flow.amount.currency() == Currency::USD));
+        assert!(merged
+            .flows
+            .iter()
+            .any(|flow| flow.amount.currency() == Currency::EUR));
     }
 
     #[test]
