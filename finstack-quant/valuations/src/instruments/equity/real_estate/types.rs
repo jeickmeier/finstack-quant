@@ -541,8 +541,6 @@ impl crate::cashflow::traits::CashflowProvider for RealEstateAsset {
         if let Some((date, amount)) = self.terminal_sale_proceeds(as_of)? {
             flows.push((date, Money::new(amount, self.currency)));
         }
-        flows.sort_by_key(|(date, _)| *date);
-
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             flows,
             self.day_count,

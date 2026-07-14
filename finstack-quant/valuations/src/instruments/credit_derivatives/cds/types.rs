@@ -1138,7 +1138,6 @@ impl crate::cashflow::traits::CashflowProvider for CreditDefaultSwap {
                     0.0,
                     None,
                 ));
-            schedule.flows.sort_by_key(|cf| cf.date);
         }
 
         // Apply holder-view sign: protection buyer (Pay) pays premium,

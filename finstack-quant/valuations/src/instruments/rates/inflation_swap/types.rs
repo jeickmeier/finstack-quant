@@ -541,7 +541,7 @@ impl CashflowProvider for InflationSwap {
             PayReceive::Receive => (fixed_amount.amount(), -inflation_amount.amount()),
         };
         let ccy = self.notional.currency();
-        let mut schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             vec![
                 (payment_date, Money::new(fixed_signed, ccy)),
                 (payment_date, Money::new(inflation_signed, ccy)),
@@ -554,7 +554,6 @@ impl CashflowProvider for InflationSwap {
                 ..Default::default()
             },
         );
-        schedule.day_count = self.day_count;
         Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Projected,
@@ -967,7 +966,7 @@ impl CashflowProvider for YoYInflationSwap {
             .into_iter()
             .map(|(pay, amount)| (pay, Money::new(amount.amount(), ccy)))
             .collect();
-        let mut schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
@@ -977,7 +976,6 @@ impl CashflowProvider for YoYInflationSwap {
                 ..Default::default()
             },
         );
-        schedule.day_count = self.day_count;
         Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Projected,

@@ -70,7 +70,7 @@ pub(crate) fn kind_rank(kind: CFKind) -> u8 {
 /// A stable sort is used deliberately: `merge_cashflow_schedules` concatenates
 /// already-sorted schedules, and the stable sort's run detection handles those
 /// pre-sorted runs in near-linear time (an unstable sort re-partitions them).
-pub fn sort_flows(flows: &mut [CashFlow]) {
+pub(crate) fn sort_flows(flows: &mut [CashFlow]) {
     flows.sort_by(compare_flows);
 }
 
@@ -863,8 +863,6 @@ where
 
     calendar_ids.sort_unstable();
     calendar_ids.dedup();
-
-    sort_flows(&mut flows);
 
     Ok(CashFlowSchedule::from_parts(
         flows,

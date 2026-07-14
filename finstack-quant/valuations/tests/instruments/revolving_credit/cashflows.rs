@@ -1,7 +1,9 @@
 //! Revolving credit cashflow generation tests.
 
-use finstack_quant_cashflows::builder::{sort_flows, CashFlowMeta, CashFlowSchedule, Notional};
-use finstack_quant_cashflows::CashflowProvider;
+use finstack_quant_cashflows::builder::CashFlowMeta;
+use finstack_quant_cashflows::{
+    schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
+};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{DayCount, Tenor};
@@ -116,7 +118,7 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
             None,
         )
     };
-    let mut flows = vec![
+    let flows = vec![
         flow(CFKind::Notional, 5.0),
         flow(CFKind::PIK, 10.0),
         flow(CFKind::Fee, 1.0),
@@ -124,10 +126,21 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
         flow(CFKind::Amortization, 20.0),
     ];
 
-    sort_flows(&mut flows);
-
+    let schedule = schedule_from_classified_flows(
+        flows,
+        DayCount::Act360,
+        ScheduleBuildOpts {
+            notional_hint: Some(Money::new(100.0, Currency::USD)),
+            meta: Some(CashFlowMeta {
+                issue_date: Some(date!(2025 - 01 - 01)),
+                ..CashFlowMeta::default()
+            }),
+            ..Default::default()
+        },
+    );
     assert_eq!(
-        flows
+        schedule
+            .flows
             .iter()
             .map(|cashflow| cashflow.kind)
             .collect::<Vec<_>>(),
@@ -140,21 +153,11 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
         ]
     );
     assert_eq!(
-        flows[3].amount.amount(),
+        schedule.flows[3].amount.amount(),
         -30.0,
         "draw sorts before repayment"
     );
-    assert_eq!(flows[4].amount.amount(), 5.0);
-
-    let schedule = CashFlowSchedule {
-        flows,
-        notional: Notional::par(100.0, Currency::USD),
-        day_count: DayCount::Act360,
-        meta: CashFlowMeta {
-            issue_date: Some(date!(2025 - 01 - 01)),
-            ..CashFlowMeta::default()
-        },
-    };
+    assert_eq!(schedule.flows[4].amount.amount(), 5.0);
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(
         outstanding,

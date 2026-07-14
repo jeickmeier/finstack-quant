@@ -3,7 +3,6 @@
 //! Covers the computationally intensive paths identified in the performance
 //! review:
 //!
-//! - `sort_flows`: multi-key unstable sort at different schedule sizes
 //! - `pv_by_period`: periodized PV aggregation (plain and credit-adjusted)
 //! - `to_period_dataframe`: DataFrame export with O(n+m) cursor vs prior O(n×m)
 //! - `build_with_curves`: full schedule generation (fixed bond, floating loan)
@@ -25,7 +24,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Through
 use finstack_quant_cashflows::aggregation::{
     aggregate_by_period, aggregate_cashflows_checked, DateContext,
 };
-use finstack_quant_cashflows::builder::schedule::{merge_cashflow_schedules, sort_flows};
+use finstack_quant_cashflows::builder::schedule::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{
     CashFlowMeta, CashFlowSchedule, CashflowRepresentation, CouponType, FixedCouponSpec, Notional,
     PeriodDataFrameOptions,
@@ -152,28 +151,6 @@ fn make_dated_flows(n: usize, base: Date) -> DatedFlows {
         .collect()
 }
 
-/// Random-ish `CashFlow` slice of length `n` for sort benchmarks.
-fn make_unsorted_flows(n: usize, base: Date) -> Vec<CashFlow> {
-    (0..n)
-        .map(|i| {
-            // Interleave dates to produce a partially-unsorted sequence.
-            let offset = ((i * 17 + 3) % n) as i64 * 90;
-            CashFlow::new(
-                base + time::Duration::days(offset),
-                None,
-                Money::new(1_000.0 + (i as f64 * 13.7), Currency::USD),
-                if i % 5 == 0 {
-                    CFKind::Amortization
-                } else {
-                    CFKind::Fixed
-                },
-                0.25,
-                Some(0.06),
-            )
-        })
-        .collect()
-}
-
 /// Build a minimal amortizing `CashFlowSchedule` with `n_principal` Amortization flows.
 fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
     let per = 1_000_000.0 / n_periods as f64;
@@ -203,41 +180,6 @@ fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
             ..Default::default()
         },
     )
-}
-
-// =============================================================================
-// Benchmark: sort_flows
-// =============================================================================
-
-fn bench_sort_flows(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cashflow_sort_flows");
-    let base = base_date();
-
-    {
-        let n = 120usize;
-        group.throughput(Throughput::Elements(n as u64));
-
-        group.bench_with_input(BenchmarkId::new("unsorted", n), &n, |b, &n| {
-            let template = make_unsorted_flows(n, base);
-            b.iter(|| {
-                let mut flows = template.clone();
-                sort_flows(black_box(&mut flows));
-                flows
-            });
-        });
-
-        group.bench_with_input(BenchmarkId::new("pre_sorted", n), &n, |b, &n| {
-            let mut template = make_unsorted_flows(n, base);
-            sort_flows(&mut template);
-            b.iter(|| {
-                let mut flows = template.clone();
-                sort_flows(black_box(&mut flows));
-                flows
-            });
-        });
-    }
-
-    group.finish();
 }
 
 // =============================================================================
@@ -629,7 +571,6 @@ fn bench_normalize_public(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    bench_sort_flows,
     bench_pv_by_period,
     bench_pv_by_period_credit,
     bench_period_dataframe,

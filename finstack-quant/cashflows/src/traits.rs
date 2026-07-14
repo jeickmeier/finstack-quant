@@ -199,22 +199,12 @@ pub fn schedule_from_dated_flows(
     day_count: DayCount,
     opts: ScheduleBuildOpts,
 ) -> CashFlowSchedule {
-    if flows.is_empty() {
-        return schedule_from_classified_flows(Vec::new(), day_count, opts);
-    }
-
-    let first_currency = flows
-        .first()
-        .map(|(_, m)| m.currency())
-        .unwrap_or(Currency::USD);
     let kind = opts.kind.unwrap_or(CFKind::Fixed);
-    let cf_flows: Vec<CashFlow> = flows
+    let classified = flows
         .into_iter()
         .map(|(date, amount)| CashFlow::new(date, None, amount, kind, 0.0, None))
         .collect();
-
-    let notional = resolve_notional(opts.notional_hint, first_currency);
-    CashFlowSchedule::from_parts(cf_flows, notional, day_count, opts.resolved_meta())
+    schedule_from_classified_flows(classified, day_count, opts)
 }
 
 /// Build a [`CashFlowSchedule`] from pre-classified [`CashFlow`] values.

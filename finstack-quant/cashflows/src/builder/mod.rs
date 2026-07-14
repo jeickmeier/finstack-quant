@@ -65,8 +65,7 @@ pub use dataframe::{PeriodDataFrame, PeriodDataFrameOptions};
 pub use periods::SchedulePeriod;
 pub use rate_helpers::{project_floating_rate, FloatingRateParams};
 pub use schedule::{
-    sort_flows, CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment,
-    PvDiscountSource,
+    CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment, PvDiscountSource,
 };
 pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultCurve, DefaultModelSpec,

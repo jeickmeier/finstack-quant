@@ -652,7 +652,7 @@ impl CashflowProvider for CmsSwap {
             .chain(self.funding_leg_flows(market, as_of)?)
             .map(|(date, amount)| (date, Money::new(amount.amount(), ccy)))
             .collect();
-        let mut schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,
             self.cms_day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
@@ -662,7 +662,6 @@ impl CashflowProvider for CmsSwap {
                 ..Default::default()
             },
         );
-        schedule.day_count = self.cms_day_count;
         Ok(schedule.normalize_public(
             as_of,
             crate::cashflow::builder::CashflowRepresentation::Projected,

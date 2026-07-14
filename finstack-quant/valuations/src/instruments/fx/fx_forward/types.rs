@@ -739,28 +739,22 @@ impl CashflowProvider for FxForward {
 
         let base_flow = self.single_leg_schedule(as_of, base_amount)?;
         let quote_schedule = self.single_leg_schedule(as_of, quote_amount)?;
+        let representation = if self.contract_rate.is_some() {
+            crate::cashflow::builder::CashflowRepresentation::Contractual
+        } else {
+            crate::cashflow::builder::CashflowRepresentation::Projected
+        };
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             vec![base_flow, quote_schedule],
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(0.0, self.base_currency)),
                 kind: Some(CFKind::Notional),
-                representation: if self.contract_rate.is_some() {
-                    crate::cashflow::builder::CashflowRepresentation::Contractual
-                } else {
-                    crate::cashflow::builder::CashflowRepresentation::Projected
-                },
+                representation,
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            if self.contract_rate.is_some() {
-                crate::cashflow::builder::CashflowRepresentation::Contractual
-            } else {
-                crate::cashflow::builder::CashflowRepresentation::Projected
-            },
-        ))
+        Ok(schedule.normalize_public(as_of, representation))
     }
 }
 
