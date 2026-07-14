@@ -1123,7 +1123,7 @@ impl crate::cashflow::traits::CashflowProvider for CreditDefaultSwap {
     fn cashflow_schedule(
         &self,
         _curves: &MarketContext,
-        _as_of: Date,
+        as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let mut schedule = self.build_premium_leg_schedule()?;
 
@@ -1151,8 +1151,10 @@ impl crate::cashflow::traits::CashflowProvider for CreditDefaultSwap {
             cf.amount = Money::new(cf.amount.amount() * sign, cf.amount.currency());
         }
 
-        schedule.meta.representation = crate::cashflow::builder::CashflowRepresentation::Projected;
-        Ok(schedule)
+        Ok(schedule.normalize_public(
+            as_of,
+            crate::cashflow::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

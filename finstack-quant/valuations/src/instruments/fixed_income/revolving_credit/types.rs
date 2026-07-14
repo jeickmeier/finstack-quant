@@ -911,8 +911,9 @@ impl crate::cashflow::traits::CashflowProvider for RevolvingCredit {
         };
         let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
         let path_schedule = engine.generate_deterministic()?;
-        let mut schedule = path_schedule.schedule;
-        schedule.meta.representation = crate::cashflow::builder::CashflowRepresentation::Projected;
-        Ok(schedule)
+        Ok(path_schedule.schedule.normalize_public(
+            as_of,
+            crate::cashflow::builder::CashflowRepresentation::Projected,
+        ))
     }
 }

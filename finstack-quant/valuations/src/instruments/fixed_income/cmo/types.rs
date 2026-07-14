@@ -442,12 +442,14 @@ impl CashflowProvider for AgencyCmo {
         as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let _ = curves;
-        let mut schedule =
+        let schedule =
             crate::instruments::fixed_income::cmo::pricer::build_reference_tranche_schedule(
                 self, as_of, None,
             )?;
-        schedule.meta.representation = crate::cashflow::builder::CashflowRepresentation::Projected;
-        Ok(schedule)
+        Ok(schedule.normalize_public(
+            as_of,
+            crate::cashflow::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

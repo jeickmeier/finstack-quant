@@ -183,14 +183,16 @@ impl CashflowProvider for AgencyMbsPassthrough {
         as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
         let _ = curves;
-        let mut schedule =
+        let schedule =
             crate::instruments::fixed_income::mbs_passthrough::pricer::build_projected_schedule(
                 self,
                 as_of,
                 Some(self.wam + 12),
             )?;
-        schedule.meta.representation = crate::cashflow::builder::CashflowRepresentation::Projected;
-        Ok(schedule)
+        Ok(schedule.normalize_public(
+            as_of,
+            crate::cashflow::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 

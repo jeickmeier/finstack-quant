@@ -630,9 +630,11 @@ impl CashflowProvider for CDSIndex {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let pricer = CDSIndexPricer::new();
-        let mut schedule = pricer.build_projected_schedule(self, curves, as_of)?;
-        schedule.meta.representation = crate::cashflow::builder::CashflowRepresentation::Projected;
-        Ok(schedule)
+        let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
+        Ok(schedule.normalize_public(
+            as_of,
+            crate::cashflow::builder::CashflowRepresentation::Projected,
+        ))
     }
 }
 
