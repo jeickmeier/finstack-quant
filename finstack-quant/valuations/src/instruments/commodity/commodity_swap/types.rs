@@ -5,11 +5,12 @@
 //! the other pays a floating price based on an index.
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
+use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use crate::instruments::common_impl::traits::Attributes;
+use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     BusinessDayConvention, CalendarRegistry, Date, ScheduleBuilder, Tenor,
@@ -441,12 +442,39 @@ impl CommoditySwap {
         Ok(dates)
     }
 
-    fn leg_schedule_from_amounts(&self, flows: &[(Date, Money)]) -> Result<Vec<(Date, Money)>> {
-        let ccy = self.underlying.currency;
-        Ok(flows
-            .iter()
-            .map(|(date, amount)| (*date, Money::new(amount.amount(), ccy)))
-            .collect())
+    fn classified_leg_flows(
+        &self,
+        flows: Vec<(Date, Money)>,
+        kind: CFKind,
+    ) -> Result<Vec<CashFlow>> {
+        let mut accrual_start = self.start_date;
+        flows
+            .into_iter()
+            .map(|(payment_date, amount)| {
+                let accrual_factor = finstack_quant_core::dates::DayCount::Act365F.year_fraction(
+                    accrual_start,
+                    payment_date,
+                    finstack_quant_core::dates::DayCountContext::default(),
+                )?;
+                let reset_date = (kind == CFKind::FloatReset).then_some(accrual_start);
+                let flow = CashFlow::new(
+                    payment_date,
+                    reset_date,
+                    Money::new(amount.amount(), self.underlying.currency),
+                    kind,
+                    accrual_factor,
+                    None,
+                )
+                .with_accrual(CashFlowAccrual {
+                    start: accrual_start,
+                    end: payment_date,
+                    day_count: finstack_quant_core::dates::DayCount::Act365F,
+                    projected_index_rate: None,
+                });
+                accrual_start = payment_date;
+                Ok(flow)
+            })
+            .collect()
     }
 
     fn fixed_leg_flows(&self) -> Result<Vec<(Date, Money)>> {
@@ -573,16 +601,18 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let flows = self
-            .leg_schedule_from_amounts(&self.fixed_leg_flows()?)?
+            .classified_leg_flows(self.fixed_leg_flows()?, CFKind::Fixed)?
             .into_iter()
-            .chain(self.leg_schedule_from_amounts(&self.floating_leg_flows(market, as_of)?)?)
+            .chain(self.classified_leg_flows(
+                self.floating_leg_flows(market, as_of)?,
+                CFKind::FloatReset,
+            )?)
             .collect();
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
             flows,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(0.0, self.underlying.currency)),
-                kind: Some(CFKind::Notional),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 ..Default::default()
             },
@@ -782,6 +812,26 @@ mod tests {
         let flows = swap
             .dated_cashflows(&market, as_of)
             .expect("should get flows");
+        let schedule = swap
+            .cashflow_schedule(&market, as_of)
+            .expect("classified schedule");
+        assert_eq!(
+            schedule
+                .flows
+                .iter()
+                .filter(|flow| flow.kind == CFKind::Fixed)
+                .count(),
+            3
+        );
+        assert_eq!(
+            schedule
+                .flows
+                .iter()
+                .filter(|flow| flow.kind == CFKind::FloatReset)
+                .count(),
+            3
+        );
+        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
 
         // The canonical contractual schedule emits both fixed and floating legs.
         assert_eq!(

@@ -1,12 +1,13 @@
 //! Zero-coupon Inflation Swap types and pricing implementation.
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
+use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
+use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
 };
@@ -540,15 +541,47 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             PayReceive::Receive => (fixed_amount.amount(), -inflation_amount.amount()),
         };
         let ccy = self.notional.currency();
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
-            vec![
-                (payment_date, Money::new(fixed_signed, ccy)),
-                (payment_date, Money::new(inflation_signed, ccy)),
-            ],
+        let accrual_factor = self.day_count.year_fraction(
+            self.start_date,
+            self.maturity,
+            DayCountContext::default(),
+        )?;
+        let fixed_rate = decimal_to_f64(self.fixed_rate, "InflationSwap fixed_rate")?;
+        let inflation_rate = (accrual_factor > 0.0)
+            .then_some(inflation_amount.amount() / self.notional.amount() / accrual_factor);
+        let fixed_flow = CashFlow::new(
+            payment_date,
+            None,
+            Money::new(fixed_signed, ccy),
+            CFKind::Fixed,
+            accrual_factor,
+            Some(fixed_rate),
+        )
+        .with_accrual(CashFlowAccrual {
+            start: self.start_date,
+            end: self.maturity,
+            day_count: self.day_count,
+            projected_index_rate: None,
+        });
+        let inflation_flow = CashFlow::new(
+            payment_date,
+            Some(self.start_date),
+            Money::new(inflation_signed, ccy),
+            CFKind::InflationCoupon,
+            accrual_factor,
+            inflation_rate,
+        )
+        .with_accrual(CashFlowAccrual {
+            start: self.start_date,
+            end: self.maturity,
+            day_count: self.day_count,
+            projected_index_rate: inflation_rate,
+        });
+        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
+            vec![fixed_flow, inflation_flow],
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                kind: Some(CFKind::Notional),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 ..Default::default()
             },
@@ -868,12 +901,12 @@ impl YoYInflationSwap {
         &self,
         curves: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+    ) -> finstack_quant_core::Result<Vec<CashFlow>> {
         let mut flows = Vec::new();
         let fixed_rate = decimal_to_f64(self.fixed_rate, "YoYInflationSwap fixed_rate")?;
 
         for (start, end, pay) in self.schedule()? {
-            if pay <= as_of {
+            if pay < as_of {
                 continue;
             }
             let accrual = self
@@ -887,12 +920,41 @@ impl YoYInflationSwap {
 
             let fixed_leg = self.notional.amount() * fixed_rate * accrual;
             let inflation_leg = self.notional.amount() * (cpi_end / cpi_start - 1.0);
+            let inflation_rate = (cpi_end / cpi_start - 1.0) / accrual;
             let (fixed_signed, inflation_signed) = match self.side {
                 PayReceive::Pay => (-fixed_leg, inflation_leg),
                 PayReceive::Receive => (fixed_leg, -inflation_leg),
             };
-            flows.push((pay, Money::new(fixed_signed, self.notional.currency())));
-            flows.push((pay, Money::new(inflation_signed, self.notional.currency())));
+            let fixed_flow = CashFlow::new(
+                pay,
+                None,
+                Money::new(fixed_signed, self.notional.currency()),
+                CFKind::Fixed,
+                accrual,
+                Some(fixed_rate),
+            )
+            .with_accrual(CashFlowAccrual {
+                start,
+                end,
+                day_count: self.day_count,
+                projected_index_rate: None,
+            });
+            let inflation_flow = CashFlow::new(
+                pay,
+                Some(start),
+                Money::new(inflation_signed, self.notional.currency()),
+                CFKind::InflationCoupon,
+                accrual,
+                Some(inflation_rate),
+            )
+            .with_accrual(CashFlowAccrual {
+                start,
+                end,
+                day_count: self.day_count,
+                projected_index_rate: Some(inflation_rate),
+            });
+            flows.push(fixed_flow);
+            flows.push(inflation_flow);
         }
 
         Ok(flows)
@@ -957,18 +1019,12 @@ impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
         curves: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let ccy = self.notional.currency();
-        let flows = self
-            .signed_period_flows(curves, as_of)?
-            .into_iter()
-            .map(|(pay, amount)| (pay, Money::new(amount.amount(), ccy)))
-            .collect();
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let flows = self.signed_period_flows(curves, as_of)?;
+        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
             flows,
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                kind: Some(CFKind::Notional),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 ..Default::default()
             },
@@ -1158,6 +1214,9 @@ mod tests {
         let flows = swap
             .dated_cashflows(&market, as_of)
             .expect("contractual schedule should build");
+        let schedule = swap
+            .cashflow_schedule(&market, as_of)
+            .expect("classified inflation schedule");
 
         assert_eq!(flows.len(), 2, "zc inflation swap should emit both legs");
         assert!(flows.iter().all(|(date, _)| *date == maturity));
@@ -1169,6 +1228,9 @@ mod tests {
             flows[1].1.amount() > 0.0,
             "pay-fixed swap should receive inflation leg"
         );
+        assert_eq!(schedule.flows[0].kind, CFKind::Fixed);
+        assert_eq!(schedule.flows[1].kind, CFKind::InflationCoupon);
+        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
     }
 
     /// YoY `npv_raw` must discount with DF(as_of → pay) = DF(pay)/DF(as_of)
@@ -1326,6 +1388,9 @@ mod tests {
         let flows = swap
             .dated_cashflows(&market, as_of)
             .expect("yoy contractual schedule should build");
+        let schedule = swap
+            .cashflow_schedule(&market, as_of)
+            .expect("classified yoy schedule");
 
         assert_eq!(
             flows.len(),
@@ -1346,5 +1411,22 @@ mod tests {
                 .count(),
             2
         );
+        assert_eq!(
+            schedule
+                .flows
+                .iter()
+                .filter(|flow| flow.kind == CFKind::Fixed)
+                .count(),
+            2
+        );
+        assert_eq!(
+            schedule
+                .flows
+                .iter()
+                .filter(|flow| flow.kind == CFKind::InflationCoupon)
+                .count(),
+            2
+        );
+        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
     }
 }

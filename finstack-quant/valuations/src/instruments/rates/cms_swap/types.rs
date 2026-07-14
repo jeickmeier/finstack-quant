@@ -14,11 +14,12 @@
 //! and Floors." *Wilmott Magazine*, March, 38-44.
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::primitives::CFKind;
+use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::PricingOverrides;
+use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{CalendarRegistry, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -456,14 +457,16 @@ impl CmsSwap {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+    ) -> finstack_quant_core::Result<Vec<CashFlow>> {
         let mut flows = Vec::new();
+        let mut accrual_start = self.cms_fixing_dates.first().copied().unwrap_or(as_of);
 
         for (i, &fixing_date) in self.cms_fixing_dates.iter().enumerate() {
             let payment_date = self.cms_payment_dates[i];
             let accrual_fraction = self.cms_accrual_fractions[i];
 
-            if payment_date <= as_of {
+            if payment_date < as_of {
+                accrual_start = payment_date;
                 continue;
             }
 
@@ -477,10 +480,23 @@ impl CmsSwap {
                     coupon_rate * accrual_fraction * self.notional.amount()
                 }
             };
-            flows.push((
-                payment_date,
-                Money::new(signed_amount, self.notional.currency()),
-            ));
+            flows.push(
+                CashFlow::new(
+                    payment_date,
+                    Some(fixing_date),
+                    Money::new(signed_amount, self.notional.currency()),
+                    CFKind::FloatReset,
+                    accrual_fraction,
+                    Some(coupon_rate),
+                )
+                .with_accrual(CashFlowAccrual {
+                    start: accrual_start,
+                    end: payment_date,
+                    day_count: self.cms_day_count,
+                    projected_index_rate: None,
+                }),
+            );
+            accrual_start = payment_date;
         }
 
         Ok(flows)
@@ -490,7 +506,7 @@ impl CmsSwap {
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<Vec<(Date, Money)>> {
+    ) -> finstack_quant_core::Result<Vec<CashFlow>> {
         use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
 
         let mut flows = Vec::new();
@@ -499,8 +515,11 @@ impl CmsSwap {
                 rate,
                 payment_dates,
                 accrual_fractions,
-                ..
+                day_count,
             } => {
+                let mut accrual_start = self
+                    .effective_start_date()
+                    .unwrap_or_else(|| payment_dates.first().copied().unwrap_or(as_of));
                 for (i, &payment_date) in payment_dates.iter().enumerate() {
                     let accrual = accrual_fractions[i];
                     let unsigned = rate * accrual * self.notional.amount();
@@ -512,7 +531,23 @@ impl CmsSwap {
                             -unsigned
                         }
                     };
-                    flows.push((payment_date, Money::new(signed, self.notional.currency())));
+                    flows.push(
+                        CashFlow::new(
+                            payment_date,
+                            None,
+                            Money::new(signed, self.notional.currency()),
+                            CFKind::Fixed,
+                            accrual,
+                            Some(*rate),
+                        )
+                        .with_accrual(CashFlowAccrual {
+                            start: accrual_start,
+                            end: payment_date,
+                            day_count: *day_count,
+                            projected_index_rate: None,
+                        }),
+                    );
+                    accrual_start = payment_date;
                 }
             }
             FundingLeg::Floating {
@@ -520,7 +555,7 @@ impl CmsSwap {
                 payment_dates,
                 accrual_fractions,
                 forward_curve_id,
-                ..
+                day_count,
             } => {
                 let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
                 let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
@@ -551,7 +586,22 @@ impl CmsSwap {
                             -unsigned
                         }
                     };
-                    flows.push((payment_date, Money::new(signed, self.notional.currency())));
+                    flows.push(
+                        CashFlow::new(
+                            payment_date,
+                            Some(prev_date),
+                            Money::new(signed, self.notional.currency()),
+                            CFKind::FloatReset,
+                            accrual,
+                            Some(fwd_rate + spread),
+                        )
+                        .with_accrual(CashFlowAccrual {
+                            start: prev_date,
+                            end: payment_date,
+                            day_count: *day_count,
+                            projected_index_rate: Some(fwd_rate),
+                        }),
+                    );
                     prev_date = payment_date;
                 }
             }
@@ -644,19 +694,16 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         self.validate()?;
-        let ccy = self.notional.currency();
         let flows = self
             .cms_leg_flows(market, as_of)?
             .into_iter()
             .chain(self.funding_leg_flows(market, as_of)?)
-            .map(|(date, amount)| (date, Money::new(amount.amount(), ccy)))
             .collect();
-        let schedule = crate::cashflow::traits::schedule_from_dated_flows(
+        let schedule = crate::cashflow::traits::schedule_from_classified_flows(
             flows,
             self.cms_day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                kind: Some(CFKind::Notional),
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 ..Default::default()
             },
@@ -718,6 +765,9 @@ mod tests {
         let flows = swap
             .dated_cashflows(&market, as_of)
             .expect("cms contractual schedule should build");
+        let schedule = swap
+            .cashflow_schedule(&market, as_of)
+            .expect("classified cms schedule");
 
         assert_eq!(
             flows.len(),
@@ -726,6 +776,23 @@ mod tests {
         );
         assert!(flows.iter().any(|(_, money)| money.amount() > 0.0));
         assert!(flows.iter().any(|(_, money)| money.amount() < 0.0));
+        assert_eq!(
+            schedule
+                .flows
+                .iter()
+                .filter(|flow| flow.kind == CFKind::FloatReset)
+                .count(),
+            swap.cms_payment_dates.len()
+        );
+        assert_eq!(
+            schedule
+                .flows
+                .iter()
+                .filter(|flow| flow.kind == CFKind::Fixed)
+                .count(),
+            swap.cms_payment_dates.len()
+        );
+        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
     }
 
     /// Build a shared market context for reconciliation tests: flat 3% OIS,
@@ -823,10 +890,10 @@ mod tests {
         let flows = swap.cms_leg_flows(&market, as_of).expect("cms_leg_flows");
         let discounted_sum: f64 = flows
             .iter()
-            .map(|(pay_date, money)| {
-                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, *pay_date)
+            .map(|flow| {
+                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, flow.date)
                     .expect("df");
-                df * money.amount()
+                df * flow.amount.amount()
             })
             .sum();
 
@@ -870,10 +937,10 @@ mod tests {
         let flows = swap.cms_leg_flows(&market, as_of).expect("cms_leg_flows");
         let discounted_sum: f64 = flows
             .iter()
-            .map(|(pay_date, money)| {
-                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, *pay_date)
+            .map(|flow| {
+                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, flow.date)
                     .expect("df");
-                df * money.amount()
+                df * flow.amount.amount()
             })
             .sum();
 
@@ -938,12 +1005,12 @@ mod tests {
             .expect("seasoned CMS leg flows");
 
         assert_eq!(flows.len(), 1);
-        assert_eq!(flows[0].0, pay);
+        assert_eq!(flows[0].date, pay);
         let expected = observed * 0.25 * 1_000_000.0;
         assert!(
-            (flows[0].1.amount() - expected).abs() < 0.01,
+            (flows[0].amount.amount() - expected).abs() < 0.01,
             "seasoned flow must use recorded fixing: expected {expected}, got {}",
-            flows[0].1.amount()
+            flows[0].amount.amount()
         );
     }
 
@@ -991,7 +1058,7 @@ mod tests {
             .funding_leg_flows(&market.insert_series(series), as_of)
             .expect("funding flows with fixing");
         let expected = (observed + 0.001) * 0.25 * 1_000_000.0;
-        assert!((flows[0].1.amount() - expected).abs() < 1e-8);
+        assert!((flows[0].amount.amount() - expected).abs() < 1e-8);
     }
 
     #[test]
