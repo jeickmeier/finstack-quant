@@ -25,7 +25,7 @@ use rust_decimal::Decimal;
 
 use crate::cashflow::builder::{
     periods::{build_periods, BuildPeriodsParams, SchedulePeriod},
-    CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec, Notional,
+    CashFlowSchedule, FloatingCouponSpec, FloatingRateSpec,
 };
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap, PayReceive};
@@ -783,47 +783,14 @@ pub(crate) fn full_signed_schedule_with_curves_as_of(
         }
     }
 
-    // Sort flows by date and CFKind priority
-    all_flows.sort_by(|a, b| {
-        use core::cmp::Ordering;
-        match a.date.cmp(&b.date) {
-            Ordering::Equal => {
-                // Use kind ranking logic from cashflow builder
-                let rank_a = match a.kind {
-                    CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => 0,
-                    CFKind::Fee => 1,
-                    CFKind::Amortization => 2,
-                    CFKind::PIK => 3,
-                    CFKind::Notional => 4,
-                    _ => 5,
-                };
-                let rank_b = match b.kind {
-                    CFKind::Fixed | CFKind::Stub | CFKind::FloatReset => 0,
-                    CFKind::Fee => 1,
-                    CFKind::Amortization => 2,
-                    CFKind::PIK => 3,
-                    CFKind::Notional => 4,
-                    _ => 5,
-                };
-                rank_a.cmp(&rank_b)
-            }
-            other => other,
-        }
-    });
-
-    if let Some(as_of) = as_of {
-        all_flows.retain(|flow| flow.date > as_of);
-    }
-
-    // Create notional spec for swap (notional doesn't amortize)
-    let notional = Notional::par(irs.notional.amount(), irs.notional.currency());
-
-    Ok(CashFlowSchedule {
-        flows: all_flows,
-        notional,
-        day_count: irs.fixed.day_count, // Use fixed leg day count as representative
-        meta: Default::default(),
-    })
+    Ok(crate::cashflow::traits::schedule_from_classified_flows(
+        all_flows,
+        irs.fixed.day_count,
+        crate::cashflow::traits::ScheduleBuildOpts {
+            notional_hint: Some(irs.notional),
+            ..Default::default()
+        },
+    ))
 }
 
 #[cfg(test)]
