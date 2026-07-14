@@ -295,9 +295,7 @@ impl StochasticDefault for CopulaBasedDefault {
                 .conditional_default_prob(threshold, factors, self.correlation);
 
         // Convert conditional annual PD to monthly MDR
-        let monthly_pd = 1.0 - (1.0 - annual_cond_pd.clamp(0.0, 1.0)).powf(1.0 / 12.0);
-
-        monthly_pd.clamp(0.0, 1.0)
+        clamped_cdr_to_mdr(annual_cond_pd)
     }
 
     fn correlation(&self) -> f64 {

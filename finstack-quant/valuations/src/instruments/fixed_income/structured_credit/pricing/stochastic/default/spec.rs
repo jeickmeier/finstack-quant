@@ -12,6 +12,7 @@ use crate::correlation::copula::CopulaSpec;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::calibrations::{
     clo_standard, rmbs_standard,
 };
+use crate::instruments::fixed_income::structured_credit::utils::rates::clamped_cdr_to_mdr;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 
 /// Stochastic default model specification.
@@ -386,16 +387,7 @@ impl StochasticDefaultSpec {
     ///
     /// Returns the unconditional expected MDR before factor shocks are applied.
     pub fn base_mdr(&self) -> f64 {
-        let annual_cdr = self.base_rate();
-        // Convert annual CDR to monthly MDR
-        // MDR = 1 - (1 - CDR)^(1/12)
-        if annual_cdr <= 0.0 {
-            0.0
-        } else if annual_cdr >= 1.0 {
-            1.0
-        } else {
-            1.0 - (1.0 - annual_cdr).powf(1.0 / 12.0)
-        }
+        clamped_cdr_to_mdr(self.base_rate())
     }
 }
 
