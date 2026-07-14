@@ -763,7 +763,7 @@ impl XccySwap {
 
         // Floating coupons
         for period in periods {
-            if period.payment_date <= as_of {
+            if period.payment_date < as_of {
                 continue;
             }
 

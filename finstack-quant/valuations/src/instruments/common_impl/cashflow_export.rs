@@ -211,7 +211,7 @@ fn build_envelope(
     let (schedule, mbs_state) =
         if let Some(mbs) = instrument.as_any().downcast_ref::<AgencyMbsPassthrough>() {
             let projection = project_mbs_cashflows(mbs, as_of_date, Some(mbs.wam + 12))?;
-            let states = projection
+            let states: std::collections::HashMap<Date, MbsState> = projection
                 .diagnostics
                 .into_iter()
                 .map(|row| {

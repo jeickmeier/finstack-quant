@@ -800,7 +800,7 @@ impl CDSIndexPricer {
         let protection_sign = -premium_sign;
         let loss_given_default = 1.0 - cds.protection.recovery_rate;
 
-        schedule.flows.retain(|flow| flow.date > as_of);
+        schedule.flows.retain(|flow| flow.date >= as_of);
         let mut prev_survival = if as_of <= survival.base_date() {
             1.0
         } else {

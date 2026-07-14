@@ -871,12 +871,12 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     let state_anchor = payment_dates
         .iter()
         .copied()
-        .filter(|date| *date <= as_of)
+        .filter(|date| *date < as_of)
         .max()
         .unwrap_or(instrument.closing_date);
     let schedule_dates: Vec<Date> = payment_dates
         .into_iter()
-        .filter(|date| *date > as_of)
+        .filter(|date| *date >= as_of)
         .collect();
 
     // Balances supplied on the instrument are current-state balances. Anchor

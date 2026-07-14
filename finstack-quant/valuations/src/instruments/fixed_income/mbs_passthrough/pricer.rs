@@ -121,7 +121,7 @@ pub fn generate_cashflows(
         let period_end = end_of_month(period_start)?;
         let payment_date = mbs.payment_date_for_accrual_period(period_start)?;
 
-        if payment_date <= as_of {
+        if payment_date < as_of {
             period_start = next_month_start(period_start)?;
             continue;
         }
@@ -321,12 +321,12 @@ fn first_unpaid_accrual_start(mbs: &AgencyMbsPassthrough, as_of: Date) -> Result
     let mut start = Date::from_calendar_date(effective_start.year(), effective_start.month(), 1)
         .map_err(|e| finstack_quant_core::Error::Validation(e.to_string()))?;
 
-    while mbs.payment_date_for_accrual_period(start)? <= as_of {
+    while mbs.payment_date_for_accrual_period(start)? < as_of {
         start = next_month_start(start)?;
     }
     while start > issue_month {
         let previous = previous_month_start(start)?;
-        if mbs.payment_date_for_accrual_period(previous)? <= as_of {
+        if mbs.payment_date_for_accrual_period(previous)? < as_of {
             break;
         }
         start = previous;
@@ -347,6 +347,9 @@ fn discount_schedule(
     let dc = curve.day_count();
     let mut pv = 0.0;
     for cf in &schedule.flows {
+        if cf.date <= as_of {
+            continue;
+        }
         let years = dc.year_fraction(as_of, cf.date, DayCountContext::default())?;
         let base_df = curve.df_between_dates(as_of, cf.date)?;
         let df = if spread.abs() > f64::EPSILON {
@@ -489,6 +492,13 @@ mod tests {
         assert_eq!(
             before[0].payment_date,
             Date::from_calendar_date(2024, Month::February, 25).expect("valid date")
+        );
+
+        let on_payment = Date::from_calendar_date(2024, Month::February, 25).expect("valid date");
+        let same_day = generate_cashflows(&mbs, on_payment, Some(1)).expect("cashflows");
+        assert_eq!(
+            same_day[0].payment_date, on_payment,
+            "raw projection must retain a same-day receivable for provider finalization"
         );
 
         let after_payment =

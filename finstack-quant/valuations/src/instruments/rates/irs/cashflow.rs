@@ -391,7 +391,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
 
     let mut flows = Vec::with_capacity(periods.len());
     for period in periods {
-        if period.payment_date <= as_of {
+        if period.payment_date < as_of {
             continue;
         }
 
