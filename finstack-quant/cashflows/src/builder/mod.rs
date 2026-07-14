@@ -69,7 +69,7 @@ pub use schedule::{
     PvDiscountSource,
 };
 pub use specs::{
-    evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultCurve, DefaultEvent, DefaultModelSpec,
+    evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultCurve, DefaultModelSpec,
     FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, FixedCouponSpec, FixedWindow, FloatingCouponSpec,
     FloatingRateFallback, FloatingRateSpec, Notional, OvernightCompoundingMethod,
     OvernightIndexConstraintApplication, PrepaymentCurve, PrepaymentModelSpec, RecoveryModelSpec,
@@ -80,6 +80,4 @@ pub use specs::{
 pub use credit_rates::{cpr_to_smm, smm_to_cpr};
 
 #[doc(hidden)]
-pub use emission::{
-    emit_default_on, emit_prepayment_on, emit_revolving_credit_fees, RevolvingFeeEmissionConfig,
-};
+pub use emission::{emit_revolving_credit_fees, RevolvingFeeEmissionConfig};

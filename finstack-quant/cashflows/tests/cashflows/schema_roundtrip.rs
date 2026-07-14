@@ -8,9 +8,9 @@
 //! Also verifies that deserialized values match expected market-standard conventions.
 
 use finstack_quant_cashflows::builder::specs::{
-    AmortizationSpec, CouponType, DefaultEvent, DefaultModelSpec, FeeSpec, FeeTier,
-    FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec, Notional, PrepaymentCurve,
-    PrepaymentModelSpec, RecoveryModelSpec, ScheduleParams, StepUpCouponSpec,
+    AmortizationSpec, CouponType, DefaultModelSpec, FeeSpec, FeeTier, FixedCouponSpec,
+    FloatingCouponSpec, FloatingRateSpec, Notional, PrepaymentCurve, PrepaymentModelSpec,
+    RecoveryModelSpec, ScheduleParams, StepUpCouponSpec,
 };
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount};
 use rust_decimal::prelude::ToPrimitive;
@@ -75,11 +75,6 @@ struct PrepaymentModelSpecPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 struct DefaultModelSpecPayload {
     default_model_spec: DefaultModelSpec,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-struct DefaultEventPayload {
-    default_event: DefaultEvent,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -572,12 +567,6 @@ fn test_default_model_constant() {
 fn test_default_model_sda_100() {
     let json = include_str!("examples/default_model_sda_100.example.json");
     test_roundtrip::<CashflowEnvelope<DefaultModelSpecPayload>>(json);
-}
-
-#[test]
-fn test_default_event() {
-    let json = include_str!("examples/default_event.example.json");
-    test_roundtrip::<CashflowEnvelope<DefaultEventPayload>>(json);
 }
 
 #[test]

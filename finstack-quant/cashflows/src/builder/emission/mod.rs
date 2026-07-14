@@ -1,12 +1,11 @@
 //! Date-level cashflow emission for the build pipeline.
 //!
-//! Submodules: `coupons`, `amortization`, `fees`, `credit`, and `helpers`.
+//! Submodules: `coupons`, `amortization`, `fees`, and `helpers`.
 //! Each `emit_*_on` function returns flows for one date plus any PIK amount to
 //! capitalize into outstanding balance.
 
 mod amortization;
 pub(crate) mod coupons;
-pub(crate) mod credit;
 mod fees;
 mod helpers;
 
@@ -29,9 +28,6 @@ pub(super) use helpers::compute_reset_date;
 
 // Re-export the pre-computed inflation coupon adapter for inflation-linked instruments.
 pub use coupons::emit_inflation_coupons;
-
-// Re-export credit event emission (used by credit model tests)
-pub use credit::{emit_default_on, emit_prepayment_on};
 
 // Re-export revolving-credit fee emission helpers (used by valuations crate).
 pub use fees::{emit_revolving_credit_fees, RevolvingFeeEmissionConfig};

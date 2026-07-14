@@ -911,9 +911,9 @@ fn is_initial_funding_flow(
 /// Outstanding balance is tracked in two distinct places that must stay
 /// consistent:
 ///
-/// 1. **Emission time** — the builder pipeline mutates a live balance as it
-///    generates flows (e.g. [`crate::builder::emit_default_on`] subtracts the
-///    defaulted amount when it emits a `DefaultedNotional` flow).
+/// 1. **Emission time** — an instrument projection mutates a live balance as it
+///    generates flows (for example, subtracting defaulted principal when it
+///    emits a `DefaultedNotional` flow).
 /// 2. **Reconstruction time** — this function, driven by
 ///    [`CashFlowSchedule::outstanding_by_date`] rebuilds the balance
 ///    path purely from `notional.initial` plus the finalized flow list.
