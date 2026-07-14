@@ -25,7 +25,7 @@ use super::compiler::{FixedSchedule, FloatSchedule};
 /// All known `CFKind` variants are explicitly ranked so that same-date ordering
 /// is fully deterministic. The wildcard arm covers future `#[non_exhaustive]`
 /// additions and sorts them after all known variants.
-pub fn kind_rank(kind: CFKind) -> u8 {
+pub(crate) fn kind_rank(kind: CFKind) -> u8 {
     match kind {
         CFKind::Fixed | CFKind::Stub | CFKind::FloatReset | CFKind::InflationCoupon => 0,
         CFKind::Fee | CFKind::CommitmentFee | CFKind::UsageFee | CFKind::FacilityFee => 1,
