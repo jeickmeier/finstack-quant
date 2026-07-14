@@ -14,6 +14,7 @@ use super::date_generation::{
     is_regular_period, validate_unique_payment_dates,
 };
 use super::emission::compute_reset_date;
+use super::specs::ScheduleParams;
 
 /// Accrual period with payment timing.
 ///
@@ -61,6 +62,35 @@ pub struct BuildPeriodsParams<'a> {
     pub reset_lag_days: Option<i32>,
     /// Adjust accrual start/end boundaries with the business-day convention.
     pub adjust_accrual_dates: bool,
+}
+
+impl<'a> BuildPeriodsParams<'a> {
+    /// Create period-generation parameters from canonical schedule conventions.
+    ///
+    /// The conversion keeps start/end boundaries and reset lag explicit while
+    /// reusing every date, calendar, stub, and day-count convention from the
+    /// schedule specification.
+    #[must_use]
+    pub fn from_schedule(
+        schedule: &'a ScheduleParams,
+        start: Date,
+        end: Date,
+        reset_lag_days: Option<i32>,
+    ) -> Self {
+        Self {
+            start,
+            end,
+            frequency: schedule.freq,
+            stub: schedule.stub,
+            bdc: schedule.bdc,
+            calendar_id: &schedule.calendar_id,
+            end_of_month: schedule.end_of_month,
+            day_count: schedule.dc,
+            payment_lag_days: schedule.payment_lag_days,
+            reset_lag_days,
+            adjust_accrual_dates: schedule.adjust_accrual_dates,
+        }
+    }
 }
 
 fn enrich_period(
