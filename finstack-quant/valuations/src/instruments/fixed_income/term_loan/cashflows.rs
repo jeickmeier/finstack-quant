@@ -155,8 +155,15 @@ pub(crate) fn generate_cashflows(
             loan.maturity,
             None,
         ))?;
+        let adjust_dates = loan.calendar_id.is_some();
         std::iter::once(loan.issue_date)
-            .chain(periods.into_iter().map(|period| period.payment_date))
+            .chain(periods.into_iter().map(|period| {
+                if adjust_dates {
+                    period.payment_date
+                } else {
+                    period.accrual_end
+                }
+            }))
             .collect()
     };
 

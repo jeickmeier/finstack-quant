@@ -63,7 +63,10 @@ pub fn cpr_to_smm(cpr: f64) -> finstack_quant_core::Result<f64> {
     if cpr == 0.0 {
         return Ok(0.0);
     }
-    Ok(1.0 - (1.0 - cpr).powf(1.0 / 12.0))
+    // `expm1` retains precision for small mortality rates. This matters for
+    // finite-difference risk measures, where rounding in two nearby PVs can be
+    // amplified by the final subtraction.
+    Ok(-((1.0 - cpr).ln() / 12.0).exp_m1())
 }
 
 /// Convert monthly SMM to annual CPR.
@@ -180,6 +183,13 @@ mod tests {
             mdr_to_cdr(monthly).expect("valid MDR"),
             smm_to_cpr(monthly).expect("valid monthly rate")
         );
+    }
+
+    #[test]
+    fn annual_to_monthly_uses_stable_kernel() {
+        let annual = 0.02;
+        let expected = -((1.0_f64 - annual).ln() / 12.0).exp_m1();
+        assert_eq!(cpr_to_smm(annual).expect("valid annual rate"), expected);
     }
 
     #[test]
