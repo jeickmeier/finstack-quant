@@ -503,16 +503,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
         let invoice = self.contractual_invoice_amount(market, as_of)?;
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             vec![(self.maturity, invoice)],
+            CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(invoice.amount().abs(), invoice.currency())),
-                kind: Some(CFKind::Notional),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule)
     }
 }
 

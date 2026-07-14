@@ -80,7 +80,7 @@ fn test_schedule_discountable_simple() {
     let schedule = CashFlowSchedule::builder()
         .principal(Money::new(1_000.0, Currency::USD), issue, maturity)
         .fixed_cf(fixed)
-        .build_with_curves(None)
+        .build(None)
         .unwrap();
 
     // Act - use explicit day count
@@ -143,7 +143,7 @@ fn test_npv_zero_rate() {
     let schedule = CashFlowSchedule::builder()
         .principal(Money::new(1_000.0, Currency::USD), issue, maturity)
         .fixed_cf(fixed)
-        .build_with_curves(None)
+        .build(None)
         .unwrap();
 
     // Act - use explicit day count
@@ -152,7 +152,7 @@ fn test_npv_zero_rate() {
     // The issue-date funding exchange is excluded; at zero rates the NPV is
     // exactly the sum of strictly future coupon and redemption cashflows.
     let expected = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.date > curve.base_date())
         .map(|cf| cf.amount.amount())

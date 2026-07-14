@@ -15,9 +15,10 @@
 //!    scalars are available, with a `tracing::warn!` log.
 //!
 //! The resolver returns the winning [`Hw1fParamSource`] alongside the
-//! parameters so callers can stamp provenance, and rejects *partial* inputs
-//! (exactly one of κ/σ supplied as an override or found as a calibrated
-//! scalar) instead of silently falling through.
+//! parameters so callers can stamp provenance. A κ-only override is accepted
+//! when a volatility surface is supplied: κ is held fixed while σ is
+//! calibrated from market quotes. A σ-only override and all partial calibrated
+//! scalar pairs are rejected instead of silently falling through.
 
 use crate::calibration::hull_white::{
     calibrate_hull_white_to_swaptions, capfloor_hw1f_scalar_keys,
@@ -279,8 +280,7 @@ fn resolve_swaption_surface_params(
 ///
 /// Errors when:
 /// - overrides are malformed (non-positive / non-finite values), or
-/// - a *partial* override pair is supplied (exactly one of `hw1f_kappa` /
-///   `hw1f_sigma`), or
+/// - a σ-only override is supplied, or κ-only is supplied without a surface,
 /// - a *partial* calibrated scalar pair is found in the `MarketContext` and no
 ///   higher-precedence source resolves. Partial inputs almost certainly
 ///   indicate a wiring bug; silently discarding half a parameter set and
@@ -299,13 +299,16 @@ pub fn resolve_hw1f_params(
         (Some(k), Some(s)) => {
             return HullWhiteParams::new(k, s).map(|p| (p, Hw1fParamSource::Override));
         }
+        (Some(_), None) if req.surface.is_some() => {
+            // Hold κ fixed and infer σ from market normal-vol quotes below.
+        }
         (None, None) => {}
-        // Partial override: exactly one of κ/σ supplied. Reject instead of
-        // silently discarding the supplied value and falling through.
+        // A σ-only override cannot define a surface calibration, while a
+        // κ-only override without a surface is incomplete.
         (k, s) => {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "{}: partial HW1F override (hw1f_kappa={k:?}, hw1f_sigma={s:?}); \
-                 supply both hw1f_kappa and hw1f_sigma or neither",
+                 supply both parameters, or supply κ alone with a volatility surface",
                 req.context
             )));
         }
@@ -337,6 +340,12 @@ pub fn resolve_hw1f_params(
             "resolved HW1F parameters from volatility surface"
         );
         return Ok((surface_params, Hw1fParamSource::CalibratedSurface));
+    }
+    if override_kappa.is_some() && override_sigma.is_none() {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{}: κ-only HW1F override could not calibrate σ from the requested volatility surface",
+            req.context
+        )));
     }
 
     // (3) Pre-calibrated parameters from the MarketContext scalar store.
@@ -533,6 +542,48 @@ mod tests {
             curve_id: "USD-OIS",
             flavor: Hw1fCalibrationFlavor::CapFloor,
             overrides: None,
+            surface: Some(Hw1fSurfaceCalibration::CapFloor {
+                surface_id: "USD-CAP-VOL",
+                points: &points,
+            }),
+            fallback: None,
+            context: "surface-test",
+        };
+
+        let (params, source) = resolve_hw1f_params(&request, &market).expect("params");
+
+        assert!((params.kappa - kappa).abs() < 1e-12);
+        assert!((params.sigma - target_sigma).abs() < 1e-12);
+        assert_eq!(source, Hw1fParamSource::CalibratedSurface);
+    }
+
+    #[test]
+    fn capfloor_kappa_only_override_calibrates_sigma_from_normal_surface() {
+        let kappa = 0.07;
+        let target_sigma = 0.018;
+        let t_fix = 1.5;
+        let accrual = 0.25;
+        let strike = 0.04;
+        let normal_vol = hw1f_caplet_forward_rate_normal_vol(kappa, target_sigma, t_fix, accrual);
+        let surface = VolSurface::builder("USD-CAP-VOL")
+            .expiries(&[t_fix])
+            .strikes(&[strike])
+            .quote_type(VolQuoteType::Normal)
+            .row(&[normal_vol])
+            .build()
+            .expect("surface");
+        let market = empty_market().insert_surface(surface);
+        let overrides = json!({ "hw1f_kappa": kappa });
+        let points = [Hw1fCapletSurfacePoint {
+            t_fix,
+            accrual,
+            strike,
+            weight: 1.0,
+        }];
+        let request = Hw1fResolveRequest {
+            curve_id: "USD-OIS",
+            flavor: Hw1fCalibrationFlavor::CapFloor,
+            overrides: Some(&overrides),
             surface: Some(Hw1fSurfaceCalibration::CapFloor {
                 surface_id: "USD-CAP-VOL",
                 points: &points,

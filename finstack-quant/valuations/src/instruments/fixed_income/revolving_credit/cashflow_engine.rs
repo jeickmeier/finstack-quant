@@ -616,8 +616,7 @@ impl<'a> CashflowEngine<'a> {
             self.facility.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(0.0, self.facility.commitment_amount.currency())),
-                meta: Some(self.schedule_meta()),
-                ..Default::default()
+                meta: self.schedule_meta(),
             },
         ))
     }
@@ -806,8 +805,7 @@ impl<'a> CashflowEngine<'a> {
             self.facility.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(0.0, self.facility.commitment_amount.currency())),
-                meta: Some(self.schedule_meta()),
-                ..Default::default()
+                meta: self.schedule_meta(),
             },
         ))
     }

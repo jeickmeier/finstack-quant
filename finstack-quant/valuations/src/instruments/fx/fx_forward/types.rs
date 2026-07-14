@@ -745,15 +745,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
         };
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             vec![base_flow, quote_schedule],
+            CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(0.0, self.base_currency)),
-                kind: Some(CFKind::Notional),
-                representation,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation,
+                    ..Default::default()
+                },
             },
         );
-        Ok(schedule.with_representation(representation))
+        Ok(schedule)
     }
 }
 

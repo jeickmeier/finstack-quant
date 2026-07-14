@@ -82,9 +82,9 @@ fn term_loan_fixed_with_draws_and_fees() {
 
     // Build full schedule and verify flows exist and are ordered
     let sched = loan.cashflow_schedule(&market, as_of).unwrap();
-    assert!(!sched.flows.is_empty());
-    let mut last = sched.flows[0].date;
-    for cf in &sched.flows {
+    assert!(!sched.get_flows().is_empty());
+    let mut last = sched.get_flows()[0].date;
+    for cf in sched.get_flows() {
         assert!(cf.date >= last);
         last = cf.date;
     }
@@ -135,7 +135,7 @@ fn term_loan_commitment_fee_step_downs() {
 
     let sched = loan.cashflow_schedule(&mc(), issue).unwrap();
     let fees: Vec<_> = sched
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::CommitmentFee)
         .collect();
@@ -199,7 +199,7 @@ fn term_loan_commitment_fee_windowed_to_availability() {
 
     let sched = loan.cashflow_schedule(&mc(), issue).unwrap();
     let fee_dates: Vec<_> = sched
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::CommitmentFee)
         .map(|cf| cf.date)
@@ -329,10 +329,10 @@ fn term_loan_pik_toggle_and_cash_sweep() {
 
     let market = mc();
     let sched = loan.cashflow_schedule(&market, issue).unwrap();
-    assert!(!sched.flows.is_empty());
+    assert!(!sched.get_flows().is_empty());
     // Holder-view schedules omit PIK accretion because it capitalizes into
     // outstanding rather than paying cash to the holder.
-    let has_pik = sched.flows.iter().any(|cf| cf.kind == CFKind::PIK);
+    let has_pik = sched.get_flows().iter().any(|cf| cf.kind == CFKind::PIK);
     assert!(!has_pik);
 }
 
@@ -459,7 +459,7 @@ fn term_loan_amortizing_outstanding_path() {
     // Build holder-view schedule and verify it still exposes amortizing repayments.
     let sched = loan.cashflow_schedule(&market, issue).unwrap();
     let amortization_flows: Vec<_> = sched
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization)
         .collect();
@@ -471,7 +471,7 @@ fn term_loan_amortizing_outstanding_path() {
     // Signed canonical schedule preserves initial negative notional.
     // Verify that positive coupon/amortization flows exist alongside any
     // negative notional flows.
-    let has_positive = sched.flows.iter().any(|cf| cf.amount.amount() > 0.0);
+    let has_positive = sched.get_flows().iter().any(|cf| cf.amount.amount() > 0.0);
     assert!(
         has_positive,
         "Schedule should have positive coupon/amortization flows"

@@ -223,7 +223,7 @@ impl TermLoanDiscountingPricer {
         // PIK increases outstanding and is repaid via principal redemption.
         // Past flows (before settlement_date) have already settled and must not be discounted.
         let flows: Vec<(finstack_quant_core::dates::Date, Money)> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind != CFKind::PIK && cf.date >= settlement_date)
             .map(|cf| (cf.date, cf.amount))
@@ -275,7 +275,7 @@ impl TermLoanDiscountingPricer {
             return Ok(());
         }
 
-        let has_past_reset = schedule.flows.iter().any(|flow| {
+        let has_past_reset = schedule.get_flows().iter().any(|flow| {
             flow.kind == CFKind::FloatReset && flow.reset_date.is_some_and(|date| date < as_of)
         });
         if !has_past_reset {
@@ -308,9 +308,10 @@ impl TermLoanDiscountingPricer {
 
         // Build outstanding path for notional lookup at each flow date.
         let outstanding_path = schedule.outstanding_by_date()?;
+        let initial_notional = schedule.get_notional().initial.amount();
         // Helper: find outstanding notional immediately before a payment date.
         let notional_before = |target: finstack_quant_core::dates::Date| -> f64 {
-            let mut last = schedule.notional.initial.amount();
+            let mut last = initial_notional;
             for (d, amt) in &outstanding_path {
                 if *d < target {
                     last = amt.amount();
@@ -321,14 +322,14 @@ impl TermLoanDiscountingPricer {
             last
         };
 
-        for flow in &mut schedule.flows {
+        schedule.try_update_flows(|flow| {
             // Only process FloatReset flows with a reset date before the valuation date.
             if flow.kind != CFKind::FloatReset {
-                continue;
+                return Ok(());
             }
             let reset_date = match flow.reset_date {
                 Some(rd) if rd < as_of => rd,
-                _ => continue,
+                _ => return Ok(()),
             };
 
             let raw_fixing = finstack_quant_core::market_data::fixings::require_fixing_value_exact(
@@ -354,7 +355,8 @@ impl TermLoanDiscountingPricer {
 
             flow.rate = Some(all_in_rate);
             flow.amount = Money::new(new_amount, flow.amount.currency());
-        }
+            Ok(())
+        })?;
         Ok(())
     }
 }
@@ -425,7 +427,7 @@ mod tests {
 
         let schedule = generate_cashflows(&loan, &market, as_of).expect("cashflows");
         assert!(
-            schedule.flows.iter().any(|cf| cf.kind == CFKind::PIK),
+            schedule.get_flows().iter().any(|cf| cf.kind == CFKind::PIK),
             "PIK loan should generate PIK cashflows"
         );
 
@@ -433,7 +435,7 @@ mod tests {
             TermLoanDiscountingPricer::price(&loan, &market, as_of).expect("pv excluding PIK");
 
         let flows_including: Vec<(Date, Money)> = schedule
-            .flows
+            .get_flows()
             .iter()
             .map(|cf| (cf.date, cf.amount))
             .collect();
@@ -561,7 +563,7 @@ mod tests {
         let fixing_rate_expected = 0.02 + 0.03; // 5% all-in (but from 2% fixing + 300 bps)
 
         let past_float_flows: Vec<_> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| {
                 cf.kind == CFKind::FloatReset && cf.reset_date.is_some_and(|rd| rd < as_of)

@@ -819,8 +819,11 @@ mod tests {
             .cashflow_schedule(&market, bond.issue_date)
             .expect("provider schedule should build");
 
-        assert_eq!(actual.flows, expected.flows);
-        assert_eq!(actual.notional.initial, expected.notional.initial);
-        assert_eq!(actual.day_count, expected.day_count);
+        assert_eq!(actual.get_flows(), expected.get_flows());
+        assert_eq!(
+            actual.get_notional().initial,
+            expected.get_notional().initial
+        );
+        assert_eq!(actual.get_day_count(), expected.get_day_count());
     }
 }

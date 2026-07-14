@@ -50,8 +50,8 @@ fn test_full_schedule_marks_initial_exchange_as_notional() {
         .cashflow_schedule(&context, date(2025, 1, 10))
         .expect("repo full schedule");
 
-    assert_eq!(schedule.flows.len(), 2);
-    assert_eq!(schedule.flows[0].kind, CFKind::Notional);
+    assert_eq!(schedule.get_flows().len(), 2);
+    assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
 }
 
 #[test]

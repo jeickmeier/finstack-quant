@@ -8,7 +8,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
+use finstack_quant_valuations::instruments::rates::cap_floor::{
+    CapFloor, CapFloorVolType, OvernightCouponConvention, OvernightSpreadCompounding,
+    RateOptionType,
+};
+use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{ExerciseStyle, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
@@ -89,6 +93,8 @@ fn test_implied_vol_round_trips_pricing_vol() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -156,7 +162,8 @@ fn test_implied_vol_fails_without_market_price_override() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -175,5 +182,214 @@ fn test_implied_vol_fails_without_market_price_override() {
     assert!(
         result.is_err(),
         "ImpliedVol should fail without market price in pricing overrides"
+    );
+}
+
+#[test]
+fn compounded_sofr_implied_vol_round_trip_uses_contractual_coupon_and_payment() {
+    let as_of = date!(2024 - 12 - 02);
+    let start = date!(2025 - 01 - 02);
+    let end = date!(2025 - 04 - 02);
+    let surface_vol = 0.25;
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.04, as_of, "USD_OIS"))
+        .insert(
+            ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
+                .base_date(as_of)
+                .day_count(DayCount::Act360)
+                .knots([(0.0, 0.03), (0.2, 0.04), (0.5, 0.055), (1.0, 0.06)])
+                .build()
+                .expect("SOFR forward curve"),
+        )
+        .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
+    let mut caplet = CapFloor::new_caplet(
+        "SOFR-IV-ROUNDTRIP",
+        Money::new(1_000_000.0, Currency::USD),
+        0.04,
+        start,
+        end,
+        DayCount::Act360,
+        "USD_OIS",
+        "USD-SOFR-OIS",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    caplet.overnight_coupon = Some(OvernightCouponConvention {
+        compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
+        payment_delay_days: 2,
+        fixing_calendar_id: Some("usny".into()),
+        payment_calendar_id: Some("usny".into()),
+        spread_compounding: OvernightSpreadCompounding::Exclude,
+    });
+
+    let pv = caplet
+        .value(&market, as_of)
+        .expect("compounded caplet price");
+    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+    let result = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ImpliedVol],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("compounded implied vol");
+    let implied_vol = result.measures["implied_vol"];
+    assert!(
+        (implied_vol - surface_vol).abs() < 1.0e-4,
+        "shared compounded coupon/payment projection should round-trip {surface_vol}, got \
+         {implied_vol}"
+    );
+}
+
+#[test]
+fn normal_implied_vol_round_trips_non_positive_forward() {
+    let as_of = date!(2024 - 01 - 02);
+    let surface_vol = 0.01;
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
+    let mut caplet = CapFloor::new_caplet(
+        "NORMAL-IV-NEGATIVE",
+        Money::new(1_000_000.0, Currency::USD),
+        0.0,
+        date!(2024 - 07 - 02),
+        date!(2024 - 10 - 02),
+        DayCount::Act360,
+        "USD_OIS",
+        "NEGATIVE_TERM",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    caplet.vol_type = CapFloorVolType::Normal;
+    let pv = caplet.value(&market, as_of).expect("normal price");
+    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+
+    let result = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ImpliedVol],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("normal implied vol");
+
+    assert!(
+        (result.measures["implied_vol"] - surface_vol).abs() < 1.0e-6,
+        "normal implied vol should round-trip a non-positive forward"
+    );
+}
+
+#[test]
+fn shifted_lognormal_implied_vol_round_trips_shifted_domain() {
+    let as_of = date!(2024 - 01 - 02);
+    let surface_vol = 0.30;
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
+    let mut caplet = CapFloor::new_caplet(
+        "SHIFTED-IV",
+        Money::new(1_000_000.0, Currency::USD),
+        0.0,
+        date!(2024 - 07 - 02),
+        date!(2024 - 10 - 02),
+        DayCount::Act360,
+        "USD_OIS",
+        "NEGATIVE_TERM",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    caplet.vol_type = CapFloorVolType::ShiftedLognormal;
+    caplet.vol_shift = 0.02;
+    let pv = caplet.value(&market, as_of).expect("shifted price");
+    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+
+    let result = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ImpliedVol],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("shifted implied vol");
+
+    assert!(
+        (result.measures["implied_vol"] - surface_vol).abs() < 1.0e-4,
+        "shifted-lognormal implied vol should round-trip on shifted positive rates"
+    );
+}
+
+#[test]
+fn same_day_caplet_does_not_synthesize_option_time() {
+    let as_of = date!(2024 - 03 - 01);
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .insert(build_flat_forward_curve(0.12, as_of, "USD_LIBOR_3M"))
+        .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
+    let mut caplet = CapFloor::new_caplet(
+        "SAME-DAY-IV",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        as_of,
+        date!(2024 - 06 - 01),
+        DayCount::Act360,
+        "USD_OIS",
+        "USD_LIBOR_3M",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    let intrinsic = caplet.value(&market, as_of).expect("intrinsic price");
+    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(intrinsic.amount());
+
+    let result = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ImpliedVol],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("fixed implied vol");
+
+    assert_eq!(result.measures["implied_vol"], 0.0);
+}
+
+#[test]
+fn auto_implied_vol_round_trips_negative_rate_lognormal_quote() {
+    let as_of = date!(2024 - 01 - 02);
+    let surface_vol = 0.30;
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .insert(build_flat_forward_curve(-0.005, as_of, "NEGATIVE_TERM"))
+        .insert_surface(build_flat_vol_surface(surface_vol, as_of, "USD_CAP_VOL"));
+    let mut caplet = CapFloor::new_caplet(
+        "AUTO-IV-NEGATIVE",
+        Money::new(1_000_000.0, Currency::USD),
+        0.0,
+        date!(2024 - 07 - 02),
+        date!(2024 - 10 - 02),
+        DayCount::Act360,
+        "USD_OIS",
+        "NEGATIVE_TERM",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    caplet.vol_type = CapFloorVolType::Auto;
+    let pv = caplet.value(&market, as_of).expect("auto fallback price");
+    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+
+    let result = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::ImpliedVol],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("auto implied vol");
+
+    assert!(
+        (result.measures["implied_vol"] - surface_vol).abs() < 1.0e-4,
+        "Auto implied vol must invert the original lognormal quote after fallback conversion"
     );
 }

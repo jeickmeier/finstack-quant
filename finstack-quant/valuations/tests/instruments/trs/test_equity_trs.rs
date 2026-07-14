@@ -233,7 +233,7 @@ fn test_equity_trs_cashflow_provider_emits_financing_flows() {
 
     assert!(
         schedule
-            .flows
+            .get_flows()
             .iter()
             .any(|cf| cf.amount.amount().abs() > 0.0),
         "TRS cashflow provider should emit non-zero financing cashflows"
@@ -259,7 +259,7 @@ fn test_equity_trs_financing_leg_matches_provider_schedule() {
     // Filter to coupon-only flows (the signed canonical schedule now also
     // contains notional flows which are not part of the financing leg PV).
     let coupon_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind.is_interest_like())
         .collect();

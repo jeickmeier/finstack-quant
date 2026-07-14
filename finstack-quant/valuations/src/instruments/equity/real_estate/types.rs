@@ -543,9 +543,13 @@ impl crate::cashflow::traits::CashflowScheduleSource for RealEstateAsset {
         }
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             flows,
+            crate::cashflow::primitives::CFKind::Fixed,
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         ))
@@ -584,14 +588,14 @@ mod tests {
             .expect("real estate schedule");
 
         assert_eq!(
-            schedule.meta.representation,
+            schedule.get_meta().representation,
             crate::cashflow::builder::CashflowRepresentation::Projected
         );
-        assert_eq!(schedule.flows.len(), 3);
-        assert_eq!(schedule.flows[0].date, noi1);
-        assert_eq!(schedule.flows[0].amount.amount(), 100.0);
-        assert_eq!(schedule.flows[1].date, noi2);
-        assert!(schedule.flows[2].amount.amount() > 100.0);
+        assert_eq!(schedule.get_flows().len(), 3);
+        assert_eq!(schedule.get_flows()[0].date, noi1);
+        assert_eq!(schedule.get_flows()[0].amount.amount(), 100.0);
+        assert_eq!(schedule.get_flows()[1].date, noi2);
+        assert!(schedule.get_flows()[2].amount.amount() > 100.0);
     }
 
     fn build_dcf_asset() -> RealEstateAsset {

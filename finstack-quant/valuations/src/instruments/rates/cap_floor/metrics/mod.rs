@@ -7,7 +7,8 @@
 //! Exposed metrics:
 //! - Delta
 //! - Gamma
-//! - Vega
+//! - Vega (market normal-vol quote sensitivity)
+//! - HwSigmaVega (direct Hull-White short-rate sigma sensitivity)
 //! - Theta
 //! - Rho
 //! - ImpliedVol (placeholder)
@@ -35,6 +36,7 @@ pub(crate) fn register_cap_floor_metrics(registry: &mut MetricRegistry) {
             (Delta, delta::DeltaCalculator),
             (Gamma, gamma::GammaCalculator),
             (Vega, vega::VegaCalculator),
+            (HwSigmaVega, vega::HwSigmaVegaCalculator),
             (Dv01, dv01::Dv01Calculator),
             (Theta, theta::ThetaCalculator),
             // Rho = parallel bump of the discount curve only. Routing through

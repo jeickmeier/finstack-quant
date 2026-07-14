@@ -79,7 +79,8 @@ fn test_quantlib_parity_atm_cap() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -131,7 +132,8 @@ fn test_quantlib_parity_cap_floor_parity() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -155,7 +157,8 @@ fn test_quantlib_parity_cap_floor_parity() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -212,7 +215,8 @@ fn test_quantlib_parity_vol_sensitivity() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -281,7 +285,8 @@ fn test_quantlib_parity_caplet_pricing() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -332,7 +337,8 @@ fn test_quantlib_parity_moneyness() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -356,7 +362,8 @@ fn test_quantlib_parity_moneyness() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -380,7 +387,8 @@ fn test_quantlib_parity_moneyness() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -439,7 +447,8 @@ fn test_quantlib_parity_delta_sign() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -463,7 +472,8 @@ fn test_quantlib_parity_delta_sign() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -538,7 +548,8 @@ fn test_quantlib_parity_gamma_positive() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -562,7 +573,8 @@ fn test_quantlib_parity_gamma_positive() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -634,7 +646,8 @@ fn test_quantlib_parity_time_to_maturity() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -658,7 +671,8 @@ fn test_quantlib_parity_time_to_maturity() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -710,7 +724,8 @@ fn test_quantlib_parity_zero_vol_itm() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -762,7 +777,8 @@ fn test_quantlib_parity_frequency_impact() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -786,7 +802,8 @@ fn test_quantlib_parity_frequency_impact() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };

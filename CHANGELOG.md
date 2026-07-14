@@ -11,6 +11,18 @@ stability contract and schema-version policy.
 
 ## [Unreleased]
 
+### Changed
+- **`CapFloor` compounded-RFR contract (intentional pre-1.0 source break):**
+  public `spread` and `overnight_coupon` fields now encode spread compounding,
+  observation conventions, and payment delay. Serde and builders default these
+  fields for legacy payloads/construction, but exhaustive Rust struct literals
+  must add them. Overnight accrual fractions are recomputed from adjusted
+  business-day boundaries before coupon, spread, and delayed-payment valuation.
+- **Hull-White cap/floor volatility risk:** `vega` now bumps market normal-vol
+  quotes and recalibrates short-rate sigma. Direct model-parameter sensitivity
+  remains available separately as `hw_sigma_vega`; a mean-reversion-only
+  override holds kappa fixed during surface calibration.
+
 ## [0.6.0] - 2026-06-16
 
 ### Removed

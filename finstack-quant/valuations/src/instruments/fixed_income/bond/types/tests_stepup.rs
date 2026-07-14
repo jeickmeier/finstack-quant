@@ -114,7 +114,7 @@ fn test_bond_serde_allows_missing_issue_date_with_custom_cashflows() {
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .expect("schedule build");
 
     let bond = Bond::from_cashflows("SERDE-NO-ISSUE", schedule, "USD-OIS", Some(99.0))
@@ -199,10 +199,10 @@ fn test_bond_custom_cashflows_serde_roundtrip() {
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .expect("schedule build");
 
-    let flow_count = schedule.flows.len();
+    let flow_count = schedule.get_flows().len();
     let bond = Bond::from_cashflows("SERDE-RT", schedule, "USD-OIS", Some(98.0))
         .expect("bond from cashflows");
 
@@ -215,7 +215,7 @@ fn test_bond_custom_cashflows_serde_roundtrip() {
             .custom_cashflows
             .as_ref()
             .expect("should have custom cashflows")
-            .flows
+            .get_flows()
             .len(),
         flow_count
     );
@@ -540,12 +540,12 @@ fn step_up_no_steps_equals_fixed_rate() {
 
     // Compare coupon flows
     let step_coupons: Vec<_> = step_sched
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
         .collect();
     let fixed_coupons: Vec<_> = fixed_sched
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
         .collect();
@@ -580,7 +580,7 @@ fn step_up_one_step_changes_rate() {
     let (_, schedule) = build_step_up_bond_schedule(0.03, vec![(step_date, 0.05)], issue, maturity);
 
     let coupons: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
         .collect();
@@ -648,7 +648,7 @@ fn step_up_multiple_steps() {
         build_step_up_bond_schedule(0.02, vec![(step1, 0.04), (step2, 0.06)], issue, maturity);
 
     let coupons: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
         .collect();

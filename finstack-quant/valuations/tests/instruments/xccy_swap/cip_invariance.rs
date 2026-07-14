@@ -349,7 +349,7 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
         .cashflow_schedule(&ctx, as_of)
         .expect("cashflow_schedule should succeed for MtM-reset");
     assert!(
-        !schedule.flows.is_empty(),
+        !schedule.get_flows().is_empty(),
         "MtM cashflow_schedule should emit at least the initial/final principal flows"
     );
 
@@ -362,7 +362,7 @@ fn mtm_reset_cashflow_schedule_npv_matches_base_value() {
     let fx = ctx.fx().expect("FX matrix");
 
     let mut pv_from_schedule = 0.0_f64;
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         if cf.date <= as_of {
             continue;
         }
@@ -435,7 +435,7 @@ fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
         .cashflow_schedule(&context, as_of)
         .expect("seasoned schedule");
     let resetting_coupon = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|flow| {
             flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
@@ -446,7 +446,7 @@ fn seasoned_mtm_schedule_uses_resetting_leg_fixing() {
     assert!((resetting_coupon.rate.expect("coupon rate") - 0.0775).abs() < 1e-12);
 
     let constant_coupon = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|flow| {
             flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
@@ -523,7 +523,7 @@ fn mtm_constant_leg_spread_changes_pv_and_schedule_rate() {
         .cashflow_schedule(&context, as_of)
         .expect("MtM schedule");
     let constant_coupon = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|flow| {
             flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
@@ -555,7 +555,7 @@ fn mtm_schedule_applies_leg_specific_coupon_frequencies() {
         .cashflow_schedule(&context, as_of)
         .expect("leg-specific MtM schedule");
     let eur_coupons = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|flow| {
             flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset
@@ -563,7 +563,7 @@ fn mtm_schedule_applies_leg_specific_coupon_frequencies() {
         })
         .count();
     let usd_coupons = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|flow| {
             flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset

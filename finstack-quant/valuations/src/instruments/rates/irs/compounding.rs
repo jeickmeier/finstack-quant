@@ -157,6 +157,7 @@ pub enum FloatingLegCompounding {
         /// weights remain anchored to the **original** accrual period dates.
         /// This is consistent with "lookback without observation shift" as
         /// described in the ISDA 2021 Definitions and ARRC SOFR conventions.
+        #[schemars(range(min = 0, max = 31))]
         lookback_days: i32,
 
         /// Optional ISDA 2021 observation shift (in business days), as an
@@ -172,6 +173,7 @@ pub enum FloatingLegCompounding {
         /// pricing path: the two conventions are mutually exclusive, and the
         /// previous behavior (the shift silently cancelling the lookback on
         /// one path while erroring on the other) was a defect.
+        #[schemars(range(min = 0, max = 31))]
         observation_shift: Option<i32>,
     },
 
@@ -187,6 +189,7 @@ pub enum FloatingLegCompounding {
     /// ```
     CompoundedWithObservationShift {
         /// Number of business days to shift both observation dates and DCF weights.
+        #[schemars(range(min = 0, max = 31))]
         shift_days: i32,
     },
 
@@ -197,6 +200,7 @@ pub enum FloatingLegCompounding {
     /// convention as "Rate Cut-Off Days".
     CompoundedWithRateCutoff {
         /// Number of business days before period end to freeze the overnight rate.
+        #[schemars(range(min = 0, max = 31))]
         cutoff_days: i32,
     },
 }

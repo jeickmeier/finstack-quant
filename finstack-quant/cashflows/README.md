@@ -83,7 +83,7 @@ let fixed_spec = FixedCouponSpec {
 let schedule = CashFlowSchedule::builder()
     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
     .fixed_cf(fixed_spec)
-    .build_with_curves(None)?;
+    .build(None)?;
 
 assert!(!schedule.flows.is_empty());
 # Ok(())
@@ -136,7 +136,7 @@ let schedule = CashFlowSchedule::builder()
     })
     .fee(fee)
     .fixed_cf(coupon)
-    .build_with_curves(None)?;
+    .build(None)?;
 
 let balances = schedule.outstanding_by_date()?;
 assert!(!balances.is_empty());
@@ -189,7 +189,7 @@ let float_spec = FloatingCouponSpec {
 let schedule = CashFlowSchedule::builder()
     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
     .floating_cf(float_spec)
-    .build_with_curves(None)?;
+    .build(None)?;
 
 assert!(!schedule.flows.is_empty());
 # Ok(())
@@ -342,7 +342,7 @@ impl CashflowProvider for FixedBondLike {
                 end_of_month: false,
                 payment_lag_days: 0,
             })
-            .build_with_curves(None)
+            .build(None)
     }
 }
 ```

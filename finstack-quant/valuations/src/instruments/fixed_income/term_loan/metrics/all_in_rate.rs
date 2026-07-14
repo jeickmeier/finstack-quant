@@ -58,7 +58,7 @@ impl MetricCalculator for AllInRateCalculator {
         // Sum cash interest and fee flows from the schedule (exclude PIK).
         // Only include flows after as_of to match the time-weighted denominator.
         let cash_cost: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.date > as_of)
             .filter_map(|cf| match cf.kind {

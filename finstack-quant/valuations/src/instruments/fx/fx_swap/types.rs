@@ -268,10 +268,10 @@ impl FxSwap {
         let _ = as_of;
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             vec![(payment_date, amount)],
+            CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(amount.amount().abs(), amount.currency())),
-                kind: Some(CFKind::Notional),
                 ..Default::default()
             },
         ))
@@ -414,7 +414,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
             ],
             Notional::par(0.0, self.base_currency),
             finstack_quant_core::dates::DayCount::Act365F,
-        )?
+        )
         .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }

@@ -50,7 +50,7 @@ fn test_pik_bond() {
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .unwrap();
 
     let bond = Bond::from_cashflows("PIK", schedule, "USD-OIS", None).unwrap();
@@ -86,7 +86,7 @@ fn test_step_up_bond() {
             step_schedule: vec![(step1, Decimal::new(5, 2)), (step2, Decimal::new(6, 2))],
             schedule: params,
         })
-        .build_with_curves(None)
+        .build(None)
         .unwrap();
 
     let bond = Bond::from_cashflows("STEPUP", schedule, "USD-OIS", None).unwrap();

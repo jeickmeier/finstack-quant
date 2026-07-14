@@ -75,7 +75,8 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -139,7 +140,8 @@ fn test_floor_theta() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -252,4 +254,36 @@ fn test_short_maturity_higher_theta() {
     // Both should be finite
     assert!(short_theta.is_finite(), "Short theta should be finite");
     assert!(long_theta.is_finite(), "Long theta should be finite");
+}
+
+#[test]
+fn same_day_unpublished_fixing_caps_theta_without_historical_series() {
+    let as_of = date!(2024 - 03 - 01);
+    let caplet = CapFloor::new_caplet(
+        "SAME-DAY-THETA",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        as_of,
+        date!(2024 - 06 - 01),
+        DayCount::Act360,
+        "USD_OIS",
+        "USD_LIBOR_3M",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .insert(build_flat_forward_curve(0.07, as_of, "USD_LIBOR_3M"))
+        .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
+
+    let result = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Theta],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("same-day theta must not require tomorrow's historical fixing");
+
+    assert_eq!(result.measures["theta"], 0.0);
 }

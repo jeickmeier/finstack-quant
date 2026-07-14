@@ -233,7 +233,7 @@ fn test_custom_cashflows_from_schedule() {
             step_schedule: vec![(step1, Decimal::new(6, 2))],
             schedule: params,
         })
-        .build_with_curves(None)
+        .build(None)
         .unwrap();
 
     let bond = Bond::from_cashflows("CUSTOM", custom_schedule, "USD-OIS", Some(98.0)).unwrap();
@@ -274,7 +274,7 @@ fn test_pik_cashflows() {
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .unwrap();
 
     let bond = Bond::from_cashflows("PIK", custom_schedule, "USD-OIS", None).unwrap();
@@ -284,12 +284,12 @@ fn test_pik_cashflows() {
 
     assert!(
         schedule
-            .flows
+            .get_flows()
             .iter()
             .all(|cf| cf.kind != finstack_quant_cashflows::primitives::CFKind::PIK),
         "holder-view cashflow_schedule should exclude PIK accretion"
     );
-    assert!(!schedule.flows.is_empty());
+    assert!(!schedule.get_flows().is_empty());
 }
 
 #[test]
@@ -451,8 +451,8 @@ fn test_cashflow_schedule_fixed() {
     let full_schedule = bond.cashflow_schedule(&curves, as_of).unwrap();
 
     // Should have flows with CFKind metadata
-    assert!(!full_schedule.flows.is_empty());
-    assert_eq!(full_schedule.notional.initial.amount(), 1000.0);
+    assert!(!full_schedule.get_flows().is_empty());
+    assert_eq!(full_schedule.get_notional().initial.amount(), 1000.0);
 }
 
 #[test]
@@ -483,7 +483,7 @@ fn test_cashflow_schedule_floating() {
     let curves = create_test_curves(as_of);
     let full_schedule = bond.cashflow_schedule(&curves, as_of).unwrap();
 
-    assert!(!full_schedule.flows.is_empty());
+    assert!(!full_schedule.get_flows().is_empty());
 }
 
 #[test]
@@ -589,7 +589,7 @@ fn test_actact_isma_daycount_context() {
 
     // Find coupon flows (exclude principal redemption)
     let coupon_flows: Vec<_> = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| {
             matches!(
@@ -678,7 +678,7 @@ fn test_bus252_daycount_with_calendar() {
 
     // Find coupon flows
     let coupon_flows: Vec<_> = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| {
             matches!(

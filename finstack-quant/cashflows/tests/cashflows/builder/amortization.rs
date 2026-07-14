@@ -398,11 +398,11 @@ mod computation {
             })
             .fixed_cf(standard_fixed_spec());
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
 
         // Get amortization flows
         let amort_flows: Vec<_> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Amortization)
             .collect();
@@ -451,10 +451,10 @@ mod computation {
             .fixed_cf(standard_fixed_spec());
 
         let schedule = builder
-            .build_with_curves(None)
+            .build(None)
             .expect("issue-dated amortization should build");
         let issue_amort: Vec<_> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Amortization && cf.date == issue)
             .collect();
@@ -466,7 +466,7 @@ mod computation {
         assert_eq!(issue_amort[0].amount.amount(), 100_000.0);
 
         let coupon = schedule
-            .flows
+            .get_flows()
             .iter()
             .find(|cf| cf.kind == CFKind::Fixed)
             .expect("coupon");
@@ -497,12 +497,12 @@ mod computation {
             .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 })
             .fixed_cf(standard_fixed_spec());
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
         let path = schedule.outstanding_by_date().unwrap();
 
         // Filter to get outstanding after each amortization event
         let amort_flows: Vec<_> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Amortization)
             .collect();
@@ -529,7 +529,7 @@ mod computation {
             // Allow for small increases due to PIK if present
             if window[1] > window[0] + 1000.0 {
                 // Only fail if significant increase without PIK
-                let has_pik = schedule.flows.iter().any(|cf| cf.kind == CFKind::PIK);
+                let has_pik = schedule.get_flows().iter().any(|cf| cf.kind == CFKind::PIK);
                 assert!(
                     has_pik,
                     "Outstanding should decrease: ${:.2} -> ${:.2}",
@@ -559,7 +559,7 @@ mod computation {
             .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 })
             .fixed_cf(standard_fixed_spec());
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
         let outstanding = schedule.outstanding_by_date().unwrap();
 
         let expected_remaining = [(q1, 750_000.0), (q2, 500_000.0), (q3, 250_000.0)];
@@ -613,11 +613,11 @@ mod computation {
             })
             .fixed_cf(standard_fixed_spec());
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
 
         // Sum of amortization flows
         let amort_sum: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Amortization)
             .map(|cf| cf.amount.amount())
@@ -625,7 +625,7 @@ mod computation {
 
         // Sum of redemption flows (positive notional flows at maturity)
         let redemption_sum: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
             .map(|cf| cf.amount.amount())
@@ -664,10 +664,10 @@ mod computation {
             },
         );
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
 
         let amortization: Vec<_> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
             .collect();
@@ -682,7 +682,7 @@ mod computation {
         );
 
         let residual_notional: Vec<_> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| {
                 cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
@@ -717,7 +717,7 @@ mod computation {
         );
 
         let err = builder
-            .build_with_curves(None)
+            .build(None)
             .expect_err("negative custom principal entries must be rejected");
         assert!(err.to_string().contains("non-negative"));
     }
@@ -750,11 +750,11 @@ mod computation {
             })
             .fixed_cf(standard_fixed_spec());
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
 
         // At maturity: scheduled step-down 800K -> 200K = 600K Amortization.
         let maturity_amort: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
             .map(|cf| cf.amount.amount())
@@ -766,7 +766,7 @@ mod computation {
 
         // Residual 200K (the final target) is redeemed as Notional.
         let maturity_notional: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| {
                 cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
@@ -780,7 +780,7 @@ mod computation {
 
         // Economic invariant: total principal returned equals initial.
         let total_amort: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Amortization)
             .map(|cf| cf.amount.amount())
@@ -812,10 +812,10 @@ mod computation {
             .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.10 })
             .fixed_cf(standard_fixed_spec());
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
 
         let maturity_amort: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.date == maturity && cf.kind == CFKind::Amortization)
             .map(|cf| cf.amount.amount())
@@ -826,7 +826,7 @@ mod computation {
         );
 
         let maturity_notional: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| {
                 cf.date == maturity && cf.kind == CFKind::Notional && cf.amount.amount() > 0.0
@@ -839,7 +839,7 @@ mod computation {
         );
 
         let total_amort: f64 = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Amortization)
             .map(|cf| cf.amount.amount())
@@ -877,7 +877,7 @@ mod computation {
             })
             .fixed_cf(standard_fixed_spec());
 
-        let schedule = builder.build_with_curves(None).unwrap();
+        let schedule = builder.build(None).unwrap();
         let outstanding = schedule.outstanding_by_date().unwrap();
 
         // Verify outstanding at each step date

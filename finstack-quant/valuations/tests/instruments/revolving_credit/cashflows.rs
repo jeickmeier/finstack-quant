@@ -42,7 +42,7 @@ fn test_interest_on_drawn_amounts() {
         .unwrap();
 
     // Assert
-    assert!(!cashflows.flows.is_empty());
+    assert!(!cashflows.get_flows().is_empty());
     // Should include quarterly interest payments
 }
 
@@ -72,7 +72,7 @@ fn test_commitment_fee_on_undrawn() {
         .unwrap();
 
     // Assert
-    assert!(!cashflows.flows.is_empty());
+    assert!(!cashflows.get_flows().is_empty());
     // Should include commitment fees on undrawn portion
 }
 
@@ -102,7 +102,7 @@ fn test_utilization_fee_at_threshold() {
         .unwrap();
 
     // Assert
-    assert!(!cashflows.flows.is_empty());
+    assert!(!cashflows.get_flows().is_empty());
 }
 
 #[test]
@@ -131,16 +131,15 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
         DayCount::Act360,
         ScheduleBuildOpts {
             notional_hint: Some(Money::new(100.0, Currency::USD)),
-            meta: Some(CashFlowMeta {
+            meta: CashFlowMeta {
                 issue_date: Some(date!(2025 - 01 - 01)),
                 ..CashFlowMeta::default()
-            }),
-            ..Default::default()
+            },
         },
     );
     assert_eq!(
         schedule
-            .flows
+            .get_flows()
             .iter()
             .map(|cashflow| cashflow.kind)
             .collect::<Vec<_>>(),
@@ -153,11 +152,11 @@ fn same_date_flows_use_the_canonical_cashflow_order() {
         ]
     );
     assert_eq!(
-        schedule.flows[3].amount.amount(),
+        schedule.get_flows()[3].amount.amount(),
         -30.0,
         "draw sorts before repayment"
     );
-    assert_eq!(schedule.flows[4].amount.amount(), 5.0);
+    assert_eq!(schedule.get_flows()[4].amount.amount(), 5.0);
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(
         outstanding,

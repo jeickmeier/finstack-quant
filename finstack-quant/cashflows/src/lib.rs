@@ -62,7 +62,7 @@
 //!         rate: dec!(0.05),
 //!         schedule: ScheduleParams::semiannual_30360(),
 //!     })
-//!     .build_with_curves(None)?;
+//!     .build(None)?;
 //!
 //! assert!(!schedule.flows.is_empty());
 //! # Ok(())

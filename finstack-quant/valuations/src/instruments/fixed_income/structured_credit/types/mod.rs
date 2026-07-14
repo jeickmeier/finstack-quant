@@ -872,8 +872,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
             dc,
             ScheduleBuildOpts {
                 notional_hint: self.notional(),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         ))
     }
@@ -918,13 +920,13 @@ impl Instrument for StructuredCredit {
         if let Ok(schedule) = self.cashflow_schedule(market, as_of) {
             context.cashflows = Some(
                 schedule
-                    .flows
+                    .get_flows()
                     .iter()
                     .filter(|flow| crate::cashflow::primitives::is_cash_settlement_kind(flow.kind))
                     .map(|flow| (flow.date, flow.amount))
                     .collect(),
             );
-            context.tagged_cashflows = Some(schedule.flows);
+            context.tagged_cashflows = Some(schedule.into_flows());
         }
     }
 

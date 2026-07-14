@@ -614,8 +614,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(0.0, self.underlying.currency)),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         );
         Ok(schedule
@@ -818,7 +820,7 @@ mod tests {
             .expect("classified schedule");
         assert_eq!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .filter(|flow| flow.kind == CFKind::Fixed)
                 .count(),
@@ -826,13 +828,16 @@ mod tests {
         );
         assert_eq!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .filter(|flow| flow.kind == CFKind::FloatReset)
                 .count(),
             3
         );
-        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
+        assert!(schedule
+            .get_flows()
+            .iter()
+            .all(|flow| flow.accrual.is_some()));
 
         // The canonical contractual schedule emits both fixed and floating legs.
         assert_eq!(

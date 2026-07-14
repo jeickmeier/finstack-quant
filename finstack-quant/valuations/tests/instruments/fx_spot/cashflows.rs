@@ -40,8 +40,8 @@ fn test_full_schedule_marks_settlement_as_notional() {
         .cashflow_schedule(&market, test_date())
         .expect("full schedule should build");
 
-    assert_eq!(schedule.flows.len(), 1);
-    assert_eq!(schedule.flows[0].kind, CFKind::Notional);
+    assert_eq!(schedule.get_flows().len(), 1);
+    assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
 }
 
 #[test]

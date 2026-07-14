@@ -180,6 +180,18 @@ mod period_flow_waterfall_integration {
         ctx
     }
 
+    fn schedule(flows: Vec<CashFlow>, notional: f64, issue_date: Date) -> CashFlowSchedule {
+        CashFlowSchedule::from_parts(
+            flows,
+            Notional::par(notional, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue_date),
+                ..CashFlowMeta::default()
+            },
+        )
+    }
+
     /// PIK compounding regression (review: SCALE_CLAMP_MAX froze PIK after
     /// ~5 quarters): a toggled-PIK loan at 2%/quarter must compound for
     /// 8 quarters. The schedule's coupon stays at 2% of the original
@@ -212,15 +224,7 @@ mod period_flow_waterfall_integration {
             ));
         }
         let instrument = ScheduleInstrument {
-            schedule: CashFlowSchedule {
-                flows,
-                notional: Notional::par(notional, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(issue),
-                    ..CashFlowMeta::default()
-                },
-            },
+            schedule: schedule(flows, notional, issue),
         };
 
         let waterfall = WaterfallSpec {
@@ -325,8 +329,8 @@ mod period_flow_waterfall_integration {
         let period = quarter_period(2025, 1);
 
         let instrument = ScheduleInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![
+            schedule: schedule(
+                vec![
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
@@ -344,13 +348,9 @@ mod period_flow_waterfall_integration {
                         None,
                     ),
                 ],
-                notional: Notional::par(1_000_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(issue),
-                    ..CashFlowMeta::default()
-                },
-            },
+                1_000_000.0,
+                issue,
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -419,8 +419,8 @@ mod period_flow_waterfall_integration {
         // Instrument issued mid-horizon (Q3): funding draw on Jul 1, one
         // coupon in Q4.
         let instrument: Arc<dyn CashflowProvider + Send + Sync> = Arc::new(ScheduleInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![
+            schedule: schedule(
+                vec![
                     CashFlow::new(
                         issue,
                         None,
@@ -438,13 +438,9 @@ mod period_flow_waterfall_integration {
                         Some(0.08),
                     ),
                 ],
-                notional: Notional::par(1_000_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(issue),
-                    ..CashFlowMeta::default()
-                },
-            },
+                1_000_000.0,
+                issue,
+            ),
         });
 
         let mut instruments: IndexMap<String, Arc<dyn CashflowProvider + Send + Sync>> =

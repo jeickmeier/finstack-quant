@@ -86,7 +86,7 @@ impl InterestRateSwap {
                 self, disc, proj, as_of, fixings,
             )?;
         let mut acc = NeumaierAccumulator::new();
-        for flow in schedule.flows {
+        for flow in schedule.get_flows() {
             let df = robust_relative_df(disc, as_of, flow.date)?;
             acc.add(flow.amount.amount() * df);
         }
@@ -131,7 +131,7 @@ impl InterestRateSwap {
         // fixed-leg pricer expects that date in `accrual_end`, so pass
         // `payment_lag_days = 0` below to avoid applying the lag twice.
         let periods = sched
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| {
                 cf.kind == crate::cashflow::primitives::CFKind::Fixed
@@ -225,7 +225,7 @@ impl InterestRateSwap {
             )?;
 
         let mut acc = NeumaierAccumulator::new();
-        for flow in float_sched.flows {
+        for flow in float_sched.get_flows() {
             if flow.kind != CFKind::FloatReset {
                 continue;
             }
@@ -384,7 +384,7 @@ mod tests {
     ) -> Result<f64> {
         let disc = ctx.get_discount(swap.fixed.discount_curve_id.as_ref())?;
         let schedule = full_signed_schedule_with_curves(swap, Some(ctx))?;
-        schedule.flows.iter().try_fold(0.0, |acc, flow| {
+        schedule.get_flows().iter().try_fold(0.0, |acc, flow| {
             let payment_date = flow.date;
             let df = disc.df_between_dates(as_of, payment_date)?;
             Ok(acc + flow.amount.amount() * df)

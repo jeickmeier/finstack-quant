@@ -71,7 +71,7 @@ pub(crate) fn realized_distributions(
 
     // Sort defensively; schedule is usually already ordered. `schedule` is an
     // owned local not used after this point, so move `flows` instead of cloning.
-    let mut flows = schedule.flows;
+    let mut flows = schedule.into_flows();
     flows.sort_by_key(|cf| cf.date);
 
     let mut points: Vec<DistPoint> = Vec::new();

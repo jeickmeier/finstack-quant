@@ -133,7 +133,7 @@ pub fn aggregate_instrument_cashflows(
         let full_schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
 
         // Determine currency from first cashflow (all cashflows should be same currency)
-        let currency = full_schedule.notional.initial.currency();
+        let currency = full_schedule.get_notional().initial.currency();
 
         // Initialize period map for this instrument
         let mut instrument_periods: IndexMap<PeriodId, CashflowBreakdown> = IndexMap::new();
@@ -163,7 +163,7 @@ pub fn aggregate_instrument_cashflows(
         // Note: We use full_schedule.flows directly rather than aggregate_by_period because
         // we need access to CFKind metadata for precise classification, which is preserved
         // in the full schedule but lost in simple aggregation.
-        for cf in &full_schedule.flows {
+        for cf in full_schedule.get_flows() {
             if let Some(period_id) = periods
                 .iter()
                 .find(|p| cf.date >= p.start && cf.date < p.end)
@@ -348,7 +348,7 @@ pub fn aggregate_instrument_cashflows(
                         // carry a zero balance; reporting the full notional
                         // before the issue date would overstate leverage.
                         let pre_issuance = full_schedule
-                            .meta
+                            .get_meta()
                             .issue_date
                             .is_some_and(|issue| issue > snapshot_date)
                             && outstanding_path
@@ -357,7 +357,7 @@ pub fn aggregate_instrument_cashflows(
                         if pre_issuance {
                             Money::new(0.0, currency)
                         } else {
-                            full_schedule.notional.initial
+                            full_schedule.get_notional().initial
                         }
                     });
 

@@ -203,7 +203,7 @@ impl ConvertibleBondValuator {
                 cf.date,
                 bond.maturity,
                 steps,
-                cashflow_schedule.day_count,
+                cashflow_schedule.get_day_count(),
                 day_count_ctx,
             )?;
             *coupon_map.entry(bounded_step).or_insert(0.0) += cf.amount.amount();
@@ -222,7 +222,7 @@ impl ConvertibleBondValuator {
                         call.start_date.max(base_date),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.day_count,
+                        cashflow_schedule.get_day_count(),
                         day_count_ctx,
                     )?;
 
@@ -232,7 +232,7 @@ impl ConvertibleBondValuator {
                         call.end_date.min(bond.maturity),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.day_count,
+                        cashflow_schedule.get_day_count(),
                         day_count_ctx,
                     )?;
 
@@ -256,7 +256,7 @@ impl ConvertibleBondValuator {
                         let call_price = if let Some((curve, spread)) = &reference_curve {
                             let mut pv_remaining = 0.0;
                             for cashflow in cashflow_schedule
-                                .flows
+                                .get_flows()
                                 .iter()
                                 .filter(|cashflow| cashflow.date > exercise_date)
                             {
@@ -289,7 +289,7 @@ impl ConvertibleBondValuator {
                         put.start_date.max(base_date),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.day_count,
+                        cashflow_schedule.get_day_count(),
                         day_count_ctx,
                     )?;
 
@@ -298,7 +298,7 @@ impl ConvertibleBondValuator {
                         put.end_date.min(bond.maturity),
                         bond.maturity,
                         steps,
-                        cashflow_schedule.day_count,
+                        cashflow_schedule.get_day_count(),
                         day_count_ctx,
                     )?;
 
@@ -395,7 +395,7 @@ impl ConvertibleBondValuator {
             put_map,
             conversion_policy: bond.conversion.policy.clone(),
             base_date,
-            day_count: cashflow_schedule.day_count,
+            day_count: cashflow_schedule.get_day_count(),
             day_count_frequency,
             conversion_price,
             soft_call_trigger: bond.soft_call_trigger.clone(),
@@ -1057,7 +1057,7 @@ fn prepare_for_pricing(
     as_of: Date,
 ) -> Result<PricingInputs> {
     let cashflow_schedule = build_convertible_schedule(bond)?;
-    let day_count = cashflow_schedule.day_count;
+    let day_count = cashflow_schedule.get_day_count();
     let eq = extract_equity_state(bond, market_context, as_of, day_count)?;
 
     Ok(PricingInputs {
@@ -1330,7 +1330,7 @@ pub(crate) fn build_convertible_schedule(bond: &ConvertibleBond) -> Result<CashF
     if let Some(floating_spec) = &bond.floating_coupon {
         let _ = builder.floating_cf(floating_spec.clone());
     }
-    builder.build_with_curves(None)
+    builder.build(None)
 }
 
 /// Calculate convertible bond parity
@@ -1411,12 +1411,14 @@ pub fn calculate_accrued_interest(bond: &ConvertibleBond, as_of: Date) -> Result
                 coupon_period: Some((period_start, period_end)),
                 ..Default::default()
             };
-            let period_yf = schedule
-                .day_count
-                .year_fraction(period_start, period_end, dc_ctx)?;
-            let accrued_yf = schedule
-                .day_count
-                .year_fraction(period_start, settle, dc_ctx)?;
+            let period_yf =
+                schedule
+                    .get_day_count()
+                    .year_fraction(period_start, period_end, dc_ctx)?;
+            let accrued_yf =
+                schedule
+                    .get_day_count()
+                    .year_fraction(period_start, settle, dc_ctx)?;
 
             if period_yf > 0.0 {
                 let fraction = accrued_yf / period_yf;

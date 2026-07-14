@@ -4,6 +4,7 @@
 //! contributions for a given functional form (e.g., delta/gamma/vega/theta).
 
 use crate::instruments::common_impl::vol_resolution::resolve_sigma_at;
+use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
 use crate::instruments::rates::cap_floor::pricing::{black, normal};
 use crate::instruments::rates::cap_floor::CapFloor;
 use crate::instruments::rates::swaption::types::{
@@ -11,22 +12,21 @@ use crate::instruments::rates::swaption::types::{
 };
 use crate::metrics::MetricContext;
 
-const MIN_EFFECTIVE_FIXING_TIME: f64 = 1e-6;
-
 /// Per-caplet inputs passed to the aggregation closure.
 ///
-/// `fixing_t` is the year fraction from `as_of` to the option's fixing date
-/// (floored at `MIN_EFFECTIVE_FIXING_TIME`) — the same time the pricer uses for
-/// both the vol-surface lookup and the model `T`. Greeks use this single time so
-/// they remain consistent with the reported price (a finite-difference Greek
-/// reconciles with the analytic one).
+/// `fixing_t` is the year fraction from `as_of` to the option's fixing date.
+/// Fully fixed coupons are omitted because their stochastic Greeks are zero.
 pub(crate) struct CapletInputs {
     /// Atomic forward rate for the accrual period.
     pub forward: f64,
     /// Resolved implied volatility (overrides → surface lookup).
     pub sigma: f64,
-    /// Year fraction to the option fixing date (clamped above `MIN_EFFECTIVE_FIXING_TIME`).
+    /// Year fraction to the option fixing date.
     pub fixing_t: f64,
+    /// Sensitivity of the optioned coupon to a parallel projected-forward shift.
+    pub forward_sensitivity: f64,
+    /// Second sensitivity to the same parallel projected-forward shift.
+    pub forward_second_sensitivity: f64,
 }
 
 /// Lognormal-convention forward delta with graceful Bachelier fallback.
@@ -83,11 +83,10 @@ pub(crate) fn lognormal_vega_with_fallback(strike: f64, forward: f64, sigma: f64
 /// The helper scales by `notional × accrual_year_fraction × discount_factor`
 /// and sums across periods.
 ///
-/// The fixing date used for vol surface lookup and `fixing_t` computation is
-/// the `reset_date` when provided (matching the pricer), falling back to
-/// `accrual_start`. This ensures Greeks are computed on the same dates as
-/// pricing, which matters for indices with non-zero reset lags (e.g., SOFR
-/// 2-day lookback).
+/// Coupon, fixing, and payment inputs come from the same canonical projection
+/// used by pricing and implied-volatility inversion. For term indices this uses
+/// the reset date; for compounded overnight coupons it uses the last distinct
+/// contractual observation after lookback, observation shift, or cutoff.
 pub(crate) fn aggregate_over_caplets<FN>(
     option: &CapFloor,
     context: &MetricContext,
@@ -96,14 +95,7 @@ pub(crate) fn aggregate_over_caplets<FN>(
 where
     FN: FnMut(CapletInputs) -> f64,
 {
-    let disc_curve = context
-        .curves
-        .get_discount(option.discount_curve_id.as_ref())?;
-    let fwd_curve = context
-        .curves
-        .get_forward(option.forward_curve_id.as_ref())?;
     let strike = option.strike_f64()?;
-    let dc_ctx = finstack_quant_core::dates::DayCountContext::default();
 
     let periods = option.pricing_periods()?;
     if periods.is_empty() {
@@ -112,25 +104,24 @@ where
 
     let mut sum = 0.0;
     for period in &periods {
-        let fixing_date = option.option_fixing_date(period);
-        if fixing_date < context.as_of {
+        if period.payment_date <= context.as_of {
+            continue;
+        }
+        let resolved_inputs =
+            resolve_optioned_caplet_inputs(option, period, context.curves.as_ref(), context.as_of)?;
+        let projection = &resolved_inputs.coupon;
+        if projection.payment_date <= context.as_of {
+            continue;
+        }
+        let fixing_date = projection.fixing_date;
+        if fixing_date <= context.as_of {
             continue;
         }
 
-        let fixing_t = finstack_quant_core::dates::DayCount::Act365F
-            .year_fraction(context.as_of, fixing_date, dc_ctx)?
-            .max(MIN_EFFECTIVE_FIXING_TIME);
+        let fixing_t = resolved_inputs.time_to_fixing;
 
-        let forward = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-            fwd_curve.as_ref(),
-            period.accrual_start,
-            period.accrual_end,
-        )?;
-        let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
-            disc_curve.as_ref(),
-            context.as_of,
-            period.payment_date,
-        )?;
+        let forward = projection.forward;
+        let df = resolved_inputs.discount_factor;
         let sigma = resolve_sigma_at(
             &option.pricing_overrides.market_quotes,
             context.curves.as_ref(),
@@ -143,8 +134,10 @@ where
             forward,
             sigma,
             fixing_t,
+            forward_sensitivity: projection.parallel_forward_sensitivity,
+            forward_second_sensitivity: projection.parallel_forward_second_sensitivity,
         });
-        sum += per_unit * option.notional.amount() * period.accrual_year_fraction * df;
+        sum += per_unit * option.notional.amount() * projection.accrual_year_fraction * df;
     }
     Ok(sum)
 }

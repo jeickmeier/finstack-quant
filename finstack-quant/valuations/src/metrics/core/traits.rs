@@ -473,7 +473,7 @@ impl MetricContext {
             let schedule = self
                 .instrument
                 .cashflow_schedule(&self.curves, self.as_of)?;
-            self.tagged_cashflows = Some(schedule.flows);
+            self.tagged_cashflows = Some(schedule.into_flows());
         }
         self.tagged_cashflows
             .as_ref()

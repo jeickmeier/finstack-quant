@@ -271,14 +271,13 @@ fn schedule_from_projection(
         mbs.day_count,
         crate::cashflow::traits::ScheduleBuildOpts {
             notional_hint: Some(mbs.current_face),
-            meta: Some(CashFlowMeta {
+            meta: CashFlowMeta {
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
                 facility_limit: None,
                 issue_date: Some(mbs.issue_date),
                 maturity_date: None,
-            }),
-            ..Default::default()
+            },
         },
     )
 }
@@ -346,7 +345,7 @@ fn discount_schedule(
 ) -> Result<f64> {
     let dc = curve.day_count();
     let mut pv = 0.0;
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         if cf.date <= as_of {
             continue;
         }
@@ -373,7 +372,7 @@ pub(crate) fn price_mbs(
 ) -> Result<Money> {
     let schedule = build_projected_schedule(mbs, as_of, Some(mbs.wam + 12))?;
 
-    if schedule.flows.is_empty() {
+    if schedule.get_flows().is_empty() {
         return Ok(Money::new(0.0, mbs.current_face.currency()));
     }
 
@@ -394,7 +393,7 @@ pub(crate) fn price_with_spread(
 ) -> Result<f64> {
     let schedule = build_projected_schedule(mbs, as_of, Some(mbs.wam + 12))?;
 
-    if schedule.flows.is_empty() {
+    if schedule.get_flows().is_empty() {
         return Ok(0.0);
     }
 
@@ -613,10 +612,13 @@ mod tests {
         let schedule = build_projected_schedule(&mbs, as_of, Some(3))
             .expect("projected schedule should build");
 
-        assert!(!schedule.flows.is_empty());
-        assert!(schedule.flows.iter().any(|cf| cf.kind == CFKind::Fixed));
+        assert!(!schedule.get_flows().is_empty());
         assert!(schedule
-            .flows
+            .get_flows()
+            .iter()
+            .any(|cf| cf.kind == CFKind::Fixed));
+        assert!(schedule
+            .get_flows()
             .iter()
             .any(|cf| matches!(cf.kind, CFKind::Amortization | CFKind::PrePayment)));
     }

@@ -312,7 +312,6 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
     if flows.is_empty() {
         return Err(crate::error::InputError::TooFewPoints.into());
     }
-    let day_count = disc.day_count();
     let ccy = flows[0].1.currency();
 
     // Validate all cashflows have the same currency
@@ -325,19 +324,70 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
         }
     }
 
-    // Discount each flow to the valuation date `base`, which need not coincide
-    // with the curve's own base date. `Discounting::df` expects an abscissa
-    // measured from the *curve* base date, so all year fractions are taken
-    // from `disc.base_date()`; the flow is then discounted by the relative
-    // factor DF(curve_base→d) / DF(curve_base→base). When `base` equals the
-    // curve base the denominator is `df(0) == 1`, so this reduces exactly to
-    // the plain `df(t)` lookup.
-    //
     // Per-flow discounting: Money × f64 discount factor produces a Money
     // value rounded to Money's Decimal scale. Accumulation of rounded
     // per-flow values is exact at that scale. For bit-exact precision,
     // callers should pre-discount amounts in Decimal and sum via
     // sum_prediscounted_money().
+    let mut total = Money::new(0.0, ccy);
+    for_each_discounted(disc, base, ctx, options, flows, |amt, df| {
+        let disc_amt = amt.checked_mul_f64(df)?;
+        total = total.checked_add(disc_amt)?;
+        Ok(())
+    })?;
+    Ok(total)
+}
+
+/// Compute an unrounded scalar NPV using a discount curve.
+///
+/// Cashflows on or before `base` are excluded: valuation on a date assumes
+/// cash settling that day has already been paid. Discount factors are relative
+/// to `base`, even when the curve has a different base date.
+///
+/// # Errors
+///
+/// Returns an error for an empty flow slice, day-count failures, or non-finite
+/// and non-positive discount factors.
+pub fn npv_amounts_with_curve<D: Discounting + ?Sized>(
+    disc: &D,
+    base: Date,
+    flows: &[(Date, f64)],
+) -> crate::Result<f64> {
+    if flows.is_empty() {
+        return Err(crate::error::InputError::TooFewPoints.into());
+    }
+
+    let mut total = NeumaierAccumulator::new();
+    for_each_discounted(
+        disc,
+        base,
+        DayCountContext::default(),
+        NpvOptions::default(),
+        flows,
+        |amount, df| {
+            total.add(amount * df);
+            Ok(())
+        },
+    )?;
+    Ok(total.total())
+}
+
+fn for_each_discounted<T, D, F>(
+    disc: &D,
+    base: Date,
+    ctx: DayCountContext<'_>,
+    options: NpvOptions,
+    flows: &[(Date, T)],
+    mut apply: F,
+) -> crate::Result<()>
+where
+    D: Discounting + ?Sized,
+    F: FnMut(&T, f64) -> crate::Result<()>,
+{
+    // Discount each flow to `base`, which need not coincide with the curve's
+    // base date. Relative discounting keeps Money and scalar valuation on the
+    // same cutoff, time-origin, and discount-factor validation policy.
+    let day_count = disc.day_count();
     let curve_base = disc.base_date();
     let t_base = day_count.signed_year_fraction(curve_base, base, ctx)?;
     let df_base = disc.df(t_base);
@@ -347,26 +397,24 @@ pub fn npv_with_options<D: Discounting + ?Sized>(
         )));
     }
 
-    let mut total = Money::new(0.0, ccy);
-    for (d, amt) in flows {
-        // Market-standard pricing semantics :
-        // flows on or before the valuation date have already paid and are
-        // not part of present value. `include_past_flows` opts back in to
-        // the legacy include-everything behavior.
-        if !options.include_past_flows && *d <= base {
+    for (date, amount) in flows {
+        // Market-standard valuation semantics: cash on the valuation date has
+        // already settled. `include_past_flows` exists only for callers that
+        // explicitly require the investment-NPV convention.
+        if !options.include_past_flows && *date <= base {
             continue;
         }
-        let t = day_count.signed_year_fraction(curve_base, *d, ctx)?;
+        let t = day_count.signed_year_fraction(curve_base, *date, ctx)?;
         let df = disc.df(t) / df_base;
         if !df.is_finite() || df <= 0.0 {
             return Err(crate::Error::Validation(format!(
-                "npv: discount factor for cashflow date {d} is invalid: {df}"
+                "npv: discount factor for cashflow date {date} is invalid: {df}"
             )));
         }
-        let disc_amt = amt.checked_mul_f64(df)?;
-        total = total.checked_add(disc_amt)?;
+        apply(amount, df)?;
     }
-    Ok(total)
+
+    Ok(())
 }
 
 /// Sum pre-discounted `Money` cashflows for bit-exact accumulation.

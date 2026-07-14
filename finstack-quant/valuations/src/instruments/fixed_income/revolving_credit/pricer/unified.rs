@@ -132,7 +132,7 @@ impl RevolvingCreditPricer {
             // Need to compute survival at each cashflow date, not just time points
             let cashflow_dates: Vec<Date> = path_schedule
                 .schedule
-                .flows
+                .get_flows()
                 .iter()
                 .map(|cf| cf.date)
                 .collect();
@@ -150,14 +150,14 @@ impl RevolvingCreditPricer {
             hazard.survival_at_dates(
                 &path_schedule
                     .schedule
-                    .flows
+                    .get_flows()
                     .iter()
                     .map(|cf| cf.date)
                     .collect::<Vec<_>>(),
             )?
         } else {
             // No credit risk
-            vec![1.0; path_schedule.schedule.flows.len()]
+            vec![1.0; path_schedule.schedule.get_flows().len()]
         };
 
         // Survival to the valuation date, from the same source as the
@@ -234,16 +234,21 @@ impl RevolvingCreditPricer {
         // Anchor PV at `as_of` (not the curve base date) so that rolling the
         // valuation date forward shortens the discount path and produces
         // non-zero theta from the time-value of accruing fees/interest.
-        if survival_probs.len() != path_schedule.schedule.flows.len() {
+        if survival_probs.len() != path_schedule.schedule.get_flows().len() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "survival probability count {} does not match cashflow count {}",
                 survival_probs.len(),
-                path_schedule.schedule.flows.len()
+                path_schedule.schedule.get_flows().len()
             )));
         }
 
         let mut total_pv = 0.0;
-        for (cf, survival_uncond) in path_schedule.schedule.flows.iter().zip(&survival_probs) {
+        for (cf, survival_uncond) in path_schedule
+            .schedule
+            .get_flows()
+            .iter()
+            .zip(&survival_probs)
+        {
             if cf.date < as_of {
                 continue;
             }
@@ -329,7 +334,7 @@ impl RevolvingCreditPricer {
 
         // Keep optional payloads live under `-D dead-code`:
         // callers expect to inspect cashflows and paths, and we also touch them here.
-        let _ = result.cashflows.flows.len();
+        let _ = result.cashflows.get_flows().len();
         let _ = result.path_data.is_some();
 
         Ok(result)

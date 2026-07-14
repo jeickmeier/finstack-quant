@@ -95,11 +95,9 @@ fn test_all_flows_preserve_currency() {
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(notional, issue, maturity).fixed_cf(fixed);
-    let schedule = builder
-        .build_with_curves(None)
-        .expect("build should succeed");
+    let schedule = builder.build(None).expect("build should succeed");
 
-    for flow in &schedule.flows {
+    for flow in schedule.get_flows() {
         assert_eq!(
             flow.amount.currency(),
             Currency::USD,
@@ -220,7 +218,7 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
                 step_schedule: Vec::new(),
                 schedule: params,
             });
-        b.build_with_curves(None).expect("schedule builds")
+        b.build(None).expect("schedule builds")
     };
 
     let swap = build(ScheduleParams::usd_sofr_swap());
@@ -229,7 +227,7 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
     let bond = build(bond_style);
 
     let last_coupon_yf = |s: &CashFlowSchedule| {
-        s.flows
+        s.get_flows()
             .iter()
             .rfind(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
             .expect("coupon present")

@@ -8,7 +8,11 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
+use finstack_quant_valuations::instruments::rates::cap_floor::{
+    CapFloor, CapFloorVolType, OvernightCouponConvention, OvernightSpreadCompounding,
+    RateOptionType,
+};
+use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{ExerciseStyle, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
@@ -70,7 +74,8 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -96,7 +101,8 @@ fn create_standard_floor(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -136,6 +142,38 @@ fn test_cap_delta_finite() {
         "Delta should be reasonable, got: {}",
         delta
     );
+}
+
+#[test]
+fn same_day_caplet_has_zero_stochastic_delta() {
+    let as_of = date!(2024 - 03 - 01);
+    let caplet = CapFloor::new_caplet(
+        "SAME-DAY-FIXED-DELTA",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        as_of,
+        date!(2024 - 06 - 01),
+        DayCount::Act360,
+        "USD_OIS",
+        "USD_LIBOR_3M",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    let market = MarketContext::new()
+        .insert(build_flat_discount_curve(0.03, as_of, "USD_OIS"))
+        .insert(build_flat_forward_curve(0.12, as_of, "USD_LIBOR_3M"))
+        .insert_surface(build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL"));
+
+    let result = caplet
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Delta],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("fixed caplet delta");
+
+    assert_eq!(result.measures["delta"], 0.0);
 }
 
 #[test]
@@ -364,7 +402,8 @@ fn test_caplet_delta() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -396,4 +435,72 @@ fn test_caplet_delta() {
         delta
     );
     assert!(delta.is_finite(), "Caplet delta should be finite");
+}
+
+#[test]
+fn compounded_sofr_delta_matches_parallel_forward_finite_difference() {
+    let as_of = date!(2024 - 12 - 02);
+    let mut caplet = CapFloor::new_caplet(
+        "SOFR-DELTA",
+        Money::new(1_000_000.0, Currency::USD),
+        0.04,
+        date!(2025 - 01 - 02),
+        date!(2025 - 04 - 02),
+        DayCount::Act360,
+        "USD_OIS",
+        "USD-SOFR-OIS",
+        "USD_CAP_VOL",
+    )
+    .expect("caplet");
+    caplet.vol_type = CapFloorVolType::Normal;
+    caplet.overnight_coupon = Some(OvernightCouponConvention {
+        compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
+        payment_delay_days: 2,
+        fixing_calendar_id: Some("usny".into()),
+        payment_calendar_id: Some("usny".into()),
+        spread_compounding: OvernightSpreadCompounding::Exclude,
+    });
+    let discount = build_flat_discount_curve(0.04, as_of, "USD_OIS");
+    let surface = build_flat_vol_surface(0.005, as_of, "USD_CAP_VOL");
+    let forward = |shift: f64| {
+        ForwardCurve::builder("USD-SOFR-OIS", 1.0 / 360.0)
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([
+                (0.0, 0.03 + shift),
+                (0.2, 0.04 + shift),
+                (0.5, 0.055 + shift),
+                (1.0, 0.06 + shift),
+            ])
+            .build()
+            .expect("forward")
+    };
+    let market = |shift: f64| {
+        MarketContext::new()
+            .insert(discount.clone())
+            .insert(forward(shift))
+            .insert_surface(surface.clone())
+    };
+    let base_market = market(0.0);
+    let analytic = caplet
+        .price_with_metrics(
+            &base_market,
+            as_of,
+            &[MetricId::Delta],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect("delta")
+        .measures["delta"];
+    let h = 1.0e-5;
+    let up = caplet.value(&market(h), as_of).expect("up price").amount();
+    let down = caplet
+        .value(&market(-h), as_of)
+        .expect("down price")
+        .amount();
+    let finite_difference = (up - down) / (2.0 * h);
+
+    assert!(
+        (analytic - finite_difference).abs() <= 1.0e-3 * finite_difference.abs().max(1.0),
+        "compounded delta {analytic} should match pricing finite difference {finite_difference}"
+    );
 }

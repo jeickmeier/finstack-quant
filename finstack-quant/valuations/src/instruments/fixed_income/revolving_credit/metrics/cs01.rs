@@ -70,7 +70,7 @@ impl ZSpreadCs01 for RevolvingCredit {
                 // immaterial to CS01.
                 let mut flows: Vec<(Date, Money)> = schedule
                     .schedule
-                    .flows
+                    .get_flows()
                     .iter()
                     .filter(|cf| cf.date >= as_of)
                     .map(|cf| (cf.date, cf.amount))

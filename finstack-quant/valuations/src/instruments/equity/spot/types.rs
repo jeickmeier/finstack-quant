@@ -435,8 +435,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
             finstack_quant_core::dates::DayCount::Act365F, // Standard for equity spot
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: self.notional(),
-                representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                    ..Default::default()
+                },
             },
         ))
     }

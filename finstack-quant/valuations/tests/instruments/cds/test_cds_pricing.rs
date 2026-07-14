@@ -499,7 +499,7 @@ fn test_cdsw_final_coupon_cashflow_accrual_matches_pricer_premium_pv() {
         .cashflow_schedule(&market, as_of)
         .expect("cashflow schedule should build");
     let final_coupon = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|flow| flow.date == maturity)
         .expect("final coupon should be exported");

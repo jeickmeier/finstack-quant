@@ -192,14 +192,13 @@ impl CDSTranchePricer {
                 tranche.day_count,
                 crate::cashflow::traits::ScheduleBuildOpts {
                     notional_hint: Some(tranche.notional),
-                    meta: Some(CashFlowMeta {
+                    meta: CashFlowMeta {
                         representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                         calendar_ids: tranche.calendar_id.clone().into_iter().collect(),
                         facility_limit: None,
                         issue_date: tranche.contractual_effective_date(as_of),
                         maturity_date: Some(tranche.maturity),
-                    }),
-                    ..Default::default()
+                    },
                 },
             ));
         }
@@ -216,14 +215,13 @@ impl CDSTranchePricer {
             tranche.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(tranche.notional),
-                meta: Some(CashFlowMeta {
+                meta: CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                     calendar_ids: tranche.calendar_id.clone().into_iter().collect(),
                     facility_limit: None,
                     issue_date: tranche.contractual_effective_date(valuation_date),
                     maturity_date: Some(tranche.maturity),
-                }),
-                ..Default::default()
+                },
             },
         ))
     }

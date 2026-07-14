@@ -70,7 +70,8 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -131,7 +132,8 @@ fn test_floor_gamma_positive() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };

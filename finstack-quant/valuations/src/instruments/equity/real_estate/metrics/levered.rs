@@ -122,7 +122,7 @@ impl MetricCalculator for DscrMin {
             let mut debt_service = 0.0;
             for sched in &schedules {
                 debt_service += sched
-                    .flows
+                    .get_flows()
                     .iter()
                     .filter(|cf| cf.date > prev && cf.date <= d)
                     .filter(|cf| {
@@ -189,7 +189,7 @@ impl MetricCalculator for DscrMinInterestOnly {
             let mut debt_service = 0.0;
             for sched in &schedules {
                 debt_service += sched
-                    .flows
+                    .get_flows()
                     .iter()
                     .filter(|cf| cf.date > prev && cf.date <= d)
                     .filter(|cf| {
@@ -255,7 +255,7 @@ impl MetricCalculator for LoanToValueAtOrigination {
         let schedules = inst.financing_schedules_supported(&context.curves, context.as_of)?;
         let mut drawn = 0.0;
         for sched in &schedules {
-            for cf in &sched.flows {
+            for cf in sched.get_flows() {
                 if cf.date != context.as_of {
                     continue;
                 }

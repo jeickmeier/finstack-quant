@@ -576,8 +576,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
                 self.day_count,
                 crate::cashflow::traits::ScheduleBuildOpts {
                     notional_hint: self.notional(),
-                    representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
-                    ..Default::default()
+                    meta: crate::cashflow::builder::CashFlowMeta {
+                        representation:
+                            crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                        ..Default::default()
+                    },
                 },
             ));
         }
@@ -592,10 +595,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
 
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,
+            crate::cashflow::primitives::CFKind::Fixed,
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: self.notional(),
-                kind: Some(crate::cashflow::primitives::CFKind::Fixed),
                 ..Default::default()
             },
         );

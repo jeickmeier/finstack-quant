@@ -39,7 +39,7 @@ fn caplet_delta(
 ) -> f64 {
     use super::common::lognormal_delta_with_fallback;
     use crate::instruments::rates::cap_floor::pricing::black;
-    match vol_type {
+    let coupon_delta = match vol_type {
         // `Auto` is a lognormal surface; both share the Black-with-Bachelier
         // fallback path so the Greek matches the pricer for any rate sign.
         CapFloorVolType::Lognormal | CapFloorVolType::Auto => {
@@ -55,5 +55,6 @@ fn caplet_delta(
         CapFloorVolType::Normal => crate::instruments::rates::cap_floor::pricing::normal::delta(
             is_cap, strike, c.forward, c.sigma, c.fixing_t,
         ),
-    }
+    };
+    coupon_delta * c.forward_sensitivity
 }

@@ -38,19 +38,23 @@ macro_rules! floating_metric {
 
 fixed_metric!(
     FixedLegPaymentCountCalculator,
-    |schedule: &crate::cashflow::builder::CashFlowSchedule| { Ok(schedule.flows.len() as f64) }
+    |schedule: &crate::cashflow::builder::CashFlowSchedule| {
+        Ok(schedule.get_flows().len() as f64)
+    }
 );
 
 floating_metric!(
     FloatingLegPaymentCountCalculator,
-    |schedule: &crate::cashflow::builder::CashFlowSchedule| { Ok(schedule.flows.len() as f64) }
+    |schedule: &crate::cashflow::builder::CashFlowSchedule| {
+        Ok(schedule.get_flows().len() as f64)
+    }
 );
 
 fixed_metric!(
     FixedFirstPaymentDateCalculator,
     |schedule: &crate::cashflow::builder::CashFlowSchedule| {
         schedule
-            .flows
+            .get_flows()
             .first()
             .map(|flow| days_since_epoch(flow.date) as f64)
             .ok_or_else(|| {
@@ -63,7 +67,7 @@ fixed_metric!(
     FixedLastPaymentDateCalculator,
     |schedule: &crate::cashflow::builder::CashFlowSchedule| {
         schedule
-            .flows
+            .get_flows()
             .last()
             .map(|flow| days_since_epoch(flow.date) as f64)
             .ok_or_else(|| {
@@ -76,7 +80,7 @@ floating_metric!(
     FloatingFirstPaymentDateCalculator,
     |schedule: &crate::cashflow::builder::CashFlowSchedule| {
         schedule
-            .flows
+            .get_flows()
             .first()
             .map(|flow| days_since_epoch(flow.date) as f64)
             .ok_or_else(|| {
@@ -89,7 +93,7 @@ floating_metric!(
     FloatingLastPaymentDateCalculator,
     |schedule: &crate::cashflow::builder::CashFlowSchedule| {
         schedule
-            .flows
+            .get_flows()
             .last()
             .map(|flow| days_since_epoch(flow.date) as f64)
             .ok_or_else(|| {
@@ -102,7 +106,7 @@ fixed_metric!(
     FixedFirstAccrualFactorCalculator,
     |schedule: &crate::cashflow::builder::CashFlowSchedule| {
         schedule
-            .flows
+            .get_flows()
             .first()
             .map(|flow| flow.accrual_factor)
             .ok_or_else(|| {
@@ -115,7 +119,7 @@ floating_metric!(
     FloatingFirstAccrualFactorCalculator,
     |schedule: &crate::cashflow::builder::CashFlowSchedule| {
         schedule
-            .flows
+            .get_flows()
             .first()
             .map(|flow| flow.accrual_factor)
             .ok_or_else(|| {

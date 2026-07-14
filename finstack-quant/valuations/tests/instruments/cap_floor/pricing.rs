@@ -70,7 +70,8 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -96,7 +97,8 @@ fn create_standard_floor(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -295,7 +297,8 @@ fn test_caplet_single_period_pricing() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -434,7 +437,8 @@ fn test_fixing_vs_payment_date_timing() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -457,11 +461,12 @@ fn test_fixing_vs_payment_date_timing() {
         pv.amount()
     );
 
-    // Price the same caplet ON the fixing date
-    // At this point, t_fix = 0, so we should get intrinsic value (which could be zero for ATM)
+    // Price the same caplet ON the fixing date. Valuation is at start of day,
+    // before the same-day fixing is published, but zero option time means only
+    // intrinsic value remains.
     let as_of_fixing = fixing_date;
     let disc_curve2 = build_flat_discount_curve(0.05, as_of_fixing, "USD_OIS");
-    let fwd_curve2 = build_flat_forward_curve(0.05, as_of_fixing, "USD_LIBOR_3M");
+    let fwd_curve2 = build_flat_forward_curve(0.12, as_of_fixing, "USD_LIBOR_3M");
     let vol_surface2 = build_flat_vol_surface(0.30, as_of_fixing, "USD_CAP_VOL");
 
     let market2 = MarketContext::new()
@@ -470,20 +475,20 @@ fn test_fixing_vs_payment_date_timing() {
         .insert_surface(vol_surface2);
 
     let pv_at_fixing = caplet.value(&market2, as_of_fixing).unwrap();
-
-    // At fixing date with t_fix=0, we get intrinsic value (0 for ATM caplet)
-    // But the caplet hasn't paid yet, so it shouldn't be zero if F > K
-    // For ATM (F=K=5%), intrinsic is zero
+    let mut zero_vol_caplet = caplet;
+    zero_vol_caplet
+        .pricing_overrides
+        .market_quotes
+        .implied_volatility = Some(0.0);
+    let expected = zero_vol_caplet
+        .value(&market2, as_of_fixing)
+        .unwrap()
+        .amount();
     assert!(
-        pv_at_fixing.amount() >= 0.0,
-        "Caplet at fixing date should have non-negative value: {}",
-        pv_at_fixing.amount()
+        (pv_at_fixing.amount() - expected).abs() < 1.0e-8,
+        "same-day caplet should equal its zero-vol intrinsic {expected}, got {}",
+        pv_at_fixing.amount(),
     );
-
-    // Note: Testing seasoned caplets (past fixing, before payment) would require
-    // providing the actual fixed rate rather than relying on the forward curve.
-    // The standard pricer uses forward curve rates, which is valid for forward-starting
-    // caplets but not for seasoned caplets where the rate is already fixed.
 }
 
 #[test]
@@ -511,6 +516,8 @@ fn test_seasoned_caplet_uses_historical_fixing_after_reset() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -619,7 +626,8 @@ fn test_caplet_after_payment_date_is_zero() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };

@@ -206,7 +206,7 @@ impl Deposit {
         context: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<f64> {
-        crate::instruments::common_impl::helpers::schedule_pv_using_curve_dc_raw(
+        crate::instruments::common_impl::helpers::schedule_pv_raw(
             self,
             context,
             as_of,
@@ -237,7 +237,7 @@ impl crate::instruments::common_impl::traits::Instrument for Deposit {
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
         self.validate()?;
-        crate::instruments::common_impl::helpers::schedule_pv_using_curve_dc(
+        crate::instruments::common_impl::helpers::schedule_pv(
             self,
             curves,
             as_of,
@@ -578,7 +578,7 @@ mod tests {
             .cashflow_schedule(&MarketContext::new(), date!(2025 - 01 - 01))
             .expect("deposit full schedule");
 
-        assert_eq!(schedule.flows.len(), 2);
-        assert_eq!(schedule.flows[0].kind, CFKind::Notional);
+        assert_eq!(schedule.get_flows().len(), 2);
+        assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
     }
 }

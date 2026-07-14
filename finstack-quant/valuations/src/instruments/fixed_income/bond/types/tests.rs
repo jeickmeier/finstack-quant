@@ -44,7 +44,7 @@ fn test_bond_with_custom_cashflows() {
             step_schedule: vec![(step1_date, Decimal::new(5, 2))],
             schedule: schedule_params,
         })
-        .build_with_curves(None)
+        .build(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
     // Create bond from custom cashflows
@@ -84,7 +84,7 @@ fn test_bond_with_custom_cashflows() {
 
     // The signed schedule preserves all flows except pure PIK
     let expected_flow_count = custom_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind != crate::cashflow::primitives::CFKind::PIK)
         .count();
@@ -123,7 +123,7 @@ fn test_bond_builder_with_custom_cashflows() {
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
     // Use builder pattern (default cashflow_spec since custom_cashflows overrides)
@@ -193,7 +193,7 @@ fn test_bond_with_cashflows_method() {
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
     // Apply custom cashflows
@@ -247,7 +247,7 @@ fn test_custom_cashflows_override_regular_generation() {
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
 
     let custom_bond = regular_bond.clone().with_cashflows(custom_schedule);
@@ -364,7 +364,7 @@ fn test_bond_frn_ex_coupon_accrual_negative_in_window() {
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule retrieval should succeed in test");
     let first_coupon_date = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::FloatReset | CFKind::Stub))
         .map(|cf| cf.date)
@@ -467,7 +467,7 @@ fn test_amortizing_bond_ex_coupon_accrual_negative_in_window() {
         .full_cashflow_schedule(&ctx)
         .expect("Full schedule retrieval should succeed in test");
     let first_coupon_date = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
         .map(|cf| cf.date)
@@ -556,7 +556,7 @@ fn test_bond_frn_dated_cashflows_uses_builder() {
         .full_cashflow_schedule(&market)
         .expect("Full schedule retrieval should succeed in test");
     let has_floating = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .any(|cf| matches!(cf.kind, CFKind::FloatReset));
     assert!(
@@ -626,7 +626,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
 
     // Find initial notional (should be negative - issuer receives)
     let initial_notional = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.date == issue && matches!(cf.kind, CFKind::Notional));
     assert!(
@@ -644,7 +644,7 @@ fn test_bond_amortization_signed_schedule_preserves_all_flows() {
 
     // Find amortization flows (should be positive in full schedule)
     let amort_flows: Vec<_> = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Amortization))
         .collect();

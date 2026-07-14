@@ -287,11 +287,11 @@ fn build_envelope(
         None => None,
     };
 
-    let mut rows = Vec::with_capacity(schedule.flows.len());
+    let mut rows = Vec::with_capacity(schedule.get_flows().len());
     let mut envelope_currency = reporting_currency;
     let mut prev_sp = 1.0_f64;
 
-    for flow in &schedule.flows {
+    for flow in schedule.get_flows() {
         let ccy = flow.amount.currency();
         if envelope_currency.is_none() {
             envelope_currency = Some(ccy);
@@ -530,7 +530,7 @@ mod tests {
 
     #[test]
     fn discounting_reconciles_with_schedule_pv_for_fixed_bond() {
-        use crate::instruments::common_impl::helpers::schedule_pv_using_curve_dc_raw;
+        use crate::instruments::common_impl::helpers::schedule_pv_raw;
 
         let issue = Date::from_calendar_date(2025, Month::January, 15).expect("date");
         let maturity = Date::from_calendar_date(2030, Month::January, 15).expect("date");
@@ -564,13 +564,8 @@ mod tests {
         let envelope: InstrumentCashflowEnvelope =
             serde_json::from_str(&payload).expect("parse envelope");
 
-        // Reference PV uses `schedule_pv_using_curve_dc_raw`, which discounts via
-        // the date-based `df_between_dates(as_of, date)` helper — the same time
-        // origin used by the discounting `BondEngine` (and therefore by
-        // `base_value`). The previous reference, `schedule_pv_using_curve_dc`,
-        // routes through `core::npv`, which discounts with `df(t)` for `t`
-        // measured from `as_of`; for this seasoned bond that lands on the wrong
-        // time origin and disagrees with `base_value` by ~$3.5k on $1M notional.
+        // The raw and Money paths share the core relative-discounting kernel;
+        // the raw path is used here to avoid Money rounding in reconciliation.
         let discount_curve_id = bond
             .market_dependencies()
             .expect("deps")
@@ -580,8 +575,7 @@ mod tests {
             .cloned()
             .expect("bond should declare a discount curve");
         let reference =
-            schedule_pv_using_curve_dc_raw(&bond, &market, as_of_date, &discount_curve_id)
-                .expect("schedule pv");
+            schedule_pv_raw(&bond, &market, as_of_date, &discount_curve_id).expect("schedule pv");
 
         let diff = (envelope.total_pv - reference).abs();
         assert!(

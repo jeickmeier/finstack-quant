@@ -116,7 +116,7 @@ impl TermLoanValuator {
             .take_while(|(date, _)| *date <= origin)
             .map(|(_, amount)| amount.amount())
             .last()
-            .unwrap_or_else(|| schedule.notional.initial.amount());
+            .unwrap_or_else(|| schedule.get_notional().initial.amount());
         let outstanding_before = |target: Date| -> f64 {
             let mut last = initial_funded;
             for (d, amt) in &out_path {
@@ -163,7 +163,7 @@ impl TermLoanValuator {
             }
         };
 
-        for cf in &schedule.flows {
+        for cf in schedule.get_flows() {
             if cf.date < origin {
                 continue;
             }

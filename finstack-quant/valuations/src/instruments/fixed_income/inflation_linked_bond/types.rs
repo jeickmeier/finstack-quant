@@ -1129,7 +1129,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
                 self.notional.currency(),
             ));
         }
-        crate::instruments::common_impl::helpers::schedule_pv_using_curve_dc(
+        crate::instruments::common_impl::helpers::schedule_pv(
             self,
             curves,
             as_of,
@@ -1592,17 +1592,17 @@ mod tests {
         let schedule = bond
             .cashflow_schedule(&market, as_of)
             .expect("schedule should build");
-        assert!(schedule.flows.len() >= 3);
+        assert!(schedule.get_flows().len() >= 3);
 
         let first_coupon = schedule
-            .flows
+            .get_flows()
             .iter()
             .find(|flow| flow.kind == CFKind::InflationCoupon)
             .expect("coupon flow")
             .amount
             .amount();
         let principal = schedule
-            .flows
+            .get_flows()
             .iter()
             .find(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional)
             .expect("principal flow")
@@ -1625,17 +1625,17 @@ mod tests {
         let schedule = bond
             .cashflow_schedule(&market, as_of)
             .expect("schedule should build");
-        assert!(schedule.flows.len() >= 3);
+        assert!(schedule.get_flows().len() >= 3);
 
         let first_coupon = schedule
-            .flows
+            .get_flows()
             .iter()
             .find(|flow| flow.kind == CFKind::InflationCoupon)
             .expect("coupon flow")
             .amount
             .amount();
         let principal = schedule
-            .flows
+            .get_flows()
             .iter()
             .find(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional)
             .expect("principal flow")
@@ -1658,14 +1658,14 @@ mod tests {
 
         assert!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .any(|flow| flow.kind == CFKind::InflationCoupon),
             "expected inflation-linked coupons in full schedule"
         );
         assert!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .any(|flow| flow.date == bond.maturity && flow.kind == CFKind::Notional),
             "expected principal notional flow at maturity"

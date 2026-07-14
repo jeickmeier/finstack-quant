@@ -333,7 +333,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
         .expect("Full schedule retrieval should succeed in test");
     use finstack_quant_cashflows::primitives::CFKind;
     let mut coupon_dates: Vec<(Date, f64)> = Vec::new();
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         if matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {
             if let Some((d, total)) = coupon_dates.last_mut() {
                 if *d == cf.date {
@@ -362,7 +362,7 @@ fn test_accrued_interest_amortizing_schedule_driven() {
     let coupon_info: Vec<CouponInfo> = {
         use finstack_quant_cashflows::primitives::CFKind;
         let mut out: Vec<CouponInfo> = Vec::new();
-        for cf in &schedule.flows {
+        for cf in schedule.get_flows() {
             if !matches!(cf.kind, CFKind::Fixed | CFKind::Stub) {
                 continue;
             }
@@ -392,17 +392,17 @@ fn test_accrued_interest_amortizing_schedule_driven() {
             let total_period = match af {
                 Some(v) => v,
                 None => schedule
-                    .day_count
+                    .get_day_count()
                     .year_fraction(accrual_start, accrual_end, DayCountContext::default())
                     .unwrap(),
             };
             let dc_elapsed = schedule
-                .day_count
+                .get_day_count()
                 .year_fraction(accrual_start, as_of, DayCountContext::default())
                 .unwrap()
                 .max(0.0);
             let dc_total = schedule
-                .day_count
+                .get_day_count()
                 .year_fraction(accrual_start, accrual_end, DayCountContext::default())
                 .unwrap();
             let elapsed = if dc_total.is_finite() && dc_total > 0.0 {

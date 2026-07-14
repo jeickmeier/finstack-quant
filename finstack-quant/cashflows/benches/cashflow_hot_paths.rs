@@ -5,7 +5,7 @@
 //!
 //! - `pv_by_period`: periodized PV aggregation (plain and credit-adjusted)
 //! - `to_period_dataframe`: DataFrame export with O(n+m) cursor vs prior O(n×m)
-//! - `build_with_curves`: full schedule generation (fixed bond, floating loan)
+//! - `build`: full schedule generation (fixed bond, floating loan)
 //! - `aggregate_by_period`: nominal dated-flow aggregation
 //! - `npv`: per-instrument NPV (allocation-per-call pattern)
 //! - `merge_cashflow_schedules`: k-way schedule concatenation + sort
@@ -103,7 +103,7 @@ fn make_fixed_schedule(base: Date, years: i32, freq: Tenor) -> CashFlowSchedule 
                 adjust_accrual_dates: false,
             },
         })
-        .build_with_curves(None)
+        .build(None)
         .unwrap()
 }
 
@@ -172,11 +172,10 @@ fn make_amortizing_schedule(base: Date, n_periods: usize) -> CashFlowSchedule {
         DayCount::Act365F,
         finstack_quant_cashflows::ScheduleBuildOpts {
             notional_hint: Some(Money::new(1_000_000.0, Currency::USD)),
-            meta: Some(CashFlowMeta {
+            meta: CashFlowMeta {
                 issue_date: Some(base),
                 ..Default::default()
-            }),
-            ..Default::default()
+            },
         },
     )
 }
@@ -197,7 +196,7 @@ fn bench_pv_by_period(c: &mut Criterion) {
         let n_quarters = (years * 4) as u32 + 4;
         let periods = make_quarterly_periods(base, n_quarters);
 
-        group.throughput(Throughput::Elements(schedule.flows.len() as u64));
+        group.throughput(Throughput::Elements(schedule.get_flows().len() as u64));
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
                 black_box(&schedule)
@@ -242,7 +241,7 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
         let periods = make_quarterly_periods(base, n_quarters);
         let date_ctx = DateContext::new(base, DayCount::Act365F, DayCountContext::default());
 
-        group.throughput(Throughput::Elements(schedule.flows.len() as u64));
+        group.throughput(Throughput::Elements(schedule.get_flows().len() as u64));
 
         group.bench_with_input(BenchmarkId::new("no_recovery", label), label, |b, _| {
             b.iter(|| {
@@ -301,7 +300,7 @@ fn bench_period_dataframe(c: &mut Criterion) {
         let schedule = make_fixed_schedule(base, years, Tenor::quarterly());
         let periods = make_quarterly_periods(base, n_periods);
 
-        group.throughput(Throughput::Elements(schedule.flows.len() as u64));
+        group.throughput(Throughput::Elements(schedule.get_flows().len() as u64));
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             let options = PeriodDataFrameOptions {
                 as_of: Some(base),
@@ -344,7 +343,7 @@ fn bench_period_dataframe(c: &mut Criterion) {
 }
 
 // =============================================================================
-// Benchmark: build_with_curves (full schedule generation)
+// Benchmark: build (full schedule generation)
 // =============================================================================
 
 fn bench_build_fixed_schedule(c: &mut Criterion) {
@@ -383,7 +382,7 @@ fn bench_build_fixed_schedule(c: &mut Criterion) {
                             adjust_accrual_dates: false,
                         },
                     })
-                    .build_with_curves(None)
+                    .build(None)
                     .unwrap()
             });
         });
@@ -448,7 +447,7 @@ fn bench_npv(c: &mut Criterion) {
         let (years, label) = (5i32, "5y");
         let schedule = make_fixed_schedule(base, years, Tenor::semi_annual());
 
-        group.throughput(Throughput::Elements(schedule.flows.len() as u64));
+        group.throughput(Throughput::Elements(schedule.get_flows().len() as u64));
         group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
             b.iter(|| {
                 black_box(&schedule)
@@ -476,7 +475,7 @@ fn bench_merge_schedules(c: &mut Criterion) {
             .map(|_| make_fixed_schedule(base, 5, Tenor::semi_annual()))
             .collect();
 
-        let total_flows: u64 = schedules.iter().map(|s| s.flows.len() as u64).sum();
+        let total_flows: u64 = schedules.iter().map(|s| s.get_flows().len() as u64).sum();
         group.throughput(Throughput::Elements(total_flows));
 
         group.bench_with_input(BenchmarkId::from_parameter(k), &k, |b, _| {
@@ -486,7 +485,6 @@ fn bench_merge_schedules(c: &mut Criterion) {
                     Notional::par(black_box(1_000_000.0 * k as f64), Currency::USD),
                     DayCount::Act365F,
                 )
-                .expect("matched currencies should merge")
             });
         });
     }

@@ -460,7 +460,7 @@ impl Bond {
     /// let schedule = CashFlowSchedule::builder()
     ///     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
     ///     .fixed_cf(fixed_spec)
-    ///     .build_with_curves(None)?;
+    ///     .build(None)?;
     ///
     /// let bond = Bond::from_cashflows("PIK-001", schedule, "USD-HY", Some(95.0))?;
     /// # let _ = bond;
@@ -475,15 +475,15 @@ impl Bond {
     ) -> finstack_quant_core::Result<Self> {
         schedule.validate()?;
         // Extract parameters from the schedule
-        let notional = schedule.notional.initial;
+        let notional = schedule.get_notional().initial;
 
         // Find issue and maturity from the cashflow dates
         let dates = schedule.dates();
         if dates.len() < 2 {
             return Err(finstack_quant_core::InputError::TooFewPoints.into());
         }
-        let issue = schedule.meta.issue_date.unwrap_or(dates[0]);
-        let maturity = schedule.meta.maturity_date.unwrap_or(
+        let issue = schedule.get_meta().issue_date.unwrap_or(dates[0]);
+        let maturity = schedule.get_meta().maturity_date.unwrap_or(
             dates
                 .last()
                 .copied()
@@ -509,7 +509,7 @@ impl Bond {
         use std::collections::HashMap;
 
         let mut coupon_dates: Vec<Date> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub | CFKind::FloatReset))
             .map(|cf| cf.date)
@@ -567,7 +567,7 @@ impl Bond {
 
         // Use schedule day count and inferred frequency in the spec so that
         // YTM/YTW/duration/convexity use correct conventions for custom bonds.
-        let cashflow_spec = CashflowSpec::fixed(0.0, inferred_freq, schedule.day_count)?;
+        let cashflow_spec = CashflowSpec::fixed(0.0, inferred_freq, schedule.get_day_count())?;
 
         let pricing_overrides = if let Some(price) = quoted_clean {
             PricingOverrides::default().with_quoted_clean_price(price)
@@ -616,7 +616,7 @@ impl Bond {
     /// # let bond = Bond::example().unwrap();
     /// # let schedule = CashFlowSchedule::builder()
     /// #     .principal(Money::new(1_000_000.0, Currency::USD), Date::from_calendar_date(2024, time::Month::January, 1).unwrap(), Date::from_calendar_date(2034, time::Month::January, 1).unwrap())
-    /// #     .build_with_curves(None).unwrap();
+    /// #     .build(None).unwrap();
     /// let bond_with_custom = bond.with_cashflows(schedule);
     /// ```
     pub fn with_cashflows(mut self, schedule: CashFlowSchedule) -> Self {
@@ -757,7 +757,7 @@ impl Bond {
         }
 
         // Build the schedule with market curves for floating rate computation
-        b.build_with_curves(Some(curves))
+        b.build(Some(curves))
     }
 
     /// Create an example floating-rate note (FRN) for testing and documentation.

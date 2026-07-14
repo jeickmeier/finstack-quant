@@ -161,7 +161,7 @@ fn bench_schedule_builder_fixed(c: &mut Criterion) {
                 let _ = builder
                     .principal(black_box(init), black_box(issue), black_box(maturity))
                     .fixed_cf(black_box(fixed_spec.clone()));
-                builder.build_with_curves(None)
+                builder.build(None)
             });
         },
     );

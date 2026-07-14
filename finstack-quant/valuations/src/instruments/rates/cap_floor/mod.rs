@@ -1,4 +1,4 @@
-//! Interest rate caps and floors with Black (1976) pricing.
+//! Interest rate caps and floors with lognormal, shifted-lognormal, or normal pricing.
 //!
 //! Interest rate caps and floors are portfolios of caplets/floorlets providing
 //! protection against rising or falling interest rates. Widely used for hedging
@@ -16,10 +16,14 @@
 //!
 //! - **Collar**: Long cap + short floor (or vice versa)
 //!
-//! # Pricing Model: Black (1976)
+//! # Pricing Models
 //!
-//! Each caplet/floorlet is priced using the Black (1976) model for options
-//! on forwards:
+//! [`CapFloorVolType::Lognormal`] uses Black (1976),
+//! [`CapFloorVolType::ShiftedLognormal`] applies Black to `F + shift` and
+//! `K + shift`, and [`CapFloorVolType::Normal`] uses Bachelier. Normal pricing
+//! supports zero and negative forwards.
+//!
+//! For Black (1976), each caplet/floorlet is priced as:
 //!
 //! **Caplet (Call on forward rate):**
 //! ```text
@@ -45,6 +49,11 @@
 //! - K = strike rate (cap/floor rate)
 //! - σ = implied volatility
 //! - T = time to option expiration
+//!
+//! Compounded overnight-RFR coupons may specify lookback/observation shift,
+//! rate cutoff, and a business-day payment delay. Daily compounding uses
+//! business-day-adjusted accrual boundaries, and discounting runs to the
+//! delayed payment date rather than the contractual accrual end.
 //!
 //! # Market Conventions
 //!
@@ -84,4 +93,7 @@ pub(crate) mod pricing;
 mod types;
 
 pub use parameters::CapFloorParams;
-pub use types::{CapFloor, CapFloorVolType, RateOptionType};
+pub use types::{
+    CapFloor, CapFloorVolType, OvernightCouponConvention, OvernightSpreadCompounding,
+    RateOptionType,
+};

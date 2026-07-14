@@ -773,7 +773,7 @@ impl Swaption {
         let underlier = self.underlying_irs(1.0, PayReceive::Receive)?;
         let sched = crate::instruments::rates::irs::cashflow::fixed_leg_schedule(&underlier)?;
         let mut annuity = NeumaierAccumulator::new();
-        for flow in sched.flows {
+        for flow in sched.get_flows() {
             if flow.date <= as_of {
                 continue;
             }

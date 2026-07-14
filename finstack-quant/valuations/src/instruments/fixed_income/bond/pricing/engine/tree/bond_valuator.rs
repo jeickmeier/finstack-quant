@@ -328,7 +328,7 @@ impl BondValuator {
 
         // Collect amortization events sorted by date
         let mut amort_events: Vec<(Date, f64)> = full_schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| matches!(cf.kind, CFKind::Amortization | CFKind::Notional))
             .filter(|cf| cf.date > as_of && cf.amount.amount() > 0.0)

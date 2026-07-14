@@ -75,7 +75,7 @@ fn verify_provider_contract<T: CashflowProvider>(
         )
     });
     let flattened_schedule_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| is_cash_settlement_kind(cf.kind))
         .map(|cf| (cf.date, cf.amount))
@@ -100,7 +100,7 @@ fn verify_provider_contract<T: CashflowProvider>(
     }
 
     // Contract: All flows must be future-only (date >= as_of)
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         assert!(
             cf.date >= as_of,
             "[{}] Flow on {} is before as_of {}; public schedule must be future-only",
@@ -112,7 +112,7 @@ fn verify_provider_contract<T: CashflowProvider>(
 
     // Contract: No pure PIK flows in the public schedule
     use finstack_quant_core::cashflow::CFKind;
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         assert!(
             cf.kind != CFKind::PIK,
             "[{}] PIK flow found on {}; pure PIK accretion must be omitted from public schedule",
@@ -150,11 +150,11 @@ fn verify_public_instrument_cashflow_surface<T: PublicInstrument>(
     let flows = instrument
         .dated_cashflows(market, as_of)
         .expect("public instrument trait should expose dated_cashflows");
-    assert_eq!(schedule.meta.representation, expected_representation);
+    assert_eq!(schedule.get_meta().representation, expected_representation);
     assert_eq!(
         flows.len(),
         schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|flow| is_cash_settlement_kind(flow.kind))
             .count()
@@ -174,9 +174,9 @@ fn verify_empty_schedule_surface<T: PublicInstrument>(
         .dated_cashflows(market, as_of)
         .expect("public instrument trait should expose dated_cashflows");
 
-    assert_eq!(schedule.meta.representation, expected_representation);
+    assert_eq!(schedule.get_meta().representation, expected_representation);
     assert!(
-        schedule.flows.is_empty(),
+        schedule.get_flows().is_empty(),
         "schedule should be genuinely empty"
     );
     assert!(flows.is_empty(), "dated flow view should also be empty");
@@ -340,10 +340,13 @@ mod repo_contract {
         let schedule =
             CashflowProvider::cashflow_schedule(&repo, &minimal_market(), as_of).expect("schedule");
         assert_eq!(
-            schedule.meta.representation,
+            schedule.get_meta().representation,
             CashflowRepresentation::Contractual
         );
-        let has_negative = schedule.flows.iter().any(|cf| cf.amount.amount() < 0.0);
+        let has_negative = schedule
+            .get_flows()
+            .iter()
+            .any(|cf| cf.amount.amount() < 0.0);
         assert!(
             has_negative,
             "Repo schedule should preserve the negative initial cash outflow"

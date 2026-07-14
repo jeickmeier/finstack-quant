@@ -23,7 +23,7 @@ impl CashFlowBuilder {
     /// # Returns
     ///
     /// Mutable builder reference for fluent chaining.
-    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
+    #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn principal(&mut self, initial: Money, issue_date: Date, maturity: Date) -> &mut Self {
         self.notional = Some(Notional {
             initial,
@@ -37,7 +37,7 @@ impl CashFlowBuilder {
     /// Configures amortization for the instrument notional.
     ///
     /// This may be called before or after [`principal`](Self::principal).
-    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
+    #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn amortization(&mut self, spec: AmortizationSpec) -> &mut Self {
         self.amortization = Some(spec.clone());
         if let Some(n) = &mut self.notional {
@@ -65,11 +65,11 @@ impl CashFlowBuilder {
     ///
     /// # Errors
     ///
-    /// Records a pending error — returned by `build_with_curves(...)` — when:
+    /// Records a pending error — returned by `build(...)` — when:
     /// * `cash` is provided with a different currency than `delta`, or
     /// * `delta` violates the sign convention for `kind` (including NaN
     ///   amounts, which never satisfy either sign requirement).
-    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
+    #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn add_principal_event(
         &mut self,
         date: Date,

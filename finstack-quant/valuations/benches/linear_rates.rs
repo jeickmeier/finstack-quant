@@ -206,6 +206,8 @@ fn interest_rate_cap(id: &str, maturity: Date) -> CapFloor {
         vol_surface_id: CurveId::new("USD-CAP-VOL"),
         vol_type: Default::default(),
         vol_shift: 0.0,
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: Default::default(),
         attributes: Default::default(),
     }

@@ -188,6 +188,8 @@ pub struct DiscountCurve {
     pub(crate) min_forward_tenor: f64,
     /// Optional market quotes used to bootstrap this curve.
     pub(crate) rate_calibration: Option<DiscountCurveRateCalibration>,
+    /// Exact typed recipe used to replay calibration after quote shocks.
+    pub(crate) rate_calibration_recipe: Option<super::RateCalibrationRecipe>,
     /// Rate cut-off (business days) of the OIS compounding convention this
     /// curve was *calibrated* under, when bootstrapped with a
     /// `CompoundedWithRateCutoff` override.
@@ -237,6 +239,9 @@ struct RawDiscountCurve {
     /// Optional market quotes used to bootstrap this curve.
     #[serde(default)]
     pub rate_calibration: Option<DiscountCurveRateCalibration>,
+    /// Exact typed calibration replay recipe.
+    #[serde(default)]
+    pub rate_calibration_recipe: Option<super::RateCalibrationRecipe>,
     /// OIS cut-off (business days) the curve was calibrated under, if any.
     #[serde(default)]
     pub calibration_ois_cutoff_days: Option<i32>,
@@ -271,6 +276,7 @@ impl From<DiscountCurve> for RawDiscountCurve {
             allow_non_monotonic: curve.allow_non_monotonic,
             min_forward_tenor: curve.min_forward_tenor,
             rate_calibration: curve.rate_calibration,
+            rate_calibration_recipe: curve.rate_calibration_recipe,
             calibration_ois_cutoff_days: curve.calibration_ois_cutoff_days,
             fx_policy: curve.fx_policy,
         }
@@ -289,6 +295,7 @@ impl TryFrom<RawDiscountCurve> for DiscountCurve {
             .extrapolation(state.extrapolation)
             .min_forward_tenor(state.min_forward_tenor)
             .rate_calibration_opt(state.rate_calibration)
+            .rate_calibration_recipe_opt(state.rate_calibration_recipe)
             .calibration_ois_cutoff_days_opt(state.calibration_ois_cutoff_days)
             .fx_policy_opt(state.fx_policy)
             .validation(ValidationMode::Raw {
@@ -339,6 +346,12 @@ impl DiscountCurve {
     #[inline]
     pub fn rate_calibration(&self) -> Option<&DiscountCurveRateCalibration> {
         self.rate_calibration.as_ref()
+    }
+
+    /// Exact typed conventions and quotes used to calibrate this curve.
+    #[inline]
+    pub fn rate_calibration_recipe(&self) -> Option<&super::RateCalibrationRecipe> {
+        self.rate_calibration_recipe.as_ref()
     }
 
     /// OIS rate cut-off (business days) this curve was calibrated under, if any.
@@ -585,6 +598,18 @@ impl DiscountCurve {
     #[inline]
     pub fn min_forward_tenor(&self) -> f64 {
         self.min_forward_tenor
+    }
+
+    /// Whether validation permits increasing discount factors.
+    #[inline]
+    pub fn allows_non_monotonic(&self) -> bool {
+        self.allow_non_monotonic
+    }
+
+    /// Minimum implied forward rate accepted by validation, if configured.
+    #[inline]
+    pub fn min_forward_rate(&self) -> Option<f64> {
+        self.min_forward_rate
     }
 
     /// Batch evaluation of discount factors for multiple times.
@@ -1194,6 +1219,7 @@ impl DiscountCurve {
             allow_non_monotonic: false, // Strict validation by default
             min_forward_tenor: DEFAULT_MIN_FORWARD_TENOR, // Default ~30 seconds
             rate_calibration: None,
+            rate_calibration_recipe: None,
             calibration_ois_cutoff_days: None,
             fx_policy: None,
         }
@@ -1203,6 +1229,17 @@ impl DiscountCurve {
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> DiscountCurveBuilder {
         self.metadata_builder(new_id)
             .knots(self.knots.iter().copied().zip(self.dfs.iter().copied()))
+    }
+
+    /// Rebuild this curve with replacement knots while preserving all metadata.
+    ///
+    /// This retains interpolation, extrapolation, validation policy, calibration
+    /// provenance, minimum forward tenor, and FX policy.
+    pub fn rebuild_with_knots<I>(&self, knots: I) -> crate::Result<Self>
+    where
+        I: IntoIterator<Item = (f64, f64)>,
+    {
+        self.metadata_builder(self.id.clone()).knots(knots).build()
     }
 
     /// Builder pre-populated with this curve's full metadata but **no** knots.
@@ -1217,6 +1254,7 @@ impl DiscountCurve {
             .extrapolation(self.extrapolation)
             .min_forward_tenor(self.min_forward_tenor)
             .rate_calibration_opt(self.rate_calibration.clone())
+            .rate_calibration_recipe_opt(self.rate_calibration_recipe.clone())
             .calibration_ois_cutoff_days_opt(self.calibration_ois_cutoff_days)
             .fx_policy_opt(self.fx_policy.clone())
             .apply_non_monotonic_settings(self.allow_non_monotonic, self.min_forward_rate)
@@ -1412,6 +1450,7 @@ pub struct DiscountCurveBuilder {
     pub(crate) allow_non_monotonic: bool,
     pub(crate) min_forward_tenor: f64,
     pub(crate) rate_calibration: Option<DiscountCurveRateCalibration>,
+    pub(crate) rate_calibration_recipe: Option<super::RateCalibrationRecipe>,
     pub(crate) calibration_ois_cutoff_days: Option<i32>,
     pub(crate) fx_policy: Option<String>,
 }
@@ -1517,6 +1556,21 @@ impl DiscountCurveBuilder {
         calibration: Option<DiscountCurveRateCalibration>,
     ) -> Self {
         self.rate_calibration = calibration;
+        self
+    }
+
+    /// Attach an exact typed calibration replay recipe.
+    pub fn rate_calibration_recipe(mut self, recipe: super::RateCalibrationRecipe) -> Self {
+        self.rate_calibration_recipe = Some(recipe);
+        self
+    }
+
+    /// Optionally attach an exact typed calibration replay recipe.
+    pub fn rate_calibration_recipe_opt(
+        mut self,
+        recipe: Option<super::RateCalibrationRecipe>,
+    ) -> Self {
+        self.rate_calibration_recipe = recipe;
         self
     }
 
@@ -1645,6 +1699,7 @@ impl DiscountCurveBuilder {
             allow_non_monotonic: self.allow_non_monotonic,
             min_forward_tenor: self.min_forward_tenor,
             rate_calibration: self.rate_calibration,
+            rate_calibration_recipe: self.rate_calibration_recipe,
             calibration_ois_cutoff_days: self.calibration_ois_cutoff_days,
             fx_policy: self.fx_policy,
         })
@@ -1696,4 +1751,67 @@ fn validate_forward_rates(knots: &[f64], dfs: &[f64], min_rate: f64) -> crate::R
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_rate_calibration_metadata_defaults_recipe_safely() {
+        let legacy = serde_json::json!({
+            "id": "USD-OIS",
+            "base": "2025-01-02",
+            "day_count": "Act365F",
+            "knot_points": [[0.0, 1.0], [5.0, 0.8]],
+            "interp_style": "linear",
+            "extrapolation": "flat_forward",
+            "rate_calibration": {
+                "index_id": "USD-SOFR-OIS",
+                "currency": "USD",
+                "quotes": [{
+                    "quote_type": "swap",
+                    "tenor": "5Y",
+                    "rate": 0.04
+                }]
+            }
+        });
+
+        let curve: DiscountCurve = serde_json::from_value(legacy).expect("legacy serialized curve");
+        let serialized = serde_json::to_value(curve).expect("serialize legacy curve");
+        let restored: DiscountCurve =
+            serde_json::from_value(serialized.clone()).expect("round-trip legacy curve");
+
+        assert!(
+            serialized["rate_calibration_recipe"].is_null(),
+            "legacy metadata must default to no replay recipe"
+        );
+        assert!(restored.rate_calibration().is_some());
+        assert!(restored.rate_calibration_recipe().is_none());
+    }
+
+    #[test]
+    fn rebuild_with_knots_retains_permissive_validation_policy() {
+        let base =
+            Date::from_calendar_date(2025, time::Month::January, 2).expect("valid base date");
+        let source = DiscountCurve::builder("USD-NEGATIVE")
+            .base_date(base)
+            .knots([(0.0, 1.0), (1.0, 1.01), (2.0, 0.99)])
+            .min_forward_tenor(0.000_123)
+            .validation(ValidationMode::Raw {
+                allow_non_monotonic: true,
+                forward_floor: Some(-0.02),
+            })
+            .build()
+            .expect("permissive source curve");
+
+        let rebuilt = source
+            .rebuild_with_knots([(0.0, 1.0), (1.0, 1.011), (2.0, 0.991)])
+            .expect("metadata-preserving rebuild");
+        let serialized = serde_json::to_value(rebuilt).expect("serialize rebuilt curve");
+
+        assert_eq!(serialized["allow_non_monotonic"], true);
+        assert_eq!(serialized["min_forward_rate"], -0.02);
+        assert_eq!(serialized["min_forward_tenor"], 0.000_123);
+    }
 }

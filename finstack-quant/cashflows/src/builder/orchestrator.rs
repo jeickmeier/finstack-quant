@@ -386,7 +386,7 @@ impl CashFlowBuilder {
     /// Without curves, the fallback policy on each floating spec controls behavior
     /// (default: error; `SpreadOnly` uses just margin; `FixedRate(r)` uses a fixed index).
     ///
-    pub fn build_with_curves(
+    pub fn build(
         &self,
         curves: Option<&finstack_quant_core::market_data::context::MarketContext>,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {

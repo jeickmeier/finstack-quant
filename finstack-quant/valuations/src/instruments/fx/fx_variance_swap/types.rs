@@ -403,8 +403,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: self.notional(),
-                representation: crate::cashflow::builder::CashflowRepresentation::Placeholder,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Placeholder,
+                    ..Default::default()
+                },
             },
         ))
     }

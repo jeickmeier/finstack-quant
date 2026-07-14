@@ -19,7 +19,10 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, DiscountCurveRateCalibration, DiscountCurveRateQuote, DiscountCurveRateQuoteType,
+    DiscountCurve, DiscountCurveRateCalibration, DiscountCurveRateQuote,
+    DiscountCurveRateQuoteType, RateCalibrationCurveRole, RateCalibrationFutureContractId,
+    RateCalibrationMethod, RateCalibrationOisCompounding, RateCalibrationPillar,
+    RateCalibrationQuote, RateCalibrationRecipe,
 };
 use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use finstack_quant_core::types::CurveId;
@@ -386,9 +389,6 @@ Global solve requires strictly increasing times.",
                 finstack_quant_core::InputError::TooFewPoints,
             ));
         }
-        let rate_calibration_sidecar =
-            Self::build_rate_calibration_from_quotes(&raw_rates_quotes, params.currency);
-
         // Curve time axis day count:
         //
         // In the prior calibration engine (master-era `calibration/adapters/discount.rs`),
@@ -412,6 +412,10 @@ Global solve requires strictly increasing times.",
             .pricing_forward_id
             .as_ref()
             .unwrap_or(&params.curve_id);
+        let rate_calibration_sidecar =
+            Self::build_rate_calibration_from_quotes(&raw_rates_quotes, params.currency);
+        let rate_calibration_recipe =
+            Self::rate_calibration_recipe(params, curve_dc, forward_id.clone(), &raw_rates_quotes);
 
         // Notional 1_000_000 keeps coupon-money construction off floating-point
         // rounding edges. The OIS-compounding override is threaded through so
@@ -538,12 +542,14 @@ Global solve requires strictly increasing times.",
 
         // Attach the rate_calibration sidecar (computed from rates_quotes before they were
         // consumed by the prepare loop above).
-        let curve = if let Some(cal) = rate_calibration_sidecar {
-            let id = curve.id().to_string();
-            curve.to_builder_with_id(id).rate_calibration(cal).build()?
-        } else {
-            curve
-        };
+        let id = curve.id().to_string();
+        let mut builder = curve
+            .to_builder_with_id(id)
+            .rate_calibration_recipe(rate_calibration_recipe);
+        if let Some(calibration) = rate_calibration_sidecar {
+            builder = builder.rate_calibration(calibration);
+        }
+        let curve = builder.build()?;
 
         let new_context = context.clone().insert(curve);
 
@@ -583,12 +589,9 @@ Global solve requires strictly increasing times.",
 
     /// Build a [`DiscountCurveRateCalibration`] from the solved rate quotes.
     ///
-    /// This preserves the input benchmark quotes on the bootstrapped curve so
-    /// that downstream quote-bump sensitivities (e.g. CDS option IR DV01) can
-    /// re-shock and re-bootstrap instead of applying direct DF bumps.
-    ///
-    /// Returns `None` if the quote list contains no deposit or swap quotes
-    /// (futures-only or empty inputs do not produce a meaningful calibration record).
+    /// This legacy compatibility sidecar is stamped only when every quote can
+    /// be represented without loss: tenor deposits and zero-spread tenor swaps.
+    /// Exact replay always uses the curve's typed [`RateCalibrationRecipe`].
     fn build_rate_calibration_from_quotes(
         quotes: &[RateQuote],
         currency: Currency,
@@ -601,34 +604,157 @@ Global solve requires strictly increasing times.",
             _ => None,
         })?;
 
-        let calibration_quotes: Vec<DiscountCurveRateQuote> = quotes
+        let calibration_quotes: Option<Vec<DiscountCurveRateQuote>> = quotes
             .iter()
-            .filter_map(|q| match q {
-                RateQuote::Deposit { pillar, rate, .. } => Some(DiscountCurveRateQuote {
+            .map(|q| match q {
+                RateQuote::Deposit {
+                    pillar: crate::market::quotes::ids::Pillar::Tenor(tenor),
+                    rate,
+                    ..
+                } => Some(DiscountCurveRateQuote {
                     quote_type: DiscountCurveRateQuoteType::Deposit,
-                    tenor: pillar.to_string(),
+                    tenor: tenor.to_string(),
                     rate: *rate,
                 }),
-                RateQuote::Swap { pillar, rate, .. } => Some(DiscountCurveRateQuote {
+                RateQuote::Swap {
+                    pillar: crate::market::quotes::ids::Pillar::Tenor(tenor),
+                    rate,
+                    spread_decimal: None,
+                    ..
+                } => Some(DiscountCurveRateQuote {
                     quote_type: DiscountCurveRateQuoteType::Swap,
-                    tenor: pillar.to_string(),
+                    tenor: tenor.to_string(),
                     rate: *rate,
                 }),
-                // Futures and FRAs are not re-bumpable via the simple quote-bump
-                // mechanism; skip them to keep the calibration record clean.
                 _ => None,
             })
             .collect();
-
-        if calibration_quotes.is_empty() {
-            return None;
-        }
+        let calibration_quotes = calibration_quotes?;
 
         Some(DiscountCurveRateCalibration {
             index_id,
             currency,
             quotes: calibration_quotes,
         })
+    }
+
+    fn rate_calibration_recipe(
+        params: &DiscountCurveParams,
+        curve_day_count: DayCount,
+        projection_curve_id: CurveId,
+        quotes: &[RateQuote],
+    ) -> RateCalibrationRecipe {
+        RateCalibrationRecipe {
+            currency: Some(params.currency),
+            method: match &params.method {
+                CalibrationMethod::Bootstrap => RateCalibrationMethod::Bootstrap,
+                CalibrationMethod::GlobalSolve {
+                    use_analytical_jacobian,
+                } => RateCalibrationMethod::GlobalSolve {
+                    use_analytical_jacobian: *use_analytical_jacobian,
+                },
+            },
+            curve_day_count,
+            ois_compounding: params
+                .conventions
+                .ois_compounding
+                .as_ref()
+                .map(Self::rate_calibration_ois_compounding),
+            role: RateCalibrationCurveRole::Discount {
+                projection_curve_id,
+            },
+            quotes: quotes.iter().map(Self::rate_calibration_quote).collect(),
+        }
+    }
+
+    fn rate_calibration_quote(quote: &RateQuote) -> RateCalibrationQuote {
+        match quote {
+            RateQuote::Deposit {
+                index,
+                pillar,
+                rate,
+                ..
+            } => RateCalibrationQuote::Deposit {
+                index_id: index.clone(),
+                pillar: Self::rate_calibration_pillar(pillar),
+                rate: *rate,
+            },
+            RateQuote::Fra {
+                index,
+                start,
+                end,
+                rate,
+                ..
+            } => RateCalibrationQuote::Fra {
+                index_id: index.clone(),
+                start: Self::rate_calibration_pillar(start),
+                end: Self::rate_calibration_pillar(end),
+                rate: *rate,
+            },
+            RateQuote::Futures {
+                contract,
+                expiry,
+                price,
+                convexity_adjustment,
+                vol_surface_id,
+                ..
+            } => RateCalibrationQuote::Futures {
+                contract: RateCalibrationFutureContractId::new(contract.as_str()),
+                expiry: *expiry,
+                price: *price,
+                convexity_adjustment: *convexity_adjustment,
+                vol_surface_id: vol_surface_id.clone(),
+            },
+            RateQuote::Swap {
+                index,
+                pillar,
+                rate,
+                spread_decimal,
+                ..
+            } => RateCalibrationQuote::Swap {
+                index_id: index.clone(),
+                pillar: Self::rate_calibration_pillar(pillar),
+                rate: *rate,
+                spread_decimal: *spread_decimal,
+            },
+        }
+    }
+
+    fn rate_calibration_pillar(
+        pillar: &crate::market::quotes::ids::Pillar,
+    ) -> RateCalibrationPillar {
+        match pillar {
+            crate::market::quotes::ids::Pillar::Tenor(tenor) => {
+                RateCalibrationPillar::Tenor(*tenor)
+            }
+            crate::market::quotes::ids::Pillar::Date(date) => RateCalibrationPillar::Date(*date),
+        }
+    }
+
+    fn rate_calibration_ois_compounding(
+        compounding: &crate::instruments::rates::irs::FloatingLegCompounding,
+    ) -> RateCalibrationOisCompounding {
+        use crate::instruments::rates::irs::FloatingLegCompounding;
+        match compounding {
+            FloatingLegCompounding::Simple => RateCalibrationOisCompounding::Simple,
+            FloatingLegCompounding::CompoundedInArrears {
+                lookback_days,
+                observation_shift,
+            } => RateCalibrationOisCompounding::CompoundedInArrears {
+                lookback_days: *lookback_days,
+                observation_shift: *observation_shift,
+            },
+            FloatingLegCompounding::CompoundedWithObservationShift { shift_days } => {
+                RateCalibrationOisCompounding::CompoundedWithObservationShift {
+                    shift_days: *shift_days,
+                }
+            }
+            FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days } => {
+                RateCalibrationOisCompounding::CompoundedWithRateCutoff {
+                    cutoff_days: *cutoff_days,
+                }
+            }
+        }
     }
 
     /// Extract the OIS rate cut-off (business days) from the step-level
@@ -1578,6 +1704,85 @@ mod tests {
         assert!(
             (guess_no_adj - guess_zero).abs() < 1e-15,
             "None adjustment should behave identically to 0.0"
+        );
+    }
+
+    #[test]
+    fn replay_recipe_preserves_supported_mixed_quote_shapes_losslessly() {
+        let date = Date::from_calendar_date(2025, Month::September, 17).expect("valid date");
+        let index = finstack_quant_core::types::IndexId::new("USD-SOFR-OIS");
+        let quotes = vec![
+            RateQuote::Deposit {
+                id: crate::market::quotes::ids::QuoteId::new("DEP"),
+                index: index.clone(),
+                pillar: crate::market::quotes::ids::Pillar::Date(date),
+                rate: 0.043,
+            },
+            RateQuote::Fra {
+                id: crate::market::quotes::ids::QuoteId::new("FRA"),
+                index: index.clone(),
+                start: crate::market::quotes::ids::Pillar::Tenor(
+                    "3M".parse().expect("valid tenor"),
+                ),
+                end: crate::market::quotes::ids::Pillar::Date(date),
+                rate: 0.041,
+            },
+            RateQuote::Futures {
+                id: crate::market::quotes::ids::QuoteId::new("FUT"),
+                contract: crate::market::conventions::ids::IrFutureContractId::new("CME:SR3"),
+                expiry: date,
+                price: 95.75,
+                convexity_adjustment: Some(0.0001),
+                vol_surface_id: Some(CurveId::new("USD-SR3-VOL")),
+            },
+            RateQuote::Swap {
+                id: crate::market::quotes::ids::QuoteId::new("SWAP"),
+                index,
+                pillar: crate::market::quotes::ids::Pillar::Tenor(
+                    "5Y".parse().expect("valid tenor"),
+                ),
+                rate: 0.039,
+                spread_decimal: Some(0.00025),
+            },
+        ];
+        let replay_quotes: Vec<_> = quotes
+            .iter()
+            .map(DiscountCurveTarget::rate_calibration_quote)
+            .collect();
+
+        assert!(matches!(
+            &replay_quotes[0],
+            RateCalibrationQuote::Deposit {
+                pillar: RateCalibrationPillar::Date(value),
+                ..
+            } if *value == date
+        ));
+        assert!(matches!(
+            &replay_quotes[1],
+            RateCalibrationQuote::Fra {
+                start: RateCalibrationPillar::Tenor(_),
+                end: RateCalibrationPillar::Date(value),
+                ..
+            } if *value == date
+        ));
+        assert!(matches!(
+            &replay_quotes[2],
+            RateCalibrationQuote::Futures {
+                convexity_adjustment: Some(value),
+                ..
+            } if (*value - 0.0001).abs() < f64::EPSILON
+        ));
+        assert!(matches!(
+            &replay_quotes[3],
+            RateCalibrationQuote::Swap {
+                spread_decimal: Some(value),
+                ..
+            } if (*value - 0.00025).abs() < f64::EPSILON
+        ));
+        assert!(
+            DiscountCurveTarget::build_rate_calibration_from_quotes(&quotes, Currency::USD)
+                .is_none(),
+            "legacy sidecar must be omitted rather than silently dropping mixed quote fields"
         );
     }
 }

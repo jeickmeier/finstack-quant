@@ -1,10 +1,13 @@
 //! Interest rate option instrument types and Black model greeks.
 
 use crate::instruments::common_impl::traits::Attributes;
+use crate::instruments::rates::irs::FloatingLegCompounding;
 use crate::instruments::{ExerciseStyle, SettlementType};
 use crate::market::conventions::defs::RateIndexKind;
 use crate::market::conventions::ConventionRegistry;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
+};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -165,7 +168,66 @@ impl std::str::FromStr for RateOptionType {
     }
 }
 
-/// Interest rate option instrument
+/// Whether a contractual spread is included in overnight daily compounding.
+///
+/// ISDA-standard RFR coupons normally compound only the overnight index and add
+/// any spread as simple interest after compounding. `Include` represents the
+/// less common contract where the spread enters every daily compound factor.
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    serde::Serialize,
+    serde::Deserialize,
+    schemars::JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum OvernightSpreadCompounding {
+    /// Add the spread after compounding the overnight index.
+    #[default]
+    Exclude,
+    /// Include the spread in every daily overnight compound factor.
+    Include,
+}
+
+/// Contractual terms for an option on a compounded overnight RFR coupon.
+///
+/// The shared [`FloatingLegCompounding`] type is reused so lookback,
+/// observation-shift, and rate-cutoff semantics cannot drift from IRS pricing.
+/// Payment and fixing calendars are separate because operational payment
+/// delays need not use the index publication calendar.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct OvernightCouponConvention {
+    /// Daily overnight compounding convention.
+    pub compounding: FloatingLegCompounding,
+    /// Payment delay in business days after the accrual end date.
+    #[serde(default)]
+    #[schemars(range(min = 0, max = 31))]
+    pub payment_delay_days: i32,
+    /// Calendar used for overnight observations and fixings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixing_calendar_id: Option<CalendarId>,
+    /// Calendar used to apply the payment delay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub payment_calendar_id: Option<CalendarId>,
+    /// Whether any contractual spread is compounded or added afterward.
+    #[serde(default)]
+    pub spread_compounding: OvernightSpreadCompounding,
+}
+
+/// Interest rate option instrument.
+///
+/// # Pre-1.0 API evolution
+///
+/// Compounded-RFR contractual terms and contractual spread are typed public
+/// fields. Adding them is intentionally source-breaking for downstream exhaustive
+/// struct literals; canonical constructors and the generated builder retain
+/// backward-compatible defaults. Prefer those construction APIs for forward
+/// compatibility.
 #[derive(
     Clone,
     Debug,
@@ -184,6 +246,14 @@ pub struct CapFloor {
     pub notional: Money,
     /// Strike (as decimal, e.g., 0.05 for 5%)
     pub strike: Decimal,
+    /// Contractual spread added to the referenced rate, in decimal rate units.
+    ///
+    /// Term-index coupons add this spread after projecting the index. For
+    /// overnight coupons, [`OvernightSpreadCompounding`] determines whether it
+    /// is added after compounding or included in every daily factor.
+    #[serde(default, skip_serializing_if = "Decimal::is_zero")]
+    #[builder(default)]
+    pub spread: Decimal,
     /// Start date of underlying period
     #[schemars(with = "String")]
     pub start_date: Date,
@@ -241,6 +311,14 @@ pub struct CapFloor {
     #[serde(default)]
     #[builder(default = 0.0_f64)]
     pub vol_shift: f64,
+    /// Optional compounded-overnight coupon terms.
+    ///
+    /// `None` preserves the legacy term-index/simple-forward caplet contract.
+    /// Set this explicitly for caps on compounded SOFR, SONIA, €STR, or another
+    /// overnight RFR coupon.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[builder(default)]
+    pub overnight_coupon: Option<OvernightCouponConvention>,
     /// Additional attributes
     #[serde(default)]
     #[builder(default)]
@@ -285,6 +363,12 @@ impl CapFloor {
             .ok_or(finstack_quant_core::InputError::ConversionOverflow.into())
     }
 
+    pub(crate) fn spread_f64(&self) -> finstack_quant_core::Result<f64> {
+        self.spread
+            .to_f64()
+            .ok_or(finstack_quant_core::InputError::ConversionOverflow.into())
+    }
+
     fn from_params(
         id: impl Into<InstrumentId>,
         option_params: &CapFloorParams,
@@ -299,6 +383,7 @@ impl CapFloor {
             rate_option_type: option_params.rate_option_type,
             notional: option_params.notional,
             strike: option_params.strike,
+            spread: Decimal::ZERO,
             start_date,
             maturity,
             frequency: option_params.frequency,
@@ -313,6 +398,7 @@ impl CapFloor {
             vol_surface_id: vol_surface_id.into(),
             vol_type: CapFloorVolType::default(),
             vol_shift: 0.0,
+            overnight_coupon: None,
             pricing_overrides: crate::instruments::PricingOverrides::default(),
             attributes: Attributes::new(),
         }
@@ -449,6 +535,10 @@ impl CapFloor {
     pub(crate) fn pricing_periods(
         &self,
     ) -> finstack_quant_core::Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
+        let overnight_payment_delay = self
+            .overnight_coupon
+            .as_ref()
+            .map(|terms| terms.payment_delay_days);
         let params = crate::cashflow::builder::periods::BuildPeriodsParams {
             start: self.start_date,
             end: self.maturity,
@@ -461,21 +551,68 @@ impl CapFloor {
                 .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
             end_of_month: false,
             day_count: self.day_count,
-            payment_lag_days: self.resolved_payment_lag_days(),
+            payment_lag_days: if overnight_payment_delay.is_some() {
+                0
+            } else {
+                self.resolved_payment_lag_days()
+            },
             reset_lag_days: self.resolved_reset_lag_days(),
             adjust_accrual_dates: false,
         };
 
-        if matches!(
+        let mut periods = if matches!(
             self.rate_option_type,
             RateOptionType::Caplet | RateOptionType::Floorlet
         ) {
-            Ok(vec![
-                crate::cashflow::builder::periods::build_single_period(params)?,
-            ])
+            vec![crate::cashflow::builder::periods::build_single_period(
+                params,
+            )?]
         } else {
-            crate::cashflow::builder::periods::build_periods(params)
+            crate::cashflow::builder::periods::build_periods(params)?
+        };
+        if let Some(terms) = &self.overnight_coupon {
+            let fixing_calendar_id = terms
+                .fixing_calendar_id
+                .as_deref()
+                .or(self.calendar_id.as_deref());
+            let fixing_calendar =
+                crate::instruments::common_impl::pricing::overnight::resolve_overnight_fixing_calendar(
+                    fixing_calendar_id,
+                    self.notional.currency(),
+                    &format!("CapFloor '{}'", self.id),
+                )?;
+            let payment_calendar_id = terms
+                .payment_calendar_id
+                .as_deref()
+                .or(self.calendar_id.as_deref())
+                .or(terms.fixing_calendar_id.as_deref());
+            for period in &mut periods {
+                (period.accrual_start, period.accrual_end) =
+                    crate::instruments::common_impl::pricing::overnight::adjust_overnight_accrual_boundaries(
+                        period.accrual_start,
+                        period.accrual_end,
+                        self.bdc,
+                        fixing_calendar,
+                    )?;
+                period.accrual_year_fraction = self.day_count.year_fraction(
+                    period.accrual_start,
+                    period.accrual_end,
+                    DayCountContext {
+                        calendar: Some(fixing_calendar),
+                        frequency: Some(self.frequency),
+                        bus_basis: None,
+                        ..DayCountContext::default()
+                    },
+                )?;
+                period.payment_date =
+                    crate::instruments::common_impl::pricing::swap_legs::add_payment_delay(
+                        period.accrual_end,
+                        terms.payment_delay_days,
+                        payment_calendar_id,
+                    )?;
+            }
         }
+        Ok(periods)
     }
 
     /// Set the volatility type convention.
@@ -527,6 +664,9 @@ impl CapFloor {
     }
 
     pub(crate) fn resolved_payment_lag_days(&self) -> i32 {
+        if let Some(terms) = &self.overnight_coupon {
+            return terms.payment_delay_days;
+        }
         let Ok(registry) = ConventionRegistry::try_global() else {
             return 0;
         };
@@ -546,28 +686,6 @@ impl CapFloor {
             .require_rate_index(&idx)
             .map(|conv| conv.default_reset_lag_days)
             .ok()
-    }
-
-    pub(crate) fn uses_overnight_rfr_index(&self) -> bool {
-        let Ok(registry) = ConventionRegistry::try_global() else {
-            return false;
-        };
-        let idx = IndexId::new(self.forward_curve_id.as_str());
-        registry
-            .require_rate_index(&idx)
-            .map(|conv| conv.kind == RateIndexKind::OvernightRfr)
-            .unwrap_or(false)
-    }
-
-    pub(crate) fn option_fixing_date(
-        &self,
-        period: &crate::cashflow::builder::periods::SchedulePeriod,
-    ) -> Date {
-        if self.uses_overnight_rfr_index() {
-            period.accrual_end
-        } else {
-            period.reset_date.unwrap_or(period.accrual_start)
-        }
     }
 
     pub(crate) fn resolved_vol_shift(&self) -> f64 {
@@ -617,6 +735,74 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
                 "CapFloor '{}' vol_shift must be finite and non-negative, got {}",
                 self.id, self.vol_shift
             )));
+        }
+        if let Some(overnight) = &self.overnight_coupon {
+            let idx = IndexId::new(self.forward_curve_id.as_str());
+            let convention = ConventionRegistry::try_global()
+                .and_then(|registry| registry.require_rate_index(&idx))
+                .map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "CapFloor '{}' carries overnight coupon settings, but forward index '{}' \
+                         is not a registered overnight RFR index",
+                        self.id, self.forward_curve_id
+                    ))
+                })?;
+            if convention.kind != RateIndexKind::OvernightRfr {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CapFloor '{}' carries overnight coupon settings for term index '{}'; \
+                     overnight settings require an OvernightRfr index",
+                    self.id, self.forward_curve_id
+                )));
+            }
+            if overnight.payment_delay_days < 0 || overnight.payment_delay_days > 31 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CapFloor '{}' overnight payment delay must be between 0 and 31 business \
+                     days, got {}",
+                    self.id, overnight.payment_delay_days
+                )));
+            }
+            match overnight.compounding {
+                FloatingLegCompounding::Simple => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CapFloor '{}' overnight coupon convention cannot use simple compounding",
+                        self.id
+                    )));
+                }
+                FloatingLegCompounding::CompoundedInArrears {
+                    lookback_days,
+                    observation_shift,
+                } => {
+                    let shift = observation_shift.unwrap_or(0);
+                    if !(0..=31).contains(&lookback_days)
+                        || !(0..=31).contains(&shift)
+                        || (lookback_days != 0 && shift != 0)
+                    {
+                        return Err(finstack_quant_core::Error::Validation(format!(
+                            "CapFloor '{}' has incompatible overnight lookback/observation-shift \
+                             settings",
+                            self.id
+                        )));
+                    }
+                }
+                FloatingLegCompounding::CompoundedWithObservationShift { shift_days }
+                    if !(0..=31).contains(&shift_days) =>
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CapFloor '{}' overnight observation shift must be between 0 and 31 \
+                         business days",
+                        self.id
+                    )));
+                }
+                FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days }
+                    if !(0..=31).contains(&cutoff_days) =>
+                {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "CapFloor '{}' overnight rate cutoff must be between 0 and 31 business days",
+                        self.id
+                    )));
+                }
+                _ => {}
+            }
         }
         if !matches!(self.exercise_style, ExerciseStyle::European) {
             return Err(finstack_quant_core::Error::Validation(format!(

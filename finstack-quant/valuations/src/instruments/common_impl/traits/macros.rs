@@ -88,9 +88,11 @@ macro_rules! impl_empty_cashflow_provider {
                         $day_count,
                         $crate::__private::finstack_quant_cashflows::traits::ScheduleBuildOpts {
                             notional_hint: self.notional(),
-                            representation: $representation,
-                            ..Default::default()
-                        },
+                            meta: $crate::__private::finstack_quant_cashflows::builder::CashFlowMeta {
+                                representation: $representation,
+                                ..Default::default()
+                },
+            },
                     ),
                 )
             }

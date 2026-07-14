@@ -774,11 +774,11 @@ pub(crate) fn outstanding_principal_at_date(
 ) -> f64 {
     use crate::cashflow::primitives::CFKind;
 
-    let initial = schedule.notional.initial.amount();
+    let initial = schedule.get_notional().initial.amount();
     let mut outstanding = initial;
 
     // Sum all amortization and principal payments up to (and including) target_date
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         if cf.date > target_date {
             break;
         }

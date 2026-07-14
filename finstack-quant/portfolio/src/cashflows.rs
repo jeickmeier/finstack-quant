@@ -287,7 +287,7 @@ pub fn aggregate_full_cashflows(
         match instrument_cashflow_schedule(position.instrument.as_ref(), market, portfolio.as_of) {
             Ok(schedule) => {
                 let scaled_flows: Vec<_> = schedule
-                    .flows
+                    .get_flows()
                     .iter()
                     .map(|flow| (*flow, position.scale_value(flow.amount)))
                     .collect();
@@ -332,9 +332,9 @@ pub fn aggregate_full_cashflows(
     for result in per_position {
         match result.schedule {
             Ok(schedule) => {
-                let event_count = schedule.flows.len();
-                let representation = schedule.meta.representation;
-                let mut position_events = Vec::with_capacity(schedule.flows.len());
+                let event_count = schedule.get_flows().len();
+                let representation = schedule.get_meta().representation;
+                let mut position_events = Vec::with_capacity(event_count);
                 for (flow, scaled_amount) in result.scaled_flows {
                     let event = PortfolioCashflowEvent {
                         position_id: result.position_id.clone(),

@@ -148,7 +148,7 @@ fn test_mid_period_draw_accrual() {
 
     // Find interest cashflow at period end (Apr-1)
     let interest_flow = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| {
             cf.date == end && matches!(cf.kind, finstack_quant_core::cashflow::CFKind::Fixed)
@@ -339,7 +339,7 @@ fn test_reset_frequency_mismatch() {
 
     // Should have interest flow at quarter end
     let interest_flow = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| {
             cf.date == end && matches!(cf.kind, finstack_quant_core::cashflow::CFKind::FloatReset)
@@ -434,14 +434,14 @@ fn test_utilization_tier() {
             .unwrap();
 
     let fee_low: f64 = schedule_low
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, finstack_quant_core::cashflow::CFKind::UsageFee))
         .map(|cf| cf.amount.amount())
         .sum();
 
     let fee_high: f64 = schedule_high
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, finstack_quant_core::cashflow::CFKind::UsageFee))
         .map(|cf| cf.amount.amount())
@@ -493,7 +493,7 @@ fn test_as_of_filtering() {
         _generate_deterministic_cashflows_with_curves_replaced(&facility, &market, q1_end).unwrap();
 
     let non_principal_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| {
             matches!(

@@ -217,11 +217,15 @@
                 "lookback_days": {
                   "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
                   "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
                   "type": "integer"
                 },
                 "observation_shift": {
                   "description": "Optional ISDA 2021 observation shift (in business days), as an\n**alternative** to a lookback.\n\nWhen set (non-zero), observation dates are shifted *backward* by\nthis many business days and the day-count-fraction weights are\nshifted with them — identical semantics to\n[`FloatingLegCompounding::CompoundedWithObservationShift`].\n\nCombining a non-zero `lookback_days` with a non-zero\n`observation_shift` is **rejected** at pricing time on every\npricing path: the two conventions are mutually exclusive, and the\nprevious behavior (the shift silently cancelling the lookback on\none path while erroring on the other) was a defect.",
                   "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
                   "type": [
                     "integer",
                     "null"
@@ -248,6 +252,8 @@
                 "shift_days": {
                   "description": "Number of business days to shift both observation dates and DCF weights.",
                   "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
                   "type": "integer"
                 }
               },
@@ -271,6 +277,8 @@
                 "cutoff_days": {
                   "description": "Number of business days before period end to freeze the overnight rate.",
                   "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
                   "type": "integer"
                 }
               },

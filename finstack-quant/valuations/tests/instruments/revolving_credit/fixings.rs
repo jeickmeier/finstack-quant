@@ -138,7 +138,7 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     let schedule_with = engine_with.generate_deterministic().unwrap();
 
     assert!(
-        !schedule_with.schedule.flows.is_empty(),
+        !schedule_with.schedule.get_flows().is_empty(),
         "Should generate cashflows with fixings"
     );
 
@@ -146,7 +146,7 @@ fn test_seasoned_facility_uses_fixings_for_past_resets() {
     // With fixings, past periods should use higher rates (5.3%, 5.1%) vs forward (4%).
     let float_flows_with: Vec<_> = schedule_with
         .schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
         .collect();
@@ -270,7 +270,7 @@ fn test_fixings_respect_floor() {
 
     let float_flows: Vec<_> = schedule
         .schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
         .collect();
@@ -333,7 +333,7 @@ fn test_non_seasoned_facility_ignores_fixings() {
     // Both should produce identical cashflows.
     let total_with: f64 = schedule_with
         .schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
         .map(|cf| cf.amount.amount())
@@ -341,7 +341,7 @@ fn test_non_seasoned_facility_ignores_fixings() {
 
     let total_without: f64 = schedule_without
         .schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
         .map(|cf| cf.amount.amount())
@@ -383,7 +383,7 @@ fn valuation_date_reset_uses_contractual_t_minus_two_fixing() {
         .unwrap();
     let first_rate = schedule
         .schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
         .and_then(|flow| flow.rate)
@@ -462,7 +462,7 @@ fn stochastic_cashflow_engine_uses_current_period_contractual_fixing() {
             .generate_stochastic_path(path)
             .expect("stochastic cashflows")
             .schedule
-            .flows
+            .get_flows()
             .iter()
             .find(|flow| flow.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
             .and_then(|flow| flow.rate)

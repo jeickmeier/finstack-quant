@@ -1128,16 +1128,14 @@ impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
         let mut schedule = self.build_premium_leg_schedule()?;
 
         if let Some((dt, amount)) = self.upfront {
-            schedule
-                .flows
-                .push(finstack_quant_core::cashflow::CashFlow::new(
-                    dt,
-                    None,
-                    amount,
-                    finstack_quant_core::cashflow::CFKind::Fee,
-                    0.0,
-                    None,
-                ));
+            schedule.push_flow(finstack_quant_core::cashflow::CashFlow::new(
+                dt,
+                None,
+                amount,
+                finstack_quant_core::cashflow::CFKind::Fee,
+                0.0,
+                None,
+            ));
         }
 
         // Apply holder-view sign: protection buyer (Pay) pays premium,
@@ -1146,9 +1144,9 @@ impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
             PayReceive::Pay => -1.0,
             PayReceive::Receive => 1.0,
         };
-        for cf in &mut schedule.flows {
+        schedule.update_flows(|cf| {
             cf.amount = Money::new(cf.amount.amount() * sign, cf.amount.currency());
-        }
+        });
 
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))

@@ -704,8 +704,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
             self.cms_day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         );
         Ok(schedule
@@ -778,7 +780,7 @@ mod tests {
         assert!(flows.iter().any(|(_, money)| money.amount() < 0.0));
         assert_eq!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .filter(|flow| flow.kind == CFKind::FloatReset)
                 .count(),
@@ -786,13 +788,16 @@ mod tests {
         );
         assert_eq!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .filter(|flow| flow.kind == CFKind::Fixed)
                 .count(),
             swap.cms_payment_dates.len()
         );
-        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
+        assert!(schedule
+            .get_flows()
+            .iter()
+            .all(|flow| flow.accrual.is_some()));
     }
 
     /// Build a shared market context for reconciliation tests: flat 3% OIS,

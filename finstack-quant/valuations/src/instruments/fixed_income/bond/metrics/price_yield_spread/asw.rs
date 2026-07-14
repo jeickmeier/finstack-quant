@@ -319,7 +319,7 @@ fn pv_coupon_from_custom_schedule(
     use finstack_quant_core::math::summation::NeumaierAccumulator;
 
     let mut pv = NeumaierAccumulator::new();
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         if cf.date <= as_of {
             continue;
         }

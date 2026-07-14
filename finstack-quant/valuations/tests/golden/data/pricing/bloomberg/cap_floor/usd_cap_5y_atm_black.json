@@ -6,11 +6,11 @@
     "description": "Bloomberg SWPM USD 5Y ATM SOFR cap captured from screens on 2026-05-02.",
     "valuation_date": "2026-05-02",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg SWPM USD SOFR cap, curve 490 USD SOFR discount/projection, USD RFR BVOL Cube, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained; the screen uses normal volatility/HW1F market setup, represented here through finstack-quant's normal cap/floor pricing path. Phase-2 envelope migration (2026-05-09): Tier-A wrap. Original snapshot preserved in initial_market with empty plan.steps. The Bloomberg target and NPV abs 1.0 tolerance are preserved. The contract-detail screen starts the first accrual on 2026-05-05 and ends it on 2026-08-06; the fixture therefore uses LongFront instead of the default one-day ShortFront stub. The forward snapshot carries those contractual quarterly boundaries for DF-chained projection. The fixture is temporarily listed in known_non_executable pending an independent HW1F and curve-risk benchmark refresh.",
+    "source_detail": "Bloomberg SWPM USD SOFR cap, curve 490 USD SOFR discount/projection, USD RFR BVOL Cube, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained; the screen uses normal volatility/HW1F. The executable envelope calibrates the discount curve from all 26 visible Curve 490 market-rate points with the screen's one-day OIS cutoff and retains the source contractual projection grid. The cap terms explicitly encode LongFront schedule generation, compounded SOFR with one-day cutoff, two-business-day payment delay, and excluded spread compounding. Kappa is fixed at the documented benchmark assumption while sigma is recalibrated from the normal-vol surface. Bloomberg targets and tolerances are unchanged.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-02",
     "last_reviewed_by": "jeickmeier",
-    "last_reviewed_on": "2026-05-09",
+    "last_reviewed_on": "2026-07-14",
     "review_interval_months": 6,
     "regen_command": "manual Bloomberg SWPM screen transcription; see provenance.screenshots",
     "screenshots": [
@@ -59,10 +59,61 @@
     "envelope": {
       "schema": "finstack_quant.calibration",
       "plan": {
-        "id": "usd_cap_5y_tier_a_wrap",
-        "description": "Tier-A wrap: the cap is a Bloomberg-parity test with very tight 1-dollar tolerance on 10MM notional NPV. Calibrating USD-SOFR-DISC or USD-SOFR forward from quotes introduces curve drift that shifts the cap's caplet PVs by tens of dollars or more \u2014 outside the parity tolerance. The envelope wrap preserves the snapshot verbatim in initial_market while routing through engine::execute_with_diagnostics.",
-        "quote_sets": {},
-        "steps": [],
+        "id": "usd_cap_5y_curve_490_calibrated",
+        "description": "USD-SOFR discount curve calibrated from all 26 visible Bloomberg Curve 490 market-rate points transcribed with the cap screen. The one-day OIS rate cutoff is replayed for base and risk calibration. The source forward snapshot remains the contractual compounded-SOFR projection representation.",
+        "quote_sets": {
+          "swpm_490_rates": [
+            "USD-SOFR-DEPOSIT-1W",
+            "USD-SOFR-DEPOSIT-2W",
+            "USD-SOFR-DEPOSIT-3W",
+            "USD-SOFR-SWAP-1M",
+            "USD-SOFR-SWAP-2M",
+            "USD-SOFR-SWAP-3M",
+            "USD-SOFR-SWAP-4M",
+            "USD-SOFR-SWAP-5M",
+            "USD-SOFR-SWAP-6M",
+            "USD-SOFR-SWAP-7M",
+            "USD-SOFR-SWAP-8M",
+            "USD-SOFR-SWAP-9M",
+            "USD-SOFR-SWAP-10M",
+            "USD-SOFR-SWAP-11M",
+            "USD-SOFR-SWAP-12M",
+            "USD-SOFR-SWAP-18M",
+            "USD-SOFR-SWAP-2Y",
+            "USD-SOFR-SWAP-3Y",
+            "USD-SOFR-SWAP-4Y",
+            "USD-SOFR-SWAP-5Y",
+            "USD-SOFR-SWAP-6Y",
+            "USD-SOFR-SWAP-7Y",
+            "USD-SOFR-SWAP-8Y",
+            "USD-SOFR-SWAP-9Y",
+            "USD-SOFR-SWAP-10Y",
+            "USD-SOFR-SWAP-12Y"
+          ]
+        },
+        "steps": [
+          {
+            "id": "USD-SOFR-DISC",
+            "quote_set": "swpm_490_rates",
+            "kind": "discount",
+            "curve_id": "USD-SOFR-DISC",
+            "currency": "USD",
+            "base_date": "2026-05-02",
+            "method": "Bootstrap",
+            "interpolation": "log_linear",
+            "extrapolation": "flat_forward",
+            "pricing_discount_id": "USD-SOFR-DISC",
+            "pricing_forward_id": "USD-SOFR",
+            "conventions": {
+              "curve_day_count": "Act365F",
+              "ois_compounding": {
+                "CompoundedWithRateCutoff": {
+                  "cutoff_days": 1
+                }
+              }
+            }
+          }
+        ],
         "settings": {
           "fx": {
             "pivot_currency": "USD",
@@ -71,7 +122,34 @@
           }
         }
       },
-      "market_data": [],
+      "market_data": [
+        {"kind":"rate_quote","type":"deposit","id":"USD-SOFR-DEPOSIT-1W","index":"USD-SOFR","pillar":{"tenor":{"count":1,"unit":"weeks"}},"rate":0.03634},
+        {"kind":"rate_quote","type":"deposit","id":"USD-SOFR-DEPOSIT-2W","index":"USD-SOFR","pillar":{"tenor":{"count":2,"unit":"weeks"}},"rate":0.036351},
+        {"kind":"rate_quote","type":"deposit","id":"USD-SOFR-DEPOSIT-3W","index":"USD-SOFR","pillar":{"tenor":{"count":3,"unit":"weeks"}},"rate":0.036335},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-1M","index":"USD-SOFR","pillar":{"tenor":{"count":1,"unit":"months"}},"rate":0.036432},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-2M","index":"USD-SOFR","pillar":{"tenor":{"count":2,"unit":"months"}},"rate":0.0365047},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-3M","index":"USD-SOFR","pillar":{"tenor":{"count":3,"unit":"months"}},"rate":0.036544},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-4M","index":"USD-SOFR","pillar":{"tenor":{"count":4,"unit":"months"}},"rate":0.036589},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-5M","index":"USD-SOFR","pillar":{"tenor":{"count":5,"unit":"months"}},"rate":0.036629},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-6M","index":"USD-SOFR","pillar":{"tenor":{"count":6,"unit":"months"}},"rate":0.0366705},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-7M","index":"USD-SOFR","pillar":{"tenor":{"count":7,"unit":"months"}},"rate":0.0367315},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-8M","index":"USD-SOFR","pillar":{"tenor":{"count":8,"unit":"months"}},"rate":0.036836},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-9M","index":"USD-SOFR","pillar":{"tenor":{"count":9,"unit":"months"}},"rate":0.0369315},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-10M","index":"USD-SOFR","pillar":{"tenor":{"count":10,"unit":"months"}},"rate":0.037023},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-11M","index":"USD-SOFR","pillar":{"tenor":{"count":11,"unit":"months"}},"rate":0.0371385},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-12M","index":"USD-SOFR","pillar":{"tenor":{"count":12,"unit":"months"}},"rate":0.0372495},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-18M","index":"USD-SOFR","pillar":{"tenor":{"count":18,"unit":"months"}},"rate":0.0372925},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-2Y","index":"USD-SOFR","pillar":{"tenor":{"count":2,"unit":"years"}},"rate":0.0371735},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-3Y","index":"USD-SOFR","pillar":{"tenor":{"count":3,"unit":"years"}},"rate":0.0368633},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-4Y","index":"USD-SOFR","pillar":{"tenor":{"count":4,"unit":"years"}},"rate":0.036904},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-5Y","index":"USD-SOFR","pillar":{"tenor":{"count":5,"unit":"years"}},"rate":0.0371715},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-6Y","index":"USD-SOFR","pillar":{"tenor":{"count":6,"unit":"years"}},"rate":0.037587},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-7Y","index":"USD-SOFR","pillar":{"tenor":{"count":7,"unit":"years"}},"rate":0.038033},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-8Y","index":"USD-SOFR","pillar":{"tenor":{"count":8,"unit":"years"}},"rate":0.03848},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-9Y","index":"USD-SOFR","pillar":{"tenor":{"count":9,"unit":"years"}},"rate":0.038924},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-10Y","index":"USD-SOFR","pillar":{"tenor":{"count":10,"unit":"years"}},"rate":0.03936},
+        {"kind":"rate_quote","type":"swap","id":"USD-SOFR-SWAP-12Y","index":"USD-SOFR","pillar":{"tenor":{"count":12,"unit":"years"}},"rate":0.0402133}
+      ],
       "prior_market": [
         {
           "kind": "forward_curve",
@@ -300,6 +378,49 @@
                 }
               }
             ]
+          },
+          "rate_calibration_recipe": {
+            "currency": "USD",
+            "method": "bootstrap",
+            "curve_day_count": "Act365F",
+            "ois_compounding": {
+              "compounded_with_rate_cutoff": {
+                "cutoff_days": 1
+              }
+            },
+            "role": {
+              "projection": {
+                "discount_curve_id": "USD-SOFR-DISC"
+              }
+            },
+            "quotes": [
+              {"deposit":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":1,"unit":"weeks"}},"rate":0.03634}},
+              {"deposit":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":2,"unit":"weeks"}},"rate":0.036351}},
+              {"deposit":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":3,"unit":"weeks"}},"rate":0.036335}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":1,"unit":"months"}},"rate":0.036432,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":2,"unit":"months"}},"rate":0.0365047,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":3,"unit":"months"}},"rate":0.036544,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":4,"unit":"months"}},"rate":0.036589,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":5,"unit":"months"}},"rate":0.036629,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":6,"unit":"months"}},"rate":0.0366705,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":7,"unit":"months"}},"rate":0.0367315,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":8,"unit":"months"}},"rate":0.036836,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":9,"unit":"months"}},"rate":0.0369315,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":10,"unit":"months"}},"rate":0.037023,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":11,"unit":"months"}},"rate":0.0371385,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":12,"unit":"months"}},"rate":0.0372495,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":18,"unit":"months"}},"rate":0.0372925,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":2,"unit":"years"}},"rate":0.0371735,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":3,"unit":"years"}},"rate":0.0368633,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":4,"unit":"years"}},"rate":0.036904,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":5,"unit":"years"}},"rate":0.0371715,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":6,"unit":"years"}},"rate":0.037587,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":7,"unit":"years"}},"rate":0.038033,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":8,"unit":"years"}},"rate":0.03848,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":9,"unit":"years"}},"rate":0.038924,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":10,"unit":"years"}},"rate":0.03936,"spread_decimal":null}},
+              {"swap":{"index_id":"USD-SOFR","pillar":{"tenor":{"count":12,"unit":"years"}},"rate":0.0402133,"spread_decimal":null}}
+            ]
           }
         },
         {
@@ -518,6 +639,7 @@
             0.0366561
           ],
           "secondary_axis": "strike",
+          "quote_type": "normal",
           "interpolation_mode": "vol",
           "vols_row_major": [
             0.00483385,
@@ -568,9 +690,20 @@
       "forward_curve_id": "USD-SOFR",
       "vol_surface_id": "USD-RFR-BVOL-CUBE-5Y",
       "vol_type": "normal",
+      "spread": "0",
+      "overnight_coupon": {
+        "compounding": {
+          "CompoundedWithRateCutoff": {
+            "cutoff_days": 1
+          }
+        },
+        "fixing_calendar_id": "usny",
+        "payment_calendar_id": "usny",
+        "payment_delay_days": 2,
+        "spread_compounding": "exclude"
+      },
       "pricing_overrides": {
         "tree_steps": 300,
-        "hw1f_sigma": 0.0094182,
         "hw1f_mean_reversion": 0.0342
       },
       "attributes": {
@@ -587,13 +720,12 @@
           "screen_model": "HW1F",
           "screen_volatility_type": "Normal",
           "screen_convexity_adjustment": "Normal",
-          "hw1f_calibration_method": "fixed_kappa_sigma_from_visible_caplet_normal_vol_strip",
+          "hw1f_calibration_method": "fixed_kappa_surface_calibrated_sigma",
           "hw1f_fixed_kappa": "0.0342",
-          "hw1f_source_quote": "VCUB USD RFR BVOL Cube visible 5Y tenor caplet normal-vol strip transcribed in inputs.market.surfaces[USD-RFR-BVOL-CUBE-5Y].vols_row_major",
-          "hw1f_source_quote_normal_vol": "caplet strip, 20 quarterly expiries",
-          "hw1f_short_rate_sigma": "0.0094182",
-          "hw1f_param_routing": "kappa and sigma are supplied to the cap/floor HW1F tree via the dedicated spec.pricing_overrides.hw1f_mean_reversion and hw1f_sigma fields (the short-rate channel the pricer consumes), not market_quotes.implied_volatility.",
-          "hw1f_calibration_note": "Bloomberg screenshot shows HW1F and normal-vol VCUB inputs but does not show mean reversion. Kappa is an explicit fixed calibration assumption; sigma is the HW1F short-rate absolute volatility derived from the visible caplet normal-vol strip rather than tuned to expected_outputs.",
+          "hw1f_source_quote": "VCUB USD RFR BVOL Cube visible 5Y-tenor normal-vol column transcribed in prior_market[USD-RFR-BVOL-CUBE-5Y].vols_row_major",
+          "hw1f_source_quote_normal_vol": "raw visible cube column, 20 quarterly expiries; not an independently stripped optionlet surface",
+          "hw1f_param_routing": "Kappa is supplied through pricing_overrides.hw1f_mean_reversion. Sigma is recalibrated from the normal-vol surface for every base or bumped valuation; no fixed sigma is supplied.",
+          "hw1f_calibration_note": "Bloomberg shows HW1F and normal VCUB inputs but not mean reversion or proprietary stripping settings. Kappa remains an explicit benchmark assumption. The raw visible cube column is retained without fitting sigma to expected_outputs.",
           "legacy_fixture_name": "usd_cap_5y_atm_black"
         }
       }

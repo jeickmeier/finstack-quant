@@ -302,12 +302,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap
 
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,
+            crate::cashflow::primitives::CFKind::Fixed,
             self.financing.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: self.notional(),
-                kind: Some(crate::cashflow::primitives::CFKind::Fixed),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         );
         Ok(schedule)

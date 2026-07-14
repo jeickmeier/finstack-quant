@@ -169,7 +169,7 @@ pub(super) fn solve_irr_to_exercise(
     // Compute settlement date using loan calendar/business-day conventions.
     let settlement_date = loan.settlement_date(as_of)?;
 
-    let mut flows: Vec<(Date, f64)> = Vec::with_capacity(schedule.flows.len() + 2);
+    let mut flows: Vec<(Date, f64)> = Vec::with_capacity(schedule.get_flows().len() + 2);
 
     // Initial price leg at settlement date (negative = cash outflow for purchase)
     flows.push((settlement_date, -target_price.amount()));
@@ -178,7 +178,7 @@ pub(super) fn solve_irr_to_exercise(
     // At the exercise date: include coupon/fee flows (holder receives accrued
     // interest) but exclude Amortization and Notional (the explicit redemption
     // parameter replaces them, using the pre-exercise outstanding).
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         if cf.date <= settlement_date || cf.date > exercise_date {
             continue;
         }

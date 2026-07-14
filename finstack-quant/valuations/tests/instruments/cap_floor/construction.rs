@@ -5,8 +5,11 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::rates::cap_floor::{CapFloor, RateOptionType};
-use finstack_quant_valuations::instruments::{ExerciseStyle, SettlementType};
+use finstack_quant_valuations::instruments::rates::cap_floor::{
+    CapFloor, OvernightCouponConvention, OvernightSpreadCompounding, RateOptionType,
+};
+use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
+use finstack_quant_valuations::instruments::{ExerciseStyle, Instrument, SettlementType};
 use rust_decimal::Decimal;
 use time::Month;
 
@@ -149,7 +152,8 @@ fn test_caplet_creation() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -183,7 +187,8 @@ fn test_floorlet_creation() {
         vol_surface_id: "EUR_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -360,4 +365,69 @@ fn test_new_caplet_accepts_valid_strike() {
         result.is_ok(),
         "new_caplet should accept a valid finite strike"
     );
+}
+
+#[test]
+fn term_index_rejects_overnight_coupon_settings() {
+    let mut caplet = CapFloor::new_caplet(
+        "TERM-WITH-OVERNIGHT-SETTINGS",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        Date::from_calendar_date(2025, Month::January, 2).unwrap(),
+        Date::from_calendar_date(2025, Month::April, 2).unwrap(),
+        DayCount::Act360,
+        "USD-OIS",
+        "USD-LIBOR-3M",
+        "USD-CAP-VOL",
+    )
+    .expect("valid caplet");
+    caplet.overnight_coupon = Some(OvernightCouponConvention {
+        compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
+        payment_delay_days: 2,
+        fixing_calendar_id: Some("usny".into()),
+        payment_calendar_id: Some("usny".into()),
+        spread_compounding: OvernightSpreadCompounding::Exclude,
+    });
+
+    let error = caplet
+        .validate_for_pricing()
+        .expect_err("term index must reject overnight-only coupon settings");
+    assert!(
+        error.to_string().contains("overnight"),
+        "validation should identify the incompatible overnight settings: {error}"
+    );
+}
+
+#[test]
+fn legacy_cap_json_defaults_overnight_coupon_to_none() {
+    let cap = CapFloor::new_cap(
+        "LEGACY-CAP",
+        Money::new(1_000_000.0, Currency::USD),
+        0.05,
+        Date::from_calendar_date(2025, Month::January, 2).unwrap(),
+        Date::from_calendar_date(2026, Month::January, 2).unwrap(),
+        Tenor::quarterly(),
+        DayCount::Act360,
+        "USD-OIS",
+        "USD-LIBOR-3M",
+        "USD-CAP-VOL",
+    )
+    .expect("valid cap");
+    let mut value = serde_json::to_value(cap).expect("serialize cap");
+    assert!(
+        value.get("overnight_coupon").is_none(),
+        "default overnight terms should be omitted for backward-compatible JSON"
+    );
+    assert!(
+        value.get("spread").is_none(),
+        "zero spread should be omitted for backward-compatible JSON"
+    );
+    value
+        .as_object_mut()
+        .expect("cap JSON object")
+        .remove("spread");
+
+    let decoded: CapFloor = serde_json::from_value(value).expect("deserialize legacy cap JSON");
+    assert!(decoded.overnight_coupon.is_none());
+    assert_eq!(decoded.spread, Decimal::ZERO);
 }

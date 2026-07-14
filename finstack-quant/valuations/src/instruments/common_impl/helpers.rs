@@ -61,16 +61,9 @@ pub fn year_fraction(dc: DayCount, start: Date, end: Date) -> finstack_quant_cor
 /// - Metric calculations (e.g., par rate using `df_on_date_curve`)
 /// - NPV calculations
 ///
-/// # Cashflow-on-as_of Policy: HOLDER-VIEW (Excludes `date <= as_of`)
-///
 /// Routes through `core::cashflow::npv`, which excludes flows on or before
-/// the valuation date (market-standard position value; 2026-06-09 core quant
-/// review). For a T+0 deposit valued on its effective date, the initial
-/// notional exchange settles on `as_of` and is excluded: `base_value` is the
-/// PV of the *remaining* flows (≈ +notional·DF), not the trade NPV (≈ 0 at
-/// inception). For pricing-view semantics that include `date == as_of` flows
-/// (needed for calibration bracketing of T+0 instruments), use
-/// [`schedule_pv_using_curve_dc_raw`].
+/// the valuation date. Valuation on a day assumes cash settling that day has
+/// already been paid.
 ///
 /// # Arguments
 ///
@@ -78,7 +71,7 @@ pub fn year_fraction(dc: DayCount, start: Date, end: Date) -> finstack_quant_cor
 /// * `curves` - Market data context
 /// * `as_of` - Valuation date
 /// * `discount_curve_id` - ID of the discount curve to use
-pub fn schedule_pv_using_curve_dc<S>(
+pub fn schedule_pv<S>(
     instrument: &S,
     curves: &MarketContext,
     as_of: Date,
@@ -99,30 +92,9 @@ where
 ///
 /// Returns unrounded NPV for high-precision calibration/risk.
 ///
-/// # Cashflow-on-as_of Policy: PRICING-VIEW (Includes `date == as_of`)
-///
-/// This helper uses **pricing-view** semantics:
-/// - Cashflows where `date < as_of` are excluded (truly past)
-/// - Cashflows where `date == as_of` are **included** at DF=1 (t=0)
-/// - Future cashflows (`date > as_of`) are discounted
-///
-/// This is critical for:
-/// - **Calibration instruments**: T+0 deposits require initial exchange for bracketing
-/// - **FRAs and same-day settling instruments**: Payment on as_of is part of value
-///
-/// For holder-view semantics (excludes `date <= as_of`), see
-/// the holder-view term-loan discounting path.
-///
-/// # Numerical Stability
-///
-/// Uses Neumaier compensated summation instead of Kahan summation because
-/// cashflow schedules often contain mixed-sign values (positive inflows and
-/// negative outflows). Neumaier's algorithm handles cases where the sum and
-/// the next value have similar magnitudes but opposite signs better than Kahan.
-///
-/// Reference: Neumaier, A. (1974). "Rundungsfehleranalyse einiger Verfahren
-/// zur Summation endlicher Summen." *ZAMM*, 54(1), 39-51.
-pub fn schedule_pv_using_curve_dc_raw<S>(
+/// Cashflows on or before `as_of` are excluded, matching [`schedule_pv`]. The
+/// only distinction is the unrounded scalar output used by calibration and risk.
+pub fn schedule_pv_raw<S>(
     instrument: &S,
     curves: &MarketContext,
     as_of: Date,
@@ -131,26 +103,16 @@ pub fn schedule_pv_using_curve_dc_raw<S>(
 where
     S: crate::cashflow::traits::CashflowProvider,
 {
-    use finstack_quant_core::math::neumaier_sum;
+    use finstack_quant_core::cashflow::npv_amounts_with_curve;
 
     let flows = S::dated_cashflows(instrument, curves, as_of)?;
     let disc = curves.get_discount(discount_curve_id.as_str())?;
 
-    let mut terms = Vec::with_capacity(flows.len());
-
-    for (date, amount) in flows {
-        // PRICING-VIEW: Include cashflows on `as_of` (t=0, df=1).
-        // Only exclude truly past cashflows (date < as_of).
-        // This ensures calibration bracketing works for T+0 instruments.
-        if date < as_of {
-            continue;
-        }
-        // Date-based DF handles the case where as_of != curve base_date correctly
-        let df = disc.df_between_dates(as_of, date)?;
-        terms.push(amount.amount() * df);
-    }
-
-    Ok(neumaier_sum(terms))
+    let amounts = flows
+        .into_iter()
+        .map(|(date, amount)| (date, amount.amount()))
+        .collect::<Vec<_>>();
+    npv_amounts_with_curve(disc.as_ref(), as_of, &amounts)
 }
 
 /// Resolve an optional dividend-yield scalar from the market context.
@@ -624,7 +586,11 @@ mod tests {
             as_of: Date,
         ) -> finstack_quant_core::Result<CashFlowSchedule> {
             Ok(schedule_from_dated_flows(
-                vec![(as_of + Duration::days(30), Money::new(100.0, Currency::USD))],
+                vec![
+                    (as_of, Money::new(10_000.0, Currency::USD)),
+                    (as_of + Duration::days(30), Money::new(100.0, Currency::USD)),
+                ],
+                crate::cashflow::primitives::CFKind::Fixed,
                 DayCount::Act365F,
                 ScheduleBuildOpts {
                     notional_hint: self.notional(),
@@ -893,7 +859,7 @@ mod tests {
     }
 
     #[test]
-    fn schedule_pv_using_curve_dc_raw_uses_provider_path() -> finstack_quant_core::Result<()> {
+    fn schedule_pv_raw_excludes_as_of_cash() -> finstack_quant_core::Result<()> {
         let as_of = date!(2024 - 01 - 01);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("DISC")
@@ -903,19 +869,15 @@ mod tests {
                 .build()?,
         );
 
-        let pv = schedule_pv_using_curve_dc_raw(
-            &SingleFlowProvider,
-            &market,
-            as_of,
-            &CurveId::new("DISC"),
-        )?;
+        let pv = schedule_pv_raw(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
 
         assert!(pv > 0.0);
+        assert!(pv < 100.0);
         Ok(())
     }
 
     #[test]
-    fn schedule_pv_using_curve_dc_uses_provider_path() -> finstack_quant_core::Result<()> {
+    fn schedule_pv_excludes_as_of_cash() -> finstack_quant_core::Result<()> {
         let as_of = date!(2024 - 01 - 01);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("DISC")
@@ -925,10 +887,10 @@ mod tests {
                 .build()?,
         );
 
-        let pv =
-            schedule_pv_using_curve_dc(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
+        let pv = schedule_pv(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
 
         assert!(pv.amount() > 0.0);
+        assert!(pv.amount() < 100.0);
         assert_eq!(pv.currency(), Currency::USD);
         Ok(())
     }

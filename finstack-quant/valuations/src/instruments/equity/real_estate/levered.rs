@@ -185,9 +185,13 @@ impl crate::cashflow::traits::CashflowScheduleSource for LeveredRealEstateEquity
 
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             flows,
+            crate::cashflow::primitives::CFKind::Fixed,
             self.asset.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         ))
@@ -236,19 +240,30 @@ mod tests {
             .expect("levered schedule");
 
         assert_eq!(
-            schedule.meta.representation,
+            schedule.get_meta().representation,
             crate::cashflow::builder::CashflowRepresentation::Projected
         );
-        assert_eq!(schedule.flows.first().expect("initial flow").date, as_of);
+        assert_eq!(
+            schedule.get_flows().first().expect("initial flow").date,
+            as_of
+        );
         assert!(
             schedule
-                .flows
+                .get_flows()
                 .first()
                 .expect("initial flow")
                 .amount
                 .amount()
                 < 0.0
         );
-        assert!(schedule.flows.last().expect("exit flow").amount.amount() > 0.0);
+        assert!(
+            schedule
+                .get_flows()
+                .last()
+                .expect("exit flow")
+                .amount
+                .amount()
+                > 0.0
+        );
     }
 }

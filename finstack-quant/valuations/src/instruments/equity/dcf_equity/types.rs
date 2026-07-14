@@ -925,9 +925,13 @@ impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
 
         Ok(crate::cashflow::traits::schedule_from_dated_flows(
             flows,
+            crate::cashflow::primitives::CFKind::Fixed,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         ))
@@ -1559,13 +1563,13 @@ mod tests {
             .expect("dcf schedule");
 
         assert_eq!(
-            schedule.meta.representation,
+            schedule.get_meta().representation,
             crate::cashflow::builder::CashflowRepresentation::Projected
         );
-        assert_eq!(schedule.flows.len(), 1);
-        assert_eq!(schedule.flows[0].date, dcf.flows[0].0);
-        assert_eq!(schedule.flows[0].amount.amount(), dcf.flows[0].1);
-        assert_eq!(schedule.flows[0].amount.currency(), Currency::USD);
+        assert_eq!(schedule.get_flows().len(), 1);
+        assert_eq!(schedule.get_flows()[0].date, dcf.flows[0].0);
+        assert_eq!(schedule.get_flows()[0].amount.amount(), dcf.flows[0].1);
+        assert_eq!(schedule.get_flows()[0].amount.currency(), Currency::USD);
     }
 
     // ──────────────────────────────────────────────────────────────────

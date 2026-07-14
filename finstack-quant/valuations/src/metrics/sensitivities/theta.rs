@@ -334,7 +334,7 @@ pub fn collect_cashflows_in_period(
 ) -> Result<f64> {
     let schedule = instrument.cashflow_schedule(curves, start_date)?;
     collect_cashflows_from_flows(
-        &schedule.flows,
+        schedule.get_flows(),
         instrument.id(),
         start_date,
         end_date,

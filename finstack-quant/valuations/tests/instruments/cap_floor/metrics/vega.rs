@@ -70,7 +70,8 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     }
@@ -131,7 +132,8 @@ fn test_floor_vega_positive() {
         vol_surface_id: "USD_CAP_VOL".into(),
         vol_type: Default::default(),
         vol_shift: 0.0,
-
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
         attributes: Default::default(),
     };
@@ -259,13 +261,9 @@ fn test_vega_scales_with_maturity() {
     );
 }
 
-/// Regression: the Hull-White 1F cap/floor vega must be non-zero and must
-/// respond to the short-rate σ the tree pricer actually consumes
-/// (`pricing_overrides.hw1f_sigma`). The previous implementation bumped
-/// `market_quotes.implied_volatility`, which the HW1F pricer ignores, so the
-/// central-difference reprice produced identical PVs and reported vega 0.
+/// Market-quote vega and direct Hull-White σ vega live on distinct axes.
 #[test]
-fn test_hull_white_1f_vega_is_nonzero_and_sigma_sensitive() {
+fn test_hull_white_1f_market_and_sigma_vegas_are_distinct() {
     use finstack_quant_valuations::pricer::ModelKey;
 
     let as_of = date!(2024 - 01 - 01);
@@ -273,7 +271,8 @@ fn test_hull_white_1f_vega_is_nonzero_and_sigma_sensitive() {
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");
-    let vol_surface = build_flat_vol_surface(0.30, as_of, "USD_CAP_VOL");
+    let vol_surface =
+        build_flat_vol_surface(0.01, as_of, "USD_CAP_VOL").with_quote_type(VolQuoteType::Normal);
 
     let market = MarketContext::new()
         .insert(disc_curve)
@@ -283,41 +282,49 @@ fn test_hull_white_1f_vega_is_nonzero_and_sigma_sensitive() {
     let opts = finstack_quant_valuations::instruments::PricingOptions::default()
         .with_model(ModelKey::HullWhite1F);
 
-    // ATM cap: the core regression is that vega is finite and non-zero.
+    // Explicit κ/σ make PV independent of the market surface, while direct
+    // model-parameter σ sensitivity remains non-zero.
     let mut atm_cap = create_standard_cap(as_of, end, 0.05);
     atm_cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
     atm_cap.pricing_overrides.model_config.hw1f_sigma = Some(0.01);
-    let atm_vega = *atm_cap
-        .price_with_metrics(&market, as_of, &[MetricId::Vega], opts.clone())
+    let result = atm_cap
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Vega, MetricId::HwSigmaVega],
+            opts.clone(),
+        )
         .unwrap()
-        .measures
-        .get("vega")
-        .unwrap();
+        .measures;
+    let market_vega = *result.get("vega").unwrap();
+    let sigma_vega = *result.get("hw_sigma_vega").unwrap();
     assert!(
-        atm_vega > 0.0,
-        "HW1F cap vega must be positive and non-zero, got {atm_vega}"
+        market_vega.abs() < 1e-8,
+        "fixed HW params must have zero market-quote vega, got {market_vega}"
+    );
+    assert!(
+        sigma_vega > 0.0,
+        "HW1F direct sigma vega must be positive, got {sigma_vega}"
     );
 
-    // OTM cap: away from the money the normal-model vega depends on σ (φ(d) with
-    // d ≠ 0), so changing `hw1f_sigma` must change the reported vega — proving
-    // the bump reaches the field the tree pricer consumes.
+    // Away from the money, changing σ changes direct model-parameter vega.
     let mut otm_cap = create_standard_cap(as_of, end, 0.08);
     otm_cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
     otm_cap.pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     let low_sigma_vega = *otm_cap
-        .price_with_metrics(&market, as_of, &[MetricId::Vega], opts.clone())
+        .price_with_metrics(&market, as_of, &[MetricId::HwSigmaVega], opts.clone())
         .unwrap()
         .measures
-        .get("vega")
+        .get("hw_sigma_vega")
         .unwrap();
 
     let mut otm_cap_high = otm_cap;
     otm_cap_high.pricing_overrides.model_config.hw1f_sigma = Some(0.02);
     let high_sigma_vega = *otm_cap_high
-        .price_with_metrics(&market, as_of, &[MetricId::Vega], opts)
+        .price_with_metrics(&market, as_of, &[MetricId::HwSigmaVega], opts)
         .unwrap()
         .measures
-        .get("vega")
+        .get("hw_sigma_vega")
         .unwrap();
 
     assert!(
@@ -336,7 +343,9 @@ fn test_hull_white_1f_surface_shock_moves_pv_and_vega() {
 
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
-    let cap = create_standard_cap(as_of, end, 0.05);
+    let mut cap = create_standard_cap(as_of, end, 0.05);
+    cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
+    cap.pricing_overrides.model_config.hw1f_sigma = None;
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");

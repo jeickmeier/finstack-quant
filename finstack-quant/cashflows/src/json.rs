@@ -7,7 +7,7 @@
 use crate::accrual::{accrued_interest_amount, AccrualConfig};
 use crate::builder::{
     CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec,
-    Notional, ScheduleParams, StepUpCouponSpec,
+    Notional, StepUpCouponSpec,
 };
 use crate::primitives::{is_cash_settlement_kind, CFKind};
 use finstack_quant_core::dates::Date;
@@ -15,10 +15,9 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
 use rust_decimal::Decimal;
-use serde::Deserializer;
 
 /// Specification for building a [`CashFlowSchedule`] from JSON.
-#[derive(Debug, Clone, serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CashflowScheduleBuildSpec {
     /// Principal amount and amortization behavior.
@@ -147,177 +146,6 @@ pub struct PaymentStepSpec {
     pub date: Date,
     /// Settlement behavior active for the step.
     pub split: CouponType,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct CanonicalBuildSpec {
-    notional: Notional,
-    issue: Date,
-    maturity: Date,
-    #[serde(default)]
-    coupon_program: Vec<CouponLegSpecInput>,
-    #[serde(default)]
-    payment_program: Vec<PaymentProgramSpec>,
-    #[serde(default)]
-    fees: Vec<FeeSpec>,
-    #[serde(default)]
-    principal_events: Vec<PrincipalEventSpec>,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(untagged)]
-enum CouponLegSpecInput {
-    Canonical(Box<CouponLegSpec>),
-    LegacyFixedRateProgram(LegacyFixedRateProgram),
-}
-
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyFixedRateProgram {
-    kind: LegacyFixedRateProgramKind,
-    steps: Vec<RateStepSpec>,
-    schedule: ScheduleParams,
-    #[serde(default)]
-    default_split: CouponType,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum LegacyFixedRateProgramKind {
-    FixedRateProgram,
-}
-
-fn canonicalize_coupon_program(
-    issue: Date,
-    maturity: Date,
-    instructions: Vec<CouponLegSpecInput>,
-) -> std::result::Result<Vec<CouponLegSpec>, String> {
-    let mut canonical = Vec::with_capacity(instructions.len());
-    for instruction in instructions {
-        match instruction {
-            CouponLegSpecInput::Canonical(instruction) => canonical.push(*instruction),
-            CouponLegSpecInput::LegacyFixedRateProgram(program) => {
-                let LegacyFixedRateProgram {
-                    kind: LegacyFixedRateProgramKind::FixedRateProgram,
-                    steps,
-                    schedule,
-                    default_split,
-                } = program;
-                if steps.is_empty() {
-                    return Err("fixed_rate_program requires at least one dated rate step".into());
-                }
-                if let Some(window) = steps
-                    .windows(2)
-                    .find(|window| window[0].date >= window[1].date)
-                {
-                    return Err(format!(
-                        "fixed_rate_program steps must be strictly increasing; found {} followed by {}",
-                        window[0].date, window[1].date
-                    ));
-                }
-
-                let mut start = issue;
-                for step in &steps {
-                    canonical.push(CouponLegSpec::FixedWindow {
-                        start,
-                        end: step.date,
-                        spec: FixedCouponSpec {
-                            coupon_type: default_split,
-                            rate: step.rate,
-                            schedule: schedule.clone(),
-                        },
-                    });
-                    start = step.date;
-                }
-                let rate = steps
-                    .last()
-                    .map(|step| step.rate)
-                    .ok_or_else(|| "fixed_rate_program requires at least one step".to_string())?;
-                canonical.push(CouponLegSpec::FixedWindow {
-                    start,
-                    end: maturity,
-                    spec: FixedCouponSpec {
-                        coupon_type: default_split,
-                        rate,
-                        schedule,
-                    },
-                });
-            }
-        }
-    }
-    Ok(canonical)
-}
-
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct LegacyBuildSpec {
-    notional: Notional,
-    issue: Date,
-    maturity: Date,
-    #[serde(default)]
-    fixed_coupons: Vec<FixedCouponSpec>,
-    #[serde(default)]
-    floating_coupons: Vec<FloatingCouponSpec>,
-    #[serde(default)]
-    fees: Vec<FeeSpec>,
-    #[serde(default)]
-    principal_events: Vec<PrincipalEventSpec>,
-}
-
-#[derive(serde::Deserialize)]
-#[serde(untagged)]
-enum BuildSpecInput {
-    Canonical(CanonicalBuildSpec),
-    Legacy(LegacyBuildSpec),
-}
-
-impl<'de> serde::Deserialize<'de> for CashflowScheduleBuildSpec {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let input = BuildSpecInput::deserialize(deserializer)?;
-        Ok(match input {
-            BuildSpecInput::Canonical(spec) => Self {
-                coupon_program: canonicalize_coupon_program(
-                    spec.issue,
-                    spec.maturity,
-                    spec.coupon_program,
-                )
-                .map_err(serde::de::Error::custom)?,
-                notional: spec.notional,
-                issue: spec.issue,
-                maturity: spec.maturity,
-                payment_program: spec.payment_program,
-                fees: spec.fees,
-                principal_events: spec.principal_events,
-            },
-            BuildSpecInput::Legacy(spec) => {
-                let mut coupon_program =
-                    Vec::with_capacity(spec.fixed_coupons.len() + spec.floating_coupons.len());
-                coupon_program.extend(
-                    spec.fixed_coupons
-                        .into_iter()
-                        .map(|spec| CouponLegSpec::Fixed { spec }),
-                );
-                coupon_program.extend(
-                    spec.floating_coupons
-                        .into_iter()
-                        .map(|spec| CouponLegSpec::Floating { spec }),
-                );
-                Self {
-                    notional: spec.notional,
-                    issue: spec.issue,
-                    maturity: spec.maturity,
-                    coupon_program,
-                    payment_program: Vec::new(),
-                    fees: spec.fees,
-                    principal_events: spec.principal_events,
-                }
-            }
-        })
-    }
 }
 
 /// JSON representation of an explicit principal event.
@@ -467,7 +295,7 @@ impl CashflowScheduleBuildSpec {
             let _ = builder.add_principal_event(event.date, event.delta, event.cash, event.kind);
         }
 
-        builder.build_with_curves(market)
+        builder.build(market)
     }
 }
 

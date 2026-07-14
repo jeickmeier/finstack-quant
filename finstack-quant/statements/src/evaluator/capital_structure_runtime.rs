@@ -215,14 +215,14 @@ pub(crate) fn resolve_opening_balance(
     // would report the full notional before the debt exists. Only use the
     // first entry for issued instruments whose first flow lands later.
     let pre_issuance = schedule
-        .meta
+        .get_meta()
         .issue_date
         .is_some_and(|issue| issue > period_start)
         && outstanding_path
             .first()
             .is_some_and(|(d, _)| *d > period_start);
     if pre_issuance {
-        return Ok(Money::new(0.0, schedule.notional.initial.currency()));
+        return Ok(Money::new(0.0, schedule.get_notional().initial.currency()));
     }
 
     if let Some((_, m)) = outstanding_path.first() {
@@ -232,7 +232,7 @@ pub(crate) fn resolve_opening_balance(
     // Use the schedule's own notional currency rather than guessing USD: an
     // empty-schedule non-USD instrument must not seed a USD zero balance (it can
     // later trip the waterfall's single-currency check with a confusing error).
-    Ok(Money::new(0.0, schedule.notional.initial.currency()))
+    Ok(Money::new(0.0, schedule.get_notional().initial.currency()))
 }
 
 fn compute_contractual_flows(
@@ -255,7 +255,7 @@ fn compute_contractual_flows(
                 balance
             } else {
                 let schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
-                Money::new(0.0, schedule.notional.initial.currency())
+                Money::new(0.0, schedule.get_notional().initial.currency())
             };
 
         // Toggle-driven PIK capitalization accumulated in state is excluded

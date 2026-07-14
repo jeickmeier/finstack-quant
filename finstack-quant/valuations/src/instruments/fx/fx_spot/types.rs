@@ -575,8 +575,11 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
                 finstack_quant_core::dates::DayCount::Act365F,
                 crate::cashflow::traits::ScheduleBuildOpts {
                     notional_hint: self.notional(),
-                    representation: crate::cashflow::builder::CashflowRepresentation::NoResidual,
-                    ..Default::default()
+                    meta: crate::cashflow::builder::CashFlowMeta {
+                        representation:
+                            crate::cashflow::builder::CashflowRepresentation::NoResidual,
+                        ..Default::default()
+                    },
                 },
             ));
         }
@@ -608,12 +611,14 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
 
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,
+            crate::cashflow::primitives::CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F, // Standard for FX spot
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: self.notional(),
-                kind: Some(crate::cashflow::primitives::CFKind::Notional),
-                representation: crate::cashflow::builder::CashflowRepresentation::Contractual,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Contractual,
+                    ..Default::default()
+                },
             },
         );
         Ok(schedule)
@@ -954,10 +959,10 @@ mod tests {
             .expect("future-dated spot schedule");
 
         assert_eq!(
-            schedule.meta.representation,
+            schedule.get_meta().representation,
             crate::cashflow::builder::CashflowRepresentation::Contractual
         );
-        assert_eq!(schedule.flows.len(), 1);
+        assert_eq!(schedule.get_flows().len(), 1);
     }
 
     #[test]
@@ -974,9 +979,9 @@ mod tests {
             .expect("same-day settled spot schedule");
 
         assert_eq!(
-            schedule.meta.representation,
+            schedule.get_meta().representation,
             crate::cashflow::builder::CashflowRepresentation::NoResidual
         );
-        assert!(schedule.flows.is_empty());
+        assert!(schedule.get_flows().is_empty());
     }
 }

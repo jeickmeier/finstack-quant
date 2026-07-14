@@ -582,8 +582,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         );
         Ok(schedule
@@ -1025,8 +1027,10 @@ impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
             self.day_count,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         );
         Ok(schedule
@@ -1228,9 +1232,12 @@ mod tests {
             flows[1].1.amount() > 0.0,
             "pay-fixed swap should receive inflation leg"
         );
-        assert_eq!(schedule.flows[0].kind, CFKind::Fixed);
-        assert_eq!(schedule.flows[1].kind, CFKind::InflationCoupon);
-        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
+        assert_eq!(schedule.get_flows()[0].kind, CFKind::Fixed);
+        assert_eq!(schedule.get_flows()[1].kind, CFKind::InflationCoupon);
+        assert!(schedule
+            .get_flows()
+            .iter()
+            .all(|flow| flow.accrual.is_some()));
     }
 
     /// YoY `npv_raw` must discount with DF(as_of → pay) = DF(pay)/DF(as_of)
@@ -1413,7 +1420,7 @@ mod tests {
         );
         assert_eq!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .filter(|flow| flow.kind == CFKind::Fixed)
                 .count(),
@@ -1421,12 +1428,15 @@ mod tests {
         );
         assert_eq!(
             schedule
-                .flows
+                .get_flows()
                 .iter()
                 .filter(|flow| flow.kind == CFKind::InflationCoupon)
                 .count(),
             2
         );
-        assert!(schedule.flows.iter().all(|flow| flow.accrual.is_some()));
+        assert!(schedule
+            .get_flows()
+            .iter()
+            .all(|flow| flow.accrual.is_some()));
     }
 }

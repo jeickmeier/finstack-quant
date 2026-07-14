@@ -42,8 +42,8 @@ impl Bond {
 
         let ex_coupon = self.accrual_config().ex_coupon;
         let schedule = self.full_cashflow_schedule(curves)?;
-        let mut flows = Vec::with_capacity(schedule.flows.len());
-        for cf in schedule.flows {
+        let mut flows = Vec::with_capacity(schedule.get_flows().len());
+        for cf in schedule.get_flows() {
             let keep = cf.date > as_of
                 && cf.kind != CFKind::PIK
                 && !(cf.kind == CFKind::Notional && cf.amount.amount() < 0.0);
@@ -90,17 +90,18 @@ impl Bond {
 
         let schedule = self.full_cashflow_schedule(market)?;
 
-        let periods: Vec<Period> =
-            if let (Some(first), Some(last)) = (schedule.flows.first(), schedule.flows.last()) {
-                vec![Period {
-                    id: PeriodId::annual(first.date.year()),
-                    start: first.date,
-                    end: last.date,
-                    is_actual: true,
-                }]
-            } else {
-                Vec::new()
-            };
+        let periods: Vec<Period> = if let (Some(first), Some(last)) =
+            (schedule.get_flows().first(), schedule.get_flows().last())
+        {
+            vec![Period {
+                id: PeriodId::annual(first.date.year()),
+                start: first.date,
+                end: last.date,
+                is_actual: true,
+            }]
+        } else {
+            Vec::new()
+        };
 
         let options = PeriodDataFrameOptions {
             credit_curve_id: self.credit_curve_id.as_ref().map(|id| id.as_str()),

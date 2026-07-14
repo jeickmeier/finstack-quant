@@ -221,11 +221,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for PrivateMarketsFund {
         let flows = self.lp_cashflows()?;
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             flows,
+            crate::cashflow::primitives::CFKind::Fixed,
             finstack_quant_core::dates::DayCount::Act365F,
-            crate::cashflow::traits::ScheduleBuildOpts {
-                kind: Some(crate::cashflow::primitives::CFKind::Fixed),
-                ..Default::default()
-            },
+            crate::cashflow::traits::ScheduleBuildOpts::default(),
         );
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))

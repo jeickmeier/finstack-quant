@@ -436,25 +436,24 @@ pub(crate) fn generate_cashflows(
     }
 
     // Build via shared builder (use market for forwards)
-    let mut schedule = builder.build_with_curves(Some(market))?;
+    let mut schedule = builder.build(Some(market))?;
 
     if let Some(ddtl) = &loan.ddtl {
         if ddtl.commitment_fee_bp != 0 {
             let commitment_fees = build_commitment_fee_flows(loan, ddtl, draw_stop, &schedule)?;
             if !commitment_fees.is_empty() {
-                let notional = schedule.notional.clone();
-                let day_count = schedule.day_count;
+                let notional = schedule.get_notional().clone();
+                let day_count = schedule.get_day_count();
                 let fee_schedule = crate::cashflow::traits::schedule_from_classified_flows(
                     commitment_fees,
                     day_count,
                     crate::cashflow::traits::ScheduleBuildOpts {
                         notional_hint: Some(notional.initial),
-                        meta: Some(schedule.meta.clone()),
-                        ..Default::default()
+                        meta: schedule.get_meta().clone(),
                     },
                 )
                 .with_notional(notional.clone());
-                schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count)?;
+                schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count);
             }
         }
     }
@@ -647,7 +646,7 @@ pub(crate) fn build_oid_eir_schedule(
     let spec = loan.oid_eir.clone().unwrap_or_default();
 
     let mut buckets: BTreeMap<Date, CashBuckets> = BTreeMap::new();
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         match cf.kind {
             CFKind::Fixed | CFKind::FloatReset | CFKind::Stub => {
                 buckets

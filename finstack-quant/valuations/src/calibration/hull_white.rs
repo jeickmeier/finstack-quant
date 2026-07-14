@@ -1621,6 +1621,29 @@ fn hw1f_caplet_price_zcb_option(
     let pf_fix = forward_df(t_fix);
     let pf_pay = forward_df(t_pay);
     let pd_pay = discount_df(t_pay);
+    hw1f_caplet_price_zcb_option_from_dfs(
+        kappa, sigma, pf_fix, pf_pay, pd_pay, t_fix, t_pay, accrual, strike, is_cap,
+    )
+}
+
+/// Exact HW1F term-index caplet/floorlet price from curve discount factors.
+///
+/// The returned value is per unit notional. `pf_fix` and `pf_pay` are
+/// projection-curve discount factors relative to the valuation date; `pd_pay`
+/// is the discount-curve factor to the contractual payment date.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn hw1f_caplet_price_zcb_option_from_dfs(
+    kappa: f64,
+    sigma: f64,
+    pf_fix: f64,
+    pf_pay: f64,
+    pd_pay: f64,
+    t_fix: f64,
+    t_pay: f64,
+    accrual: f64,
+    strike: f64,
+    is_cap: bool,
+) -> f64 {
     let valid_df = |p: f64| p.is_finite() && p > 0.0;
     if !valid_df(pf_fix) || !valid_df(pf_pay) || !valid_df(pd_pay) {
         return f64::NAN;
@@ -1662,6 +1685,68 @@ fn hw1f_caplet_price_zcb_option(
     };
     let zcb_option_clamped = if zcb_option < 0.0 { 0.0 } else { zcb_option };
     basis * gearing * zcb_option_clamped
+}
+
+/// Exact HW1F term-index caplet/floorlet price for a possibly lagged fixing.
+///
+/// This prices the option on the projection-bond ratio
+/// `P_f(T_fix,T_start) / P_f(T_fix,T_end)`. It reduces to the standard
+/// zero-coupon-bond option formula when `T_fix == T_start`, while retaining the
+/// exact HW1F bond-ratio variance when a term index fixes before accrual start.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn hw1f_term_caplet_price_from_dfs(
+    kappa: f64,
+    sigma: f64,
+    pf_start: f64,
+    pf_end: f64,
+    pd_pay: f64,
+    t_fix: f64,
+    t_start: f64,
+    t_end: f64,
+    accrual: f64,
+    strike: f64,
+    is_cap: bool,
+) -> f64 {
+    let valid_df = |value: f64| value.is_finite() && value > 0.0;
+    if !valid_df(pf_start)
+        || !valid_df(pf_end)
+        || !valid_df(pd_pay)
+        || accrual <= 0.0
+        || t_end <= t_start
+        || t_start < t_fix
+    {
+        return f64::NAN;
+    }
+    let ratio_forward = pf_start / pf_end;
+    let ratio_strike = 1.0 + accrual * strike;
+    if ratio_strike <= 0.0 {
+        return if is_cap {
+            pd_pay * (ratio_forward - ratio_strike)
+        } else {
+            0.0
+        };
+    }
+
+    let ratio_vol = (hw_bond_vol(kappa, sigma, 0.0, t_fix, t_end)
+        - hw_bond_vol(kappa, sigma, 0.0, t_fix, t_start))
+    .abs();
+    if ratio_vol < 1.0e-15 {
+        let intrinsic = if is_cap {
+            (ratio_forward - ratio_strike).max(0.0)
+        } else {
+            (ratio_strike - ratio_forward).max(0.0)
+        };
+        return pd_pay * intrinsic;
+    }
+
+    let d1 = (ratio_forward / ratio_strike).ln() / ratio_vol + 0.5 * ratio_vol;
+    let d2 = d1 - ratio_vol;
+    let option = if is_cap {
+        ratio_forward * norm_cdf(d1) - ratio_strike * norm_cdf(d2)
+    } else {
+        ratio_strike * norm_cdf(-d2) - ratio_forward * norm_cdf(-d1)
+    };
+    pd_pay * option.max(0.0)
 }
 
 /// Return the flat normal vol that reproduces the HW1F cap/floor model price.

@@ -267,14 +267,13 @@ pub(crate) fn build_reference_tranche_schedule(
         DayCount::Thirty360,
         crate::cashflow::traits::ScheduleBuildOpts {
             notional_hint: Some(tranche.current_face),
-            meta: Some(CashFlowMeta {
+            meta: CashFlowMeta {
                 representation: crate::cashflow::builder::CashflowRepresentation::Projected,
                 calendar_ids: Vec::new(),
                 facility_limit: None,
                 issue_date: Some(cmo.issue_date),
                 maturity_date: None,
-            }),
-            ..Default::default()
+            },
         },
     ))
 }
@@ -324,13 +323,13 @@ pub(crate) fn price_cmo(cmo: &AgencyCmo, market: &MarketContext, as_of: Date) ->
         .map(|tranche| tranche.current_face.currency())
         .unwrap_or(Currency::USD);
 
-    if schedule.flows.is_empty() {
+    if schedule.get_flows().is_empty() {
         return Ok(Money::new(0.0, currency));
     }
 
     let discount_curve = market.get_discount(&cmo.discount_curve_id)?;
     let mut pv = 0.0;
-    for cf in &schedule.flows {
+    for cf in schedule.get_flows() {
         let df = discount_curve.df_between_dates(as_of, cf.date)?;
         pv += cf.amount.amount() * df;
     }
@@ -387,14 +386,17 @@ mod tests {
         let schedule = build_reference_tranche_schedule(&cmo, as_of, Some(6))
             .expect("reference tranche schedule should build");
 
-        assert!(!schedule.flows.is_empty());
-        assert!(schedule.flows.iter().any(|cf| cf.kind == CFKind::Fixed));
+        assert!(!schedule.get_flows().is_empty());
         assert!(schedule
-            .flows
+            .get_flows()
+            .iter()
+            .any(|cf| cf.kind == CFKind::Fixed));
+        assert!(schedule
+            .get_flows()
             .iter()
             .any(|cf| cf.kind == CFKind::Amortization));
         assert!(schedule
-            .flows
+            .get_flows()
             .iter()
             .any(|cf| cf.kind == CFKind::PrePayment));
     }
@@ -425,7 +427,7 @@ mod tests {
             .expect("PAC schedule should build");
         assert!(
             pac_schedule
-                .flows
+                .get_flows()
                 .iter()
                 .any(|cf| cf.kind == CFKind::Amortization),
             "PAC tranche should receive scheduled principal"
@@ -436,7 +438,7 @@ mod tests {
         // wrongly carried prepayment rows.)
         assert!(
             !pac_schedule
-                .flows
+                .get_flows()
                 .iter()
                 .any(|cf| cf.kind == CFKind::PrePayment),
             "PAC tranche within collar must not carry prepayment rows"

@@ -527,8 +527,8 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
-        flows: vec![
+    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+        vec![
             CashFlow::new(
                 default_date,
                 None,
@@ -546,10 +546,10 @@ fn defaulted_notional_is_not_counted_as_positive_npv_cashflow() {
                 None,
             ),
         ],
-        notional: Notional::par(1_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: CashFlowMeta::default(),
-    };
+        Notional::par(1_000.0, Currency::USD),
+        DayCount::Act365F,
+        CashFlowMeta::default(),
+    );
 
     let curve = DiscountCurve::builder("USD-OIS")
         .base_date(base)
@@ -588,8 +588,8 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
     let default_date = Date::from_calendar_date(2025, Month::June, 1).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::December, 1).unwrap();
 
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
-        flows: vec![
+    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+        vec![
             CashFlow::new(
                 default_date,
                 None,
@@ -607,10 +607,10 @@ fn credit_adjusted_period_pv_respects_explicit_default_and_recovery_flows() {
                 None,
             ),
         ],
-        notional: Notional::par(1_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: CashFlowMeta::default(),
-    };
+        Notional::par(1_000.0, Currency::USD),
+        DayCount::Act365F,
+        CashFlowMeta::default(),
+    );
 
     let periods = vec![Period {
         id: PeriodId::annual(2025),

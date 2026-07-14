@@ -86,6 +86,8 @@ fn make_caplet(
         vol_surface_id: "VOL".into(),
         vol_type,
         vol_shift: 0.0,
+        overnight_coupon: None,
+        spread: Decimal::ZERO,
         pricing_overrides: Default::default(),
         attributes: Default::default(),
     }

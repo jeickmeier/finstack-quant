@@ -84,7 +84,7 @@ pub fn calculate_period_flows(
     as_of: Date,
 ) -> Result<(CashflowBreakdown, Money, Money, Vec<EvalWarning>)> {
     let full_schedule = instrument.cashflow_schedule(market_ctx, as_of)?;
-    let currency = full_schedule.notional.initial.currency();
+    let currency = full_schedule.get_notional().initial.currency();
     if opening_balance.amount() != 0.0 && opening_balance.currency() != currency {
         return Err(crate::error::Error::currency_mismatch(
             currency,
@@ -116,7 +116,7 @@ pub fn calculate_period_flows(
             }
         })
         .next_back()
-        .unwrap_or(full_schedule.notional.initial);
+        .unwrap_or(full_schedule.get_notional().initial);
 
     // Use opening balance to scale cashflows when the schedule notional differs from the
     // stateful outstanding (e.g., after applying sweeps). This is an approximation but
@@ -175,7 +175,7 @@ pub fn calculate_period_flows(
     let mut net_interest_cash = 0.0_f64;
 
     // Extract flows that fall within this period
-    for cf in &full_schedule.flows {
+    for cf in full_schedule.get_flows() {
         if cf.date >= period.start && cf.date < period.end {
             // Currency safety: every in-period flow must share the breakdown
             // currency. Cross-currency instruments (e.g. xccy swaps) mix
@@ -276,7 +276,7 @@ pub fn calculate_period_flows(
             // instrument whose first flow lands in a later period) fall back
             // to the initial notional.
             let pre_issuance = full_schedule
-                .meta
+                .get_meta()
                 .issue_date
                 .is_some_and(|issue| issue > snapshot_date)
                 && outstanding_path
@@ -285,7 +285,7 @@ pub fn calculate_period_flows(
             if pre_issuance {
                 return Money::new(0.0, currency);
             }
-            let initial = full_schedule.notional.initial;
+            let initial = full_schedule.get_notional().initial;
             if initial.amount() < 0.0 {
                 Money::new(-initial.amount(), initial.currency())
             } else {
@@ -293,7 +293,7 @@ pub fn calculate_period_flows(
             }
         });
 
-    let has_new_funding = full_schedule.flows.iter().any(|cf| {
+    let has_new_funding = full_schedule.get_flows().iter().any(|cf| {
         (cf.date >= period.start
             && cf.date < period.end
             && matches!(cf.kind, CFKind::RevolvingDraw))
@@ -303,7 +303,7 @@ pub fn calculate_period_flows(
                 && cf.amount.amount() <= 0.0)
     });
     let net_new_funding: f64 = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.date >= period.start && cf.date < period.end)
         .filter_map(|cf| match cf.kind {
@@ -319,7 +319,7 @@ pub fn calculate_period_flows(
             // of draws net of in-period repayments — taking the scheduled
             // closing balance here would resurrect the swept balance.
             let in_period_repayments: f64 = full_schedule
-                .flows
+                .get_flows()
                 .iter()
                 .filter(|cf| cf.date >= period.start && cf.date < period.end)
                 .filter_map(|cf| match cf.kind {
@@ -392,6 +392,18 @@ mod tests {
         }
     }
 
+    fn test_schedule(flows: Vec<CashFlow>, notional: f64, issue_date: Date) -> CashFlowSchedule {
+        CashFlowSchedule::from_parts(
+            flows,
+            Notional::par(notional, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue_date),
+                ..CashFlowMeta::default()
+            },
+        )
+    }
+
     #[test]
     fn calculate_period_flows_normalizes_interest_to_issuer_outflow() {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
@@ -404,8 +416,8 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![CashFlow::new(
+            schedule: test_schedule(
+                vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::new(-50_000.0, Currency::USD),
@@ -413,13 +425,9 @@ mod tests {
                     0.25,
                     None,
                 )],
-                notional: Notional::par(1_000_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(start),
-                    ..CashFlowMeta::default()
-                },
-            },
+                1_000_000.0,
+                start,
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -449,8 +457,8 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![
+            schedule: test_schedule(
+                vec![
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
@@ -468,13 +476,9 @@ mod tests {
                         None,
                     ),
                 ],
-                notional: Notional::par(1_000_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(start),
-                    ..CashFlowMeta::default()
-                },
-            },
+                1_000_000.0,
+                start,
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -508,8 +512,8 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![CashFlow::new(
+            schedule: test_schedule(
+                vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::new(-100_000.0, Currency::USD),
@@ -517,13 +521,9 @@ mod tests {
                     0.0,
                     None,
                 )],
-                notional: Notional::par(0.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(start),
-                    ..CashFlowMeta::default()
-                },
-            },
+                0.0,
+                start,
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -588,15 +588,7 @@ mod tests {
             outstanding -= 100_000.0;
         }
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows,
-                notional: Notional::par(1_000_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(issue),
-                    ..CashFlowMeta::default()
-                },
-            },
+            schedule: test_schedule(flows, 1_000_000.0, issue),
         };
 
         let market_ctx = MarketContext::new();
@@ -659,8 +651,8 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![CashFlow::new(
+            schedule: test_schedule(
+                vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::new(-20_000.0, Currency::USD),
@@ -668,13 +660,9 @@ mod tests {
                     0.25,
                     Some(0.08),
                 )],
-                notional: Notional::par(1_000_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(start),
-                    ..CashFlowMeta::default()
-                },
-            },
+                1_000_000.0,
+                start,
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -730,8 +718,8 @@ mod tests {
 
         let issue = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![
+            schedule: test_schedule(
+                vec![
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
@@ -751,13 +739,9 @@ mod tests {
                 ],
                 // Scheduled balance is 500k — the stateful balance (zero,
                 // fully swept upstream) takes precedence.
-                notional: Notional::par(500_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(issue),
-                    ..CashFlowMeta::default()
-                },
-            },
+                500_000.0,
+                issue,
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -794,8 +778,8 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![
+            schedule: test_schedule(
+                vec![
                     CashFlow::new(
                         Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                         None,
@@ -813,13 +797,9 @@ mod tests {
                         None,
                     ),
                 ],
-                notional: Notional::par(1_000_000.0, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(start),
-                    ..CashFlowMeta::default()
-                },
-            },
+                1_000_000.0,
+                start,
+            ),
         };
 
         let market_ctx = MarketContext::new();
@@ -854,8 +834,8 @@ mod tests {
         };
 
         let instrument = SignedFlowInstrument {
-            schedule: CashFlowSchedule {
-                flows: vec![CashFlow::new(
+            schedule: test_schedule(
+                vec![CashFlow::new(
                     Date::from_calendar_date(2025, Month::February, 15).expect("valid date"),
                     None,
                     Money::new(-50_000.0, Currency::USD),
@@ -863,13 +843,9 @@ mod tests {
                     0.25,
                     None,
                 )],
-                notional: Notional::par(0.01, Currency::USD),
-                day_count: DayCount::Act365F,
-                meta: CashFlowMeta {
-                    issue_date: Some(start),
-                    ..CashFlowMeta::default()
-                },
-            },
+                0.01,
+                start,
+            ),
         };
 
         let market_ctx = MarketContext::new();

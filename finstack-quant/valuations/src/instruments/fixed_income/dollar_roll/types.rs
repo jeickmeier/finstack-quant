@@ -316,16 +316,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
                     Money::new(-self.trade_cash_amount(self.back_price), ccy),
                 ),
             ],
+            CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(self.notional),
-                kind: Some(CFKind::Notional),
-                representation: crate::cashflow::builder::CashflowRepresentation::Contractual,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Contractual,
+                    ..Default::default()
+                },
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
+        Ok(schedule)
     }
 }
 

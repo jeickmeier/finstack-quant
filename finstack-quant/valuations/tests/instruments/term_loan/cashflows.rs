@@ -138,7 +138,7 @@ fn test_over_amortization_is_capped() {
 
     // Total amortization should equal exactly the notional (capped)
     let total_amort: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization)
         .map(|cf| cf.amount.amount())
@@ -204,7 +204,7 @@ fn test_linear_amort_no_event_at_issue_date() {
 
     // No amort event should occur on the issue date itself
     let amort_at_issue: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization && cf.date == issue)
         .collect();
@@ -216,7 +216,7 @@ fn test_linear_amort_no_event_at_issue_date() {
 
     // Total amort should equal exactly the notional (4 equal quarterly payments)
     let total_amort: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization)
         .map(|cf| cf.amount.amount())
@@ -228,7 +228,7 @@ fn test_linear_amort_no_event_at_issue_date() {
 
     // Should have exactly 4 quarterly amort events (not 5)
     let amort_count = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization)
         .count();
@@ -277,7 +277,7 @@ fn test_percent_per_period_full_amort() {
     // Q1: 100% × 1M = 1M (fully repaid in first period)
     // Q2-Q4: 0 (nothing left to amortize)
     let total_amort: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization)
         .map(|cf| cf.amount.amount())
@@ -325,7 +325,7 @@ fn test_percent_of_original_notional_flat_dollar() {
         .expect("cashflow schedule should succeed");
 
     let amort_amounts: Vec<f64> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization)
         .map(|cf| cf.amount.amount())
@@ -390,7 +390,7 @@ fn test_flat_vs_geometric_amort_differ() {
     let get_amorts = |loan: &TermLoan| -> Vec<f64> {
         let schedule = loan.cashflow_schedule(&market, as_of).unwrap();
         schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == CFKind::Amortization)
             .map(|cf| cf.amount.amount())
@@ -480,7 +480,7 @@ fn test_ddtl_partial_draw_amort_uses_funded_amount() {
         .expect("cashflow schedule should succeed");
 
     let amort_amounts: Vec<f64> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Amortization)
         .map(|cf| cf.amount.amount())
@@ -553,7 +553,7 @@ fn test_commitment_fees_use_correct_kind() {
 
     // Commitment fees should exist and use CommitmentFee kind
     let commitment_fees: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::CommitmentFee)
         .collect();
@@ -563,7 +563,7 @@ fn test_commitment_fees_use_correct_kind() {
     );
     assert!(
         schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
             .all(|cf| cf.accrual.is_some()),
@@ -572,7 +572,7 @@ fn test_commitment_fees_use_correct_kind() {
 
     // No generic Fee kind should be used for commitment fees
     let generic_fees: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fee)
         .collect();

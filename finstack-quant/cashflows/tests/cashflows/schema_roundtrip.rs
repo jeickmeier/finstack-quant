@@ -202,7 +202,7 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
 
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
-    assert!(schedule.flows.iter().any(|flow| matches!(
+    assert!(schedule.get_flows().iter().any(|flow| matches!(
         flow.kind,
         finstack_quant_cashflows::primitives::CFKind::Fixed
             | finstack_quant_cashflows::primitives::CFKind::FloatReset
@@ -210,7 +210,7 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
             | finstack_quant_cashflows::primitives::CFKind::InflationCoupon
     )));
     assert_eq!(
-        schedule.meta.issue_date,
+        schedule.get_meta().issue_date,
         Some(time::macros::date!(2024 - 08 - 31))
     );
 
@@ -224,7 +224,7 @@ fn test_json_bridge_build_validate_flows_and_accrual() {
     let dated = finstack_quant_cashflows::dated_flows_json(&schedule_json).expect("dated flows");
     let dated_flows: Vec<finstack_quant_cashflows::DatedFlowJson> =
         serde_json::from_str(&dated).expect("dated flow JSON");
-    assert_eq!(dated_flows.len(), schedule.flows.len());
+    assert_eq!(dated_flows.len(), schedule.get_flows().len());
 
     let accrued =
         finstack_quant_cashflows::accrued_interest_json(&schedule_json, "2025-02-28", None)
@@ -296,7 +296,7 @@ fn test_json_bridge_amortizing_schedule_build() {
             .expect("amortizing schedule should build");
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule JSON should deserialize");
-    assert!(schedule.flows.iter().any(|flow| matches!(
+    assert!(schedule.get_flows().iter().any(|flow| matches!(
         flow.kind,
         finstack_quant_cashflows::primitives::CFKind::Amortization
     )));
@@ -695,7 +695,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
         serde_json::from_str(&schedule_json).expect("schedule JSON deserializes");
 
     let first_coupon = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|flow| {
             matches!(
@@ -722,7 +722,7 @@ fn test_json_bridge_seasoned_floating_schedule_with_fixing_series() {
 }
 
 #[test]
-fn legacy_coupon_arrays_deserialize_but_serialize_canonically() {
+fn legacy_coupon_arrays_are_rejected() {
     let legacy = json!({
         "notional": {
             "initial": {"amount": "1000000", "currency": "USD"},
@@ -741,12 +741,28 @@ fn legacy_coupon_arrays_deserialize_but_serialize_canonically() {
         }]
     });
 
-    let spec: finstack_quant_cashflows::CashflowScheduleBuildSpec =
-        serde_json::from_value(legacy).expect("legacy input remains readable");
-    let canonical = serde_json::to_value(spec).expect("canonical spec serializes");
-    assert!(canonical.get("coupon_program").is_some());
-    assert!(canonical.get("fixed_coupons").is_none());
-    assert!(canonical.get("floating_coupons").is_none());
+    let error =
+        serde_json::from_value::<finstack_quant_cashflows::CashflowScheduleBuildSpec>(legacy)
+            .expect_err("legacy coupon arrays must fail");
+    assert!(error.to_string().contains("unknown field"));
+}
+
+#[test]
+fn legacy_fixed_rate_program_is_rejected() {
+    let legacy = canonical_build_spec(
+        vec![json!({
+            "kind": "fixed_rate_program",
+            "steps": [{"date": "2026-01-01", "rate": "0.04"}],
+            "schedule": canonical_schedule_params(),
+            "default_split": "Cash"
+        })],
+        Vec::new(),
+    );
+
+    let error =
+        serde_json::from_value::<finstack_quant_cashflows::CashflowScheduleBuildSpec>(legacy)
+            .expect_err("legacy fixed-rate programs must fail");
+    assert!(error.to_string().contains("unknown variant"));
 }
 
 #[test]
@@ -786,7 +802,7 @@ fn canonical_coupon_and_payment_programs_build_nontrivial_schedule() {
     let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(&schedule_json).expect("schedule deserializes");
     assert!(schedule
-        .flows
+        .get_flows()
         .iter()
         .any(|flow| flow.kind == finstack_quant_cashflows::primitives::CFKind::PIK));
 }
@@ -938,15 +954,6 @@ fn every_canonical_coupon_variant_dispatches_to_the_builder() {
             })],
         ),
         (
-            "legacy_fixed_rate_program",
-            vec![json!({
-                "kind": "fixed_rate_program",
-                "steps": [{"date": "2026-01-01", "rate": "0.04"}],
-                "schedule": canonical_schedule_params(),
-                "default_split": "Cash"
-            })],
-        ),
-        (
             "floating_margin_program",
             vec![json!({
                 "kind": "floating_margin_program",
@@ -963,7 +970,7 @@ fn every_canonical_coupon_variant_dispatches_to_the_builder() {
                 .unwrap_or_else(|err| panic!("build {name}: {err}"));
         let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
             serde_json::from_str(&schedule).unwrap_or_else(|err| panic!("parse {name}: {err}"));
-        assert!(schedule.flows.len() > 2, "{name} emitted no coupons");
+        assert!(schedule.get_flows().len() > 2, "{name} emitted no coupons");
     }
 }
 

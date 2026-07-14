@@ -592,10 +592,8 @@ impl BasisSwap {
                     adjust_accrual_dates: false,
                 },
             });
-        let mut schedule = builder.build_with_curves(Some(market))?;
-        schedule
-            .flows
-            .retain(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset);
+        let mut schedule = builder.build(Some(market))?;
+        schedule.retain_flows(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset);
         Ok(schedule)
     }
 }
@@ -651,7 +649,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
             [primary, reference],
             Notional::par(self.notional.amount(), self.notional.currency()),
             self.primary_leg.day_count,
-        )?
+        )
         .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }

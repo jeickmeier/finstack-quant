@@ -368,7 +368,7 @@ impl EquityTotalReturnSwap {
         let discount = curves.get_discount(self.financing.discount_curve_id.as_str())?;
         let schedule = self.cashflow_schedule(curves, as_of)?;
         let financing_flows: Vec<_> = schedule
-            .flows
+            .get_flows()
             .iter()
             .filter(|cf| cf.kind == finstack_quant_core::cashflow::CFKind::FloatReset)
             .collect();
@@ -523,7 +523,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap 
                     adjust_accrual_dates: false,
                 },
             });
-        let schedule = builder.build_with_curves(Some(context))?;
+        let schedule = builder.build(Some(context))?;
         Ok(schedule
             .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }

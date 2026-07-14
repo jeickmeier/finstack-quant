@@ -193,7 +193,7 @@ impl HazardBondEngine {
         // capitalizations, amortization) even when they don't produce
         // signed canonical schedule cashflows, so the recovery leg tracks the correct
         // notional at each interval boundary.
-        for cf in &schedule.flows {
+        for cf in schedule.get_flows() {
             if cf.date > as_of && matches!(cf.kind, CFKind::PIK | CFKind::Amortization) {
                 dates.push(cf.date);
             }
@@ -267,10 +267,10 @@ impl HazardBondEngine {
         // so that recovery is computed on the correct accreted balance.
         let mut pv_rec = 0.0;
         if recovery > 0.0 {
-            let mut full_flows = schedule.flows.clone();
+            let mut full_flows = schedule.get_flows().to_vec();
             full_flows.sort_by_key(|cf| cf.date);
 
-            let mut outstanding = schedule.notional.initial.amount();
+            let mut outstanding = schedule.get_notional().initial.amount();
             let mut future_balance_delta = std::collections::BTreeMap::<Date, f64>::new();
 
             for cf in &full_flows {

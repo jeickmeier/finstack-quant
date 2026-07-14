@@ -208,7 +208,7 @@ status = "exists"
 note = "JSON-only schedule build, validation, dated-flow, and accrual surface."
 
 [crates.cashflows.modules]
-json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the full canonical coupon_program and payment_program builder surface; legacy fixed_coupons/floating_coupons arrays are input-only" }
+json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the canonical coupon_program and payment_program builder surface" }
 accrual     = { python = "finstack_quant.cashflows.accrual",     status = "missing", note = "Accrual engine reachable only via accrued_interest_json on the JSON bridge" }
 aggregation = { python = "finstack_quant.cashflows.aggregation", status = "missing", note = "Period aggregation not yet bound; use the JSON bridge schedule output" }
 builder     = { python = "finstack_quant.cashflows.builder",     status = "missing", note = "Every public coupon and payment-program builder instruction travels through the canonical JSON program; no typed Python surface" }

@@ -53,7 +53,7 @@ fn principal_events_after_maturity_rejected() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_err(),
         "Build should fail when principal event is after maturity"
@@ -91,7 +91,7 @@ fn principal_events_at_maturity_accepted() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_ok(),
         "Build should succeed when principal event is exactly at maturity"
@@ -126,11 +126,11 @@ fn principal_events_before_issue_included_and_adjusts_outstanding() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     // Pre-issue event should appear in flows
     assert!(
-        schedule.flows.iter().any(|cf| cf.date == pre_issue),
+        schedule.get_flows().iter().any(|cf| cf.date == pre_issue),
         "Pre-issue event should appear in flows"
     );
 
@@ -172,7 +172,7 @@ fn principal_events_at_issue_accepted() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_ok(),
         "Build should succeed when principal event is at issue date"
@@ -207,7 +207,7 @@ fn principal_events_currency_mismatch_rejected() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_err(),
         "Build should fail when principal event currency differs from notional"
@@ -235,7 +235,7 @@ fn principal_event_delta_cash_currency_mismatch_rejected() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_err(),
         "Build should fail when principal event delta/cash currencies differ"
@@ -289,7 +289,7 @@ fn multiple_principal_events_same_date_accepted() {
             events[1].kind,
         );
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_ok(),
         "Build should succeed with multiple events on same date"
@@ -298,7 +298,7 @@ fn multiple_principal_events_same_date_accepted() {
     // Verify net effect: draw 200k, repay 100k => +100k outstanding
     let schedule = result.unwrap();
     let principal_flows_on_mid: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| {
             cf.date == mid_date && (cf.kind == CFKind::Notional || cf.kind == CFKind::Amortization)
@@ -357,7 +357,7 @@ fn principal_event_draw_increases_outstanding() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, Some(event.cash), event.kind);
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
     let outstanding = schedule.outstanding_by_date().unwrap();
 
     // Find outstanding at mid_date
@@ -401,11 +401,11 @@ fn principal_event_repay_effect_on_outstanding() {
         .principal(init, issue, maturity)
         .add_principal_event(event.date, event.delta, None, event.kind);
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     // Verify the event was added to flows
     let notional_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Notional)
         .collect();
@@ -419,7 +419,7 @@ fn principal_event_repay_effect_on_outstanding() {
 
     // Verify a repayment flow exists at mid_date with positive cash (defaulted to -delta)
     let mid_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.date == mid_date && cf.kind == CFKind::Amortization)
         .collect();
@@ -474,14 +474,14 @@ fn principal_event_emitted_cashflow_sign_follows_kind() {
             CFKind::Amortization,
         );
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
     let draw_flow = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.date == draw_date && cf.kind == CFKind::Notional)
         .expect("draw flow emitted");
     let repay_flow = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.date == repay_date && cf.kind == CFKind::Amortization)
         .expect("repayment flow emitted");
@@ -514,7 +514,7 @@ fn empty_principal_events_accepted() {
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity);
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_ok(),
         "Build should succeed with empty events list"
@@ -528,7 +528,7 @@ fn empty_principal_events_accepted() {
 /// Count flows matching a date and kind.
 fn count_flows(schedule: &CashFlowSchedule, date: Date, kind: CFKind) -> usize {
     schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.date == date && cf.kind == kind)
         .count()
@@ -562,7 +562,7 @@ fn pre_issue_and_at_issue_events_emit_once_each() {
             CFKind::Notional,
         );
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     assert_eq!(
         count_flows(&schedule, pre_issue, CFKind::Notional),
@@ -590,7 +590,7 @@ fn pre_issue_and_at_issue_events_emit_once_each() {
 
     // Redemption at maturity repays the full outstanding exactly once.
     let redemption: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.date >= maturity && cf.kind == CFKind::Notional)
         .map(|cf| cf.amount.amount())
@@ -626,7 +626,7 @@ fn two_pre_issue_events_on_different_dates_emit_once_each() {
             CFKind::Notional,
         );
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     assert_eq!(count_flows(&schedule, pre_a, CFKind::Notional), 1);
     assert_eq!(count_flows(&schedule, pre_b, CFKind::Notional), 1);
@@ -667,7 +667,7 @@ fn pre_issue_event_with_issue_dated_fixed_fee_emits_fee_once() {
             amount: Money::new(5_000.0, Currency::USD),
         });
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     assert_eq!(
         count_flows(&schedule, issue, CFKind::Fee),
@@ -695,7 +695,7 @@ fn fixed_fee_before_issue_emitted_once_at_its_date() {
             amount: Money::new(2_500.0, Currency::USD),
         });
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     assert_eq!(
         count_flows(&schedule, fee_date, CFKind::Fee),
@@ -703,7 +703,7 @@ fn fixed_fee_before_issue_emitted_once_at_its_date() {
         "pre-issue fixed fee must be emitted exactly once on its date"
     );
     let fee = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.date == fee_date && cf.kind == CFKind::Fee)
         .unwrap();
@@ -749,10 +749,10 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity).fixed_cf(fixed);
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     let redemption = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
         .expect("redemption flow emitted");
@@ -762,7 +762,7 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
     );
 
     let final_coupon_date = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind != CFKind::Notional && cf.amount.amount() > 0.0)
         .map(|cf| cf.date)
@@ -775,7 +775,7 @@ fn weekend_maturity_redemption_matches_final_coupon_date() {
 
     // No flow may remain on the raw (non-business-day) maturity date.
     assert!(
-        schedule.flows.iter().all(|cf| cf.date != maturity),
+        schedule.get_flows().iter().all(|cf| cf.date != maturity),
         "no flow may be dated on the unadjusted weekend maturity"
     );
 }
@@ -801,7 +801,7 @@ fn amortization_event_with_positive_delta_rejected() {
             CFKind::Amortization,
         );
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(result.is_err(), "Amortization events require delta <= 0");
     let msg = format!("{}", result.unwrap_err());
     assert!(
@@ -827,7 +827,7 @@ fn notional_event_with_negative_delta_rejected() {
             CFKind::Notional,
         );
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(result.is_err(), "Notional events require delta >= 0");
     let msg = format!("{}", result.unwrap_err());
     assert!(
@@ -904,8 +904,8 @@ fn assert_program_order_independent<F>(
     let _ = second.principal(principal, issue, maturity);
 
     assert_eq!(
-        first.build_with_curves(None).unwrap().flows,
-        second.build_with_curves(None).unwrap().flows
+        first.build(None).unwrap().get_flows(),
+        second.build(None).unwrap().get_flows()
     );
 }
 
@@ -929,8 +929,8 @@ fn principal_and_amortization_are_order_independent() {
         .principal(principal, issue, maturity);
 
     assert_eq!(
-        principal_first.build_with_curves(None).unwrap().flows,
-        amortization_first.build_with_curves(None).unwrap().flows
+        principal_first.build(None).unwrap().get_flows(),
+        amortization_first.build(None).unwrap().get_flows()
     );
 }
 
@@ -1019,6 +1019,6 @@ fn principal_does_not_clear_the_first_builder_error() {
         })
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity);
 
-    let error = builder.build_with_curves(None).unwrap_err().to_string();
+    let error = builder.build(None).unwrap_err().to_string();
     assert!(error.contains("strictly increasing"), "{error}");
 }

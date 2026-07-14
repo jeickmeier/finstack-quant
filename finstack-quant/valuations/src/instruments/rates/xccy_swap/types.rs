@@ -609,13 +609,11 @@ impl XccySwap {
                     adjust_accrual_dates: false,
                 },
             });
-        let mut schedule = builder.build_with_curves(Some(market))?;
-        schedule
-            .flows
-            .retain(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset);
-        for cf in &mut schedule.flows {
+        let mut schedule = builder.build(Some(market))?;
+        schedule.retain_flows(|cf| cf.kind == crate::cashflow::primitives::CFKind::FloatReset);
+        schedule.update_flows(|cf| {
             cf.amount *= leg.side.coupon_sign();
-        }
+        });
         Ok(schedule)
     }
 
@@ -651,7 +649,7 @@ impl XccySwap {
             );
         }
         Ok(builder
-            .build_with_curves(None)?
+            .build(None)?
             .with_notional(Notional::par(leg.notional.amount(), leg.currency)))
     }
 
@@ -959,7 +957,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
             [leg1_schedule, leg1_principal, leg2_schedule, leg2_principal],
             Notional::par(0.0, self.reporting_currency),
             self.leg1.day_count,
-        )?
+        )
         .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }

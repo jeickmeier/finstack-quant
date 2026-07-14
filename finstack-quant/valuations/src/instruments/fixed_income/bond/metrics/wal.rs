@@ -35,7 +35,7 @@ impl MetricCalculator for BondWalCalculator {
         let mut weighted_sum = 0.0;
         let mut total_principal = 0.0;
 
-        for cf in &schedule.flows {
+        for cf in schedule.get_flows() {
             if cf.date <= context.as_of {
                 continue;
             }

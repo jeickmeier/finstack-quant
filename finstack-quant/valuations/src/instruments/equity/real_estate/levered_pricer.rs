@@ -146,7 +146,7 @@ pub(crate) fn equity_cashflows(
 
     let financing_schedules = financing_schedules_supported(inst, market, as_of)?;
     for sched in &financing_schedules {
-        for cf in &sched.flows {
+        for cf in sched.get_flows() {
             if cf.date < as_of || cf.date > exit {
                 continue;
             }

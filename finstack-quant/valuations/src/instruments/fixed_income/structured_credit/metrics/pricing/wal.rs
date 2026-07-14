@@ -276,17 +276,17 @@ mod tests {
             total_pik: zero,
             total_writedown: zero,
         };
-        let schedule = CashFlowSchedule {
-            flows: principal_flows
+        let schedule = CashFlowSchedule::from_parts(
+            principal_flows
                 .iter()
                 .map(|(date, amount)| {
                     CashFlow::new(*date, None, *amount, CFKind::Amortization, 0.0, None)
                 })
                 .collect(),
-            notional: Notional::par(100.0, Currency::USD),
-            day_count: DayCount::Thirty360,
-            meta: CashFlowMeta::default(),
-        };
+            Notional::par(100.0, Currency::USD),
+            DayCount::Thirty360,
+            CashFlowMeta::default(),
+        );
 
         let tranche_wal = calculate_tranche_wal(&tranche, as_of).expect("tranche WAL");
         let schedule_wal = schedule.weighted_average_life(as_of).expect("schedule WAL");

@@ -218,9 +218,12 @@ fn projected_schedule_contains_premium_and_default_rows() {
         .build_projected_schedule(&tranche, &market, as_of)
         .expect("projected tranche schedule");
 
-    assert!(schedule.flows.iter().any(|cf| cf.kind == CFKind::Fixed));
     assert!(schedule
-        .flows
+        .get_flows()
+        .iter()
+        .any(|cf| cf.kind == CFKind::Fixed));
+    assert!(schedule
+        .get_flows()
         .iter()
         .any(|cf| cf.kind == CFKind::DefaultedNotional));
 }

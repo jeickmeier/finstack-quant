@@ -45,6 +45,165 @@
         }
       ]
     },
+    "FloatingLegCompounding": {
+      "description": "Method for calculating floating leg coupon payments.\n\nDifferent reference rates require different compounding conventions:\n- **Term rates (SOFR 3M, EURIBOR, historical LIBOR)**: Simple interest\n- **Overnight rates (SOFR, SONIA, €STR, TONA)**: Compounded in arrears\n\n# Market Standards\n\n## Simple (LIBOR-style)\n- **Formula**: `Coupon = Notional × (Forward_Rate + Spread) × DCF`\n- **Use for**: USD LIBOR, EUR EURIBOR, GBP LIBOR (historical)\n- **Standard**: ISDA 2006 Definitions\n\n## Compounded In Arrears (RFR-style)\n- **Formula**: `Coupon = Notional × [∏(1 + r_i × dcf_i) - 1]`\n- **Use for**: USD SOFR, GBP SONIA, EUR €STR, JPY TONA\n- **Standard**: ISDA 2021 Definitions\n- **Lookback**: Typically 2-5 business days before period end\n- **Observation shift**: Optional shift for operational convenience\n\n# Examples\n\n```\nuse finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;\n\n// LIBOR-style swap (simple compounding)\nlet simple = FloatingLegCompounding::Simple;\nassert_eq!(simple, FloatingLegCompounding::default());\n\n// SOFR OIS swap: plain compounded in arrears (no lookback)\nlet sofr = FloatingLegCompounding::CompoundedInArrears {\n    lookback_days: 0,\n    observation_shift: None,\n};\nassert_eq!(sofr, FloatingLegCompounding::sofr());\n\n// SONIA FRN-style leg with the BoE 5-day lookback (explicit, not the OIS preset)\nlet sonia_frn = FloatingLegCompounding::CompoundedInArrears {\n    lookback_days: 5,\n    observation_shift: None,\n};\nassert_ne!(sonia_frn, FloatingLegCompounding::sonia());\n```\n\n# References\n\n- **ISDA 2021 Definitions**: Compounded RFR conventions\n- **ARRC** (Alternative Reference Rates Committee): SOFR conventions\n- **BoE** (Bank of England): SONIA conventions\n- **ECB**: €STR conventions\n\nIn the IRS instrument implementation, the RFR-style variant\n(`CompoundedInArrears`) is also used to classify swaps as OIS for\ndiscount-only float-leg pricing; see `InterestRateSwap::is_single_curve_ois` for details.",
+      "oneOf": [
+        {
+          "const": "Simple",
+          "description": "Simple interest compounding (term-rate style).\n\nCoupon = Notional × (Forward_Rate + Spread) × Day_Count_Fraction\n\nUse for:\n- Term SOFR / EURIBOR-style swaps with fixed-tenor indices\n- Legacy USD/EUR/GBP LIBOR swaps (for back-testing only)\n\nThis is the current default behavior for vanilla IRS and matches\nISDA 2006 term-rate conventions.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears (overnight RFR rates).\n\nCoupon = Notional × [∏(1 + r_i × dcf_i) - 1] where the product\nis taken over daily observations in the accrual period.\n\nUse for:\n- USD SOFR (Secured Overnight Financing Rate)\n- GBP SONIA (Sterling Overnight Index Average)\n- EUR €STR (Euro Short-Term Rate)\n- JPY TONA (Tokyo Overnight Average Rate)\n\n# Fields\n\n- `lookback_days`: Days to shift observation end date before period end (typically 2-5)\n- `observation_shift`: Optional additional shift for operational convenience\n\n# Market Conventions\n\n- **SOFR**: 2-day lookback (ARRC recommended)\n- **SONIA**: 5-day lookback (BoE recommended)\n- **€STR**: 2-day shift (ECB convention)\n- **TONA**: 2-day lag (JSCC convention)",
+          "properties": {
+            "CompoundedInArrears": {
+              "properties": {
+                "lookback_days": {
+                  "description": "Number of business days to shift observation dates back from the accrual\nperiod (lookback).  Typically 2–5 days depending on market convention.\n\nThe observation dates are shifted while the day-count-fraction (DCF)\nweights remain anchored to the **original** accrual period dates.\nThis is consistent with \"lookback without observation shift\" as\ndescribed in the ISDA 2021 Definitions and ARRC SOFR conventions.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "observation_shift": {
+                  "description": "Optional ISDA 2021 observation shift (in business days), as an\n**alternative** to a lookback.\n\nWhen set (non-zero), observation dates are shifted *backward* by\nthis many business days and the day-count-fraction weights are\nshifted with them — identical semantics to\n[`FloatingLegCompounding::CompoundedWithObservationShift`].\n\nCombining a non-zero `lookback_days` with a non-zero\n`observation_shift` is **rejected** at pricing time on every\npricing path: the two conventions are mutually exclusive, and the\nprevious behavior (the shift silently cancelling the lookback on\none path while erroring on the other) was a defect.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "lookback_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CompoundedInArrears"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with true ISDA 2021 observation shift.\n\nUnlike `CompoundedInArrears` (lookback semantics), this variant shifts\n**both** the observation dates AND the day-count-fraction (DCF) weights.\nThis matches ISDA 2021 Definitions Section 4.5(c).\n\n```text\nLookback:           DCF(d, d+1)           × rate(d - shift, d+1 - shift)\nObservation Shift:  DCF(d - shift, d+1 - shift) × rate(d - shift, d+1 - shift)\n```",
+          "properties": {
+            "CompoundedWithObservationShift": {
+              "properties": {
+                "shift_days": {
+                  "description": "Number of business days to shift both observation dates and DCF weights.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "shift_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CompoundedWithObservationShift"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Compounded in arrears with a rate cut-off near the period end.\n\nThis freezes the last observed overnight rate for the final `cutoff_days`\nbusiness days of the accrual period. Bloomberg SWPM labels this\nconvention as \"Rate Cut-Off Days\".",
+          "properties": {
+            "CompoundedWithRateCutoff": {
+              "properties": {
+                "cutoff_days": {
+                  "description": "Number of business days before period end to freeze the overnight rate.",
+                  "format": "int32",
+                  "maximum": 31,
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cutoff_days"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "CompoundedWithRateCutoff"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OvernightCouponConvention": {
+      "additionalProperties": false,
+      "description": "Contractual terms for an option on a compounded overnight RFR coupon.\n\nThe shared [`FloatingLegCompounding`] type is reused so lookback,\nobservation-shift, and rate-cutoff semantics cannot drift from IRS pricing.\nPayment and fixing calendars are separate because operational payment\ndelays need not use the index publication calendar.",
+      "properties": {
+        "compounding": {
+          "$ref": "#/$defs/FloatingLegCompounding",
+          "description": "Daily overnight compounding convention."
+        },
+        "fixing_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Calendar used for overnight observations and fixings."
+        },
+        "payment_calendar_id": {
+          "anyOf": [
+            {
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Calendar used to apply the payment delay."
+        },
+        "payment_delay_days": {
+          "default": 0,
+          "description": "Payment delay in business days after the accrual end date.",
+          "format": "int32",
+          "maximum": 31,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "spread_compounding": {
+          "$ref": "#/$defs/OvernightSpreadCompounding",
+          "default": "exclude",
+          "description": "Whether any contractual spread is compounded or added afterward."
+        }
+      },
+      "required": [
+        "compounding"
+      ],
+      "type": "object"
+    },
+    "OvernightSpreadCompounding": {
+      "description": "Whether a contractual spread is included in overnight daily compounding.\n\nISDA-standard RFR coupons normally compound only the overnight index and add\nany spread as simple interest after compounding. `Include` represents the\nless common contract where the spread enters every daily compound factor.",
+      "oneOf": [
+        {
+          "const": "exclude",
+          "description": "Add the spread after compounding the overnight index.",
+          "type": "string"
+        },
+        {
+          "const": "include",
+          "description": "Include the spread in every daily overnight compound factor.",
+          "type": "string"
+        }
+      ]
+    },
     "RateOptionType": {
       "description": "Type of interest rate option",
       "oneOf": [
@@ -238,6 +397,17 @@
               "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
               "description": "Notional amount"
             },
+            "overnight_coupon": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/OvernightCouponConvention"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional compounded-overnight coupon terms.\n\n`None` preserves the legacy term-index/simple-forward caplet contract.\nSet this explicitly for caps on compounded SOFR, SONIA, €STR, or another\novernight RFR coupon."
+            },
             "pricing_overrides": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
               "default": {
@@ -271,6 +441,14 @@
               "$ref": "#/$defs/SettlementType",
               "default": "cash",
               "description": "Settlement type (defaults to Cash; caps/floors are virtually always cash-settled)"
+            },
+            "spread": {
+              "description": "Contractual spread added to the referenced rate, in decimal rate units.\n\nTerm-index coupons add this spread after projecting the index. For\novernight coupons, [`OvernightSpreadCompounding`] determines whether it\nis added after compounding or included in every daily factor.",
+              "pattern": "^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$",
+              "type": [
+                "string",
+                "number"
+              ]
             },
             "start_date": {
               "description": "Start date of underlying period",

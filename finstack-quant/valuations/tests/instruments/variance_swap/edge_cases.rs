@@ -544,9 +544,9 @@ fn test_cashflow_schedule_is_empty_placeholder() {
     let flows = swap.dated_cashflows(&ctx, as_of).unwrap();
 
     // Assert
-    assert!(schedule.flows.is_empty());
+    assert!(schedule.get_flows().is_empty());
     assert_eq!(
-        schedule.meta.representation,
+        schedule.get_meta().representation,
         finstack_quant_cashflows::builder::CashflowRepresentation::Placeholder
     );
     assert!(flows.is_empty());
@@ -566,7 +566,7 @@ fn test_cashflow_schedule_preserves_currency() {
     let schedule = swap.cashflow_schedule(&ctx, as_of).unwrap();
 
     // Assert
-    assert_eq!(schedule.notional.initial.currency(), Currency::EUR);
+    assert_eq!(schedule.get_notional().initial.currency(), Currency::EUR);
 }
 
 #[test]

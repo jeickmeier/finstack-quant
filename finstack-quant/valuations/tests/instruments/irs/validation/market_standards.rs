@@ -1375,7 +1375,7 @@ fn test_eom_pricer_cashflow_consistency() {
 
     // The schedule should have generated valid flows
     assert!(
-        !sched.flows.is_empty(),
+        !sched.get_flows().is_empty(),
         "EOM cashflow schedule should have flows"
     );
 

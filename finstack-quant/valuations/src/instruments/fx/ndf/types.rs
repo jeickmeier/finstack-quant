@@ -983,16 +983,17 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
         let ccy = self.settlement_currency;
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
             vec![(self.maturity, Money::new(settlement_amount, ccy))],
+            CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
                 notional_hint: Some(Money::new(0.0, ccy)),
-                kind: Some(CFKind::Notional),
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                ..Default::default()
+                meta: crate::cashflow::builder::CashFlowMeta {
+                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
             },
         );
-        Ok(schedule
-            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
+        Ok(schedule)
     }
 }
 
@@ -1469,7 +1470,7 @@ mod tests {
             .expect("ndf schedule");
 
         assert_eq!(
-            schedule.meta.representation,
+            schedule.get_meta().representation,
             crate::cashflow::builder::CashflowRepresentation::Projected
         );
     }

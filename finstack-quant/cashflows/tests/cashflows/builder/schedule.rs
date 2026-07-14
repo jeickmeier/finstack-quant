@@ -73,7 +73,7 @@ fn linear_vs_step_parity() {
             final_notional: Money::new(0.0, Currency::USD),
         })
         .fixed_cf(fixed.clone());
-    let s1 = b1.build_with_curves(None).unwrap();
+    let s1 = b1.build(None).unwrap();
 
     // Step schedule equivalent
     let sched = finstack_quant_cashflows::builder::periods::build_periods(
@@ -106,10 +106,10 @@ fn linear_vs_step_parity() {
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::StepRemaining { schedule: pairs })
         .fixed_cf(fixed);
-    let s2 = b2.build_with_curves(None).unwrap();
+    let s2 = b2.build(None).unwrap();
 
-    assert_eq!(s1.flows.len(), s2.flows.len());
-    for (a, b) in s1.flows.iter().zip(s2.flows.iter()) {
+    assert_eq!(s1.get_flows().len(), s2.get_flows().len());
+    for (a, b) in s1.get_flows().iter().zip(s2.get_flows().iter()) {
         assert_eq!(a.date, b.date);
         assert_eq!(a.kind, b.kind);
         assert!(
@@ -151,7 +151,7 @@ fn pik_capitalization_increases_outstanding() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
-    let s = b.build_with_curves(None).unwrap();
+    let s = b.build(None).unwrap();
     let path = s.outstanding_by_date().unwrap();
     // Find last outstanding before redemption
     let last_before = path
@@ -223,10 +223,10 @@ fn linear_amortization_uses_first_coupon_leg_cadence() {
             final_notional: Money::new(0.0, Currency::USD),
         })
         .fixed_to_float(switch, monthly_fixed, quarterly_float, CouponType::Cash);
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
     let amortization_dates: Vec<Date> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|flow| flow.kind == CFKind::Amortization)
         .map(|flow| flow.date)
@@ -283,12 +283,12 @@ fn ordering_invariants_within_date() {
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 })
         .fixed_cf(fixed);
-    let s = b.build_with_curves(None).unwrap();
+    let s = b.build(None).unwrap();
 
     // On coupon dates where multiple flows exist, enforce order: Fixed/Stub -> Amortization -> PIK -> Notional
     let mut by_date: finstack_quant_core::HashMap<Date, Vec<CFKind>> =
         finstack_quant_core::HashMap::default();
-    for cf in &s.flows {
+    for cf in s.get_flows() {
         by_date.entry(cf.date).or_default().push(cf.kind);
     }
 
@@ -341,7 +341,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Use a flat DF=1.0 curve for this test (testing NPV = sum when no discounting)
     // NOTE: Flat curves are not monotonically decreasing, so must allow_non_monotonic()
@@ -363,7 +363,7 @@ fn fixed_schedule_npv_equals_sum_cashflows() {
     // PV with flat curve DF=1.0 should equal only strictly-future cashflows;
     // the issue-date funding exchange is already settled at the valuation date.
     let expected = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.date > issue)
         .fold(0.0, |sum, cf| sum + cf.amount.amount());
@@ -410,11 +410,11 @@ fn detects_stub_periods() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Find coupon flows (not notional)
     let coupon_flows: Vec<&CashFlow> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub)
         .collect();
@@ -471,10 +471,10 @@ fn negative_rate_fixed_coupons_are_emitted() {
     let _ = b
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .fixed_cf(fixed);
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     let coupons: Vec<&CashFlow> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed)
         .collect();
@@ -574,12 +574,13 @@ fn outstanding_by_date_dedup_and_values() {
         .principal(init, issue, maturity)
         .amortization(AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 })
         .fixed_cf(fixed);
-    let s = b.build_with_curves(None).unwrap();
+    let s = b.build(None).unwrap();
 
     let end_by_date = s.outstanding_by_date().unwrap();
 
     // 1) One entry per unique date
-    let unique_dates: std::collections::BTreeSet<Date> = s.flows.iter().map(|cf| cf.date).collect();
+    let unique_dates: std::collections::BTreeSet<Date> =
+        s.get_flows().iter().map(|cf| cf.date).collect();
     assert_eq!(end_by_date.len(), unique_dates.len());
     // Dates are ordered
     for ((d1, _), d2) in end_by_date.iter().zip(unique_dates.iter()) {
@@ -632,8 +633,8 @@ fn outstanding_by_date_dedup_and_values() {
 #[test]
 fn outstanding_by_date_includes_prepayment() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
-        flows: vec![CashFlow::new(
+    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+        vec![CashFlow::new(
             prepay_date,
             None,
             Money::new(250.0, Currency::USD),
@@ -641,13 +642,13 @@ fn outstanding_by_date_includes_prepayment() {
             0.0,
             None,
         )],
-        notional: finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: finstack_quant_cashflows::builder::schedule::CashFlowMeta {
+        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
+        DayCount::Act365F,
+        finstack_quant_cashflows::builder::schedule::CashFlowMeta {
             issue_date: Some(prepay_date),
             ..Default::default()
         },
-    };
+    );
 
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(outstanding.len(), 1, "expected one dated balance snapshot");
@@ -662,8 +663,8 @@ fn outstanding_by_date_includes_prepayment() {
 fn outstanding_by_date_includes_defaulted_notional() {
     let default_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
     let recovery_date = Date::from_calendar_date(2025, Month::September, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
-        flows: vec![
+    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+        vec![
             CashFlow::new(
                 default_date,
                 None,
@@ -681,13 +682,13 @@ fn outstanding_by_date_includes_defaulted_notional() {
                 None,
             ),
         ],
-        notional: finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: finstack_quant_cashflows::builder::schedule::CashFlowMeta {
+        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
+        DayCount::Act365F,
+        finstack_quant_cashflows::builder::schedule::CashFlowMeta {
             issue_date: Some(default_date),
             ..Default::default()
         },
-    };
+    );
 
     let outstanding = schedule.outstanding_by_date().unwrap();
     assert_eq!(outstanding.len(), 2, "expected default and recovery dates");
@@ -732,17 +733,17 @@ fn builder_created_schedule_sets_issue_date_for_outstanding_by_date() {
 
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity).fixed_cf(fixed);
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
 
-    assert_eq!(schedule.meta.issue_date, Some(issue));
+    assert_eq!(schedule.get_meta().issue_date, Some(issue));
     assert!(schedule.outstanding_by_date().is_ok());
 }
 
 #[test]
 fn outstanding_by_date_requires_issue_date() {
     let prepay_date = Date::from_calendar_date(2025, Month::March, 15).unwrap();
-    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule {
-        flows: vec![CashFlow::new(
+    let schedule = finstack_quant_cashflows::builder::schedule::CashFlowSchedule::from_parts(
+        vec![CashFlow::new(
             prepay_date,
             None,
             Money::new(250.0, Currency::USD),
@@ -750,10 +751,10 @@ fn outstanding_by_date_requires_issue_date() {
             0.0,
             None,
         )],
-        notional: finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: finstack_quant_cashflows::builder::schedule::CashFlowMeta::default(),
-    };
+        finstack_quant_cashflows::builder::Notional::par(1_000.0, Currency::USD),
+        DayCount::Act365F,
+        finstack_quant_cashflows::builder::schedule::CashFlowMeta::default(),
+    );
 
     let err = schedule
         .outstanding_by_date()
@@ -774,9 +775,9 @@ fn fixed_fee_on_issue_date_is_emitted() {
             amount: Money::new(12_500.0, Currency::USD),
         });
 
-    let schedule = builder.build_with_curves(None).unwrap();
+    let schedule = builder.build(None).unwrap();
     let fees: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fee)
         .collect();
@@ -826,7 +827,7 @@ fn schedule_errors_on_unknown_calendar() {
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .fixed_cf(fixed);
 
-    let result = builder.build_with_curves(None);
+    let result = builder.build(None);
     assert!(
         result.is_err(),
         "Schedule generation should error on unknown calendar"
@@ -865,11 +866,11 @@ fn stub_period_thirty360_produces_proportional_accrual() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed.clone());
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Find coupon flows only
     let coupon_flows: Vec<&CashFlow> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed || cf.kind == CFKind::Stub)
         .collect();
@@ -964,18 +965,18 @@ fn npv_golden_value_with_realistic_discount_curve() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Count positive and negative flows to understand structure
     let positive_flows: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.amount.amount() > 0.0)
         .map(|cf| cf.amount.amount())
         .sum();
 
     let negative_flows: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.amount.amount() < 0.0)
         .map(|cf| cf.amount.amount())
@@ -1027,7 +1028,7 @@ fn npv_golden_value_with_realistic_discount_curve() {
     // 2. The schedule generates expected number of positive cash flows
     // (2 coupons + 1 redemption = 3 positive flows for 1-year semi-annual)
     let positive_count = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.amount.amount() > 0.0)
         .count();
@@ -1039,7 +1040,7 @@ fn npv_golden_value_with_realistic_discount_curve() {
 
     // 3. Verify coupon amounts are correct (~25K each for 5% semi-annual on 1M)
     let coupons: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed)
         .collect();
@@ -1053,7 +1054,10 @@ fn npv_golden_value_with_realistic_discount_curve() {
         coupons.len()
     );
     assert!(
-        !schedule.flows.iter().any(|cf| cf.kind == CFKind::Stub),
+        !schedule
+            .get_flows()
+            .iter()
+            .any(|cf| cf.kind == CFKind::Stub),
         "regular bullet schedule must not contain Stub coupons"
     );
 
@@ -1099,11 +1103,11 @@ fn coupon_amount_golden_values() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Find coupon flows
     let coupons: Vec<&CashFlow> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Fixed)
         .collect();
@@ -1117,7 +1121,10 @@ fn coupon_amount_golden_values() {
         coupons.len()
     );
     assert!(
-        !schedule.flows.iter().any(|cf| cf.kind == CFKind::Stub),
+        !schedule
+            .get_flows()
+            .iter()
+            .any(|cf| cf.kind == CFKind::Stub),
         "regular bullet schedule must not contain Stub coupons"
     );
 
@@ -1142,7 +1149,7 @@ fn coupon_amount_golden_values() {
 
     // Verify principal redemption amount
     let redemption: Vec<&CashFlow> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::Notional && cf.amount.amount() > 0.0)
         .collect();
@@ -1203,11 +1210,11 @@ fn cashflow_conservation_bond_principal() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Sum principal-related flows (Notional + Amortization)
     let principal_sum: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Notional | CFKind::Amortization))
         .map(|cf| cf.amount.amount())
@@ -1261,11 +1268,11 @@ fn cashflow_conservation_amortizing_bond_principal() {
         .principal(init, issue, maturity)
         .fixed_cf(fixed)
         .amortization(AmortizationSpec::LinearTo { final_notional });
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Sum principal-related flows
     let principal_sum: f64 = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Notional | CFKind::Amortization))
         .map(|cf| cf.amount.amount())
@@ -1316,7 +1323,7 @@ fn outstanding_never_negative() {
         .principal(init, issue, maturity)
         .fixed_cf(fixed)
         .amortization(AmortizationSpec::LinearTo { final_notional });
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Get outstanding path (returns Vec<(Date, Money)>)
     let outstanding_path = schedule
@@ -1364,7 +1371,7 @@ fn npv_decreases_with_higher_discount_rate() {
 
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).fixed_cf(fixed);
-    let schedule = b.build_with_curves(None).unwrap();
+    let schedule = b.build(None).unwrap();
 
     // Build curves at different rates
     let build_curve = |rate: f64| {
@@ -1437,12 +1444,12 @@ fn test_weighted_average_life_two_amort() {
         ),
     ];
 
-    let schedule = CashFlowSchedule {
+    let schedule = CashFlowSchedule::from_parts(
         flows,
-        notional: Notional::par(1_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: CashFlowMeta::default(),
-    };
+        Notional::par(1_000.0, Currency::USD),
+        DayCount::Act365F,
+        CashFlowMeta::default(),
+    );
 
     let wal = schedule
         .weighted_average_life(as_of)
@@ -1475,12 +1482,12 @@ fn test_weighted_average_life_bullet() {
         None,
     )];
 
-    let schedule = CashFlowSchedule {
+    let schedule = CashFlowSchedule::from_parts(
         flows,
-        notional: Notional::par(1_000_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: CashFlowMeta::default(),
-    };
+        Notional::par(1_000_000.0, Currency::USD),
+        DayCount::Act365F,
+        CashFlowMeta::default(),
+    );
 
     let wal = schedule
         .weighted_average_life(as_of)
@@ -1501,12 +1508,12 @@ fn test_weighted_average_life_empty() {
 
     let as_of = Date::from_calendar_date(2025, Month::January, 15).unwrap();
 
-    let schedule = CashFlowSchedule {
-        flows: vec![],
-        notional: Notional::par(1_000_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: CashFlowMeta::default(),
-    };
+    let schedule = CashFlowSchedule::from_parts(
+        vec![],
+        Notional::par(1_000_000.0, Currency::USD),
+        DayCount::Act365F,
+        CashFlowMeta::default(),
+    );
 
     let wal = schedule
         .weighted_average_life(as_of)
@@ -1556,12 +1563,12 @@ fn test_weighted_average_life_ignores_coupons() {
         ),
     ];
 
-    let schedule = CashFlowSchedule {
+    let schedule = CashFlowSchedule::from_parts(
         flows,
-        notional: Notional::par(1_000_000.0, Currency::USD),
-        day_count: DayCount::Act365F,
-        meta: CashFlowMeta::default(),
-    };
+        Notional::par(1_000_000.0, Currency::USD),
+        DayCount::Act365F,
+        CashFlowMeta::default(),
+    );
 
     let wal = schedule
         .weighted_average_life(as_of)

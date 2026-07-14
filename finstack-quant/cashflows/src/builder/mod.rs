@@ -32,7 +32,7 @@
 //! let schedule = CashFlowSchedule::builder()
 //!     .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
 //!     .fixed_cf(fixed_spec)
-//!     .build_with_curves(None)?;
+//!     .build(None)?;
 //!
 //! assert!(!schedule.flows.is_empty());
 //! # Ok(())

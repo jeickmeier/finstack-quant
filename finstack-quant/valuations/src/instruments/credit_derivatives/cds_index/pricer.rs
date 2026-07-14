@@ -372,11 +372,11 @@ impl CDSIndexPricer {
                         )
                     })
                     .collect::<Vec<_>>();
-                merge_cashflow_schedules(
+                Ok(merge_cashflow_schedules(
                     schedules,
                     Notional::par(index.notional.amount(), index.notional.currency()),
                     index.premium.day_count,
-                )
+                ))
             }
         }
     }
@@ -800,7 +800,7 @@ impl CDSIndexPricer {
         let protection_sign = -premium_sign;
         let loss_given_default = 1.0 - cds.protection.recovery_rate;
 
-        schedule.flows.retain(|flow| flow.date >= as_of);
+        schedule.retain_flows(|flow| flow.date >= as_of);
         let mut prev_survival = if as_of <= survival.base_date() {
             1.0
         } else {
@@ -812,10 +812,10 @@ impl CDSIndexPricer {
             survival.sp(t)
         };
         let conditioning_survival = prev_survival.max(f64::EPSILON);
-        let mut projected_flows = Vec::with_capacity(schedule.flows.len() * 2);
+        let mut projected_flows = Vec::with_capacity(schedule.get_flows().len() * 2);
         let mut previous_premium_date = as_of;
 
-        for flow in schedule.flows {
+        for flow in schedule.into_flows() {
             if matches!(flow.kind, CFKind::Fixed | CFKind::Stub) {
                 let t = survival.day_count().year_fraction(
                     survival.base_date(),
@@ -1089,11 +1089,11 @@ mod tests {
             .expect("projected schedule should build");
 
         assert!(schedule
-            .flows
+            .get_flows()
             .iter()
             .any(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub)));
         assert!(schedule
-            .flows
+            .get_flows()
             .iter()
             .any(|cf| cf.kind == CFKind::DefaultedNotional));
     }
@@ -1113,7 +1113,7 @@ mod tests {
             .expect("projected schedule should build");
         let discount = market.get_discount("USD-OIS").expect("discount curve");
         let discounted_total = schedule
-            .flows
+            .get_flows()
             .iter()
             .try_fold(Money::new(0.0, Currency::USD), |acc, flow| {
                 let df = discount.df_between_dates(as_of, flow.date)?;

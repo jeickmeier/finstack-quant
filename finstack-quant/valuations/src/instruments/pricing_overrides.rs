@@ -453,14 +453,16 @@ pub struct ModelConfig {
     /// A value of 0.20 (a typical lognormal swaption vol) would be approximately
     /// 13–40× too large and would produce a wildly mis-priced HW tree.
     ///
-    /// Must be set together with [`Self::hw1f_mean_reversion`]; a partial override
-    /// (only σ or only κ) falls through to the calibrated-scalar / default branch.
+    /// A σ override must be set together with [`Self::hw1f_mean_reversion`].
+    /// A κ-only cap/floor override is valid when a normal-vol surface is
+    /// available: κ is held fixed while σ is calibrated from market quotes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hw1f_sigma: Option<f64>,
     /// Hull-White 1F mean-reversion speed override (κ), in annualised units.
     ///
-    /// Companion to [`Self::hw1f_sigma`]: both must be set for the explicit HW1F
-    /// override to take effect. Typical values: 0.01–0.10.
+    /// Companion to [`Self::hw1f_sigma`]. Both values define an explicit HW1F
+    /// parameter pair; cap/floor pricing may also hold κ fixed and calibrate σ
+    /// from a normal-vol surface. Typical values: 0.01–0.10.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hw1f_mean_reversion: Option<f64>,
     /// Optional discount curve identifier for tree-based option/OAS models.

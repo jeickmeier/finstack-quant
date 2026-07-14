@@ -239,7 +239,7 @@ fn test_irs_value_matches_combined_signed_schedule() {
     let schedule = swap.cashflow_schedule(&market, as_of).unwrap();
 
     let expected_pv = schedule
-        .flows
+        .get_flows()
         .iter()
         .try_fold(0.0, |acc, flow| -> finstack_quant_core::Result<f64> {
             let payment_date = match flow.kind {
@@ -447,8 +447,11 @@ fn test_irs_full_schedule_with_cfkind() {
     // Verify we have both fixed and floating cashflows
     use finstack_quant_cashflows::primitives::CFKind;
 
-    let has_fixed = sched.flows.iter().any(|cf| cf.kind == CFKind::Fixed);
-    let has_float = sched.flows.iter().any(|cf| cf.kind == CFKind::FloatReset);
+    let has_fixed = sched.get_flows().iter().any(|cf| cf.kind == CFKind::Fixed);
+    let has_float = sched
+        .get_flows()
+        .iter()
+        .any(|cf| cf.kind == CFKind::FloatReset);
 
     assert!(has_fixed || has_float, "Should have classified cashflows");
 }
@@ -500,7 +503,7 @@ fn test_regular_short_front_schedule_does_not_tag_first_coupon_as_stub() {
         .expect("full schedule");
 
     let fixed_stub_count = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::Stub)
         .count();
@@ -558,7 +561,7 @@ fn test_genuine_front_stub_fixed_coupon_is_tagged_as_stub() {
         .expect("full schedule");
 
     let fixed_stub_count = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::Stub)
         .count();
@@ -613,7 +616,7 @@ fn test_regular_holiday_end_coupon_under_stub_rule_is_not_tagged_stub() {
         .expect("full schedule");
 
     let fixed_stub_count = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::Stub)
         .count();
@@ -671,7 +674,7 @@ fn test_regular_eom_schedule_under_stub_rule_is_not_tagged_stub() {
         .expect("full schedule");
 
     let fixed_stub_count = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::Stub)
         .count();
@@ -851,7 +854,7 @@ fn test_irs_explicit_zero_payment_delay_preserved() {
     })
     .expect("expected schedule");
     let first_payment = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| {
             matches!(
@@ -916,7 +919,7 @@ fn test_irs_explicit_zero_reset_lag_preserved() {
         .cashflow_schedule(&market, start)
         .expect("full schedule");
     let first_reset = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == finstack_quant_cashflows::primitives::CFKind::FloatReset)
         .and_then(|cf| cf.reset_date)
@@ -946,7 +949,7 @@ fn test_irs_receive_fixed_cashflow_signs() {
     use finstack_quant_cashflows::primitives::CFKind;
 
     // Check signs
-    for cf in &full_schedule.flows {
+    for cf in full_schedule.get_flows() {
         match cf.kind {
             CFKind::Fixed | CFKind::Stub => {
                 // Receive fixed: should be positive
@@ -988,7 +991,7 @@ fn test_irs_pay_fixed_cashflow_signs() {
     use finstack_quant_cashflows::primitives::CFKind;
 
     // Check signs
-    for cf in &full_schedule.flows {
+    for cf in full_schedule.get_flows() {
         match cf.kind {
             CFKind::Fixed | CFKind::Stub => {
                 // Pay fixed: should be negative
@@ -1069,14 +1072,14 @@ fn test_irs_npv_parity_at_par_rate() {
 
     // Separate fixed and floating leg flows
     let fixed_sum: f64 = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
         .map(|cf| cf.amount.amount())
         .sum();
 
     let float_sum: f64 = full_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .map(|cf| cf.amount.amount())

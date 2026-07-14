@@ -1,7 +1,7 @@
 //! Implied volatility calculator for interest rate options.
 //!
-//! Uses root-finding to solve for the Black volatility that reproduces the
-//! observed market price of the option.
+//! Uses root-finding with the instrument's volatility convention: Bachelier for
+//! normal vol, Black for lognormal vol, and shifted Black for shifted-lognormal vol.
 //!
 //! # Limitations
 //!
@@ -10,17 +10,17 @@
 //! implied volatilities. Calling this metric on a `Cap` or `Floor` instrument
 //! will return an error directing the caller to the appropriate workflow.
 
-use crate::instruments::common_impl::pricing::time::{
-    rate_between_on_dates, relative_df_discount_curve,
-};
 use crate::instruments::rates::cap_floor::pricing::black::price_caplet_floorlet;
+use crate::instruments::rates::cap_floor::pricing::normal;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
-use crate::instruments::rates::cap_floor::{CapFloor, RateOptionType};
+use crate::instruments::rates::cap_floor::pricing::pricer::price_lognormal_quote_with_fallback;
+use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
+use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::Result;
 
-/// Implied volatility calculator using Black model.
+/// Implied volatility calculator using the cap/floor's quoted-volatility model.
 ///
 /// # Supported Instruments
 ///
@@ -62,11 +62,6 @@ impl MetricCalculator for ImpliedVolCalculator {
                 })
             })?;
 
-        // Get curves from market context
-        let forward_curve = context.curves.get_forward(&option.forward_curve_id)?;
-        let discount_curve = context.curves.get_discount(&option.discount_curve_id)?;
-        let dc_ctx = finstack_quant_core::dates::DayCountContext::default();
-
         // Use the same canonical schedule the pricer uses so fixing date,
         // payment date, forward period, and accrual all match pricing exactly.
         // (Single-period caplet/floorlet, validated above, so exactly one period.)
@@ -79,19 +74,18 @@ impl MetricCalculator for ImpliedVolCalculator {
                     "Implied vol requires a non-empty caplet/floorlet schedule".to_string(),
                 )
             })?;
-        let fixing_date = option.option_fixing_date(&period);
+        if period.payment_date <= context.as_of {
+            return Ok(0.0);
+        }
+        let resolved_inputs = resolve_optioned_caplet_inputs(
+            option,
+            &period,
+            context.curves.as_ref(),
+            context.as_of,
+        )?;
+        let projection = &resolved_inputs.coupon;
 
-        // Time-to-fixing uses ACT/365F (calendar-time vol axis convention),
-        // matching the pricer; the instrument day count governs accruals only.
-        let time_to_fixing = if fixing_date > context.as_of {
-            finstack_quant_core::dates::DayCount::Act365F.year_fraction(
-                context.as_of,
-                fixing_date,
-                dc_ctx,
-            )?
-        } else {
-            0.0
-        };
+        let time_to_fixing = resolved_inputs.time_to_fixing;
 
         if time_to_fixing <= 0.0 {
             return Ok(0.0); // Expired/seasoned option has no implied vol
@@ -99,28 +93,32 @@ impl MetricCalculator for ImpliedVolCalculator {
 
         // Use curve-consistent helpers for forward rate and discount factor
         // (same as in the main pricing implementation)
-        let forward_rate = rate_between_on_dates(
-            forward_curve.as_ref(),
-            period.accrual_start,
-            period.accrual_end,
-        )?;
-
-        // Black implied vol is only defined for a positive forward. Fail loudly
-        // rather than letting the solver thrash against an undefined objective.
-        if forward_rate <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Black implied vol requires a positive forward rate; got {forward_rate:.6}. \
-                 Use a normal (Bachelier) implied-vol workflow for non-positive forwards."
-            )));
+        let forward_rate = projection.forward;
+        let vol_shift = option.resolved_vol_shift();
+        let resolved_vol_type = option.vol_type;
+        match resolved_vol_type {
+            CapFloorVolType::Lognormal if forward_rate <= 0.0 || strike <= 0.0 => {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Lognormal implied vol requires positive forward and strike; got \
+                     forward={forward_rate:.6}, strike={strike:.6}"
+                )));
+            }
+            CapFloorVolType::ShiftedLognormal
+                if forward_rate + vol_shift <= 0.0 || strike + vol_shift <= 0.0 =>
+            {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Shifted-lognormal implied vol requires positive shifted forward and strike; \
+                     got forward+shift={:.6}, strike+shift={:.6}",
+                    forward_rate + vol_shift,
+                    strike + vol_shift
+                )));
+            }
+            _ => {}
         }
 
-        let discount_factor = relative_df_discount_curve(
-            discount_curve.as_ref(),
-            context.as_of,
-            period.payment_date,
-        )?;
+        let discount_factor = resolved_inputs.discount_factor;
 
-        let accrual_fraction = period.accrual_year_fraction;
+        let accrual_fraction = projection.accrual_year_fraction;
         let is_cap = matches!(
             option.rate_option_type,
             RateOptionType::Cap | RateOptionType::Caplet
@@ -139,23 +137,23 @@ impl MetricCalculator for ImpliedVolCalculator {
             currency: option.notional.currency(),
         };
 
-        // Objective function: Black price - market price = 0
+        // Objective function: convention-specific model price - market price = 0.
         let objective = |vol: f64| {
-            // Keep the objective well-defined and sign-consistent so the solver can
-            // bracket a root robustly.
-            //
-            // At vol -> 0, the Black price approaches 0, so the residual approaches
-            // `-market_price`.
-            if vol <= 0.0 {
-                return -market_price;
-            }
-
             let mut inputs = base_inputs;
-            inputs.volatility = vol;
-
-            match price_caplet_floorlet(inputs) {
+            inputs.volatility = vol.max(0.0);
+            let price = match resolved_vol_type {
+                CapFloorVolType::Normal => normal::price_caplet_floorlet(inputs),
+                CapFloorVolType::Lognormal => price_caplet_floorlet(inputs),
+                CapFloorVolType::ShiftedLognormal => price_caplet_floorlet(CapletFloorletInputs {
+                    forward: inputs.forward + vol_shift,
+                    strike: inputs.strike + vol_shift,
+                    ..inputs
+                }),
+                CapFloorVolType::Auto => price_lognormal_quote_with_fallback(inputs),
+            };
+            match price {
                 Ok(price) => price.amount() - market_price,
-                Err(_) => market_price, // Treat pricing failure as a large positive residual
+                Err(_) => f64::NAN,
             }
         };
 
@@ -163,8 +161,11 @@ impl MetricCalculator for ImpliedVolCalculator {
         let mut solver = BrentSolver::new().tolerance(1e-6);
         solver.max_iterations = 50;
 
-        // Initial guess: 20% volatility, reasonable bounds 0.1% to 300%
-        let implied_vol = solver.solve(objective, 0.20)?;
+        let initial_guess = match resolved_vol_type {
+            CapFloorVolType::Normal => 0.01,
+            _ => 0.20,
+        };
+        let implied_vol = solver.solve(objective, initial_guess)?;
 
         // Sanity check result
         if implied_vol > 0.0 && implied_vol < 5.0 {

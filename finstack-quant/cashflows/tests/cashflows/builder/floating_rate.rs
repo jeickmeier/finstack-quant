@@ -81,10 +81,10 @@ fn term_coupon_uses_the_actual_reset_date_fixing() {
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .floating_cf(spec);
     let schedule = builder
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("floating schedule should build");
     let first_float = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == CFKind::FloatReset)
         .expect("expected a floating coupon");
@@ -140,11 +140,11 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("mixed tenor floating schedule should build");
 
     let first_float = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == CFKind::FloatReset)
         .expect("expected at least one floating coupon");
@@ -191,10 +191,10 @@ fn test_floating_rate_fallback_error_no_curve() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     // No market context => no forward curve => should error
-    let result = b.build_with_curves(None);
+    let result = b.build(None);
     assert!(
         result.is_err(),
-        "build_with_curves(None) should fail when fallback is Error"
+        "build(None) should fail when fallback is Error"
     );
 }
 
@@ -215,12 +215,12 @@ fn test_floating_rate_fallback_spread_only_no_curve() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(None)
+        .build(None)
         .expect("SpreadOnly fallback should succeed without a curve");
 
     // Find all FloatReset flows
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -263,12 +263,12 @@ fn test_floating_rate_fallback_fixed_rate() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(None)
+        .build(None)
         .expect("FixedRate fallback should succeed without a curve");
 
     // Find all FloatReset flows
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -312,11 +312,11 @@ fn test_floating_rate_fallback_fixed_rate_with_floor_cap() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(None)
+        .build(None)
         .expect("FixedRate fallback with cap should succeed");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -365,11 +365,11 @@ fn test_floating_rate_default_fallback_with_curve() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Error fallback should succeed when curve is present");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -416,12 +416,12 @@ fn test_pik_flow_metadata() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(None)
+        .build(None)
         .expect("PIK with SpreadOnly fallback should succeed without a curve");
 
     // Find all PIK flows
     let pik_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::PIK)
         .collect();
@@ -454,7 +454,7 @@ fn test_pik_flow_metadata() {
 
     // Also verify there are no FloatReset flows (100% PIK means no cash coupons)
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -510,11 +510,11 @@ fn test_floating_rate_golden_sofr_200bp() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Golden SOFR+200bp build should succeed with flat curve");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -583,11 +583,11 @@ fn test_floating_rate_golden_zero_spread() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Golden zero-spread build should succeed with flat curve");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -647,11 +647,11 @@ fn test_floating_rate_golden_gearing_includes_spread() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Golden gearing (includes spread) build should succeed");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -712,11 +712,11 @@ fn test_floating_rate_golden_gearing_excludes_spread() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Golden gearing (excludes spread) build should succeed");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -791,11 +791,11 @@ fn test_floating_rate_index_floor_zero() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Index floor test should succeed with flat curve");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -839,11 +839,11 @@ fn test_floating_rate_index_cap() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Index cap test should succeed with flat curve");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -887,11 +887,11 @@ fn test_floating_rate_all_in_cap() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("All-in cap test should succeed with flat curve");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -932,11 +932,11 @@ fn test_floating_rate_negative_index_no_floor() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Negative index no-floor test should succeed with flat curve");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -980,11 +980,11 @@ fn test_floating_rate_all_in_floor() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("All-in floor test should succeed with flat curve");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -1077,11 +1077,11 @@ fn test_overnight_compounding_flat_curve() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Overnight compounding with flat curve should succeed");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -1142,11 +1142,11 @@ fn test_overnight_simple_average_flat() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Overnight simple average with flat curve should succeed");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -1193,11 +1193,11 @@ fn test_overnight_lockout_flat_curve() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Overnight lockout with flat curve should succeed");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -1274,24 +1274,23 @@ fn test_overnight_observation_shift_samples_pre_accrual_window() {
     let arrears_schedule = {
         let mut b = CashFlowSchedule::builder();
         let _ = b.principal(init, issue, maturity).floating_cf(arrears_spec);
-        b.build_with_curves(Some(&market))
-            .expect("in-arrears schedule builds")
+        b.build(Some(&market)).expect("in-arrears schedule builds")
     };
     let shifted_schedule = {
         let mut b = CashFlowSchedule::builder();
         let _ = b.principal(init, issue, maturity).floating_cf(shifted_spec);
-        b.build_with_curves(Some(&market))
+        b.build(Some(&market))
             .expect("observation-shifted schedule builds")
     };
 
     let arrears_rates: Vec<f64> = arrears_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .map(|cf| cf.rate.expect("FloatReset has a rate"))
         .collect();
     let shifted_rates: Vec<f64> = shifted_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .map(|cf| cf.rate.expect("FloatReset has a rate"))
@@ -1376,26 +1375,24 @@ fn test_overnight_lookback_samples_pre_accrual_rates() {
     let arrears_schedule = {
         let mut b = CashFlowSchedule::builder();
         let _ = b.principal(init, issue, maturity).floating_cf(arrears_spec);
-        b.build_with_curves(Some(&market))
-            .expect("in-arrears schedule builds")
+        b.build(Some(&market)).expect("in-arrears schedule builds")
     };
     let lookback_schedule = {
         let mut b = CashFlowSchedule::builder();
         let _ = b
             .principal(init, issue, maturity)
             .floating_cf(lookback_spec);
-        b.build_with_curves(Some(&market))
-            .expect("lookback schedule builds")
+        b.build(Some(&market)).expect("lookback schedule builds")
     };
 
     let arrears_rates: Vec<f64> = arrears_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .map(|cf| cf.rate.expect("FloatReset has a rate"))
         .collect();
     let lookback_rates: Vec<f64> = lookback_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .map(|cf| cf.rate.expect("FloatReset has a rate"))
@@ -1441,7 +1438,7 @@ fn test_overnight_compounding_no_curve_error_fallback() {
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
-    let result = b.build_with_curves(None);
+    let result = b.build(None);
     assert!(
         result.is_err(),
         "Overnight compounding with no curve and Error fallback should fail"
@@ -1465,11 +1462,11 @@ fn test_overnight_compounding_no_curve_spread_only_fallback() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let schedule = b
-        .build_with_curves(None)
+        .build(None)
         .expect("Overnight compounding with SpreadOnly fallback should succeed");
 
     let float_flows: Vec<_> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -1508,7 +1505,7 @@ fn test_overnight_vs_term_rate_flat_curve_equivalence() {
         .principal(init, issue, maturity)
         .floating_cf(overnight_spec);
     let overnight_schedule = b1
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Overnight build should succeed");
 
     // Build with standard term rate
@@ -1516,16 +1513,16 @@ fn test_overnight_vs_term_rate_flat_curve_equivalence() {
     let mut b2 = CashFlowSchedule::builder();
     let _ = b2.principal(init, issue, maturity).floating_cf(term_spec);
     let term_schedule = b2
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Term rate build should succeed");
 
     let overnight_flows: Vec<_> = overnight_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
     let term_flows: Vec<_> = term_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -1627,23 +1624,23 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     let sat_schedule = CashFlowSchedule::builder()
         .principal(init, saturday, maturity)
         .floating_cf(make_spec(BusinessDayConvention::Unadjusted))
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Unadjusted Saturday start should build");
 
     // Schedule 2: Monday start with Following BDC (baseline)
     let mon_schedule = CashFlowSchedule::builder()
         .principal(init, monday, maturity)
         .floating_cf(make_spec(BusinessDayConvention::Following))
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("Following Monday start should build");
 
     let sat_floats: Vec<_> = sat_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
     let mon_floats: Vec<_> = mon_schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .collect();
@@ -1742,7 +1739,7 @@ fn test_overnight_empty_fixing_window_errors() {
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
     let err = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect_err("empty fixing window must not silently accrue at 0% index");
     assert!(
         err.to_string().contains("no business-day fixings"),
@@ -1772,7 +1769,7 @@ fn test_seasoned_coupon_before_curve_base_errors_by_default() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let err = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect_err("strictly-past observation with Error fallback must fail");
     let msg = err.to_string();
     assert!(
@@ -1801,11 +1798,11 @@ fn test_seasoned_coupon_before_curve_base_uses_fixed_rate_fallback() {
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("FixedRate fallback should cover pre-base coupons");
 
     let rates: Vec<(Date, f64)> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .map(|cf| (cf.date, cf.rate.expect("rate")))
@@ -1867,14 +1864,14 @@ fn test_overnight_sampling_uses_fixing_calendar() {
         spec.rate_spec.fixing_calendar_id = fixing_calendar_id;
         let mut b = CashFlowSchedule::builder();
         let _ = b.principal(init, issue, maturity).floating_cf(spec);
-        b.build_with_curves(Some(&market)).expect("schedule builds")
+        b.build(Some(&market)).expect("schedule builds")
     };
 
     let weekends_only = build_with_fixing_cal(None);
     let usny = build_with_fixing_cal(Some("usny".to_string()));
 
     let first_rate = |s: &CashFlowSchedule| {
-        s.flows
+        s.get_flows()
             .iter()
             .find(|cf| cf.kind == CFKind::FloatReset)
             .and_then(|cf| cf.rate)
@@ -1941,9 +1938,9 @@ fn build_single_overnight_coupon(
     let _ = b
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .floating_cf(spec);
-    let schedule = b.build_with_curves(Some(market))?;
+    let schedule = b.build(Some(market))?;
     Ok(schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == CFKind::FloatReset)
         .and_then(|cf| cf.rate)
@@ -2347,11 +2344,11 @@ fn test_seasoned_term_reset_resolves_from_exact_fixing_with_spread_and_gearing()
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("seasoned term resets should resolve from exact-date fixings");
 
     let rates: Vec<f64> = schedule
-        .flows
+        .get_flows()
         .iter()
         .filter(|cf| cf.kind == CFKind::FloatReset)
         .map(|cf| cf.rate.expect("rate"))
@@ -2393,11 +2390,11 @@ fn test_term_reset_before_curve_base_uses_fixing_when_accrual_starts_on_base() {
     let mut b = CashFlowSchedule::builder();
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
     let schedule = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("reset before curve base should use exact fixing");
 
     let first_float = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == CFKind::FloatReset)
         .expect("floating coupon");
@@ -2442,11 +2439,9 @@ fn test_overnight_index_floor_defaults_to_daily_fixing_application() {
     let _ = b
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .floating_cf(spec);
-    let schedule = b
-        .build_with_curves(Some(&market))
-        .expect("overnight coupon");
+    let schedule = b.build(Some(&market)).expect("overnight coupon");
     let rate = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == CFKind::FloatReset)
         .and_then(|cf| cf.rate)
@@ -2475,11 +2470,11 @@ fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
     let mut builder = CashFlowSchedule::builder();
     let _ = builder.principal(init, issue, maturity).floating_cf(spec);
     let schedule = builder
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect("a reset on the curve base should remain projectable");
 
     let rate = schedule
-        .flows
+        .get_flows()
         .iter()
         .find(|cf| cf.kind == CFKind::FloatReset)
         .and_then(|cf| cf.rate)
@@ -2511,7 +2506,7 @@ fn test_seasoned_term_reset_missing_exact_fixing_errors() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
     let err = b
-        .build_with_curves(Some(&market))
+        .build(Some(&market))
         .expect_err("missing exact-date term fixing must fail");
     let msg = err.to_string();
     assert!(

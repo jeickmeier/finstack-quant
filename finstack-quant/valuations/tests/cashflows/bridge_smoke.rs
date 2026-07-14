@@ -50,10 +50,13 @@ fn bridge_builder_schedule_builds() {
     let schedule = CashFlowSchedule::builder()
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
         .fixed_cf(fixed_spec)
-        .build_with_curves(None)
+        .build(None)
         .expect("bridge builder should build schedule");
 
-    assert!(!schedule.flows.is_empty(), "expected non-empty schedule");
+    assert!(
+        !schedule.get_flows().is_empty(),
+        "expected non-empty schedule"
+    );
 }
 
 #[test]

@@ -172,6 +172,8 @@ pub struct ForwardCurve {
     interp: Interp,
     /// Optional market quotes used to bootstrap this curve.
     rate_calibration: Option<ForwardCurveRateCalibration>,
+    /// Exact typed recipe used to replay calibration after quote shocks.
+    rate_calibration_recipe: Option<super::RateCalibrationRecipe>,
     /// Opaque FX policy stamp; see [`DiscountCurve::fx_policy`].
     fx_policy: Option<String>,
 }
@@ -204,6 +206,9 @@ struct RawForwardCurve {
     /// Optional market quotes used to bootstrap this curve.
     #[serde(default)]
     pub rate_calibration: Option<ForwardCurveRateCalibration>,
+    /// Exact typed calibration replay recipe.
+    #[serde(default)]
+    pub rate_calibration_recipe: Option<super::RateCalibrationRecipe>,
     /// Opaque FX policy stamp; see [`super::DiscountCurve::fx_policy`].
     #[serde(default)]
     pub fx_policy: Option<String>,
@@ -229,6 +234,7 @@ impl From<ForwardCurve> for RawForwardCurve {
             interp_style: curve.interp.style(),
             extrapolation: curve.interp.extrapolation(),
             rate_calibration: curve.rate_calibration,
+            rate_calibration_recipe: curve.rate_calibration_recipe,
             fx_policy: curve.fx_policy,
         }
     }
@@ -247,6 +253,7 @@ impl TryFrom<RawForwardCurve> for ForwardCurve {
             .interp(state.interp_style)
             .extrapolation(state.extrapolation)
             .rate_calibration_opt(state.rate_calibration)
+            .rate_calibration_recipe_opt(state.rate_calibration_recipe)
             .fx_policy_opt(state.fx_policy)
             .build()
     }
@@ -286,6 +293,7 @@ impl ForwardCurve {
             min_forward_rate: None,
             extrapolation: ExtrapolationPolicy::FlatForward,
             rate_calibration: None,
+            rate_calibration_recipe: None,
             fx_policy: None,
         }
     }
@@ -401,6 +409,12 @@ impl ForwardCurve {
     #[inline]
     pub fn rate_calibration(&self) -> Option<&ForwardCurveRateCalibration> {
         self.rate_calibration.as_ref()
+    }
+
+    /// Exact typed conventions and quotes used to calibrate this curve.
+    #[inline]
+    pub fn rate_calibration_recipe(&self) -> Option<&super::RateCalibrationRecipe> {
+        self.rate_calibration_recipe.as_ref()
     }
 
     /// Opaque FX policy stamp set by the curve constructor; see
@@ -616,6 +630,7 @@ impl ForwardCurve {
             .extrapolation(self.interp.extrapolation())
             .projection_grid_opt(self.projection_grid.as_deref().map(<[f64]>::to_vec))
             .rate_calibration_opt(self.rate_calibration.clone())
+            .rate_calibration_recipe_opt(self.rate_calibration_recipe.clone())
             .fx_policy_opt(self.fx_policy.clone())
     }
 
@@ -915,6 +930,7 @@ pub struct ForwardCurveBuilder {
     min_forward_rate: Option<f64>,
     extrapolation: ExtrapolationPolicy,
     rate_calibration: Option<ForwardCurveRateCalibration>,
+    rate_calibration_recipe: Option<super::RateCalibrationRecipe>,
     fx_policy: Option<String>,
 }
 
@@ -989,6 +1005,21 @@ impl ForwardCurveBuilder {
         calibration: Option<ForwardCurveRateCalibration>,
     ) -> Self {
         self.rate_calibration = calibration;
+        self
+    }
+
+    /// Attach an exact typed calibration replay recipe.
+    pub fn rate_calibration_recipe(mut self, recipe: super::RateCalibrationRecipe) -> Self {
+        self.rate_calibration_recipe = Some(recipe);
+        self
+    }
+
+    /// Optionally attach an exact typed calibration replay recipe.
+    pub fn rate_calibration_recipe_opt(
+        mut self,
+        recipe: Option<super::RateCalibrationRecipe>,
+    ) -> Self {
+        self.rate_calibration_recipe = recipe;
         self
     }
 
@@ -1072,6 +1103,7 @@ impl ForwardCurveBuilder {
             projection_grid,
             interp,
             rate_calibration: self.rate_calibration,
+            rate_calibration_recipe: self.rate_calibration_recipe,
             fx_policy: self.fx_policy,
         })
     }
@@ -1226,6 +1258,74 @@ mod tests {
                 .abs()
                 < 1e-14
         );
+    }
+
+    #[test]
+    fn full_rate_calibration_recipe_retains_one_day_cutoff() {
+        let json = serde_json::json!({
+            "id": "USD-SOFR",
+            "base": "2025-01-02",
+            "reset_lag": 0,
+            "day_count": "Act365F",
+            "tenor": 1.0,
+            "knot_points": [[0.0, 0.04], [5.0, 0.04]],
+            "interp_style": "linear",
+            "extrapolation": "flat_forward",
+            "rate_calibration": {
+                "index_id": "USD-SOFR-OIS",
+                "currency": "USD",
+                "discount_curve_id": "USD-OIS",
+                "quotes": [{
+                    "swap": {
+                        "tenor": "5Y",
+                        "rate": 0.04,
+                        "spread_decimal": null
+                    }
+                }]
+            },
+            "rate_calibration_recipe": {
+                "method": {
+                    "global_solve": {
+                        "use_analytical_jacobian": true
+                    }
+                },
+                "curve_day_count": "Act365F",
+                "ois_compounding": {
+                    "compounded_with_rate_cutoff": {
+                        "cutoff_days": 1
+                    }
+                },
+                "role": {
+                    "projection": {
+                        "discount_curve_id": "USD-OIS"
+                    }
+                }
+            }
+        });
+
+        let curve: ForwardCurve = serde_json::from_value(json).expect("full calibration recipe");
+        let serialized = serde_json::to_value(curve).expect("serialize full recipe");
+        let restored: ForwardCurve =
+            serde_json::from_value(serialized.clone()).expect("round-trip full recipe");
+
+        assert_eq!(
+            serialized["rate_calibration_recipe"]["ois_compounding"]["compounded_with_rate_cutoff"]
+                ["cutoff_days"],
+            1
+        );
+        assert_eq!(
+            serialized["rate_calibration_recipe"]["role"]["projection"]["discount_curve_id"],
+            "USD-OIS"
+        );
+        let recipe = restored.rate_calibration_recipe().expect("restored recipe");
+        assert!(matches!(
+            recipe.ois_compounding.as_ref(),
+            Some(
+                crate::market_data::term_structures::RateCalibrationOisCompounding::CompoundedWithRateCutoff {
+                    cutoff_days
+                }
+            ) if *cutoff_days == 1
+        ));
     }
 
     #[test]

@@ -36,12 +36,14 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
         let discount = market.get_discount(fra.discount_curve_id.as_str())?;
         let forward = market.get_forward(fra.forward_curve_id.as_str())?;
 
-        let Some(discount_cal) = discount.rate_calibration() else {
+        let discount_cal = discount.rate_calibration();
+        if discount_cal.is_none() && discount.rate_calibration_recipe().is_none() {
             return generic_fallback(context);
-        };
-        let Some(forward_cal) = forward.rate_calibration() else {
+        }
+        let forward_cal = forward.rate_calibration();
+        if forward_cal.is_none() && forward.rate_calibration_recipe().is_none() {
             return generic_fallback(context);
-        };
+        }
 
         let bump_bp =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?
@@ -50,29 +52,34 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
         let discount_id = &fra.discount_curve_id;
         let forward_id = &fra.forward_curve_id;
 
-        if uses_basis_quotes(forward_cal) {
-            // Basis forwards aren't supported by the shared helper; use the
-            // shared discount path and rebuild the forward locally.
-            let make_market = |bp: f64| -> Result<MarketContext> {
-                let bumped_discount = bump_discount_curve_from_rate_calibration(
-                    discount.as_ref(),
-                    discount_cal,
-                    market,
-                    &BumpRequest::Parallel(bp),
-                )?;
-                let with_discount = market.clone().insert(bumped_discount);
-                let bumped_discount_ref = with_discount.get_discount(discount_id.as_str())?;
-                let rebuilt_forward = rebuild_forward_curve_from_basis_quotes(
-                    forward.as_ref(),
-                    forward_cal,
-                    bumped_discount_ref.as_ref(),
-                    bp,
-                )?;
-                Ok(with_discount.insert(rebuilt_forward))
-            };
-            let pv_up = context.reprice_raw(&make_market(bump_bp)?, context.as_of)?;
-            let pv_down = context.reprice_raw(&make_market(-bump_bp)?, context.as_of)?;
-            return Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp));
+        if let Some(forward_cal) = forward_cal {
+            if uses_basis_quotes(forward_cal) {
+                let Some(discount_cal) = discount_cal else {
+                    return generic_fallback(context);
+                };
+                // Basis forwards aren't supported by the shared helper; use the
+                // shared discount path and rebuild the forward locally.
+                let make_market = |bp: f64| -> Result<MarketContext> {
+                    let bumped_discount = bump_discount_curve_from_rate_calibration(
+                        discount.as_ref(),
+                        discount_cal,
+                        market,
+                        &BumpRequest::Parallel(bp),
+                    )?;
+                    let with_discount = market.clone().insert(bumped_discount);
+                    let bumped_discount_ref = with_discount.get_discount(discount_id.as_str())?;
+                    let rebuilt_forward = rebuild_forward_curve_from_basis_quotes(
+                        forward.as_ref(),
+                        forward_cal,
+                        bumped_discount_ref.as_ref(),
+                        bp,
+                    )?;
+                    Ok(with_discount.insert(rebuilt_forward))
+                };
+                let pv_up = context.reprice_raw(&make_market(bump_bp)?, context.as_of)?;
+                let pv_down = context.reprice_raw(&make_market(-bump_bp)?, context.as_of)?;
+                return Ok(sensitivity_central_diff(pv_up, pv_down, bump_bp));
+            }
         }
 
         let bumped_up = bump_market_via_rate_quote_shock(market, discount_id, forward_id, bump_bp)?;

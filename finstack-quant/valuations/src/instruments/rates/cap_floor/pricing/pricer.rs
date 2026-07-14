@@ -1,14 +1,14 @@
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
+use crate::instruments::rates::cap_floor::pricing::projection::resolve_optioned_caplet_inputs;
 use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType, RateOptionType};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
 use crate::results::ValuationResult;
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::types::CurveId;
 
 /// Minimum time-to-fixing for vol surface lookup (in years).
 ///
@@ -39,24 +39,32 @@ fn resolve_vol_type(vol_type: CapFloorVolType) -> CapFloorVolType {
     }
 }
 
-fn cap_floor_fixing_series_id(forward_curve_id: &CurveId) -> String {
-    finstack_quant_core::market_data::fixings::fixing_series_id(forward_curve_id.as_str())
-}
+/// Price a lognormal quote with the cap/floor pricer's negative-rate fallback.
+///
+/// The quote remains lognormal. Where Black-76 is outside its positive
+/// forward/strike domain, the quote is converted to an equivalent normal
+/// volatility before Bachelier pricing. `Auto` pricing and implied-vol inversion
+/// share this function so inversion returns the original quote convention.
+pub(crate) fn price_lognormal_quote_with_fallback(
+    inputs: CapletFloorletInputs,
+) -> finstack_quant_core::Result<Money> {
+    use crate::instruments::rates::cap_floor::pricing::{black, normal};
 
-fn historical_cap_floor_fixing(
-    curves: &MarketContext,
-    forward_curve_id: &CurveId,
-    fixing_date: Date,
-) -> finstack_quant_core::Result<f64> {
-    let fixings_id = cap_floor_fixing_series_id(forward_curve_id);
-    let series = curves.get_series(&fixings_id).map_err(|_| {
-        finstack_quant_core::Error::Validation(format!(
-            "Seasoned cap/floor requires historical fixing series '{}' for fixing date {}. \
-             Fixed-but-unpaid coupons must be valued off observed fixings, not the live forward curve.",
-            fixings_id, fixing_date
-        ))
-    })?;
-    series.value_on_exact(fixing_date)
+    if inputs.forward > 0.0 && inputs.strike > 0.0 {
+        black::price_caplet_floorlet(inputs)
+    } else {
+        let normal_vol = crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
+            inputs.volatility,
+            inputs.forward,
+            inputs.strike,
+            inputs.time_to_fixing,
+            None,
+        );
+        normal::price_caplet_floorlet(CapletFloorletInputs {
+            volatility: normal_vol,
+            ..inputs
+        })
+    }
 }
 
 pub(crate) fn price_cap_floor(
@@ -64,19 +72,13 @@ pub(crate) fn price_cap_floor(
     curves: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
-    use crate::instruments::common_impl::pricing::time::{
-        rate_between_on_dates, relative_df_discount_curve,
-    };
     use crate::instruments::rates::cap_floor::pricing::{black, normal};
 
     cap_floor.validate_for_pricing()?;
 
-    let disc_curve = curves.get_discount(cap_floor.discount_curve_id.as_ref())?;
-    let fwd_curve = curves.get_forward(cap_floor.forward_curve_id.as_ref())?;
     let strike = cap_floor.strike_f64()?;
 
     let mut total_pv = Money::new(0.0, cap_floor.notional.currency());
-    let dc_ctx = DayCountContext::default();
     let periods = cap_floor.pricing_periods()?;
     if periods.is_empty() {
         return Ok(total_pv);
@@ -87,74 +89,25 @@ pub(crate) fn price_cap_floor(
         RateOptionType::Caplet | RateOptionType::Cap
     );
     for period in periods {
-        let pay = period.payment_date;
-        if pay <= as_of {
+        if period.payment_date <= as_of {
             continue;
         }
+        let resolved_inputs = resolve_optioned_caplet_inputs(cap_floor, &period, curves, as_of)?;
+        let projection = &resolved_inputs.coupon;
 
-        let fixing_date = cap_floor.option_fixing_date(&period);
-        // Once the contractual fixing date is before the valuation date the
-        // coupon is known, regardless of whether its accrual period has begun.
-        // Re-projecting a T-2 fixing at T-1 books phantom curve P&L.
-        let is_fixed_unpaid = fixing_date < as_of;
-        let t_fix = if is_fixed_unpaid {
+        let fixing_date = projection.fixing_date;
+        // No option time remains on or after the contractual fixing date.
+        // Earlier fixings are observed; under the explicit start-of-day policy,
+        // a same-day unpublished fixing is projected but priced intrinsically.
+        let has_no_option_time = fixing_date <= as_of;
+        let effective_t_fix = if has_no_option_time {
             0.0
         } else {
-            // Option expiry is calendar time: ACT/365F, not the accrual day
-            // count (Act360 would inflate T by ~365/360 and bias the vol).
-            finstack_quant_core::dates::DayCount::Act365F.year_fraction(
-                as_of,
-                fixing_date,
-                dc_ctx,
-            )?
-        };
-        let effective_t_fix = if is_fixed_unpaid {
-            0.0
-        } else {
-            t_fix.max(MIN_VOL_LOOKUP_TIME)
+            resolved_inputs.time_to_fixing.max(MIN_VOL_LOOKUP_TIME)
         };
 
-        let forward = if cap_floor.uses_overnight_rfr_index() {
-            use crate::instruments::common_impl::pricing::swap_legs::{
-                compounded_forward_projection, compounded_spliced_projection,
-            };
-            let calendar_id = cap_floor.calendar_id.as_ref().map(|id| id.as_str());
-            if period.accrual_start <= as_of {
-                let fixing_series_id = cap_floor_fixing_series_id(&cap_floor.forward_curve_id);
-                let fixings = curves.get_series(&fixing_series_id).ok();
-                compounded_spliced_projection(
-                    fwd_curve.as_ref(),
-                    fixings,
-                    cap_floor.forward_curve_id.as_str(),
-                    period.accrual_start,
-                    period.accrual_end,
-                    as_of,
-                    period.accrual_year_fraction,
-                    0,
-                    calendar_id,
-                    None,
-                    None,
-                    false,
-                )?
-            } else {
-                compounded_forward_projection(
-                    fwd_curve.as_ref(),
-                    period.accrual_start,
-                    period.accrual_end,
-                    period.accrual_year_fraction,
-                    0,
-                    calendar_id,
-                    None,
-                    None,
-                    false,
-                )?
-            }
-        } else if is_fixed_unpaid {
-            historical_cap_floor_fixing(curves, &cap_floor.forward_curve_id, fixing_date)?
-        } else {
-            rate_between_on_dates(fwd_curve.as_ref(), period.accrual_start, period.accrual_end)?
-        };
-        let df = relative_df_discount_curve(disc_curve.as_ref(), as_of, pay)?;
+        let forward = projection.forward;
+        let df = resolved_inputs.discount_factor;
         let sigma = if effective_t_fix > 0.0 {
             crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
                 &cap_floor.pricing_overrides.market_quotes,
@@ -166,7 +119,7 @@ pub(crate) fn price_cap_floor(
         } else {
             0.0
         };
-        let tau = period.accrual_year_fraction;
+        let tau = projection.accrual_year_fraction;
 
         let inputs = || CapletFloorletInputs {
             is_cap,
@@ -182,32 +135,7 @@ pub(crate) fn price_cap_floor(
         let vol_shift = cap_floor.resolved_vol_shift();
         let resolved = resolve_vol_type(cap_floor.vol_type);
         let leg_pv = match resolved {
-            CapFloorVolType::Lognormal => {
-                if forward > 0.0 && strike > 0.0 {
-                    black::price_caplet_floorlet(inputs())?
-                } else {
-                    // Black-76 is undefined unless both the forward and strike
-                    // are strictly positive (it takes `ln(F/K)`) — fall back to
-                    // Bachelier (normal). `sigma` is a LOGNORMAL vol; it must be
-                    // converted to a normal vol before the Bachelier pricer,
-                    // otherwise the price is wrong by ~ a factor of the forward
-                    // rate. Convert via the standard lognormal→normal mapping
-                    // (no shift on this lognormal path). `Auto` resolves here
-                    // too, so this is also the negative-rate path for `Auto`.
-                    let normal_vol =
-                        crate::instruments::rates::swaption::types::lognormal_to_normal_vol(
-                            sigma,
-                            forward,
-                            strike,
-                            effective_t_fix,
-                            None,
-                        );
-                    normal::price_caplet_floorlet(CapletFloorletInputs {
-                        volatility: normal_vol,
-                        ..inputs()
-                    })?
-                }
-            }
+            CapFloorVolType::Lognormal => price_lognormal_quote_with_fallback(inputs())?,
             CapFloorVolType::ShiftedLognormal => {
                 // Shifted-lognormal Black-76 requires the SHIFTED forward and
                 // strike to be strictly positive — that is the whole point of

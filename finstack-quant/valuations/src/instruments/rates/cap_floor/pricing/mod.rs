@@ -9,3 +9,4 @@ pub(crate) mod normal;
 pub(crate) mod payoff;
 /// Cap/floor pricer implementation
 pub(crate) mod pricer;
+pub(crate) mod projection;
