@@ -111,7 +111,8 @@ finstack-quant-py/examples/outputs/
 *.db
 
 target-codex/
-docs/superpowers/*
+docs/superpowers/
+docs/audits/
 
 .worktrees/
 .worktree/
