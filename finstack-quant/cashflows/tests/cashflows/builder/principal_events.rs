@@ -974,11 +974,12 @@ fn full_horizon_coupon_programs_are_order_independent() {
         let _ = builder.step_up_cf(step_spec());
     });
     assert_program_order_independent(principal, issue, maturity, |builder| {
-        let _ = builder.fixed_stepup_decimal(
-            &[(switch, dec!(0.04))],
-            ScheduleParams::semiannual_30360(),
-            CouponType::Cash,
-        );
+        let _ = builder.step_up_cf(StepUpCouponSpec {
+            coupon_type: CouponType::Cash,
+            initial_rate: dec!(0.04),
+            step_schedule: Vec::new(),
+            schedule: ScheduleParams::semiannual_30360(),
+        });
     });
     assert_program_order_independent(principal, issue, maturity, |builder| {
         let _ = builder
@@ -1010,9 +1011,14 @@ fn principal_does_not_clear_the_first_builder_error() {
     let maturity = Date::from_calendar_date(2026, Month::January, 15).unwrap();
     let mut builder = CashFlowSchedule::builder();
     let _ = builder
-        .fixed_stepup_decimal(&[], ScheduleParams::semiannual_30360(), CouponType::Cash)
+        .step_up_cf(StepUpCouponSpec {
+            coupon_type: CouponType::Cash,
+            initial_rate: dec!(0.04),
+            step_schedule: vec![(issue, dec!(0.05)), (issue, dec!(0.06))],
+            schedule: ScheduleParams::semiannual_30360(),
+        })
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity);
 
     let error = builder.build_with_curves(None).unwrap_err().to_string();
-    assert!(error.contains("requires at least one"), "{error}");
+    assert!(error.contains("strictly increasing"), "{error}");
 }

@@ -58,12 +58,6 @@ export type CouponLegJson =
       floating: unknown;
       fixed_split: CouponTypeJson;
     }
-  | {
-      kind: "fixed_rate_program";
-      steps: RateStepJson[];
-      schedule: unknown;
-      default_split?: CouponTypeJson;
-    }
   | { kind: "floating_margin_program"; steps: RateStepJson[]; base: unknown };
 
 export type PaymentProgramJson =

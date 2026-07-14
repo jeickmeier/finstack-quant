@@ -80,15 +80,12 @@ fn test_step_up_bond() {
 
     let schedule = CashFlowSchedule::builder()
         .principal(Money::new(1000.0, Currency::USD), issue, maturity)
-        .fixed_stepup_decimal(
-            &[
-                (step1, Decimal::new(4, 2)),
-                (step2, Decimal::new(5, 2)),
-                (maturity, Decimal::new(6, 2)),
-            ],
-            params,
-            CouponType::Cash,
-        )
+        .step_up_cf(finstack_quant_cashflows::builder::StepUpCouponSpec {
+            coupon_type: CouponType::Cash,
+            initial_rate: Decimal::new(4, 2),
+            step_schedule: vec![(step1, Decimal::new(5, 2)), (step2, Decimal::new(6, 2))],
+            schedule: params,
+        })
         .build_with_curves(None)
         .unwrap();
 

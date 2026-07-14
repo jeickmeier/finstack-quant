@@ -835,12 +835,6 @@ fn every_canonical_coupon_and_payment_variant_round_trips() {
             "fixed_split": "Cash"
         }),
         json!({
-            "kind": "fixed_rate_program",
-            "steps": [{"date": "2026-01-01", "rate": "0.04"}],
-            "schedule": canonical_schedule_params(),
-            "default_split": "Cash"
-        }),
-        json!({
             "kind": "floating_margin_program",
             "steps": [{"date": "2026-01-01", "rate": "175"}],
             "base": canonical_floating_coupon("150")
@@ -944,7 +938,7 @@ fn every_canonical_coupon_variant_dispatches_to_the_builder() {
             })],
         ),
         (
-            "fixed_rate_program",
+            "legacy_fixed_rate_program",
             vec![json!({
                 "kind": "fixed_rate_program",
                 "steps": [{"date": "2026-01-01", "rate": "0.04"}],

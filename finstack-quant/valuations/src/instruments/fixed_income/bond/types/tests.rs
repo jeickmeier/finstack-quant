@@ -38,14 +38,12 @@ fn test_bond_with_custom_cashflows() {
 
     let custom_schedule = CashFlowSchedule::builder()
         .principal(Money::new(1_000_000.0, Currency::USD), issue, maturity)
-        .fixed_stepup_decimal(
-            &[
-                (step1_date, Decimal::new(3, 2)),
-                (maturity, Decimal::new(5, 2)),
-            ],
-            schedule_params,
-            CouponType::Cash,
-        )
+        .step_up_cf(finstack_quant_cashflows::builder::StepUpCouponSpec {
+            coupon_type: CouponType::Cash,
+            initial_rate: Decimal::new(3, 2),
+            step_schedule: vec![(step1_date, Decimal::new(5, 2))],
+            schedule: schedule_params,
+        })
         .build_with_curves(None)
         .expect("CashFlowSchedule builder should succeed with valid test data");
 

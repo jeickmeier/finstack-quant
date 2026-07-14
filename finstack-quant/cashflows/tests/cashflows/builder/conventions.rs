@@ -198,7 +198,9 @@ fn contractual_accrual_boundaries_are_not_business_day_adjusted() {
 /// rolled date and the day-count fraction reflects the adjusted boundaries.
 #[test]
 fn sofr_swap_preset_adjusts_accrual_boundaries() {
-    use finstack_quant_cashflows::builder::{CashFlowSchedule, CouponType, ScheduleParams};
+    use finstack_quant_cashflows::builder::{
+        CashFlowSchedule, CouponType, ScheduleParams, StepUpCouponSpec,
+    };
     use finstack_quant_core::cashflow::CFKind;
     use rust_decimal_macros::dec;
 
@@ -210,11 +212,14 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
 
     let build = |params: ScheduleParams| {
         let mut b = CashFlowSchedule::builder();
-        let _ = b.principal(notional, issue, maturity).fixed_stepup_decimal(
-            &[(maturity, dec!(0.04))],
-            params,
-            CouponType::Cash,
-        );
+        let _ = b
+            .principal(notional, issue, maturity)
+            .step_up_cf(StepUpCouponSpec {
+                coupon_type: CouponType::Cash,
+                initial_rate: dec!(0.04),
+                step_schedule: Vec::new(),
+                schedule: params,
+            });
         b.build_with_curves(None).expect("schedule builds")
     };
 

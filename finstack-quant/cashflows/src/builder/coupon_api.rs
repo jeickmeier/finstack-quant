@@ -468,66 +468,6 @@ impl CashFlowBuilder {
         )
     }
 
-    /// Convenience: fixed-rate step-up program with Decimal rates.
-    ///
-    /// Creates consecutive fixed coupon windows whose rate changes at the
-    /// supplied boundary dates.
-    #[must_use = "builder methods should be chained or terminated with .build_with_curves(...)"]
-    ///
-    /// # Errors
-    ///
-    /// Records a deferred error (surfaced by the terminal build) when `steps`
-    /// is empty or its boundary dates are not strictly increasing.
-    pub fn fixed_stepup_decimal(
-        &mut self,
-        steps: &[(Date, Decimal)],
-        schedule: ScheduleParams,
-        default_split: CouponType,
-    ) -> &mut Self {
-        if self.pending_error.is_some() {
-            return self;
-        }
-        if steps.is_empty() {
-            self.record_error(finstack_quant_core::Error::Validation(
-                "fixed_stepup_decimal requires at least one (date, rate) step".into(),
-            ));
-            return self;
-        }
-        if let Some(w) = steps.windows(2).find(|w| w[0].0 >= w[1].0) {
-            self.record_error(finstack_quant_core::Error::Validation(format!(
-                "fixed_stepup_decimal steps must be strictly increasing by date; found {} \
-                 followed by {}",
-                w[0].0, w[1].0
-            )));
-            return self;
-        }
-        let mut prev = WindowBound::Issue;
-        for &(end, rate) in steps {
-            let _ = self.push_coupon_program(
-                ProgramWindow {
-                    start: prev,
-                    end: WindowBound::Date(end),
-                },
-                schedule.clone(),
-                CouponSpec::Fixed { rate },
-                default_split,
-            );
-            prev = WindowBound::Date(end);
-        }
-        if let Some(&(_, rate)) = steps.last() {
-            let _ = self.push_coupon_program(
-                ProgramWindow {
-                    start: prev,
-                    end: WindowBound::Maturity,
-                },
-                schedule,
-                CouponSpec::Fixed { rate },
-                default_split,
-            );
-        }
-        self
-    }
-
     /// Convenience: floating margin step-up program with Decimal margins.
     ///
     /// Creates consecutive floating coupon windows whose margin over the

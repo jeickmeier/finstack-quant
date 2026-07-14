@@ -266,6 +266,7 @@ fn cashflows_dts_matches_json_bridge_surface() {
     assert!(dts.contains("export declare const cashflows: CashflowsNamespace;"));
     let generated = include_str!("../types/generated/CashflowSchedule.ts");
     assert!(generated.contains("method: \"Linear\" | \"Compounded\";"));
+    assert!(!generated.contains("fixed_rate_program"));
 }
 
 #[test]

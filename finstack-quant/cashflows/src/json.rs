@@ -96,16 +96,6 @@ pub enum CouponLegSpec {
         /// Settlement behavior for the fixed leg.
         fixed_split: CouponType,
     },
-    /// Consecutive fixed-rate windows driven by dated rate steps.
-    FixedRateProgram {
-        /// Dated rate steps in strictly increasing order.
-        steps: Vec<RateStepSpec>,
-        /// Shared schedule conventions for every fixed-rate window.
-        schedule: ScheduleParams,
-        #[serde(default)]
-        /// Default settlement behavior for the generated windows.
-        default_split: CouponType,
-    },
     /// Consecutive floating-rate windows driven by dated margin steps.
     FloatingMarginProgram {
         /// Dated floating-margin steps in strictly increasing order.
@@ -166,13 +156,97 @@ struct CanonicalBuildSpec {
     issue: Date,
     maturity: Date,
     #[serde(default)]
-    coupon_program: Vec<CouponLegSpec>,
+    coupon_program: Vec<CouponLegSpecInput>,
     #[serde(default)]
     payment_program: Vec<PaymentProgramSpec>,
     #[serde(default)]
     fees: Vec<FeeSpec>,
     #[serde(default)]
     principal_events: Vec<PrincipalEventSpec>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum CouponLegSpecInput {
+    Canonical(CouponLegSpec),
+    LegacyFixedRateProgram(LegacyFixedRateProgram),
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LegacyFixedRateProgram {
+    kind: LegacyFixedRateProgramKind,
+    steps: Vec<RateStepSpec>,
+    schedule: ScheduleParams,
+    #[serde(default)]
+    default_split: CouponType,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum LegacyFixedRateProgramKind {
+    FixedRateProgram,
+}
+
+fn canonicalize_coupon_program(
+    issue: Date,
+    maturity: Date,
+    instructions: Vec<CouponLegSpecInput>,
+) -> std::result::Result<Vec<CouponLegSpec>, String> {
+    let mut canonical = Vec::with_capacity(instructions.len());
+    for instruction in instructions {
+        match instruction {
+            CouponLegSpecInput::Canonical(instruction) => canonical.push(instruction),
+            CouponLegSpecInput::LegacyFixedRateProgram(program) => {
+                let LegacyFixedRateProgram {
+                    kind: LegacyFixedRateProgramKind::FixedRateProgram,
+                    steps,
+                    schedule,
+                    default_split,
+                } = program;
+                if steps.is_empty() {
+                    return Err("fixed_rate_program requires at least one dated rate step".into());
+                }
+                if let Some(window) = steps
+                    .windows(2)
+                    .find(|window| window[0].date >= window[1].date)
+                {
+                    return Err(format!(
+                        "fixed_rate_program steps must be strictly increasing; found {} followed by {}",
+                        window[0].date, window[1].date
+                    ));
+                }
+
+                let mut start = issue;
+                for step in &steps {
+                    canonical.push(CouponLegSpec::FixedWindow {
+                        start,
+                        end: step.date,
+                        spec: FixedCouponSpec {
+                            coupon_type: default_split,
+                            rate: step.rate,
+                            schedule: schedule.clone(),
+                        },
+                    });
+                    start = step.date;
+                }
+                let rate = steps
+                    .last()
+                    .map(|step| step.rate)
+                    .ok_or_else(|| "fixed_rate_program requires at least one step".to_string())?;
+                canonical.push(CouponLegSpec::FixedWindow {
+                    start,
+                    end: maturity,
+                    spec: FixedCouponSpec {
+                        coupon_type: default_split,
+                        rate,
+                        schedule,
+                    },
+                });
+            }
+        }
+    }
+    Ok(canonical)
 }
 
 #[derive(serde::Deserialize)]
@@ -206,10 +280,15 @@ impl<'de> serde::Deserialize<'de> for CashflowScheduleBuildSpec {
         let input = BuildSpecInput::deserialize(deserializer)?;
         Ok(match input {
             BuildSpecInput::Canonical(spec) => Self {
+                coupon_program: canonicalize_coupon_program(
+                    spec.issue,
+                    spec.maturity,
+                    spec.coupon_program,
+                )
+                .map_err(serde::de::Error::custom)?,
                 notional: spec.notional,
                 issue: spec.issue,
                 maturity: spec.maturity,
-                coupon_program: spec.coupon_program,
                 payment_program: spec.payment_program,
                 fees: spec.fees,
                 principal_events: spec.principal_events,
@@ -363,14 +442,6 @@ impl CashflowScheduleBuildSpec {
                         floating.clone(),
                         *fixed_split,
                     );
-                }
-                CouponLegSpec::FixedRateProgram {
-                    steps,
-                    schedule,
-                    default_split,
-                } => {
-                    let steps: Vec<_> = steps.iter().map(|step| (step.date, step.rate)).collect();
-                    let _ = builder.fixed_stepup_decimal(&steps, schedule.clone(), *default_split);
                 }
                 CouponLegSpec::FloatingMarginProgram { steps, base } => {
                     let steps: Vec<_> = steps.iter().map(|step| (step.date, step.rate)).collect();
