@@ -194,37 +194,7 @@ fn standard_rmbs_prepayment_defaults() -> finstack_quant_core::Result<(f64, f64)
     Ok((calibration.base_cpr, calibration.burnout_rate))
 }
 
-/// Convert CPR (constant prepayment rate) to SMM (single monthly mortality).
-///
-/// SMM = 1 - (1 - CPR)^(1/12)
-///
-/// # Errors
-///
-/// Returns `Error::Validation` if `cpr` is not in `[0.0, 1.0]` or is non-finite.
-pub fn cpr_to_smm(cpr: f64) -> finstack_quant_core::Result<f64> {
-    if !cpr.is_finite() || !(0.0..=1.0).contains(&cpr) {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "cpr_to_smm: CPR must be a finite value in [0.0, 1.0], got {cpr}"
-        )));
-    }
-    Ok(1.0 - (1.0 - cpr).powf(1.0 / 12.0))
-}
-
-/// Convert SMM (single monthly mortality) to CPR (constant prepayment rate).
-///
-/// CPR = 1 - (1 - SMM)^12
-///
-/// # Errors
-///
-/// Returns `Error::Validation` if `smm` is not in `[0.0, 1.0]` or is non-finite.
-pub fn smm_to_cpr(smm: f64) -> finstack_quant_core::Result<f64> {
-    if !smm.is_finite() || !(0.0..=1.0).contains(&smm) {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "smm_to_cpr: SMM must be a finite value in [0.0, 1.0], got {smm}"
-        )));
-    }
-    Ok(1.0 - (1.0 - smm).powi(12))
-}
+pub use finstack_quant_cashflows::builder::{cpr_to_smm, smm_to_cpr};
 
 #[cfg(test)]
 mod tests {

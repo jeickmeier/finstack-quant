@@ -76,7 +76,7 @@ pub use specs::{
 };
 
 // Re-export credit rate conversions (hazard-style CPR↔SMM helpers)
-pub use credit_rates::{cpr_to_smm, smm_to_cpr};
+pub use credit_rates::{cdr_to_mdr, cpr_to_smm, mdr_to_cdr, smm_to_cpr};
 
 #[doc(hidden)]
 pub use emission::{emit_revolving_credit_fees, RevolvingFeeEmissionConfig};

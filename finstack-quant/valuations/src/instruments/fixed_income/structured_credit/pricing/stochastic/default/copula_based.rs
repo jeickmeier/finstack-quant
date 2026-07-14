@@ -26,7 +26,7 @@ use super::super::calibrations::{clo_standard, rmbs_standard};
 use super::traits::{MacroCreditFactors, StochasticDefault};
 use crate::correlation::copula::{Copula, CopulaSpec, GaussianCopula};
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
-use crate::instruments::fixed_income::structured_credit::utils::rates::cdr_to_mdr;
+use crate::instruments::fixed_income::structured_credit::utils::rates::clamped_cdr_to_mdr;
 use finstack_quant_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 
 /// Seasoning curve specification for default models.
@@ -309,7 +309,7 @@ impl StochasticDefault for CopulaBasedDefault {
     }
 
     fn expected_mdr(&self, seasoning: u32) -> f64 {
-        cdr_to_mdr(self.seasoned_cdr(seasoning))
+        clamped_cdr_to_mdr(self.seasoned_cdr(seasoning))
     }
 }
 

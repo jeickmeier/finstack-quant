@@ -1,7 +1,7 @@
 //! Regime-switching prepayment model.
 
 use super::traits::StochasticPrepayment;
-use crate::instruments::fixed_income::structured_credit::utils::rates::cpr_to_smm;
+use crate::instruments::fixed_income::structured_credit::utils::rates::clamped_cpr_to_smm;
 
 /// Two-state Markov prepayment model with factor-shocked CPR.
 #[derive(Debug, Clone)]
@@ -68,11 +68,11 @@ impl StochasticPrepayment for RegimeSwitchingPrepay {
 
         let z = factors.first().copied().unwrap_or(0.0);
         let shock = (self.factor_loading * z * self.cpr_volatility).exp();
-        cpr_to_smm((base_cpr * shock * burnout).clamp(0.0, 1.0))
+        clamped_cpr_to_smm((base_cpr * shock * burnout).clamp(0.0, 1.0))
     }
 
     fn expected_smm(&self, seasoning: u32) -> f64 {
-        cpr_to_smm(self.base_cpr(seasoning))
+        clamped_cpr_to_smm(self.base_cpr(seasoning))
     }
 
     fn factor_loading(&self) -> f64 {

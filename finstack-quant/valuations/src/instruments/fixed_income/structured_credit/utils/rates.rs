@@ -36,6 +36,11 @@
 //! PSA speeds are multiples of this curve (e.g., 150% PSA = 1.5x the standard curve).
 
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
+use finstack_quant_cashflows::builder::{cdr_to_mdr, cpr_to_smm, mdr_to_cdr, smm_to_cpr};
+
+fn convert_clamped(rate: f64, convert: fn(f64) -> finstack_quant_core::Result<f64>) -> f64 {
+    convert(rate.clamp(0.0, 1.0)).unwrap_or(f64::NAN)
+}
 
 /// Converts annual CPR to monthly SMM.
 ///
@@ -53,18 +58,8 @@ use crate::instruments::fixed_income::structured_credit::assumptions::embedded_r
 /// SMM = 1 - (1 - CPR)^(1/12)
 /// ```
 #[inline]
-pub fn cpr_to_smm(cpr: f64) -> f64 {
-    let cpr = cpr.clamp(0.0, 1.0);
-    if cpr == 0.0 {
-        return 0.0;
-    }
-    if cpr >= 1.0 {
-        return 1.0;
-    }
-    // SMM = 1 - (1 - CPR)^(1/12)
-    //     = 1 - exp(ln(1 - CPR) / 12)
-    //     = -expm1(ln(1 - CPR) / 12)
-    -((1.0 - cpr).ln() / 12.0).exp_m1()
+pub fn clamped_cpr_to_smm(cpr: f64) -> f64 {
+    convert_clamped(cpr, cpr_to_smm)
 }
 
 /// Converts monthly SMM to annual CPR.
@@ -83,15 +78,8 @@ pub fn cpr_to_smm(cpr: f64) -> f64 {
 /// CPR = 1 - (1 - SMM)^12
 /// ```
 #[inline]
-pub fn smm_to_cpr(smm: f64) -> f64 {
-    let smm = smm.clamp(0.0, 1.0);
-    if smm == 0.0 {
-        return 0.0;
-    }
-    if smm >= 1.0 {
-        return 1.0;
-    }
-    1.0 - (1.0 - smm).powi(12)
+pub fn clamped_smm_to_cpr(smm: f64) -> f64 {
+    convert_clamped(smm, smm_to_cpr)
 }
 
 /// Converts annual CDR to monthly MDR.
@@ -110,17 +98,8 @@ pub fn smm_to_cpr(smm: f64) -> f64 {
 /// MDR = 1 - (1 - CDR)^(1/12)
 /// ```
 #[inline]
-pub fn cdr_to_mdr(cdr: f64) -> f64 {
-    let cdr = cdr.clamp(0.0, 1.0);
-    if cdr == 0.0 {
-        return 0.0;
-    }
-    if cdr >= 1.0 {
-        return 1.0;
-    }
-    // MDR = 1 - (1 - CDR)^(1/12)
-    //     = -expm1(ln(1 - CDR) / 12)
-    -((1.0 - cdr).ln() / 12.0).exp_m1()
+pub fn clamped_cdr_to_mdr(cdr: f64) -> f64 {
+    convert_clamped(cdr, cdr_to_mdr)
 }
 
 /// Converts monthly MDR to annual CDR.
@@ -139,15 +118,8 @@ pub fn cdr_to_mdr(cdr: f64) -> f64 {
 /// CDR = 1 - (1 - MDR)^12
 /// ```
 #[inline]
-pub fn mdr_to_cdr(mdr: f64) -> f64 {
-    let mdr = mdr.clamp(0.0, 1.0);
-    if mdr == 0.0 {
-        return 0.0;
-    }
-    if mdr >= 1.0 {
-        return 1.0;
-    }
-    1.0 - (1.0 - mdr).powi(12)
+pub fn clamped_mdr_to_cdr(mdr: f64) -> f64 {
+    convert_clamped(mdr, mdr_to_cdr)
 }
 
 /// Converts PSA speed to CPR at a given month.
@@ -258,8 +230,8 @@ mod tests {
     fn test_cpr_smm_roundtrip() {
         let test_cprs = vec![0.0, 0.01, 0.05, 0.10, 0.15, 0.20, 0.30];
         for cpr in test_cprs {
-            let smm = cpr_to_smm(cpr);
-            let cpr_back = smm_to_cpr(smm);
+            let smm = clamped_cpr_to_smm(cpr);
+            let cpr_back = clamped_smm_to_cpr(smm);
             assert!(
                 (cpr - cpr_back).abs() < 1e-10,
                 "Roundtrip failed for CPR={}: got {}",
@@ -273,8 +245,8 @@ mod tests {
     fn test_cdr_mdr_roundtrip() {
         let test_cdrs = vec![0.0, 0.01, 0.02, 0.05, 0.10];
         for cdr in test_cdrs {
-            let mdr = cdr_to_mdr(cdr);
-            let cdr_back = mdr_to_cdr(mdr);
+            let mdr = clamped_cdr_to_mdr(cdr);
+            let cdr_back = clamped_mdr_to_cdr(mdr);
             assert!(
                 (cdr - cdr_back).abs() < 1e-10,
                 "Roundtrip failed for CDR={}: got {}",
@@ -295,10 +267,10 @@ mod tests {
 
     #[test]
     fn test_boundary_clamping() {
-        assert_eq!(cpr_to_smm(-0.05), 0.0);
-        assert_eq!(cpr_to_smm(1.5), 1.0);
-        assert_eq!(cdr_to_mdr(-0.02), 0.0);
-        assert_eq!(cdr_to_mdr(1.5), 1.0);
+        assert_eq!(clamped_cpr_to_smm(-0.05), 0.0);
+        assert_eq!(clamped_cpr_to_smm(1.5), 1.0);
+        assert_eq!(clamped_cdr_to_mdr(-0.02), 0.0);
+        assert_eq!(clamped_cdr_to_mdr(1.5), 1.0);
         assert_eq!(psa_to_cpr(-1.0, 15), 0.0);
         assert_eq!(psa_to_cpr(17.0, 30), 1.0);
     }

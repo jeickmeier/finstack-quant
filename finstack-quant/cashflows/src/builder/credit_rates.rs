@@ -118,6 +118,24 @@ pub fn smm_to_cpr(smm: f64) -> finstack_quant_core::Result<f64> {
     Ok(1.0 - (1.0 - smm).powi(12))
 }
 
+/// Convert annual CDR (constant default rate) to monthly MDR.
+///
+/// Default and prepayment mortality rates use the same annual-to-monthly
+/// conversion. This named entry point keeps domain terminology explicit while
+/// delegating to the single checked kernel.
+pub fn cdr_to_mdr(cdr: f64) -> finstack_quant_core::Result<f64> {
+    cpr_to_smm(cdr)
+}
+
+/// Convert monthly MDR to annual CDR.
+///
+/// Default and prepayment mortality rates use the same monthly-to-annual
+/// conversion. This named entry point keeps domain terminology explicit while
+/// delegating to the single checked kernel.
+pub fn mdr_to_cdr(mdr: f64) -> finstack_quant_core::Result<f64> {
+    smm_to_cpr(mdr)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -151,6 +169,17 @@ mod tests {
 
         // Should roundtrip with high precision
         assert!((original - back).abs() < 1e-10);
+    }
+
+    #[test]
+    fn default_rate_names_share_the_checked_kernel() {
+        let annual = 0.02;
+        let monthly = cdr_to_mdr(annual).expect("valid CDR");
+        assert_eq!(monthly, cpr_to_smm(annual).expect("valid annual rate"));
+        assert_eq!(
+            mdr_to_cdr(monthly).expect("valid MDR"),
+            smm_to_cpr(monthly).expect("valid monthly rate")
+        );
     }
 
     #[test]

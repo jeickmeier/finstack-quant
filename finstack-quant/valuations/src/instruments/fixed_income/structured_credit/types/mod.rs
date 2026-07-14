@@ -99,7 +99,9 @@ use crate::instruments::fixed_income::structured_credit::pricing::stochastic::pr
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::tree::{
     BranchingSpec, ScenarioTreeConfig,
 };
-use crate::instruments::fixed_income::structured_credit::utils::rates::{cdr_to_mdr, cpr_to_smm};
+use crate::instruments::fixed_income::structured_credit::utils::rates::{
+    clamped_cdr_to_mdr, clamped_cpr_to_smm,
+};
 use crate::instruments::model_params::ModelParamsSnapshot;
 use crate::instruments::rates::irs::InterestRateSwap;
 use crate::metrics::{MetricContext, MetricId};
@@ -802,7 +804,7 @@ impl StructuredCredit {
         }
 
         if let Some(cpr) = self.behavior_overrides.cpr_annual {
-            return Some(cpr_to_smm(cpr));
+            return Some(clamped_cpr_to_smm(cpr));
         }
 
         if let Some(psa_mult) = self.behavior_overrides.psa_speed_multiplier {
@@ -813,7 +815,7 @@ impl StructuredCredit {
                 psa_curve.terminal_cpr
             };
             let cpr = base_cpr * psa_mult;
-            return Some(cpr_to_smm(cpr));
+            return Some(clamped_cpr_to_smm(cpr));
         }
 
         None
@@ -821,7 +823,7 @@ impl StructuredCredit {
 
     fn default_rate_override(&self, _pay_date: Date, seasoning: u32) -> Option<f64> {
         if let Some(cdr) = self.behavior_overrides.cdr_annual {
-            return Some(cdr_to_mdr(cdr));
+            return Some(clamped_cdr_to_mdr(cdr));
         }
 
         if let Some(sda_mult) = self.behavior_overrides.sda_speed_multiplier {

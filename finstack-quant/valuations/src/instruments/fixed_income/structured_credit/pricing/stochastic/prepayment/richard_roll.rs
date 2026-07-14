@@ -37,7 +37,7 @@
 
 use super::super::calibrations::rmbs_standard;
 use super::traits::StochasticPrepayment;
-use crate::instruments::fixed_income::structured_credit::utils::rates::cpr_to_smm;
+use crate::instruments::fixed_income::structured_credit::utils::rates::clamped_cpr_to_smm;
 use finstack_quant_core::types::{Percentage, Rate};
 
 /// Richard-Roll prepayment model for RMBS.
@@ -313,7 +313,7 @@ impl StochasticPrepayment for RichardRollPrepay {
         let shock = (self.factor_loading * z * self.cpr_volatility).exp();
         let shocked_cpr = (base_conditional_cpr * shock).clamp(0.0, 1.0);
 
-        cpr_to_smm(shocked_cpr)
+        clamped_cpr_to_smm(shocked_cpr)
     }
 
     fn expected_smm(&self, seasoning: u32) -> f64 {
@@ -330,7 +330,7 @@ impl StochasticPrepayment for RichardRollPrepay {
 
         let expected_cpr =
             (self.base_cpr * refi_mult * season_mult * month_mult * jensen).clamp(0.0, 1.0);
-        cpr_to_smm(expected_cpr)
+        clamped_cpr_to_smm(expected_cpr)
     }
 
     fn factor_loading(&self) -> f64 {

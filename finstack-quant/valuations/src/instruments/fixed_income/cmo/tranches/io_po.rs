@@ -4,7 +4,7 @@
 //! interest and principal components of MBS cashflows.
 
 use crate::instruments::fixed_income::cmo::types::CmoTranche;
-use crate::instruments::fixed_income::structured_credit::{cpr_to_smm, psa_to_cpr};
+use crate::instruments::fixed_income::structured_credit::{clamped_cpr_to_smm, psa_to_cpr};
 
 /// Single monthly mortality (SMM) at a PSA speed for a given month.
 ///
@@ -13,7 +13,7 @@ use crate::instruments::fixed_income::structured_credit::{cpr_to_smm, psa_to_cpr
 /// so IO/PO valuations stay consistent with the rest of the workspace.
 #[inline]
 fn psa_to_smm(psa_speed: f64, month: u32) -> f64 {
-    cpr_to_smm(psa_to_cpr(psa_speed, month))
+    clamped_cpr_to_smm(psa_to_cpr(psa_speed, month))
 }
 
 /// IO strip characteristics.
@@ -371,7 +371,7 @@ mod tests {
         // unclamped CPR exceeded 1.0 and produced NaN via `.powf`.
         for &psa in &[0.0, 0.5, 1.0, 1.5, 3.0, 18.0] {
             for &month in &[1u32, 15, 30, 60, 360] {
-                let canonical = cpr_to_smm(psa_to_cpr(psa, month));
+                let canonical = clamped_cpr_to_smm(psa_to_cpr(psa, month));
                 let got = psa_to_smm(psa, month);
                 assert!(
                     (got - canonical).abs() < 1e-12,

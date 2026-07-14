@@ -6,7 +6,7 @@
 //! the PAC.
 
 use crate::instruments::fixed_income::cmo::types::PacCollar;
-use crate::instruments::fixed_income::structured_credit::{cpr_to_smm, psa_to_cpr};
+use crate::instruments::fixed_income::structured_credit::{clamped_cpr_to_smm, psa_to_cpr};
 
 /// PAC amortization schedule.
 #[derive(Debug, Clone)]
@@ -175,7 +175,7 @@ fn project_principal_stream(
 /// keeping PAC/Support projection consistent with the rest of the workspace.
 #[inline]
 fn psa_to_smm(psa_speed: f64, month: u32) -> f64 {
-    cpr_to_smm(psa_to_cpr(psa_speed, month))
+    clamped_cpr_to_smm(psa_to_cpr(psa_speed, month))
 }
 
 /// Allocate principal between PAC and support tranches.
@@ -395,7 +395,7 @@ mod tests {
         // helper across a PSA grid, including high-speed clamping behavior.
         for &psa in &[0.0, 0.5, 1.0, 2.0, 3.0, 18.0] {
             for &month in &[1u32, 15, 30, 60, 360] {
-                let canonical = cpr_to_smm(psa_to_cpr(psa, month));
+                let canonical = clamped_cpr_to_smm(psa_to_cpr(psa, month));
                 let got = psa_to_smm(psa, month);
                 assert!(
                     (got - canonical).abs() < 1e-12,

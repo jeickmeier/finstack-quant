@@ -122,8 +122,8 @@ pub use types::{
 // ============================================================================
 
 pub use utils::{
-    cdr_to_mdr, cpr_to_smm, get_validation_errors, is_valid_waterfall_spec, mdr_to_cdr, psa_to_cpr,
-    smm_to_cpr, ValidationError,
+    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, clamped_smm_to_cpr,
+    get_validation_errors, is_valid_waterfall_spec, psa_to_cpr, ValidationError,
 };
 
 // ============================================================================

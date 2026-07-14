@@ -17,7 +17,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{moodys_warf_factor, CreditRating};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_to_cpr, AssetPool, DealType, PoolAsset,
+    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, psa_to_cpr, AssetPool, DealType,
+    PoolAsset,
 };
 use time::Month;
 
@@ -109,7 +110,7 @@ fn test_psa_golden_smm_conversion() {
     // 6% CPR → SMM = 1 - 0.94^(1/12) = 0.51430...%
     let cpr: f64 = 0.06;
     let expected_smm = 1.0 - (1.0 - cpr).powf(1.0 / 12.0);
-    let actual_smm = cpr_to_smm(cpr);
+    let actual_smm = clamped_cpr_to_smm(cpr);
 
     assert!(
         (actual_smm - expected_smm).abs() < RATE_TOLERANCE,
@@ -145,7 +146,7 @@ fn test_cdr_mdr_golden_conversion() {
 
     for (cdr, label) in test_cases {
         let expected_mdr = 1.0 - (1.0 - cdr).powf(1.0 / 12.0);
-        let actual_mdr = cdr_to_mdr(cdr);
+        let actual_mdr = clamped_cdr_to_mdr(cdr);
 
         assert!(
             (actual_mdr - expected_mdr).abs() < RATE_TOLERANCE,
@@ -156,7 +157,7 @@ fn test_cdr_mdr_golden_conversion() {
         );
 
         // Verify roundtrip
-        let cdr_back = mdr_to_cdr(actual_mdr);
+        let cdr_back = clamped_mdr_to_cdr(actual_mdr);
         assert!(
             (cdr_back - cdr).abs() < RATE_TOLERANCE,
             "{}: roundtrip failed: {} -> {} -> {}",
@@ -174,7 +175,7 @@ fn test_cdr_mdr_golden_2_percent() {
     // Reference: Moody's CLO methodology
 
     let cdr = 0.02;
-    let mdr = cdr_to_mdr(cdr);
+    let mdr = clamped_cdr_to_mdr(cdr);
 
     // Expected: 1 - 0.98^(1/12) = 0.0016833...
     let expected = 1.0 - 0.98_f64.powf(1.0 / 12.0);

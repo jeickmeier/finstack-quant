@@ -27,7 +27,7 @@
 
 use super::traits::StochasticPrepayment;
 use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
-use crate::instruments::fixed_income::structured_credit::utils::rates::cpr_to_smm;
+use crate::instruments::fixed_income::structured_credit::utils::rates::clamped_cpr_to_smm;
 use finstack_quant_core::types::Percentage;
 
 /// Factor-correlated prepayment model.
@@ -155,7 +155,7 @@ impl StochasticPrepayment for FactorCorrelatedPrepay {
         let shocked_cpr = (base_cpr * shock * burnout).clamp(0.0, 1.0);
 
         // Convert CPR to SMM
-        cpr_to_smm(shocked_cpr)
+        clamped_cpr_to_smm(shocked_cpr)
     }
 
     fn expected_smm(&self, seasoning: u32) -> f64 {
@@ -163,7 +163,7 @@ impl StochasticPrepayment for FactorCorrelatedPrepay {
 
         // For log-normal shock, E[exp(β × Z × σ)] = exp(0.5 × β² × σ²)
         // But for correlation purposes, we use the base CPR
-        cpr_to_smm(base_cpr)
+        clamped_cpr_to_smm(base_cpr)
     }
 
     fn factor_loading(&self) -> f64 {
@@ -194,7 +194,7 @@ mod tests {
         let model = FactorCorrelatedPrepay::new(base, 0.4, 0.20);
 
         let smm = model.conditional_smm(12, &[0.0], 0.05, 1.0);
-        let expected_smm = cpr_to_smm(0.10);
+        let expected_smm = clamped_cpr_to_smm(0.10);
 
         assert!(
             (smm - expected_smm).abs() < 1e-6,

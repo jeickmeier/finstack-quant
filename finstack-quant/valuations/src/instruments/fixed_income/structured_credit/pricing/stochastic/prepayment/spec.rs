@@ -8,7 +8,7 @@ use super::{
     FactorCorrelatedPrepay, RegimeSwitchingPrepay, RichardRollPrepay, StochasticPrepayment,
 };
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
-use crate::instruments::fixed_income::structured_credit::utils::rates::cpr_to_smm;
+use crate::instruments::fixed_income::structured_credit::utils::rates::clamped_cpr_to_smm;
 
 /// Stochastic prepayment model specification.
 ///
@@ -246,16 +246,18 @@ impl StochasticPrepaySpec {
         match self {
             StochasticPrepaySpec::Deterministic(spec) => {
                 // Convert annual CPR to monthly SMM
-                cpr_to_smm(spec.cpr)
+                clamped_cpr_to_smm(spec.cpr)
             }
-            StochasticPrepaySpec::FactorCorrelated { base_spec, .. } => cpr_to_smm(base_spec.cpr),
-            StochasticPrepaySpec::RichardRoll { base_cpr, .. } => cpr_to_smm(*base_cpr),
+            StochasticPrepaySpec::FactorCorrelated { base_spec, .. } => {
+                clamped_cpr_to_smm(base_spec.cpr)
+            }
+            StochasticPrepaySpec::RichardRoll { base_cpr, .. } => clamped_cpr_to_smm(*base_cpr),
             StochasticPrepaySpec::RegimeSwitching {
                 low_cpr, high_cpr, ..
             } => {
                 // Average of low and high states
                 let avg_cpr = (low_cpr + high_cpr) / 2.0;
-                cpr_to_smm(avg_cpr)
+                clamped_cpr_to_smm(avg_cpr)
             }
         }
     }

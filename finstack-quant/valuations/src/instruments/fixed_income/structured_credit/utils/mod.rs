@@ -13,5 +13,7 @@ pub(crate) mod validation;
 
 // Re-export commonly used functions
 pub(crate) use rates::frequency_periods_per_year;
-pub use rates::{cdr_to_mdr, cpr_to_smm, mdr_to_cdr, psa_to_cpr, smm_to_cpr};
+pub use rates::{
+    clamped_cdr_to_mdr, clamped_cpr_to_smm, clamped_mdr_to_cdr, clamped_smm_to_cpr, psa_to_cpr,
+};
 pub use validation::{get_validation_errors, is_valid_waterfall_spec, ValidationError};
