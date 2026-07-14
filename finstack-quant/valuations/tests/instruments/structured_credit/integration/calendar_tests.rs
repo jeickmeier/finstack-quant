@@ -134,21 +134,16 @@ fn test_invalid_calendar_id_fails_with_available_options() {
     // Act
     let result = clo.dated_cashflows(&market, test_date());
 
-    // Assert: Should fail with NotFound error listing available calendars
+    // Assert: Should fail through the shared strict calendar resolver.
     assert!(result.is_err(), "Should fail for invalid calendar");
 
     let error = result.unwrap_err();
     let error_msg = format!("{}", error);
 
-    // Error should mention the invalid calendar and available options
+    // Error should identify the invalid calendar.
     assert!(
         error_msg.contains("NONEXISTENT_CALENDAR"),
         "Error should mention the invalid calendar ID: {}",
-        error_msg
-    );
-    assert!(
-        error_msg.contains("available"),
-        "Error should mention available calendars: {}",
         error_msg
     );
 }

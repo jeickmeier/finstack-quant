@@ -4,7 +4,7 @@
 //! and `FIIndexTotalReturnSwap` instruments.
 
 use crate::cashflow::builder::ScheduleParams;
-use finstack_quant_core::dates::{Date, DateExt, Schedule, ScheduleBuilder};
+use finstack_quant_core::dates::{Date, DateExt, Schedule};
 
 /// Side of the TRS trade from the party's perspective.
 ///
@@ -119,14 +119,23 @@ impl TrsScheduleSpec {
 
     /// Builds the period date schedule in a canonical way.
     pub fn period_schedule(&self) -> finstack_quant_core::Result<Schedule> {
-        let cal =
-            crate::cashflow::builder::calendar::resolve_calendar_strict(&self.params.calendar_id)?;
-        ScheduleBuilder::new(self.start, self.end)?
-            .frequency(self.params.freq)
-            .stub_rule(self.params.stub)
-            .end_of_month(self.params.end_of_month)
-            .adjust_with(self.params.bdc, cal)
-            .build()
+        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+
+        let periods = build_periods(BuildPeriodsParams::from_schedule(
+            &self.params,
+            self.start,
+            self.end,
+            None,
+        ))?;
+        let mut dates = Vec::with_capacity(periods.len() + 1);
+        if let Some(first) = periods.first() {
+            dates.push(first.accrual_start);
+            dates.extend(periods.iter().map(|period| period.accrual_end));
+        }
+        Ok(Schedule {
+            dates,
+            warnings: Vec::new(),
+        })
     }
 
     /// Computes the payment date for a given accrual end date.

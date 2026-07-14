@@ -913,11 +913,18 @@ impl Instrument for StructuredCredit {
     ) {
         context.discount_curve_id = Some(self.discount_curve_id.to_owned());
         context.notional = self.pool.total_balance().ok();
-        // Pre-compute cashflows once here to avoid re-running the waterfall
-        // simulation for each metric. Ignore errors — the metric calculators
-        // will handle missing cashflows gracefully.
-        if let Ok(flows) = self.dated_cashflows(market, as_of) {
-            context.cashflows = Some(flows);
+        // Preserve classified rows for metrics such as WAL while deriving the
+        // cash-only compatibility view from the same canonical schedule.
+        if let Ok(schedule) = self.cashflow_schedule(market, as_of) {
+            context.cashflows = Some(
+                schedule
+                    .flows
+                    .iter()
+                    .filter(|flow| crate::cashflow::primitives::is_cash_settlement_kind(flow.kind))
+                    .map(|flow| (flow.date, flow.amount))
+                    .collect(),
+            );
+            context.tagged_cashflows = Some(schedule.flows);
         }
     }
 

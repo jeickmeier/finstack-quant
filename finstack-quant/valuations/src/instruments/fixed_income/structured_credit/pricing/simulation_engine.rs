@@ -17,11 +17,9 @@ use crate::instruments::fixed_income::structured_credit::types::{
 use crate::instruments::fixed_income::structured_credit::utils::simulation::RecoveryQueue;
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::CalendarRegistry;
 use finstack_quant_core::dates::HolidayCalendar;
 use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, ScheduleBuilder,
-    StubKind,
+    adjust, BusinessDayConvention, Date, DateExt, DayCount, DayCountContext, StubKind,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::fixings;
@@ -821,27 +819,15 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     // Resolve payment calendar - required for structured credit deals.
     // Silent fallback to weekends-only would shift coupons around holidays,
     // breaking WAC/WAL and OC tests.
-    let calendar: &dyn HolidayCalendar = match instrument.payment_calendar_id.as_deref() {
-        Some(cal_id) => CalendarRegistry::global()
-            .resolve_str(cal_id)
-            .ok_or_else(|| {
-                finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-                    id: format!(
-                        "payment_calendar_id:{} (available: {})",
-                        cal_id,
-                        CalendarRegistry::global().available_ids().join(", ")
-                    ),
-                })
-            })?,
-        None => {
-            return Err(finstack_quant_core::Error::Validation(
-                "Structured credit instruments require a payment_calendar_id for accurate \
-                     schedule generation. Specify a valid calendar ID (e.g., 'nyse', 'target2') \
-                     to ensure payment dates are adjusted correctly for business days."
-                    .to_string(),
-            ));
-        }
-    };
+    let calendar_id = instrument.payment_calendar_id.as_deref().ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "Structured credit instruments require a payment_calendar_id for accurate \
+             schedule generation. Specify a valid calendar ID (e.g., 'nyse', 'target2') \
+             to ensure payment dates are adjusted correctly for business days."
+                .to_string(),
+        )
+    })?;
+    let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict(calendar_id)?;
 
     let convention = instrument
         .payment_bdc
@@ -850,24 +836,45 @@ pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
     // Generate the full contractual payment schedule, then filter future dates.
     // Re-anchoring the schedule at `as_of` would shift legal coupon dates for
     // seasoned deals valued between payment dates.
-    let schedule = ScheduleBuilder::new(instrument.first_payment_date, instrument.maturity)?
-        .frequency(instrument.frequency)
-        .stub_rule(StubKind::ShortBack)
-        .build()?;
-
-    let mut adjusted_schedule = schedule;
-    for date in &mut adjusted_schedule.dates {
-        *date = adjust(*date, convention, calendar)?;
-    }
-    let state_anchor = adjusted_schedule
-        .dates
+    use crate::cashflow::builder::periods::{
+        build_periods, build_single_period, BuildPeriodsParams,
+    };
+    let schedule_params = crate::cashflow::builder::ScheduleParams {
+        freq: instrument.frequency,
+        dc: DayCount::Act360,
+        bdc: convention,
+        calendar_id: calendar_id.to_string(),
+        stub: StubKind::ShortBack,
+        end_of_month: false,
+        payment_lag_days: 0,
+        adjust_accrual_dates: false,
+    };
+    let first_period = build_single_period(BuildPeriodsParams::from_schedule(
+        &schedule_params,
+        instrument.closing_date,
+        instrument.first_payment_date,
+        None,
+    ))?;
+    let remaining_periods = build_periods(BuildPeriodsParams::from_schedule(
+        &schedule_params,
+        instrument.first_payment_date,
+        instrument.maturity,
+        None,
+    ))?;
+    let payment_dates: Vec<Date> = std::iter::once(first_period.payment_date)
+        .chain(
+            remaining_periods
+                .into_iter()
+                .map(|period| period.payment_date),
+        )
+        .collect();
+    let state_anchor = payment_dates
         .iter()
         .copied()
         .filter(|date| *date <= as_of)
         .max()
         .unwrap_or(instrument.closing_date);
-    let schedule_dates: Vec<Date> = adjusted_schedule
-        .dates
+    let schedule_dates: Vec<Date> = payment_dates
         .into_iter()
         .filter(|date| *date > as_of)
         .collect();

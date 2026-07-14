@@ -271,9 +271,15 @@ fn test_cashflow_dates_respect_payment_frequency() {
     let flows = clo.dated_cashflows(&market, test_date()).unwrap();
 
     // Assert: Payment dates should be quarterly (roughly 3 months apart)
-    if flows.len() >= 2 {
-        let first_date = flows[0].0;
-        let second_date = flows[1].0;
+    let payment_dates: Vec<_> = flows
+        .iter()
+        .map(|(date, _)| *date)
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    if payment_dates.len() >= 2 {
+        let first_date = payment_dates[0];
+        let second_date = payment_dates[1];
         let days_diff = (second_date - first_date).whole_days();
 
         // Quarterly is approximately 90 days (allow some variance)

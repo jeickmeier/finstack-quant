@@ -457,7 +457,12 @@ fn test_structured_credit_registry_wal_matches_cashflow_wal() {
     // Both changes slightly front-load defaults/scheduled principal, so
     // principal returns marginally earlier and the WAL shortens.
     //   old: 2.226010097887204   new: 2.2250660687393284   (−0.00094 y, ~0.04%)
-    let expected = 2.225_066_068_739_328_4_f64;
+    // The canonical provider now seeds classified schedule rows. WAL therefore
+    // weights only principal-like rows instead of the former final fallback,
+    // which treated every positive cash settlement (including interest) as
+    // principal. This is the deterministic principal-only benchmark.
+    //   old: 2.2250660687393284   new: 2.342301092973921
+    let expected = 2.342_301_092_973_921_f64;
     let actual = valuation.measures["wal"];
 
     assert!(

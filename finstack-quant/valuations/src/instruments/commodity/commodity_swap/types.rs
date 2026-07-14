@@ -12,9 +12,7 @@ use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, CalendarRegistry, Date, ScheduleBuilder, Tenor,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, CalendarRegistry, Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -411,35 +409,38 @@ impl CommoditySwap {
 
     /// Generate the payment schedule for this swap.
     pub fn payment_schedule(&self, _as_of: Date) -> Result<Vec<Date>> {
-        // Market standard: Modified Following for commodity swaps (matches QuantLib/Bloomberg)
-        let bdc = self.bdc;
+        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
-        let mut builder = ScheduleBuilder::new(self.start_date, self.maturity)?
-            .frequency(self.frequency)
-            .stub_rule(finstack_quant_core::dates::StubKind::ShortBack);
-
-        // Apply calendar adjustment if calendar_id is specified
-        if let Some(ref cal_id) = self.calendar_id {
-            let cal = CalendarRegistry::global()
-                .resolve_str(cal_id)
-                .ok_or_else(|| {
-                    finstack_quant_core::Error::Validation(format!(
-                        "CommoditySwap '{}' references unknown calendar_id '{cal_id}'",
-                        self.id
-                    ))
-                })?;
-            builder = builder.adjust_with(bdc, cal);
-        }
-
-        let schedule = builder.build()?;
-
-        // ScheduleBuilder always emits the adjusted start anchor first.
-        // Preserve every subsequent adjusted anchor positionally: comparing
-        // adjusted dates with raw start/maturity can admit a rolled start or
-        // discard a rolled final payment.
-        let dates: Vec<Date> = schedule.into_iter().skip(1).collect();
-
-        Ok(dates)
+        let bdc = if self.calendar_id.is_some() {
+            self.bdc
+        } else {
+            BusinessDayConvention::Unadjusted
+        };
+        let schedule = crate::cashflow::builder::ScheduleParams {
+            freq: self.frequency,
+            dc: finstack_quant_core::dates::DayCount::Act365F,
+            bdc,
+            calendar_id: self
+                .calendar_id
+                .as_ref()
+                .map(|id| id.as_str().to_string())
+                .unwrap_or_else(|| {
+                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
+                }),
+            stub: finstack_quant_core::dates::StubKind::ShortBack,
+            end_of_month: false,
+            payment_lag_days: 0,
+            adjust_accrual_dates: false,
+        };
+        Ok(build_periods(BuildPeriodsParams::from_schedule(
+            &schedule,
+            self.start_date,
+            self.maturity,
+            None,
+        ))?
+        .into_iter()
+        .map(|period| period.payment_date)
+        .collect())
     }
 
     fn classified_leg_flows(

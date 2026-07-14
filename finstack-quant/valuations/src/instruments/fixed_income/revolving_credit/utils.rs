@@ -5,15 +5,13 @@
 
 use super::types::{BaseRateSpec, RevolvingCredit};
 use crate::instruments::common_impl::traits::Attributes;
-use finstack_quant_core::dates::{
-    BusinessDayConvention, Date, DateExt, HolidayCalendar, ScheduleBuilder,
-};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DateExt, HolidayCalendar};
 use finstack_quant_core::Result;
 
 /// Resolve the calendar for a facility from its attributes.
 ///
-/// Looks for `calendar_id` or `calendar` metadata and returns the resolved
-/// calendar if found in the global registry.
+/// Looks for `calendar_id` or `calendar` metadata and strictly resolves it,
+/// defaulting to the canonical weekends-only calendar.
 ///
 /// # Arguments
 ///
@@ -21,14 +19,19 @@ use finstack_quant_core::Result;
 ///
 /// # Returns
 ///
-/// Reference to a `HolidayCalendar` if calendar metadata is present and resolvable, `None` otherwise.
+/// Reference to the resolved `HolidayCalendar`.
+///
+/// # Errors
+///
+/// Returns an error when configured calendar metadata is unknown.
 pub(super) fn resolve_facility_calendar(
     attrs: &Attributes,
-) -> Option<&'static dyn HolidayCalendar> {
+) -> Result<&'static dyn HolidayCalendar> {
     let cal_code = attrs
         .get_meta("calendar_id")
-        .or_else(|| attrs.get_meta("calendar"))?;
-    finstack_quant_core::dates::CalendarRegistry::global().resolve_str(cal_code)
+        .or_else(|| attrs.get_meta("calendar"))
+        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+    crate::cashflow::builder::calendar::resolve_calendar_strict(cal_code)
 }
 
 /// Build payment schedule dates for a revolving credit facility.
@@ -53,16 +56,29 @@ pub(super) fn build_payment_dates(
     facility: &RevolvingCredit,
     include_sentinel: bool,
 ) -> Result<Vec<Date>> {
-    let mut builder = ScheduleBuilder::new(facility.commitment_date, facility.maturity)?
-        .frequency(facility.frequency)
-        .stub_rule(facility.stub);
+    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
-    if let Some(cal) = resolve_facility_calendar(&facility.attributes) {
-        builder = builder.adjust_with(BusinessDayConvention::ModifiedFollowing, cal);
-    }
-
-    let payment_schedule = builder.build()?;
-    let mut payment_dates: Vec<Date> = payment_schedule.into_iter().collect();
+    let calendar_id = facility
+        .attributes
+        .get_meta("calendar_id")
+        .or_else(|| facility.attributes.get_meta("calendar"))
+        .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+    let periods = build_periods(BuildPeriodsParams {
+        start: facility.commitment_date,
+        end: facility.maturity,
+        frequency: facility.frequency,
+        stub: facility.stub,
+        bdc: BusinessDayConvention::ModifiedFollowing,
+        calendar_id,
+        end_of_month: false,
+        day_count: facility.day_count,
+        payment_lag_days: 0,
+        reset_lag_days: None,
+        adjust_accrual_dates: false,
+    })?;
+    let mut payment_dates: Vec<Date> = std::iter::once(facility.commitment_date)
+        .chain(periods.into_iter().map(|period| period.payment_date))
+        .collect();
 
     // Add sentinel if requested (for period PV aggregation with exclusive end semantics)
     if include_sentinel {
@@ -99,18 +115,31 @@ pub(super) fn build_payment_dates(
 pub(super) fn build_reset_dates(facility: &RevolvingCredit) -> Result<Option<Vec<Date>>> {
     match &facility.base_rate_spec {
         BaseRateSpec::Floating(spec) => {
-            let mut reset_builder =
-                ScheduleBuilder::new(facility.commitment_date, facility.maturity)?
-                    .frequency(spec.reset_freq)
-                    .stub_rule(facility.stub);
+            use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
 
-            if let Some(cal) = resolve_facility_calendar(&facility.attributes) {
-                reset_builder =
-                    reset_builder.adjust_with(BusinessDayConvention::ModifiedFollowing, cal);
-            }
-
-            let reset_schedule = reset_builder.build()?;
-            Ok(Some(reset_schedule.into_iter().collect()))
+            let calendar_id = facility
+                .attributes
+                .get_meta("calendar_id")
+                .or_else(|| facility.attributes.get_meta("calendar"))
+                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
+            let periods = build_periods(BuildPeriodsParams {
+                start: facility.commitment_date,
+                end: facility.maturity,
+                frequency: spec.reset_freq,
+                stub: facility.stub,
+                bdc: BusinessDayConvention::ModifiedFollowing,
+                calendar_id,
+                end_of_month: false,
+                day_count: facility.day_count,
+                payment_lag_days: 0,
+                reset_lag_days: None,
+                adjust_accrual_dates: false,
+            })?;
+            Ok(Some(
+                std::iter::once(facility.commitment_date)
+                    .chain(periods.into_iter().map(|period| period.payment_date))
+                    .collect(),
+            ))
         }
         BaseRateSpec::Fixed { .. } => Ok(None),
     }
@@ -237,13 +266,11 @@ pub(super) fn compute_reset_period_end(
         TenorUnit::Days => reset_date + time::Duration::days(reset_freq.count() as i64),
     };
 
-    if let Some(calendar) = resolve_facility_calendar(attrs) {
-        reset_end = finstack_quant_core::dates::adjust(
-            reset_end,
-            BusinessDayConvention::ModifiedFollowing,
-            calendar,
-        )?;
-    }
+    reset_end = finstack_quant_core::dates::adjust(
+        reset_end,
+        BusinessDayConvention::ModifiedFollowing,
+        resolve_facility_calendar(attrs)?,
+    )?;
 
     Ok(reset_end)
 }
@@ -314,19 +341,22 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_facility_calendar_none() {
+    fn test_resolve_facility_calendar_defaults_to_weekends_only() {
         let attrs = Attributes::new();
-        assert!(resolve_facility_calendar(&attrs).is_none());
+        assert!(resolve_facility_calendar(&attrs).is_ok());
     }
 
     #[test]
     fn test_resolve_facility_calendar_with_id() {
-        // Test with a calendar that exists (WMR = Weekends, Memorial days, Retail calendar)
-        let attrs = Attributes::new().with_meta("calendar_id", "WMR");
+        let attrs = Attributes::new().with_meta("calendar_id", "weekends_only");
         let cal = resolve_facility_calendar(&attrs);
-        // Calendar resolution depends on global registry state, so we just test the mechanism
-        // If a calendar doesn't exist, it returns None (which is fine for this test)
-        let _ = cal;
+        assert!(cal.is_ok());
+    }
+
+    #[test]
+    fn test_resolve_facility_calendar_rejects_unknown_id() {
+        let attrs = Attributes::new().with_meta("calendar_id", "NOT-A-CALENDAR");
+        assert!(resolve_facility_calendar(&attrs).is_err());
     }
 
     #[test]

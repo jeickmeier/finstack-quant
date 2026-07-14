@@ -8,7 +8,7 @@ use crate::cashflow::builder::schedule::{merge_cashflow_schedules, CashFlowSched
 use crate::cashflow::builder::specs::{
     CouponType, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec, FloatingRateSpec,
 };
-use crate::cashflow::builder::{CashFlowBuilder, PrincipalEvent};
+use crate::cashflow::builder::{CashFlowBuilder, PrincipalEvent, ScheduleParams};
 use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::instruments::fixed_income::term_loan::types::TermLoan;
 use finstack_quant_core::cashflow::xirr_with_daycount;
@@ -18,6 +18,22 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
 use std::collections::BTreeMap;
+
+fn loan_schedule_params(loan: &TermLoan) -> ScheduleParams {
+    ScheduleParams {
+        freq: loan.frequency,
+        dc: loan.day_count,
+        bdc: loan.bdc,
+        calendar_id: loan
+            .calendar_id
+            .clone()
+            .unwrap_or_else(|| crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()),
+        stub: loan.stub,
+        end_of_month: false,
+        payment_lag_days: 0,
+        adjust_accrual_dates: false,
+    }
+}
 
 /// Generate the full crate-internal cashflow schedule for a term loan.
 pub(crate) fn generate_cashflows(
@@ -130,18 +146,18 @@ pub(crate) fn generate_cashflows(
 
     // Coupon dates for amortization conversion
     let coupon_dates: Vec<Date> = {
-        let mut sb =
-            finstack_quant_core::dates::ScheduleBuilder::new(loan.issue_date, loan.maturity)?
-                .frequency(loan.frequency)
-                .stub_rule(loan.stub);
-        if let Some(ref cal) = loan.calendar_id {
-            sb = sb.adjust_with_id(loan.bdc, cal);
-        }
-        let mut ds: Vec<Date> = sb.build()?.into_iter().collect();
-        if ds.first().copied() != Some(loan.issue_date) {
-            ds.insert(0, loan.issue_date);
-        }
-        ds
+        use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+
+        let schedule = loan_schedule_params(loan);
+        let periods = build_periods(BuildPeriodsParams::from_schedule(
+            &schedule,
+            loan.issue_date,
+            loan.maturity,
+            None,
+        ))?;
+        std::iter::once(loan.issue_date)
+            .chain(periods.into_iter().map(|period| period.payment_date))
+            .collect()
     };
 
     // Amortization → principal events
@@ -293,25 +309,7 @@ pub(crate) fn generate_cashflows(
             let spec = FixedCouponSpec {
                 coupon_type: loan.coupon_type,
                 rate: rate_decimal,
-                schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                    freq: loan.frequency,
-
-                    dc: loan.day_count,
-
-                    bdc: loan.bdc,
-
-                    calendar_id: loan.calendar_id.clone().unwrap_or_else(|| {
-                        crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
-                    }),
-
-                    stub: loan.stub,
-
-                    end_of_month: false,
-
-                    payment_lag_days: 0,
-
-                    adjust_accrual_dates: false,
-                },
+                schedule: loan_schedule_params(loan),
             };
             let _ = builder.fixed_cf(spec);
         }
@@ -376,18 +374,7 @@ pub(crate) fn generate_cashflows(
                     overnight_basis: spec.overnight_basis,
                     fallback: spec.fallback.clone(),
                 },
-                schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                    freq: loan.frequency,
-                    dc: loan.day_count,
-                    bdc: loan.bdc,
-                    calendar_id: loan.calendar_id.clone().unwrap_or_else(|| {
-                        crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID.to_string()
-                    }),
-                    stub: loan.stub,
-                    end_of_month: false,
-                    payment_lag_days: 0,
-                    adjust_accrual_dates: false,
-                },
+                schedule: loan_schedule_params(loan),
             };
             let _ = builder.float_margin_stepup_decimal(&steps, base_spec);
         }
@@ -509,21 +496,18 @@ fn build_commitment_fee_flows(
         return Ok(Vec::new());
     }
 
-    let mut schedule_builder =
-        finstack_quant_core::dates::ScheduleBuilder::new(fee_start, fee_end)?
-            .frequency(loan.frequency)
-            .stub_rule(loan.stub);
-    if let Some(ref cal_id) = loan.calendar_id {
-        schedule_builder = schedule_builder.adjust_with_id(loan.bdc, cal_id);
-    }
-    let sched = schedule_builder.build()?;
-    let mut dates: Vec<Date> = sched.into_iter().collect();
-    if dates.first().copied() != Some(fee_start) {
-        dates.insert(0, fee_start);
-    }
-    if dates.last().copied() != Some(fee_end) {
-        dates.push(fee_end);
-    }
+    use crate::cashflow::builder::periods::{build_periods, BuildPeriodsParams};
+
+    let schedule_params = loan_schedule_params(loan);
+    let periods = build_periods(BuildPeriodsParams::from_schedule(
+        &schedule_params,
+        fee_start,
+        fee_end,
+        None,
+    ))?;
+    let mut dates: Vec<Date> = std::iter::once(fee_start)
+        .chain(periods.into_iter().map(|period| period.accrual_end))
+        .collect();
     for sd in &ddtl.commitment_step_downs {
         if sd.date > fee_start && sd.date < fee_end {
             dates.push(sd.date);
