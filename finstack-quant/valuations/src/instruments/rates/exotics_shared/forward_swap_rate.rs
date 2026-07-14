@@ -126,11 +126,7 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
 
     let mut annuity = 0.0;
     for period in &sched_fixed {
-        let accrual = inputs.fixed_day_count.year_fraction(
-            period.accrual_start,
-            period.accrual_end,
-            DayCountContext::default(),
-        )?;
+        let accrual = period.accrual_year_fraction;
         let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, period.payment_date)?;
         annuity += accrual * df;
     }
@@ -172,11 +168,7 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
 
         let mut pv_float = 0.0;
         for period in &sched_float {
-            let accrual = inputs.float_day_count.year_fraction(
-                period.accrual_start,
-                period.accrual_end,
-                DayCountContext::default(),
-            )?;
+            let accrual = period.accrual_year_fraction;
             let fwd_rate = rate_between_on_dates(
                 fwd_curve.as_ref(),
                 period.accrual_start,

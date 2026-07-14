@@ -895,18 +895,7 @@ impl InflationLinkedBond {
             if period.payment_date < as_of {
                 continue;
             }
-            let year_frac = self
-                .day_count
-                .year_fraction(
-                    period.accrual_start,
-                    period.accrual_end,
-                    DayCountContext {
-                        frequency: Some(self.frequency),
-                        coupon_period: Some((period.accrual_start, period.accrual_end)),
-                        ..Default::default()
-                    },
-                )?
-                .max(0.0);
+            let year_frac = period.accrual_year_fraction.max(0.0);
             let coupon_rate = self
                 .real_coupon
                 .to_f64()
@@ -1212,18 +1201,7 @@ impl CashflowProvider for InflationLinkedBond {
         let mut detailed_flows = Vec::with_capacity(periods.len() + 1);
         let mut coupon_rows = Vec::with_capacity(periods.len());
         for period in &periods {
-            let accrual_factor = self
-                .day_count
-                .year_fraction(
-                    period.accrual_start,
-                    period.accrual_end,
-                    DayCountContext {
-                        frequency: Some(self.frequency),
-                        coupon_period: Some((period.accrual_start, period.accrual_end)),
-                        ..Default::default()
-                    },
-                )?
-                .max(0.0);
+            let accrual_factor = period.accrual_year_fraction.max(0.0);
             let coupon_rate = self
                 .real_coupon
                 .to_f64()

@@ -674,11 +674,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
 
             let mut float_pv = 0.0_f64;
             for period in float_periods {
-                let accrual = leg_conv.float_day_count.year_fraction(
-                    period.accrual_start,
-                    period.accrual_end,
-                    DayCountContext::default(),
-                )?;
+                let accrual = period.accrual_year_fraction;
 
                 let t_pay_disc = disc.day_count().year_fraction(
                     disc.base_date(),
@@ -756,11 +752,7 @@ Set params.sabr_extrapolation='clamp' to allow flat extrapolation.",
 
         let mut pv01 = 0.0_f64;
         for period in periods {
-            let dcf = leg_conv.fixed_day_count.year_fraction(
-                period.accrual_start,
-                period.accrual_end,
-                DayCountContext::default(),
-            )?;
+            let dcf = period.accrual_year_fraction;
             let t = disc.day_count().year_fraction(
                 disc.base_date(),
                 period.payment_date,

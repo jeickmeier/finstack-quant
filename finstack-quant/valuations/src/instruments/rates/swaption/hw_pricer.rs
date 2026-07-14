@@ -230,17 +230,7 @@ impl SwaptionHullWhitePricer {
                         PricingErrorContext::default(),
                     )
                 })?;
-            let accrual = year_fraction(
-                swaption.underlying_day_count(),
-                period.accrual_start,
-                period.accrual_end,
-            )
-            .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+            let accrual = period.accrual_year_fraction;
             payment_times.push(t);
             accrual_fractions.push(accrual);
         }
