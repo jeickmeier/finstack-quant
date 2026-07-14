@@ -183,8 +183,10 @@ fn near_expiry_swap_prices_correctly() {
 
 #[test]
 fn expired_swap_returns_zero_pv() {
-    // Valuation date is after maturity
-    let base = d(2025, 1, 2);
+    // Valuation date is after the final business-day-adjusted settlement.
+    // The 2025-01-01 maturity settles on 2025-01-02 under the USD calendar,
+    // and same-day cashflows remain live by contract.
+    let base = d(2025, 1, 3);
     let start = d(2024, 1, 2);
     let maturity = d(2025, 1, 1); // Already expired
 

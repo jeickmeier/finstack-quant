@@ -677,6 +677,49 @@ impl XccySwap {
 
         self.validate_leg(leg)?;
 
+        let periods = crate::cashflow::builder::periods::build_periods(
+            crate::cashflow::builder::periods::BuildPeriodsParams {
+                start: leg.start,
+                end: leg.end,
+                frequency: leg.frequency,
+                stub: leg.stub,
+                bdc: leg.bdc,
+                calendar_id: if leg.calendar_id.as_deref().is_some_and(|id| {
+                    crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
+                }) {
+                    leg.calendar_id.as_deref().unwrap_or_default()
+                } else {
+                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID
+                },
+                end_of_month: false,
+                day_count: leg.day_count,
+                payment_lag_days: leg.payment_lag_days,
+                reset_lag_days: leg.reset_lag_days,
+                adjust_accrual_dates: false,
+            },
+        )?;
+
+        if periods.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "XccySwap leg schedule must contain at least 1 period".to_string(),
+            ));
+        }
+
+        let unsettled_coupon = periods.iter().any(|period| period.payment_date >= as_of);
+        let unsettled_initial = matches!(
+            self.notional_exchange,
+            NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
+        ) && leg.start >= as_of;
+        let unsettled_final = matches!(
+            self.notional_exchange,
+            NotionalExchange::Final
+                | NotionalExchange::InitialAndFinal
+                | NotionalExchange::MtmResetting { .. }
+        ) && leg.end >= as_of;
+        if !unsettled_coupon && !unsettled_initial && !unsettled_final {
+            return Ok(Money::new(0.0, self.reporting_currency));
+        }
+
         // Curves
         let disc = context.get_discount(&leg.discount_curve_id)?;
         let fwd = context.get_forward(&leg.forward_curve_id)?;
@@ -711,7 +754,7 @@ impl XccySwap {
         if matches!(
             self.notional_exchange,
             NotionalExchange::InitialAndFinal | NotionalExchange::MtmResetting { .. }
-        ) && leg.start > as_of
+        ) && leg.start >= as_of
         {
             let df = robust_relative_df(disc.as_ref(), as_of, leg.start)?;
             let cf_leg_ccy = leg.side.initial_principal_sign() * leg.notional.amount() * df;
@@ -725,40 +768,12 @@ impl XccySwap {
             NotionalExchange::Final
                 | NotionalExchange::InitialAndFinal
                 | NotionalExchange::MtmResetting { .. }
-        ) && leg.end > as_of
+        ) && leg.end >= as_of
         {
             let df = robust_relative_df(disc.as_ref(), as_of, leg.end)?;
             let cf_leg_ccy = leg.side.final_principal_sign() * leg.notional.amount() * df;
             let cf_rep = convert_pv(cf_leg_ccy)?;
             pv.add(cf_rep);
-        }
-
-        let periods = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: leg.start,
-                end: leg.end,
-                frequency: leg.frequency,
-                stub: leg.stub,
-                bdc: leg.bdc,
-                calendar_id: if leg.calendar_id.as_deref().is_some_and(|id| {
-                    crate::cashflow::builder::calendar::resolve_calendar_strict(id).is_ok()
-                }) {
-                    leg.calendar_id.as_deref().unwrap_or_default()
-                } else {
-                    crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID
-                },
-                end_of_month: false,
-                day_count: leg.day_count,
-                payment_lag_days: leg.payment_lag_days,
-                reset_lag_days: leg.reset_lag_days,
-                adjust_accrual_dates: false,
-            },
-        )?;
-
-        if periods.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(
-                "XccySwap leg schedule must contain at least 1 period".to_string(),
-            ));
         }
 
         // Floating coupons

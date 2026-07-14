@@ -573,7 +573,26 @@ impl CashFlowSchedule {
         let initial = self.notional.initial;
         let expected_currency = initial.currency();
         let initial_amount = initial.amount().abs();
-        let epsilon = (initial_amount * 1e-8).max(1e-6);
+        let mut initial_funding_skipped = false;
+        let additional_funding = self.flows.iter().fold(0.0, |total, flow| {
+            if flow.amount.currency() != expected_currency
+                || !matches!(flow.kind, CFKind::Notional | CFKind::RevolvingDraw)
+                || flow.amount.amount() >= 0.0
+            {
+                return total;
+            }
+            let is_initial_funding = self.meta.issue_date.is_some_and(|issue_date| {
+                is_initial_funding_flow(flow, issue_date, initial_amount, initial_funding_skipped)
+            });
+            initial_funding_skipped |= is_initial_funding;
+            if is_initial_funding {
+                total
+            } else {
+                total + flow.amount.amount().abs()
+            }
+        });
+        let funded_principal = initial_amount + additional_funding;
+        let epsilon = (funded_principal * 1e-8).max(1e-6);
         let total_amortization = self
             .flows
             .iter()
@@ -589,9 +608,9 @@ impl CashFlowSchedule {
                 Ok(total + flow.amount.amount().max(0.0))
             })?;
 
-        if total_amortization > initial_amount + epsilon {
+        if total_amortization > funded_principal + epsilon {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "total amortization ({total_amortization:.6}) exceeds initial notional ({initial_amount:.6})"
+                "total amortization ({total_amortization:.6}) exceeds funded principal ({funded_principal:.6})"
             )));
         }
 
@@ -1386,6 +1405,28 @@ mod tests {
             .flows
             .iter()
             .any(|flow| flow.amount.currency() == Currency::EUR));
+    }
+
+    #[test]
+    fn validation_counts_delayed_funding_before_amortization() {
+        let issue = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let repayment = Date::from_calendar_date(2025, Month::July, 15).expect("valid date");
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                flow(issue, -100.0, CFKind::Notional),
+                flow(repayment, 30.0, CFKind::Amortization),
+            ],
+            Notional::par(0.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta {
+                issue_date: Some(issue),
+                ..Default::default()
+            },
+        );
+
+        schedule
+            .validate()
+            .expect("future funding should support later amortization");
     }
 
     #[test]
