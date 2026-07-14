@@ -510,13 +510,13 @@ mod tests {
         let dates_no_cal = build_payment_dates(&facility_no_cal, false)
             .expect("Payment dates building should succeed in test");
 
-        // With NYC calendar
+        // With NYSE calendar
         let facility_with_cal = create_test_facility(
             start,
             end,
             Tenor::quarterly(),
             BaseRateSpec::Fixed { rate: 0.05 },
-            Some("NYC"),
+            Some("nyse"),
         );
         let dates_with_cal = build_payment_dates(&facility_with_cal, false)
             .expect("Payment dates building should succeed in test");

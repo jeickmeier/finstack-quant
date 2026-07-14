@@ -182,7 +182,7 @@ Deterministic and stochastic modes both produce `CashFlowSchedule`. In determini
 
 ### Calendars and schedules
 
-Payment schedules (and floating reset schedules) are built from `commitment_date → maturity_date` using the configured `Tenor`, and optionally adjusted using a calendar from `attributes` (e.g., `calendar_id="NYC"`). A sentinel date can be appended for exclusive‑end period aggregation where needed.
+Payment schedules (and floating reset schedules) are built from `commitment_date → maturity_date` using the configured `Tenor`, and optionally adjusted using a calendar from `attributes` (e.g., `calendar_id="nyse"`). A sentinel date can be appended for exclusive‑end period aggregation where needed.
 
 ---
 
