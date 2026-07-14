@@ -301,7 +301,7 @@ fn build_envelope(
             .get(&ccy)
             .unwrap_or(&discount_curve_id);
         let row_discount = if row_discount_curve_id == &discount_curve_id {
-            primary_discount.clone()
+            std::sync::Arc::clone(&primary_discount)
         } else {
             market.get_discount(row_discount_curve_id.as_str())?
         };
