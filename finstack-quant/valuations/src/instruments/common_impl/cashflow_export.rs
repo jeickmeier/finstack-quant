@@ -33,6 +33,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{Error, Result};
 use serde::Serialize;
@@ -41,7 +42,9 @@ use crate::instruments::fixed_income::inflation_linked_bond::InflationLinkedBond
 use crate::instruments::fixed_income::mbs_passthrough::{
     pricer::project_cashflows as project_mbs_cashflows, AgencyMbsPassthrough,
 };
+use crate::instruments::fx::fx_swap::FxSwap;
 use crate::instruments::json_loader::InstrumentEnvelope;
+use crate::instruments::rates::xccy_swap::XccySwap;
 use crate::pricer::{shared_standard_registry, ModelKey, PricerKey};
 
 // ---------------------------------------------------------------------------
@@ -53,7 +56,7 @@ use crate::pricer::{shared_standard_registry, ModelKey, PricerKey};
 pub struct InstrumentCashflowEnvelope {
     /// Instrument identifier.
     pub instrument_id: String,
-    /// Reporting currency (first flow's currency; errors if schedule mixes currencies).
+    /// Reporting currency used for row PVs and `total_pv`.
     pub currency: Currency,
     /// Model key used (`"discounting"` or `"hazard_rate"`).
     pub model: String,
@@ -104,6 +107,8 @@ pub struct CashflowRow {
     pub reset_date: Option<Date>,
     /// `df(as_of, date)`.
     pub discount_factor: f64,
+    /// Discount curve used for this row.
+    pub discount_curve_id: CurveId,
     /// Cumulative survival probability (hazard mode only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub survival_probability: Option<f64>,
@@ -122,7 +127,7 @@ pub struct CashflowRow {
     /// Ending pool balance for the period (agency MBS only).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ending_balance: Option<f64>,
-    /// Per-flow present value. Sums to `total_pv`.
+    /// Per-flow present value in the envelope reporting currency. Sums to `total_pv`.
     pub pv: f64,
 }
 
@@ -187,12 +192,34 @@ fn build_envelope(
     // --- Resolve curves ---
     let deps = instrument.market_dependencies()?;
     let curves = deps.curve_dependencies();
-    let discount_curve_id = curves.discount_curves.first().cloned().ok_or_else(|| {
+    let default_discount_curve_id = curves.discount_curves.first().cloned().ok_or_else(|| {
         Error::Validation(
             "instrument has no declared discount curve; cannot compute cashflow DFs".into(),
         )
     })?;
-    let discount = market.get_discount(discount_curve_id.as_str())?;
+    let mut currency_discount_curves = std::collections::HashMap::new();
+    let (discount_curve_id, reporting_currency) = if let Some(swap) =
+        instrument.as_any().downcast_ref::<FxSwap>()
+    {
+        currency_discount_curves.insert(swap.base_currency, swap.foreign_discount_curve_id.clone());
+        currency_discount_curves
+            .insert(swap.quote_currency, swap.domestic_discount_curve_id.clone());
+        (
+            swap.domestic_discount_curve_id.clone(),
+            Some(swap.quote_currency),
+        )
+    } else if let Some(swap) = instrument.as_any().downcast_ref::<XccySwap>() {
+        currency_discount_curves.insert(swap.leg1.currency, swap.leg1.discount_curve_id.clone());
+        currency_discount_curves.insert(swap.leg2.currency, swap.leg2.discount_curve_id.clone());
+        let primary = currency_discount_curves
+            .get(&swap.reporting_currency)
+            .cloned()
+            .unwrap_or(default_discount_curve_id);
+        (primary, Some(swap.reporting_currency))
+    } else {
+        (default_discount_curve_id, None)
+    };
+    let primary_discount = market.get_discount(discount_curve_id.as_str())?;
 
     let (hazard_curve_id, hazard_arc) = if matches!(model_key, ModelKey::HazardRate) {
         let id = curves.credit_curves.first().cloned().ok_or_else(|| {
@@ -233,7 +260,6 @@ fn build_envelope(
         instrument.as_any().downcast_ref::<InflationLinkedBond>();
 
     // --- Iterate flows ---
-    let curve_dc = discount.day_count();
     let dc_ctx = DayCountContext::default();
 
     // Survival probability at `as_of` under the hazard curve's own time origin.
@@ -262,22 +288,24 @@ fn build_envelope(
     };
 
     let mut rows = Vec::with_capacity(schedule.flows.len());
-    let mut envelope_currency: Option<Currency> = None;
+    let mut envelope_currency = reporting_currency;
     let mut prev_sp = 1.0_f64;
 
     for flow in &schedule.flows {
         let ccy = flow.amount.currency();
-        if let Some(first) = envelope_currency {
-            if first != ccy {
-                return Err(Error::Validation(format!(
-                    "schedule mixes currencies ({first:?} and {ccy:?}); total_pv aggregation undefined. \
-                     instrument_cashflows requires a single-currency schedule"
-                )));
-            }
-        } else {
+        if envelope_currency.is_none() {
             envelope_currency = Some(ccy);
         }
 
+        let row_discount_curve_id = currency_discount_curves
+            .get(&ccy)
+            .unwrap_or(&discount_curve_id);
+        let row_discount = if row_discount_curve_id == &discount_curve_id {
+            primary_discount.clone()
+        } else {
+            market.get_discount(row_discount_curve_id.as_str())?
+        };
+        let curve_dc = row_discount.day_count();
         let year_fraction = curve_dc.signed_year_fraction(as_of_date, flow.date, dc_ctx)?;
 
         // Flows on or before `as_of` are already settled (holder view): they
@@ -306,7 +334,7 @@ fn build_envelope(
             // year fraction into `df` lands on the wrong time origin and
             // breaks reconciliation with `Instrument::value`, which uses
             // `df_between_dates`. Use the same date-based helper here.
-            let df = discount.df_between_dates(as_of_date, flow.date)?;
+            let df = row_discount.df_between_dates(as_of_date, flow.date)?;
             let (sp, cond_pd) = match (hazard_arc.as_ref(), survival_at_as_of) {
                 (Some(h), Some(s0)) => {
                     // Conditional survival Q(as_of, T) = S(T) / S(as_of).
@@ -321,13 +349,20 @@ fn build_envelope(
             (df, sp, cond_pd)
         };
 
-        let pv = credit_adjusted_cashflow_pv(
+        let native_pv = credit_adjusted_cashflow_pv(
             flow,
             discount_factor,
             survival_probability.unwrap_or(1.0),
             recovery_rate,
             as_of_date,
         )?;
+        let pv = market
+            .convert_money(
+                Money::new(native_pv, ccy),
+                envelope_currency.unwrap_or(ccy),
+                as_of_date,
+            )?
+            .amount();
 
         let mbs_row = mbs_state.as_ref().and_then(|m| m.get(&flow.date));
 
@@ -341,6 +376,7 @@ fn build_envelope(
             rate: flow.rate,
             reset_date: flow.reset_date,
             discount_factor,
+            discount_curve_id: row_discount_curve_id.clone(),
             survival_probability,
             conditional_default_prob,
             inflation_index_ratio: inflation_bond
@@ -376,7 +412,7 @@ fn build_envelope(
     // discounting bug — instead of silently claiming a reconciliation that
     // does not hold.
     let reconciles_with_base_value = match instrument.value(market, as_of_date) {
-        Ok(base_value) => {
+        Ok(base_value) if base_value.currency() == currency => {
             let base = base_value.amount();
             // Relative tolerance with an absolute floor: per-flow PVs and
             // `base_value` are summed by different (compensated) accumulators,
@@ -387,7 +423,7 @@ fn build_envelope(
         }
         // If the instrument cannot be priced via `Instrument::value` we cannot
         // assert reconciliation; report `false` rather than an unverified `true`.
-        Err(_) => false,
+        Ok(_) | Err(_) => false,
     };
 
     Ok(InstrumentCashflowEnvelope {
@@ -434,7 +470,9 @@ mod tests {
     use crate::instruments::Instrument;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::money::fx::{FxMatrix, SimpleFxProvider};
     use finstack_quant_core::money::Money;
+    use std::sync::Arc;
     use time::Month;
 
     fn serialize_bond(bond: &Bond) -> String {
@@ -443,6 +481,51 @@ mod tests {
             instrument: InstrumentJson::Bond(bond.clone()),
         };
         serde_json::to_string(&envelope).expect("serialize bond envelope")
+    }
+
+    #[test]
+    fn mixed_currency_fx_swap_rows_use_native_curves_and_reporting_currency_pv() {
+        let as_of = Date::from_calendar_date(2024, Month::January, 1).expect("date");
+        let swap = FxSwap::example();
+        let provider = Arc::new(SimpleFxProvider::new());
+        provider
+            .set_quote(Currency::EUR, Currency::USD, 1.10)
+            .expect("fx quote");
+        let market = MarketContext::new()
+            .insert(
+                DiscountCurve::builder("USD-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.95)])
+                    .build()
+                    .expect("usd curve"),
+            )
+            .insert(
+                DiscountCurve::builder("EUR-OIS")
+                    .base_date(as_of)
+                    .knots([(0.0, 1.0), (1.0, 0.97)])
+                    .build()
+                    .expect("eur curve"),
+            )
+            .insert_fx(FxMatrix::new(provider));
+        let instrument = InstrumentEnvelope {
+            schema: InstrumentEnvelope::CURRENT_SCHEMA.to_string(),
+            instrument: InstrumentJson::FxSwap(swap),
+        };
+        let json = serde_json::to_string(&instrument).expect("serialize fx swap");
+
+        let payload = instrument_cashflows_json(&json, &market, "2024-01-01", "discounting")
+            .expect("mixed-currency cashflow export");
+        let envelope: InstrumentCashflowEnvelope =
+            serde_json::from_str(&payload).expect("parse envelope");
+
+        assert_eq!(envelope.currency, Currency::USD);
+        assert!(envelope.reconciles_with_base_value);
+        assert!(envelope.flows.iter().any(|row| {
+            row.currency == Currency::EUR && row.discount_curve_id.as_str() == "EUR-OIS"
+        }));
+        assert!(envelope.flows.iter().any(|row| {
+            row.currency == Currency::USD && row.discount_curve_id.as_str() == "USD-OIS"
+        }));
     }
 
     #[test]

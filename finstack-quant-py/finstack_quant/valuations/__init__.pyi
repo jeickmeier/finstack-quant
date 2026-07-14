@@ -341,8 +341,8 @@ def instrument_cashflows(
         ``(envelope, df)`` where ``envelope`` is the parsed dict and ``df``
         carries one row per flow with columns ``date``, ``amount``,
         ``currency``, ``kind``, ``accrual_factor``, ``year_fraction``,
-        ``rate``, ``reset_date``, ``discount_factor``, ``survival_probability``,
-        ``conditional_default_prob``, ``inflation_index_ratio``,
+        ``rate``, ``reset_date``, ``discount_factor``, ``discount_curve_id``,
+        ``survival_probability``, ``conditional_default_prob``, ``inflation_index_ratio``,
         ``prepayment_smm``, ``beginning_balance``, ``ending_balance``, and
         ``pv``.
     """
