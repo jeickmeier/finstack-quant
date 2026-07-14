@@ -392,7 +392,6 @@ pub(crate) fn mtm_cashflow_schedule(
     context: &finstack_quant_core::market_data::context::MarketContext,
     as_of: Date,
 ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
-    use crate::cashflow::builder::{CashFlowMeta, CashFlowSchedule, Notional};
     use crate::cashflow::primitives::{CFKind, CashFlow};
     use crate::instruments::common_impl::numeric::decimal_to_f64;
     use finstack_quant_core::money::fx::FxQuery;
@@ -618,14 +617,17 @@ pub(crate) fn mtm_cashflow_schedule(
         None,
     ));
 
-    flows.sort_by(|a, b| a.date.cmp(&b.date));
-
-    Ok(CashFlowSchedule {
+    Ok(crate::cashflow::traits::schedule_from_classified_flows(
         flows,
-        notional: Notional::par(resetting_leg.notional.amount(), resetting_leg.currency),
-        day_count: resetting_leg.day_count,
-        meta: CashFlowMeta::default(),
-    })
+        resetting_leg.day_count,
+        crate::cashflow::traits::ScheduleBuildOpts {
+            notional_hint: Some(Money::new(
+                resetting_leg.notional.amount(),
+                resetting_leg.currency,
+            )),
+            ..Default::default()
+        },
+    ))
 }
 
 /// Per-period resetting-leg notional under CIP no-FX-vol: `N_C / X_t^FRA`.
