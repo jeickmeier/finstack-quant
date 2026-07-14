@@ -12,10 +12,7 @@ use time::macros::date;
 
 use super::pricer;
 use crate::impl_instrument_base;
-use crate::{
-    cashflow::traits::CashflowProvider,
-    instruments::{common_impl::traits::Attributes, MarketDependencies},
-};
+use crate::instruments::{common_impl::traits::Attributes, MarketDependencies};
 
 pub use crate::instruments::common_impl::parameters::PayReceive;
 
@@ -450,12 +447,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for VarianceSwap
     }
 }
 
-impl CashflowProvider for VarianceSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for VarianceSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _context: &MarketContext,
         _as_of: Date,

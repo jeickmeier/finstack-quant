@@ -171,8 +171,8 @@ impl CurveDependencies for LeveredRealEstateEquity {
     }
 }
 
-impl crate::cashflow::traits::CashflowProvider for LeveredRealEstateEquity {
-    fn cashflow_schedule(
+impl crate::cashflow::traits::CashflowScheduleSource for LeveredRealEstateEquity {
+    fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
         as_of: Date,

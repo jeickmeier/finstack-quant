@@ -5,7 +5,6 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyProgram;
@@ -293,15 +292,15 @@ impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
     }
 }
 
-impl CashflowProvider for DollarRoll {
+impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _market: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let front_date = self.front_settle_date()?;
         let back_date = self.back_settle_date()?;
@@ -325,10 +324,8 @@ impl CashflowProvider for DollarRoll {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Contractual,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
     }
 }
 

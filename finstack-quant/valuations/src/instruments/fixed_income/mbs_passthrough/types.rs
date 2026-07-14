@@ -5,7 +5,6 @@
 //! and payment delay conventions.
 
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::PricingOverrides;
@@ -172,12 +171,12 @@ impl std::fmt::Display for AgencyProgram {
     }
 }
 
-impl CashflowProvider for AgencyMbsPassthrough {
+impl finstack_quant_cashflows::CashflowScheduleSource for AgencyMbsPassthrough {
     fn notional(&self) -> Option<Money> {
         Some(self.current_face)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
@@ -189,10 +188,8 @@ impl CashflowProvider for AgencyMbsPassthrough {
                 as_of,
                 Some(self.wam + 12),
             )?;
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

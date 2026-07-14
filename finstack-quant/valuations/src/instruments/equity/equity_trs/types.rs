@@ -479,15 +479,15 @@ impl crate::instruments::common_impl::traits::Instrument for EquityTotalReturnSw
     }
 }
 
-impl CashflowProvider for EquityTotalReturnSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for EquityTotalReturnSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         context: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
         let mut builder = crate::cashflow::builder::CashFlowSchedule::builder();
         let _ = builder
@@ -524,10 +524,8 @@ impl CashflowProvider for EquityTotalReturnSwap {
                 },
             });
         let schedule = builder.build_with_curves(Some(context))?;
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

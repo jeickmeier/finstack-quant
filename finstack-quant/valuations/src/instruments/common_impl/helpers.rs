@@ -528,7 +528,7 @@ pub(crate) fn build_with_metrics_dyn(
 mod tests {
     use super::*;
     use crate::cashflow::builder::CashFlowSchedule;
-    use crate::cashflow::traits::{CashflowProvider, DatedFlows};
+    use crate::cashflow::traits::{schedule_from_dated_flows, ScheduleBuildOpts};
     use crate::instruments::common_impl::traits::{Attributes, Instrument};
     use crate::metrics::MetricId;
     use crate::pricer::InstrumentType;
@@ -611,32 +611,26 @@ mod tests {
         }
     }
 
-    struct DatedFlowsOnlyProvider;
+    struct SingleFlowProvider;
 
-    impl CashflowProvider for DatedFlowsOnlyProvider {
+    impl finstack_quant_cashflows::CashflowScheduleSource for SingleFlowProvider {
         fn notional(&self) -> Option<Money> {
             Some(Money::new(100.0, Currency::USD))
         }
 
-        fn cashflow_schedule(
-            &self,
-            _curves: &MarketContext,
-            _as_of: Date,
-        ) -> finstack_quant_core::Result<CashFlowSchedule> {
-            Err(finstack_quant_core::Error::Validation(
-                "shared PV helpers should use dated_cashflows".to_string(),
-            ))
-        }
-
-        fn dated_cashflows(
+        fn raw_cashflow_schedule(
             &self,
             _curves: &MarketContext,
             as_of: Date,
-        ) -> finstack_quant_core::Result<DatedFlows> {
-            Ok(vec![(
-                as_of + Duration::days(30),
-                Money::new(100.0, Currency::USD),
-            )])
+        ) -> finstack_quant_core::Result<CashFlowSchedule> {
+            Ok(schedule_from_dated_flows(
+                vec![(as_of + Duration::days(30), Money::new(100.0, Currency::USD))],
+                DayCount::Act365F,
+                ScheduleBuildOpts {
+                    notional_hint: self.notional(),
+                    ..Default::default()
+                },
+            ))
         }
     }
 
@@ -899,8 +893,7 @@ mod tests {
     }
 
     #[test]
-    fn schedule_pv_using_curve_dc_raw_uses_dated_cashflows_path() -> finstack_quant_core::Result<()>
-    {
+    fn schedule_pv_using_curve_dc_raw_uses_provider_path() -> finstack_quant_core::Result<()> {
         let as_of = date!(2024 - 01 - 01);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("DISC")
@@ -911,7 +904,7 @@ mod tests {
         );
 
         let pv = schedule_pv_using_curve_dc_raw(
-            &DatedFlowsOnlyProvider,
+            &SingleFlowProvider,
             &market,
             as_of,
             &CurveId::new("DISC"),
@@ -922,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn schedule_pv_using_curve_dc_uses_dated_cashflows_path() -> finstack_quant_core::Result<()> {
+    fn schedule_pv_using_curve_dc_uses_provider_path() -> finstack_quant_core::Result<()> {
         let as_of = date!(2024 - 01 - 01);
         let market = MarketContext::new().insert(
             DiscountCurve::builder("DISC")
@@ -932,12 +925,8 @@ mod tests {
                 .build()?,
         );
 
-        let pv = schedule_pv_using_curve_dc(
-            &DatedFlowsOnlyProvider,
-            &market,
-            as_of,
-            &CurveId::new("DISC"),
-        )?;
+        let pv =
+            schedule_pv_using_curve_dc(&SingleFlowProvider, &market, as_of, &CurveId::new("DISC"))?;
 
         assert!(pv.amount() > 0.0);
         assert_eq!(pv.currency(), Currency::USD);

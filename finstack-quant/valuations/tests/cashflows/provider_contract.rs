@@ -1,13 +1,13 @@
 //! Contract tests for `CashflowProvider` implementations.
 //!
-//! These tests ensure all instruments correctly implement the trait contract.
-//! Add new instruments here when they implement `CashflowProvider` to catch
-//! drift and ensure consistent behavior across the codebase.
+//! These representative instrument tests verify the public provider surface.
+//! The non-overridable lifecycle itself is tested once in the cashflows crate,
+//! where `CashflowProvider` is blanket-implemented for every raw schedule source.
 //!
 //! # Contract Properties Verified
 //!
 //! 1. `cashflow_schedule` succeeds with minimal valid market context
-//! 2. `dated_cashflows` is a pure flattening of `cashflow_schedule`
+//! 2. `dated_cashflows` is the cash-settlement view of `cashflow_schedule`
 //! 3. Returned flows are sorted by date (non-decreasing)
 //! 4. All flows have the same currency as the instrument's notional (if provided)
 //! 5. All flows satisfy `date >= as_of` (future-only)
@@ -28,6 +28,7 @@
 
 use super::helpers::d;
 use finstack_quant_cashflows::builder::schedule::CashflowRepresentation;
+use finstack_quant_cashflows::primitives::is_cash_settlement_kind;
 use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -47,7 +48,7 @@ use finstack_quant_valuations::instruments::Instrument as PublicInstrument;
 /// # Contract Properties
 ///
 /// 1. `cashflow_schedule` returns `Ok` with valid market context
-/// 2. `dated_cashflows` is a pure flattening of `cashflow_schedule`
+/// 2. `dated_cashflows` is the cash-settlement view of `cashflow_schedule`
 /// 3. Flows are sorted by date (non-decreasing)
 /// 4. All flows satisfy `date >= as_of` (future-only)
 /// 5. No `CFKind::PIK` flows in the public schedule
@@ -76,11 +77,12 @@ fn verify_provider_contract<T: CashflowProvider>(
     let flattened_schedule_flows: Vec<_> = schedule
         .flows
         .iter()
+        .filter(|cf| is_cash_settlement_kind(cf.kind))
         .map(|cf| (cf.date, cf.amount))
         .collect();
     assert_eq!(
         flows, flattened_schedule_flows,
-        "[{}] dated_cashflows must be the flattened view of cashflow_schedule",
+        "[{}] dated_cashflows must be the cash-settlement view of cashflow_schedule",
         type_name
     );
 
@@ -149,7 +151,14 @@ fn verify_public_instrument_cashflow_surface<T: PublicInstrument>(
         .dated_cashflows(market, as_of)
         .expect("public instrument trait should expose dated_cashflows");
     assert_eq!(schedule.meta.representation, expected_representation);
-    assert_eq!(flows.len(), schedule.flows.len());
+    assert_eq!(
+        flows.len(),
+        schedule
+            .flows
+            .iter()
+            .filter(|flow| is_cash_settlement_kind(flow.kind))
+            .count()
+    );
 }
 
 fn verify_empty_schedule_surface<T: PublicInstrument>(

@@ -517,6 +517,13 @@ impl CashFlowSchedule {
         super::CashFlowBuilder::default()
     }
 
+    /// Attach the economic representation produced by a raw schedule source.
+    #[must_use]
+    pub fn with_representation(mut self, representation: CashflowRepresentation) -> Self {
+        self.meta.representation = representation;
+        self
+    }
+
     /// Returns the list of dates for all flows in schedule order.
     pub fn dates(&self) -> Vec<Date> {
         self.flows.iter().map(|cf| cf.date).collect()
@@ -556,12 +563,11 @@ impl CashFlowSchedule {
     /// 1. Future-flow filtering (`date >= as_of`)
     /// 2. Pure PIK omission
     /// 3. Re-sort (defensive, in case instrument code appended unsorted flows)
-    /// 4. Attach the given representation tag
+    /// 4. Preserve the representation attached by the raw schedule source
     #[must_use]
-    pub fn normalize_public(self, as_of: Date, representation: CashflowRepresentation) -> Self {
+    pub(crate) fn normalize_public(self, as_of: Date) -> Self {
         let mut normalized = self.filter_future(as_of).omit_pure_pik();
         sort_schedule_with_metadata(&mut normalized);
-        normalized.meta.representation = representation;
         normalized
     }
 

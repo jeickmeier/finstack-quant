@@ -15,7 +15,6 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
@@ -634,12 +633,12 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
     }
 }
 
-impl CashflowProvider for CmsSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
@@ -662,10 +661,8 @@ impl CashflowProvider for CmsSwap {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

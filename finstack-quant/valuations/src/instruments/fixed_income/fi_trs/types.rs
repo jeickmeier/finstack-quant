@@ -6,7 +6,6 @@
 use crate::impl_instrument_base;
 use crate::{
     cashflow::builder::ScheduleParams,
-    cashflow::traits::CashflowProvider,
     instruments::common_impl::parameters::{
         legs::FinancingLegSpec, trs_common::TrsScheduleSpec, trs_common::TrsSide,
         underlying::IndexUnderlyingParams,
@@ -279,12 +278,12 @@ impl crate::instruments::common_impl::traits::Instrument for FIIndexTotalReturnS
     }
 }
 
-impl CashflowProvider for FIIndexTotalReturnSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for FIIndexTotalReturnSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _context: &MarketContext,
         _as_of: Date,

@@ -1,7 +1,6 @@
 //! Private markets fund investment instrument type and implementations.
 
 use super::pricer;
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::equity::pe_fund::waterfall::{AllocationLedger, FundEvent, WaterfallSpec};
@@ -213,11 +212,11 @@ impl Instrument for PrivateMarketsFund {
     }
 }
 
-impl CashflowProvider for PrivateMarketsFund {
-    fn cashflow_schedule(
+impl finstack_quant_cashflows::CashflowScheduleSource for PrivateMarketsFund {
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let flows = self.lp_cashflows()?;
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
@@ -228,9 +227,7 @@ impl CashflowProvider for PrivateMarketsFund {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Contractual,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
     }
 }

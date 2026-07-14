@@ -70,12 +70,12 @@ macro_rules! impl_empty_cashflow_provider {
         );
     };
     ($ty:ty, $representation:expr, $notional:expr, $day_count:expr) => {
-        impl $crate::__private::finstack_quant_cashflows::traits::CashflowProvider for $ty {
+        impl $crate::__private::finstack_quant_cashflows::traits::CashflowScheduleSource for $ty {
             fn notional(&self) -> Option<finstack_quant_core::money::Money> {
                 $notional
             }
 
-            fn cashflow_schedule(
+            fn raw_cashflow_schedule(
                 &self,
                 _market: &finstack_quant_core::market_data::context::MarketContext,
                 _as_of: finstack_quant_core::dates::Date,

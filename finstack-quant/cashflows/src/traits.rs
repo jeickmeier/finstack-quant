@@ -1,9 +1,10 @@
 //! Cashflow-related traits and helpers.
 //!
-//! [`CashflowProvider`] is the instrument boundary for emitting a
-//! [`crate::builder::CashFlowSchedule`]. [`schedule_from_dated_flows`] and
-//! [`schedule_from_classified_flows`] wrap ad-hoc flow lists using
-//! [`ScheduleBuildOpts`].
+//! [`CashflowScheduleSource`] is the implementation boundary for producing a
+//! raw schedule. [`CashflowProvider`] is blanket-implemented over every source
+//! and owns the non-overridable public normalization and dated-flow views.
+//! [`schedule_from_dated_flows`] and [`schedule_from_classified_flows`] wrap
+//! ad-hoc flow lists using [`ScheduleBuildOpts`].
 
 use crate::builder::schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation};
 use crate::builder::Notional;
@@ -49,13 +50,11 @@ impl ScheduleBuildOpts {
     }
 }
 
-/// Build cashflow schedules and provide currency-safe aggregation hooks.
+/// Implementation boundary for building an instrument's raw cashflow schedule.
 ///
-/// Instruments implement this to generate their canonical signed cashflow schedule
-/// given market curves and valuation date. The returned schedule is future-filtered
-/// (`date >= as_of`), preserves fees and signed notionals, omits pure PIK accretion,
-/// and tags curve-dependent amounts as `Projected`.
-pub trait CashflowProvider: Send + Sync {
+/// Instruments implement this trait. Callers use [`CashflowProvider`], whose
+/// blanket implementation applies the canonical public lifecycle exactly once.
+pub trait CashflowScheduleSource: Send + Sync {
     /// Returns the instrument's notional amount, if applicable.
     ///
     /// Instruments with a defined notional should override this to return
@@ -73,14 +72,14 @@ pub trait CashflowProvider: Send + Sync {
     /// use finstack_quant_core::market_data::context::MarketContext;
     /// use finstack_quant_core::money::Money;
     /// use finstack_quant_cashflows::builder::CashFlowSchedule;
-    /// use finstack_quant_cashflows::{CashflowProvider, schedule_from_dated_flows, ScheduleBuildOpts};
+    /// use finstack_quant_cashflows::{CashflowScheduleSource, schedule_from_dated_flows, ScheduleBuildOpts};
     ///
     /// struct MyInstrument {
     ///     notional: Money,
     /// }
     ///
-    /// impl CashflowProvider for MyInstrument {
-    ///     fn cashflow_schedule(
+    /// impl CashflowScheduleSource for MyInstrument {
+    ///     fn raw_cashflow_schedule(
     ///         &self,
     ///         _curves: &MarketContext,
     ///         _as_of: Date,
@@ -107,6 +106,23 @@ pub trait CashflowProvider: Send + Sync {
         None
     }
 
+    /// Build the complete signed schedule before public lifecycle normalization.
+    ///
+    /// Implementations must preserve classification and attach the correct
+    /// [`CashflowRepresentation`] to schedule metadata. They must not perform
+    /// public date filtering, PIK omission, or final sorting.
+    fn raw_cashflow_schedule(
+        &self,
+        curves: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<crate::builder::CashFlowSchedule>;
+}
+
+/// Canonical public cashflow schedule and derived dated-flow views.
+///
+/// This trait is blanket-implemented for every [`CashflowScheduleSource`], so
+/// instruments cannot override lifecycle normalization or dated-flow meaning.
+pub trait CashflowProvider: CashflowScheduleSource {
     /// Return the canonical signed cashflow schedule, future-filtered by `as_of`.
     ///
     /// The returned schedule:
@@ -126,7 +142,11 @@ pub trait CashflowProvider: Send + Sync {
         &self,
         curves: &MarketContext,
         as_of: Date,
-    ) -> finstack_quant_core::Result<crate::builder::CashFlowSchedule>;
+    ) -> finstack_quant_core::Result<crate::builder::CashFlowSchedule> {
+        Ok(self
+            .raw_cashflow_schedule(curves, as_of)?
+            .normalize_public(as_of))
+    }
 
     /// Convenience: return flattened `(Date, Money)` flows derived from the canonical schedule.
     ///
@@ -138,8 +158,6 @@ pub trait CashflowProvider: Send + Sync {
     /// # Errors
     ///
     /// Forwards any error returned by [`CashflowProvider::cashflow_schedule`].
-    /// Override this method only if you want to bypass schedule construction
-    /// and produce dated flows by some other means.
     fn dated_cashflows(
         &self,
         curves: &MarketContext,
@@ -154,6 +172,8 @@ pub trait CashflowProvider: Send + Sync {
             .collect())
     }
 }
+
+impl<T> CashflowProvider for T where T: CashflowScheduleSource + ?Sized {}
 
 /// Resolve the schedule-level notional from an optional `Money` hint and a
 /// fallback currency inferred from the flow list.
@@ -282,12 +302,12 @@ mod tests {
 
     struct DummyInstrument;
 
-    impl CashflowProvider for DummyInstrument {
+    impl CashflowScheduleSource for DummyInstrument {
         fn notional(&self) -> Option<Money> {
             Some(Money::new(1_000_000.0, Currency::USD))
         }
 
-        fn cashflow_schedule(
+        fn raw_cashflow_schedule(
             &self,
             _curves: &MarketContext,
             _as_of: Date,
@@ -320,6 +340,97 @@ mod tests {
         assert_eq!(dated_flows.len(), 2);
         assert_eq!(dated_flows[0].1.amount(), 100.0);
         assert_eq!(dated_flows[1].1.amount(), 250.0);
+    }
+
+    struct LifecycleInstrument;
+
+    impl CashflowScheduleSource for LifecycleInstrument {
+        fn raw_cashflow_schedule(
+            &self,
+            _curves: &MarketContext,
+            _as_of: Date,
+        ) -> finstack_quant_core::Result<CashFlowSchedule> {
+            let past = Date::from_calendar_date(2024, Month::December, 31).expect("valid date");
+            let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+            let future = Date::from_calendar_date(2025, Month::February, 1).expect("valid date");
+            let flows = vec![
+                CashFlow::new(
+                    future,
+                    None,
+                    Money::new(30.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    future,
+                    None,
+                    Money::new(40.0, Currency::USD),
+                    CFKind::PIK,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    past,
+                    None,
+                    Money::new(10.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    as_of,
+                    None,
+                    Money::new(20.0, Currency::USD),
+                    CFKind::Fixed,
+                    0.0,
+                    None,
+                ),
+                CashFlow::new(
+                    future,
+                    None,
+                    Money::new(50.0, Currency::USD),
+                    CFKind::DefaultedNotional,
+                    0.0,
+                    None,
+                ),
+            ];
+            Ok(schedule_from_classified_flows(
+                flows,
+                DayCount::Act365F,
+                ScheduleBuildOpts {
+                    representation: CashflowRepresentation::Projected,
+                    ..Default::default()
+                },
+            ))
+        }
+    }
+
+    #[test]
+    fn public_provider_owns_the_complete_cashflow_lifecycle() {
+        let curves = MarketContext::new();
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let instrument = LifecycleInstrument;
+
+        let schedule = instrument
+            .cashflow_schedule(&curves, as_of)
+            .expect("public schedule");
+        assert_eq!(
+            schedule.meta.representation,
+            CashflowRepresentation::Projected
+        );
+        assert_eq!(schedule.flows.len(), 3);
+        assert_eq!(schedule.flows[0].date, as_of);
+        assert_eq!(schedule.flows[1].date, as_of + time::Duration::days(31));
+        assert_eq!(schedule.flows[2].date, as_of + time::Duration::days(31));
+        assert!(schedule.flows.iter().all(|flow| flow.kind != CFKind::PIK));
+
+        let dated = instrument
+            .dated_cashflows(&curves, as_of)
+            .expect("dated cash settlements");
+        assert_eq!(dated.len(), 2);
+        assert_eq!(dated[0].1.amount(), 20.0);
+        assert_eq!(dated[1].1.amount(), 30.0);
     }
 
     #[test]

@@ -133,7 +133,7 @@ pub mod primitives {
     ///
     /// PIK is a capitalization event and `DefaultedNotional` is a write-down;
     /// neither should be emitted by APIs whose contract is dated cash.
-    pub(crate) fn is_cash_settlement_kind(kind: CFKind) -> bool {
+    pub fn is_cash_settlement_kind(kind: CFKind) -> bool {
         !matches!(kind, CFKind::PIK | CFKind::DefaultedNotional)
     }
 }
@@ -167,7 +167,8 @@ pub use json::{
     RateStepSpec,
 };
 pub use traits::{
-    schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider, ScheduleBuildOpts,
+    schedule_from_classified_flows, schedule_from_dated_flows, CashflowProvider,
+    CashflowScheduleSource, ScheduleBuildOpts,
 };
 
 pub use finstack_quant_core::dates::Date;

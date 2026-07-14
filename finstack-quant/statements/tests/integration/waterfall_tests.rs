@@ -136,8 +136,8 @@ mod period_flow_waterfall_integration {
         schedule: CashFlowSchedule,
     }
 
-    impl CashflowProvider for ScheduleInstrument {
-        fn cashflow_schedule(
+    impl finstack_quant_cashflows::CashflowScheduleSource for ScheduleInstrument {
+        fn raw_cashflow_schedule(
             &self,
             _curves: &MarketContext,
             _as_of: Date,

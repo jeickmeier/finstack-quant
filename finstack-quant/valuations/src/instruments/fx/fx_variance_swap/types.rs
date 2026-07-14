@@ -1,7 +1,6 @@
 //! FX variance swap type definitions and pricing logic.
 
 use super::pricer;
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::traits::CurveDependencies;
@@ -389,12 +388,12 @@ impl CurveDependencies for FxVarianceSwap {
     }
 }
 
-impl CashflowProvider for FxVarianceSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _context: &MarketContext,
         _as_of: Date,

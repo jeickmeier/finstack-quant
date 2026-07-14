@@ -4,7 +4,6 @@
 //! redistribute the cashflows from underlying MBS pools into tranches with
 //! different risk/return profiles.
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram};
@@ -431,12 +430,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for AgencyCmo {
     }
 }
 
-impl CashflowProvider for AgencyCmo {
+impl finstack_quant_cashflows::CashflowScheduleSource for AgencyCmo {
     fn notional(&self) -> Option<Money> {
         self.reference_tranche().map(|tranche| tranche.current_face)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: Date,
@@ -446,10 +445,8 @@ impl CashflowProvider for AgencyCmo {
             crate::instruments::fixed_income::cmo::pricer::build_reference_tranche_schedule(
                 self, as_of, None,
             )?;
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

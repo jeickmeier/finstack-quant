@@ -24,7 +24,6 @@ use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId, Rate};
 use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::Attributes;
@@ -455,15 +454,15 @@ impl Deposit {
     }
 }
 
-impl CashflowProvider for Deposit {
+impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         // Validate deposit parameters before building schedule
         // (includes effective date ordering check)
@@ -517,10 +516,8 @@ impl CashflowProvider for Deposit {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Contractual,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
     }
 }
 

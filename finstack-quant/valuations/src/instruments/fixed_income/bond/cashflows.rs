@@ -11,19 +11,18 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use crate::cashflow::builder::CashflowRepresentation;
-use crate::cashflow::traits::CashflowProvider;
 
 use super::types::Bond;
 
-impl CashflowProvider for Bond {
+impl finstack_quant_cashflows::CashflowScheduleSource for Bond {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
         let schedule = if let Some(ref custom) = self.custom_cashflows {
             custom.clone()
@@ -37,6 +36,6 @@ impl CashflowProvider for Bond {
             CashflowRepresentation::Contractual
         };
 
-        Ok(schedule.normalize_public(as_of, representation))
+        Ok(schedule.with_representation(representation))
     }
 }

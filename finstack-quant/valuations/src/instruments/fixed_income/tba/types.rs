@@ -4,7 +4,6 @@
 //! pools to be delivered are not known at trade time. Instead, pools must
 //! meet good delivery standards (coupon, term, agency).
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram};
@@ -296,12 +295,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for AgencyTba {
     }
 }
 
-impl CashflowProvider for AgencyTba {
+impl finstack_quant_cashflows::CashflowScheduleSource for AgencyTba {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: Date,

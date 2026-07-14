@@ -26,8 +26,7 @@ use finstack_quant_cashflows::aggregation::{
 };
 use finstack_quant_cashflows::builder::schedule::merge_cashflow_schedules;
 use finstack_quant_cashflows::builder::{
-    CashFlowMeta, CashFlowSchedule, CashflowRepresentation, CouponType, FixedCouponSpec, Notional,
-    PeriodDataFrameOptions,
+    CashFlowMeta, CashFlowSchedule, CouponType, FixedCouponSpec, Notional, PeriodDataFrameOptions,
 };
 use finstack_quant_cashflows::primitives::{CFKind, CashFlow};
 use finstack_quant_cashflows::DatedFlows;
@@ -542,30 +541,6 @@ fn bench_wal(c: &mut Criterion) {
 }
 
 // =============================================================================
-// Benchmark: normalize_public (filter + sort on every public schedule call)
-// =============================================================================
-
-fn bench_normalize_public(c: &mut Criterion) {
-    let mut group = c.benchmark_group("cashflow_normalize_public");
-    let base = base_date();
-
-    {
-        let (years, label) = (5i32, "5y");
-        let schedule = make_fixed_schedule(base, years, Tenor::semi_annual());
-
-        group.throughput(Throughput::Elements(schedule.flows.len() as u64));
-        group.bench_with_input(BenchmarkId::from_parameter(label), label, |b, _| {
-            b.iter(|| {
-                black_box(schedule.clone())
-                    .normalize_public(black_box(base), CashflowRepresentation::Contractual)
-            });
-        });
-    }
-
-    group.finish();
-}
-
-// =============================================================================
 // Registration
 // =============================================================================
 
@@ -581,6 +556,5 @@ criterion_group!(
     bench_merge_schedules,
     bench_outstanding_by_date,
     bench_wal,
-    bench_normalize_public,
 );
 criterion_main!(benches);

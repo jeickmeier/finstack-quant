@@ -556,12 +556,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for FxSpot {
     }
 }
 
-impl CashflowProvider for FxSpot {
+impl finstack_quant_cashflows::CashflowScheduleSource for FxSpot {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
         as_of: Date,

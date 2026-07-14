@@ -2,7 +2,6 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
@@ -523,12 +522,12 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
     }
 }
 
-impl CashflowProvider for InflationSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
         as_of: Date,
@@ -554,10 +553,8 @@ impl CashflowProvider for InflationSwap {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 
@@ -950,12 +947,12 @@ impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
     }
 }
 
-impl CashflowProvider for YoYInflationSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
         as_of: Date,
@@ -976,10 +973,8 @@ impl CashflowProvider for YoYInflationSwap {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

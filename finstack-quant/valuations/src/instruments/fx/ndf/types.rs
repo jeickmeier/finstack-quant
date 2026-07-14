@@ -6,7 +6,6 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
@@ -974,8 +973,8 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
     }
 }
 
-impl CashflowProvider for Ndf {
-    fn cashflow_schedule(
+impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {
+    fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
         as_of: Date,
@@ -992,10 +991,8 @@ impl CashflowProvider for Ndf {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

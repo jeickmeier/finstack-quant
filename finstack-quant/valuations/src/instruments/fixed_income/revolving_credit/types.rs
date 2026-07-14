@@ -882,12 +882,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for RevolvingCre
 }
 
 // Implement CashflowProvider for standard cashflow interface
-impl crate::cashflow::traits::CashflowProvider for RevolvingCredit {
+impl crate::cashflow::traits::CashflowScheduleSource for RevolvingCredit {
     fn notional(&self) -> Option<finstack_quant_core::money::Money> {
         Some(self.commitment_amount)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
@@ -911,9 +911,8 @@ impl crate::cashflow::traits::CashflowProvider for RevolvingCredit {
         };
         let engine = CashflowEngine::new(self, Some(curves), as_of, fixings)?;
         let path_schedule = engine.generate_deterministic()?;
-        Ok(path_schedule.schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(path_schedule
+            .schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }

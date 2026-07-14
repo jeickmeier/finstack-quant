@@ -1115,15 +1115,15 @@ impl crate::instruments::common_impl::traits::CurveDependencies for CreditDefaul
     }
 }
 
-impl crate::cashflow::traits::CashflowProvider for CreditDefaultSwap {
+impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
     fn notional(&self) -> Option<finstack_quant_core::money::Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let mut schedule = self.build_premium_leg_schedule()?;
 
@@ -1150,10 +1150,8 @@ impl crate::cashflow::traits::CashflowProvider for CreditDefaultSwap {
             cf.amount = Money::new(cf.amount.amount() * sign, cf.amount.currency());
         }
 
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

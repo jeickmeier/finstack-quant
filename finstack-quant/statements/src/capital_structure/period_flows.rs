@@ -382,8 +382,8 @@ mod tests {
         schedule: CashFlowSchedule,
     }
 
-    impl CashflowProvider for SignedFlowInstrument {
-        fn cashflow_schedule(
+    impl finstack_quant_cashflows::CashflowScheduleSource for SignedFlowInstrument {
+        fn raw_cashflow_schedule(
             &self,
             _curves: &MarketContext,
             _as_of: Date,

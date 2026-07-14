@@ -27,7 +27,6 @@
 //!
 //! For STIR futures on SOFR, adjustments are typically sourced from broker screens
 //! or implied from listed options.
-use crate::cashflow::traits::CashflowProvider;
 use crate::constants::ONE_BASIS_POINT;
 // Params-based constructor removed; build via builder instead.
 use crate::impl_instrument_base;
@@ -581,12 +580,12 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
     }
 }
 
-impl CashflowProvider for InterestRateFuture {
+impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         _as_of: Date,

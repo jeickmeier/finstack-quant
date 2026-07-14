@@ -114,7 +114,6 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Error;
 
 use finstack_quant_core::HashMap;
-use std::collections::BTreeMap;
 
 use crate::impl_instrument_base;
 use serde::{Deserialize, Serialize};
@@ -842,30 +841,13 @@ impl StructuredCredit {
 // TRAIT IMPLEMENTATIONS
 // ============================================================================
 
-impl CashflowProvider for StructuredCredit {
+impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
     fn notional(&self) -> Option<Money> {
         // Return total pool balance as the notional
         self.pool.total_balance().ok()
     }
 
-    fn dated_cashflows(
-        &self,
-        context: &MarketContext,
-        as_of: Date,
-    ) -> finstack_quant_core::Result<crate::cashflow::traits::DatedFlows> {
-        let schedule = self.cashflow_schedule(context, as_of)?;
-        let mut by_date = BTreeMap::<Date, Money>::new();
-        for flow in schedule.flows {
-            if let Some(total) = by_date.get_mut(&flow.date) {
-                *total = total.checked_add(flow.amount)?;
-            } else {
-                by_date.insert(flow.date, flow.amount);
-            }
-        }
-        Ok(by_date.into_iter().collect())
-    }
-
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         context: &MarketContext,
         as_of: Date,

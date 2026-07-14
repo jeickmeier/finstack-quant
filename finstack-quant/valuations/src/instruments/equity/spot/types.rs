@@ -4,7 +4,6 @@
 //! instrument macro. Pricing is delegated to `pricing::EquityPricer` and
 //! metrics live under `metrics/`.
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::traits::Attributes;
@@ -418,7 +417,7 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
     }
 }
 
-impl CashflowProvider for Equity {
+impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
     fn notional(&self) -> Option<Money> {
         // Equity notional is shares * price (market value)
         // If price not quoted, return None to avoid incorrect estimation
@@ -426,7 +425,7 @@ impl CashflowProvider for Equity {
             .map(|p| Money::new(self.effective_shares() * p, self.currency))
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         _as_of: Date,
@@ -446,6 +445,7 @@ impl CashflowProvider for Equity {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use finstack_quant_cashflows::CashflowProvider as _;
     use time::Month;
 
     #[test]

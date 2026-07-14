@@ -27,7 +27,6 @@
 //! - Black, F. (1976). "The pricing of commodity contracts."
 //!   *Journal of Financial Economics*, 3(1-2), 167-179.
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::parameters::OptionType;
@@ -344,12 +343,12 @@ impl crate::instruments::common_impl::traits::Instrument for IrFutureOption {
     }
 }
 
-impl CashflowProvider for IrFutureOption {
+impl finstack_quant_cashflows::CashflowScheduleSource for IrFutureOption {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         _as_of: Date,

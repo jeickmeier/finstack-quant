@@ -1,6 +1,6 @@
 //! Inflation-Linked Bond (ILB) types and implementation.
 
-use crate::cashflow::traits::{CashflowProvider, DatedFlows};
+use crate::cashflow::traits::DatedFlows;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
@@ -1158,15 +1158,15 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
     }
 }
 
-impl CashflowProvider for InflationLinkedBond {
+impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
         if self.issue_date >= self.maturity {
             return Ok(crate::cashflow::traits::schedule_from_classified_flows(
@@ -1249,10 +1249,8 @@ impl CashflowProvider for InflationLinkedBond {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

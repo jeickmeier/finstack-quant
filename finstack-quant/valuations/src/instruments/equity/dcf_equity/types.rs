@@ -910,8 +910,8 @@ impl CurveDependencies for DiscountedCashFlow {
     }
 }
 
-impl crate::cashflow::traits::CashflowProvider for DiscountedCashFlow {
-    fn cashflow_schedule(
+impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         as_of: Date,

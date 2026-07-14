@@ -11,7 +11,6 @@ use finstack_quant_core::Error;
 
 use crate::cashflow::builder::specs::{FixedCouponSpec, FloatingCouponSpec};
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::CashflowProvider;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::bond::CallPutSchedule;
 use crate::instruments::model_params::ModelParamsSnapshot;
@@ -772,21 +771,19 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
     }
 }
 
-impl CashflowProvider for ConvertibleBond {
+impl finstack_quant_cashflows::CashflowScheduleSource for ConvertibleBond {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &finstack_quant_core::market_data::context::MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let schedule = pricer::build_convertible_schedule(self)?;
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Contractual,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
     }
 }
 

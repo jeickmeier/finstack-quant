@@ -468,8 +468,8 @@ mod tests {
     #[derive(Clone)]
     struct UnsupportedInstrument;
 
-    impl finstack_quant_cashflows::CashflowProvider for UnsupportedInstrument {
-        fn cashflow_schedule(
+    impl finstack_quant_cashflows::CashflowScheduleSource for UnsupportedInstrument {
+        fn raw_cashflow_schedule(
             &self,
             _market: &MarketContext,
             _as_of: Date,

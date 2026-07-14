@@ -15,7 +15,6 @@ use crate::cashflow::builder::{
     Notional,
 };
 use crate::cashflow::primitives::CFKind;
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::swap_legs::robust_relative_df;
@@ -903,8 +902,8 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
     }
 }
 
-impl CashflowProvider for XccySwap {
-    fn cashflow_schedule(
+impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {
+    fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
         as_of: Date,
@@ -932,10 +931,8 @@ impl CashflowProvider for XccySwap {
                     as_of,
                 )?;
             schedule.notional = Notional::par(0.0, self.reporting_currency);
-            return Ok(schedule.normalize_public(
-                as_of,
-                crate::cashflow::builder::CashflowRepresentation::Projected,
-            ));
+            return Ok(schedule
+                .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected));
         }
 
         let mut leg1_schedule = self.leg_coupon_schedule(&self.leg1, market)?;
@@ -947,10 +944,8 @@ impl CashflowProvider for XccySwap {
         leg1_schedule.flows.extend(leg2_schedule.flows);
         leg1_schedule.flows.extend(leg2_principal.flows);
         leg1_schedule.notional = Notional::par(0.0, self.reporting_currency);
-        Ok(leg1_schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(leg1_schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

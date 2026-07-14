@@ -4,7 +4,6 @@
 //! the deliverable basket, contract specifications, and the main BondFuture type.
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::cashflow::CashflowProvider;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
@@ -2024,12 +2023,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for BondFuture {
     }
 }
 
-impl CashflowProvider for BondFuture {
+impl finstack_quant_cashflows::CashflowScheduleSource for BondFuture {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _market: &finstack_quant_core::market_data::context::MarketContext,
         _as_of: Date,

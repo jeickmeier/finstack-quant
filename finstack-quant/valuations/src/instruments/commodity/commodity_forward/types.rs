@@ -6,7 +6,6 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::{CommodityConvention, CommodityUnderlyingParams};
 use crate::instruments::common_impl::traits::Attributes;
@@ -495,8 +494,8 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
     }
 }
 
-impl CashflowProvider for CommodityForward {
-    fn cashflow_schedule(
+impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
+    fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
         as_of: Date,
@@ -512,10 +511,8 @@ impl CashflowProvider for CommodityForward {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

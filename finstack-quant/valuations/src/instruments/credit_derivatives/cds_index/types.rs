@@ -7,7 +7,6 @@
 //! - `Constituents`: expand into per-name CDS positions with weights and
 //!   aggregate results across names.
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::parameters::CreditParams;
 use crate::instruments::common_impl::traits::Attributes;
@@ -619,22 +618,20 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
     }
 }
 
-impl CashflowProvider for CDSIndex {
+impl finstack_quant_cashflows::CashflowScheduleSource for CDSIndex {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<crate::cashflow::builder::CashFlowSchedule> {
         let pricer = CDSIndexPricer::new();
         let schedule = pricer.build_projected_schedule(self, curves, as_of)?;
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

@@ -6,7 +6,6 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
@@ -726,8 +725,8 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
     }
 }
 
-impl CashflowProvider for FxForward {
-    fn cashflow_schedule(
+impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
+    fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
         as_of: Date,
@@ -754,7 +753,7 @@ impl CashflowProvider for FxForward {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(as_of, representation))
+        Ok(schedule.with_representation(representation))
     }
 }
 

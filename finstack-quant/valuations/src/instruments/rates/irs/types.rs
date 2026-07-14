@@ -14,7 +14,6 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
-use crate::cashflow::traits::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::Attributes;
@@ -669,12 +668,12 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
     }
 }
 
-impl CashflowProvider for InterestRateSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
         as_of: Date,
@@ -685,10 +684,8 @@ impl CashflowProvider for InterestRateSwap {
                 Some(curves),
                 Some(as_of),
             )?;
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

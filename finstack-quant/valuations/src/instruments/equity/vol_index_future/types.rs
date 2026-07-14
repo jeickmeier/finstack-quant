@@ -41,7 +41,6 @@
 //! - Whaley, R. E. (2009). "Understanding the VIX." *Journal of Portfolio Management*.
 
 use super::pricer;
-use crate::cashflow::traits::CashflowProvider;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
@@ -317,12 +316,12 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
     }
 }
 
-impl CashflowProvider for VolatilityIndexFuture {
+impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         _as_of: Date,

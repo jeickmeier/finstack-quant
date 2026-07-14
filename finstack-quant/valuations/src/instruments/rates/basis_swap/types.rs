@@ -30,7 +30,6 @@ use crate::cashflow::builder::{
     CashFlowSchedule, CouponType, FloatingCouponSpec, FloatingRateFallback, FloatingRateSpec,
     Notional,
 };
-use crate::cashflow::CashflowProvider;
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::swap_legs::{FloatingLegParams, LegPeriod};
@@ -634,15 +633,15 @@ impl crate::instruments::common_impl::traits::Instrument for BasisSwap {
     }
 }
 
-impl CashflowProvider for BasisSwap {
+impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         market: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         let mut primary = self.floating_leg_schedule(&self.primary_leg, market)?;
         let mut reference = self.floating_leg_schedule(&self.reference_leg, market)?;
@@ -652,10 +651,10 @@ impl CashflowProvider for BasisSwap {
         primary.flows.extend(reference.flows);
         primary.notional = Notional::par(self.notional.amount(), self.notional.currency());
         primary.day_count = self.primary_leg.day_count;
-        Ok(primary.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(
+            primary
+                .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected),
+        )
     }
 }
 

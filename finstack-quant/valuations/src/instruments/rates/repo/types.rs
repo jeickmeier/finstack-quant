@@ -656,15 +656,15 @@ impl Instrument for Repo {
 
 // Attributable is provided via blanket impl for all Instrument types
 
-impl CashflowProvider for Repo {
+impl finstack_quant_cashflows::CashflowScheduleSource for Repo {
     fn notional(&self) -> Option<Money> {
         Some(self.cash_amount)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _context: &MarketContext,
-        as_of: Date,
+        _as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
         let (adj_start, adj_maturity) = self.adjusted_dates()?;
 
@@ -697,10 +697,8 @@ impl CashflowProvider for Repo {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Contractual,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Contractual))
     }
 }
 

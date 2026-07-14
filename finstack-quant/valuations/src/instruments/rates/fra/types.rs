@@ -559,12 +559,12 @@ impl crate::instruments::common_impl::traits::CurveDependencies for ForwardRateA
     }
 }
 
-impl CashflowProvider for ForwardRateAgreement {
+impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &MarketContext,
         as_of: Date,
@@ -599,10 +599,8 @@ impl CashflowProvider for ForwardRateAgreement {
                 ..Default::default()
             },
         );
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

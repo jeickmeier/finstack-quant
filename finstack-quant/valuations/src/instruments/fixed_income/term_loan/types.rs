@@ -813,12 +813,12 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
     }
 }
 
-impl crate::cashflow::traits::CashflowProvider for TermLoan {
+impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {
     fn notional(&self) -> Option<finstack_quant_core::money::Money> {
         Some(self.notional_limit)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
@@ -827,10 +827,8 @@ impl crate::cashflow::traits::CashflowProvider for TermLoan {
             self, curves, as_of,
         )?;
 
-        Ok(schedule.normalize_public(
-            as_of,
-            crate::cashflow::builder::CashflowRepresentation::Projected,
-        ))
+        Ok(schedule
+            .with_representation(crate::cashflow::builder::CashflowRepresentation::Projected))
     }
 }
 

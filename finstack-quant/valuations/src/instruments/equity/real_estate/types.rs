@@ -526,8 +526,8 @@ impl CurveDependencies for RealEstateAsset {
     }
 }
 
-impl crate::cashflow::traits::CashflowProvider for RealEstateAsset {
-    fn cashflow_schedule(
+impl crate::cashflow::traits::CashflowScheduleSource for RealEstateAsset {
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         as_of: Date,

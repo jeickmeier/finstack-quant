@@ -31,7 +31,6 @@
 //! - CME Group. "E-mini S&P 500 Futures Contract Specifications."
 
 use super::pricer;
-use crate::cashflow::traits::CashflowProvider;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
@@ -510,12 +509,12 @@ impl crate::instruments::common_impl::traits::Instrument for EquityIndexFuture {
     }
 }
 
-impl CashflowProvider for EquityIndexFuture {
+impl finstack_quant_cashflows::CashflowScheduleSource for EquityIndexFuture {
     fn notional(&self) -> Option<Money> {
         Some(self.notional)
     }
 
-    fn cashflow_schedule(
+    fn raw_cashflow_schedule(
         &self,
         _curves: &MarketContext,
         _as_of: Date,
