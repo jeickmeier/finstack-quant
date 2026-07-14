@@ -830,7 +830,7 @@ impl StructuredCredit {
             // lives on `SdaCurveDefaults::cdr_at`.
             let cdr = embedded_registry_or_panic().sda_curve().cdr_at(seasoning) * sda_mult;
 
-            return Some(1.0 - (1.0 - cdr).powf(1.0 / 12.0));
+            return Some(clamped_cdr_to_mdr(cdr));
         }
 
         None
