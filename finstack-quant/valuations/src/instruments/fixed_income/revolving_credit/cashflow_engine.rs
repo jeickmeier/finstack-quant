@@ -24,7 +24,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use crate::cashflow::builder::{
-    emit_revolving_credit_fees, sort_flows, CashFlowSchedule, Notional, RevolvingFeeEmissionConfig,
+    emit_revolving_credit_fees, CashFlowSchedule, RevolvingFeeEmissionConfig,
 };
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 
@@ -134,6 +134,16 @@ pub struct CashflowEngine<'a> {
 }
 
 impl<'a> CashflowEngine<'a> {
+    fn schedule_meta(&self) -> crate::cashflow::builder::CashFlowMeta {
+        crate::cashflow::builder::CashFlowMeta {
+            representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+            calendar_ids: Vec::new(),
+            facility_limit: Some(self.facility.commitment_amount),
+            issue_date: Some(self.facility.commitment_date),
+            maturity_date: None,
+        }
+    }
+
     /// Create a new cashflow engine.
     ///
     /// # Arguments
@@ -601,25 +611,15 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        sort_flows(&mut flows);
-
-        Ok(CashFlowSchedule {
+        Ok(crate::cashflow::traits::schedule_from_classified_flows(
             flows,
-            // Start outstanding at zero; principal flows (including initial draw) build the path
-            notional: Notional::par(0.0, self.facility.commitment_amount.currency()),
-            day_count: self.facility.day_count,
-            meta: crate::cashflow::builder::CashFlowMeta {
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                calendar_ids: Vec::new(),
-                facility_limit: Some(self.facility.commitment_amount),
-                // commitment_date is the facility's effective start: the date on which the
-                // initial draw is made and interest accrual begins. Providing it here
-                // eliminates the inverse day count approximation (±1-2 day error) used
-                // by the accrual engine when issue_date is absent.
-                issue_date: Some(self.facility.commitment_date),
-                maturity_date: None,
+            self.facility.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(Money::new(0.0, self.facility.commitment_amount.currency())),
+                meta: Some(self.schedule_meta()),
+                ..Default::default()
             },
-        })
+        ))
     }
 
     /// Build cashflow schedule from 3-factor path trajectory.
@@ -801,25 +801,15 @@ impl<'a> CashflowEngine<'a> {
             ));
         }
 
-        sort_flows(&mut flows);
-
-        Ok(CashFlowSchedule {
+        Ok(crate::cashflow::traits::schedule_from_classified_flows(
             flows,
-            // Start outstanding at zero; utilization-driven principal flows build the path
-            notional: Notional::par(0.0, self.facility.commitment_amount.currency()),
-            day_count: self.facility.day_count,
-            meta: crate::cashflow::builder::CashFlowMeta {
-                representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                calendar_ids: Vec::new(),
-                facility_limit: Some(self.facility.commitment_amount),
-                // commitment_date is the facility's effective start: the date on which the
-                // initial draw is made and interest accrual begins. Providing it here
-                // eliminates the inverse day count approximation (±1-2 day error) used
-                // by the accrual engine when issue_date is absent.
-                issue_date: Some(self.facility.commitment_date),
-                maturity_date: None,
+            self.facility.day_count,
+            crate::cashflow::traits::ScheduleBuildOpts {
+                notional_hint: Some(Money::new(0.0, self.facility.commitment_amount.currency())),
+                meta: Some(self.schedule_meta()),
+                ..Default::default()
             },
-        })
+        ))
     }
 }
 
