@@ -605,11 +605,11 @@ impl CompiledCashFlowPlan {
             Some(self.maturity),
         );
         debug!(flows = flows.len(), "cashflow schedule: project complete");
-        Ok(CashFlowSchedule {
+        Ok(CashFlowSchedule::from_parts(
             flows,
-            notional: self.notional.clone(),
-            day_count: out_dc,
+            self.notional.clone(),
+            out_dc,
             meta,
-        })
+        ))
     }
 }

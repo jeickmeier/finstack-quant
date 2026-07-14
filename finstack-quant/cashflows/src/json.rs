@@ -5,13 +5,12 @@
 //! types as the canonical schema.
 
 use crate::accrual::{accrued_interest_amount, AccrualConfig};
-use crate::builder::schedule::sort_schedule_with_metadata;
 use crate::builder::{
     CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FixedWindow, FloatingCouponSpec,
     Notional, ScheduleParams, StepUpCouponSpec,
 };
 use crate::primitives::{is_cash_settlement_kind, CFKind};
-use finstack_quant_core::dates::{Date, DateExt};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
@@ -514,16 +513,14 @@ pub fn build_cashflow_schedule_json(spec_json: &str, market_json: Option<&str>) 
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
-    let mut schedule = parse_schedule(schedule_json)?;
-    validate_cashflow_schedule(&mut schedule)?;
+    let schedule = parse_schedule(schedule_json)?;
+    validate_cashflow_schedule(&schedule)?;
     serialize_json(&schedule, "cashflow schedule")
 }
 
 /// Validate and canonicalize an in-memory schedule for all public consumers.
-pub fn validate_cashflow_schedule(schedule: &mut CashFlowSchedule) -> Result<()> {
-    sort_schedule_with_metadata(schedule);
-    schedule.validate()?;
-    validate_schedule_economic_invariants(schedule)
+pub fn validate_cashflow_schedule(schedule: &CashFlowSchedule) -> Result<()> {
+    schedule.validate()
 }
 
 /// Extract dated amounts from a schedule JSON payload.
@@ -568,8 +565,8 @@ pub fn validate_cashflow_schedule(schedule: &mut CashFlowSchedule) -> Result<()>
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
 pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
-    let mut schedule = parse_schedule(schedule_json)?;
-    validate_cashflow_schedule(&mut schedule)?;
+    let schedule = parse_schedule(schedule_json)?;
+    validate_cashflow_schedule(&schedule)?;
     let flows: Vec<DatedFlowJson> = schedule
         .flows
         .iter()
@@ -641,8 +638,8 @@ pub fn accrued_interest_json(
     as_of: &str,
     config_json: Option<&str>,
 ) -> Result<f64> {
-    let mut schedule = parse_schedule(schedule_json)?;
-    validate_cashflow_schedule(&mut schedule)?;
+    let schedule = parse_schedule(schedule_json)?;
+    validate_cashflow_schedule(&schedule)?;
     let as_of = parse_iso_date(as_of)?;
     let config = match config_json {
         Some(json) => serde_json::from_str::<AccrualConfig>(json)
@@ -655,70 +652,6 @@ pub fn accrued_interest_json(
 fn parse_schedule(schedule_json: &str) -> Result<CashFlowSchedule> {
     serde_json::from_str(schedule_json)
         .map_err(|err| Error::Validation(format!("invalid cashflow schedule JSON: {err}")))
-}
-
-fn validate_schedule_economic_invariants(schedule: &CashFlowSchedule) -> Result<()> {
-    let initial = schedule.notional.initial;
-    let expected_currency = initial.currency();
-    let initial_amount = initial.amount().abs();
-    // Scale tolerance with notional to absorb serde/f64 roundoff; this is not
-    // a permission to over-amortize economically.
-    let epsilon = (initial_amount * 1e-8).max(1e-6);
-    let mut total_amortization = 0.0_f64;
-
-    for flow in &schedule.flows {
-        if flow.kind == CFKind::Amortization {
-            if flow.amount.currency() != expected_currency {
-                return Err(Error::Validation(format!(
-                    "amortization flow currency ({}) must match initial notional currency ({})",
-                    flow.amount.currency(),
-                    expected_currency
-                )));
-            }
-            total_amortization += flow.amount.amount().max(0.0);
-        }
-    }
-
-    if total_amortization > initial_amount + epsilon {
-        return Err(Error::Validation(format!(
-            "total amortization ({total_amortization:.6}) exceeds initial notional ({initial_amount:.6})"
-        )));
-    }
-
-    if let Some(issue_date) = schedule.meta.issue_date {
-        let long_horizon = issue_date.add_months(1200);
-        for flow in &schedule.flows {
-            // Principal-type flows (Notional/Amortization/PrePayment and the
-            // revolver variants) and fees MAY predate the issue date: the
-            // builder itself emits them for delayed-funding structures.
-            // Interest-bearing kinds cannot accrue before issue, so they are
-            // still rejected.
-            let interest_bearing = matches!(
-                flow.kind,
-                CFKind::Fixed
-                    | CFKind::FloatReset
-                    | CFKind::InflationCoupon
-                    | CFKind::PIK
-                    | CFKind::Stub
-            );
-            if flow.date < issue_date && interest_bearing {
-                return Err(Error::Validation(format!(
-                    "interest-bearing cashflow ({:?}) dated {} is before issue date {}",
-                    flow.kind, flow.date, issue_date
-                )));
-            }
-            if flow.date > long_horizon {
-                tracing::warn!(
-                    flow_date = %flow.date,
-                    issue_date = %issue_date,
-                    horizon_date = %long_horizon,
-                    "cashflow schedule contains a flow more than 100 years after issue date"
-                );
-            }
-        }
-    }
-
-    Ok(())
 }
 
 fn parse_optional_market(market_json: Option<&str>) -> Result<Option<MarketContext>> {

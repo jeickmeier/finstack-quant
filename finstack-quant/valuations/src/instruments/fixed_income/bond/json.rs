@@ -16,11 +16,11 @@ pub fn bond_from_cashflows_json(
     discount_curve_id: &str,
     quoted_clean: Option<f64>,
 ) -> finstack_quant_core::Result<String> {
-    let mut schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
+    let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
         serde_json::from_str(schedule_json).map_err(|err| {
             finstack_quant_core::Error::Validation(format!("invalid cashflow schedule JSON: {err}"))
         })?;
-    finstack_quant_cashflows::validate_cashflow_schedule(&mut schedule)?;
+    finstack_quant_cashflows::validate_cashflow_schedule(&schedule)?;
     let bond =
         super::Bond::from_cashflows(instrument_id, schedule, discount_curve_id, quoted_clean)?;
     let instrument = crate::instruments::InstrumentJson::Bond(bond);

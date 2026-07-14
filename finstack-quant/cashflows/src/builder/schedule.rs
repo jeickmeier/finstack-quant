@@ -8,7 +8,7 @@ use crate::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::cashflow::Discountable;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Period, PeriodId};
+use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Period, PeriodId};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
@@ -369,18 +369,18 @@ impl TryFrom<CashFlowScheduleWire> for CashFlowSchedule {
             }
         }
 
-        Ok(Self {
+        Ok(Self::from_parts(
             flows,
             notional,
             day_count,
-            meta: CashFlowMeta {
+            CashFlowMeta {
                 representation: meta.representation,
                 calendar_ids: meta.calendar_ids,
                 facility_limit: meta.facility_limit,
                 issue_date: meta.issue_date,
                 maturity_date: meta.maturity_date,
             },
-        })
+        ))
     }
 }
 
@@ -462,8 +462,11 @@ impl Discountable for CashFlowSchedule {
 }
 
 impl CashFlowSchedule {
-    /// Internal raw constructor for already-classified flows.
-    pub(crate) fn from_parts(
+    /// Construct a canonical schedule from already-classified flows.
+    ///
+    /// Flows are sorted into deterministic schedule order. Call [`Self::validate`]
+    /// when accepting untrusted or externally supplied economic state.
+    pub fn from_parts(
         flows: Vec<CashFlow>,
         notional: Notional,
         day_count: DayCount,
@@ -540,6 +543,63 @@ impl CashFlowSchedule {
                 "cashflow schedule flows must be sorted by date".into(),
             ));
         }
+        self.validate_economic_invariants()
+    }
+
+    fn validate_economic_invariants(&self) -> finstack_quant_core::Result<()> {
+        let initial = self.notional.initial;
+        let expected_currency = initial.currency();
+        let initial_amount = initial.amount().abs();
+        let epsilon = (initial_amount * 1e-8).max(1e-6);
+        let total_amortization = self
+            .flows
+            .iter()
+            .filter(|flow| flow.kind == CFKind::Amortization)
+            .try_fold(0.0, |total, flow| {
+                if flow.amount.currency() != expected_currency {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "amortization flow currency ({}) must match initial notional currency ({})",
+                        flow.amount.currency(),
+                        expected_currency
+                    )));
+                }
+                Ok(total + flow.amount.amount().max(0.0))
+            })?;
+
+        if total_amortization > initial_amount + epsilon {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "total amortization ({total_amortization:.6}) exceeds initial notional ({initial_amount:.6})"
+            )));
+        }
+
+        if let Some(issue_date) = self.meta.issue_date {
+            let long_horizon = issue_date.add_months(1200);
+            for flow in &self.flows {
+                let interest_bearing = matches!(
+                    flow.kind,
+                    CFKind::Fixed
+                        | CFKind::FloatReset
+                        | CFKind::InflationCoupon
+                        | CFKind::PIK
+                        | CFKind::Stub
+                );
+                if flow.date < issue_date && interest_bearing {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "interest-bearing cashflow ({:?}) dated {} is before issue date {}",
+                        flow.kind, flow.date, issue_date
+                    )));
+                }
+                if flow.date > long_horizon {
+                    tracing::warn!(
+                        flow_date = %flow.date,
+                        issue_date = %issue_date,
+                        horizon_date = %long_horizon,
+                        "cashflow schedule contains a flow more than 100 years after issue date"
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -1308,6 +1368,26 @@ mod tests {
         let canonical = serde_json::to_value(decoded).expect("canonical schedule");
         assert!(canonical["meta"].get("accrual_periods").is_none());
         assert!(canonical["meta"].get("accrual_day_counts").is_none());
+    }
+
+    #[test]
+    fn deserialization_routes_unsorted_flows_through_canonical_constructor() {
+        let early = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
+        let late = Date::from_calendar_date(2025, Month::April, 15).expect("valid date");
+        let schedule = CashFlowSchedule::from_parts(
+            vec![
+                flow(early, 1.0, CFKind::Fixed),
+                flow(late, 2.0, CFKind::Fixed),
+            ],
+            Notional::par(100.0, Currency::USD),
+            DayCount::Act365F,
+            CashFlowMeta::default(),
+        );
+        let mut wire = serde_json::to_value(schedule).expect("serialize schedule");
+        wire["flows"].as_array_mut().expect("flows array").reverse();
+
+        let decoded: CashFlowSchedule = serde_json::from_value(wire).expect("canonical schedule");
+        assert_eq!(decoded.dates(), vec![early, late]);
     }
 
     #[test]
