@@ -450,12 +450,16 @@ pub(crate) fn generate_cashflows(
             if !commitment_fees.is_empty() {
                 let notional = schedule.notional.clone();
                 let day_count = schedule.day_count;
-                let fee_schedule = CashFlowSchedule {
-                    flows: commitment_fees,
-                    notional: notional.clone(),
+                let mut fee_schedule = crate::cashflow::traits::schedule_from_classified_flows(
+                    commitment_fees,
                     day_count,
-                    meta: schedule.meta.clone(),
-                };
+                    crate::cashflow::traits::ScheduleBuildOpts {
+                        notional_hint: Some(notional.initial),
+                        meta: Some(schedule.meta.clone()),
+                        ..Default::default()
+                    },
+                );
+                fee_schedule.notional = notional.clone();
                 schedule = merge_cashflow_schedules([schedule, fee_schedule], notional, day_count)?;
             }
         }
