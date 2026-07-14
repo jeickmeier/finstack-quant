@@ -51,7 +51,7 @@ def instrument_cashflows(
     market: _Any,
     as_of: str,
     *,
-    model: str = "discounting",
+    model: str,
 ) -> tuple[dict, "pd.DataFrame"]:
     """Per-flow DF / survival / PV DataFrame for a discountable instrument.
 

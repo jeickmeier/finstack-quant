@@ -116,10 +116,8 @@ impl PyValuationResult {
 
 #[pyfunction]
 fn validate_instrument_json(json: &str) -> PyResult<String> {
-    let canonical = finstack_quant_valuations::pricer::validate_instrument_json(json)
-        .map_err(crate::errors::display_to_py)?;
-    let parsed: serde_json::Value = serde_json::from_str(&canonical).map_err(display_to_py)?;
-    serde_json::to_string_pretty(&parsed).map_err(display_to_py)
+    finstack_quant_valuations::pricer::validate_instrument_json(json)
+        .map_err(crate::errors::display_to_py)
 }
 
 /// Construct tagged bond instrument JSON from a cashflow schedule.

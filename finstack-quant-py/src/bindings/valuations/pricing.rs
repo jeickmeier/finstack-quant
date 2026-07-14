@@ -159,7 +159,7 @@ fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<Str
 /// as_of : str
 ///     Valuation date in ISO 8601 format.
 /// model : str
-///     ``"discounting"`` (default) or ``"hazard_rate"``.
+///     ``"discounting"`` or ``"hazard_rate"``.
 ///
 /// Returns
 /// -------
@@ -167,7 +167,6 @@ fn list_standard_metrics_grouped() -> std::collections::BTreeMap<String, Vec<Str
 ///     JSON-serialized ``InstrumentCashflowEnvelope``. Parse and wrap in a
 ///     DataFrame via :func:`finstack_quant.valuations.instrument_cashflows`.
 #[pyfunction]
-#[pyo3(signature = (instrument_json, market, as_of, model="discounting"))]
 fn instrument_cashflows_json(
     py: Python<'_>,
     instrument_json: &str,

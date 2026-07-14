@@ -148,7 +148,7 @@ def instrument_cashflows_json(
     instrument_json: str,
     market: MarketContext | str,
     as_of: str,
-    model: str = "discounting",
+    model: str,
 ) -> str:
     """Per-flow cashflow envelope for a discountable instrument.
 
@@ -160,7 +160,7 @@ def instrument_cashflows_json(
         Typed ``MarketContext`` or serialized market-context JSON.
     as_of : str
         ISO 8601 valuation date.
-    model : str, default "discounting"
+    model : str
         ``"discounting"`` or ``"hazard_rate"``.
 
     Returns

@@ -326,7 +326,7 @@ def instrument_cashflows(
     market: MarketContext | str,
     as_of: str,
     *,
-    model: str = "discounting",
+    model: str,
 ) -> tuple[dict[str, Any], pd.DataFrame]:
     """DataFrame-friendly wrapper around :func:`instrument_cashflows_json`.
 
