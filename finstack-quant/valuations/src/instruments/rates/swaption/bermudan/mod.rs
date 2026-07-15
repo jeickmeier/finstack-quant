@@ -20,10 +20,13 @@ use std::sync::Arc;
 
 fn hw1f_overrides_json(swaption: &BermudanSwaption) -> Option<serde_json::Value> {
     let kappa = swaption
-        .pricing_overrides
+        .instrument_pricing_overrides
         .model_config
         .hw1f_mean_reversion?;
-    let sigma = swaption.pricing_overrides.model_config.hw1f_sigma?;
+    let sigma = swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma?;
     Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
 }
 
@@ -283,7 +286,7 @@ impl BermudanSwaptionPricer {
 
     fn effective_tree_steps(&self, swaption: &BermudanSwaption) -> usize {
         swaption
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .tree_steps
             .unwrap_or(self.config.tree_steps)
@@ -291,7 +294,7 @@ impl BermudanSwaptionPricer {
 
     fn effective_mc_paths(&self, swaption: &BermudanSwaption) -> usize {
         swaption
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .mc_paths
             .unwrap_or(self.config.mc_paths)

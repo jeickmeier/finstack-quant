@@ -81,7 +81,9 @@ fn test_quantlib_parity_atm_cap() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -134,7 +136,9 @@ fn test_quantlib_parity_cap_floor_parity() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -159,7 +163,9 @@ fn test_quantlib_parity_cap_floor_parity() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -217,7 +223,9 @@ fn test_quantlib_parity_vol_sensitivity() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -287,7 +295,9 @@ fn test_quantlib_parity_caplet_pricing() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -339,7 +349,9 @@ fn test_quantlib_parity_moneyness() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -364,7 +376,9 @@ fn test_quantlib_parity_moneyness() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -389,7 +403,9 @@ fn test_quantlib_parity_moneyness() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -449,7 +465,9 @@ fn test_quantlib_parity_delta_sign() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -474,7 +492,9 @@ fn test_quantlib_parity_delta_sign() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -550,7 +570,9 @@ fn test_quantlib_parity_gamma_positive() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -575,7 +597,9 @@ fn test_quantlib_parity_gamma_positive() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -648,7 +672,9 @@ fn test_quantlib_parity_time_to_maturity() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -673,7 +699,9 @@ fn test_quantlib_parity_time_to_maturity() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -726,7 +754,9 @@ fn test_quantlib_parity_zero_vol_itm() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -779,7 +809,9 @@ fn test_quantlib_parity_frequency_impact() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -804,7 +836,9 @@ fn test_quantlib_parity_frequency_impact() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 

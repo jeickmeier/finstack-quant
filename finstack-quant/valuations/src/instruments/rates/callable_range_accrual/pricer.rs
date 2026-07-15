@@ -267,12 +267,11 @@ impl CallableRangeAccrualPricer {
 
     fn effective_config(&self, inst: &CallableRangeAccrual) -> RateExoticMcConfig {
         let mut cfg = self.config;
-        if let Some(paths) = inst.pricing_overrides.model_config.mc_paths {
+        if let Some(paths) = inst.instrument_pricing_overrides.model_config.mc_paths {
             cfg.num_paths = paths.max(if cfg.antithetic { 2 } else { 1 });
         }
         cfg.seed = inst
-            .pricing_overrides
-            .metrics
+            .metric_pricing_overrides
             .mc_seed_scenario
             .as_deref()
             .map_or_else(
@@ -401,8 +400,11 @@ impl Default for CallableRangeAccrualPricer {
 }
 
 fn hw1f_overrides_json(inst: &CallableRangeAccrual) -> Option<serde_json::Value> {
-    let kappa = inst.pricing_overrides.model_config.hw1f_mean_reversion?;
-    let sigma = inst.pricing_overrides.model_config.hw1f_sigma?;
+    let kappa = inst
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion?;
+    let sigma = inst.instrument_pricing_overrides.model_config.hw1f_sigma?;
     Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
 }
 
@@ -669,7 +671,6 @@ mod tests {
     use super::*;
     use crate::instruments::rates::exotics_shared::bermudan_call::BermudanCallProvision;
     use crate::instruments::rates::range_accrual::RangeAccrual;
-    use crate::instruments::PricingOverrides;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
     use finstack_quant_core::market_data::context::MarketContext;
@@ -716,7 +717,6 @@ mod tests {
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
                 .attributes(Default::default())
                 .payment_date_opt(None)
                 .past_fixings_in_range_opt(None)
@@ -724,7 +724,9 @@ mod tests {
                 .build()
                 .expect("range accrual"),
             call_provision: BermudanCallProvision::new(call_dates, 1.0, lockout_periods),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         }
     }
@@ -763,7 +765,10 @@ mod tests {
         let curves = market(as_of, 0.02, 0.03);
         let no_iv = test_callable(vec![date(2025, Month::July, 1)], 10, 0.06);
         let mut with_iv = no_iv.clone();
-        with_iv.pricing_overrides.market_quotes.implied_volatility = Some(0.20);
+        with_iv
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.20);
 
         let pv_no_iv = deterministic_pricer(8)
             .price_estimate(&no_iv, &curves, as_of)

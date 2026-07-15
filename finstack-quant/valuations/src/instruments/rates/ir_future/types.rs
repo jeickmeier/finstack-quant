@@ -46,9 +46,7 @@ pub use crate::instruments::Position;
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct InterestRateFuture {
@@ -99,7 +97,16 @@ pub struct InterestRateFuture {
     /// Attributes
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -536,17 +543,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
             .or_else(|| self.fixing_date.map(|d| d + time::Duration::days(2)))
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {

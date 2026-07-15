@@ -9,7 +9,7 @@ use finstack_quant_core::market_data::term_structures::ForwardCurve;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
-use finstack_quant_valuations::instruments::{Instrument, OptionType, PricingOverrides};
+use finstack_quant_valuations::instruments::{Instrument, OptionType};
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use time::Month;
@@ -235,7 +235,9 @@ fn test_cms_option_requires_vol_surface_in_market() {
         discount_curve_id: CurveId::new("USD-OIS"),
         forward_curve_id: CurveId::new("USD-LIBOR-3M"),
         vol_surface_id: CurveId::new("NONEXISTENT-VOL"), // Vol surface not in market
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -268,7 +270,9 @@ fn seasoned_cms_option(fixing: Date, payment: Date) -> CmsOption {
         discount_curve_id: CurveId::new("USD-OIS"),
         forward_curve_id: CurveId::new("USD-LIBOR-3M"),
         vol_surface_id: CurveId::new("USD-CMS10Y-VOL"),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }

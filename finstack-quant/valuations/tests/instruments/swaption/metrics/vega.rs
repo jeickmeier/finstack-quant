@@ -2,7 +2,7 @@
 
 use crate::swaption::common::*;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 
 #[test]
@@ -48,10 +48,12 @@ fn test_vega_finite_difference() {
     let base_vol = 0.30;
     let h = 0.01; // 1% vol shift
 
-    swaption.pricing_overrides = PricingOverrides::default().with_implied_vol(base_vol + h);
+    swaption.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_implied_vol(base_vol + h);
     let pv_up = swaption.value(&market, as_of).unwrap().amount();
 
-    swaption.pricing_overrides = PricingOverrides::default().with_implied_vol(base_vol - h);
+    swaption.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_implied_vol(base_vol - h);
     let pv_down = swaption.value(&market, as_of).unwrap().amount();
 
     let vega_fd = (pv_up - pv_down) / 2.0; // Per 1% change

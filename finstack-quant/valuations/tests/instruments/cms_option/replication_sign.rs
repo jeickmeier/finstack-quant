@@ -73,7 +73,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::rates::cms_option::replication_pricer::CmsReplicationPricer;
 use finstack_quant_valuations::instruments::rates::cms_option::CmsOption;
-use finstack_quant_valuations::instruments::{OptionType, PricingOverrides};
+use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::pricer::Pricer;
 use rust_decimal::Decimal;
 use time::Month;
@@ -213,7 +213,9 @@ fn single_curve_cms(
         discount_curve_id: CurveId::new("USD-FLAT"),
         forward_curve_id: CurveId::new("USD-FLAT"),
         vol_surface_id: CurveId::new("USD-FLAT-VOL"),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }

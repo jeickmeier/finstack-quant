@@ -95,14 +95,19 @@ fn test_implied_vol_round_trips_pricing_vol() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
     // Price the caplet with the surface vol, then feed that price back as the
     // market quote the implied-vol solver must match.
     let pv = caplet.value(&market, as_of).expect("caplet should price");
-    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+    caplet
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -164,7 +169,9 @@ fn test_implied_vol_fails_without_market_price_override() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -225,7 +232,10 @@ fn compounded_sofr_implied_vol_round_trip_uses_contractual_coupon_and_payment() 
     let pv = caplet
         .value(&market, as_of)
         .expect("compounded caplet price");
-    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+    caplet
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(pv.amount());
     let result = caplet
         .price_with_metrics(
             &market,
@@ -264,7 +274,10 @@ fn normal_implied_vol_round_trips_non_positive_forward() {
     .expect("caplet");
     caplet.vol_type = CapFloorVolType::Normal;
     let pv = caplet.value(&market, as_of).expect("normal price");
-    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+    caplet
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -304,7 +317,10 @@ fn shifted_lognormal_implied_vol_round_trips_shifted_domain() {
     caplet.vol_type = CapFloorVolType::ShiftedLognormal;
     caplet.vol_shift = 0.02;
     let pv = caplet.value(&market, as_of).expect("shifted price");
-    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+    caplet
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -341,7 +357,10 @@ fn same_day_caplet_does_not_synthesize_option_time() {
     )
     .expect("caplet");
     let intrinsic = caplet.value(&market, as_of).expect("intrinsic price");
-    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(intrinsic.amount());
+    caplet
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(intrinsic.amount());
 
     let result = caplet
         .price_with_metrics(
@@ -377,7 +396,10 @@ fn auto_implied_vol_round_trips_negative_rate_lognormal_quote() {
     .expect("caplet");
     caplet.vol_type = CapFloorVolType::Auto;
     let pv = caplet.value(&market, as_of).expect("auto fallback price");
-    caplet.pricing_overrides.market_quotes.quoted_clean_price = Some(pv.amount());
+    caplet
+        .instrument_pricing_overrides
+        .market_quotes
+        .quoted_clean_price = Some(pv.amount());
 
     let result = caplet
         .price_with_metrics(

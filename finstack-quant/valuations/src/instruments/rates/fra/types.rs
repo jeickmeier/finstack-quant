@@ -58,8 +58,7 @@ const MAX_REASONABLE_RATE: f64 = 0.50;
     Debug,
     Clone,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct ForwardRateAgreement {
@@ -102,11 +101,20 @@ pub struct ForwardRateAgreement {
     pub forward_curve_id: CurveId,
     /// Direction of the FRA: Pay means paying the fixed rate (receiving floating),
     /// Receive means receiving the fixed rate (paying floating).
+    #[serde(default = "default_fra_side")]
     pub side: PayReceive,
-    /// Attributes for scenario selection
+    /// Instrument-owned pricing inputs.
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -136,64 +144,8 @@ pub struct ConventionFraParams<'a> {
     pub attributes: Attributes,
 }
 
-/// Custom deserializer for ForwardRateAgreement that accepts `side`
-/// (PayReceive enum), defaulting to `Pay` when omitted.
-impl<'de> serde::Deserialize<'de> for ForwardRateAgreement {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        /// Helper struct that mirrors the JSON structure for deserialization.
-        #[derive(serde::Deserialize)]
-        #[serde(deny_unknown_fields)]
-        struct FraHelper {
-            id: InstrumentId,
-            notional: Money,
-            #[serde(default)]
-            fixing_date: Option<Date>,
-            start_date: Date,
-            maturity: Date,
-            fixed_rate: Decimal,
-            day_count: DayCount,
-            reset_lag: i32,
-            #[serde(default)]
-            fixing_calendar_id: Option<CalendarId>,
-            #[serde(default)]
-            fixing_bdc: Option<BusinessDayConvention>,
-            #[serde(default)]
-            observed_fixing: Option<f64>,
-            discount_curve_id: CurveId,
-            forward_curve_id: CurveId,
-            #[serde(default)]
-            side: Option<PayReceive>,
-            #[serde(default)]
-            pricing_overrides: crate::instruments::PricingOverrides,
-            attributes: Attributes,
-        }
-
-        let helper = FraHelper::deserialize(deserializer)?;
-
-        let side = helper.side.unwrap_or(PayReceive::Pay);
-
-        Ok(ForwardRateAgreement {
-            id: helper.id,
-            notional: helper.notional,
-            fixing_date: helper.fixing_date,
-            start_date: helper.start_date,
-            maturity: helper.maturity,
-            fixed_rate: helper.fixed_rate,
-            day_count: helper.day_count,
-            reset_lag: helper.reset_lag,
-            fixing_calendar_id: helper.fixing_calendar_id,
-            fixing_bdc: helper.fixing_bdc,
-            observed_fixing: helper.observed_fixing,
-            discount_curve_id: helper.discount_curve_id,
-            forward_curve_id: helper.forward_curve_id,
-            side,
-            pricing_overrides: helper.pricing_overrides,
-            attributes: helper.attributes,
-        })
-    }
+fn default_fra_side() -> PayReceive {
+    PayReceive::Pay
 }
 
 impl ForwardRateAgreement {
@@ -545,17 +497,7 @@ impl crate::instruments::common_impl::traits::Instrument for ForwardRateAgreemen
         Some(self.start_date)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {

@@ -67,7 +67,9 @@ fn test_bermudan_swaption(
         .expect("valid Bermudan schedule"),
         bermudan_type: BermudanType::CoTerminal,
         calendar_id: None,
-        pricing_overrides: Default::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }
@@ -730,8 +732,14 @@ fn test_require_calibration_accepts_instrument_hw1f_overrides() {
     let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("valid");
     let mut swaption =
         test_bermudan_swaption(swap_start, swap_end, first_exercise, 0.03, OptionType::Call);
-    swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-    swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.05);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.012);
 
     let market = build_market_context();
     let pricer = BermudanSwaptionPricer::lsmc_with_config(BermudanSwaptionPricerConfig {
@@ -755,9 +763,18 @@ fn test_tree_require_calibration_accepts_instrument_hw1f_overrides() {
     let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("valid");
     let mut swaption =
         test_bermudan_swaption(swap_start, swap_end, first_exercise, 0.03, OptionType::Call);
-    swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-    swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
-    swaption.pricing_overrides.model_config.tree_steps = Some(50);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.05);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.012);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .tree_steps = Some(50);
 
     let market = build_market_context();
     let pricer = BermudanSwaptionPricer::tree_with_config(BermudanSwaptionPricerConfig {
@@ -779,9 +796,15 @@ fn test_registry_default_prices_with_instrument_hw1f_overrides() {
     let first_exercise = Date::from_calendar_date(2027, Month::January, 1).expect("valid");
     let mut swaption =
         test_bermudan_swaption(swap_start, swap_end, first_exercise, 0.03, OptionType::Call);
-    swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-    swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
-    swaption.pricing_overrides.model_config.mc_paths = Some(1_000);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.05);
+    swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.012);
+    swaption.instrument_pricing_overrides.model_config.mc_paths = Some(1_000);
 
     let market = build_market_context();
     let result = swaption

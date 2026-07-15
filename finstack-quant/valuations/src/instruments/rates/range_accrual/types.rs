@@ -4,7 +4,6 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::QuantoSpec;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IndexId, InstrumentId, PriceId, Rate};
@@ -78,9 +77,7 @@ impl std::str::FromStr for BoundsType {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct RangeAccrual {
@@ -137,7 +134,16 @@ pub struct RangeAccrual {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     pub attributes: Attributes,
     /// Optional quanto adjustment parameters. When provided, applies a drift
@@ -225,7 +231,6 @@ impl RangeAccrual {
             .spot_id("SPX-SPOT".into())
             .vol_surface_id(CurveId::new("SPX-VOL"))
             .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .payment_date_opt(None)
             .past_fixings_in_range_opt(None)
@@ -259,7 +264,6 @@ impl RangeAccrual {
             .spot_id("SOFR-RATE".into())
             .vol_surface_id(CurveId::new("SOFR-VOL"))
             .div_yield_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .payment_date_opt(None)
             .past_fixings_in_range_opt(None)
@@ -446,23 +450,13 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
         self.observation_dates.first().copied()
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.
 impl crate::metrics::HasPricingOverrides for RangeAccrual {
     fn metric_pricing_overrides_mut(&mut self) -> &mut crate::instruments::MetricPricingOverrides {
-        &mut self.pricing_overrides.metrics
+        &mut self.metric_pricing_overrides
     }
 }
 

@@ -1,7 +1,6 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Attributes;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -92,7 +91,14 @@ pub struct BermudanSwaption {
     pub calendar_id: Option<CalendarId>,
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping
     #[serde(default)]
     /// Attributes for scenario selection and tagging
@@ -134,7 +140,9 @@ impl BermudanSwaption {
             .expect("valid Bermudan schedule"),
             bermudan_type: BermudanType::CoTerminal,
             calendar_id: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -171,7 +179,9 @@ impl BermudanSwaption {
             bermudan_schedule,
             bermudan_type: BermudanType::CoTerminal,
             calendar_id: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::default(),
         })
     }
@@ -208,7 +218,9 @@ impl BermudanSwaption {
             bermudan_schedule,
             bermudan_type: BermudanType::CoTerminal,
             calendar_id: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::default(),
         })
     }
@@ -475,7 +487,9 @@ impl BermudanSwaption {
             calendar_id: self.calendar_id.clone(),
             underlying_fixed_leg: None,
             underlying_float_leg: None,
-            pricing_overrides: self.pricing_overrides.clone(),
+            instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
+            metric_pricing_overrides: self.metric_pricing_overrides.clone(),
+            scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
             sabr_params: None,
             attributes: self.attributes.clone(),
         })
@@ -522,17 +536,7 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
         Some(self.swap_start)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 /// Convert lognormal (Black) volatility to normal (Bachelier) volatility.

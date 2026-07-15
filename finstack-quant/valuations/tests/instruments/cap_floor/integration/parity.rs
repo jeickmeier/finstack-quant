@@ -71,7 +71,9 @@ fn create_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }
@@ -98,7 +100,9 @@ fn create_floor(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }
@@ -265,7 +269,9 @@ fn test_caplet_floorlet_parity() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -290,7 +296,9 @@ fn test_caplet_floorlet_parity() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 

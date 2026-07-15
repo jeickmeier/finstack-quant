@@ -72,7 +72,9 @@ fn create_standard_cap(as_of: Date, end: Date, strike: f64) -> CapFloor {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }
@@ -134,7 +136,9 @@ fn test_floor_vega_positive() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -285,8 +289,11 @@ fn test_hull_white_1f_market_and_sigma_vegas_are_distinct() {
     // Explicit κ/σ make PV independent of the market surface, while direct
     // model-parameter σ sensitivity remains non-zero.
     let mut atm_cap = create_standard_cap(as_of, end, 0.05);
-    atm_cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
-    atm_cap.pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+    atm_cap
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
+    atm_cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     let result = atm_cap
         .price_with_metrics(
             &market,
@@ -309,8 +316,11 @@ fn test_hull_white_1f_market_and_sigma_vegas_are_distinct() {
 
     // Away from the money, changing σ changes direct model-parameter vega.
     let mut otm_cap = create_standard_cap(as_of, end, 0.08);
-    otm_cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
-    otm_cap.pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+    otm_cap
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
+    otm_cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
     let low_sigma_vega = *otm_cap
         .price_with_metrics(&market, as_of, &[MetricId::HwSigmaVega], opts.clone())
         .unwrap()
@@ -319,7 +329,10 @@ fn test_hull_white_1f_market_and_sigma_vegas_are_distinct() {
         .unwrap();
 
     let mut otm_cap_high = otm_cap;
-    otm_cap_high.pricing_overrides.model_config.hw1f_sigma = Some(0.02);
+    otm_cap_high
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma = Some(0.02);
     let high_sigma_vega = *otm_cap_high
         .price_with_metrics(&market, as_of, &[MetricId::HwSigmaVega], opts)
         .unwrap()
@@ -344,8 +357,10 @@ fn test_hull_white_1f_surface_shock_moves_pv_and_vega() {
     let as_of = date!(2024 - 01 - 01);
     let end = date!(2029 - 01 - 01);
     let mut cap = create_standard_cap(as_of, end, 0.05);
-    cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
-    cap.pricing_overrides.model_config.hw1f_sigma = None;
+    cap.instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion = Some(0.03);
+    cap.instrument_pricing_overrides.model_config.hw1f_sigma = None;
 
     let disc_curve = build_flat_discount_curve(0.05, as_of, "USD_OIS");
     let fwd_curve = build_flat_forward_curve(0.05, as_of, "USD_LIBOR_3M");

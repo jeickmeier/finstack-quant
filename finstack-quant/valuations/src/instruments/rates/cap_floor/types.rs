@@ -232,9 +232,7 @@ pub struct OvernightCouponConvention {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct CapFloor {
@@ -322,7 +320,16 @@ pub struct CapFloor {
     /// Additional attributes
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: crate::instruments::PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and tagging
     pub attributes: Attributes,
 }
@@ -399,7 +406,9 @@ impl CapFloor {
             vol_type: CapFloorVolType::default(),
             vol_shift: 0.0,
             overnight_coupon: None,
-            pricing_overrides: crate::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -860,17 +869,7 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
         Some(self.start_date)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(
@@ -924,6 +923,66 @@ mod tests {
             .insert(disc)
             .insert(fwd)
             .insert_surface(vol_surface)
+    }
+
+    #[test]
+    fn focused_overrides_preserve_legacy_wire_shape() {
+        let mut cap = CapFloor::new_cap(
+            "WIRE-CAP",
+            Money::new(1_000_000.0, Currency::USD),
+            0.04,
+            date(2024, 3, 1),
+            date(2025, 3, 1),
+            Tenor::quarterly(),
+            DayCount::Act360,
+            "TEST-DISC",
+            "USD-SOFR-3M",
+            "TEST-VOL",
+        )
+        .expect("valid cap");
+        cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+        cap.metric_pricing_overrides.mc_seed_scenario = Some("vega_up".to_string());
+        cap.scenario_pricing_overrides.scenario_price_shock_pct = Some(-0.04);
+
+        let value = serde_json::to_value(&cap).expect("serialize focused overrides");
+        assert!(value.get("instrument_pricing_overrides").is_none());
+        assert!(value.get("metric_pricing_overrides").is_none());
+        assert!(value.get("scenario_pricing_overrides").is_none());
+        let wire = value
+            .get("pricing_overrides")
+            .and_then(serde_json::Value::as_object)
+            .expect("legacy pricing_overrides object");
+        assert_eq!(wire.get("hw1f_sigma"), Some(&serde_json::json!(0.012)));
+        assert_eq!(
+            wire.get("mc_seed_scenario"),
+            Some(&serde_json::json!("vega_up"))
+        );
+        assert_eq!(
+            wire.get("scenario_price_shock_pct"),
+            Some(&serde_json::json!(-0.04))
+        );
+
+        let roundtrip: CapFloor = serde_json::from_value(value).expect("deserialize legacy wire");
+        assert_eq!(
+            roundtrip
+                .instrument_pricing_overrides
+                .model_config
+                .hw1f_sigma,
+            Some(0.012)
+        );
+        assert_eq!(
+            roundtrip
+                .metric_pricing_overrides
+                .mc_seed_scenario
+                .as_deref(),
+            Some("vega_up")
+        );
+        assert_eq!(
+            roundtrip
+                .scenario_pricing_overrides
+                .scenario_price_shock_pct,
+            Some(-0.04)
+        );
     }
 
     /// Test cap-floor parity: Cap(K) - Floor(K) = Forward Swap PV

@@ -519,10 +519,18 @@ impl CapFloorHullWhitePricer {
 /// into the HW tree would produce a ~13–40× mis-priced result.
 fn hw1f_overrides_json(cap_floor: &CapFloor) -> Option<serde_json::Value> {
     let mut overrides = serde_json::Map::new();
-    if let Some(kappa) = cap_floor.pricing_overrides.model_config.hw1f_mean_reversion {
+    if let Some(kappa) = cap_floor
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_mean_reversion
+    {
         overrides.insert("hw1f_kappa".to_owned(), serde_json::json!(kappa));
     }
-    if let Some(sigma) = cap_floor.pricing_overrides.model_config.hw1f_sigma {
+    if let Some(sigma) = cap_floor
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma
+    {
         overrides.insert("hw1f_sigma".to_owned(), serde_json::json!(sigma));
     }
     (!overrides.is_empty()).then_some(serde_json::Value::Object(overrides))
@@ -566,9 +574,13 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
     market: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
 ) -> finstack_quant_core::Result<HullWhiteModelParams> {
-    if let Some(schedule) = &cap_floor.pricing_overrides.model_config.hw1f_sigma_schedule {
+    if let Some(schedule) = &cap_floor
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma_schedule
+    {
         if cap_floor
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .hw1f_sigma
             .is_some()
@@ -579,7 +591,7 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
             )));
         }
         let kappa = cap_floor
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .hw1f_mean_reversion
             .filter(|value| value.is_finite() && *value > 0.0)
@@ -591,7 +603,10 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
             })?;
         return HullWhiteModelParams::new(kappa, schedule.clone());
     }
-    let explicit_scalar_sigma = cap_floor.pricing_overrides.model_config.hw1f_sigma;
+    let explicit_scalar_sigma = cap_floor
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma;
     if explicit_scalar_sigma.is_none() {
         let schedule_key = capfloor_hw1f_sigma_schedule_key(cap_floor.discount_curve_id.as_str());
         if let Ok(series) = market.get_series(&schedule_key) {
@@ -611,7 +626,7 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
                     _ => None,
                 });
             let kappa = cap_floor
-                .pricing_overrides
+                .instrument_pricing_overrides
                 .model_config
                 .hw1f_mean_reversion
                 .filter(|value| value.is_finite() && *value > 0.0)
@@ -646,7 +661,7 @@ pub(crate) fn resolve_capfloor_hw1f_model_params(
 
 fn capfloor_kappa_hint(cap_floor: &CapFloor, market: &MarketContext) -> f64 {
     if let Some(kappa) = cap_floor
-        .pricing_overrides
+        .instrument_pricing_overrides
         .model_config
         .hw1f_mean_reversion
         .filter(|value| value.is_finite() && *value > 0.0)
@@ -1040,8 +1055,10 @@ mod tests {
         // HW1F-specific overrides via the dedicated short-rate-vol field (NOT
         // implied_volatility which is an option vol). PV must differ from the
         // market-scalar PV.
-        cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
-        cap.pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+        cap.instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.03);
+        cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.01);
         let override_pv = CapFloorHullWhitePricer
             .price_internal(&cap, &market, as_of)
             .expect("override pricing should succeed")
@@ -1068,8 +1085,10 @@ mod tests {
             .amount();
 
         // Override with a significantly different short-rate σ (~3× default).
-        cap.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        cap.pricing_overrides.model_config.hw1f_sigma = Some(0.030);
+        cap.instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        cap.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.030);
         let overridden_pv = CapFloorHullWhitePricer
             .price_internal(&cap, &market, as_of)
             .expect("hw1f_sigma override pricing should succeed")
@@ -1105,7 +1124,7 @@ mod tests {
         // Typical lognormal cap vol (0.20) with NO hw1f_sigma set.
         // If the bug were present, this would feed 0.20 into the HW tree as σ.
         cap_with_iv
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.20);
         let pv_with_iv = CapFloorHullWhitePricer
@@ -1137,8 +1156,11 @@ mod tests {
             "USD-CAP-VOL",
         )
         .expect("caplet");
-        caplet.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        caplet.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+        caplet
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 5.0))
             .insert(flat_forward_with_tenor("USD-SOFR-3M", as_of, 0.04, 5.0));
@@ -1212,10 +1234,13 @@ mod tests {
         .expect("caplet");
         with_spread.spread = rust_decimal::Decimal::try_from(0.01).expect("spread");
         with_spread
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .hw1f_mean_reversion = Some(0.05);
-        with_spread.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+        with_spread
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma = Some(0.012);
         let mut reduced_strike = with_spread.clone();
         reduced_strike.spread = rust_decimal::Decimal::ZERO;
         reduced_strike.strike = rust_decimal::Decimal::try_from(0.03).expect("strike");
@@ -1466,8 +1491,11 @@ mod tests {
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
         });
-        delayed.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        delayed.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+        delayed
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        delayed.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.05, 5.0))
             .insert(flat_forward_with_tenor("USD-SOFR-OIS", as_of, 0.045, 5.0));
@@ -1622,8 +1650,11 @@ mod tests {
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
         });
-        caplet.pricing_overrides.model_config.hw1f_mean_reversion = Some(kappa);
-        caplet.pricing_overrides.model_config.hw1f_sigma = Some(sigma);
+        caplet
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(kappa);
+        caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(sigma);
         let market = MarketContext::new()
             .insert(flat_discount_with_tenor("USD-OIS", as_of, short_rate, 5.0));
         let period = caplet.pricing_periods().expect("periods").remove(0);
@@ -1652,7 +1683,10 @@ mod tests {
         assert_eq!(mc.stderr.to_bits(), repeated_mc.stderr.to_bits());
 
         let mut zero_sigma_caplet = caplet;
-        zero_sigma_caplet.pricing_overrides.model_config.hw1f_sigma = Some(0.0);
+        zero_sigma_caplet
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma = Some(0.0);
         zero_sigma_caplet.strike =
             rust_decimal::Decimal::try_from(projection.forward - 0.001).expect("intrinsic strike");
         let zero_sigma_coupon = (projection
@@ -1714,8 +1748,11 @@ mod tests {
             payment_calendar_id: Some("usny".into()),
             spread_compounding: OvernightSpreadCompounding::Exclude,
         });
-        caplet.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        caplet.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+        caplet
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        caplet.instrument_pricing_overrides.model_config.hw1f_sigma = Some(0.012);
         let market =
             MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0));
         let scalar = CapFloorHullWhitePricer
@@ -1725,8 +1762,14 @@ mod tests {
             .amount();
 
         let mut scheduled = caplet;
-        scheduled.pricing_overrides.model_config.hw1f_sigma = None;
-        scheduled.pricing_overrides.model_config.hw1f_sigma_schedule = Some(
+        scheduled
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma = None;
+        scheduled
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma_schedule = Some(
             finstack_quant_core::math::piecewise::PiecewiseConstantCurve::constant(0.012)
                 .expect("schedule"),
         );

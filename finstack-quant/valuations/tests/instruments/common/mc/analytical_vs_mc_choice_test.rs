@@ -32,7 +32,9 @@ mod choice_tests {
             discount_curve_id: CurveId::from("USD-OIS"),
             vol_surface_id: CurveId::from("SPX_VOL"),
             div_yield_id: None,
-            pricing_overrides: Default::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
             past_fixings: vec![],
         };

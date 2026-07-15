@@ -132,7 +132,9 @@ fn quantlib_parity_fra_at_market_valuation() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive, // receive fixed rate
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -177,7 +179,9 @@ fn quantlib_parity_fra_off_market_valuation() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive, // receive fixed rate
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -238,7 +242,9 @@ fn quantlib_parity_fra_implied_rate() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -300,7 +306,9 @@ fn quantlib_parity_fra_settlement_adjustment() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -373,7 +381,9 @@ fn quantlib_parity_fra_buy_sell_symmetry() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive, // receive fixed rate
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -393,7 +403,9 @@ fn quantlib_parity_fra_buy_sell_symmetry() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Pay, // pay fixed rate
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -441,7 +453,9 @@ fn quantlib_parity_fra_standard_tenor_3x6() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -477,7 +491,9 @@ fn quantlib_parity_fra_standard_tenor_6x9() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -513,7 +529,9 @@ fn quantlib_parity_fra_standard_tenor_6x12() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -556,7 +574,9 @@ fn quantlib_parity_fra_dv01_sign_convention() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive, // receive fixed rate
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -575,7 +595,9 @@ fn quantlib_parity_fra_dv01_sign_convention() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Pay, // pay fixed rate
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -645,7 +667,9 @@ fn quantlib_parity_fra_day_count_act360_vs_act365() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -664,7 +688,9 @@ fn quantlib_parity_fra_day_count_act360_vs_act365() {
         discount_curve_id: "USD_OIS".into(),
         forward_curve_id: "USD_LIBOR_3M".into(),
         side: PayReceive::Receive,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 

@@ -43,7 +43,7 @@ use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::norm_cdf;
 use finstack_quant_valuations::instruments::Instrument;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use time::macros::date;
 
@@ -374,11 +374,13 @@ fn test_quantlib_parity_vega() {
 
     // Cross-check with finite difference
     let mut swaption_up = swaption.clone();
-    swaption_up.pricing_overrides = PricingOverrides::default().with_implied_vol(0.21);
+    swaption_up.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_implied_vol(0.21);
     let pv_up = swaption_up.value(&market, as_of).unwrap().amount();
 
     let mut swaption_down = swaption;
-    swaption_down.pricing_overrides = PricingOverrides::default().with_implied_vol(0.19);
+    swaption_down.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_implied_vol(0.19);
     let pv_down = swaption_down.value(&market, as_of).unwrap().amount();
 
     let vega_fd = (pv_up - pv_down) / 2.0; // Per 1% change

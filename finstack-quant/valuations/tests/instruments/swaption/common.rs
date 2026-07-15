@@ -13,8 +13,7 @@ use finstack_quant_valuations::instruments::rates::irs::{
 use finstack_quant_valuations::instruments::rates::swaption::{
     Swaption, SwaptionExercise, SwaptionSettlement, VolatilityModel,
 };
-use finstack_quant_valuations::instruments::PricingOverrides;
-use finstack_quant_valuations::instruments::{Instrument, OptionType};
+use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides, OptionType};
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -95,8 +94,10 @@ pub fn create_standard_payer_swaption(
         vol_surface_id: "USD_SWAPTION_VOL".into(),
         // Tests intentionally exercise OTM/ITM strikes; opt in to flat extrapolation
         // to avoid making results depend on the surface strike grid.
-        pricing_overrides: PricingOverrides::default()
+        instrument_pricing_overrides: InstrumentPricingOverrides::default()
             .with_vol_surface_extrapolation(VolSurfaceExtrapolation::Clamp),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         calendar_id: None,
         underlying_fixed_leg: None,
         underlying_float_leg: None,

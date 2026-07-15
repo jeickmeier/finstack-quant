@@ -90,7 +90,9 @@ fn test_realistic_usd_cap_pricing() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -140,7 +142,9 @@ fn test_realistic_otm_floor_pricing() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -187,7 +191,9 @@ fn test_all_greeks_with_realistic_market() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -257,7 +263,9 @@ fn test_semi_annual_vs_quarterly_frequency() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -282,7 +290,9 @@ fn test_semi_annual_vs_quarterly_frequency() {
         vol_shift: 0.0,
         overnight_coupon: None,
         spread: Decimal::ZERO,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 

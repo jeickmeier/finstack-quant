@@ -18,7 +18,6 @@ use crate::cashflow::primitives::{CFKind, CashFlow};
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::dates::{CalendarRegistry, Date, DateExt, DayCount, Tenor};
 use finstack_quant_core::money::Money;
@@ -41,9 +40,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[builder(validate = CmsSwap::validate)]
 #[serde(deny_unknown_fields)]
@@ -118,7 +115,16 @@ pub struct CmsSwap {
     /// Pricing overrides (manual price, yield, spread).
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection and grouping.
     #[serde(default)]
     #[builder(default)]
@@ -447,7 +453,6 @@ impl CmsSwap {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .forward_curve_id(CurveId::new("USD-LIBOR-3M"))
             .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("Example CmsSwap construction should not fail")
@@ -679,17 +684,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
         self.cms_fixing_dates.first().copied()
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {

@@ -110,7 +110,7 @@ pub(crate) fn price_cap_floor(
         let df = resolved_inputs.discount_factor;
         let sigma = if effective_t_fix > 0.0 {
             crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-                &cap_floor.pricing_overrides.market_quotes,
+                &cap_floor.instrument_pricing_overrides.market_quotes,
                 curves,
                 cap_floor.vol_surface_id.as_str(),
                 effective_t_fix,

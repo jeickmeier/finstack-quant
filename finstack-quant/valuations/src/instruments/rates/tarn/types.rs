@@ -3,7 +3,6 @@
 use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -66,7 +65,14 @@ pub struct Tarn {
     pub day_count: DayCount,
     /// Pricing overrides.
     #[serde(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes for scenario selection.
     pub attributes: Attributes,
 }
@@ -145,7 +151,9 @@ impl Tarn {
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act360,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -199,17 +207,7 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
         self.coupon_dates.first().copied()
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(
@@ -244,7 +242,9 @@ mod tests {
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act360,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         };
         assert!(tarn.validate().is_err());

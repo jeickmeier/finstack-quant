@@ -2,7 +2,7 @@
 //!
 //! Computes cash gamma using Black or Normal model gamma with forward swap rate and
 //! underlying swap annuity. Uses SABR-implied vol if parameters are set,
-//! otherwise uses the volatility surface or an override from `PricingOverrides`.
+//! otherwise uses the volatility surface or an override from `InstrumentPricingOverrides`.
 //!
 //! # Numerical Stability
 //!

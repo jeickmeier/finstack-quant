@@ -112,7 +112,9 @@ fn floating_note_tarn(coupon_dates: Vec<Date>) -> Tarn {
         discount_curve_id: CurveId::new("USD-OIS"),
         vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
         day_count: DayCount::Act365F,
-        pricing_overrides: Default::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }

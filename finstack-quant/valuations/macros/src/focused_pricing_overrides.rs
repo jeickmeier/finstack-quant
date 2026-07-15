@@ -160,7 +160,11 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                         #(#ordinary_serde_attrs)*
                         #ordinary_idents: #ordinary_types,
                     )*
-                    #[serde(default)]
+                    #[serde(
+                        default,
+                        deserialize_with =
+                            "crate::instruments::common_impl::parameters::deserialize_null_default"
+                    )]
                     pricing_overrides:
                         crate::instruments::pricing_overrides::PricingOverridesWire,
                 }

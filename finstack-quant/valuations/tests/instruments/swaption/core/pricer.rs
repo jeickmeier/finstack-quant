@@ -21,7 +21,10 @@ fn test_simple_swaption_black76_pricer_honors_instrument_vol_model() {
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     swaption.vol_model =
         finstack_quant_valuations::instruments::rates::swaption::VolatilityModel::Normal;
-    swaption.pricing_overrides = swaption.pricing_overrides.clone().with_implied_vol(0.25);
+    swaption.instrument_pricing_overrides = swaption
+        .instrument_pricing_overrides
+        .clone()
+        .with_implied_vol(0.25);
 
     let market = create_flat_market(as_of, 0.03, 0.2);
     let expected_normal = swaption.price_normal(&market, 0.25, as_of).unwrap();
@@ -42,7 +45,10 @@ fn test_simple_swaption_pricer_fallback_uses_instrument_value() {
     let mut swaption = create_standard_payer_swaption(expiry, swap_start, swap_end, 0.05);
     swaption.vol_model =
         finstack_quant_valuations::instruments::rates::swaption::VolatilityModel::Normal;
-    swaption.pricing_overrides = swaption.pricing_overrides.clone().with_implied_vol(0.35);
+    swaption.instrument_pricing_overrides = swaption
+        .instrument_pricing_overrides
+        .clone()
+        .with_implied_vol(0.35);
 
     let market = create_flat_market(as_of, 0.03, 0.2);
     let pricer = SimpleSwaptionBlackPricer::with_model(ModelKey::Discounting);

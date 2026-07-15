@@ -7,7 +7,6 @@ use crate::instruments::pricing_overrides::VolSurfaceExtrapolation;
 use crate::instruments::rates::irs::{
     FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
 };
-use crate::instruments::PricingOverrides;
 use crate::models::SABRModel;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -29,9 +28,7 @@ use super::definitions::{
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct Swaption {
@@ -114,7 +111,16 @@ pub struct Swaption {
     /// Pricing overrides (manual price, yield, spread)
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Optional SABR volatility model parameters
     pub sabr_params: Option<SABRParameters>,
     /// Attributes for scenario selection and grouping
@@ -192,7 +198,9 @@ impl Swaption {
             calendar_id: None,
             underlying_fixed_leg: None,
             underlying_float_leg: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             sabr_params: None,
             attributes: Attributes::new(),
         }
@@ -233,7 +241,9 @@ impl Swaption {
             calendar_id: None,
             underlying_fixed_leg: None,
             underlying_float_leg: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             sabr_params: Some(SABRParameters {
                 alpha: 0.025,
                 beta: 0.5,
@@ -273,7 +283,9 @@ impl Swaption {
             calendar_id: None,
             underlying_fixed_leg: None,
             underlying_float_leg: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             sabr_params: None,
             attributes: Attributes::default(),
             vol_model: Default::default(),
@@ -321,7 +333,9 @@ impl Swaption {
             calendar_id: None,
             underlying_fixed_leg: None,
             underlying_float_leg: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             sabr_params: None,
             attributes: Attributes::default(),
             vol_model: Default::default(),
@@ -989,7 +1003,11 @@ impl Swaption {
         }
 
         // 2. Pricing override
-        if let Some(impl_vol) = self.pricing_overrides.market_quotes.implied_volatility {
+        if let Some(impl_vol) = self
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+        {
             return Ok(impl_vol);
         }
 
@@ -999,7 +1017,7 @@ impl Swaption {
         let strike = self.strike_f64()?;
         let underlying_tenor = self.underlying_tenor_years()?;
         match self
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .vol_surface_extrapolation
         {
@@ -1136,17 +1154,7 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
         Some(self.swap_start)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.

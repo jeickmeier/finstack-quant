@@ -59,33 +59,36 @@ impl MetricCalculator for ImpliedVolCalculator {
         };
 
         // Initial guess: overrides -> SABR ATM -> surface -> 20%
-        let initial_sigma =
-            if let Some(ov) = option.pricing_overrides.market_quotes.implied_volatility {
-                ov
-            } else if let Some(sabr) = &option.sabr_params {
-                let model = crate::models::SABRModel::new(sabr.clone());
-                model.implied_volatility(forward, strike, t).unwrap_or(0.2)
-            } else {
-                context
-                    .curves
-                    .get_surface(option.vol_surface_id.as_str())
-                    .and_then(|s| {
-                        s.require_secondary_axis(VolSurfaceAxis::Strike)?;
-                        match option
-                            .pricing_overrides
-                            .model_config
-                            .vol_surface_extrapolation
-                        {
-                            VolSurfaceExtrapolation::Clamp
-                            | VolSurfaceExtrapolation::LinearInVariance => {
-                                // LinearInVariance falls back to Clamp until surface impl is ready
-                                Ok(s.value_clamped(t, strike))
-                            }
-                            VolSurfaceExtrapolation::Error => s.value_checked(t, strike),
+        let initial_sigma = if let Some(ov) = option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility
+        {
+            ov
+        } else if let Some(sabr) = &option.sabr_params {
+            let model = crate::models::SABRModel::new(sabr.clone());
+            model.implied_volatility(forward, strike, t).unwrap_or(0.2)
+        } else {
+            context
+                .curves
+                .get_surface(option.vol_surface_id.as_str())
+                .and_then(|s| {
+                    s.require_secondary_axis(VolSurfaceAxis::Strike)?;
+                    match option
+                        .instrument_pricing_overrides
+                        .model_config
+                        .vol_surface_extrapolation
+                    {
+                        VolSurfaceExtrapolation::Clamp
+                        | VolSurfaceExtrapolation::LinearInVariance => {
+                            // LinearInVariance falls back to Clamp until surface impl is ready
+                            Ok(s.value_clamped(t, strike))
                         }
-                    })
-                    .unwrap_or(0.2)
-            };
+                        VolSurfaceExtrapolation::Error => s.value_checked(t, strike),
+                    }
+                })
+                .unwrap_or(0.2)
+        };
 
         let eps = 1e-8;
         let x0 = (initial_sigma.max(eps)).ln();
@@ -124,7 +127,7 @@ mod tests {
     use crate::instruments::rates::swaption::{
         SwaptionExercise, SwaptionSettlement, VolatilityModel,
     };
-    use crate::instruments::{OptionType, PricingOverrides};
+    use crate::instruments::OptionType;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -187,7 +190,9 @@ mod tests {
             discount_curve_id: "USD_OIS".into(),
             forward_curve_id: "USD_LIBOR_3M".into(),
             vol_surface_id: "USD_SWAPTION_VOL".into(),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             calendar_id: None,
             underlying_fixed_leg: None,
             underlying_float_leg: None,

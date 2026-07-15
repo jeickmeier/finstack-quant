@@ -63,7 +63,9 @@ fn test_irs_at_par_npv_zero() {
             end,
         },
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -122,7 +124,9 @@ fn test_irs_receive_fixed_below_market() {
             end,
         },
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -180,7 +184,9 @@ fn test_irs_receive_fixed_above_market() {
             end,
         },
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -243,7 +249,9 @@ fn test_irs_pay_vs_receive_opposite_signs() {
         fixed: fixed_leg.clone(),
         float: float_leg.clone(),
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -254,7 +262,9 @@ fn test_irs_pay_vs_receive_opposite_signs() {
         fixed: fixed_leg,
         float: float_leg,
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 

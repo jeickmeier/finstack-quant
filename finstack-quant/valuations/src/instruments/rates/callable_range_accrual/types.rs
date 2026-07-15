@@ -4,7 +4,6 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::exotics_shared::bermudan_call::BermudanCallProvision;
 use crate::instruments::rates::range_accrual::{BoundsType, RangeAccrual};
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -38,7 +37,14 @@ pub struct CallableRangeAccrual {
     pub call_provision: BermudanCallProvision,
     /// Pricing overrides.
     #[serde(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes.
     pub attributes: Attributes,
 }
@@ -115,7 +121,6 @@ impl CallableRangeAccrual {
                 .spot_id("SOFR-RATE".into())
                 .vol_surface_id(CurveId::new("SOFR-VOL"))
                 .div_yield_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
                 .attributes(Attributes::new())
                 .payment_date_opt(None)
                 .past_fixings_in_range_opt(None)
@@ -123,7 +128,9 @@ impl CallableRangeAccrual {
                 .build()
                 .expect("example range accrual leg should build"),
             call_provision: BermudanCallProvision::new(call_dates, 1.0, 1),
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -165,17 +172,7 @@ impl crate::instruments::common_impl::traits::Instrument for CallableRangeAccrua
         self.range_accrual.observation_dates.first().copied()
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

@@ -482,7 +482,9 @@ mod tests {
             .expect("valid Bermudan schedule"),
             bermudan_type: BermudanType::CoTerminal,
             calendar_id: None,
-            pricing_overrides: Default::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         }
     }

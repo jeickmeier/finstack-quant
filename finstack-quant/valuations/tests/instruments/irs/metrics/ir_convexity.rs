@@ -76,7 +76,9 @@ fn create_standard_swap(as_of: Date, end: Date, side: PayReceive) -> InterestRat
             end,
         },
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     }
 }

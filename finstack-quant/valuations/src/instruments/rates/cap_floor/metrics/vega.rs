@@ -117,9 +117,12 @@ fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> 
     let base = resolve_capfloor_hw1f_model_params(option, market, context.as_of)?;
     let with_sigma = |shift: f64| -> Result<CapFloor> {
         let mut bumped = option.clone();
-        bumped.pricing_overrides.model_config.hw1f_mean_reversion = Some(base.kappa);
+        bumped
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(base.kappa);
         if option
-            .pricing_overrides
+            .instrument_pricing_overrides
             .model_config
             .hw1f_sigma_schedule
             .is_some()
@@ -130,15 +133,18 @@ fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> 
                 .iter()
                 .map(|sigma| sigma + shift)
                 .collect();
-            bumped.pricing_overrides.model_config.hw1f_sigma = None;
-            bumped.pricing_overrides.model_config.hw1f_sigma_schedule = Some(
+            bumped.instrument_pricing_overrides.model_config.hw1f_sigma = None;
+            bumped
+                .instrument_pricing_overrides
+                .model_config
+                .hw1f_sigma_schedule = Some(
                 finstack_quant_core::math::piecewise::PiecewiseConstantCurve::new(
                     base.volatility.times().to_vec(),
                     values,
                 )?,
             );
         } else {
-            bumped.pricing_overrides.model_config.hw1f_sigma =
+            bumped.instrument_pricing_overrides.model_config.hw1f_sigma =
                 Some(base.volatility.values()[0] + shift);
         }
         Ok(bumped)

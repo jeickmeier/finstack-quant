@@ -37,7 +37,7 @@ impl MetricCalculator for RhoCalculator {
             return Ok(0.0);
         }
 
-        let bump_bp = instrument.pricing_overrides.rho_bump_bp();
+        let bump_bp = instrument.metric_pricing_overrides.rho_bump_bp();
         let curves_bumped =
             bump_discount_curve_parallel(&context.curves, &instrument.discount_curve_id, bump_bp)?;
 

@@ -412,7 +412,9 @@ fn test_irs_receive_vs_pay_fixed() {
         fixed: fixed_leg.clone(),
         float: float_leg.clone(),
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -423,7 +425,9 @@ fn test_irs_receive_vs_pay_fixed() {
         fixed: fixed_leg,
         float: float_leg,
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -501,7 +505,9 @@ fn test_irs_rate_sensitivity() {
         fixed: fixed_leg,
         float: float_leg,
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 
@@ -591,7 +597,9 @@ fn test_irs_leg_pvs_consistency() {
             fixing_calendar_id: None,
         },
         margin_spec: None,
-        pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         attributes: Default::default(),
     };
 

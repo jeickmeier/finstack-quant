@@ -36,7 +36,6 @@ use crate::instruments::common_impl::validation;
 use crate::instruments::rates::cap_floor::pricing::{
     black as black_ir, normal as normal_ir, payoff::CapletFloorletInputs,
 };
-use crate::instruments::PricingOverrides;
 use crate::pricer::ModelKey;
 use finstack_quant_core::dates::{
     BusinessDayConvention, Date, DayCount, DayCountContext, StubKind, Tenor,
@@ -103,9 +102,7 @@ impl std::str::FromStr for InflationCapFloorType {
     Clone,
     Debug,
     finstack_quant_valuations_macros::FinancialBuilder,
-    serde::Serialize,
-    serde::Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct InflationCapFloor {
@@ -147,7 +144,16 @@ pub struct InflationCapFloor {
     /// Pricing overrides (implied volatility, surface extrapolation).
     #[serde(default)]
     #[builder(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    #[builder(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    #[builder(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Optional contract-level lag override.
     #[builder(optional)]
     pub lag_override: Option<InflationLag>,
@@ -207,7 +213,6 @@ impl InflationCapFloor {
             .inflation_index_id(CurveId::new("US-CPI"))
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("USD-INFL-VOL"))
-            .pricing_overrides(PricingOverrides::default())
             .lag_override(InflationLag::Months(3))
             .attributes(Attributes::new())
             .build()
@@ -440,7 +445,7 @@ impl InflationCapFloor {
             // Bachelier payoff.
             let sigma = if t_fix > 0.0 {
                 crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-                    &self.pricing_overrides.market_quotes,
+                    &self.instrument_pricing_overrides.market_quotes,
                     curves,
                     self.vol_surface_id.as_str(),
                     t_fix,
@@ -468,7 +473,7 @@ impl InflationCapFloor {
             // cancels) is vol-independent.
             let forward_rate = if t_fix > 0.0 {
                 let atm_sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-                    &self.pricing_overrides.market_quotes,
+                    &self.instrument_pricing_overrides.market_quotes,
                     curves,
                     self.vol_surface_id.as_str(),
                     t_fix,
@@ -666,17 +671,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
         Some(self.start_date)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

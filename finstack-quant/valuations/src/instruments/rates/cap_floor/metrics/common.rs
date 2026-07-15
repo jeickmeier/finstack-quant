@@ -123,7 +123,7 @@ where
         let forward = projection.forward;
         let df = resolved_inputs.discount_factor;
         let sigma = resolve_sigma_at(
-            &option.pricing_overrides.market_quotes,
+            &option.instrument_pricing_overrides.market_quotes,
             context.curves.as_ref(),
             option.vol_surface_id.as_str(),
             fixing_t,

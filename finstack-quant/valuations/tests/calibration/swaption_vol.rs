@@ -17,7 +17,6 @@ use finstack_quant_valuations::instruments::rates::swaption::{
     Swaption, SwaptionExercise, SwaptionSettlement, VolatilityModel,
 };
 use finstack_quant_valuations::instruments::OptionType;
-use finstack_quant_valuations::instruments::PricingOverrides;
 use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
 use finstack_quant_valuations::market::quotes::ids::QuoteId;
 use finstack_quant_valuations::market::quotes::market_quote::MarketQuote;
@@ -305,7 +304,9 @@ fn calibrated_swaption_surface_is_not_silently_reused_as_strike_surface() {
         discount_curve_id: "USD-OIS".into(),
         forward_curve_id: "USD-SOFR-3M".into(),
         vol_surface_id: "USD-SWPT".into(),
-        pricing_overrides: PricingOverrides::default(),
+        instrument_pricing_overrides: Default::default(),
+        metric_pricing_overrides: Default::default(),
+        scenario_pricing_overrides: Default::default(),
         calendar_id: None,
         underlying_fixed_leg: None,
         underlying_float_leg: None,

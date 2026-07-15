@@ -4,7 +4,6 @@ use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::IRSConvention;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::instruments::PricingOverrides;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -112,7 +111,14 @@ pub struct CmsSpreadOption {
     pub swap_float_day_count: Option<DayCount>,
     /// Pricing overrides.
     #[serde(default)]
-    pub pricing_overrides: PricingOverrides,
+    /// Instrument-owned pricing inputs.
+    pub instrument_pricing_overrides: crate::instruments::InstrumentPricingOverrides,
+    /// Metric-time pricing configuration.
+    #[serde(default)]
+    pub metric_pricing_overrides: crate::instruments::MetricPricingOverrides,
+    /// Scenario-only pricing adjustments.
+    #[serde(default)]
+    pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Attributes.
     pub attributes: Attributes,
 }
@@ -224,7 +230,9 @@ impl CmsSpreadOption {
             swap_float_freq: None,
             swap_day_count: None,
             swap_float_day_count: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
     }
@@ -310,17 +318,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSpreadOption {
         Some(self.expiry_date)
     }
 
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&mut self.pricing_overrides)
-    }
-
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        Some(&self.pricing_overrides)
-    }
+    crate::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

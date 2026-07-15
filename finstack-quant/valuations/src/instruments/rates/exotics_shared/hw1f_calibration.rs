@@ -1,7 +1,7 @@
 //! Resolve HW1F short-rate parameters (κ, σ) for exotic rate products.
 //!
 //! Precedence:
-//! 1. Explicit overrides in `PricingOverrides.model_config` (keys `hw1f_kappa`, `hw1f_sigma`).
+//! 1. Explicit overrides in `InstrumentPricingOverrides.model_config` (keys `hw1f_kappa`, `hw1f_sigma`).
 //! 2. Pricing-time calibration from a volatility surface, when supplied.
 //! 3. Pre-calibrated parameters read from the `MarketContext` scalar store.
 //!    A prior Hull-White calibration step (`StepParams::HullWhite` /
@@ -36,7 +36,7 @@ use finstack_quant_core::Result;
 /// silently proceeding on uncalibrated defaults.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hw1fParamSource {
-    /// Both κ and σ supplied via `PricingOverrides.model_config`.
+    /// Both κ and σ supplied via `InstrumentPricingOverrides.model_config`.
     Override,
     /// Calibrated at pricing time from a volatility surface.
     CalibratedSurface,
@@ -139,7 +139,7 @@ pub struct Hw1fResolveRequest<'a> {
     pub curve_id: &'a str,
     /// Which calibration flavour to read scalars for (swaption vs cap/floor).
     pub flavor: Hw1fCalibrationFlavor,
-    /// Optional pricing-override JSON blob (from `PricingOverrides.model_config`).
+    /// Optional pricing-override JSON blob (from `InstrumentPricingOverrides.model_config`).
     pub overrides: Option<&'a serde_json::Value>,
     /// Optional pricing-time surface input used to infer market-consistent HW1F params.
     pub surface: Option<Hw1fSurfaceCalibration<'a>>,

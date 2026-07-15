@@ -342,10 +342,13 @@ impl SwaptionHullWhitePricer {
 /// into the HW tree would produce a ~13–40× mis-priced result.
 fn hw1f_overrides_json(swaption: &Swaption) -> Option<serde_json::Value> {
     let kappa = swaption
-        .pricing_overrides
+        .instrument_pricing_overrides
         .model_config
         .hw1f_mean_reversion?;
-    let sigma = swaption.pricing_overrides.model_config.hw1f_sigma?;
+    let sigma = swaption
+        .instrument_pricing_overrides
+        .model_config
+        .hw1f_sigma?;
     Some(serde_json::json!({ "hw1f_kappa": kappa, "hw1f_sigma": sigma }))
 }
 
@@ -510,8 +513,14 @@ mod tests {
         // Add HW1F-specific overrides (dedicated short-rate-vol field, NOT
         // implied_volatility which is an option vol). PV must differ from the
         // market-scalar PV.
-        swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.03);
-        swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.01);
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.03);
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma = Some(0.01);
         let override_pv = SwaptionHullWhitePricer::default()
             .price_internal(&swaption, &market, as_of)
             .expect("override pricing should succeed")
@@ -540,8 +549,14 @@ mod tests {
 
         // Override with a significantly different short-rate σ. The HW1F default
         // σ is ~0.01; using 0.03 (3×) should produce a clearly different PV.
-        swaption.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        swaption.pricing_overrides.model_config.hw1f_sigma = Some(0.030);
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        swaption
+            .instrument_pricing_overrides
+            .model_config
+            .hw1f_sigma = Some(0.030);
         let overridden_pv = SwaptionHullWhitePricer::default()
             .price_internal(&swaption, &market, as_of)
             .expect("hw1f_sigma override pricing should succeed")
@@ -585,7 +600,7 @@ mod tests {
         // leave hw1f_sigma/hw1f_mean_reversion unset. If the bug is present,
         // 0.20 would be fed into the HW tree as σ, producing a wildly different PV.
         swaption_with_iv
-            .pricing_overrides
+            .instrument_pricing_overrides
             .market_quotes
             .implied_volatility = Some(0.20);
         let pv_with_iv = SwaptionHullWhitePricer::default()

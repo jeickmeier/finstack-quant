@@ -236,7 +236,7 @@ impl RangeAccrualMcPricer {
         // Derive deterministic seed from instrument ID and scenario
         use finstack_quant_monte_carlo::seed;
 
-        let seed = if let Some(ref scenario) = inst.pricing_overrides.metrics.mc_seed_scenario {
+        let seed = if let Some(ref scenario) = inst.metric_pricing_overrides.mc_seed_scenario {
             seed::derive_seed(&inst.id, scenario)
         } else {
             seed::derive_seed(&inst.id, "base")
@@ -705,7 +705,7 @@ mod tests {
         without_seed.observation_dates = vec![date(2024, 6, 30), date(2024, 12, 31)];
         without_seed.payment_date = Some(date(2025, 1, 2));
         let mut with_seed = without_seed.clone();
-        with_seed.pricing_overrides.metrics.mc_seed_scenario = Some("stress".to_string());
+        with_seed.metric_pricing_overrides.mc_seed_scenario = Some("stress".to_string());
 
         let analytic_without_seed =
             compute_pv(&without_seed, &curves, as_of).expect("default model without seed");

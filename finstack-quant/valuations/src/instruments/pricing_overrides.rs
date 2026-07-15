@@ -576,6 +576,12 @@ impl InstrumentPricingOverrides {
         self
     }
 
+    /// Set the volatility-surface extrapolation policy.
+    pub fn with_vol_surface_extrapolation(mut self, policy: VolSurfaceExtrapolation) -> Self {
+        self.model_config.vol_surface_extrapolation = policy;
+        self
+    }
+
     /// Validate instrument-owned override fields.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         self.market_quotes.validate()?;
