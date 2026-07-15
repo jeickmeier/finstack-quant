@@ -18,7 +18,7 @@
 
 use std::marker::PhantomData;
 
-use crate::instruments::common_impl::traits::{EquityDependencies, Instrument};
+use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::{Date, DayCount};
@@ -395,7 +395,7 @@ pub trait HasPricingOverrides {
 ///
 /// Calculates delta (price sensitivity to underlying spot) using the central
 /// finite difference method. Works with any instrument that implements the
-/// required traits: [`Instrument`], [`EquityDependencies`], [`HasExpiry`],
+/// required traits: [`Instrument`], [`HasExpiry`],
 /// [`HasDayCount`], and [`HasPricingOverrides`].
 ///
 /// # Mathematical Foundation
@@ -443,13 +443,7 @@ impl<I> Default for GenericFdDelta<I> {
 
 impl<I> MetricCalculator for GenericFdDelta<I>
 where
-    I: Instrument
-        + EquityDependencies
-        + HasExpiry
-        + HasDayCount
-        + HasPricingOverrides
-        + Clone
-        + 'static,
+    I: Instrument + HasExpiry + HasDayCount + HasPricingOverrides + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -457,9 +451,8 @@ where
         let defaults =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
 
-        // Get equity dependencies
-        let eq_deps = instrument.equity_dependencies()?;
-        let spot_id = eq_deps.spot_id.as_ref().ok_or_else(|| {
+        let dependencies = instrument.market_dependencies()?;
+        let spot_id = dependencies.spot_ids.first().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "Instrument missing spot_id for delta calculation".to_string(),
             )
@@ -535,13 +528,7 @@ impl<I> Default for GenericFdGamma<I> {
 
 impl<I> MetricCalculator for GenericFdGamma<I>
 where
-    I: Instrument
-        + EquityDependencies
-        + HasExpiry
-        + HasDayCount
-        + HasPricingOverrides
-        + Clone
-        + 'static,
+    I: Instrument + HasExpiry + HasDayCount + HasPricingOverrides + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -549,9 +536,8 @@ where
         let defaults =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
 
-        // Get equity dependencies
-        let eq_deps = instrument.equity_dependencies()?;
-        let spot_id = eq_deps.spot_id.as_ref().ok_or_else(|| {
+        let dependencies = instrument.market_dependencies()?;
+        let spot_id = dependencies.spot_ids.first().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "Instrument missing spot_id for gamma calculation".to_string(),
             )
@@ -626,7 +612,7 @@ impl<I> Default for GenericFdVega<I> {
 
 impl<I> MetricCalculator for GenericFdVega<I>
 where
-    I: Instrument + EquityDependencies + HasPricingOverrides + Clone + 'static,
+    I: Instrument + HasPricingOverrides + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -634,17 +620,19 @@ where
         let defaults =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
 
-        // Get equity dependencies
-        let eq_deps = instrument.equity_dependencies()?;
-
-        // Get vol surface id from instrument - error if missing
-        let vol_surface_id = eq_deps.vol_surface_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "Instrument {} missing vol_surface_id for vega calculation. \
+        let dependencies = instrument.market_dependencies()?;
+        let volatility_dependency =
+            dependencies
+                .volatility_dependencies
+                .first()
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "Instrument {} missing vol_surface_id for vega calculation. \
                  Cannot compute vega without a volatility surface.",
-                instrument.id()
-            ))
-        })?;
+                        instrument.id()
+                    ))
+                })?;
+        let vol_surface_id = &volatility_dependency.surface_id;
 
         // Verify the vol surface exists in the market context
         let Ok(surface) = context.curves.get_surface(vol_surface_id.as_str()) else {
@@ -672,7 +660,7 @@ where
         // an ATM-vega option. Multi-strike instruments that leave
         // `reference_strike = None` fall back to the conservative global
         // minimum.
-        let min_vol = min_relevant_surface_vol(&surface, eq_deps.reference_strike);
+        let min_vol = min_relevant_surface_vol(&surface, volatility_dependency.reference_strike);
         let clamp_active = min_vol.map(|m| m < bump_abs).unwrap_or(false);
 
         let vega = if clamp_active {
@@ -747,13 +735,7 @@ impl<I> Default for GenericFdVolga<I> {
 
 impl<I> MetricCalculator for GenericFdVolga<I>
 where
-    I: Instrument
-        + EquityDependencies
-        + HasExpiry
-        + HasDayCount
-        + HasPricingOverrides
-        + Clone
-        + 'static,
+    I: Instrument + HasExpiry + HasDayCount + HasPricingOverrides + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -773,17 +755,18 @@ where
             return Ok(0.0);
         }
 
-        // Get equity dependencies
-        let eq_deps = instrument.equity_dependencies()?;
-
-        // Get vol surface id from instrument - error if missing
-        let vol_surface_id = eq_deps.vol_surface_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "Instrument {} missing vol_surface_id for volga calculation. \
+        let dependencies = instrument.market_dependencies()?;
+        let vol_surface_id = dependencies
+            .volatility_dependencies
+            .first()
+            .map(|dependency| &dependency.surface_id)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "Instrument {} missing vol_surface_id for volga calculation. \
                  Cannot compute volga without a volatility surface.",
-                instrument.id()
-            ))
-        })?;
+                    instrument.id()
+                ))
+            })?;
 
         // Verify the vol surface exists in the market context
         if context.curves.get_surface(vol_surface_id.as_str()).is_err() {
@@ -849,13 +832,7 @@ impl<I> Default for GenericFdVanna<I> {
 
 impl<I> MetricCalculator for GenericFdVanna<I>
 where
-    I: Instrument
-        + EquityDependencies
-        + HasExpiry
-        + HasDayCount
-        + HasPricingOverrides
-        + Clone
-        + 'static,
+    I: Instrument + HasExpiry + HasDayCount + HasPricingOverrides + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -873,18 +850,21 @@ where
             return Ok(0.0);
         }
 
-        // Get equity dependencies
-        let eq_deps = instrument.equity_dependencies()?;
-        let spot_id = eq_deps.spot_id.as_ref().ok_or_else(|| {
+        let dependencies = instrument.market_dependencies()?;
+        let spot_id = dependencies.spot_ids.first().ok_or_else(|| {
             finstack_quant_core::Error::Validation(
                 "Instrument missing spot_id for vanna calculation".to_string(),
             )
         })?;
-        let vol_surface_id = eq_deps.vol_surface_id.as_ref().ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "Instrument missing vol_surface_id for vanna calculation".to_string(),
-            )
-        })?;
+        let vol_surface_id = dependencies
+            .volatility_dependencies
+            .first()
+            .map(|dependency| &dependency.surface_id)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "Instrument missing vol_surface_id for vanna calculation".to_string(),
+                )
+            })?;
 
         // Spot level for bump sizing
         let spot_scalar = context.curves.get_price(spot_id)?;
@@ -956,9 +936,8 @@ where
 mod tests {
     use super::*;
 
-    use crate::instruments::common_impl::traits::{
-        Attributes, EquityDependencies, EquityInstrumentDeps,
-    };
+    use crate::instruments::common_impl::dependencies::{MarketDependencies, VolatilityDependency};
+    use crate::instruments::common_impl::traits::Attributes;
     use crate::instruments::PricingOverrides;
     use crate::metrics::{MetricContext, MetricId, MetricRegistry};
     use crate::pricer::InstrumentType;
@@ -1036,14 +1015,6 @@ mod tests {
         }
     }
 
-    impl EquityDependencies for TestFdInstrument {
-        fn equity_dependencies(&self) -> finstack_quant_core::Result<EquityInstrumentDeps> {
-            EquityInstrumentDeps::builder()
-                .spot(self.spot_id.as_str().to_string())
-                .build()
-        }
-    }
-
     impl HasExpiry for TestFdInstrument {
         fn expiry(&self) -> Date {
             self.expiry
@@ -1059,14 +1030,6 @@ mod tests {
     impl HasPricingOverrides for TestFdInstrument {
         fn pricing_overrides_mut(&mut self) -> &mut PricingOverrides {
             &mut self.overrides
-        }
-    }
-
-    impl EquityDependencies for RoundingSensitiveInstrument {
-        fn equity_dependencies(&self) -> finstack_quant_core::Result<EquityInstrumentDeps> {
-            EquityInstrumentDeps::builder()
-                .spot(self.spot_id.as_str().to_string())
-                .build()
         }
     }
 
@@ -1089,6 +1052,12 @@ mod tests {
     }
 
     impl crate::instruments::common_impl::traits::Instrument for TestFdInstrument {
+        fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
+            let mut dependencies = MarketDependencies::new();
+            dependencies.add_spot_id(self.spot_id.as_str());
+            Ok(dependencies)
+        }
+
         fn id(&self) -> &str {
             &self.id
         }
@@ -1158,6 +1127,12 @@ mod tests {
     }
 
     impl crate::instruments::common_impl::traits::Instrument for RoundingSensitiveInstrument {
+        fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
+            let mut dependencies = MarketDependencies::new();
+            dependencies.add_spot_id(self.spot_id.as_str());
+            Ok(dependencies)
+        }
+
         fn id(&self) -> &str {
             &self.id
         }
@@ -1230,7 +1205,6 @@ mod tests {
     fn registry_for_test<I>() -> MetricRegistry
     where
         I: crate::instruments::common_impl::traits::Instrument
-            + EquityDependencies
             + HasExpiry
             + HasDayCount
             + HasPricingOverrides
@@ -1513,15 +1487,6 @@ mod tests {
         }
     }
 
-    impl EquityDependencies for VolLinearInstrument {
-        fn equity_dependencies(&self) -> finstack_quant_core::Result<EquityInstrumentDeps> {
-            EquityInstrumentDeps::builder()
-                .spot(self.spot_id.as_str().to_string())
-                .vol_surface(self.vol_surface_id.clone())
-                .build()
-        }
-    }
-
     impl HasExpiry for VolLinearInstrument {
         fn expiry(&self) -> Date {
             self.expiry
@@ -1541,6 +1506,17 @@ mod tests {
     }
 
     impl crate::instruments::common_impl::traits::Instrument for VolLinearInstrument {
+        fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
+            let mut dependencies = MarketDependencies::new();
+            dependencies.add_spot_id(self.spot_id.as_str());
+            dependencies.add_volatility_dependency(VolatilityDependency::new(
+                self.vol_surface_id.clone(),
+                Some(self.spot_id.clone()),
+                None,
+            ));
+            Ok(dependencies)
+        }
+
         fn id(&self) -> &str {
             &self.id
         }

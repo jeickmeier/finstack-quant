@@ -28,8 +28,10 @@ pub fn decompose(deps: &MarketDependencies) -> Vec<MarketDependency> {
         result.push(MarketDependency::Spot { id: id.clone() });
     }
 
-    for id in &deps.vol_surface_ids {
-        result.push(MarketDependency::VolSurface { id: id.clone() });
+    for id in deps.unique_vol_surface_ids() {
+        result.push(MarketDependency::VolSurface {
+            id: id.as_str().to_string(),
+        });
     }
 
     for pair in &deps.fx_pairs {

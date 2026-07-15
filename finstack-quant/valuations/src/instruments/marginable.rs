@@ -243,10 +243,10 @@ impl Marginable for InterestRateSwap {
         let rate_curves: Vec<finstack_quant_core::types::CurveId> = self
             .market_dependencies()
             .map(|deps| {
-                let cd = deps.curve_dependencies();
-                cd.discount_curves
+                deps.curves
+                    .discount_curves
                     .iter()
-                    .chain(cd.forward_curves.iter())
+                    .chain(deps.curves.forward_curves.iter())
                     .cloned()
                     .collect()
             })

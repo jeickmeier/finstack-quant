@@ -135,7 +135,7 @@ fn discount_curve_id(context: &MetricContext) -> Result<CurveId> {
     context
         .instrument
         .market_dependencies()?
-        .curve_dependencies()
+        .curves
         .discount_curves
         .first()
         .cloned()

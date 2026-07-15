@@ -45,7 +45,7 @@
 
 use super::risk_view::with_bond_risk_view;
 use crate::constants::ONE_BASIS_POINT;
-use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_from_z_spread;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
@@ -61,7 +61,7 @@ impl MetricCalculator for BondCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let has_credit = {
             let bond: &Bond = context.instrument_as()?;
-            !bond.curve_dependencies()?.credit_curves.is_empty()
+            !bond.market_dependencies()?.curves.credit_curves.is_empty()
         };
 
         if has_credit {
@@ -112,7 +112,7 @@ impl MetricCalculator for BondBucketedCs01Calculator {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let has_credit = {
             let bond: &Bond = context.instrument_as()?;
-            !bond.curve_dependencies()?.credit_curves.is_empty()
+            !bond.market_dependencies()?.curves.credit_curves.is_empty()
         };
 
         if has_credit {

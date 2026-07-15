@@ -191,7 +191,7 @@ fn build_envelope(
 
     // --- Resolve curves ---
     let deps = instrument.market_dependencies()?;
-    let curves = deps.curve_dependencies();
+    let curves = &deps.curves;
     let default_discount_curve_id = curves.discount_curves.first().cloned().ok_or_else(|| {
         Error::Validation(
             "instrument has no declared discount curve; cannot compute cashflow DFs".into(),
@@ -569,7 +569,7 @@ mod tests {
         let discount_curve_id = bond
             .market_dependencies()
             .expect("deps")
-            .curve_dependencies()
+            .curves
             .discount_curves
             .first()
             .cloned()
@@ -728,7 +728,7 @@ mod tests {
     }
 
     // NOTE: A hazard_rate reconciliation test would require an instrument that
-    // (a) declares a credit curve in `curve_dependencies()` AND (b) has a
+    // (a) declares a canonical credit-curve dependency AND (b) has a
     // registered `HazardRate` pricer. The existing CDS and bond-with-hazard
     // pathways satisfy both via the instrument JSON layer, which is exercised
     // by the workspace-wide test suite (see `tests/instruments/cds/`). The

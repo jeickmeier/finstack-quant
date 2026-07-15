@@ -398,7 +398,7 @@ where
 
 // ===== Generic Calculators =====
 
-use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
+use crate::instruments::common_impl::traits::Instrument;
 use crate::metrics::MetricCalculator;
 use std::marker::PhantomData;
 
@@ -418,10 +418,8 @@ enum Cs01Curves {
 ///
 /// Returns [`Cs01Curves::NoCreditCurve`] when no credit curve is declared so the
 /// caller can decide whether that is a hard error or a graceful `0.0`.
-fn resolve_cs01_curves<I: Instrument + CurveDependencies>(
-    instrument: &I,
-) -> finstack_quant_core::Result<Cs01Curves> {
-    let curves = instrument.curve_dependencies()?;
+fn resolve_cs01_curves<I: Instrument>(instrument: &I) -> finstack_quant_core::Result<Cs01Curves> {
+    let curves = instrument.market_dependencies()?.curves;
     let Some(hazard_id) = curves.credit_curves.first().cloned() else {
         return Ok(Cs01Curves::NoCreditCurve);
     };
@@ -442,7 +440,7 @@ fn missing_credit_curve_error<I: Instrument>(
     ))
 }
 
-fn resolve_optional_cs01_curves<I: Instrument + CurveDependencies>(
+fn resolve_optional_cs01_curves<I: Instrument>(
     instrument: &I,
     empty_credit_curve_zero: bool,
     metric_name: &str,
@@ -484,7 +482,7 @@ impl<I> Default for GenericParallelCs01<I> {
 
 impl<I> MetricCalculator for GenericParallelCs01<I>
 where
-    I: Instrument + CurveDependencies + 'static,
+    I: Instrument + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -530,7 +528,7 @@ impl<I> Default for GenericBucketedCs01<I> {
 
 impl<I> MetricCalculator for GenericBucketedCs01<I>
 where
-    I: Instrument + CurveDependencies + 'static,
+    I: Instrument + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -602,7 +600,7 @@ impl<I> GenericParallelCs01Hazard<I> {
 
 impl<I> MetricCalculator for GenericParallelCs01Hazard<I>
 where
-    I: Instrument + CurveDependencies + 'static,
+    I: Instrument + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -683,7 +681,7 @@ impl<I> GenericBucketedCs01Hazard<I> {
 
 impl<I> MetricCalculator for GenericBucketedCs01Hazard<I>
 where
-    I: Instrument + CurveDependencies + 'static,
+    I: Instrument + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -848,7 +846,7 @@ impl<I> Default for CreditParallelCs01<I> {
 
 impl<I> MetricCalculator for CreditParallelCs01<I>
 where
-    I: Instrument + CurveDependencies + CdsCs01Conventions + 'static,
+    I: Instrument + CdsCs01Conventions + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -884,7 +882,8 @@ where
         // Resolve the discount curve from whatever context is now active.
         let discount_id = context
             .instrument_as::<I>()?
-            .curve_dependencies()?
+            .market_dependencies()?
+            .curves
             .discount_curves
             .first()
             .cloned();
@@ -934,7 +933,7 @@ impl<I> Default for CreditBucketedCs01<I> {
 
 impl<I> MetricCalculator for CreditBucketedCs01<I>
 where
-    I: Instrument + CurveDependencies + CdsCs01Conventions + 'static,
+    I: Instrument + CdsCs01Conventions + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -968,7 +967,8 @@ where
 
         let discount_id = context
             .instrument_as::<I>()?
-            .curve_dependencies()?
+            .market_dependencies()?
+            .curves
             .discount_curves
             .first()
             .cloned();

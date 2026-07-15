@@ -54,7 +54,7 @@ use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
-use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{
@@ -231,8 +231,12 @@ fn assign_buckets(cached: &[CachedFlow], buckets: &[f64]) -> Vec<Vec<usize>> {
 }
 
 /// Resolve whether the instrument declares a credit (hazard) curve.
-fn has_credit_curve<I: CurveDependencies>(instrument: &I) -> finstack_quant_core::Result<bool> {
-    Ok(!instrument.curve_dependencies()?.credit_curves.is_empty())
+fn has_credit_curve<I: Instrument>(instrument: &I) -> finstack_quant_core::Result<bool> {
+    Ok(!instrument
+        .market_dependencies()?
+        .curves
+        .credit_curves
+        .is_empty())
 }
 
 // =============================================================================
@@ -273,7 +277,7 @@ impl<I> ZSpreadParallelCs01<I> {
 
 impl<I> MetricCalculator for ZSpreadParallelCs01<I>
 where
-    I: Instrument + CurveDependencies + ZSpreadCs01 + 'static,
+    I: Instrument + ZSpreadCs01 + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let inst_arc = Arc::clone(&context.instrument);
@@ -356,7 +360,7 @@ impl<I> ZSpreadBucketedCs01<I> {
 
 impl<I> MetricCalculator for ZSpreadBucketedCs01<I>
 where
-    I: Instrument + CurveDependencies + ZSpreadCs01 + 'static,
+    I: Instrument + ZSpreadCs01 + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let inst_arc = Arc::clone(&context.instrument);

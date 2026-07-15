@@ -16,7 +16,7 @@
 //!
 //! # Key Features
 //!
-//! - **Type-safe curve discovery**: Uses [`CurveDependencies`] trait to discover curves at compile time
+//! - **Type-safe curve discovery**: Uses canonical instrument market dependencies
 //! - **Mathematically correct**: Triangular weights partition unity across bucket grid
 //! - **Multiple curve types**: Handles discount, forward, and credit curves
 //! - **Par-rate option**: Re-bootstrap curve for exact sum-to-parallel behavior
@@ -35,7 +35,7 @@
 //! // DV01 is in currency units per 1bp rate move
 //! ```
 
-use crate::instruments::common_impl::traits::{CurveDependencies, Instrument, RatesCurveKind};
+use crate::instruments::common_impl::traits::{Instrument, RatesCurveKind};
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::MetricCalculator;
 use crate::metrics::{MetricContext, MetricId};
@@ -237,7 +237,7 @@ impl<I> Default for UnifiedDv01Calculator<I> {
 
 impl<I> MetricCalculator for UnifiedDv01Calculator<I>
 where
-    I: Instrument + CurveDependencies + 'static,
+    I: Instrument + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -268,7 +268,7 @@ where
 
 impl<I> UnifiedDv01Calculator<I>
 where
-    I: Instrument + CurveDependencies + 'static,
+    I: Instrument + 'static,
 {
     /// Collect curves based on configuration and what exists in the market.
     ///
@@ -282,7 +282,7 @@ where
         instrument: &I,
         market: &MarketContext,
     ) -> finstack_quant_core::Result<Vec<(CurveId, RatesCurveKind)>> {
-        let deps = instrument.curve_dependencies()?;
+        let deps = instrument.market_dependencies()?.curves;
         let mut curves = Vec::new();
         let mut missing_curves = Vec::new();
 

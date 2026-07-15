@@ -20,7 +20,7 @@
 //! - Hull, J. C. (2018). *Options, Futures, and Other Derivatives*. Chapter 7.
 //! - Tuckman, B., & Serrat, A. (2011). *Fixed Income Securities*. Chapter 5.
 
-use crate::instruments::common_impl::traits::{CurveDependencies, Instrument, RatesCurveKind};
+use crate::instruments::common_impl::traits::{Instrument, RatesCurveKind};
 use crate::instruments::InterestRateSwap;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -40,7 +40,7 @@ impl MetricCalculator for IrConvexityCalculator {
 
         let base_pv = irs.value_raw(context.curves.as_ref(), as_of)?;
 
-        let deps = irs.curve_dependencies()?;
+        let deps = irs.market_dependencies()?.curves;
         let mut bumps_up: Vec<MarketBump> = Vec::new();
         let mut bumps_down: Vec<MarketBump> = Vec::new();
 

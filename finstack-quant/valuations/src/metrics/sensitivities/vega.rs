@@ -174,10 +174,14 @@ where
         let defaults =
             sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
 
-        let eq_deps = instrument.market_dependencies()?.equity_dependencies();
-        let vol_surface_id = eq_deps.vol_surface_id.ok_or_else(|| {
-            finstack_quant_core::Error::from(finstack_quant_core::InputError::Invalid)
-        })?;
+        let dependencies = instrument.market_dependencies()?;
+        let vol_surface_id = dependencies
+            .volatility_dependencies
+            .first()
+            .map(|dependency| dependency.surface_id.clone())
+            .ok_or_else(|| {
+                finstack_quant_core::Error::from(finstack_quant_core::InputError::Invalid)
+            })?;
 
         let curves = std::sync::Arc::clone(&context.curves);
         let base_ctx = curves.as_ref();
@@ -229,7 +233,7 @@ where
 
         let use_ratio_strikes = self.strikes.iter().all(|k| *k <= 10.0);
         let strike_grid: Vec<f64> = if use_ratio_strikes {
-            let spot_id = eq_deps.spot_id.as_ref().ok_or_else(|| {
+            let spot_id = dependencies.spot_ids.first().ok_or_else(|| {
                 finstack_quant_core::Error::from(finstack_quant_core::InputError::Invalid)
             })?;
             let spot = base_ctx

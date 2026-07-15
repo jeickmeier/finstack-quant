@@ -270,11 +270,12 @@ pub(crate) fn make_credit_bumper(context: &MetricContext) -> Result<Option<Box<d
 /// Create a volatility bumper from runtime instrument dependencies.
 pub(crate) fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn FactorBumper>>> {
     let deps = context.instrument.market_dependencies()?;
-    let Some(surface_id) = deps
-        .vol_surface_ids
+    let surface_ids = deps.unique_vol_surface_ids();
+    let Some(surface_id) = surface_ids
         .iter()
         .find(|surface_id| context.curves.get_surface(surface_id.as_str()).is_ok())
-        .or_else(|| deps.vol_surface_ids.first())
+        .cloned()
+        .or_else(|| surface_ids.first().cloned())
     else {
         return Ok(None);
     };
@@ -282,7 +283,7 @@ pub(crate) fn make_vol_bumper(context: &MetricContext) -> Result<Option<Box<dyn 
     let defaults =
         sens_config::from_context_or_default(context.config(), context.get_metric_overrides())?;
     Ok(Some(Box::new(VolParallelBumper {
-        surface_id: CurveId::from(surface_id.as_str()),
+        surface_id,
         bump_abs: defaults.vol_bump_pct,
     })))
 }

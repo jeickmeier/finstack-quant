@@ -52,7 +52,7 @@ use crate::calibration::bumps::hazard::{
 };
 use crate::calibration::bumps::BumpRequest;
 use crate::constants::BASIS_POINTS_PER_UNIT;
-use crate::instruments::common_impl::traits::CurveDependencies;
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -80,7 +80,7 @@ impl MetricCalculator for CsGammaCalculator {
         }
 
         // Resolve curve IDs.
-        let curve_deps = cds.curve_dependencies()?;
+        let curve_deps = cds.market_dependencies()?.curves;
         let Some(hazard_id) = curve_deps.credit_curves.first().cloned() else {
             return Ok(0.0);
         };

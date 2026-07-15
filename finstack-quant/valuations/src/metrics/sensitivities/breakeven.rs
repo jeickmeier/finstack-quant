@@ -147,7 +147,7 @@ fn bump_market_for_target(
                 .instrument
                 .market_dependencies()
                 .ok()
-                .and_then(|d| d.curve_dependencies().discount_curves.first().cloned())
+                .and_then(|d| d.curves.discount_curves.first().cloned())
                 .or_else(|| context.discount_curve_id.clone())
                 .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                     id: "iterative_breakeven: no discount curve found for instrument".into(),
@@ -159,7 +159,7 @@ fn bump_market_for_target(
                 .instrument
                 .market_dependencies()
                 .ok()
-                .and_then(|d| d.vol_surface_ids.first().cloned())
+                .and_then(|d| d.unique_vol_surface_ids().into_iter().next())
                 .ok_or_else(|| finstack_quant_core::InputError::NotFound {
                     id: "iterative_breakeven: no vol surface found for instrument".into(),
                 })?;

@@ -30,7 +30,7 @@
 
 use crate::calibration::bumps::hazard::{bump_hazard_shift, bump_hazard_spreads};
 use crate::calibration::bumps::BumpRequest;
-use crate::instruments::common_impl::traits::CurveDependencies;
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::credit_derivatives::cds_index::{CDSIndex, IndexPricing};
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::sensitivity_central_diff;
@@ -77,9 +77,9 @@ impl MetricCalculator for Cs01HazardCalculator {
                 vec![index.protection.credit_curve_id.clone()]
             }
             IndexPricing::Constituents => {
-                // Pull from curve_dependencies but skip the index-level curve
+                // Pull from canonical dependencies but skip the index-level curve
                 // because it is informational only in Constituents mode.
-                let curves = index.curve_dependencies()?;
+                let curves = index.market_dependencies()?.curves;
                 curves
                     .credit_curves
                     .into_iter()
@@ -170,7 +170,8 @@ impl MetricCalculator for CdsIndexBucketedCs01Calculator {
         let credit_ids: Vec<CurveId> = match index.pricing {
             IndexPricing::SingleCurve => vec![index.protection.credit_curve_id.clone()],
             IndexPricing::Constituents => index
-                .curve_dependencies()?
+                .market_dependencies()?
+                .curves
                 .credit_curves
                 .into_iter()
                 .filter(|id| id != &index.protection.credit_curve_id)

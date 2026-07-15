@@ -21,7 +21,7 @@
 //!   used by `ZSpread`/`price_from_z_spread`; a continuous curve shift is deliberately
 //!   NOT used — wrong compounding basis).
 
-use crate::instruments::common_impl::traits::{CurveDependencies, Instrument};
+use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::bond::metrics::effective::option_risk_bond_and_base_price;
 use crate::instruments::fixed_income::bond::pricing::quote_conversions::clear_price_driving_overrides;
 use crate::instruments::Bond;
@@ -57,7 +57,12 @@ pub(crate) fn bond_risk_view(
             return Ok(None);
         }
         let has_options = bond.call_put.as_ref().is_some_and(|cp| cp.has_options());
-        let credit_id = bond.curve_dependencies()?.credit_curves.first().cloned();
+        let credit_id = bond
+            .market_dependencies()?
+            .curves
+            .credit_curves
+            .first()
+            .cloned();
         (bond.clone(), has_options, credit_id)
     };
 
