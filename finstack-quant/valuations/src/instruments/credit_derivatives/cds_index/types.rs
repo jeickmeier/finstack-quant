@@ -585,7 +585,17 @@ impl crate::instruments::common_impl::traits::Instrument for CDSIndex {
         Some(self)
     }
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
-        MarketDependencies::from_curve_dependencies(self)
+        let mut deps = MarketDependencies::new();
+        deps.add_discount_curve(self.premium.discount_curve_id.clone());
+        deps.add_credit_curve(self.protection.credit_curve_id.clone());
+        if self.pricing == IndexPricing::Constituents {
+            for constituent in &self.constituents {
+                if !constituent.defaulted {
+                    deps.add_credit_curve(constituent.credit.credit_curve_id.clone());
+                }
+            }
+        }
+        Ok(deps)
     }
 
     fn base_value(

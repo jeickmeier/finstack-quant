@@ -1055,9 +1055,10 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
     ) -> finstack_quant_core::Result<
         crate::instruments::common_impl::dependencies::MarketDependencies,
     > {
-        crate::instruments::common_impl::dependencies::MarketDependencies::from_curve_dependencies(
-            self,
-        )
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.premium.discount_curve_id.clone());
+        deps.add_credit_curve(self.protection.credit_curve_id.clone());
+        Ok(deps)
     }
     fn as_marginable(&self) -> Option<&dyn finstack_quant_margin::Marginable> {
         Some(self)

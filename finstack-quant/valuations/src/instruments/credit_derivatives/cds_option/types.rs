@@ -548,6 +548,25 @@ pub(crate) fn prior_cds_roll_on_or_before(date: Date) -> Date {
 impl crate::instruments::common_impl::traits::Instrument for CDSOption {
     impl_instrument_base!(crate::pricer::InstrumentType::CDSOption);
 
+    fn market_dependencies(
+        &self,
+    ) -> finstack_quant_core::Result<
+        crate::instruments::common_impl::dependencies::MarketDependencies,
+    > {
+        use crate::instruments::common_impl::dependencies::VolatilityDependency;
+        use rust_decimal::prelude::ToPrimitive;
+
+        let mut deps = crate::instruments::common_impl::dependencies::MarketDependencies::new();
+        deps.add_discount_curve(self.discount_curve_id.clone());
+        deps.add_credit_curve(self.credit_curve_id.clone());
+        deps.add_volatility_dependency(VolatilityDependency::new(
+            self.vol_surface_id.clone(),
+            None,
+            self.strike.to_f64(),
+        ));
+        Ok(deps)
+    }
+
     fn default_model(&self) -> crate::pricer::ModelKey {
         crate::pricer::ModelKey::BloombergCdso
     }
