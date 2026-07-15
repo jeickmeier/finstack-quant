@@ -1958,8 +1958,7 @@ mod tests {
 
         let error = state
             .to_ctx()
-            .err()
-            .expect("unknown persisted calendar must fail hydration");
+            .expect_err("unknown persisted calendar must fail hydration");
         assert!(error.to_string().contains("not_a_calendar"));
     }
 
