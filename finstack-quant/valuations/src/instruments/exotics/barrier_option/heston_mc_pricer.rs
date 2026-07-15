@@ -17,7 +17,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_monte_carlo::engine::McEngine;
 use finstack_quant_monte_carlo::payoff::barrier::BarrierOptionPayoff;
-use finstack_quant_monte_carlo::payoff::barrier::{BarrierType as McBarrierType, OptionKind};
+use finstack_quant_monte_carlo::payoff::barrier::OptionKind;
 use finstack_quant_monte_carlo::process::heston::{HestonParams, HestonProcess};
 use finstack_quant_monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_monte_carlo::seed;
@@ -124,11 +124,10 @@ impl BarrierOptionHestonMcPricer {
         let maturity_step = time_grid.num_steps();
 
         // Create barrier payoff (uses vol-surface sigma for bridge correction)
-        let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
             inst.barrier.amount(),
-            mc_barrier_type,
+            inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
             inst.rebate.map(|m| m.amount()),
             inst.notional.amount(),

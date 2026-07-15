@@ -1,4 +1,5 @@
 use finstack_quant_core::market_data::context::MarketContext;
+pub use finstack_quant_core::types::BarrierType;
 use finstack_quant_core::HashMap;
 
 use super::state_keys;
@@ -35,20 +36,6 @@ pub struct BarrierState {
     pub barrier_level: f64,
     /// Barrier type
     pub barrier_type: BarrierType,
-}
-
-/// Types of barrier conditions
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum BarrierType {
-    /// Up-and-out (option knocks out when spot > barrier)
-    #[default]
-    UpAndOut,
-    /// Up-and-in (option knocks in when spot > barrier)
-    UpAndIn,
-    /// Down-and-out (option knocks out when spot < barrier)
-    DownAndOut,
-    /// Down-and-in (option knocks in when spot < barrier)
-    DownAndIn,
 }
 
 /// Pre-extracted state variable cache to avoid redundant HashMap lookups in hot paths.

@@ -32,6 +32,7 @@ use crate::traits::PathState;
 use crate::traits::Payoff;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
+pub use finstack_quant_core::types::BarrierType;
 
 /// Vanilla option kind for barrier payoff evaluation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -42,41 +43,11 @@ pub enum OptionKind {
     Put,
 }
 
-/// Barrier option type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-pub enum BarrierType {
-    /// Up-and-out: option knocked out if S >= B
-    UpAndOut,
-    /// Up-and-in: option activated if S >= B
-    UpAndIn,
-    /// Down-and-out: option knocked out if S <= B
-    DownAndOut,
-    /// Down-and-in: option activated if S <= B
-    DownAndIn,
-}
-
-impl BarrierType {
-    /// Check if this is a knock-out barrier.
-    pub fn is_knock_out(&self) -> bool {
-        matches!(self, BarrierType::UpAndOut | BarrierType::DownAndOut)
-    }
-
-    /// Check if this is a knock-in barrier.
-    pub fn is_knock_in(&self) -> bool {
-        !self.is_knock_out()
-    }
-
-    /// Get barrier direction.
-    pub fn direction(&self) -> BarrierDirection {
-        match self {
-            BarrierType::UpAndOut | BarrierType::UpAndIn => BarrierDirection::Up,
-            BarrierType::DownAndOut | BarrierType::DownAndIn => BarrierDirection::Down,
-        }
-    }
-
-    /// Check if this is an up barrier.
-    pub fn is_up(&self) -> bool {
-        matches!(self, BarrierType::UpAndOut | BarrierType::UpAndIn)
+fn barrier_direction(barrier_type: BarrierType) -> BarrierDirection {
+    if barrier_type.is_up() {
+        BarrierDirection::Up
+    } else {
+        BarrierDirection::Down
     }
 }
 
@@ -232,7 +203,7 @@ impl Payoff for BarrierOptionPayoff {
         if state.step == 0 {
             self.previous_spot = current_spot;
 
-            let breached = match self.barrier_type.direction() {
+            let breached = match barrier_direction(self.barrier_type) {
                 BarrierDirection::Up => current_spot >= self.barrier,
                 BarrierDirection::Down => current_spot <= self.barrier,
             };
@@ -273,7 +244,7 @@ impl Payoff for BarrierOptionPayoff {
                 self.previous_spot,
                 current_spot,
                 self.barrier,
-                self.barrier_type.direction(),
+                barrier_direction(self.barrier_type),
                 local_sigma,
                 dt,
                 uniform_random,

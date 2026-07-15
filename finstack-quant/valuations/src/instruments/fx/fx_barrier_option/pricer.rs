@@ -16,7 +16,6 @@ use finstack_quant_core::money::Money;
 
 // MC-specific imports
 use crate::instruments::fx::fx_barrier_option::monte_carlo::FxBarrierPayoff;
-use finstack_quant_monte_carlo::payoff::barrier::BarrierType as McBarrierType;
 use finstack_quant_monte_carlo::payoff::barrier::OptionKind as McOptionKind;
 use finstack_quant_monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
@@ -108,7 +107,6 @@ impl FxBarrierOptionMcPricer {
         // Standard FX barrier: the GBM drift `r_dom - r_for` (set above via
         // `GbmParams`) fully describes the dynamics. Quanto barriers are not
         // supported by this 1D MC payoff — see `FxBarrierPayoff` docs.
-        let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let mc_option_kind = match inst.option_type {
             crate::instruments::OptionType::Call => McOptionKind::Call,
             crate::instruments::OptionType::Put => McOptionKind::Put,
@@ -116,7 +114,7 @@ impl FxBarrierOptionMcPricer {
         let mut payoff = FxBarrierPayoff::new(
             inst.strike,
             inst.barrier,
-            mc_barrier_type,
+            inst.barrier_type,
             mc_option_kind,
             inst.notional.amount(),
             maturity_step,
@@ -458,19 +456,6 @@ impl Default for FxBarrierOptionAnalyticalPricer {
     }
 }
 
-/// Map from the instrument's BarrierType to the analytical BarrierType.
-fn map_barrier_type(
-    bt: crate::instruments::exotics::barrier_option::types::BarrierType,
-) -> AnalyticalBarrierType {
-    use crate::instruments::exotics::barrier_option::types::BarrierType;
-    match bt {
-        BarrierType::UpAndIn => AnalyticalBarrierType::UpIn,
-        BarrierType::UpAndOut => AnalyticalBarrierType::UpOut,
-        BarrierType::DownAndIn => AnalyticalBarrierType::DownIn,
-        BarrierType::DownAndOut => AnalyticalBarrierType::DownOut,
-    }
-}
-
 /// Compute the BS barrier price + optional rebate (without notional scaling).
 fn bs_barrier_price_per_unit(
     fx_barrier: &FxBarrierOption,
@@ -618,7 +603,7 @@ impl Pricer for FxBarrierOptionAnalyticalPricer {
             ));
         }
 
-        let analytical_barrier_type = map_barrier_type(fx_barrier.barrier_type);
+        let analytical_barrier_type = fx_barrier.barrier_type;
 
         let price_per_unit = bs_barrier_price_per_unit(
             fx_barrier,

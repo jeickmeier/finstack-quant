@@ -32,11 +32,13 @@
 //! ```
 
 mod attributes;
+mod barrier;
 mod id;
 mod rates;
 mod ratings;
 
 pub use attributes::Attributes;
+pub use barrier::BarrierType;
 pub use id::{
     CalendarId, CurveId, DealId, Id, IndexId, InstrumentId, IssuerId, PoolId, PriceId, UnderlyingId,
 };

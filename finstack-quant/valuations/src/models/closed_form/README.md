@@ -326,7 +326,7 @@ use finstack_quant_valuations::models::closed_form::barrier::{
 
 let doc_price = down_out_call(100.0, 100.0, 90.0, 1.0, 0.05, 0.02, 0.20);
 let uic_price = barrier_call_continuous(
-    100.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.20, BarrierType::UpIn,
+    100.0, 100.0, 120.0, 1.0, 0.05, 0.02, 0.20, BarrierType::UpAndIn,
 );
 ```
 

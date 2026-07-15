@@ -3,7 +3,7 @@
 // Common imports for all pricers
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::common_impl::two_clock::TwoClockParams;
-use crate::instruments::exotics::barrier_option::types::BarrierOption;
+use crate::instruments::exotics::barrier_option::types::{BarrierOption, BarrierType};
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -14,7 +14,7 @@ use finstack_quant_core::money::Money;
 
 // MC-specific imports
 use finstack_quant_monte_carlo::payoff::barrier::BarrierOptionPayoff;
-use finstack_quant_monte_carlo::payoff::barrier::{BarrierType as McBarrierType, OptionKind};
+use finstack_quant_monte_carlo::payoff::barrier::OptionKind;
 use finstack_quant_monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -153,11 +153,10 @@ impl BarrierOptionMcPricer {
         let maturity_step = num_steps;
 
         // Create payoff (using vol surface time for barrier adjustment calculations)
-        let mc_barrier_type: McBarrierType = inst.barrier_type.into();
         let mut payoff = BarrierOptionPayoff::new(
             inst.strike,
             inst.barrier.amount(),
-            mc_barrier_type,
+            inst.barrier_type,
             Self::convert_option_kind(inst.option_type),
             inst.rebate.map(|m| m.amount()),
             inst.notional.amount(),
@@ -315,7 +314,6 @@ fn price_expired_barrier(
 
 use crate::models::closed_form::barrier::{
     barrier_call_continuous, barrier_put_continuous, barrier_rebate, BarrierParams,
-    BarrierType as AnalyticalBarrierType,
 };
 /// Broadie-Glasserman-Kou / Gobet-Miri discrete barrier adjustment constant.
 ///
@@ -443,14 +441,7 @@ impl Pricer for BarrierOptionAnalyticalPricer {
             return Ok(ValuationResult::stamped(barrier_opt.id(), as_of, pv));
         }
 
-        // Map barrier type
-        use crate::instruments::exotics::barrier_option::types::BarrierType;
-        let analytical_barrier_type = match barrier_opt.barrier_type {
-            BarrierType::UpAndIn => AnalyticalBarrierType::UpIn,
-            BarrierType::UpAndOut => AnalyticalBarrierType::UpOut,
-            BarrierType::DownAndIn => AnalyticalBarrierType::DownIn,
-            BarrierType::DownAndOut => AnalyticalBarrierType::DownOut,
-        };
+        let analytical_barrier_type = barrier_opt.barrier_type;
 
         // Apply Broadie-Glasserman-Kou discrete monitoring correction when
         // monitoring_frequency is set.
@@ -670,14 +661,14 @@ mod tests {
         let expected_at_hit = crate::models::closed_form::barrier::barrier_rebate(
             &p,
             rebate,
-            AnalyticalBarrierType::UpOut,
+            AnalyticalBarrierType::UpAndOut,
             crate::models::closed_form::barrier::RebateTiming::AtHit,
         );
         assert!(((rebate_pv - base_pv) - expected_at_hit).abs() < 1e-12);
 
         // Explicit AtExpiry reproduces the legacy pay-at-expiry value.
         let expected_at_expiry =
-            barrier_rebate_continuous(&p, rebate, AnalyticalBarrierType::UpOut);
+            barrier_rebate_continuous(&p, rebate, AnalyticalBarrierType::UpAndOut);
         assert!(((rebate_pv_at_expiry - base_pv) - expected_at_expiry).abs() < 1e-12);
 
         // At-hit must dominate at-expiry under positive rates.
@@ -764,7 +755,7 @@ mod tests {
         let shifted_barrier = barrier * (-(BG_BETA * vol * monitoring_dt.sqrt())).exp();
         let p = BarrierParams::with_df(spot, strike, shifted_barrier, t, df, div_yield, vol)
             .expect("positive df constructs");
-        let expected = barrier_call_continuous(&p, AnalyticalBarrierType::DownOut);
+        let expected = barrier_call_continuous(&p, AnalyticalBarrierType::DownAndOut);
 
         assert!((pv - expected).abs() < 1e-12);
     }
@@ -955,7 +946,7 @@ mod tests {
         let df = (-rate * t).exp();
         let p = BarrierParams::with_df(spot, strike, barrier, t, df, div_yield, vol)
             .expect("positive df constructs");
-        let expected = barrier_put_continuous(&p, AnalyticalBarrierType::UpOut);
+        let expected = barrier_put_continuous(&p, AnalyticalBarrierType::UpAndOut);
 
         assert!((pv - expected).abs() < 1e-12);
     }

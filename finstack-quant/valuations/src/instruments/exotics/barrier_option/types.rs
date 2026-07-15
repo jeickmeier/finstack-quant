@@ -8,66 +8,8 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 
-/// Barrier type for barrier options.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
-)]
-#[serde(rename_all = "snake_case")]
-pub enum BarrierType {
-    /// Up-and-out: option knocked out if S >= B
-    UpAndOut,
-    /// Up-and-in: option activated if S >= B
-    UpAndIn,
-    /// Down-and-out: option knocked out if S <= B
-    DownAndOut,
-    /// Down-and-in: option activated if S <= B
-    DownAndIn,
-}
-
-impl std::fmt::Display for BarrierType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::UpAndOut => write!(f, "up_and_out"),
-            Self::UpAndIn => write!(f, "up_and_in"),
-            Self::DownAndOut => write!(f, "down_and_out"),
-            Self::DownAndIn => write!(f, "down_and_in"),
-        }
-    }
-}
-
-/// One-line conversion from the valuations-side `BarrierType` to the
-/// `finstack_quant_monte_carlo` payoff enum. Replaces three identical
-/// `convert_barrier_type` helpers that previously lived in
-/// `exotics/barrier_option/{pricer,heston_mc_pricer}.rs` and
-/// `fx/fx_barrier_option/pricer.rs`.
-impl From<BarrierType> for finstack_quant_monte_carlo::payoff::barrier::BarrierType {
-    fn from(bt: BarrierType) -> Self {
-        match bt {
-            BarrierType::UpAndOut => Self::UpAndOut,
-            BarrierType::UpAndIn => Self::UpAndIn,
-            BarrierType::DownAndOut => Self::DownAndOut,
-            BarrierType::DownAndIn => Self::DownAndIn,
-        }
-    }
-}
-
-impl std::str::FromStr for BarrierType {
-    type Err = String;
-
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let normalized = s.trim().to_ascii_lowercase().replace(['-', '/', ' '], "_");
-        match normalized.as_str() {
-            "up_and_out" | "upandout" => Ok(Self::UpAndOut),
-            "up_and_in" | "upandin" => Ok(Self::UpAndIn),
-            "down_and_out" | "downandout" => Ok(Self::DownAndOut),
-            "down_and_in" | "downandin" => Ok(Self::DownAndIn),
-            other => Err(format!(
-                "Unknown barrier type: '{}'. Valid: up_and_in, up_and_out, down_and_in, down_and_out",
-                other
-            )),
-        }
-    }
-}
+/// Backward-compatible instrument path for the canonical barrier type.
+pub use finstack_quant_core::types::BarrierType;
 
 /// Default for use_gobet_miri field.
 ///

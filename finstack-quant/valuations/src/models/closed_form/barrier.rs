@@ -142,6 +142,8 @@
 
 use crate::models::volatility::black::d1_d2;
 use finstack_quant_core::math::special_functions::norm_cdf;
+/// Backward-compatible closed-form path for the canonical barrier type.
+pub use finstack_quant_core::types::BarrierType;
 
 /// Parameters for barrier option pricing.
 #[derive(Debug, Clone, Copy)]
@@ -242,19 +244,6 @@ pub enum RebateTiming {
     AtHit,
     /// Rebate is paid at option expiry.
     AtExpiry,
-}
-
-/// Barrier option type.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BarrierType {
-    /// Up-and-in barrier option (activates when spot rises above barrier)
-    UpIn,
-    /// Up-and-out barrier option (deactivates when spot rises above barrier)
-    UpOut,
-    /// Down-and-in barrier option (activates when spot falls below barrier)
-    DownIn,
-    /// Down-and-out barrier option (deactivates when spot falls below barrier)
-    DownOut,
 }
 
 #[inline]
@@ -612,7 +601,7 @@ pub fn barrier_rebate_continuous(
     rebate: f64,
     barrier_type: BarrierType,
 ) -> f64 {
-    let is_up = matches!(barrier_type, BarrierType::UpIn | BarrierType::UpOut);
+    let is_up = matches!(barrier_type, BarrierType::UpAndIn | BarrierType::UpAndOut);
     let p_hit = barrier_touch_probability(
         params.spot,
         params.barrier,
@@ -630,12 +619,12 @@ pub fn barrier_rebate_continuous(
     };
 
     match barrier_type {
-        BarrierType::UpIn | BarrierType::DownIn => {
+        BarrierType::UpAndIn | BarrierType::DownAndIn => {
             // Knock-In: Option activates if Hit.
             // Rebate paid if it fails to activate (Not Hit).
             rebate * df * (1.0 - p_hit)
         }
-        BarrierType::UpOut | BarrierType::DownOut => {
+        BarrierType::UpAndOut | BarrierType::DownAndOut => {
             // Knock-Out: Option deactivates if Hit.
             // Rebate paid if it deactivates (Hit).
             rebate * df * p_hit
@@ -663,12 +652,12 @@ pub fn barrier_rebate(
     timing: RebateTiming,
 ) -> f64 {
     match (barrier_type, timing) {
-        (BarrierType::UpIn | BarrierType::DownIn, _)
-        | (BarrierType::UpOut | BarrierType::DownOut, RebateTiming::AtExpiry) => {
+        (BarrierType::UpAndIn | BarrierType::DownAndIn, _)
+        | (BarrierType::UpAndOut | BarrierType::DownAndOut, RebateTiming::AtExpiry) => {
             barrier_rebate_continuous(params, rebate, barrier_type)
         }
-        (BarrierType::UpOut | BarrierType::DownOut, RebateTiming::AtHit) => {
-            let is_up = matches!(barrier_type, BarrierType::UpOut);
+        (BarrierType::UpAndOut | BarrierType::DownAndOut, RebateTiming::AtHit) => {
+            let is_up = matches!(barrier_type, BarrierType::UpAndOut);
             rebate * discounted_touch_value(params, is_up)
         }
     }
@@ -866,10 +855,10 @@ pub fn barrier_call_continuous(params: &BarrierParams, barrier_type: BarrierType
         vol,
     } = *params;
     match barrier_type {
-        BarrierType::UpIn => up_in_call(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::UpOut => up_out_call(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownIn => down_in_call(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownOut => down_out_call(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::UpAndIn => up_in_call(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::UpAndOut => up_out_call(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::DownAndIn => down_in_call(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::DownAndOut => down_out_call(spot, strike, barrier, time, rate, div_yield, vol),
     }
 }
 
@@ -997,10 +986,10 @@ pub fn barrier_put_continuous(params: &BarrierParams, barrier_type: BarrierType)
         vol,
     } = *params;
     match barrier_type {
-        BarrierType::UpIn => up_in_put(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::UpOut => up_out_put(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownIn => down_in_put(spot, strike, barrier, time, rate, div_yield, vol),
-        BarrierType::DownOut => down_out_put(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::UpAndIn => up_in_put(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::UpAndOut => up_out_put(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::DownAndIn => down_in_put(spot, strike, barrier, time, rate, div_yield, vol),
+        BarrierType::DownAndOut => down_out_put(spot, strike, barrier, time, rate, div_yield, vol),
     }
 }
 
@@ -1058,8 +1047,8 @@ mod tests {
         let vol = 0.2;
 
         let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
-        let down_in = barrier_put_continuous(&params, BarrierType::DownIn);
-        let down_out = barrier_put_continuous(&params, BarrierType::DownOut);
+        let down_in = barrier_put_continuous(&params, BarrierType::DownAndIn);
+        let down_out = barrier_put_continuous(&params, BarrierType::DownAndOut);
 
         let d1 = ((spot / strike).ln() + (rate - div_yield + 0.5 * vol * vol) * time)
             / (vol * time.sqrt());
@@ -1124,12 +1113,15 @@ mod tests {
         let df = (-rate * time).exp();
 
         for barrier_type in [
-            BarrierType::UpIn,
-            BarrierType::UpOut,
-            BarrierType::DownIn,
-            BarrierType::DownOut,
+            BarrierType::UpAndIn,
+            BarrierType::UpAndOut,
+            BarrierType::DownAndIn,
+            BarrierType::DownAndOut,
         ] {
-            let b = if matches!(barrier_type, BarrierType::DownIn | BarrierType::DownOut) {
+            let b = if matches!(
+                barrier_type,
+                BarrierType::DownAndIn | BarrierType::DownAndOut
+            ) {
                 80.0 // Use down barrier for down types
             } else {
                 barrier
@@ -1163,12 +1155,15 @@ mod tests {
         let df = (-rate * time).exp();
 
         for barrier_type in [
-            BarrierType::UpIn,
-            BarrierType::UpOut,
-            BarrierType::DownIn,
-            BarrierType::DownOut,
+            BarrierType::UpAndIn,
+            BarrierType::UpAndOut,
+            BarrierType::DownAndIn,
+            BarrierType::DownAndOut,
         ] {
-            let b = if matches!(barrier_type, BarrierType::DownIn | BarrierType::DownOut) {
+            let b = if matches!(
+                barrier_type,
+                BarrierType::DownAndIn | BarrierType::DownAndOut
+            ) {
                 80.0
             } else {
                 barrier
@@ -1202,12 +1197,15 @@ mod tests {
         let df = (-rate * time).exp();
 
         for barrier_type in [
-            BarrierType::UpIn,
-            BarrierType::UpOut,
-            BarrierType::DownIn,
-            BarrierType::DownOut,
+            BarrierType::UpAndIn,
+            BarrierType::UpAndOut,
+            BarrierType::DownAndIn,
+            BarrierType::DownAndOut,
         ] {
-            let b = if matches!(barrier_type, BarrierType::DownIn | BarrierType::DownOut) {
+            let b = if matches!(
+                barrier_type,
+                BarrierType::DownAndIn | BarrierType::DownAndOut
+            ) {
                 80.0
             } else {
                 barrier
@@ -2025,7 +2023,7 @@ mod tests {
         );
 
         let p_no_hit = BarrierParams::new(100.0, 120.0, 120.0, 1.0, 0.0, 0.0, 0.0);
-        let rebate_no_hit = barrier_rebate_continuous(&p_no_hit, 5.0, BarrierType::UpIn);
+        let rebate_no_hit = barrier_rebate_continuous(&p_no_hit, 5.0, BarrierType::UpAndIn);
         assert_eq!(
             rebate_no_hit, 5.0,
             "knock-in rebate should pay in full when zero-vol path never hits"
@@ -2041,10 +2039,10 @@ mod tests {
     #[test]
     fn test_rebate_is_not_discounted_after_expiry() {
         let p_rate = BarrierParams::new(130.0, 120.0, 120.0, -0.25, 0.05, 0.0, 0.2);
-        let rate_rebate = barrier_rebate_continuous(&p_rate, 5.0, BarrierType::UpOut);
+        let rate_rebate = barrier_rebate_continuous(&p_rate, 5.0, BarrierType::UpAndOut);
         let p_df = BarrierParams::with_df(130.0, 120.0, 120.0, -0.25, 0.95, 0.0, 0.2)
             .expect("positive df is valid");
-        let df_rebate = barrier_rebate_continuous(&p_df, 5.0, BarrierType::UpOut);
+        let df_rebate = barrier_rebate_continuous(&p_df, 5.0, BarrierType::UpAndOut);
 
         assert_eq!(
             rate_rebate, 5.0,
@@ -2132,8 +2130,8 @@ mod tests {
     fn at_hit_ko_rebate_brackets_at_expiry_value() {
         let rebate = 5.0;
         for (spot, barrier, bt, is_up) in [
-            (100.0, 120.0, BarrierType::UpOut, true),
-            (100.0, 80.0, BarrierType::DownOut, false),
+            (100.0, 120.0, BarrierType::UpAndOut, true),
+            (100.0, 80.0, BarrierType::DownAndOut, false),
         ] {
             let p = BarrierParams::new(spot, 100.0, barrier, 1.0, 0.05, 0.0, 0.30);
             let at_expiry = barrier_rebate(&p, rebate, bt, RebateTiming::AtExpiry);
@@ -2162,8 +2160,8 @@ mod tests {
     #[test]
     fn at_hit_ko_rebate_matches_at_expiry_when_rate_is_zero() {
         let p = BarrierParams::new(100.0, 100.0, 120.0, 1.0, 0.0, 0.0, 0.25);
-        let at_hit = barrier_rebate(&p, 5.0, BarrierType::UpOut, RebateTiming::AtHit);
-        let at_expiry = barrier_rebate(&p, 5.0, BarrierType::UpOut, RebateTiming::AtExpiry);
+        let at_hit = barrier_rebate(&p, 5.0, BarrierType::UpAndOut, RebateTiming::AtHit);
+        let at_expiry = barrier_rebate(&p, 5.0, BarrierType::UpAndOut, RebateTiming::AtExpiry);
         assert!(
             (at_hit - at_expiry).abs() < 1e-10,
             "r=0: at-hit {at_hit} should equal at-expiry {at_expiry}"
@@ -2176,12 +2174,12 @@ mod tests {
     #[test]
     fn rebate_timing_edge_cases() {
         let p = BarrierParams::new(100.0, 100.0, 120.0, 1.0, 0.05, 0.0, 0.25);
-        let ki_hit = barrier_rebate(&p, 5.0, BarrierType::UpIn, RebateTiming::AtHit);
-        let ki_exp = barrier_rebate(&p, 5.0, BarrierType::UpIn, RebateTiming::AtExpiry);
+        let ki_hit = barrier_rebate(&p, 5.0, BarrierType::UpAndIn, RebateTiming::AtHit);
+        let ki_exp = barrier_rebate(&p, 5.0, BarrierType::UpAndIn, RebateTiming::AtExpiry);
         assert_eq!(ki_hit, ki_exp, "timing must not affect knock-in rebates");
 
         let breached = BarrierParams::new(125.0, 100.0, 120.0, 1.0, 0.05, 0.0, 0.25);
-        let v = barrier_rebate(&breached, 5.0, BarrierType::UpOut, RebateTiming::AtHit);
+        let v = barrier_rebate(&breached, 5.0, BarrierType::UpAndOut, RebateTiming::AtHit);
         assert!(
             (v - 5.0).abs() < 1e-12,
             "already-breached at-hit KO rebate pays the full undiscounted amount, got {v}"
