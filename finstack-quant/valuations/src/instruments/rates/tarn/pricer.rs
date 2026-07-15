@@ -520,8 +520,11 @@ fn tarn_surface_points(inst: &Tarn, as_of: Date) -> Result<Vec<Hw1fCapletSurface
             points.push(Hw1fCapletSurfacePoint {
                 t_fix,
                 accrual,
+                forward: inst.fixed_rate,
                 strike: inst.fixed_rate,
+                is_cap: true,
                 weight: accrual * inst.notional.amount().abs(),
+                normal_vol_per_unit_sigma: None,
             });
         }
     }

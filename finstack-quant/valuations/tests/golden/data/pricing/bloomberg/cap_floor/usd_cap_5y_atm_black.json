@@ -6,7 +6,7 @@
     "description": "Bloomberg SWPM USD 5Y ATM SOFR cap captured from screens on 2026-05-02.",
     "valuation_date": "2026-05-02",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg SWPM USD SOFR cap, curve 490 USD SOFR discount/projection, USD RFR BVOL Cube, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained; the screen uses normal volatility/HW1F. The executable envelope calibrates the discount curve from all 26 visible Curve 490 market-rate points with the screen's one-day OIS cutoff and retains the source contractual projection grid. The cap terms explicitly encode LongFront schedule generation, compounded SOFR with one-day cutoff, two-business-day payment delay, and excluded spread compounding. Kappa is fixed at the documented benchmark assumption while sigma is recalibrated from the normal-vol surface. Bloomberg targets and tolerances are unchanged.",
+    "source_detail": "Bloomberg SWPM USD SOFR cap, curve 490 USD SOFR discount/projection dated 2026-05-01, USD RFR BVOL Cube, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained; the screen uses normal volatility/HW1F. The executable envelope calibrates a single discount/projection curve from all 26 visible Curve 490 market-rate points with the screen's one-day OIS cutoff; compounded-SOFR forwards are derived from its discount factors on contractual observation dates. The cap terms explicitly encode LongFront schedule generation, compounded SOFR with one-day cutoff, two-business-day payment delay, and excluded spread compounding. Kappa is fixed at the documented benchmark assumption while sigma is recalibrated from the normal-vol surface. Bloomberg targets and tolerances are unchanged.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-02",
     "last_reviewed_by": "jeickmeier",
@@ -60,7 +60,7 @@
       "schema": "finstack_quant.calibration",
       "plan": {
         "id": "usd_cap_5y_curve_490_calibrated",
-        "description": "USD-SOFR discount curve calibrated from all 26 visible Bloomberg Curve 490 market-rate points transcribed with the cap screen. The one-day OIS rate cutoff is replayed for base and risk calibration. The source forward snapshot remains the contractual compounded-SOFR projection representation.",
+        "description": "Single-curve USD-SOFR OIS discount/projection curve calibrated from all 26 visible Bloomberg Curve 490 market-rate points transcribed with the cap screen. The one-day OIS rate cutoff is replayed for base and risk calibration; compounded-SOFR projection is derived from the same calibrated discount factors.",
         "quote_sets": {
           "swpm_490_rates": [
             "USD-SOFR-DEPOSIT-1W",
@@ -93,17 +93,17 @@
         },
         "steps": [
           {
-            "id": "USD-SOFR-DISC",
+            "id": "USD-SOFR",
             "quote_set": "swpm_490_rates",
             "kind": "discount",
-            "curve_id": "USD-SOFR-DISC",
+            "curve_id": "USD-SOFR",
             "currency": "USD",
-            "base_date": "2026-05-02",
+            "base_date": "2026-05-01",
             "method": "Bootstrap",
             "interpolation": "log_linear",
             "extrapolation": "flat_forward",
-            "pricing_discount_id": "USD-SOFR-DISC",
-            "pricing_forward_id": "USD-SOFR",
+            "pricing_discount_id": null,
+            "pricing_forward_id": null,
             "conventions": {
               "curve_day_count": "Act365F",
               "ois_compounding": {
@@ -153,8 +153,8 @@
       "prior_market": [
         {
           "kind": "forward_curve",
-          "id": "USD-SOFR",
-          "base": "2026-05-02",
+          "id": "USD-SOFR-SNAPSHOT",
+          "base": "2026-05-01",
           "reset_lag": 0,
           "day_count": "Act360",
           "tenor": 0.25,
@@ -426,7 +426,7 @@
         {
           "kind": "discount_curve",
           "id": "USD-SOFR-DISC",
-          "base": "2026-05-02",
+          "base": "2026-05-01",
           "day_count": "Act365F",
           "knot_points": [
             [
@@ -686,7 +686,7 @@
       "stub": "LongFront",
       "day_count": "Act360",
       "calendar_id": "usny",
-      "discount_curve_id": "USD-SOFR-DISC",
+      "discount_curve_id": "USD-SOFR",
       "forward_curve_id": "USD-SOFR",
       "vol_surface_id": "USD-RFR-BVOL-CUBE-5Y",
       "vol_type": "normal",
@@ -722,8 +722,8 @@
           "screen_convexity_adjustment": "Normal",
           "hw1f_calibration_method": "fixed_kappa_surface_calibrated_sigma",
           "hw1f_fixed_kappa": "0.0342",
-          "hw1f_source_quote": "VCUB USD RFR BVOL Cube visible 5Y-tenor normal-vol column transcribed in prior_market[USD-RFR-BVOL-CUBE-5Y].vols_row_major",
-          "hw1f_source_quote_normal_vol": "raw visible cube column, 20 quarterly expiries; not an independently stripped optionlet surface",
+          "hw1f_source_quote": "Twenty-expiry normal optionlet strip retained in prior_market[USD-RFR-BVOL-CUBE-5Y].vols_row_major; the VCUB screenshot supplies the raw cube but does not expose Bloomberg's stripping recipe.",
+          "hw1f_source_quote_normal_vol": "derived optionlet strip, 20 quarterly expiries; proprietary raw-cube stripping Jacobian unavailable",
           "hw1f_param_routing": "Kappa is supplied through pricing_overrides.hw1f_mean_reversion. Sigma is recalibrated from the normal-vol surface for every base or bumped valuation; no fixed sigma is supplied.",
           "hw1f_calibration_note": "Bloomberg shows HW1F and normal VCUB inputs but not mean reversion or proprietary stripping settings. Kappa remains an explicit benchmark assumption. The raw visible cube column is retained without fitting sigma to expected_outputs.",
           "legacy_fixture_name": "usd_cap_5y_atm_black"

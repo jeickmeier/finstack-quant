@@ -35,11 +35,13 @@
 //! Brigo & Mercurio (2006) *Interest Rate Models — Theory and Practice*
 //! §3.3.1 (HW1F affine bond price, eqs. 3.39–3.40); Hull & White (1990).
 
-use crate::calibration::hull_white::HullWhiteParams;
+use crate::calibration::hull_white::{HullWhiteModelParams, HullWhiteParams};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::Result;
-use finstack_quant_monte_carlo::process::ou::{calibrate_theta_from_curve, HullWhite1FParams};
+use finstack_quant_monte_carlo::process::ou::{
+    calibrate_theta_from_curve, calibrate_theta_from_curve_with_piecewise_sigma, HullWhite1FParams,
+};
 
 /// Spacing (years) of the piecewise-constant θ(t) bootstrap grid.
 ///
@@ -159,6 +161,38 @@ pub fn calibrate_hw1f_params(
         midpoint_fit.theta_curve,
         boundaries,
     ))
+}
+
+/// Calibrate a simulation-ready HW1F process from scheduled model parameters.
+///
+/// This is the piecewise-volatility counterpart to [`calibrate_hw1f_params`].
+/// It uses the exact volatility-kernel correction when deriving θ(t), so a
+/// one-segment schedule reproduces the scalar process.
+pub fn calibrate_hw1f_model_params(
+    model: &HullWhiteModelParams,
+    discount_curve: &dyn Discounting,
+    as_of: Date,
+    horizon: f64,
+) -> Result<HullWhite1FParams> {
+    let discount_fn = rebased_discount_fn(discount_curve, as_of)?;
+    let n_steps = (horizon / THETA_GRID_SPACING_YEARS).ceil().max(1.0) as usize;
+    let midpoints: Vec<f64> = (0..n_steps)
+        .map(|index| (index as f64 + 0.5) * THETA_GRID_SPACING_YEARS)
+        .collect();
+    let boundaries: Vec<f64> = (0..n_steps)
+        .map(|index| index as f64 * THETA_GRID_SPACING_YEARS)
+        .collect();
+    calibrate_theta_from_curve_with_piecewise_sigma(
+        model.kappa,
+        model.volatility.times().to_vec(),
+        model.volatility.values().to_vec(),
+        discount_fn,
+        &midpoints,
+    )
+    .map(|mut params| {
+        params.theta_times = boundaries;
+        params
+    })
 }
 
 /// Initial short rate `r(0)` for a HW1F simulation that reprices `discount_curve`.
@@ -426,6 +460,29 @@ mod tests {
         // θ(t) at the horizon resolves to the final knot, not an extrapolation.
         let theta_h = params.theta_at_time(horizon);
         assert!((theta_h - *params.theta_curve.last().expect("θ")).abs() < 1e-12);
+    }
+
+    #[test]
+    fn scheduled_constant_sigma_matches_scalar_process() {
+        let as_of = date(2025, Month::January, 1);
+        let curve = flat_curve(as_of, 0.03);
+        let scalar = HullWhiteParams::new(0.05, 0.01).expect("scalar");
+        let model = HullWhiteModelParams::try_from(scalar).expect("model");
+
+        let scalar_process =
+            calibrate_hw1f_params(scalar, &curve, as_of, 2.0).expect("scalar process");
+        let scheduled_process =
+            calibrate_hw1f_model_params(&model, &curve, as_of, 2.0).expect("scheduled process");
+
+        assert_eq!(scheduled_process.sigma_at_time(1.0), scalar_process.sigma);
+        assert_eq!(scheduled_process.theta_times, scalar_process.theta_times);
+        for (scheduled, scalar) in scheduled_process
+            .theta_curve
+            .iter()
+            .zip(&scalar_process.theta_curve)
+        {
+            assert!((scheduled - scalar).abs() < 1.0e-12);
+        }
     }
 
     /// On a *flat* curve the HW1F term forward must equal the curve's own

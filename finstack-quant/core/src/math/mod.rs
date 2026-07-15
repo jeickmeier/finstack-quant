@@ -99,6 +99,7 @@ pub mod fractional;
 pub mod integration;
 pub mod interp;
 pub mod linalg;
+pub mod piecewise;
 pub mod probability;
 pub mod random;
 pub mod solver;

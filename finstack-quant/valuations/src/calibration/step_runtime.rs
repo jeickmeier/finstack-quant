@@ -1,9 +1,12 @@
-use crate::calibration::api::schema::{CalibrationStep, StepParams, StepPrimaryOutput};
+use crate::calibration::api::schema::{
+    CalibrationStep, HullWhiteVolatilityMode, StepParams, StepPrimaryOutput,
+};
 use crate::calibration::config::CalibrationConfig;
 use crate::calibration::hull_white::{
-    calibrate_hull_white_to_cap_floors, calibrate_hull_white_to_swaptions_with_schedules,
-    capfloor_hw1f_scalar_keys, hw1f_scalar_keys, CapFloorCalibrationConfig, CapFloorQuote,
-    HullWhiteParams, SwapFrequency, SwaptionQuote,
+    bootstrap_hull_white_sigma_schedule_to_cap_floors, calibrate_hull_white_to_cap_floors,
+    calibrate_hull_white_to_swaptions_with_schedules, capfloor_hw1f_scalar_keys,
+    capfloor_hw1f_sigma_schedule_key, hw1f_scalar_keys, CapFloorCalibrationConfig, CapFloorQuote,
+    HullWhiteParams, PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
 };
 use crate::calibration::targets::base_correlation::BaseCorrelationTarget;
 use crate::calibration::targets::discount::DiscountCurveTarget;
@@ -24,7 +27,7 @@ use crate::market::quotes::vol::VolQuote;
 use finstack_quant_core::dates::{DayCount, DayCountContext};
 use finstack_quant_core::explain::TraceEntry;
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
-use finstack_quant_core::market_data::scalars::MarketScalar;
+use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::{VolCube, VolSurface};
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::types::CurveId;
@@ -44,8 +47,15 @@ pub(crate) enum StepOutput {
     Curves(Vec<CurveStorage>),
     Surface(Arc<VolSurface>),
     VolCube(Arc<VolCube>),
-    Scalar { key: String, value: MarketScalar },
+    Scalar {
+        key: String,
+        value: MarketScalar,
+    },
     Scalars(Vec<(String, MarketScalar)>),
+    ScalarsAndSeries {
+        scalars: Vec<(String, MarketScalar)>,
+        series: ScalarTimeSeries,
+    },
 }
 
 /// Aggregated outcome of a single calibration step.
@@ -114,6 +124,13 @@ pub(crate) fn apply_output(
                 updated = updated.insert_price(&key, value);
             }
             *context = updated;
+        }
+        StepOutput::ScalarsAndSeries { scalars, series } => {
+            let mut updated = std::mem::take(context);
+            for (key, value) in scalars {
+                updated = updated.insert_price(&key, value);
+            }
+            *context = updated.insert_series(series);
         }
     }
 
@@ -427,26 +444,72 @@ pub(crate) fn execute_params(
                     ))
                 }
             };
-            let (hw_params, report) = calibrate_hull_white_to_cap_floors(
-                &discount_df,
-                &forward_df,
-                &cap_floor_quotes,
-                CapFloorCalibrationConfig {
-                    frequency: p.payment_frequency,
-                    fixed_kappa: p.fixed_kappa,
-                    initial_guess,
-                },
-            )?;
-
             let (kappa_key, sigma_key) = capfloor_hw1f_scalar_keys(p.discount_curve_id.as_str());
-            Ok(StepOutcome {
-                output: StepOutput::Scalars(vec![
-                    (kappa_key, MarketScalar::Unitless(hw_params.kappa)),
-                    (sigma_key, MarketScalar::Unitless(hw_params.sigma)),
-                ]),
-                credit_index_update: None,
-                report,
-            })
+            match p.volatility_mode {
+                HullWhiteVolatilityMode::Scalar => {
+                    let (hw_params, report) = calibrate_hull_white_to_cap_floors(
+                        &discount_df,
+                        &forward_df,
+                        &cap_floor_quotes,
+                        CapFloorCalibrationConfig {
+                            frequency: p.payment_frequency,
+                            fixed_kappa: p.fixed_kappa,
+                            initial_guess,
+                        },
+                    )?;
+                    Ok(StepOutcome {
+                        output: StepOutput::Scalars(vec![
+                            (kappa_key, MarketScalar::Unitless(hw_params.kappa)),
+                            (sigma_key, MarketScalar::Unitless(hw_params.sigma)),
+                        ]),
+                        credit_index_update: None,
+                        report,
+                    })
+                }
+                HullWhiteVolatilityMode::Piecewise => {
+                    let fixed_kappa = p.fixed_kappa.ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "piecewise cap/floor HW1F calibration requires fixed_kappa".into(),
+                        )
+                    })?;
+                    let (model, report) = bootstrap_hull_white_sigma_schedule_to_cap_floors(
+                        &discount_df,
+                        &forward_df,
+                        &cap_floor_quotes,
+                        PiecewiseSigmaCalibrationConfig {
+                            fixed_kappa,
+                            sigma_min: 1.0e-5,
+                            sigma_max: 2.0,
+                            frequency: p.payment_frequency,
+                        },
+                    )?;
+                    let observations = model
+                        .volatility
+                        .times()
+                        .iter()
+                        .zip(model.volatility.values())
+                        .map(|(&time, &sigma)| {
+                            (
+                                p.base_date + time::Duration::days((time * 365.0).round() as i64),
+                                sigma,
+                            )
+                        })
+                        .collect();
+                    let series = ScalarTimeSeries::new(
+                        capfloor_hw1f_sigma_schedule_key(p.discount_curve_id.as_str()),
+                        observations,
+                        None,
+                    )?;
+                    Ok(StepOutcome {
+                        output: StepOutput::ScalarsAndSeries {
+                            scalars: vec![(kappa_key, MarketScalar::Unitless(model.kappa))],
+                            series,
+                        },
+                        credit_index_update: None,
+                        report,
+                    })
+                }
+            }
         }
         StepParams::SviSurface(p) => {
             let (surface, report) = SviSurfaceTarget::solve(p, quotes, context, global_config)?;
@@ -778,6 +841,7 @@ mod tests {
             initial_kappa: None,
             initial_sigma: None,
             payment_frequency: SwapFrequency::Quarterly,
+            volatility_mode: HullWhiteVolatilityMode::Scalar,
         });
 
         let df_fn = |t: f64| (-0.03 * t).exp();
@@ -824,6 +888,58 @@ mod tests {
                 );
             }
             _ => panic!("expected multiple scalar outputs for cap/floor Hull-White calibration"),
+        }
+    }
+
+    #[test]
+    fn piecewise_cap_floor_hull_white_step_persists_sigma_schedule() {
+        let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let params = StepParams::CapFloorHullWhite(CapFloorHullWhiteStepParams {
+            discount_curve_id: "USD-OIS".into(),
+            forward_curve_id: "USD-OIS".into(),
+            currency: Currency::USD,
+            base_date,
+            fixed_kappa: Some(0.0342),
+            initial_kappa: None,
+            initial_sigma: None,
+            payment_frequency: SwapFrequency::Quarterly,
+            volatility_mode: HullWhiteVolatilityMode::Piecewise,
+        });
+        let df_fn = |t: f64| (-0.03 * t).exp();
+        let vol = crate::calibration::hull_white::hw1f_cap_floor_implied_normal_vol(
+            0.0342,
+            0.0095,
+            &df_fn,
+            &df_fn,
+            crate::calibration::hull_white::CapFloorPriceSpec::new(
+                5.0,
+                0.0365,
+                true,
+                SwapFrequency::Quarterly,
+            ),
+        );
+        let quotes = vec![MarketQuote::Vol(VolQuote::CapFloorVol {
+            id: QuoteId::new("USD-CAP-VOL-20300101-0.0365"),
+            expiry: Date::from_calendar_date(2030, Month::January, 1).expect("expiry"),
+            strike: 0.0365,
+            vol,
+            quote_type: "normal".to_string(),
+            is_cap: true,
+            convention: CapFloorConventionId::new("USD-SOFR-CAP"),
+        })];
+        let context =
+            MarketContext::new().insert(build_flat_discount_curve(0.03, base_date, "USD-OIS"));
+
+        let outcome = execute_params(&params, &quotes, &context, &CalibrationConfig::default())
+            .expect("piecewise cap/floor calibration");
+        match outcome.output {
+            StepOutput::ScalarsAndSeries { scalars, series } => {
+                assert_eq!(scalars.len(), 1);
+                assert_eq!(scalars[0].0, "USD-OIS_CAPFLOOR_HW1F_KAPPA");
+                assert_eq!(series.id().as_str(), "USD-OIS_CAPFLOOR_HW1F_SIGMA_SCHEDULE");
+                assert_eq!(series.len(), 1);
+            }
+            _ => panic!("piecewise cap/floor calibration must persist scalars and schedule"),
         }
     }
 

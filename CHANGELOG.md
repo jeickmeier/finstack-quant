@@ -22,6 +22,11 @@ stability contract and schema-version policy.
   quotes and recalibrates short-rate sigma. Direct model-parameter sensitivity
   remains available separately as `hw_sigma_vega`; a mean-reversion-only
   override holds kappa fixed during surface calibration.
+- **Hull-White cap/floor calibration:** scalar surface calibration now matches
+  contractual-schedule prices rather than averaging implied short-rate sigmas.
+  A backwards-compatible piecewise `hw1f_sigma_schedule` and fixed-kappa
+  expiry bootstrap are available for cap/floor calibration; scalar overrides
+  and market scalars continue to work unchanged.
 
 ## [0.6.0] - 2026-06-16
 

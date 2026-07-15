@@ -26,7 +26,8 @@ pub use hw1f_calibration::{
 /// HW1F θ(t) curve calibration and term-forward bond reconstruction.
 pub mod hw1f_curve;
 pub use hw1f_curve::{
-    calibrate_hw1f_params, initial_short_rate_from_curve, Hw1fTermForward, PeriodForwardCoeffs,
+    calibrate_hw1f_model_params, calibrate_hw1f_params, initial_short_rate_from_curve,
+    Hw1fTermForward, PeriodForwardCoeffs,
 };
 
 /// Historical CMS (par swap rate) fixing lookups for seasoned CMS trades.

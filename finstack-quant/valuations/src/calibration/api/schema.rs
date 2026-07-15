@@ -854,6 +854,19 @@ pub struct HullWhiteStepParams {
 /// Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.
 #[cfg_attr(feature = "ts_export", derive(TS))]
 #[cfg_attr(feature = "ts_export", ts(export))]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HullWhiteVolatilityMode {
+    /// Calibrate and persist one scalar short-rate volatility.
+    #[default]
+    Scalar,
+    /// Bootstrap a piecewise-constant short-rate volatility schedule at quote expiries.
+    Piecewise,
+}
+
+/// Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.
+#[cfg_attr(feature = "ts_export", derive(TS))]
+#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct CapFloorHullWhiteStepParams {
@@ -884,6 +897,9 @@ pub struct CapFloorHullWhiteStepParams {
     #[serde(default)]
     #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub payment_frequency: SwapFrequency,
+    /// Scalar or expiry-bootstraped piecewise short-rate volatility calibration.
+    #[serde(default)]
+    pub volatility_mode: HullWhiteVolatilityMode,
 }
 
 /// Parameters for SVI volatility surface calibration step.

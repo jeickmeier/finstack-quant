@@ -1113,6 +1113,11 @@
               "$ref": "#/$defs/SwapFrequency",
               "default": "SemiAnnual",
               "description": "Payment frequency used to decompose quoted caps/floors into caplets."
+            },
+            "volatility_mode": {
+              "$ref": "#/$defs/HullWhiteVolatilityMode",
+              "default": "scalar",
+              "description": "Scalar or expiry-bootstraped piecewise short-rate volatility calibration."
             }
           },
           "required": [
@@ -1561,6 +1566,21 @@
     "FxOptionConventionId": {
       "description": "Identifier for FX option market conventions (e.g., \"EUR/USD-VANILLA\").",
       "type": "string"
+    },
+    "HullWhiteVolatilityMode": {
+      "description": "Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.",
+      "oneOf": [
+        {
+          "const": "scalar",
+          "description": "Calibrate and persist one scalar short-rate volatility.",
+          "type": "string"
+        },
+        {
+          "const": "piecewise",
+          "description": "Bootstrap a piecewise-constant short-rate volatility schedule at quote expiries.",
+          "type": "string"
+        }
+      ]
     },
     "InflationInterpolation": {
       "description": "Interpolation method for CPI/RPI values between monthly observations.\n\nDetermines how index values are computed for dates between published\nmonthly levels. Different markets use different conventions.\n\n# Market Conventions\n\n- **US TIPS**: Linear interpolation (daily pro-rata)\n- **UK Index-Linked Gilts**: Linear interpolation with 3-month lag\n- **Euro inflation bonds**: Varies by issuer (typically linear)\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationInterpolation;\n\nlet linear = InflationInterpolation::Linear; // TIPS standard\nlet step = InflationInterpolation::Step;     // Conservative approach\n```",

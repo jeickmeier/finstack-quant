@@ -580,8 +580,11 @@ fn snowball_surface_points(inst: &Snowball, as_of: Date) -> Result<Vec<Hw1fCaple
             points.push(Hw1fCapletSurfacePoint {
                 t_fix,
                 accrual,
+                forward: inst.fixed_rate,
                 strike: inst.fixed_rate,
+                is_cap: true,
                 weight: accrual * inst.notional.amount().abs(),
+                normal_vol_per_unit_sigma: None,
             });
         }
     }

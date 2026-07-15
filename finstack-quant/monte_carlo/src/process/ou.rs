@@ -32,6 +32,8 @@
 //! yield curve; the Ornstein-Uhlenbeck (Vasicek) model uses constant θ.
 
 use super::super::traits::{PathState, StateKey, StochasticProcess};
+use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
+use finstack_quant_core::Result;
 use tracing::warn;
 
 /// Hull-White 1-factor parameters.
@@ -41,6 +43,12 @@ pub struct HullWhite1FParams {
     pub kappa: f64,
     /// Instantaneous volatility (σ)
     pub sigma: f64,
+    /// Optional piecewise-constant short-rate volatility schedule.
+    ///
+    /// When absent, [`Self::sigma`] is used everywhere for backwards
+    /// compatibility with existing serialized market snapshots and callers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sigma_curve: Option<PiecewiseConstantCurve>,
     /// Time-dependent mean reversion level θ(t)
     /// Stored as piecewise-constant segments
     pub theta_curve: Vec<f64>,
@@ -54,6 +62,7 @@ impl HullWhite1FParams {
         Self {
             kappa,
             sigma,
+            sigma_curve: None,
             theta_curve: vec![theta],
             theta_times: vec![0.0],
         }
@@ -86,9 +95,82 @@ impl HullWhite1FParams {
         Self {
             kappa,
             sigma,
+            sigma_curve: None,
             theta_curve,
             theta_times,
         }
+    }
+
+    /// Create parameters with a piecewise-constant short-rate volatility.
+    ///
+    /// `sigma` retains the first segment for legacy readers; new process
+    /// calculations use the validated `sigma_curve`.
+    pub fn with_piecewise_sigma(
+        kappa: f64,
+        sigma_times: Vec<f64>,
+        sigma_values: Vec<f64>,
+        theta_curve: Vec<f64>,
+        theta_times: Vec<f64>,
+    ) -> Result<Self> {
+        let sigma_curve = PiecewiseConstantCurve::new(sigma_times, sigma_values)?;
+        if theta_curve.len() != theta_times.len() || theta_times.is_empty() {
+            return Err(finstack_quant_core::Error::Validation(
+                "Hull-White theta curve and times must be non-empty and equally sized".into(),
+            ));
+        }
+        if !kappa.is_finite() || kappa <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Hull-White kappa must be positive and finite, got {kappa}"
+            )));
+        }
+        Ok(Self {
+            kappa,
+            sigma: sigma_curve.values()[0],
+            sigma_curve: Some(sigma_curve),
+            theta_curve,
+            theta_times,
+        })
+    }
+
+    /// Instantaneous short-rate volatility at `t`.
+    #[must_use]
+    pub fn sigma_at_time(&self, t: f64) -> f64 {
+        self.sigma_curve
+            .as_ref()
+            .map_or(self.sigma, |curve| curve.value_at(t))
+    }
+
+    /// Exact OU state variance over `[t, t + dt]`.
+    pub fn sigma_variance(&self, t: f64, dt: f64) -> Result<f64> {
+        if dt <= 0.0 {
+            return Ok(0.0);
+        }
+        match &self.sigma_curve {
+            Some(curve) => curve.integrate_squared_exp_weight(self.kappa, t + dt, t, t + dt),
+            None => {
+                if self.kappa.abs() < 1.0e-12 {
+                    Ok(self.sigma * self.sigma * dt)
+                } else {
+                    Ok(
+                        self.sigma * self.sigma * (-(-2.0 * self.kappa * dt).exp_m1())
+                            / (2.0 * self.kappa),
+                    )
+                }
+            }
+        }
+    }
+
+    /// Exact OU variance for an already-validated simulation step.
+    ///
+    /// Simulation grids provide finite `t >= 0` and `dt > 0`; invalid values
+    /// produce `NaN` so numerical validation can surface the error instead of
+    /// silently pricing with a different volatility.
+    #[must_use]
+    pub fn sigma_variance_for_step(&self, t: f64, dt: f64) -> f64 {
+        if !t.is_finite() || !dt.is_finite() || t < 0.0 || dt <= 0.0 {
+            return f64::NAN;
+        }
+        self.sigma_variance(t, dt).unwrap_or(f64::NAN)
     }
 
     /// Get θ(t) at a given time.
@@ -202,9 +284,8 @@ impl StochasticProcess for HullWhite1FProcess {
         out[0] = self.params.kappa * (theta - x[0]);
     }
 
-    fn diffusion(&self, _t: f64, _x: &[f64], out: &mut [f64]) {
-        // σ(r) = σ (constant volatility)
-        out[0] = self.params.sigma;
+    fn diffusion(&self, t: f64, _x: &[f64], out: &mut [f64]) {
+        out[0] = self.params.sigma_at_time(t);
     }
 
     fn populate_path_state(&self, x: &[f64], state: &mut PathState) {
@@ -293,6 +374,54 @@ where
     HullWhite1FParams::with_time_dependent_theta(kappa, sigma, theta_curve, theta_times.to_vec())
 }
 
+/// Calibrate θ(t) against a discount curve under a piecewise-constant HW
+/// short-rate volatility schedule.
+///
+/// The curve-fit correction is `Var[x(t)] / κ`, which reduces exactly to
+/// `σ²(1 - exp(-2κt)) / (2κ²)` for a constant σ.
+pub fn calibrate_theta_from_curve_with_piecewise_sigma<F>(
+    kappa: f64,
+    sigma_times: Vec<f64>,
+    sigma_values: Vec<f64>,
+    discount_curve_fn: F,
+    theta_times: &[f64],
+) -> Result<HullWhite1FParams>
+where
+    F: Fn(f64) -> f64,
+{
+    let sigma_curve = PiecewiseConstantCurve::new(sigma_times, sigma_values)?;
+    if !kappa.is_finite() || kappa <= 0.0 {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "Hull-White kappa must be positive and finite, got {kappa}"
+        )));
+    }
+    let theta_boundaries = if theta_times.is_empty() {
+        vec![0.0]
+    } else {
+        theta_times.to_vec()
+    };
+    let theta_curve: Result<Vec<f64>> = theta_boundaries
+        .iter()
+        .copied()
+        .map(|time| {
+            let variance = sigma_curve.integrate_squared_exp_weight(kappa, time, 0.0, time)?;
+            Ok(compute_theta_at_time_with_variance(
+                kappa,
+                variance,
+                &discount_curve_fn,
+                time,
+            ))
+        })
+        .collect();
+    HullWhite1FParams::with_piecewise_sigma(
+        kappa,
+        sigma_curve.times().to_vec(),
+        sigma_curve.values().to_vec(),
+        theta_curve?,
+        theta_boundaries,
+    )
+}
+
 /// Compute θ(t) at a specific time in the Vasicek-style mean-reversion-level
 /// convention used by this crate's HW1F drift `κ·(θ(t) - r)`.
 ///
@@ -334,6 +463,20 @@ where
     let vol_term = (sigma * sigma) / (2.0 * kappa * kappa) * (1.0 - (-2.0 * kappa * t).exp());
 
     f_t + df_dt / kappa + vol_term
+}
+
+fn compute_theta_at_time_with_variance<F>(
+    kappa: f64,
+    state_variance: f64,
+    discount_curve_fn: &F,
+    t: f64,
+) -> f64
+where
+    F: Fn(f64) -> f64,
+{
+    let f_t = instantaneous_forward(discount_curve_fn, t);
+    let df_dt = forward_derivative(discount_curve_fn, t);
+    f_t + df_dt / kappa + state_variance / kappa
 }
 
 /// Compute instantaneous forward rate f(0,t) = -d/dt ln P(0,t)
@@ -690,6 +833,41 @@ mod tests {
                 t,
                 deviation
             );
+        }
+    }
+
+    #[test]
+    fn piecewise_sigma_uses_the_active_segment() {
+        let params = HullWhite1FParams::with_piecewise_sigma(
+            0.1,
+            vec![0.0, 1.0],
+            vec![0.01, 0.02],
+            vec![0.03],
+            vec![0.0],
+        )
+        .expect("valid schedule");
+
+        assert_eq!(params.sigma_at_time(0.5), 0.01);
+        assert_eq!(params.sigma_at_time(1.0), 0.02);
+        assert_eq!(params.sigma_at_time(10.0), 0.02);
+    }
+
+    #[test]
+    fn constant_piecewise_sigma_matches_scalar_theta_calibration() {
+        let discount = |time: f64| (-0.03 * time).exp();
+        let scalar = calibrate_theta_from_curve(0.05, 0.01, discount, &[0.5, 1.0, 2.0]);
+        let scheduled = calibrate_theta_from_curve_with_piecewise_sigma(
+            0.05,
+            vec![0.0],
+            vec![0.01],
+            discount,
+            &[0.5, 1.0, 2.0],
+        )
+        .expect("scheduled theta calibration");
+
+        assert_eq!(scheduled.theta_times, scalar.theta_times);
+        for (actual, expected) in scheduled.theta_curve.iter().zip(&scalar.theta_curve) {
+            assert!((actual - expected).abs() < 1.0e-12);
         }
     }
 }

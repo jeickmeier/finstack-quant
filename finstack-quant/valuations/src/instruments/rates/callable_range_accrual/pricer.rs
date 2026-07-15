@@ -429,8 +429,11 @@ fn callable_range_surface_points(
             points.push(Hw1fCapletSurfacePoint {
                 t_fix,
                 accrual,
+                forward: strike,
                 strike,
+                is_cap: true,
                 weight: range.notional.amount().abs(),
+                normal_vol_per_unit_sigma: None,
             });
         }
     }

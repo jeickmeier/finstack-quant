@@ -1,6 +1,6 @@
 //! Vega calculator for interest rate options (caps/floors/caplets/floorlets).
 
-use crate::instruments::rates::cap_floor::hw_pricer::resolve_capfloor_hw1f_params;
+use crate::instruments::rates::cap_floor::hw_pricer::resolve_capfloor_hw1f_model_params;
 use crate::instruments::rates::cap_floor::{CapFloor, CapFloorVolType};
 use crate::metrics::bump_surface_vol_absolute;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -113,21 +113,42 @@ fn hull_white_surface_vega_per_pct(option: &CapFloor, context: &MetricContext) -
 
 fn hull_white_sigma_vega_per_pct(option: &CapFloor, context: &MetricContext) -> Result<f64> {
     let market = context.curves.as_ref();
-    let base = resolve_capfloor_hw1f_params(option, market, context.as_of)?;
-    let base_sigma = base.sigma;
     let bump = DEFAULT_HW_VEGA_BUMP;
-    let with_sigma = |sigma: f64| -> CapFloor {
+    let base = resolve_capfloor_hw1f_model_params(option, market, context.as_of)?;
+    let with_sigma = |shift: f64| -> Result<CapFloor> {
         let mut bumped = option.clone();
-        bumped.pricing_overrides.model_config.hw1f_sigma = Some(sigma);
         bumped.pricing_overrides.model_config.hw1f_mean_reversion = Some(base.kappa);
-        bumped
+        if option
+            .pricing_overrides
+            .model_config
+            .hw1f_sigma_schedule
+            .is_some()
+        {
+            let values = base
+                .volatility
+                .values()
+                .iter()
+                .map(|sigma| sigma + shift)
+                .collect();
+            bumped.pricing_overrides.model_config.hw1f_sigma = None;
+            bumped.pricing_overrides.model_config.hw1f_sigma_schedule = Some(
+                finstack_quant_core::math::piecewise::PiecewiseConstantCurve::new(
+                    base.volatility.times().to_vec(),
+                    values,
+                )?,
+            );
+        } else {
+            bumped.pricing_overrides.model_config.hw1f_sigma =
+                Some(base.volatility.values()[0] + shift);
+        }
+        Ok(bumped)
     };
 
-    let up = with_sigma(base_sigma + bump);
+    let up = with_sigma(bump)?;
     let pv_up = context.reprice_instrument_raw(&up, market, context.as_of)?;
 
-    if base_sigma > bump {
-        let down = with_sigma(base_sigma - bump);
+    if base.volatility.values().iter().all(|sigma| *sigma > bump) {
+        let down = with_sigma(-bump)?;
         let pv_down = context.reprice_instrument_raw(&down, market, context.as_of)?;
         Ok((pv_up - pv_down) / (2.0 * bump) * 0.01)
     } else {

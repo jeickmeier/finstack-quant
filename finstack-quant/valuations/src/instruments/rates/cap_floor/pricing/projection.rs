@@ -52,10 +52,32 @@ pub(crate) fn resolve_optioned_coupon(
     market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<OptionedCouponProjection> {
-    let forward_curve = market.get_forward(cap_floor.forward_curve_id.as_ref())?;
     let spread = cap_floor.spread_f64()?;
 
     if let Some(overnight) = &cap_floor.overnight_coupon {
+        let forward_curve = match market.get_forward(cap_floor.forward_curve_id.as_ref()) {
+            Ok(curve) => Some(curve),
+            Err(_) if cap_floor.forward_curve_id == cap_floor.discount_curve_id => None,
+            Err(error) => return Err(error),
+        };
+        let discount_projection = if forward_curve.is_none()
+            && cap_floor.forward_curve_id == cap_floor.discount_curve_id
+        {
+            Some(market.get_discount(cap_floor.discount_curve_id.as_ref())?)
+        } else {
+            None
+        };
+        let projection_curve = if let Some(curve) = &forward_curve {
+            OvernightProjectionCurve::Forward(curve.as_ref())
+        } else {
+            let curve = discount_projection.as_ref().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CapFloor '{}' has no projection curve '{}'",
+                    cap_floor.id, cap_floor.forward_curve_id
+                ))
+            })?;
+            OvernightProjectionCurve::Discount(curve.as_ref())
+        };
         let calendar_id = overnight
             .fixing_calendar_id
             .as_deref()
@@ -72,7 +94,7 @@ pub(crate) fn resolve_optioned_coupon(
             OvernightSpreadCompounding::Include => spread,
         };
         let projection = project_overnight_coupon(OvernightCouponProjectionInput {
-            curve: OvernightProjectionCurve::Forward(forward_curve.as_ref()),
+            curve: projection_curve,
             fixings,
             fixing_id: cap_floor.forward_curve_id.as_str(),
             as_of,
@@ -100,6 +122,7 @@ pub(crate) fn resolve_optioned_coupon(
         });
     }
 
+    let forward_curve = market.get_forward(cap_floor.forward_curve_id.as_ref())?;
     let fixing_date = period.reset_date.unwrap_or(period.accrual_start);
     // Valuation is at start of day: a fixing dated exactly `as_of` is not yet
     // published, while earlier fixings must be supplied as observations.

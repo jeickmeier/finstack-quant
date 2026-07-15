@@ -40,6 +40,7 @@
 use super::short_rate_tree::TreeCompounding;
 use crate::instruments::common_impl::validation;
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::{Error, Result};
 
 // ============================================================================
@@ -162,6 +163,8 @@ impl HullWhiteTreeConfig {
 pub struct HullWhiteTree {
     /// Configuration parameters
     config: HullWhiteTreeConfig,
+    /// Optional left-continuous volatility schedule used for transition widths.
+    volatility: Option<PiecewiseConstantCurve>,
     /// Time grid (year fractions from t=0), `n+1` entries
     time_grid: Vec<f64>,
     /// Per-step time sizes: `dts[i] = time_grid[i+1] - time_grid[i]`, `n` entries
@@ -259,6 +262,27 @@ impl HullWhiteTree {
         time_to_maturity: f64,
         mandatory_times: &[f64],
     ) -> Result<Self> {
+        Self::calibrate_with_times_and_volatility(
+            config,
+            discount_curve,
+            time_to_maturity,
+            mandatory_times,
+            None,
+        )
+    }
+
+    /// Build a tree with a left-continuous piecewise volatility schedule.
+    ///
+    /// Volatility knots are merged into the mandatory grid so no transition
+    /// straddles a sigma change. Scalar callers continue through
+    /// [`Self::calibrate_with_times`] unchanged.
+    pub fn calibrate_with_times_and_volatility(
+        config: HullWhiteTreeConfig,
+        discount_curve: &dyn Discounting,
+        time_to_maturity: f64,
+        mandatory_times: &[f64],
+        volatility: Option<PiecewiseConstantCurve>,
+    ) -> Result<Self> {
         config.validate()?;
 
         // Validate the tree horizon up front. Without this check a
@@ -275,17 +299,36 @@ impl HullWhiteTree {
             )));
         }
 
-        let time_grid = Self::build_time_grid(config.steps, time_to_maturity, mandatory_times)?;
+        let mut refined_times = mandatory_times.to_vec();
+        if let Some(schedule) = &volatility {
+            refined_times.extend(
+                schedule
+                    .times()
+                    .iter()
+                    .copied()
+                    .filter(|time| *time > 0.0 && *time < time_to_maturity),
+            );
+        }
+        let time_grid = Self::build_time_grid(config.steps, time_to_maturity, &refined_times)?;
         let n = time_grid.len() - 1;
 
         let dts: Vec<f64> = time_grid.windows(2).map(|w| w[1] - w[0]).collect();
+        let step_sigmas: Vec<f64> = dts
+            .iter()
+            .enumerate()
+            .map(|(step, _)| {
+                volatility
+                    .as_ref()
+                    .map_or(config.sigma, |schedule| schedule.value_at(time_grid[step]))
+            })
+            .collect();
         // Level spacing: dx_i = σ√(3·dt_{i-1}) matches the variance of the
         // step *arriving* at level i. Level 0 has a single node at x = 0, so
         // its spacing is irrelevant; mirror dx_1 for accessor consistency.
         let mut dxs = Vec::with_capacity(n + 1);
-        dxs.push(config.sigma * (3.0 * dts[0]).sqrt());
-        for &dt_i in &dts {
-            dxs.push(config.sigma * (3.0 * dt_i).sqrt());
+        dxs.push(step_sigmas[0] * (3.0 * dts[0]).sqrt());
+        for (&dt_i, &sigma_i) in dts.iter().zip(&step_sigmas) {
+            dxs.push(sigma_i * (3.0 * dt_i).sqrt());
         }
 
         // Optional hard cap on level width from `max_nodes`: signed index
@@ -315,7 +358,7 @@ impl HullWhiteTree {
             let dt_i = dts[step];
             let dx_curr = dxs[step];
             let dx_next = dxs[step + 1];
-            let variance = config.sigma * config.sigma * dt_i;
+            let variance = step_sigmas[step] * step_sigmas[step] * dt_i;
 
             // Pass 1: central child (signed index at next level) per node.
             // The conditional mean of x over the step is x·(1 − κ·dt_i);
@@ -388,6 +431,7 @@ impl HullWhiteTree {
 
         Ok(Self {
             config,
+            volatility,
             time_grid,
             dts,
             dxs,
@@ -820,7 +864,6 @@ impl HullWhiteTree {
 
         let r = self.rate_at_node(step, node_idx);
         let kappa = self.config.kappa;
-        let sigma = self.config.sigma;
 
         // B(t, T) factor
         let b = if kappa.abs() < 1e-10 {
@@ -856,12 +899,23 @@ impl HullWhiteTree {
             self.alpha[0]
         };
 
-        // Variance term
-        let var_term = if kappa.abs() < 1e-10 {
-            sigma * sigma * t * b * b / 2.0
+        // Variance term. A scheduled tree uses the same exact integrated
+        // state variance as its affine caplet formulas; the scalar branch
+        // retains the established arithmetic bit-for-bit.
+        let state_variance = if let Some(schedule) = &self.volatility {
+            match schedule.integrate_squared_exp_weight(kappa, t, 0.0, t) {
+                Ok(variance) => variance,
+                Err(_) => return f64::NAN,
+            }
         } else {
-            sigma * sigma * (1.0 - (-2.0 * kappa * t).exp()) * b * b / (4.0 * kappa)
+            let sigma = self.config.sigma;
+            if kappa.abs() < 1e-10 {
+                sigma * sigma * t
+            } else {
+                sigma * sigma * (1.0 - (-2.0 * kappa * t).exp()) / (2.0 * kappa)
+            }
         };
+        let var_term = 0.5 * state_variance * b * b;
 
         let ln_a = (p_0_tt / p_0_t).ln() + b * f_0_t - var_term;
         let a = ln_a.exp();
@@ -1148,6 +1202,28 @@ mod tests {
                 t
             );
         }
+    }
+
+    #[test]
+    fn scheduled_tree_includes_volatility_knots_in_grid() {
+        let curve = test_discount_curve();
+        let schedule =
+            PiecewiseConstantCurve::new(vec![0.0, 1.0], vec![0.01, 0.02]).expect("schedule");
+        let tree = HullWhiteTree::calibrate_with_times_and_volatility(
+            HullWhiteTreeConfig::new(0.03, 0.01, 40),
+            &curve,
+            2.0,
+            &[],
+            Some(schedule),
+        )
+        .expect("scheduled tree");
+
+        assert!(
+            tree.time_grid()
+                .iter()
+                .any(|time| (*time - 1.0).abs() < 1.0e-12),
+            "volatility knot must be a tree time"
+        );
     }
 
     #[test]

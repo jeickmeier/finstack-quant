@@ -21,9 +21,9 @@
 //! scalar pairs are rejected instead of silently falling through.
 
 use crate::calibration::hull_white::{
-    calibrate_hull_white_to_swaptions, capfloor_hw1f_scalar_keys,
-    hw1f_caplet_forward_rate_normal_vol, hw1f_scalar_keys, HullWhiteParams, SwapFrequency,
-    SwaptionQuote,
+    calibrate_fixed_kappa_sigma_to_caplet_prices, calibrate_hull_white_to_swaptions,
+    capfloor_hw1f_scalar_keys, hw1f_caplet_forward_rate_normal_vol, hw1f_scalar_keys,
+    FixedKappaCapletPricePoint, HullWhiteParams, SwapFrequency, SwaptionQuote,
 };
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
@@ -80,10 +80,24 @@ pub struct Hw1fCapletSurfacePoint {
     pub t_fix: f64,
     /// Accrual year fraction for the underlying rate period.
     pub accrual: f64,
+    /// Contractual forward coupon rate used to translate a normal-vol quote
+    /// into a market Bachelier price.
+    pub forward: f64,
     /// Surface strike coordinate to read.
     pub strike: f64,
-    /// Non-negative aggregation weight, typically annuity × normal vega.
+    /// Whether the contractual option is a cap/call (`true`) or floor/put.
+    pub is_cap: bool,
+    /// Discounted cashflow annuity, including notional where appropriate.
+    ///
+    /// This legacy field name is retained until every exotic caller has moved
+    /// to an explicit `annuity` constructor.
     pub weight: f64,
+    /// Product-specific normal-volatility factor produced by unit HW sigma.
+    ///
+    /// `None` uses the exact term-caplet factor. Compounded-RFR products set
+    /// this to the unit-sigma output of their date-specific moment match so
+    /// calibration and pricing use the same model mapping.
+    pub normal_vol_per_unit_sigma: Option<f64>,
 }
 
 /// Optional pricing-time vol-surface calibration input for HW1F products.
@@ -201,23 +215,38 @@ fn resolve_capfloor_surface_params(
         finstack_quant_core::market_data::surfaces::VolSurfaceAxis::Strike,
     )?;
     surface.require_quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)?;
-    let mut weighted_sigma = 0.0;
-    let mut total_weight = 0.0;
-    for point in points {
-        let factor = hw1f_caplet_forward_rate_normal_vol(kappa, 1.0, point.t_fix, point.accrual);
+    let mut price_points = Vec::with_capacity(points.len());
+    for (index, point) in points.iter().copied().enumerate() {
+        let factor = point.normal_vol_per_unit_sigma.unwrap_or_else(|| {
+            hw1f_caplet_forward_rate_normal_vol(kappa, 1.0, point.t_fix, point.accrual)
+        });
         let normal_vol = surface.value_clamped(point.t_fix, point.strike);
-        if factor > 0.0 && normal_vol.is_finite() && normal_vol > 0.0 {
-            let weight = point.weight.max(0.0);
-            if weight > 0.0 {
-                weighted_sigma += (normal_vol / factor) * weight;
-                total_weight += weight;
-            }
+        if !factor.is_finite() || factor <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Cap/floor HW1F surface point {index} has invalid unit-sigma loading {factor}"
+            )));
         }
+        if !normal_vol.is_finite() || normal_vol <= 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Cap/floor HW1F surface point {index} has invalid normal volatility {normal_vol}"
+            )));
+        }
+        price_points.push(FixedKappaCapletPricePoint {
+            forward: point.forward,
+            strike: point.strike,
+            option_time: point.t_fix,
+            annuity: point.weight,
+            is_cap: point.is_cap,
+            market_normal_vol: normal_vol,
+            normal_vol_per_unit_sigma: factor,
+        });
     }
-    if total_weight <= 0.0 {
+    if price_points.is_empty() {
         return Ok(None);
     }
-    HullWhiteParams::new(kappa, weighted_sigma / total_weight).map(Some)
+    calibrate_fixed_kappa_sigma_to_caplet_prices(kappa, &price_points, "cap/floor HW1F surface")
+        .and_then(|sigma| HullWhiteParams::new(kappa, sigma))
+        .map(Some)
 }
 
 fn resolve_swaption_surface_params(
@@ -535,8 +564,11 @@ mod tests {
         let points = [Hw1fCapletSurfacePoint {
             t_fix,
             accrual,
+            forward: strike,
             strike,
+            is_cap: true,
             weight: 1.0,
+            normal_vol_per_unit_sigma: None,
         }];
         let request = Hw1fResolveRequest {
             curve_id: "USD-OIS",
@@ -577,8 +609,11 @@ mod tests {
         let points = [Hw1fCapletSurfacePoint {
             t_fix,
             accrual,
+            forward: strike,
             strike,
+            is_cap: true,
             weight: 1.0,
+            normal_vol_per_unit_sigma: None,
         }];
         let request = Hw1fResolveRequest {
             curve_id: "USD-OIS",
@@ -619,8 +654,11 @@ mod tests {
         let points = [Hw1fCapletSurfacePoint {
             t_fix,
             accrual,
+            forward: strike,
             strike,
+            is_cap: true,
             weight: 1.0,
+            normal_vol_per_unit_sigma: None,
         }];
         let request = Hw1fResolveRequest {
             curve_id: "USD-OIS",
@@ -688,6 +726,76 @@ mod tests {
         assert!(
             msg.contains("partial calibrated HW1F scalars"),
             "unexpected error: {msg}"
+        );
+    }
+
+    #[test]
+    fn fixed_kappa_price_calibration_recovers_consistent_sigma() {
+        let points = [
+            FixedKappaCapletPricePoint {
+                forward: 0.035,
+                strike: 0.030,
+                option_time: 0.75,
+                annuity: 0.24,
+                is_cap: true,
+                market_normal_vol: 0.006,
+                normal_vol_per_unit_sigma: 0.6,
+            },
+            FixedKappaCapletPricePoint {
+                forward: 0.040,
+                strike: 0.045,
+                option_time: 1.25,
+                annuity: 0.23,
+                is_cap: false,
+                market_normal_vol: 0.009,
+                normal_vol_per_unit_sigma: 0.9,
+            },
+        ];
+
+        let sigma = calibrate_fixed_kappa_sigma_to_caplet_prices(0.0342, &points, "test")
+            .expect("price calibration");
+
+        assert!(
+            (sigma - 0.01).abs() < 1e-12,
+            "price calibration must recover the common short-rate sigma, got {sigma}"
+        );
+    }
+
+    #[test]
+    fn fixed_kappa_price_calibration_does_not_average_implied_sigmas() {
+        let points = [
+            FixedKappaCapletPricePoint {
+                forward: 0.040,
+                strike: 0.040,
+                option_time: 0.50,
+                annuity: 0.20,
+                is_cap: true,
+                market_normal_vol: 0.003,
+                normal_vol_per_unit_sigma: 0.50,
+            },
+            FixedKappaCapletPricePoint {
+                forward: 0.030,
+                strike: 0.055,
+                option_time: 2.00,
+                annuity: 0.30,
+                is_cap: true,
+                market_normal_vol: 0.012,
+                normal_vol_per_unit_sigma: 0.80,
+            },
+        ];
+        let old_weighted_average = points
+            .iter()
+            .map(|point| point.market_normal_vol / point.normal_vol_per_unit_sigma)
+            .sum::<f64>()
+            / points.len() as f64;
+
+        let sigma = calibrate_fixed_kappa_sigma_to_caplet_prices(0.0342, &points, "test")
+            .expect("price calibration");
+
+        assert!(
+            (sigma - old_weighted_average).abs() > 1.0e-5,
+            "price calibration must not regress to implied-sigma averaging: \
+             price_root={sigma}, weighted_average={old_weighted_average}"
         );
     }
 }

@@ -914,6 +914,55 @@ pub(crate) fn bump_market_via_rate_quote_shock(
     Ok(seeded_with_discount.insert(bumped_forward))
 }
 
+/// Re-bootstrap a single OIS discount curve under a parallel market-quote shock.
+///
+/// This path is used when discounting and compounded-overnight projection are
+/// two views of the same curve and no separate [`ForwardCurve`] is stored.
+/// Pricing derives overnight forwards directly from discount-factor ratios.
+pub(crate) fn bump_single_ois_market_via_rate_quote_shock(
+    market: &MarketContext,
+    curve_id: &CurveId,
+    bump_bp: f64,
+) -> finstack_quant_core::Result<MarketContext> {
+    let discount = market.get_discount(curve_id.as_str())?;
+    let discount_cal = discount
+        .rate_calibration()
+        .cloned()
+        .map(Ok)
+        .unwrap_or_else(|| discount_calibration_from_recipe(discount.as_ref()))?;
+
+    let mut seeded = market.clone();
+    let mut seeded_indices = HashSet::new();
+    if let Some(recipe) = discount.rate_calibration_recipe() {
+        seeded = seed_recipe_fixings(seeded, recipe, discount.base_date(), &mut seeded_indices)?;
+    }
+    let first_rate = discount
+        .rate_calibration_recipe()
+        .and_then(|recipe| recipe.quotes.first())
+        .map(rate_calibration_quote_level)
+        .or_else(|| discount_cal.quotes.first().map(|quote| quote.rate));
+    if let Some(rate) = first_rate {
+        if discount.rate_calibration_recipe().is_none() {
+            seeded = seeded.insert_series(fixing_seed(
+                &discount_cal.index_id,
+                discount.base_date(),
+                rate,
+            )?);
+        }
+        seeded = seeded.insert_series(fixing_seed(curve_id.as_str(), discount.base_date(), rate)?);
+    }
+
+    let bumped = bump_discount_curve_from_rate_calibration_with_projection(
+        discount.as_ref(),
+        &discount_cal,
+        &seeded,
+        &BumpRequest::Parallel(bump_bp),
+        Some(curve_id.clone()),
+        DiscountReplayShape::CalibratedOnSourceGrid,
+    )?;
+    Ok(seeded.insert(bumped))
+}
+
 /// Seed bootstrap-time fixings for both curve and index identifiers so the
 /// calibration engine has the reference rates it needs when re-bootstrapping
 /// after a quote shock. Uses the first quote of each calibration set as the

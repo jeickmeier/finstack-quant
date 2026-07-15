@@ -115,8 +115,15 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         // matches the prepared one (exact bit match → identical value); fall
         // back to inline computation for unprepared or non-uniform grids.
         let consts = match self.prepared {
-            Some(c) if c.dt.to_bits() == dt.to_bits() => c,
-            _ => Hw1fStepConstants::compute(params.kappa, params.sigma, dt),
+            Some(c) if params.sigma_curve.is_none() && c.dt.to_bits() == dt.to_bits() => c,
+            _ if params.sigma_curve.is_none() => {
+                Hw1fStepConstants::compute(params.kappa, params.sigma, dt)
+            }
+            _ => Hw1fStepConstants {
+                dt,
+                exp_kappa_dt: (-params.kappa * dt).exp(),
+                std_dev: params.sigma_variance_for_step(t, dt).max(0.0).sqrt(),
+            },
         };
 
         // Conditional mean E[r_{t+Δt}|r_t] and exact step.
@@ -129,11 +136,15 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
             return;
         }
         let params = process.params();
-        self.prepared = Some(Hw1fStepConstants::compute(
-            params.kappa,
-            params.sigma,
-            time_grid.dt(0),
-        ));
+        self.prepared = if params.sigma_curve.is_none() {
+            Some(Hw1fStepConstants::compute(
+                params.kappa,
+                params.sigma,
+                time_grid.dt(0),
+            ))
+        } else {
+            None
+        };
     }
 
     fn work_size(&self, _process: &HullWhite1FProcess) -> usize {
@@ -258,5 +269,30 @@ mod tests {
             "step across θ knot should use the averaged θ: got {}, expected {expected}",
             x[0]
         );
+    }
+
+    #[test]
+    fn exact_step_uses_integrated_piecewise_sigma_variance() {
+        let params = HullWhite1FParams::with_piecewise_sigma(
+            0.1,
+            vec![0.0, 1.0],
+            vec![0.01, 0.02],
+            vec![0.03],
+            vec![0.0],
+        )
+        .expect("valid schedule");
+        let process = HullWhite1FProcess::new(params);
+        let disc = ExactHullWhite1F::new();
+        let mut x = vec![0.03];
+        let mut work = vec![];
+        let z = vec![1.0];
+
+        disc.step(&process, 0.0, 2.0, &mut x, &z, &mut work);
+
+        let expected_mean = 0.03;
+        let first = 0.01_f64.powi(2) * ((-0.2_f64).exp() - (-0.4_f64).exp()) / 0.2;
+        let second = 0.02_f64.powi(2) * (1.0 - (-0.2_f64).exp()) / 0.2;
+        let expected = expected_mean + (first + second).sqrt();
+        assert!((x[0] - expected).abs() < 1.0e-12);
     }
 }

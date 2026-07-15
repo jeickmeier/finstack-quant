@@ -458,6 +458,13 @@ pub struct ModelConfig {
     /// available: κ is held fixed while σ is calibrated from market quotes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hw1f_sigma: Option<f64>,
+    /// Optional piecewise-constant Hull-White short-rate volatility schedule.
+    ///
+    /// When supplied, this replaces the scalar [`Self::hw1f_sigma`] override.
+    /// The schedule is left-continuous, starts at time zero, and carries
+    /// absolute annual short-rate volatilities.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hw1f_sigma_schedule: Option<finstack_quant_core::math::piecewise::PiecewiseConstantCurve>,
     /// Hull-White 1F mean-reversion speed override (κ), in annualised units.
     ///
     /// Companion to [`Self::hw1f_sigma`]. Both values define an explicit HW1F

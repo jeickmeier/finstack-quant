@@ -24,7 +24,10 @@
 //!   Chapter 3: One-factor Short-Rate Models, Section 3.3.2 (Gaussian forward-rate
 //!   dynamics underpinning the closed-form caplet normal volatility).
 
-use crate::calibration::hull_white::hw1f_term_caplet_price_from_dfs;
+use crate::calibration::hull_white::{
+    capfloor_hw1f_scalar_keys, capfloor_hw1f_sigma_schedule_key,
+    hw1f_term_caplet_price_from_dfs_with_model, HullWhiteModelParams, HullWhiteParams,
+};
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::rates::cap_floor::pricing::payoff::CapletFloorletInputs;
 use crate::instruments::rates::cap_floor::pricing::projection::{
@@ -41,6 +44,7 @@ use crate::pricer::{
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
 
 /// Hull-White 1-factor closed-form pricer for caps and floors.
@@ -101,6 +105,14 @@ fn hw1f_ou_covariance(kappa: f64, sigma: f64, left_time: f64, right_time: f64) -
             * (-(-2.0 * kappa * min_time).exp_m1())
             / (2.0 * kappa)
     }
+}
+
+fn hw1f_ou_covariance_with_model(
+    params: &HullWhiteModelParams,
+    left_time: f64,
+    right_time: f64,
+) -> finstack_quant_core::Result<f64> {
+    params.state_covariance(left_time.max(0.0), right_time.max(0.0))
 }
 
 /// Date-specific first-order HW1F moment match for a compounded-RFR coupon.
@@ -185,6 +197,76 @@ pub(crate) fn hw1f_compounded_rfr_moment_match(
     })
 }
 
+/// Scheduled-volatility variant of [`hw1f_compounded_rfr_moment_match`].
+///
+/// It retains the same product-rule coupon loadings while evaluating the OU
+/// covariance with the exact piecewise volatility integral.
+pub(crate) fn hw1f_compounded_rfr_moment_match_with_model(
+    as_of: Date,
+    params: &HullWhiteModelParams,
+    projection: &OptionedCouponProjection,
+) -> finstack_quant_core::Result<CompoundedRfrMomentMatch> {
+    let context = DayCountContext::default();
+    let option_time = DayCount::Act365F.year_fraction(as_of, projection.fixing_date, context)?;
+    let mut observation_loadings = Vec::with_capacity(projection.observation_exposures.len());
+    for exposure in &projection.observation_exposures {
+        let fixing_time = if exposure.observation_start <= as_of {
+            0.0
+        } else {
+            DayCount::Act365F.year_fraction(as_of, exposure.observation_start, context)?
+        };
+        let interval_time = DayCount::Act365F.year_fraction(
+            exposure.observation_start,
+            exposure.observation_end,
+            context,
+        )?;
+        let bond_state_loading = hw1f_b(params.kappa, interval_time);
+        let forward_state_loading = (1.0
+            + exposure.projected_rate * exposure.rate_accrual_year_fraction)
+            * bond_state_loading
+            / exposure.rate_accrual_year_fraction;
+        observation_loadings.push(Hw1fObservationLoading {
+            fixing_time,
+            projected_rate: exposure.projected_rate,
+            rate_accrual_year_fraction: exposure.rate_accrual_year_fraction,
+            bond_state_loading,
+            forward_state_loading,
+            coupon_state_loading: exposure.coupon_forward_derivative * forward_state_loading,
+        });
+    }
+    let variance = observation_loadings
+        .iter()
+        .map(|left| {
+            observation_loadings
+                .iter()
+                .map(|right| {
+                    Ok::<f64, finstack_quant_core::Error>(
+                        left.coupon_state_loading
+                            * right.coupon_state_loading
+                            * hw1f_ou_covariance_with_model(
+                                params,
+                                left.fixing_time,
+                                right.fixing_time,
+                            )?,
+                    )
+                })
+                .sum::<finstack_quant_core::Result<f64>>()
+        })
+        .sum::<finstack_quant_core::Result<f64>>()?
+        .max(0.0);
+    let normal_vol = if option_time > 0.0 {
+        (variance / option_time).sqrt()
+    } else {
+        0.0
+    };
+    Ok(CompoundedRfrMomentMatch {
+        normal_vol,
+        variance,
+        option_time: option_time.max(0.0),
+        observation_loadings,
+    })
+}
+
 impl Pricer for CapFloorHullWhitePricer {
     fn key(&self) -> PricerKey {
         PricerKey::new(InstrumentType::CapFloor, ModelKey::HullWhite1F)
@@ -220,16 +302,23 @@ impl CapFloorHullWhitePricer {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
         })?;
 
-        // Get discount and projection curves. Bloomberg's HW1F cap/floor setup is
-        // still a projected SOFR payoff discounted on the OIS curve.
-        let fwd = market
-            .get_forward(cap_floor.forward_curve_id.as_str())
-            .map_err(|e| {
-                PricingError::missing_market_data_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
-                )
-            })?;
+        // Standard term caplets require an explicit forward curve. Compounded
+        // overnight coupons resolve through the shared projection path, which
+        // can derive forwards from a single OIS discount curve.
+        let fwd = if cap_floor.overnight_coupon.is_none() {
+            Some(
+                market
+                    .get_forward(cap_floor.forward_curve_id.as_str())
+                    .map_err(|e| {
+                        PricingError::missing_market_data_with_context(
+                            e.to_string(),
+                            PricingErrorContext::default(),
+                        )
+                    })?,
+            )
+        } else {
+            None
+        };
 
         // Build schedule periods
         let periods = cap_floor.pricing_periods().map_err(|e| {
@@ -264,9 +353,13 @@ impl CapFloorHullWhitePricer {
         // Resolve HW1F parameters following the documented precedence:
         // explicit `pricing_overrides` κ/σ → calibrated MarketContext scalars
         // → warned `HullWhiteParams::default()`.
-        let hw_params = resolve_capfloor_hw1f_params(cap_floor, market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let hw_model =
+            resolve_capfloor_hw1f_model_params(cap_floor, market, as_of).map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         // Price each caplet/floorlet in closed form (Bachelier with the
         // HW1F-implied normal vol); no tree is built.
@@ -306,18 +399,14 @@ impl CapFloorHullWhitePricer {
             let t_fix = resolved_inputs.time_to_fixing;
 
             let caplet_pv = if projection.is_compounded_overnight {
-                let moment_match = hw1f_compounded_rfr_moment_match(
-                    as_of,
-                    hw_params.kappa,
-                    hw_params.sigma,
-                    projection,
-                )
-                .map_err(|e| {
-                    PricingError::model_failure_with_context(
-                        e.to_string(),
-                        PricingErrorContext::default(),
-                    )
-                })?;
+                let moment_match =
+                    hw1f_compounded_rfr_moment_match_with_model(as_of, &hw_model, projection)
+                        .map_err(|e| {
+                            PricingError::model_failure_with_context(
+                                e.to_string(),
+                                PricingErrorContext::default(),
+                            )
+                        })?;
                 crate::instruments::rates::cap_floor::pricing::normal::price_caplet_floorlet(
                     CapletFloorletInputs {
                         is_cap,
@@ -339,6 +428,15 @@ impl CapFloorHullWhitePricer {
                 })?
                 .amount()
             } else {
+                let fwd = fwd.as_ref().ok_or_else(|| {
+                    PricingError::missing_market_data_with_context(
+                        format!(
+                            "Forward curve '{}' is required for term-index cap/floor '{}'",
+                            cap_floor.forward_curve_id, cap_floor.id
+                        ),
+                        PricingErrorContext::default(),
+                    )
+                })?;
                 let projection_df_as_of = fwd.df_on_date_curve(as_of).map_err(|e| {
                     PricingError::model_failure_with_context(
                         e.to_string(),
@@ -374,9 +472,8 @@ impl CapFloorHullWhitePricer {
                         )
                     })?;
                 notional
-                    * hw1f_term_caplet_price_from_dfs(
-                        hw_params.kappa,
-                        hw_params.sigma,
+                    * hw1f_term_caplet_price_from_dfs_with_model(
+                        &hw_model,
                         pf_start,
                         pf_pay,
                         df,
@@ -387,6 +484,12 @@ impl CapFloorHullWhitePricer {
                         term_strike,
                         is_cap,
                     )
+                    .map_err(|e| {
+                        PricingError::model_failure_with_context(
+                            e.to_string(),
+                            PricingErrorContext::default(),
+                        )
+                    })?
             };
 
             total_pv += caplet_pv;
@@ -438,7 +541,8 @@ pub(crate) fn resolve_capfloor_hw1f_params(
 ) -> finstack_quant_core::Result<crate::calibration::hull_white::HullWhiteParams> {
     let context_label = format!("CapFloor {}", cap_floor.id);
     let overrides = hw1f_overrides_json(cap_floor);
-    let surface_points = capfloor_surface_points(cap_floor, market, as_of)?;
+    let kappa_hint = capfloor_kappa_hint(cap_floor, market);
+    let surface_points = capfloor_surface_points(cap_floor, market, as_of, kappa_hint)?;
     let req = Hw1fResolveRequest {
         curve_id: cap_floor.discount_curve_id.as_str(),
         flavor: Hw1fCalibrationFlavor::CapFloor,
@@ -455,10 +559,118 @@ pub(crate) fn resolve_capfloor_hw1f_params(
     resolve_hw1f_params(&req, market).map(|(params, _source)| params)
 }
 
+/// Resolve the full cap/floor HW1F model, including an explicit scheduled
+/// short-rate volatility override when supplied.
+pub(crate) fn resolve_capfloor_hw1f_model_params(
+    cap_floor: &CapFloor,
+    market: &MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+) -> finstack_quant_core::Result<HullWhiteModelParams> {
+    if let Some(schedule) = &cap_floor.pricing_overrides.model_config.hw1f_sigma_schedule {
+        if cap_floor
+            .pricing_overrides
+            .model_config
+            .hw1f_sigma
+            .is_some()
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CapFloor '{}' supplies both hw1f_sigma and hw1f_sigma_schedule",
+                cap_floor.id
+            )));
+        }
+        let kappa = cap_floor
+            .pricing_overrides
+            .model_config
+            .hw1f_mean_reversion
+            .filter(|value| value.is_finite() && *value > 0.0)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(format!(
+                    "CapFloor '{}' requires hw1f_mean_reversion with hw1f_sigma_schedule",
+                    cap_floor.id
+                ))
+            })?;
+        return HullWhiteModelParams::new(kappa, schedule.clone());
+    }
+    let explicit_scalar_sigma = cap_floor.pricing_overrides.model_config.hw1f_sigma;
+    if explicit_scalar_sigma.is_none() {
+        let schedule_key = capfloor_hw1f_sigma_schedule_key(cap_floor.discount_curve_id.as_str());
+        if let Ok(series) = market.get_series(&schedule_key) {
+            let (kappa_key, _) = capfloor_hw1f_scalar_keys(cap_floor.discount_curve_id.as_str());
+            let stored_kappa = market
+                .get_price(&kappa_key)
+                .ok()
+                .and_then(|scalar| match scalar {
+                    MarketScalar::Unitless(value) if value.is_finite() && *value > 0.0 => {
+                        Some(*value)
+                    }
+                    MarketScalar::Price(money)
+                        if money.amount().is_finite() && money.amount() > 0.0 =>
+                    {
+                        Some(money.amount())
+                    }
+                    _ => None,
+                });
+            let kappa = cap_floor
+                .pricing_overrides
+                .model_config
+                .hw1f_mean_reversion
+                .filter(|value| value.is_finite() && *value > 0.0)
+                .or(stored_kappa)
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "CapFloor '{}' has persisted HW1F sigma schedule '{}' without kappa",
+                        cap_floor.id, schedule_key
+                    ))
+                })?;
+            let discount = market.get_discount(cap_floor.discount_curve_id.as_str())?;
+            let observations = series.observations();
+            let times = observations
+                .iter()
+                .map(|(date, _)| {
+                    DayCount::Act365F.year_fraction(
+                        discount.base_date(),
+                        *date,
+                        DayCountContext::default(),
+                    )
+                })
+                .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+            let values = observations.iter().map(|(_, sigma)| *sigma).collect();
+            return HullWhiteModelParams::new(
+                kappa,
+                finstack_quant_core::math::piecewise::PiecewiseConstantCurve::new(times, values)?,
+            );
+        }
+    }
+    HullWhiteModelParams::try_from(resolve_capfloor_hw1f_params(cap_floor, market, as_of)?)
+}
+
+fn capfloor_kappa_hint(cap_floor: &CapFloor, market: &MarketContext) -> f64 {
+    if let Some(kappa) = cap_floor
+        .pricing_overrides
+        .model_config
+        .hw1f_mean_reversion
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        return kappa;
+    }
+    let (kappa_key, _) = capfloor_hw1f_scalar_keys(cap_floor.discount_curve_id.as_str());
+    if let Ok(scalar) = market.get_price(&kappa_key) {
+        let value = match scalar {
+            MarketScalar::Unitless(value) => *value,
+            MarketScalar::Price(money) => money.amount(),
+        };
+        if value.is_finite() && value > 0.0 {
+            return value;
+        }
+    }
+    HullWhiteParams::default().kappa
+}
+
 fn capfloor_surface_points(
     cap_floor: &CapFloor,
     market: &MarketContext,
     as_of: finstack_quant_core::dates::Date,
+    kappa: f64,
 ) -> finstack_quant_core::Result<Vec<Hw1fCapletSurfacePoint>> {
     let periods = cap_floor.pricing_periods()?;
     let strike = if cap_floor.overnight_coupon.is_some() {
@@ -485,11 +697,22 @@ fn capfloor_surface_points(
             continue;
         }
         let df = resolved_inputs.discount_factor;
+        let normal_vol_per_unit_sigma = if projection.is_compounded_overnight {
+            Some(hw1f_compounded_rfr_moment_match(as_of, kappa, 1.0, projection)?.normal_vol)
+        } else {
+            None
+        };
         points.push(Hw1fCapletSurfacePoint {
             t_fix,
             accrual: tau,
+            forward: projection.forward,
             strike,
+            is_cap: matches!(
+                cap_floor.rate_option_type,
+                RateOptionType::Cap | RateOptionType::Caplet
+            ),
             weight: (cap_floor.notional.amount() * tau * df).abs(),
+            normal_vol_per_unit_sigma,
         });
     }
     Ok(points)
@@ -510,12 +733,206 @@ mod tests {
     use crate::instruments::rates::cap_floor::{
         OvernightCouponConvention, OvernightSpreadCompounding,
     };
+    use crate::instruments::rates::exotics_shared::{RateExoticHw1fMcPricer, RateExoticMcConfig};
     use crate::instruments::rates::irs::FloatingLegCompounding;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{CalendarRegistry, DateExt, DayCount, DayCountContext};
     use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
     use finstack_quant_core::money::Money;
+    use finstack_quant_monte_carlo::process::ou::HullWhite1FParams;
+    use finstack_quant_monte_carlo::results::MoneyEstimate;
+    use finstack_quant_monte_carlo::traits::{PathState, Payoff, StateKey};
+    use std::collections::BTreeMap;
     use test_utils::{date, flat_discount_with_tenor, flat_forward_with_tenor};
+
+    /// Test-only affine reconstruction of one contractual overnight factor.
+    ///
+    /// The factor is normalized to the contractual projection at zero HW state.
+    /// Its state coefficient is independently reconstructed from the HW affine
+    /// bond loading rather than from the compounded-coupon moment match.
+    #[derive(Debug, Clone, Copy)]
+    struct HwAffineOvernightFactor {
+        projected_rate: f64,
+        rate_accrual_year_fraction: f64,
+        factor_accrual_year_fraction: f64,
+        bond_state_loading: f64,
+    }
+
+    impl HwAffineOvernightFactor {
+        fn rate_at_state(self, state: f64) -> f64 {
+            let base_factor = 1.0 + self.projected_rate * self.rate_accrual_year_fraction;
+            (base_factor * (self.bond_state_loading * state).exp() - 1.0)
+                / self.rate_accrual_year_fraction
+        }
+    }
+
+    #[derive(Debug, Clone, Default)]
+    struct CompoundedSofrMcEvent {
+        factor_indices: Vec<usize>,
+        settles_coupon: bool,
+    }
+
+    #[derive(Debug, Clone)]
+    struct CompoundedSofrMcPayoff {
+        factors: Vec<HwAffineOvernightFactor>,
+        events: Vec<CompoundedSofrMcEvent>,
+        short_rate_center: f64,
+        notional: f64,
+        strike: f64,
+        accrual_year_fraction: f64,
+        is_cap: bool,
+        next_event: usize,
+        compound_factor: f64,
+        discounted_pv: f64,
+    }
+
+    impl Payoff for CompoundedSofrMcPayoff {
+        fn on_event(&mut self, state: &mut PathState) {
+            let Some(event) = self.events.get(self.next_event) else {
+                return;
+            };
+            let short_rate = state
+                .get_key(StateKey::ShortRate)
+                .unwrap_or(self.short_rate_center);
+            let short_rate_state = short_rate - self.short_rate_center;
+            for &factor_index in &event.factor_indices {
+                let factor = self.factors[factor_index];
+                let rate = factor.rate_at_state(short_rate_state);
+                self.compound_factor *= 1.0 + rate * factor.factor_accrual_year_fraction;
+            }
+            if event.settles_coupon {
+                let coupon_rate = (self.compound_factor - 1.0) / self.accrual_year_fraction;
+                let intrinsic_rate = if self.is_cap {
+                    (coupon_rate - self.strike).max(0.0)
+                } else {
+                    (self.strike - coupon_rate).max(0.0)
+                };
+                let bank = state.get_key(StateKey::BankAccount).unwrap_or(1.0);
+                self.discounted_pv =
+                    self.notional * self.accrual_year_fraction * intrinsic_rate / bank;
+            }
+            self.next_event += 1;
+        }
+
+        fn value(&self, currency: Currency) -> Money {
+            Money::new(self.discounted_pv, currency)
+        }
+
+        fn reset(&mut self) {
+            self.next_event = 0;
+            self.compound_factor = 1.0;
+            self.discounted_pv = 0.0;
+        }
+    }
+
+    fn hw1f_affine_b(kappa: f64, tenor: f64) -> f64 {
+        if kappa.abs() < 1.0e-8 {
+            tenor
+        } else {
+            -(-kappa * tenor).exp_m1() / kappa
+        }
+    }
+
+    /// Independently simulate the contractual compounded-SOFR caplet payoff.
+    ///
+    /// The benchmark deliberately does not call the compounded-RFR moment-match
+    /// helper. It uses the resolver's contractual observations, rate cutoff, and
+    /// delayed payment date, then reconstructs each overnight factor from its
+    /// own HW affine bond loading. The generic rate-exotic harness supplies exact
+    /// HW transitions, Philox streams, antithetic paths, and pathwise bank-account
+    /// discounting.
+    fn compounded_sofr_hw_mc_benchmark(
+        as_of: finstack_quant_core::dates::Date,
+        caplet: &CapFloor,
+        projection: &crate::instruments::rates::cap_floor::pricing::projection::OptionedCouponProjection,
+        kappa: f64,
+        sigma: f64,
+        short_rate: f64,
+    ) -> MoneyEstimate {
+        let context = DayCountContext::default();
+        let mut events = BTreeMap::<finstack_quant_core::dates::Date, CompoundedSofrMcEvent>::new();
+        let mut factors = Vec::with_capacity(projection.observation_exposures.len());
+        for exposure in &projection.observation_exposures {
+            assert!(
+                exposure.observation_start > as_of,
+                "benchmark requires all overnight observations to be forward-starting"
+            );
+            let interval_time = DayCount::Act365F
+                .year_fraction(
+                    exposure.observation_start,
+                    exposure.observation_end,
+                    context,
+                )
+                .expect("valid observation interval");
+            factors.push(HwAffineOvernightFactor {
+                projected_rate: exposure.projected_rate,
+                rate_accrual_year_fraction: exposure.rate_accrual_year_fraction,
+                factor_accrual_year_fraction: exposure.factor_accrual_year_fraction,
+                bond_state_loading: hw1f_affine_b(kappa, interval_time),
+            });
+            events
+                .entry(exposure.observation_start)
+                .or_default()
+                .factor_indices
+                .push(factors.len() - 1);
+        }
+        events
+            .entry(projection.payment_date)
+            .or_default()
+            .settles_coupon = true;
+
+        let (event_times, events): (Vec<_>, Vec<_>) = events
+            .into_iter()
+            .map(|(event_date, event)| {
+                (
+                    DayCount::Act365F
+                        .year_fraction(as_of, event_date, context)
+                        .expect("positive event time"),
+                    event,
+                )
+            })
+            .unzip();
+        assert!(
+            event_times.windows(2).all(|pair| pair[0] < pair[1]),
+            "contractual observation and payment events must be strictly ordered"
+        );
+
+        let strike = caplet.strike_f64().expect("valid strike");
+        let is_cap = matches!(
+            caplet.rate_option_type,
+            RateOptionType::Cap | RateOptionType::Caplet
+        );
+        let pricer = RateExoticHw1fMcPricer {
+            // A flat θ = r₀ keeps the centered short-rate state exactly
+            // zero-mean, so the independently reconstructed affine factors are
+            // normalized to the resolver's deterministic projections.
+            process_params: HullWhite1FParams::new(kappa, sigma, short_rate),
+            r0: short_rate,
+            event_times,
+            config: RateExoticMcConfig {
+                num_paths: if sigma == 0.0 { 2 } else { 32_768 },
+                seed: 0x5EED_50F5,
+                antithetic: true,
+                min_steps_between_events: 4,
+                ..Default::default()
+            },
+            currency: caplet.notional.currency(),
+        };
+        pricer
+            .price(|| CompoundedSofrMcPayoff {
+                factors: factors.clone(),
+                events: events.clone(),
+                short_rate_center: short_rate,
+                notional: caplet.notional.amount(),
+                strike,
+                accrual_year_fraction: projection.accrual_year_fraction,
+                is_cap,
+                next_event: 0,
+                compound_factor: 1.0,
+                discounted_pv: 0.0,
+            })
+            .expect("compounded-SOFR HW Monte Carlo benchmark")
+    }
 
     /// Pricing a cap via the HW pricer (which falls back to uncalibrated
     /// `HullWhiteParams::default()` absent overrides) must still produce a
@@ -756,10 +1173,10 @@ mod tests {
         let t_end = DayCount::Act365F
             .year_fraction(as_of, period.accrual_end, DayCountContext::default())
             .expect("end time");
+        let model = HullWhiteModelParams::constant(0.05, 0.012).expect("constant model");
         let expected = caplet.notional.amount()
-            * hw1f_term_caplet_price_from_dfs(
-                0.05,
-                0.012,
+            * hw1f_term_caplet_price_from_dfs_with_model(
+                &model,
                 pf_start,
                 pf_end,
                 pd_pay,
@@ -769,7 +1186,8 @@ mod tests {
                 period.accrual_year_fraction,
                 0.04,
                 true,
-            );
+            )
+            .expect("term caplet price");
 
         assert!(
             (actual - expected).abs() < 1.0e-8,
@@ -923,6 +1341,12 @@ mod tests {
             .expect("tiny kappa");
         assert!(zero_kappa.normal_vol.is_finite());
         assert!((zero_kappa.normal_vol - tiny_kappa.normal_vol).abs() < 1.0e-14);
+
+        let model = HullWhiteModelParams::constant(kappa, sigma).expect("constant model");
+        let scheduled = hw1f_compounded_rfr_moment_match_with_model(as_of, &model, &projection)
+            .expect("scheduled moment match");
+        assert!((scheduled.variance - matched.variance).abs() < 1.0e-15);
+        assert!((scheduled.normal_vol - matched.normal_vol).abs() < 1.0e-15);
     }
 
     #[test]
@@ -1171,5 +1595,180 @@ mod tests {
             (hw - standard).abs() < 1.0e-8,
             "fixed compounded coupon must remain payable through 2025-04-04: {hw} vs {standard}"
         );
+    }
+
+    #[test]
+    fn compounded_sofr_hw_moment_match_agrees_with_seeded_mc() {
+        let as_of = date(2024, 12, 2);
+        let kappa = 0.05;
+        let sigma = 0.012;
+        let short_rate = 0.045;
+        let mut caplet = CapFloor::new_caplet(
+            "SOFR-HW-MC-BENCHMARK",
+            Money::new(1_000_000.0, Currency::USD),
+            0.04,
+            date(2025, 1, 2),
+            date(2025, 4, 2),
+            DayCount::Act360,
+            "USD-OIS",
+            "USD-OIS",
+            "UNUSED-VOL",
+        )
+        .expect("caplet");
+        caplet.overnight_coupon = Some(OvernightCouponConvention {
+            compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
+            payment_delay_days: 2,
+            fixing_calendar_id: Some("usny".into()),
+            payment_calendar_id: Some("usny".into()),
+            spread_compounding: OvernightSpreadCompounding::Exclude,
+        });
+        caplet.pricing_overrides.model_config.hw1f_mean_reversion = Some(kappa);
+        caplet.pricing_overrides.model_config.hw1f_sigma = Some(sigma);
+        let market = MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, short_rate, 5.0));
+        let period = caplet.pricing_periods().expect("periods").remove(0);
+        let projection =
+            resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("projection");
+        caplet.strike =
+            rust_decimal::Decimal::try_from(projection.forward).expect("representable strike");
+
+        assert_eq!(projection.fixing_date, date(2025, 3, 31));
+        assert_eq!(projection.payment_date, date(2025, 4, 4));
+
+        let analytical = CapFloorHullWhitePricer
+            .price_internal(&caplet, &market, as_of)
+            .expect("moment-match price")
+            .value
+            .amount();
+        let mc =
+            compounded_sofr_hw_mc_benchmark(as_of, &caplet, &projection, kappa, sigma, short_rate);
+        let repeated_mc =
+            compounded_sofr_hw_mc_benchmark(as_of, &caplet, &projection, kappa, sigma, short_rate);
+
+        assert_eq!(
+            mc.mean.amount().to_bits(),
+            repeated_mc.mean.amount().to_bits()
+        );
+        assert_eq!(mc.stderr.to_bits(), repeated_mc.stderr.to_bits());
+
+        let mut zero_sigma_caplet = caplet;
+        zero_sigma_caplet.pricing_overrides.model_config.hw1f_sigma = Some(0.0);
+        zero_sigma_caplet.strike =
+            rust_decimal::Decimal::try_from(projection.forward - 0.001).expect("intrinsic strike");
+        let zero_sigma_coupon = (projection
+            .observation_exposures
+            .iter()
+            .map(|exposure| 1.0 + exposure.projected_rate * exposure.factor_accrual_year_fraction)
+            .product::<f64>()
+            - 1.0)
+            / projection.accrual_year_fraction;
+        let payment_time = DayCount::Act365F
+            .year_fraction(as_of, projection.payment_date, DayCountContext::default())
+            .expect("payment time");
+        let zero_sigma_intrinsic = zero_sigma_caplet.notional.amount()
+            * projection.accrual_year_fraction
+            * (-short_rate * payment_time).exp()
+            * (zero_sigma_coupon - zero_sigma_caplet.strike_f64().expect("valid strike")).max(0.0);
+        let zero_sigma_mc = compounded_sofr_hw_mc_benchmark(
+            as_of,
+            &zero_sigma_caplet,
+            &projection,
+            kappa,
+            0.0,
+            short_rate,
+        );
+        assert!(
+            (zero_sigma_mc.mean.amount() - zero_sigma_intrinsic).abs() < 1.0e-8,
+            "zero-sigma MC must equal intrinsic value: MC={}, intrinsic={zero_sigma_intrinsic}",
+            zero_sigma_mc.mean.amount()
+        );
+
+        let tolerance = 5.0 * mc.stderr + 0.50;
+        assert!(
+            (mc.mean.amount() - analytical).abs() <= tolerance,
+            "moment match={analytical:.6}, MC={:.6}, stderr={:.6}, tolerance={tolerance:.6}",
+            mc.mean.amount(),
+            mc.stderr
+        );
+    }
+
+    #[test]
+    fn constant_sigma_schedule_matches_scalar_hw_price() {
+        let as_of = date(2024, 12, 2);
+        let mut caplet = CapFloor::new_caplet(
+            "SOFR-HW-SCHEDULE",
+            Money::new(1_000_000.0, Currency::USD),
+            0.04,
+            date(2025, 1, 2),
+            date(2025, 4, 2),
+            DayCount::Act360,
+            "USD-OIS",
+            "USD-OIS",
+            "UNUSED-VOL",
+        )
+        .expect("caplet");
+        caplet.overnight_coupon = Some(OvernightCouponConvention {
+            compounding: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days: 1 },
+            payment_delay_days: 2,
+            fixing_calendar_id: Some("usny".into()),
+            payment_calendar_id: Some("usny".into()),
+            spread_compounding: OvernightSpreadCompounding::Exclude,
+        });
+        caplet.pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
+        caplet.pricing_overrides.model_config.hw1f_sigma = Some(0.012);
+        let market =
+            MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0));
+        let scalar = CapFloorHullWhitePricer
+            .price_internal(&caplet, &market, as_of)
+            .expect("scalar price")
+            .value
+            .amount();
+
+        let mut scheduled = caplet;
+        scheduled.pricing_overrides.model_config.hw1f_sigma = None;
+        scheduled.pricing_overrides.model_config.hw1f_sigma_schedule = Some(
+            finstack_quant_core::math::piecewise::PiecewiseConstantCurve::constant(0.012)
+                .expect("schedule"),
+        );
+        let schedule_price = CapFloorHullWhitePricer
+            .price_internal(&scheduled, &market, as_of)
+            .expect("schedule price")
+            .value
+            .amount();
+
+        assert!((schedule_price - scalar).abs() < 1.0e-10);
+    }
+
+    #[test]
+    fn persisted_sigma_schedule_resolves_before_legacy_scalar_sigma() {
+        let as_of = date(2024, 12, 2);
+        let caplet = CapFloor::new_caplet(
+            "SOFR-HW-PERSISTED-SCHEDULE",
+            Money::new(1_000_000.0, Currency::USD),
+            0.04,
+            date(2025, 1, 2),
+            date(2025, 4, 2),
+            DayCount::Act360,
+            "USD-OIS",
+            "USD-OIS",
+            "UNUSED-VOL",
+        )
+        .expect("caplet");
+        let (kappa_key, _) = capfloor_hw1f_scalar_keys("USD-OIS");
+        let schedule = ScalarTimeSeries::new(
+            capfloor_hw1f_sigma_schedule_key("USD-OIS"),
+            vec![(as_of, 0.01), (date(2025, 12, 2), 0.02)],
+            None,
+        )
+        .expect("schedule");
+        let market = MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.045, 5.0))
+            .insert_price(&kappa_key, MarketScalar::Unitless(0.05))
+            .insert_series(schedule);
+
+        let model = resolve_capfloor_hw1f_model_params(&caplet, &market, as_of).expect("model");
+
+        assert_eq!(model.volatility.times()[0], 0.0);
+        assert_eq!(model.volatility.values(), &[0.01, 0.02]);
     }
 }

@@ -803,6 +803,30 @@
       ],
       "type": "object"
     },
+    "PiecewiseConstantCurve": {
+      "description": "A finite, left-continuous piecewise-constant curve.",
+      "properties": {
+        "times": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "values": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "times",
+        "values"
+      ],
+      "type": "object"
+    },
     "PikMode": {
       "description": "Per-coupon PIK behavior for the MC engine.\n\nDetermines how each coupon payment is handled: paid in cash, accreted\nto notional (PIK), split between cash and PIK, or decided dynamically\nby a [`ToggleExerciseModel`].",
       "oneOf": [
@@ -1395,6 +1419,17 @@
         "number",
         "null"
       ]
+    },
+    "hw1f_sigma_schedule": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PiecewiseConstantCurve"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional piecewise-constant Hull-White short-rate volatility schedule.\n\nWhen supplied, this replaces the scalar [`Self::hw1f_sigma`] override.\nThe schedule is left-continuous, starts at time zero, and carries\nabsolute annual short-rate volatilities."
     },
     "implied_volatility": {
       "description": "Implied volatility (overrides vol surface). When set on surface-driven\npricers, it is used as a flat σ across tenor and strike.",

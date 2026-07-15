@@ -17,19 +17,14 @@
       "description": "USD Bloomberg cap HW1F and curve-risk benchmark gaps",
       "metrics": [
         {
-          "metric": "dv01",
-          "reason": "Preserve the Bloomberg DV01 pending an independent curve-risk refresh after quote-shock forward recalibration moved to GlobalSolve.",
-          "evidence": "Executable DV01 is 2089.632530 versus Bloomberg 2158.57, outside the established $25 tolerance."
-        },
-        {
           "metric": "npv",
-          "reason": "Preserve the Bloomberg NPV pending an independent HW1F benchmark refresh after the source-backed LongFront and contractual-grid corrections.",
-          "evidence": "Executable NPV is 257842.188297 versus Bloomberg 258327.94, outside the established $1 tolerance."
+          "reason": "Bloomberg's proprietary HW1F stripping and compounded-SOFR convexity settings are not exposed by the supplied SWPM/VCUB screens.",
+          "evidence": "After executable Curve 490 single-curve calibration, contractual compounded-SOFR projection, and price-consistent scalar HW sigma calibration on the product schedule, executable NPV is 248081.800707 versus Bloomberg 258327.94. The remaining 10246.14 gap cannot be source-backed without Bloomberg's optionlet strip or HW1F calibration settings."
         },
         {
           "metric": "vega",
-          "reason": "Preserve the Bloomberg vega pending an independent HW1F benchmark refresh after the source-backed LongFront and contractual-grid corrections.",
-          "evidence": "Executable vega is 265996.256254 versus Bloomberg 265946.0, outside the established $10 tolerance."
+          "reason": "Bloomberg's screen vega depends on its undisclosed quote-to-optionlet stripping Jacobian.",
+          "evidence": "Market-quote vega now bumps the normal surface and recalibrates the price-consistent scalar HW sigma through the production path, producing 278547.200768 versus Bloomberg 265946.0. Reproducing the remaining 12601.20 gap requires Bloomberg's stripping Jacobian; direct HW sigma sensitivity is separately reported as hw_sigma_vega."
         }
       ]
     },
