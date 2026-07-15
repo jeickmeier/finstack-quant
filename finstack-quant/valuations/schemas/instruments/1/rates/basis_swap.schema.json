@@ -235,7 +235,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides for scenario analysis and model configuration."
+              "description": "Pricing overrides for scenario analysis and model configuration.\nInstrument-owned pricing inputs."
             },
             "primary_leg": {
               "$ref": "#/$defs/BasisSwapLeg",

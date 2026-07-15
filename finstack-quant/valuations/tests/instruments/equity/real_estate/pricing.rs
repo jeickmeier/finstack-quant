@@ -509,7 +509,7 @@ fn test_levered_real_estate_equity_value_is_asset_minus_debt() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
+        .instrument_pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .expect("loan build");
@@ -588,7 +588,7 @@ fn test_levered_real_estate_equity_custom_metrics_compute() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
+        .instrument_pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .expect("loan build");
@@ -674,7 +674,7 @@ fn test_levered_real_estate_sensitivities_metrics_compute() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
+        .instrument_pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .expect("loan build");

@@ -1051,7 +1051,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for selection and tagging."
+              "description": "Attributes for selection and tagging.\nInstrument-owned pricing inputs."
             },
             "recovery_rate": {
               "description": "Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).\n\nUsed in the Tsiveriotis-Zhang credit model to blend risky and risk-free\ndiscounting on the cash component. A recovery rate of 0 (the default)\nreduces to the standard zero-recovery TZ model. Typical values:\n- **Investment grade**: 0.40 (ISDA standard assumption)\n- **High yield**: 0.25-0.35\n- **Distressed**: 0.10-0.20\n\nOnly relevant when `credit_curve_id` is set.",

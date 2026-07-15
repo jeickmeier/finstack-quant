@@ -158,9 +158,11 @@
           "additionalProperties": false,
           "properties": {
             "attributes": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+              "description": "Attributes for scenario selection and grouping"
             },
             "autocall_barriers": {
+              "description": "Autocall barrier levels (as ratios of initial spot, e.g., 1.0 = 100%).\n\nEach barrier corresponds to the observation date at the same index.\nIf spot ≥ barrier × initial_spot on the observation date, the product autocalls.",
               "items": {
                 "format": "double",
                 "type": "number"
@@ -168,10 +170,12 @@
               "type": "array"
             },
             "cap_level": {
+              "description": "Cap level for final payoff (maximum return)",
               "format": "double",
               "type": "number"
             },
             "coupons": {
+              "description": "Coupon amounts paid if observation barrier is met",
               "items": {
                 "format": "double",
                 "type": "number"
@@ -179,10 +183,12 @@
               "type": "array"
             },
             "day_count": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+              "description": "Day count convention for interest calculations"
             },
             "discount_curve_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Discount curve ID for present value calculations"
             },
             "div_yield_id": {
               "anyOf": [
@@ -193,24 +199,29 @@
                   "type": "null"
                 }
               ],
-              "default": null
+              "description": "Optional dividend yield curve ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
             },
             "expiry": {
+              "description": "Explicit terminal expiry date for the structure.",
               "format": "date",
               "type": "string"
             },
             "final_barrier": {
+              "description": "Final barrier level for final payoff determination",
               "format": "double",
               "type": "number"
             },
             "final_payoff_type": {
-              "$ref": "#/$defs/FinalPayoffType"
+              "$ref": "#/$defs/FinalPayoffType",
+              "description": "Type of final payoff (capital protection, participation, knock-in put)"
             },
             "id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Unique instrument identifier"
             },
             "initial_level": {
               "default": null,
+              "description": "Initial (strike-set) underlying level S_0 used as the reference for\nbarrier and payoff ratios.\n\n`None` (the default) uses the spot at the valuation date, which is only\ncorrect for a new trade priced on its strike-set date. **Required for\nseasoned trades** (any observation date on or before `as_of`): pricing\nerrors if past observation dates exist without it.",
               "format": "double",
               "type": [
                 "number",
@@ -219,23 +230,28 @@
             },
             "memory_coupons": {
               "default": false,
+              "description": "Memory (\"Phoenix\") coupon feature.\n\nWhen `true`, any coupons from earlier observation dates whose barrier\nwas *not* met are accrued (\"remembered\") and paid in full on the\nobservation date that finally triggers the autocall (in addition to\nthat date's own coupon). When `false` (the default), only the coupon\nat the autocall date is paid and earlier missed coupons are lost.\n\nThis flag must match the term sheet: a Phoenix/memory autocallable\npriced with `memory_coupons = false` is silently underpriced.",
               "type": "boolean"
             },
             "notional": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+              "description": "Notional amount"
             },
             "observation_dates": {
+              "description": "Observation dates for autocall and coupon checks.\n\nBarriers are monitored **discretely** at these exact dates only.\nThe Monte Carlo time grid is constructed to include these dates precisely.",
               "items": {
                 "type": "string"
               },
               "type": "array"
             },
             "participation_rate": {
+              "description": "Participation rate in underlying performance",
               "format": "double",
               "type": "number"
             },
             "past_fixings": {
               "default": [],
+              "description": "Observed underlying fixings for seasoned trades (date, level pairs).\n\nFor a mid-life autocallable, every observation date on or before the\nvaluation date must have a matching fixing here; pricing errors\notherwise. Past fixings are evaluated deterministically (autocall,\nmissed memory coupons, discrete knock-in monitoring) and only the\nremaining future observation dates are simulated.",
               "items": {
                 "maxItems": 2,
                 "minItems": 2,
@@ -274,16 +290,20 @@
                 "vol_bump_pct": null,
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
-              }
+              },
+              "description": "Pricing overrides (manual price, yield, spread)"
             },
             "spot_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Spot price identifier for underlying asset"
             },
             "underlying_ticker": {
+              "description": "Underlying asset ticker symbol",
               "type": "string"
             },
             "vol_surface_id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Volatility surface ID for option pricing"
             }
           },
           "required": [

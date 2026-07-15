@@ -14,10 +14,10 @@
 //! contract, not the pricing call.
 //!
 //! The determinism guarantee is provided by the Rust core, not by these
-//! wrappers: when an instrument's `pricing_overrides.metrics.mc_seed_scenario`
+//! wrappers: when an instrument's `metric_pricing_overrides.mc_seed_scenario`
 //! is `None`, the core MC pricers derive a **stable** seed deterministically
 //! from the instrument ID (see
-//! `finstack_quant_valuations::instruments::PricingOverrides`). Repricing the same
+//! `finstack_quant_valuations::instruments::InstrumentPricingOverrides`). Repricing the same
 //! instrument JSON therefore yields bit-identical results without the caller
 //! supplying a seed. Callers who need a distinct deterministic stream set
 //! `mc_seed_scenario` inside the instrument JSON. This contract is verified by
@@ -348,13 +348,15 @@ mod tests {
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations::instruments::rates::tarn::Tarn;
-        use finstack_quant_valuations::instruments::{InstrumentJson, PricingOverrides};
+        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 
-        let mut pricing_overrides = PricingOverrides::default();
-        pricing_overrides.model_config.mc_paths = Some(32);
-        pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
+        let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
+        instrument_pricing_overrides.model_config.mc_paths = Some(32);
+        instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        instrument_pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
 
         let tarn = Tarn {
             id: InstrumentId::new("TARN-WASM-E2E"),
@@ -373,7 +375,9 @@ mod tests {
             discount_curve_id: CurveId::new("USD-OIS"),
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             day_count: DayCount::Act365F,
-            pricing_overrides,
+            instrument_pricing_overrides,
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         };
         serde_json::to_string(&InstrumentJson::Tarn(tarn)).expect("serialize")
@@ -384,13 +388,15 @@ mod tests {
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations::instruments::rates::snowball::{Snowball, SnowballVariant};
-        use finstack_quant_valuations::instruments::{InstrumentJson, PricingOverrides};
+        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 
-        let mut pricing_overrides = PricingOverrides::default();
-        pricing_overrides.model_config.mc_paths = Some(32);
-        pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
+        let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
+        instrument_pricing_overrides.model_config.mc_paths = Some(32);
+        instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        instrument_pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
 
         let snowball = Snowball {
             id: InstrumentId::new("SNOWBALL-WASM-E2E"),
@@ -413,7 +419,9 @@ mod tests {
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             callable: None,
             day_count: DayCount::Act365F,
-            pricing_overrides,
+            instrument_pricing_overrides,
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         };
         serde_json::to_string(&InstrumentJson::Snowball(snowball)).expect("serialize")
@@ -424,7 +432,7 @@ mod tests {
         use finstack_quant_core::money::Money;
         use finstack_quant_core::types::{CurveId, InstrumentId};
         use finstack_quant_valuations::instruments::rates::snowball::{Snowball, SnowballVariant};
-        use finstack_quant_valuations::instruments::{InstrumentJson, PricingOverrides};
+        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 
         let inverse_floater = Snowball {
@@ -448,7 +456,9 @@ mod tests {
             vol_surface_id: Some(CurveId::new("USD-SOFR-HW-VOL")),
             callable: None,
             day_count: DayCount::Act365F,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         };
         serde_json::to_string(&InstrumentJson::Snowball(inverse_floater)).expect("serialize")
@@ -463,13 +473,15 @@ mod tests {
         use finstack_quant_valuations::instruments::rates::range_accrual::{
             BoundsType, RangeAccrual,
         };
-        use finstack_quant_valuations::instruments::{InstrumentJson, PricingOverrides};
+        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 
-        let mut pricing_overrides = PricingOverrides::default();
-        pricing_overrides.model_config.mc_paths = Some(8);
-        pricing_overrides.model_config.hw1f_mean_reversion = Some(0.05);
-        pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
+        let mut instrument_pricing_overrides = InstrumentPricingOverrides::default();
+        instrument_pricing_overrides.model_config.mc_paths = Some(8);
+        instrument_pricing_overrides
+            .model_config
+            .hw1f_mean_reversion = Some(0.05);
+        instrument_pricing_overrides.model_config.hw1f_sigma = Some(1e-12);
 
         let range_accrual = RangeAccrual::builder()
             .id(InstrumentId::new("RA-WASM-E2E"))
@@ -501,7 +513,7 @@ mod tests {
             .spot_id("SOFR-RATE".into())
             .vol_surface_id(CurveId::new("SOFR-VOL"))
             .div_yield_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Default::default())
             .payment_date_opt(None)
             .past_fixings_in_range_opt(None)
@@ -517,7 +529,9 @@ mod tests {
                 1.0,
                 0,
             ),
-            pricing_overrides,
+            instrument_pricing_overrides,
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         };
         serde_json::to_string(&InstrumentJson::CallableRangeAccrual(Box::new(callable)))
@@ -531,7 +545,7 @@ mod tests {
         use finstack_quant_valuations::instruments::rates::cms_spread_option::{
             CmsSpreadOption, CmsSpreadOptionType,
         };
-        use finstack_quant_valuations::instruments::{InstrumentJson, PricingOverrides};
+        use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
         use time::Month;
 
         let option = CmsSpreadOption {
@@ -554,7 +568,9 @@ mod tests {
             swap_float_freq: None,
             swap_day_count: None,
             swap_float_day_count: None,
-            pricing_overrides: PricingOverrides::default(),
+            instrument_pricing_overrides: InstrumentPricingOverrides::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         };
         serde_json::to_string(&InstrumentJson::CmsSpreadOption(option)).expect("serialize")

@@ -121,7 +121,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
         },
         "reference_tranche_id": {
           "description": "Reference tranche ID for pricing (which tranche to value)",
@@ -254,7 +254,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (including quoted price for OAS)."
+          "description": "Pricing overrides (including quoted price for OAS).\nInstrument-owned pricing inputs."
         },
         "servicing_fee_rate": {
           "default": 0.0,
@@ -293,7 +293,7 @@
       "type": "object"
     },
     "AgencyProgram": {
-      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. The legacy `Gnma`\nvariant maps to GNMA II (the larger and more actively traded program).",
+      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Legacy `GNMA`\nand `GNMA_I_I` payloads deserialize as `GnmaII`.",
       "oneOf": [
         {
           "const": "FNMA",
@@ -306,17 +306,12 @@
           "type": "string"
         },
         {
-          "const": "GNMA",
-          "description": "Ginnie Mae II (Government National Mortgage Association) - multi-issuer pools.\n\nThis is the legacy variant; equivalent to `GnmaII`. Use `GnmaI` or `GnmaII`\nfor explicit program selection.",
-          "type": "string"
-        },
-        {
           "const": "GNMA_I",
           "description": "Ginnie Mae I - single-issuer pools with 14-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 14-day stated delay from month-end.",
           "type": "string"
         },
         {
-          "const": "GNMA_I_I",
+          "const": "GNMA_II",
           "description": "Ginnie Mae II - multi-issuer pools with 50-day stated delay.\n\nGNMA II securities pay on the 20th of the month following the accrual\nperiod, resulting in a ~50-day stated delay from accrual start. This is\nthe larger and more actively traded GNMA program.",
           "type": "string"
         }
@@ -383,7 +378,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
         },
         "settlement_class": {
           "anyOf": [
@@ -1521,9 +1516,11 @@
       "description": "Autocallable structured product instrument.",
       "properties": {
         "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and grouping"
         },
         "autocall_barriers": {
+          "description": "Autocall barrier levels (as ratios of initial spot, e.g., 1.0 = 100%).\n\nEach barrier corresponds to the observation date at the same index.\nIf spot ≥ barrier × initial_spot on the observation date, the product autocalls.",
           "items": {
             "format": "double",
             "type": "number"
@@ -1531,10 +1528,12 @@
           "type": "array"
         },
         "cap_level": {
+          "description": "Cap level for final payoff (maximum return)",
           "format": "double",
           "type": "number"
         },
         "coupons": {
+          "description": "Coupon amounts paid if observation barrier is met",
           "items": {
             "format": "double",
             "type": "number"
@@ -1542,10 +1541,12 @@
           "type": "array"
         },
         "day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for interest calculations"
         },
         "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve ID for present value calculations"
         },
         "div_yield_id": {
           "anyOf": [
@@ -1556,24 +1557,29 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional dividend yield curve ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
+          "description": "Explicit terminal expiry date for the structure.",
           "format": "date",
           "type": "string"
         },
         "final_barrier": {
+          "description": "Final barrier level for final payoff determination",
           "format": "double",
           "type": "number"
         },
         "final_payoff_type": {
-          "$ref": "#/$defs/FinalPayoffType"
+          "$ref": "#/$defs/FinalPayoffType",
+          "description": "Type of final payoff (capital protection, participation, knock-in put)"
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier"
         },
         "initial_level": {
           "default": null,
+          "description": "Initial (strike-set) underlying level S_0 used as the reference for\nbarrier and payoff ratios.\n\n`None` (the default) uses the spot at the valuation date, which is only\ncorrect for a new trade priced on its strike-set date. **Required for\nseasoned trades** (any observation date on or before `as_of`): pricing\nerrors if past observation dates exist without it.",
           "format": "double",
           "type": [
             "number",
@@ -1582,23 +1588,28 @@
         },
         "memory_coupons": {
           "default": false,
+          "description": "Memory (\"Phoenix\") coupon feature.\n\nWhen `true`, any coupons from earlier observation dates whose barrier\nwas *not* met are accrued (\"remembered\") and paid in full on the\nobservation date that finally triggers the autocall (in addition to\nthat date's own coupon). When `false` (the default), only the coupon\nat the autocall date is paid and earlier missed coupons are lost.\n\nThis flag must match the term sheet: a Phoenix/memory autocallable\npriced with `memory_coupons = false` is silently underpriced.",
           "type": "boolean"
         },
         "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount"
         },
         "observation_dates": {
+          "description": "Observation dates for autocall and coupon checks.\n\nBarriers are monitored **discretely** at these exact dates only.\nThe Monte Carlo time grid is constructed to include these dates precisely.",
           "items": {
             "type": "string"
           },
           "type": "array"
         },
         "participation_rate": {
+          "description": "Participation rate in underlying performance",
           "format": "double",
           "type": "number"
         },
         "past_fixings": {
           "default": [],
+          "description": "Observed underlying fixings for seasoned trades (date, level pairs).\n\nFor a mid-life autocallable, every observation date on or before the\nvaluation date must have a matching fixing here; pricing errors\notherwise. Past fixings are evaluated deterministically (autocall,\nmissed memory coupons, discrete knock-in monitoring) and only the\nremaining future observation dates are simulated.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -1637,16 +1648,20 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          }
+          },
+          "description": "Pricing overrides (manual price, yield, spread)"
         },
         "spot_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Spot price identifier for underlying asset"
         },
         "underlying_ticker": {
+          "description": "Underlying asset ticker symbol",
           "type": "string"
         },
         "vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Volatility surface ID for option pricing"
         }
       },
       "required": [
@@ -1859,26 +1874,26 @@
       "type": "object"
     },
     "BarrierType2": {
-      "description": "Barrier type for barrier options.",
+      "description": "Four-state barrier option classification.",
       "oneOf": [
         {
           "const": "up_and_out",
-          "description": "Up-and-out: option knocked out if S >= B",
+          "description": "Up-and-out: knocked out when spot touches or rises above the barrier.",
           "type": "string"
         },
         {
           "const": "up_and_in",
-          "description": "Up-and-in: option activated if S >= B",
+          "description": "Up-and-in: activated when spot touches or rises above the barrier.",
           "type": "string"
         },
         {
           "const": "down_and_out",
-          "description": "Down-and-out: option knocked out if S <= B",
+          "description": "Down-and-out: knocked out when spot touches or falls below the barrier.",
           "type": "string"
         },
         {
           "const": "down_and_in",
-          "description": "Down-and-in: option activated if S <= B",
+          "description": "Down-and-in: activated when spot touches or falls below the barrier.",
           "type": "string"
         }
       ]
@@ -1973,7 +1988,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides for scenario analysis and model configuration."
+          "description": "Pricing overrides for scenario analysis and model configuration.\nInstrument-owned pricing inputs."
         },
         "primary_leg": {
           "$ref": "#/$defs/BasisSwapLeg",
@@ -2349,7 +2364,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "settlement": {
           "$ref": "#/$defs/SwaptionSettlement",
@@ -2540,7 +2555,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (including quoted clean price)"
+          "description": "Instrument-owned pricing inputs."
         },
         "return_floor": {
           "anyOf": [
@@ -2665,7 +2680,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
         },
         "quoted_price": {
           "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",
@@ -2883,7 +2898,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (including upfront payment)"
+          "description": "Instrument-owned pricing overrides (including upfront payment)."
         },
         "protection": {
           "$ref": "#/$defs/ProtectionLegSpec",
@@ -3044,7 +3059,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (including implied volatility)"
+          "description": "Instrument-owned pricing overrides (including implied volatility)."
         },
         "protection_start_convention": {
           "$ref": "#/$defs/ProtectionStartConvention",
@@ -3224,7 +3239,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for tagging and selection"
+          "description": "Instrument-owned pricing overrides."
         },
         "running_coupon_bp": {
           "description": "Running coupon in basis points (e.g., 100 = 1.00%)",
@@ -3510,7 +3525,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
         },
         "range_accrual": {
           "$ref": "#/$defs/RangeAccrual",
@@ -3617,7 +3632,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Additional attributes"
+          "description": "Additional attributes\nInstrument-owned pricing inputs."
         },
         "rate_option_type": {
           "$ref": "#/$defs/RateOptionType",
@@ -4192,13 +4207,16 @@
       "description": "Cliquet option instrument.",
       "properties": {
         "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and grouping"
         },
         "day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention"
         },
         "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve ID for present value calculations"
         },
         "div_yield_id": {
           "anyOf": [
@@ -4209,25 +4227,30 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional dividend yield curve ID.\n\n`Some(id)`: lookup MUST succeed (a missing or non-unitless scalar\nreturns an error). `None`: no implicit default; treated as zero\ncontinuous dividend yield. Set explicitly for index underlyings."
         },
         "expiry": {
+          "description": "Explicit terminal expiry date for the structure.",
           "format": "date",
           "type": "string"
         },
         "global_cap": {
+          "description": "Global cap on sum of all period returns",
           "format": "double",
           "type": "number"
         },
         "global_floor": {
+          "description": "Global floor on sum of all period returns (default 0.0)",
           "format": "double",
           "type": "number"
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier"
         },
         "initial_level": {
           "default": null,
+          "description": "Strike-set underlying level anchoring the first period's return.\n\n`None` (the default) uses the spot at the valuation date, which is only\ncorrect for a new trade priced on its strike-set date. **Required for\nseasoned trades** (any reset date strictly before `as_of`): pricing\nerrors otherwise. Do not duplicate the strike-set date inside\n`reset_dates` when providing this — reset dates are period-end\nobservations.",
           "format": "double",
           "type": [
             "number",
@@ -4235,18 +4258,22 @@
           ]
         },
         "local_cap": {
+          "description": "Local cap on individual period returns",
           "format": "double",
           "type": "number"
         },
         "local_floor": {
+          "description": "Local floor on individual period returns (default 0.0)",
           "format": "double",
           "type": "number"
         },
         "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount"
         },
         "past_fixings": {
           "default": [],
+          "description": "Observed underlying fixings for seasoned trades (date, level pairs).\n\nEvery reset date strictly before the valuation date must have a\nmatching fixing here; pricing errors otherwise. Locked-in period\nreturns are computed deterministically from these fixings (with local\ncap/floor applied) and only the remaining future periods are simulated.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -4265,7 +4292,8 @@
         },
         "payoff_type": {
           "$ref": "#/$defs/CliquetPayoffType",
-          "default": "Additive"
+          "default": "Additive",
+          "description": "Payoff aggregation type (default: Additive)"
         },
         "pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
@@ -4289,22 +4317,27 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          }
+          },
+          "description": "Pricing overrides (manual price, yield, spread)"
         },
         "reset_dates": {
+          "description": "Reset dates for periodic return locking",
           "items": {
             "type": "string"
           },
           "type": "array"
         },
         "spot_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Spot price identifier"
         },
         "underlying_ticker": {
+          "description": "Underlying asset ticker symbol",
           "type": "string"
         },
         "vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Volatility surface ID"
         }
       },
       "required": [
@@ -4526,7 +4559,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "strike": {
           "description": "Strike (fixed rate for CMS option)",
@@ -4685,7 +4718,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
         },
         "short_cms_tenor": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/tenor.schema.json",
@@ -4900,7 +4933,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)."
+          "description": "Pricing overrides (manual price, yield, spread).\nInstrument-owned pricing inputs."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -5217,7 +5250,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Instrument-owned pricing inputs."
         },
         "quantity": {
           "description": "Contract quantity in commodity units.",
@@ -5397,7 +5430,7 @@
           "type": "number"
         },
         "position": {
-          "$ref": "#/$defs/Position2",
+          "$ref": "#/$defs/Position",
           "default": "long",
           "description": "Position direction (long or short).\n\n- Long: buyer of the commodity at settlement\n- Short: seller of the commodity at settlement"
         },
@@ -5424,7 +5457,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for tagging and selection."
+          "description": "Instrument-owned pricing inputs."
         },
         "quantity": {
           "description": "Contract quantity in units.",
@@ -5605,7 +5638,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (implied vol, tree steps, etc.)."
+          "description": "Instrument-owned pricing inputs."
         },
         "quantity": {
           "description": "Contract quantity in units.",
@@ -5750,7 +5783,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (implied vol, etc.)."
+          "description": "Instrument-owned pricing inputs."
         },
         "strike": {
           "description": "Spread strike price K in the payoff max(S1 - S2 - K, 0).",
@@ -5866,7 +5899,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for tagging and selection."
+          "description": "Instrument-owned pricing inputs."
         },
         "quantity": {
           "description": "Notional quantity per period.",
@@ -5894,6 +5927,7 @@
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
+          "default": "pay",
           "description": "Direction of the swap: Pay means paying the fixed price leg,\nReceive means receiving the fixed price leg."
         },
         "start_date": {
@@ -5919,7 +5953,6 @@
         "quantity",
         "fixed_price",
         "floating_index_id",
-        "side",
         "start_date",
         "maturity",
         "frequency",
@@ -6018,7 +6051,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (implied vol, etc.)."
+          "description": "Instrument-owned pricing inputs."
         },
         "swap_end": {
           "description": "Underlying swap end date.",
@@ -6379,7 +6412,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for selection and tagging."
+          "description": "Attributes for selection and tagging.\nInstrument-owned pricing inputs."
         },
         "recovery_rate": {
           "description": "Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).\n\nUsed in the Tsiveriotis-Zhang credit model to blend risky and risk-free\ndiscounting on the cash component. A recovery rate of 0 (the default)\nreduces to the standard zero-recovery TZ model. Typical values:\n- **Investment grade**: 0.40 (ISDA standard assumption)\n- **High yield**: 0.25-0.35\n- **Distressed**: 0.10-0.20\n\nOnly relevant when `credit_curve_id` is set.",
@@ -6758,7 +6791,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (including upfront payment)"
+          "description": "Instrument-owned pricing overrides (including upfront payment)."
         },
         "protection": {
           "$ref": "#/$defs/ProtectionLegSpec",
@@ -7516,7 +7549,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
         },
         "quote_rate": {
           "description": "Optional quoted simple rate r (annualised) for the deposit.\n\nNote: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders).",
@@ -7629,20 +7662,23 @@
       "description": "Discounted Cash Flow instrument for corporate valuation.\n\nDCF values a company by discounting projected free cash flows and terminal value.\nThe equity value is calculated as: Enterprise Value - Net Debt (or structured bridge).\n\n# Equity Bridge\n\nWhen [`equity_bridge`](Self::equity_bridge) is `Some`, it takes precedence over\nthe flat [`net_debt`](Self::net_debt) field for the EV-to-equity conversion.\n\n# Mid-Year Convention\n\nWhen [`mid_year_convention`](Self::mid_year_convention) is `true`, cash flows are\ndiscounted at `t` minus half the average flow spacing instead of `t` years,\nreflecting the assumption that cash flows arrive mid-period (standard IB/PE\npractice). For annual grids this is the classic `(t - 0.5)`; for sub-annual\ngrids the shift is half a period. `ExitMultiple` terminal values always\ndiscount at the full horizon (a point-in-time sale price).\n\n# Valuation Discounts\n\nPrivate company valuations can apply DLOM, DLOC, and other discounts via\n[`valuation_discounts`](Self::valuation_discounts). These discounts apply\nafter the EV-to-equity bridge, so the reported enterprise value remains a\npre-discount enterprise value and does not equal discounted equity value\nplus net debt.",
       "properties": {
         "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and tagging"
         },
         "currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency for all cashflows."
         },
         "dilution_securities": {
-          "default": [],
+          "description": "Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method.",
           "items": {
             "$ref": "#/$defs/DilutionSecurity"
           },
           "type": "array"
         },
         "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier, used for risk attribution only.\n\nDiscounting always uses [`wacc`](Self::wacc) via `(1 + wacc)^{-t}`\nregardless of whether this curve is loaded (the\nprevious behavior silently switched risky flows to risk-free curve\ndiscounting). Rate sensitivity (`Dv01`/`BucketedDv01`) bumps the\nrisk-free component inside the WACC instead."
         },
         "equity_bridge": {
           "anyOf": [
@@ -7653,9 +7689,10 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Structured equity bridge for EV-to-equity conversion.\n\nWhen present, takes precedence over the flat `net_debt` field."
         },
         "flows": {
+          "description": "Explicit period free cash flows (date, amount pairs).",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -7673,13 +7710,16 @@
           "type": "array"
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique identifier for the DCF."
         },
         "mid_year_convention": {
           "default": false,
+          "description": "Mid-year discounting convention (default: `false` = end-of-period).\n\nWhen `true`, each flow is discounted at `t` minus half the average\nflow spacing instead of `t` (the classic `t - 0.5` for annual\ngrids; half a period for sub-annual grids), reflecting the\nassumption that cash flows arrive mid-period. This is the standard\nconvention in IB/PE practice (Koller et al.). Exit-multiple\nterminal values are not shifted (point-in-time sale at the horizon).",
           "type": "boolean"
         },
         "net_debt": {
+          "description": "Net debt (debt - cash) to subtract from enterprise value.\n\nIgnored when [`equity_bridge`](Self::equity_bridge) is `Some`.",
           "format": "double",
           "type": "number"
         },
@@ -7705,10 +7745,11 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          }
+          },
+          "description": "Attributes for tagging and scenarios."
         },
         "shares_outstanding": {
-          "default": null,
+          "description": "Basic shares outstanding for per-share value calculation.",
           "format": "double",
           "type": [
             "number",
@@ -7716,7 +7757,7 @@
           ]
         },
         "terminal_flow_override": {
-          "default": null,
+          "description": "Annualized terminal flow used by growth-perpetuity terminal values.\n\nGordon Growth and H-Model capitalize an *annual* flow with annual\nWACC and growth rates. When the explicit `flows` grid is sub-annual\n(e.g. quarterly), the last flow is a period flow, not an annual one;\nset this to the trailing-twelve-month aggregate of the final\nexplicit year so the terminal value is computed on a consistent\nannual basis (Koller et al., Damodaran). When `None`, the last\nexplicit flow is used directly (correct for annual grids).\n\nIgnored by `ExitMultiple` terminal values.",
           "format": "double",
           "type": [
             "number",
@@ -7724,9 +7765,11 @@
           ]
         },
         "terminal_value": {
-          "$ref": "#/$defs/TerminalValueSpec"
+          "$ref": "#/$defs/TerminalValueSpec",
+          "description": "Terminal value specification."
         },
         "valuation_date": {
+          "description": "Valuation date (as-of date for the DCF).",
           "format": "date",
           "type": "string"
         },
@@ -7739,9 +7782,10 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Private company valuation discounts (DLOM, DLOC)."
         },
         "wacc": {
+          "description": "Weighted Average Cost of Capital (discount rate).",
           "format": "double",
           "type": "number"
         }
@@ -7882,7 +7926,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
         },
         "repo_curve_id": {
           "anyOf": [
@@ -8545,10 +8589,11 @@
       "description": "Equity Total Return Swap instrument.\n\nA TRS where the total return leg is based on an equity index or single stock.\nThe holder receives the total return (price appreciation + dividends) of the underlying\nequity in exchange for paying a floating rate plus spread on the notional amount.\n\n# Use Cases\n\n- **Synthetic long exposure**: Gain equity index exposure without buying assets\n- **Leverage**: Minimize upfront capital requirements\n- **ETF replication**: Replicate equity ETF returns synthetically\n- **Short exposure**: Easier than borrowing securities\n\n# Example\n\n```\nuse finstack_quant_valuations::instruments::equity::equity_trs::EquityTotalReturnSwap;\n\nlet trs = EquityTotalReturnSwap::example().unwrap();\n// let pv = trs.value(&market_context, as_of_date)?;\n```",
       "properties": {
         "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and tagging"
         },
         "discrete_dividends": {
-          "default": [],
+          "description": "Optional discrete cash dividends `(ex_date, amount)` for the underlying.\n\nWhen non-empty, pricing uses explicit period dividend pass-through and does\nnot add continuous-yield dividend return to avoid double counting.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -8567,16 +8612,20 @@
         },
         "dividend_tax_rate": {
           "default": 0.0,
+          "description": "Dividend withholding tax rate for net return calculation.\n\nSpecifies the fraction of dividends withheld for tax (e.g., 0.15 for 15% withholding).\nWhen set to 0.0 (default), the TRS passes through 100% of dividends (gross return).\nWhen set to a positive value, the dividend return component is reduced:\n```text\nnet_dividend_return = gross_dividend_return × (1 - dividend_tax_rate)\n```\n\n# Market Context\n\nWithholding tax varies by jurisdiction and investor domicile:\n- US qualified dividends: typically 0% for domestic investors\n- US non-qualified: up to 30% for foreign investors (varies by treaty)\n- European: varies by country (15-30% typical)",
           "format": "double",
           "type": "number"
         },
         "financing": {
-          "$ref": "#/$defs/FinancingLegSpec"
+          "$ref": "#/$defs/FinancingLegSpec",
+          "description": "Financing leg specification (curves, spread, day count)."
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier."
         },
         "initial_level": {
+          "description": "Initial index level (if known, otherwise fetched from market).",
           "format": "double",
           "type": [
             "number",
@@ -8592,13 +8641,14 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional OTC margin specification for VM/IM.\n\nEquity TRS use SIMM equity bucket for margin calculation."
         },
         "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount for the swap."
         },
         "past_fixings": {
-          "default": [],
+          "description": "Observed underlying levels at past reset (period-start) dates.\n\nFor a seasoned TRS valued inside a return period, the total-return leg\nmust anchor the current period to the level *observed* at the period\nstart so the realized spot move enters the PV (equity delta). Provide\n`(reset_date, level)` pairs for every period-start date on or before\nthe valuation date; the first period may use `initial_level` instead.\nPricing errors when the current period's start level is unavailable.",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -8637,16 +8687,20 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          }
+          },
+          "description": "Attributes for scenario selection and tagging."
         },
         "schedule": {
-          "$ref": "#/$defs/TrsScheduleSpec"
+          "$ref": "#/$defs/TrsScheduleSpec",
+          "description": "Schedule specification (payment dates and frequency)."
         },
         "side": {
-          "$ref": "#/$defs/TrsSide"
+          "$ref": "#/$defs/TrsSide",
+          "description": "Trade side (receive/pay total return)."
         },
         "underlying": {
-          "$ref": "#/$defs/EquityUnderlyingParams"
+          "$ref": "#/$defs/EquityUnderlyingParams",
+          "description": "Underlying equity parameters (spot ID, dividend yield, contract size)."
         }
       },
       "required": [
@@ -8804,7 +8858,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
         },
         "schedule": {
           "$ref": "#/$defs/TrsScheduleSpec",
@@ -9588,7 +9642,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection"
+          "description": "Instrument-owned pricing inputs."
         },
         "reset_lag": {
           "description": "Reset lag in business days (fixing to value date)",
@@ -9597,6 +9651,7 @@
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
+          "default": "pay",
           "description": "Direction of the FRA: Pay means paying the fixed rate (receiving floating),\nReceive means receiving the fixed rate (paying floating)."
         },
         "start_date": {
@@ -9615,7 +9670,6 @@
         "reset_lag",
         "discount_curve_id",
         "forward_curve_id",
-        "side",
         "attributes"
       ],
       "type": "object"
@@ -9906,7 +9960,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -10054,7 +10108,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -10094,10 +10148,9 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
           "description": "Optional base currency calendar for business day adjustment.",
           "type": [
             "string",
@@ -10109,7 +10162,6 @@
           "description": "Base currency (foreign currency, numerator of the pair)."
         },
         "contract_rate": {
-          "default": null,
           "description": "Contract forward rate (quote per base). If None, valued at-market.",
           "format": "double",
           "type": [
@@ -10161,10 +10213,9 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Attributes for tagging and selection.\nInstrument-owned pricing inputs."
         },
         "quote_calendar_id": {
-          "default": null,
           "description": "Optional quote currency calendar for business day adjustment.",
           "type": [
             "string",
@@ -10176,7 +10227,6 @@
           "description": "Quote currency (domestic currency, denominator of the pair, PV currency)."
         },
         "spot_rate_override": {
-          "default": null,
           "description": "Optional spot rate override (quote per base). If None, source from FxMatrix.",
           "format": "double",
           "type": [
@@ -10267,7 +10317,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -10308,20 +10358,24 @@
       "description": "FX Spot instrument (1 unit of `base` priced in `quote`).\n\nRepresents the spot exchange rate between two currencies following\nstandard market quoting conventions (base/quote or CCY1/CCY2).\n\n# Quote Convention\n\nThe rate is interpreted as: **1 unit of base = rate units of quote**\n\nFor example, if `base = EUR`, `quote = USD`, and `spot_rate = 1.10`:\n- 1 EUR = 1.10 USD\n- This is the \"EUR/USD\" rate\n\n# Settlement\n\nFX spot typically settles T+2 (two business days after trade date).\nThis can be customized via `settlement_lag_days`.\n\nSee module-level documentation for comprehensive FX quoting conventions.",
       "properties": {
         "attributes": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
+          "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
           "type": [
             "string",
             "null"
           ]
         },
         "base_currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Base currency (the currency being priced)"
         },
         "bdc": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-          "default": "modified_following"
+          "default": "modified_following",
+          "description": "Business day convention to apply when adjusting settlement (default: ModifiedFollowing)\n\nNote: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align\nwith ISDA standard FX settlement conventions."
         },
         "discount_curve_id": {
           "anyOf": [
@@ -10332,13 +10386,15 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique identifier for the FX pair"
         },
         "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional amount in base currency."
         },
         "pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
@@ -10362,24 +10418,29 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          }
+          },
+          "description": "Per-instrument pricing/sensitivity override knobs.\nInstrument-owned pricing inputs."
         },
         "quote_calendar_id": {
+          "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
           "type": [
             "string",
             "null"
           ]
         },
         "quote_currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Quote currency (the currency used for pricing)"
         },
         "settlement": {
+          "description": "Optional settlement date (T+2 typically for spot)",
           "type": [
             "string",
             "null"
           ]
         },
         "settlement_lag_days": {
+          "description": "Optional settlement lag in business days when `settlement` is not provided (default: 2)",
           "format": "int32",
           "type": [
             "integer",
@@ -10387,6 +10448,7 @@
           ]
         },
         "spot_rate": {
+          "description": "Optional spot rate (if not provided, will look up from market data)",
           "format": "double",
           "type": [
             "number",
@@ -10409,10 +10471,9 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
           "description": "Optional base currency calendar for spot/settlement adjustment metadata.",
           "type": [
             "string",
@@ -10421,23 +10482,22 @@
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency (foreign)."
+          "description": "Base currency (foreign)"
         },
         "base_notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Notional amount in base currency (exchanged on near, reversed on far)."
+          "description": "Notional amount in base currency (exchanged on near, reversed on far)"
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Domestic discount curve id (quote currency)."
+          "description": "Domestic discount curve id (quote currency)"
         },
         "far_date": {
-          "description": "Far leg settlement date (forward leg).",
+          "description": "Far leg settlement date (forward leg)",
           "format": "date",
           "type": "string"
         },
         "far_rate": {
-          "default": null,
           "description": "Optional far leg FX rate (quote per base). If None, source from forwards.",
           "format": "double",
           "type": [
@@ -10447,19 +10507,18 @@
         },
         "foreign_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Foreign discount curve id (base currency)."
+          "description": "Foreign discount curve id (base currency)"
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "near_date": {
-          "description": "Near leg settlement date (spot leg).",
+          "description": "Near leg settlement date (spot leg)",
           "format": "date",
           "type": "string"
         },
         "near_rate": {
-          "default": null,
           "description": "Optional near leg FX rate (quote per base). If None, source from market.",
           "format": "double",
           "type": [
@@ -10490,10 +10549,9 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Attributes for tagging and selection\nInstrument-owned pricing inputs."
         },
         "quote_calendar_id": {
-          "default": null,
           "description": "Optional quote currency calendar for spot/settlement adjustment metadata.",
           "type": [
             "string",
@@ -10502,7 +10560,7 @@
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Quote currency (domestic)."
+          "description": "Quote currency (domestic)"
         }
       },
       "required": [
@@ -10606,7 +10664,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
@@ -10749,7 +10807,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection"
+          "description": "Attributes for scenario selection\nInstrument-owned pricing inputs."
         },
         "quote_calendar_id": {
           "description": "Quote-currency calendar used in the joint observation calendar.",
@@ -11136,7 +11194,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (implied volatility, surface extrapolation)."
+          "description": "Pricing overrides (implied volatility, surface extrapolation).\nInstrument-owned pricing inputs."
         },
         "start_date": {
           "description": "Start date of the first inflation period.",
@@ -11347,7 +11405,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Additional attributes"
+          "description": "Additional attributes\nInstrument-owned pricing inputs."
         },
         "quoted_clean": {
           "description": "Quoted clean price (if available)",
@@ -11489,7 +11547,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -12866,7 +12924,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes"
+          "description": "Attributes\nInstrument-owned pricing inputs."
         },
         "quoted_price": {
           "description": "Quoted future price (e.g., 99.25)",
@@ -13003,7 +13061,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -13078,7 +13136,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides"
+          "description": "Pricing overrides\nInstrument-owned pricing inputs."
         },
         "strike": {
           "description": "Option strike price (in futures price terms, e.g., 95.00)",
@@ -13699,10 +13757,9 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging"
         },
         "base_calendar_id": {
-          "default": null,
           "description": "Optional base currency calendar.",
           "type": [
             "string",
@@ -13714,7 +13771,7 @@
           "description": "Base currency (restricted/non-deliverable currency, numerator)."
         },
         "contract_rate": {
-          "description": "Contract forward rate. Interpretation depends on `quote_convention`.",
+          "description": "Contract forward rate. Interpretation depends on `quote_convention`:\n- BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)\n- SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)",
           "format": "double",
           "type": "number"
         },
@@ -13728,8 +13785,7 @@
           "type": "string"
         },
         "fixing_rate": {
-          "default": null,
-          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+          "description": "Observed fixing rate. Interpretation depends on `quote_convention`.\nIf Some, NDF is post-fixing.",
           "format": "double",
           "type": [
             "number",
@@ -13745,8 +13801,7 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Official fixing source/benchmark enum for type-safe specification."
+          "description": "Official fixing source/benchmark enum for type-safe specification.\n\nUse this field for validated fixing sources.\nSee [`NdfFixingSource`] for supported benchmarks and their typical currencies."
         },
         "foreign_discount_curve_id": {
           "anyOf": [
@@ -13757,12 +13812,10 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional foreign (base) currency discount curve ID."
+          "description": "Optional foreign (base) currency discount curve ID.\nRequired for pre-fixing forward estimation unless `forward_rate_override`\nis supplied."
         },
         "forward_rate_override": {
-          "default": null,
-          "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+          "description": "Explicit pre-fixing forward rate in `quote_convention` units.\n\nUse this for NDF market quotes or basis-adjusted forwards when a base\ncurrency discount curve is unavailable.",
           "format": "double",
           "type": [
             "number",
@@ -13805,10 +13858,9 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Per-instrument pricing/sensitivity override knobs."
+          "description": "Attributes for tagging and selection.\nInstrument-owned pricing inputs."
         },
         "quote_calendar_id": {
-          "default": null,
           "description": "Optional settlement currency calendar.",
           "type": [
             "string",
@@ -13824,8 +13876,7 @@
           "description": "Settlement currency (freely convertible, typically USD, denominator and PV currency)."
         },
         "spot_rate_override": {
-          "default": null,
-          "description": "Optional spot rate override for forward rate calculation.",
+          "description": "Optional spot rate override for forward rate calculation.\nInterpretation depends on `quote_convention`.",
           "format": "double",
           "type": [
             "number",
@@ -14586,31 +14637,16 @@
       ]
     },
     "Position": {
-      "description": "Position side for futures.",
+      "description": "Position direction for futures and forwards.",
       "oneOf": [
         {
           "const": "long",
-          "description": "Long position (buyer of futures contract)",
+          "description": "Long position (buyer of the contract).",
           "type": "string"
         },
         {
           "const": "short",
-          "description": "Short position (seller of futures contract)",
-          "type": "string"
-        }
-      ]
-    },
-    "Position2": {
-      "description": "Position direction for futures and forwards.\n\nIndicates whether the holder is long (buyer) or short (seller) of the contract.",
-      "oneOf": [
-        {
-          "const": "long",
-          "description": "Long position (buyer of futures/forward contract).\n\nProfits when the underlying price increases.",
-          "type": "string"
-        },
-        {
-          "const": "short",
-          "description": "Short position (seller of futures/forward contract).\n\nProfits when the underlying price decreases.",
+          "description": "Short position (seller of the contract).",
           "type": "string"
         }
       ]
@@ -14856,20 +14892,20 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "description": "Attributes for scenario selection and grouping."
+          "description": "Attributes for scenario selection and grouping"
         },
         "base_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Base currency (equity denomination)."
+          "description": "Base currency (equity denomination)"
         },
         "correlation": {
-          "description": "Correlation between equity price and FX rate.",
+          "description": "Correlation between equity price and FX rate",
           "format": "double",
           "type": "number"
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention."
+          "description": "Day count convention"
         },
         "div_yield_id": {
           "anyOf": [
@@ -14880,29 +14916,27 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional dividend yield curve ID."
+          "description": "Optional dividend yield curve ID"
         },
         "domestic_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve ID (domestic currency)."
+          "description": "Discount curve ID (domestic currency)"
         },
         "equity_strike": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Strike price for equity option."
+          "description": "Strike price for equity option"
         },
         "expiry": {
-          "description": "Option expiry date.",
+          "description": "Option expiry date",
           "format": "date",
           "type": "string"
         },
         "foreign_discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Discount curve ID (foreign currency)."
+          "description": "Discount curve ID (foreign currency)"
         },
         "fx_rate_id": {
-          "default": null,
-          "description": "Optional FX rate identifier.",
+          "description": "Optional FX rate identifier.\n\nThe referenced scalar must be quoted as **quote currency per unit of\nbase currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,\nconventionally named `JPYUSD`). The pricer compounds it with\n`exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol\nlookup, so an inverted quote (JPY-per-USD) silently mislocates the\nsmile. `validate()` rejects ids whose embedded pair name contradicts\nthis direction.",
           "type": [
             "string",
             "null"
@@ -14917,24 +14951,22 @@
               "type": "null"
             }
           ],
-          "default": null,
-          "description": "Optional FX volatility surface ID."
+          "description": "Optional FX volatility surface ID.\n\nMust be calibrated in the same **quote-per-base** direction as\n`fx_rate_id` so absolute-strike lookups at the CIRP forward land on\nthe correct smile. `validate()` rejects ids whose embedded pair name\ncontradicts this direction."
         },
         "id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Unique instrument identifier."
+          "description": "Unique instrument identifier"
         },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-          "description": "Strike-equivalent domestic reference notional."
+          "description": "Strike-equivalent domestic reference notional.\n\nWhen `underlying_quantity` and `payoff_fx_rate` are supplied, this must\nequal `underlying_quantity * payoff_fx_rate * equity_strike.amount()`."
         },
         "option_type": {
           "$ref": "#/$defs/OptionType",
-          "description": "Option type (call or put)."
+          "description": "Option type (call or put)"
         },
         "payoff_fx_rate": {
-          "default": null,
-          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.",
+          "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.\n\nExample: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD\nconversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.",
           "format": "double",
           "type": [
             "number",
@@ -14964,19 +14996,18 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)."
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "quote_currency": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-          "description": "Quote currency (payment/settlement currency)."
+          "description": "Quote currency (payment/settlement currency)"
         },
         "spot_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Equity spot price identifier."
+          "description": "Equity spot price identifier"
         },
         "underlying_quantity": {
-          "default": null,
-          "description": "Number of underlying units covered by the option payoff.",
+          "description": "Number of underlying units covered by the option payoff.\n\nQuanto pricing is performed per unit of the underlying in the base currency.\nThis quantity converts the per-unit price into contract-level exposure.",
           "format": "double",
           "type": [
             "number",
@@ -14984,12 +15015,12 @@
           ]
         },
         "underlying_ticker": {
-          "description": "Underlying equity ticker symbol.",
+          "description": "Underlying equity ticker symbol",
           "type": "string"
         },
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-          "description": "Equity volatility surface ID."
+          "description": "Equity volatility surface ID"
         }
       },
       "required": [
@@ -15142,7 +15173,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "projection_curve_id": {
           "anyOf": [
@@ -15302,7 +15333,7 @@
       "description": "Real estate asset valuation instrument.\n\nSupports DCF (explicit NOI schedule) and direct capitalization valuation.",
       "properties": {
         "acquisition_cost": {
-          "default": null,
+          "description": "Optional one-time acquisition cost deducted at `as_of` in DCF valuation.\n\nThis is intended for closing costs, fees, and other transaction costs.",
           "format": "double",
           "type": [
             "number",
@@ -15310,7 +15341,7 @@
           ]
         },
         "acquisition_costs": {
-          "default": [],
+          "description": "Optional detailed acquisition cost line items (positive outflows) deducted at `as_of`.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
           },
@@ -15325,14 +15356,15 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional appraisal override value."
         },
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {}
+          "default": {},
+          "description": "Attributes for scenario selection and tagging"
         },
         "cap_rate": {
-          "default": null,
+          "description": "Capitalization rate for direct cap (annualized).",
           "format": "double",
           "type": [
             "number",
@@ -15340,7 +15372,7 @@
           ]
         },
         "capex_schedule": {
-          "default": null,
+          "description": "Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.\n\nWhen present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -15361,16 +15393,19 @@
           ]
         },
         "currency": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+          "description": "Currency for valuation."
         },
         "day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention for year fractions."
         },
         "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier, used for risk attribution only.\n\nDCF valuation always discounts at [`discount_rate`](Self::discount_rate)\nregardless of whether this curve is loaded ; rate\nsensitivity (`Dv01`/`BucketedDv01`) bumps the risk-free component\ninside the rate."
         },
         "discount_rate": {
-          "default": null,
+          "description": "Discount rate for DCF (annualized).",
           "format": "double",
           "type": [
             "number",
@@ -15378,7 +15413,7 @@
           ]
         },
         "disposition_cost_pct": {
-          "default": null,
+          "description": "Optional disposition cost percentage applied to terminal value.\n\nA value of `0.02` represents 2% selling costs. Must be in \\([0, 1)\\).",
           "format": "double",
           "type": [
             "number",
@@ -15386,16 +15421,18 @@
           ]
         },
         "disposition_costs": {
-          "default": [],
+          "description": "Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.",
           "items": {
             "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
           },
           "type": "array"
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique instrument identifier."
         },
         "noi_schedule": {
+          "description": "Net operating income schedule (date, amount).",
           "items": {
             "maxItems": 2,
             "minItems": 2,
@@ -15434,7 +15471,8 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          }
+          },
+          "description": "Attributes for tagging and scenarios."
         },
         "property_type": {
           "anyOf": [
@@ -15445,7 +15483,7 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional property type classification (for reporting)."
         },
         "purchase_price": {
           "anyOf": [
@@ -15456,10 +15494,10 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional purchase price (useful for IRR / cap rate metrics)."
         },
         "sale_date": {
-          "default": null,
+          "description": "Optional sale/exit date that truncates the DCF horizon.\n\nWhen set, DCF only values unlevered flows up to and including `sale_date`.\nTerminal proceeds (if configured) are realized on `sale_date`.",
           "format": "date",
           "type": [
             "string",
@@ -15475,10 +15513,10 @@
               "type": "null"
             }
           ],
-          "default": null
+          "description": "Optional explicit gross sale price (terminal proceeds), before disposition costs.\n\nWhen set, this takes precedence over `terminal_cap_rate` for terminal proceeds."
         },
         "stabilized_noi": {
-          "default": null,
+          "description": "Optional stabilized NOI override for direct cap.",
           "format": "double",
           "type": [
             "number",
@@ -15486,7 +15524,7 @@
           ]
         },
         "terminal_cap_rate": {
-          "default": null,
+          "description": "Optional terminal cap rate for DCF (uses last NOI).",
           "format": "double",
           "type": [
             "number",
@@ -15494,7 +15532,7 @@
           ]
         },
         "terminal_growth_rate": {
-          "default": null,
+          "description": "Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.\n\nMarket convention for exit-cap terminal value is \\(TV = NOI_{N+1} / cap\\_rate\\_exit\\).\nWhen not provided, defaults to 0 (uses last NOI as-is).\nValidation range is \\([-100\\%, 20\\%]\\) to guard against configuration errors.",
           "format": "double",
           "type": [
             "number",
@@ -15502,11 +15540,13 @@
           ]
         },
         "valuation_date": {
+          "description": "Valuation date (base date for discounting).",
           "format": "date",
           "type": "string"
         },
         "valuation_method": {
-          "$ref": "#/$defs/RealEstateValuationMethod"
+          "$ref": "#/$defs/RealEstateValuationMethod",
+          "description": "Valuation method (DCF or DirectCap)."
         }
       },
       "required": [
@@ -15848,7 +15888,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
         },
         "repo_rate": {
           "description": "Repo rate (annual, as decimal)",
@@ -16187,7 +16227,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
         },
         "recovery_rate": {
           "default": 0.0,
@@ -16483,7 +16523,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
         },
         "variant": {
           "$ref": "#/$defs/SnowballVariant",
@@ -17253,7 +17293,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection."
+          "description": "Attributes for scenario selection.\nInstrument-owned pricing inputs."
         },
         "recovery_spec": {
           "$ref": "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json",
@@ -17446,7 +17486,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (manual price, yield, spread)"
+          "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
         },
         "sabr_params": {
           "anyOf": [
@@ -17636,7 +17676,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides."
+          "description": "Pricing overrides.\nInstrument-owned pricing inputs."
         },
         "target_coupon": {
           "description": "Target cumulative coupon level (triggers early redemption).\n\nA zero target is allowed and represents redemption at the first\nfuture coupon date without coupon accrual.",
@@ -17831,7 +17871,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (quoted price, seed, etc.)"
+          "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
         },
         "rate": {
           "$ref": "#/$defs/RateSpec",
@@ -18873,31 +18913,37 @@
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-          "default": {}
+          "default": {},
+          "description": "Attributes for scenario selection and tagging"
         },
         "contract_specs": {
           "$ref": "#/$defs/VolIndexOptionSpecs",
           "default": {
             "index_id": "VIX",
             "multiplier": 100.0
-          }
+          },
+          "description": "Contract specifications."
         },
         "day_count": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
+          "description": "Day count convention (default: Act365F)."
         },
         "discount_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Discount curve identifier for present value calculations."
         },
         "exercise_style": {
           "$ref": "#/$defs/ExerciseStyle",
-          "default": "european"
+          "default": "european",
+          "description": "Exercise style (always European for VIX options)."
         },
         "expiry": {
+          "description": "Option expiry date.",
           "format": "date",
           "type": "string"
         },
         "expiry_fixing": {
-          "default": null,
+          "description": "Observed volatility-index settlement fixing, required after expiry when\ncash settlement occurs later than expiry.",
           "format": "double",
           "type": [
             "number",
@@ -18905,13 +18951,16 @@
           ]
         },
         "id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Unique identifier."
         },
         "notional": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+          "description": "Notional exposure in currency units."
         },
         "option_type": {
-          "$ref": "#/$defs/OptionType"
+          "$ref": "#/$defs/OptionType",
+          "description": "Option type (Call or Put)."
         },
         "pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
@@ -18935,10 +18984,11 @@
             "vol_bump_pct": null,
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
-          }
+          },
+          "description": "Attributes for tagging and selection."
         },
         "settlement_date": {
-          "default": null,
+          "description": "Settlement date (typically same as expiry for cash-settled).",
           "format": "date",
           "type": [
             "string",
@@ -18946,14 +18996,17 @@
           ]
         },
         "strike": {
+          "description": "Strike price (in index points, e.g., 20.0).",
           "format": "double",
           "type": "number"
         },
         "vol_index_curve_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Volatility index forward curve identifier."
         },
         "vol_of_vol_surface_id": {
-          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+          "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+          "description": "Vol-of-vol surface identifier for option implied volatility."
         }
       },
       "required": [
@@ -19349,7 +19402,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging"
+          "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",

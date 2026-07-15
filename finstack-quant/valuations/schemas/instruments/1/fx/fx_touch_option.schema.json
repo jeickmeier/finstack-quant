@@ -190,7 +190,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (manual price, yield, spread)"
+              "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
             },
             "quote_currency": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",

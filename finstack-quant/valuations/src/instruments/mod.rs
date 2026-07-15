@@ -263,7 +263,7 @@ pub mod pricing_overrides;
 pub use pricing_overrides::{
     BondRiskBasis, BreakevenConfig, BreakevenMode, BreakevenTarget, BumpConfig,
     InstrumentPricingOverrides, MarketQuoteOverrides, MetricPricingOverrides, ModelConfig,
-    PricingOverrides, ScenarioPricingOverrides,
+    ScenarioPricingOverrides,
 };
 
 // === JSON Import/Export ===

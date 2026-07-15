@@ -274,7 +274,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Pricing overrides (including quoted clean price)"
+          "description": "Instrument-owned pricing inputs."
         },
         "return_floor": {
           "anyOf": [
@@ -1293,16 +1293,16 @@
       ]
     },
     "Position": {
-      "description": "Position side for futures.",
+      "description": "Position direction for futures and forwards.",
       "oneOf": [
         {
           "const": "long",
-          "description": "Long position (buyer of futures contract)",
+          "description": "Long position (buyer of the contract).",
           "type": "string"
         },
         {
           "const": "short",
-          "description": "Short position (seller of futures contract)",
+          "description": "Short position (seller of the contract).",
           "type": "string"
         }
       ]
@@ -1721,7 +1721,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for scenario selection and tagging"
+              "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
             },
             "quoted_price": {
               "description": "Contract/entry futures price (e.g., 125.50 for 125-16/32).\n\n`base_value` returns model-minus-contract value for a long position.\nCurrent-settlement variation margin is a separate cash-P&L workflow.",

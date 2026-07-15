@@ -26,7 +26,7 @@ use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::types::Entity;
 use finstack_quant_portfolio::PortfolioBuilder;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 use time::Month;
@@ -87,9 +87,12 @@ fn build_bond_portfolio(as_of: Date) -> finstack_quant_portfolio::Portfolio {
     .expect("Bond::fixed should succeed with valid parameters");
 
     // Use explicit quoted clean prices so YTM is driven by market levels, not model PVs.
-    bond_aaa.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
-    bond_bbb.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
-    bond_ccc.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_aaa.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_bbb.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_ccc.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let pos_aaa = Position::new(
         "POS_AAA",

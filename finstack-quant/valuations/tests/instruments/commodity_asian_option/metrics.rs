@@ -12,8 +12,8 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::commodity::commodity_asian_option::CommodityAsianOption;
 use finstack_quant_valuations::instruments::{
-    Attributes, AveragingMethod, CommodityUnderlyingParams, Instrument, OptionType,
-    PricingOverrides,
+    Attributes, AveragingMethod, CommodityUnderlyingParams, Instrument, InstrumentPricingOverrides,
+    OptionType,
 };
 use finstack_quant_valuations::metrics::{standard_registry, MetricContext, MetricId};
 use std::sync::Arc;
@@ -63,7 +63,7 @@ fn atm_asian_option(option_type: OptionType) -> (CommodityAsianOption, MarketCon
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("CL-VOL"))
         .day_count(finstack_quant_core::dates::DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("should build");

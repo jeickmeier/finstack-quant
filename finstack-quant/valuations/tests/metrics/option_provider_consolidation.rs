@@ -9,10 +9,10 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{Attributes, ExerciseStyle, FxOption, OptionType};
+use finstack_quant_valuations::instruments::{InstrumentPricingOverrides, SettlementType};
 use finstack_quant_valuations::instruments::{
     OptionGreekKind, OptionGreeksProvider, OptionGreeksRequest,
 };
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 use time::macros::date;
@@ -196,7 +196,7 @@ fn build_fx_call_option(expiry: Date, strike: f64, notional: f64) -> FxOption {
         .domestic_discount_curve_id(CurveId::new("USD-OIS"))
         .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
         .vol_surface_id(CurveId::new("EURUSD-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("fx option should build")

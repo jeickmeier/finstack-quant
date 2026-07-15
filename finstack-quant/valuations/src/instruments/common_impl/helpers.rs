@@ -558,7 +558,10 @@ mod tests {
     struct StubInstrument {
         id: String,
         attrs: Attributes,
-        pricing_overrides: crate::instruments::pricing_overrides::PricingOverrides,
+        instrument_pricing_overrides:
+            crate::instruments::pricing_overrides::InstrumentPricingOverrides,
+        metric_pricing_overrides: crate::instruments::pricing_overrides::MetricPricingOverrides,
+        scenario_pricing_overrides: crate::instruments::pricing_overrides::ScenarioPricingOverrides,
     }
 
     crate::impl_empty_cashflow_provider!(
@@ -571,8 +574,9 @@ mod tests {
             Self {
                 id: id.to_string(),
                 attrs: Attributes::default(),
-                pricing_overrides: crate::instruments::pricing_overrides::PricingOverrides::default(
-                ),
+                instrument_pricing_overrides: Default::default(),
+                metric_pricing_overrides: Default::default(),
+                scenario_pricing_overrides: Default::default(),
             }
         }
     }
@@ -641,17 +645,7 @@ mod tests {
             Box::new(self.clone())
         }
 
-        fn pricing_overrides_mut(
-            &mut self,
-        ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-            Some(&mut self.pricing_overrides)
-        }
-
-        fn pricing_overrides(
-            &self,
-        ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-            Some(&self.pricing_overrides)
-        }
+        crate::impl_focused_pricing_overrides!();
 
         fn price_with_metrics(
             &self,
@@ -714,7 +708,9 @@ mod tests {
     fn build_with_metrics_applies_scenario_price_shock_to_base_value(
     ) -> finstack_quant_core::Result<()> {
         let mut instrument = StubInstrument::new("STUB-SHOCK");
-        instrument.pricing_overrides = instrument.pricing_overrides.with_price_shock_pct(-0.10);
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_price_shock_pct(-0.10);
 
         let market = MarketContext::new();
         let result = instrument.price_with_metrics(
@@ -734,7 +730,9 @@ mod tests {
         // base_value returns 123.45; -10% shock should yield 111.105 from value(),
         // and value() == price_with_metrics().value to guarantee a single application.
         let mut instrument = StubInstrument::new("STUB-VALUE");
-        instrument.pricing_overrides = instrument.pricing_overrides.with_price_shock_pct(-0.10);
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_price_shock_pct(-0.10);
 
         let market = MarketContext::new();
         let as_of = date!(2024 - 01 - 01);
@@ -758,7 +756,9 @@ mod tests {
     fn instrument_base_value_is_unshocked() -> finstack_quant_core::Result<()> {
         // base_value must ignore scenario overrides; only value() applies them.
         let mut instrument = StubInstrument::new("STUB-BASE");
-        instrument.pricing_overrides = instrument.pricing_overrides.with_price_shock_pct(-0.10);
+        instrument.scenario_pricing_overrides = instrument
+            .scenario_pricing_overrides
+            .with_price_shock_pct(-0.10);
 
         let market = MarketContext::new();
         let base = instrument.base_value(&market, date!(2024 - 01 - 01))?;

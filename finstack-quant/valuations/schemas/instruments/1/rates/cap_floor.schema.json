@@ -431,7 +431,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Additional attributes"
+              "description": "Additional attributes\nInstrument-owned pricing inputs."
             },
             "rate_option_type": {
               "$ref": "#/$defs/RateOptionType",

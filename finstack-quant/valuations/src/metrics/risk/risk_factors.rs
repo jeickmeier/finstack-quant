@@ -408,7 +408,7 @@ mod tests {
             .div_yield_id_opt(Some(finstack_quant_core::types::CurveId::new(
                 "EQUITY-DIVYIELD",
             )))
-            .pricing_overrides(crate::instruments::PricingOverrides::default())
+            .instrument_pricing_overrides(crate::instruments::InstrumentPricingOverrides::default())
             .attributes(crate::instruments::Attributes::new())
             .build()?;
 
@@ -453,7 +453,7 @@ mod tests {
     fn test_extract_vol_factors_from_fx_option() -> Result<()> {
         use crate::instruments::fx::fx_option::FxOption;
         use crate::instruments::{
-            Attributes, ExerciseStyle, OptionType, PricingOverrides, SettlementType,
+            Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
         };
 
         let as_of = date!(2024 - 01 - 01);
@@ -471,7 +471,7 @@ mod tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()?;
 

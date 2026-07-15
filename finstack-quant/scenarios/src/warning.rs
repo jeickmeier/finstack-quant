@@ -273,7 +273,7 @@ impl fmt::Display for Warning {
             } => write!(
                 f,
                 "Instrument {shock_kind} shock fell back to metadata for instrument '{label}' \
-                 (type {inst_type}): the pricer does not expose scenario_overrides_mut(), \
+                 (type {inst_type}): the pricer does not expose get_scenario_pricing_overrides_mut(), \
                  so the shock is recorded under scenario_{shock_kind}_shock_* but will not affect \
                  valuation unless the downstream consumer reads that metadata."
             ),

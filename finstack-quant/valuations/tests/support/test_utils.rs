@@ -23,7 +23,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds::{
 };
 use finstack_quant_valuations::instruments::rates::irs::{FloatingLegCompounding, InterestRateSwap};
 use finstack_quant_valuations::instruments::{
-    Attributes, EquityOption, ExerciseStyle, FxOption, OptionType, PricingOverrides,
+    Attributes, EquityOption, ExerciseStyle, FxOption, OptionType, InstrumentPricingOverrides,
     SettlementType,
 };
 use finstack_quant_valuations::metrics::MetricId;
@@ -203,7 +203,7 @@ pub fn equity_option_european_call(
         .spot_id(underlying.spot_id)
         .vol_surface_id(CurveId::new("EQUITY-VOL"))
         .div_yield_id_opt(underlying.div_yield_id)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
 }
@@ -234,7 +234,7 @@ pub fn equity_option_european_put(
         .spot_id(underlying.spot_id)
         .vol_surface_id(CurveId::new("EQUITY-VOL"))
         .div_yield_id_opt(underlying.div_yield_id)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
 }
@@ -265,7 +265,7 @@ pub fn equity_option_american_call(
         .spot_id(underlying.spot_id)
         .vol_surface_id(CurveId::new("EQUITY-VOL"))
         .div_yield_id_opt(underlying.div_yield_id)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
 }
@@ -304,7 +304,7 @@ pub fn fx_option_european_call(
         .domestic_discount_curve_id(fx_underlying.domestic_discount_curve_id)
         .foreign_discount_curve_id(fx_underlying.foreign_discount_curve_id)
         .vol_surface_id(vol_surface_id.into())
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
 }
@@ -343,7 +343,7 @@ pub fn fx_option_european_put(
         .domestic_discount_curve_id(fx_underlying.domestic_discount_curve_id)
         .foreign_discount_curve_id(fx_underlying.foreign_discount_curve_id)
         .vol_surface_id(vol_surface_id.into())
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
 }
@@ -393,7 +393,7 @@ pub fn cds_buy_protection(
             recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),
         })
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()?;
 
@@ -446,7 +446,7 @@ pub fn cds_sell_protection(
             recovery_rate: STANDARD_RECOVERY_SENIOR,
             settlement_delay: convention.settlement_delay(),
         })
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()?;
 

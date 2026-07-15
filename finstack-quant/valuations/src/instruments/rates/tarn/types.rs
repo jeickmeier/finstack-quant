@@ -33,7 +33,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 ///
 /// - Brigo, D., & Mercurio, F. (2006). *Interest Rate Models - Theory and
 ///   Practice* (2nd ed.). Springer. Chapter 14: Exotic Derivatives.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Debug, finstack_quant_valuations_macros::FocusedPricingOverrides)]
 #[serde(deny_unknown_fields)]
 pub struct Tarn {
     /// Unique instrument identifier.

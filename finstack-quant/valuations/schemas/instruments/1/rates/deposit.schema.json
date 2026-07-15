@@ -120,7 +120,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for scenario selection and tagging."
+              "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
             },
             "quote_rate": {
               "description": "Optional quoted simple rate r (annualised) for the deposit.\n\nNote: `cashflow_schedule()` requires `quote_rate` to be set. Leaving it as `None`\nis only appropriate if the caller never requests cashflow generation/PV from\nthis instrument (e.g., constructing placeholders).",

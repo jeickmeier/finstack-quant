@@ -332,7 +332,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (manual price, yield, spread)."
+              "description": "Pricing overrides (manual price, yield, spread).\nInstrument-owned pricing inputs."
             },
             "side": {
               "$ref": "#/$defs/PayReceive",

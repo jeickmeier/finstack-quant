@@ -79,7 +79,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides."
+              "description": "Pricing overrides.\nInstrument-owned pricing inputs."
             },
             "target_coupon": {
               "description": "Target cumulative coupon level (triggers early redemption).\n\nA zero target is allowed and represents redemption at the first\nfuture coupon date without coupon accrual.",

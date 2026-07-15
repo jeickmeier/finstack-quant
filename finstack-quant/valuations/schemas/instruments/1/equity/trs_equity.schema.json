@@ -618,10 +618,11 @@
           "additionalProperties": false,
           "properties": {
             "attributes": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+              "description": "Attributes for scenario selection and tagging"
             },
             "discrete_dividends": {
-              "default": [],
+              "description": "Optional discrete cash dividends `(ex_date, amount)` for the underlying.\n\nWhen non-empty, pricing uses explicit period dividend pass-through and does\nnot add continuous-yield dividend return to avoid double counting.",
               "items": {
                 "maxItems": 2,
                 "minItems": 2,
@@ -640,16 +641,20 @@
             },
             "dividend_tax_rate": {
               "default": 0.0,
+              "description": "Dividend withholding tax rate for net return calculation.\n\nSpecifies the fraction of dividends withheld for tax (e.g., 0.15 for 15% withholding).\nWhen set to 0.0 (default), the TRS passes through 100% of dividends (gross return).\nWhen set to a positive value, the dividend return component is reduced:\n```text\nnet_dividend_return = gross_dividend_return × (1 - dividend_tax_rate)\n```\n\n# Market Context\n\nWithholding tax varies by jurisdiction and investor domicile:\n- US qualified dividends: typically 0% for domestic investors\n- US non-qualified: up to 30% for foreign investors (varies by treaty)\n- European: varies by country (15-30% typical)",
               "format": "double",
               "type": "number"
             },
             "financing": {
-              "$ref": "#/$defs/FinancingLegSpec"
+              "$ref": "#/$defs/FinancingLegSpec",
+              "description": "Financing leg specification (curves, spread, day count)."
             },
             "id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Unique instrument identifier."
             },
             "initial_level": {
+              "description": "Initial index level (if known, otherwise fetched from market).",
               "format": "double",
               "type": [
                 "number",
@@ -665,13 +670,14 @@
                   "type": "null"
                 }
               ],
-              "default": null
+              "description": "Optional OTC margin specification for VM/IM.\n\nEquity TRS use SIMM equity bucket for margin calculation."
             },
             "notional": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+              "description": "Notional amount for the swap."
             },
             "past_fixings": {
-              "default": [],
+              "description": "Observed underlying levels at past reset (period-start) dates.\n\nFor a seasoned TRS valued inside a return period, the total-return leg\nmust anchor the current period to the level *observed* at the period\nstart so the realized spot move enters the PV (equity delta). Provide\n`(reset_date, level)` pairs for every period-start date on or before\nthe valuation date; the first period may use `initial_level` instead.\nPricing errors when the current period's start level is unavailable.",
               "items": {
                 "maxItems": 2,
                 "minItems": 2,
@@ -710,16 +716,20 @@
                 "vol_bump_pct": null,
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
-              }
+              },
+              "description": "Attributes for scenario selection and tagging."
             },
             "schedule": {
-              "$ref": "#/$defs/TrsScheduleSpec"
+              "$ref": "#/$defs/TrsScheduleSpec",
+              "description": "Schedule specification (payment dates and frequency)."
             },
             "side": {
-              "$ref": "#/$defs/TrsSide"
+              "$ref": "#/$defs/TrsSide",
+              "description": "Trade side (receive/pay total return)."
             },
             "underlying": {
-              "$ref": "#/$defs/EquityUnderlyingParams"
+              "$ref": "#/$defs/EquityUnderlyingParams",
+              "description": "Underlying equity parameters (spot ID, dividend yield, contract size)."
             }
           },
           "required": [

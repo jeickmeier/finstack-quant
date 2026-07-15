@@ -691,7 +691,7 @@
     },
     "MertonMcOverride": {
       "$ref": "#/$defs/MertonMcConfig",
-      "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n`PricingOverrides`."
+      "description": "Merton Monte Carlo configuration stored on the bond for registry-based pricing.\n\nThis is a wrapper around\n[`crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcConfig`]\nthat allows the pricer registry to access the MC configuration from\n[`InstrumentPricingOverrides`]."
     },
     "MertonModel": {
       "description": "Merton structural credit model.\n\nModels a firm's equity as a call option on its assets, where default\noccurs when asset value falls below the debt barrier.\n\n# Fields\n\n- `asset_value` (V_0): Current market value of the firm's assets.\n- `asset_vol` (sigma_V): Annualized volatility of asset returns.\n- `debt_barrier` (B): Face value of debt / default point.\n- `risk_free_rate` (r): Continuous risk-free rate.\n- `payout_rate` (q): Continuous dividend / payout yield on assets.\n- `barrier_type`: Terminal or first-passage barrier monitoring.\n- `dynamics`: Asset return dynamics specification.",
@@ -1569,7 +1569,7 @@
     },
     "rho_bump_decimal": {
       "default": null,
-      "description": "Rho bump size in **decimal rate** units (default `0.0001 = 1bp`).\n\nNote: internal curve-bump APIs often take bump sizes in **bp** units (`1.0 = 1bp`).\nPrefer using [`PricingOverrides::rho_bump_bp`] when wiring into `BumpSpec::parallel_bp`\nor `metrics::bump_discount_curve_parallel` to avoid unit mistakes.",
+      "description": "Rho bump size in **decimal rate** units (default `0.0001 = 1bp`).\n\nNote: internal curve-bump APIs often take bump sizes in **bp** units (`1.0 = 1bp`).\nPrefer using [`MetricPricingOverrides::rho_bump_bp`] when wiring into `BumpSpec::parallel_bp`\nor `metrics::bump_discount_curve_parallel` to avoid unit mistakes.",
       "format": "double",
       "type": [
         "number",
@@ -1632,7 +1632,7 @@
           "type": "null"
         }
       ],
-      "description": "Term loan specific overrides"
+      "description": "Term loan specific overrides."
     },
     "theta_period": {
       "default": null,

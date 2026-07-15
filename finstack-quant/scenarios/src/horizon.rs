@@ -370,7 +370,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::CurveId;
     use finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec;
-    use finstack_quant_valuations::instruments::pricing_overrides::PricingOverrides;
+    use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
     use finstack_quant_valuations::instruments::{Attributes, Bond};
     use time::macros::date;
 
@@ -391,7 +391,7 @@ mod tests {
             )
             .discount_curve_id(CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()?;
         Ok(Arc::new(bond))

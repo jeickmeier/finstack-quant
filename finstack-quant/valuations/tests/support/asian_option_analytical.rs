@@ -67,7 +67,7 @@ fn asian_base(
         .spot_id("SPX-SPOT".into())
         .vol_surface_id(CurveId::new("SPX-VOL"))
         .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-        .pricing_overrides(Default::default())
+        .instrument_pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .expect("asian builder should succeed")

@@ -2064,7 +2064,7 @@
             "vol_surface_extrapolation": "error",
             "ytm_bump_decimal": null
           },
-          "description": "Attributes for scenario selection and tagging."
+          "description": "Attributes for scenario selection and tagging.\nInstrument-owned pricing inputs."
         },
         "side": {
           "$ref": "#/$defs/PayReceive",
@@ -4041,7 +4041,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for scenario selection."
+              "description": "Attributes for scenario selection.\nInstrument-owned pricing inputs."
             },
             "recovery_spec": {
               "$ref": "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json",

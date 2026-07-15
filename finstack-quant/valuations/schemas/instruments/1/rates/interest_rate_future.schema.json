@@ -43,16 +43,16 @@
       "type": "object"
     },
     "Position": {
-      "description": "Position side for futures.",
+      "description": "Position direction for futures and forwards.",
       "oneOf": [
         {
           "const": "long",
-          "description": "Long position (buyer of futures contract)",
+          "description": "Long position (buyer of the contract).",
           "type": "string"
         },
         {
           "const": "short",
-          "description": "Short position (seller of futures contract)",
+          "description": "Short position (seller of the contract).",
           "type": "string"
         }
       ]
@@ -203,7 +203,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes"
+              "description": "Attributes\nInstrument-owned pricing inputs."
             },
             "quoted_price": {
               "description": "Quoted future price (e.g., 99.25)",

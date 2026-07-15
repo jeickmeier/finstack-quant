@@ -350,113 +350,46 @@ pub trait Instrument: CashflowProvider + Send + Sync {
     /// Mutable reference to `Attributes`
     fn attributes_mut(&mut self) -> &mut Attributes;
 
-    /// Get mutable reference to the full pricing overrides bag.
-    ///
-    /// This remains available as a compatibility hook while the public surface
-    /// transitions away from a single catch-all overrides struct.
-    fn pricing_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::PricingOverrides> {
-        None
-    }
-
-    /// Get immutable reference to the full pricing overrides bag.
-    fn pricing_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::PricingOverrides> {
-        None
-    }
-
     /// Get instrument-owned pricing inputs.
-    ///
-    /// During the B14-B17 migration the default is a view into the temporary
-    /// full compatibility bag. Focused-storage instruments override this
-    /// accessor directly.
     fn get_instrument_pricing_overrides(
         &self,
     ) -> Option<&crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
-        self.pricing_overrides()
-            .map(|overrides| &overrides.instrument)
+        None
     }
 
     /// Get mutable instrument-owned pricing inputs.
     fn get_instrument_pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::InstrumentPricingOverrides> {
-        self.pricing_overrides_mut()
-            .map(|overrides| &mut overrides.instrument)
+        None
     }
 
     /// Get metric-only pricing controls.
     fn get_metric_pricing_overrides(
         &self,
     ) -> Option<&crate::instruments::pricing_overrides::MetricPricingOverrides> {
-        self.pricing_overrides().map(|overrides| &overrides.metrics)
+        None
     }
 
     /// Get mutable metric-only pricing controls.
     fn get_metric_pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::MetricPricingOverrides> {
-        self.pricing_overrides_mut()
-            .map(|overrides| &mut overrides.metrics)
+        None
     }
 
     /// Get scenario-only pricing adjustments.
     fn get_scenario_pricing_overrides(
         &self,
     ) -> Option<&crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
-        self.pricing_overrides()
-            .map(|overrides| &overrides.scenario)
+        None
     }
 
     /// Get mutable scenario-only pricing adjustments.
     fn get_scenario_pricing_overrides_mut(
         &mut self,
     ) -> Option<&mut crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
-        self.pricing_overrides_mut()
-            .map(|overrides| &mut overrides.scenario)
-    }
-
-    /// Get mutable reference to scenario-only pricing adjustments.
-    ///
-    /// # Returns
-    ///
-    /// `Some(&mut ScenarioPricingOverrides)` if the instrument supports scenario adjustments,
-    /// `None` otherwise.
-    ///
-    /// # Default Implementation
-    ///
-    /// Returns a mutable view into
-    /// [`crate::instruments::pricing_overrides::PricingOverrides::scenario`] when
-    /// the instrument exposes the compatibility overrides wrapper.
-    ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use finstack_quant_valuations::instruments::Instrument;
-    /// fn apply_price_shock(instrument: &mut dyn Instrument, shock_pct: f64) {
-    ///     if let Some(overrides) = instrument.scenario_overrides_mut() {
-    ///         overrides.scenario_price_shock_pct = Some(shock_pct);
-    ///     }
-    /// }
-    /// ```
-    fn scenario_overrides_mut(
-        &mut self,
-    ) -> Option<&mut crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
-        self.get_scenario_pricing_overrides_mut()
-    }
-
-    /// Get immutable reference to scenario-only pricing adjustments.
-    ///
-    /// # Returns
-    ///
-    /// `Some(&ScenarioPricingOverrides)` if the instrument supports scenario adjustments,
-    /// `None` otherwise.
-    fn scenario_overrides(
-        &self,
-    ) -> Option<&crate::instruments::pricing_overrides::ScenarioPricingOverrides> {
-        self.get_scenario_pricing_overrides()
+        None
     }
 
     /// Whether this instrument's pricer consumes

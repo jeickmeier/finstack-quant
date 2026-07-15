@@ -47,7 +47,7 @@ use super::swaption::Swaption;
 /// // Create a 10NC2 (10-year swap, callable after 2 years)
 /// let swaption = BermudanSwaption::example();
 /// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, finstack_quant_valuations_macros::FocusedPricingOverrides)]
 #[serde(deny_unknown_fields)]
 pub struct BermudanSwaption {
     /// Unique instrument identifier

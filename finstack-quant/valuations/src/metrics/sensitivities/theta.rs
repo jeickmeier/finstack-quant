@@ -90,7 +90,7 @@
 //! ## Example 3: Bond Carry (Theta with Coupon Accrual)
 //!
 //! ```ignore
-//! use finstack_quant_valuations::instruments::{Bond, Instrument, PricingOptions, PricingOverrides};
+//! use finstack_quant_valuations::instruments::{Bond, Instrument, PricingOptions};
 //! use finstack_quant_valuations::metrics::{standard_registry, MetricId};
 //! use finstack_quant_core::dates::create_date;
 //! use finstack_quant_core::market_data::context::MarketContext;

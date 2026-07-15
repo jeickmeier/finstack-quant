@@ -57,20 +57,24 @@
           "additionalProperties": false,
           "properties": {
             "attributes": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
+              "description": "Attributes for scenario selection and tagging"
             },
             "base_calendar_id": {
+              "description": "Optional base currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "base_currency": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Base currency (the currency being priced)"
             },
             "bdc": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/business_day_convention.schema.json",
-              "default": "modified_following"
+              "default": "modified_following",
+              "description": "Business day convention to apply when adjusting settlement (default: ModifiedFollowing)\n\nNote: Default changed from `Following` to `ModifiedFollowing` in v0.8.0 to align\nwith ISDA standard FX settlement conventions."
             },
             "discount_curve_id": {
               "anyOf": [
@@ -81,13 +85,15 @@
                   "type": "null"
                 }
               ],
-              "default": null
+              "description": "Optional quote-currency discount curve for PV-ing the settlement\ncashflow. When absent the settlement amount is reported undiscounted\n(a 1–2 day effect for standard spot lags)."
             },
             "id": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
+              "description": "Unique identifier for the FX pair"
             },
             "notional": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
+              "description": "Notional amount in base currency."
             },
             "pricing_overrides": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/pricing_overrides.schema.json",
@@ -111,24 +117,29 @@
                 "vol_bump_pct": null,
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
-              }
+              },
+              "description": "Per-instrument pricing/sensitivity override knobs.\nInstrument-owned pricing inputs."
             },
             "quote_calendar_id": {
+              "description": "Optional quote currency calendar for joint calendar settlement adjustment.\n\nPer market convention, FX settlement uses the joint calendar of both currencies.\nA date is a good business day only if it's valid in both calendars.",
               "type": [
                 "string",
                 "null"
               ]
             },
             "quote_currency": {
-              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json"
+              "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
+              "description": "Quote currency (the currency used for pricing)"
             },
             "settlement": {
+              "description": "Optional settlement date (T+2 typically for spot)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "settlement_lag_days": {
+              "description": "Optional settlement lag in business days when `settlement` is not provided (default: 2)",
               "format": "int32",
               "type": [
                 "integer",
@@ -136,6 +147,7 @@
               ]
             },
             "spot_rate": {
+              "description": "Optional spot rate (if not provided, will look up from market data)",
               "format": "double",
               "type": [
                 "number",

@@ -47,8 +47,8 @@ pub use crate::instruments::{
     AsianOption, BarrierOption, BasisSwap, Bond, BondConvention, CDSIndex, CDSTranche,
     ConvertibleBond, CreditDefaultSwap, Deposit, EquityOption, ExerciseStyle, FixedLegSpec,
     FloatLegSpec, FxForward, FxOption, FxSwap, InflationLinkedBond, InterestRateSwap, OptionType,
-    PayReceive, PricingOptions, PricingOverrides, Repo, RevolvingCredit, SettlementType,
-    StructuredCredit, Swaption, TermLoan, VarianceSwap,
+    PayReceive, PricingOptions, Repo, RevolvingCredit, SettlementType, StructuredCredit, Swaption,
+    TermLoan, VarianceSwap,
 };
 
 pub use finstack_quant_core::prelude::*;

@@ -290,9 +290,7 @@ impl CreditModelConfig {
 #[derive(
     Clone,
     finstack_quant_valuations_macros::FinancialBuilder,
-    Serialize,
-    Deserialize,
-    schemars::JsonSchema,
+    finstack_quant_valuations_macros::FocusedPricingOverrides,
 )]
 #[serde(deny_unknown_fields)]
 pub struct StructuredCredit {

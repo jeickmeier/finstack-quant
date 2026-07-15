@@ -13,7 +13,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
+use finstack_quant_valuations::instruments::{InstrumentPricingOverrides, SettlementType};
 
 // =============================================================================
 // Market Context Builders

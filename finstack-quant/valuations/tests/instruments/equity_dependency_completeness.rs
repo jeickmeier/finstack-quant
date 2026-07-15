@@ -15,7 +15,7 @@ use finstack_quant_valuations::instruments::commodity::commodity_option::Commodi
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{
-    ExerciseStyle, OptionType, PricingOverrides, SettlementType,
+    ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
 };
 use time::macros::date;
 
@@ -80,7 +80,7 @@ fn test_commodity_option_equity_dependencies_complete() {
         .vol_surface_id(CurveId::new("WTI-VOL"))
         .spot_id("WTI-SPOT".into())
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .build()
         .expect("Commodity option construction should succeed");
 
@@ -137,7 +137,7 @@ fn test_missing_equity_spot_fails() {
         .vol_surface_id(CurveId::new("WTI-VOL"))
         .spot_id("WTI-SPOT".into())
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .build()
         .expect("Commodity option construction should succeed");
 

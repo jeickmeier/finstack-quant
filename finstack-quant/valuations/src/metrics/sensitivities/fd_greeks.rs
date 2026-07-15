@@ -931,7 +931,7 @@ mod tests {
 
     use crate::instruments::common_impl::dependencies::{MarketDependencies, VolatilityDependency};
     use crate::instruments::common_impl::traits::Attributes;
-    use crate::instruments::PricingOverrides;
+    use crate::instruments::MetricPricingOverrides;
     use crate::metrics::{MetricContext, MetricId, MetricRegistry};
     use crate::pricer::InstrumentType;
     use finstack_quant_core::currency::Currency;
@@ -949,7 +949,7 @@ mod tests {
         expiry: Date,
         day_count: DayCount,
         spot_id: PriceId,
-        overrides: PricingOverrides,
+        overrides: MetricPricingOverrides,
         attributes: Attributes,
     }
 
@@ -960,7 +960,7 @@ mod tests {
                 expiry,
                 day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
-                overrides: PricingOverrides::default(),
+                overrides: MetricPricingOverrides::default(),
                 attributes: Attributes::new(),
             }
         }
@@ -973,7 +973,7 @@ mod tests {
         expiry: Date,
         day_count: DayCount,
         spot_id: PriceId,
-        overrides: PricingOverrides,
+        overrides: MetricPricingOverrides,
         attributes: Attributes,
     }
 
@@ -993,7 +993,7 @@ mod tests {
                 expiry,
                 day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
-                overrides: PricingOverrides::default(),
+                overrides: MetricPricingOverrides::default(),
                 attributes: Attributes::new(),
             }
         }
@@ -1024,7 +1024,7 @@ mod tests {
         fn metric_pricing_overrides_mut(
             &mut self,
         ) -> &mut crate::instruments::MetricPricingOverrides {
-            &mut self.overrides.metrics
+            &mut self.overrides
         }
     }
 
@@ -1044,7 +1044,7 @@ mod tests {
         fn metric_pricing_overrides_mut(
             &mut self,
         ) -> &mut crate::instruments::MetricPricingOverrides {
-            &mut self.overrides.metrics
+            &mut self.overrides
         }
     }
 
@@ -1444,7 +1444,7 @@ mod tests {
         spot_id: PriceId,
         vol_surface_id: String,
         slope: f64,
-        overrides: PricingOverrides,
+        overrides: MetricPricingOverrides,
         attributes: Attributes,
     }
 
@@ -1462,7 +1462,7 @@ mod tests {
                 spot_id: spot_id.into(),
                 vol_surface_id: vol_surface_id.to_string(),
                 slope,
-                overrides: PricingOverrides::default(),
+                overrides: MetricPricingOverrides::default(),
                 attributes: Attributes::new(),
             }
         }
@@ -1500,7 +1500,7 @@ mod tests {
         fn metric_pricing_overrides_mut(
             &mut self,
         ) -> &mut crate::instruments::MetricPricingOverrides {
-            &mut self.overrides.metrics
+            &mut self.overrides
         }
     }
 

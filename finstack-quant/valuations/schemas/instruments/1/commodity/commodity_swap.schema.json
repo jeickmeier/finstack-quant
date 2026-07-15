@@ -172,7 +172,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for tagging and selection."
+              "description": "Instrument-owned pricing inputs."
             },
             "quantity": {
               "description": "Notional quantity per period.",
@@ -200,6 +200,7 @@
             },
             "side": {
               "$ref": "#/$defs/PayReceive",
+              "default": "pay",
               "description": "Direction of the swap: Pay means paying the fixed price leg,\nReceive means receiving the fixed price leg."
             },
             "start_date": {
@@ -225,7 +226,6 @@
             "quantity",
             "fixed_price",
             "floating_index_id",
-            "side",
             "start_date",
             "maturity",
             "frequency",

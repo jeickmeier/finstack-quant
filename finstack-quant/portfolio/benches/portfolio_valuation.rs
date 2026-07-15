@@ -556,7 +556,9 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
             upfront: None,
             doc_clause: None,
             protection_effective_date: None,
-            pricing_overrides: Default::default(),
+            instrument_pricing_overrides: Default::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             valuation_convention: CdsValuationConvention::default(),
             attributes: Default::default(),
             margin_spec: None,
@@ -697,7 +699,7 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
             .domestic_discount_curve_id("USD-OIS".into())
             .foreign_discount_curve_id("EUR-OIS".into())
             .vol_surface_id("FX-VOL".into())
-            .pricing_overrides(Default::default())
+            .instrument_pricing_overrides(Default::default())
             .attributes(Attributes::default())
             .build()
             .unwrap();
@@ -1013,7 +1015,10 @@ fn create_institutional_portfolio(num_positions: usize) -> finstack_quant_portfo
             recovery_rate: None,
             fixed_coupon: Some(fixed_coupon),
             floating_coupon: None,
-            pricing_overrides: finstack_quant_valuations::instruments::PricingOverrides::default(),
+            instrument_pricing_overrides:
+                finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+            metric_pricing_overrides: Default::default(),
+            scenario_pricing_overrides: Default::default(),
             attributes: Default::default(),
         };
 

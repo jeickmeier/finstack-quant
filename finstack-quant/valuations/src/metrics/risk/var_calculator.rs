@@ -1746,7 +1746,7 @@ mod tests {
     fn test_taylor_vol_shock_skips_gracefully_for_fx_option() -> Result<()> {
         use crate::instruments::fx::fx_option::FxOption;
         use crate::instruments::{
-            Attributes, ExerciseStyle, OptionType, PricingOverrides, SettlementType,
+            Attributes, ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
         };
         use finstack_quant_core::currency::Currency;
         use finstack_quant_core::dates::DayCount;
@@ -1776,7 +1776,7 @@ mod tests {
             .domestic_discount_curve_id(CurveId::new("USD-OIS"))
             .foreign_discount_curve_id(CurveId::new("EUR-OIS"))
             .vol_surface_id(CurveId::new("EURUSD-VOL"))
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("valid FX option");

@@ -7,7 +7,7 @@ use finstack_quant_scenarios::{
     ExecutionContext, InstrumentType, OperationSpec, ScenarioEngine, ScenarioSpec,
 };
 use finstack_quant_statements::FinancialModelSpec;
-use finstack_quant_valuations::instruments::pricing_overrides::PricingOverrides;
+use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument};
 use indexmap::IndexMap;
 use time::Month;
@@ -37,7 +37,7 @@ fn test_instrument_type_price_shock_matching() {
                 )
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(Attributes::new())
                 .build()
                 .unwrap(),
@@ -58,7 +58,7 @@ fn test_instrument_type_price_shock_matching() {
                 )
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(Attributes::new())
                 .build()
                 .unwrap(),
@@ -93,8 +93,8 @@ fn test_instrument_type_price_shock_matching() {
     // Verify shock was applied via scenario_overrides (for instruments that support it)
     // or metadata (for instruments that don't)
     for instrument in &instruments {
-        // Bond supports scenario_overrides_mut(), so check there
-        if let Some(overrides) = instrument.scenario_overrides() {
+        // Bond supports get_scenario_pricing_overrides_mut(), so check there
+        if let Some(overrides) = instrument.get_scenario_pricing_overrides() {
             assert!(
                 overrides.scenario_price_shock_pct.is_some(),
                 "scenario_price_shock_pct should be set in pricing_overrides"
@@ -136,7 +136,7 @@ fn test_instrument_type_spread_shock_matching() {
             )
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .unwrap(),
@@ -171,7 +171,7 @@ fn test_instrument_type_spread_shock_matching() {
     // (applied as an additional flat Z-spread at valuation); no metadata
     // fallback and no fallback warning.
     let overrides = instruments[0]
-        .scenario_overrides()
+        .get_scenario_pricing_overrides()
         .expect("bond exposes scenario overrides");
     let stored = overrides
         .scenario_spread_shock_bp
@@ -229,7 +229,7 @@ fn test_instrument_spread_shock_moves_bond_pv() {
         )
         .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
         .credit_curve_id_opt(None)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap();
@@ -302,7 +302,7 @@ fn test_instrument_attr_price_shock_matching() {
                 )
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(
                     Attributes::new()
                         .with_meta("sector", "Energy")
@@ -327,7 +327,7 @@ fn test_instrument_attr_price_shock_matching() {
                 )
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(
                     Attributes::new()
                         .with_meta("sector", "Technology")
@@ -365,12 +365,12 @@ fn test_instrument_attr_price_shock_matching() {
     assert_eq!(report.operations_applied, 1);
 
     let first_overrides = instruments[0]
-        .scenario_overrides()
+        .get_scenario_pricing_overrides()
         .and_then(|o| o.scenario_price_shock_pct);
     assert_eq!(first_overrides, Some(-0.04));
 
     let second_overrides = instruments[1]
-        .scenario_overrides()
+        .get_scenario_pricing_overrides()
         .and_then(|o| o.scenario_price_shock_pct);
     assert_eq!(second_overrides, None);
 }
@@ -398,7 +398,7 @@ fn test_instrument_attr_price_shock_no_matches() {
             )
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new().with_meta("sector", "Energy"))
             .build()
             .unwrap(),
@@ -491,7 +491,7 @@ fn test_instrument_shock_no_matching_types() {
             )
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .unwrap(),
@@ -583,7 +583,7 @@ fn test_instrument_shock_multiple_types() {
                 )
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(Attributes::new())
                 .build()
                 .unwrap(),
@@ -604,7 +604,7 @@ fn test_instrument_shock_multiple_types() {
                 )
                 .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
                 .credit_curve_id_opt(None)
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(Attributes::new())
                 .build()
                 .unwrap(),
@@ -698,7 +698,7 @@ fn test_attr_filter_ignores_tags_uses_meta_only() {
             )
             .discount_curve_id(finstack_quant_core::types::CurveId::new("USD-OIS"))
             .credit_curve_id_opt(None)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new().with_tag("Energy"))
             .build()
             .unwrap(),

@@ -28,7 +28,9 @@ fn get_base_builder(as_of: Date) -> LookbackOptionBuilder {
         .spot_id("SPX-SPOT".into())
         .vol_surface_id(CurveId::new("SPX-VOL"))
         .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-        .pricing_overrides(finstack_quant_valuations::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+        )
         .attributes(finstack_quant_valuations::instruments::Attributes::new())
 }
 
@@ -238,7 +240,9 @@ fn test_expired_fixed_strike_call_returns_realized_payoff() {
         .spot_id("SPX-SPOT".into())
         .vol_surface_id(CurveId::new("SPX-VOL"))
         .div_yield_id_opt(Some(CurveId::new("SPX-DIV")))
-        .pricing_overrides(finstack_quant_valuations::instruments::PricingOverrides::default())
+        .instrument_pricing_overrides(
+            finstack_quant_valuations::instruments::InstrumentPricingOverrides::default(),
+        )
         .observed_min_opt(None)
         .observed_max_opt(Some(Money::new(130.0, Currency::USD)))
         .attributes(finstack_quant_valuations::instruments::Attributes::new())

@@ -1,7 +1,7 @@
 {
   "$defs": {
     "AgencyProgram": {
-      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. The legacy `Gnma`\nvariant maps to GNMA II (the larger and more actively traded program).",
+      "description": "Agency program enumeration.\n\nIdentifies the government-sponsored enterprise (GSE) or government agency\nthat guarantees the mortgage-backed security.\n\n# GNMA Programs\n\nGinnie Mae has two distinct programs with different payment delay conventions:\n- **GNMA I**: Single-issuer pools with a 14-day stated delay. Payments on the 15th.\n- **GNMA II**: Multi-issuer pools with a 50-day stated delay. Payments on the 20th.\n\nUse `GnmaI` or `GnmaII` to select the appropriate convention. Legacy `GNMA`\nand `GNMA_I_I` payloads deserialize as `GnmaII`.",
       "oneOf": [
         {
           "const": "FNMA",
@@ -14,17 +14,12 @@
           "type": "string"
         },
         {
-          "const": "GNMA",
-          "description": "Ginnie Mae II (Government National Mortgage Association) - multi-issuer pools.\n\nThis is the legacy variant; equivalent to `GnmaII`. Use `GnmaI` or `GnmaII`\nfor explicit program selection.",
-          "type": "string"
-        },
-        {
           "const": "GNMA_I",
           "description": "Ginnie Mae I - single-issuer pools with 14-day stated delay.\n\nGNMA I securities pay on the 15th of the month following the accrual\nperiod, resulting in a 14-day stated delay from month-end.",
           "type": "string"
         },
         {
-          "const": "GNMA_I_I",
+          "const": "GNMA_II",
           "description": "Ginnie Mae II - multi-issuer pools with 50-day stated delay.\n\nGNMA II securities pay on the 20th of the month following the accrual\nperiod, resulting in a ~50-day stated delay from accrual start. This is\nthe larger and more actively traded GNMA program.",
           "type": "string"
         }
@@ -234,7 +229,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (including quoted price for OAS)."
+              "description": "Pricing overrides (including quoted price for OAS).\nInstrument-owned pricing inputs."
             },
             "servicing_fee_rate": {
               "default": 0.0,

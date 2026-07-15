@@ -9,7 +9,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::equity::equity_option::EquityOption;
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::{ExerciseStyle, OptionType};
-use finstack_quant_valuations::instruments::{PricingOverrides, SettlementType};
+use finstack_quant_valuations::instruments::{InstrumentPricingOverrides, SettlementType};
 use time::macros::date;
 
 #[test]
@@ -30,7 +30,7 @@ fn test_builder_creates_valid_option() {
         .spot_id(SPOT_ID.into())
         .vol_surface_id(CurveId::new(VOL_ID))
         .div_yield_id_opt(Some(CurveId::new(DIV_ID)))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .unwrap();

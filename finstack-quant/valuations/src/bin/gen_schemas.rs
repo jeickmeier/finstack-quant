@@ -660,11 +660,15 @@ fn main() {
         finstack_quant_core::money::Money,
         "money.schema.json"
     );
-    gen_common_schema!(
+    let pricing_overrides_schema =
+        finstack_quant_valuations::instruments::pricing_overrides::pricing_overrides_wire_schema();
+    let pricing_overrides_schema_value = serde_json::to_value(&pricing_overrides_schema)
+        .expect("serialize schema for Pricing Overrides");
+    update_common_schema_file(
         "Pricing Overrides",
         "Per-instrument pricing and sensitivity override knobs.",
-        finstack_quant_valuations::instruments::PricingOverrides,
-        "pricing_overrides.schema.json"
+        "pricing_overrides.schema.json",
+        pricing_overrides_schema_value,
     );
     gen_common_schema!(
         "Tenor",

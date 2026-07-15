@@ -15,7 +15,7 @@ use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::{
-    ExerciseStyle, OptionType, PricingOverrides, SettlementType,
+    ExerciseStyle, InstrumentPricingOverrides, OptionType, SettlementType,
 };
 
 fn bs_price(
@@ -79,7 +79,7 @@ fn test_black76_futures_based_pricing() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("CL-VOL"))
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -136,7 +136,7 @@ fn test_futures_based_american_matches_european() {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should build")
@@ -198,7 +198,7 @@ fn test_futures_based_bermudan_prices_between_european_and_american() {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should build")
@@ -263,7 +263,7 @@ fn test_spot_based_american_put_above_european() {
             .vol_surface_id(CurveId::new("CL-VOL"))
             .spot_id_opt(Some("CL-SPOT".to_string()))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should build")
@@ -312,7 +312,7 @@ fn test_post_expiry_returns_zero() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("CL-VOL"))
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -348,7 +348,7 @@ fn test_post_expiry_returns_zero() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("CL-VOL"))
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -398,7 +398,7 @@ fn test_at_expiry_returns_intrinsic() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("CL-VOL"))
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -433,7 +433,7 @@ fn test_at_expiry_returns_intrinsic() {
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("CL-VOL"))
         .day_count(DayCount::Act365F)
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
         .build()
         .expect("should build");
@@ -493,7 +493,7 @@ fn test_put_call_parity_european() {
                 .discount_curve_id(CurveId::new("USD-OIS"))
                 .vol_surface_id(CurveId::new("CL-VOL"))
                 .day_count(DayCount::Act365F)
-                .pricing_overrides(PricingOverrides::default())
+                .instrument_pricing_overrides(InstrumentPricingOverrides::default())
                 .attributes(Attributes::new())
                 .build()
                 .expect("should build")
@@ -596,7 +596,7 @@ fn test_non_flat_vol_surface_skew() {
             .discount_curve_id(CurveId::new("USD-OIS"))
             .vol_surface_id(CurveId::new("CL-VOL"))
             .day_count(DayCount::Act365F)
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .expect("should build")

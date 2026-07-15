@@ -70,7 +70,7 @@ fn term_loan_capital_structure_evaluates_with_market() {
         .upfront_fee_opt(None)
         .ddtl_opt(None)
         .covenants_opt(None)
-        .pricing_overrides(Default::default())
+        .instrument_pricing_overrides(Default::default())
         .attributes(Default::default())
         .build()
         .expect("valid term loan");

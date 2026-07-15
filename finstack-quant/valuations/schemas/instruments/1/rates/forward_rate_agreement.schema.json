@@ -172,7 +172,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for scenario selection"
+              "description": "Instrument-owned pricing inputs."
             },
             "reset_lag": {
               "description": "Reset lag in business days (fixing to value date)",
@@ -181,6 +181,7 @@
             },
             "side": {
               "$ref": "#/$defs/PayReceive",
+              "default": "pay",
               "description": "Direction of the FRA: Pay means paying the fixed rate (receiving floating),\nReceive means receiving the fixed rate (paying floating)."
             },
             "start_date": {
@@ -199,7 +200,6 @@
             "reset_lag",
             "discount_curve_id",
             "forward_curve_id",
-            "side",
             "attributes"
           ],
           "type": "object"

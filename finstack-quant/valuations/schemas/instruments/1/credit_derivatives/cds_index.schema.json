@@ -786,7 +786,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (including upfront payment)"
+              "description": "Instrument-owned pricing overrides (including upfront payment)."
             },
             "protection": {
               "$ref": "#/$defs/ProtectionLegSpec",

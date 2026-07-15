@@ -13,7 +13,7 @@ use finstack_quant_valuations::instruments::rates::inflation_cap_floor::{
     InflationCapFloor, InflationCapFloorType,
 };
 use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, PricingOptions, PricingOverrides,
+    Attributes, Instrument, InstrumentPricingOverrides, PricingOptions,
 };
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
@@ -37,7 +37,7 @@ fn build_caplet() -> InflationCapFloor {
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .lag_override_opt(None)
         .attributes(Attributes::new())
         .build()
@@ -110,7 +110,7 @@ fn build_option(option_type: InflationCapFloorType, strike: f64) -> InflationCap
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .lag_override_opt(None)
         .attributes(Attributes::new())
         .build()

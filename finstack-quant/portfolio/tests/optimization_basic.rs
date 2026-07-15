@@ -16,7 +16,7 @@ use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::PortfolioBuilder;
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::rates::deposit::Deposit;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::InstrumentType;
@@ -232,9 +232,12 @@ fn build_bond_portfolio() -> finstack_quant_portfolio::Portfolio {
 
     // For yield-based optimization, require explicit quoted clean prices for all bonds.
     // Use par (100.0) for simplicity so coupon ordering drives YTM ordering.
-    bond_aaa.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
-    bond_bbb.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
-    bond_ccc.pricing_overrides = PricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_aaa.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_bbb.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
+    bond_ccc.instrument_pricing_overrides =
+        InstrumentPricingOverrides::default().with_quoted_clean_price(100.0);
 
     let pos_aaa = Position::new(
         "POS_AAA",

@@ -50,7 +50,7 @@ impl std::fmt::Display for CmsSpreadOptionType {
 ///
 /// - Hagan, P. S. (2003). "Convexity Conundrums." *Wilmott Magazine*.
 /// - Antonov, A., Konikov, M., & Spector, M. (2013). "SABR Spreads." *Risk*.
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Clone, Debug, finstack_quant_valuations_macros::FocusedPricingOverrides)]
 #[serde(deny_unknown_fields)]
 pub struct CmsSpreadOption {
     /// Unique instrument identifier.

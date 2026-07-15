@@ -264,7 +264,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (implied volatility, surface extrapolation)."
+              "description": "Pricing overrides (implied volatility, surface extrapolation).\nInstrument-owned pricing inputs."
             },
             "start_date": {
               "description": "Start date of the first inflation period.",

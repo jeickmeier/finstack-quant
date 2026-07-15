@@ -167,7 +167,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (implied vol, etc.)."
+              "description": "Instrument-owned pricing inputs."
             },
             "swap_end": {
               "description": "Underlying swap end date.",

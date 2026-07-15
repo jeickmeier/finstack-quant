@@ -17,6 +17,11 @@ pub(crate) fn derive_focused_pricing_overrides_impl(input: TokenStream) -> Token
 }
 
 fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
+    let schema_container_attrs: Vec<_> = input
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc") || attr.path().is_ident("schemars"))
+        .collect();
     let struct_name = input.ident;
     if !input.generics.params.is_empty() {
         return Err(syn::Error::new_spanned(
@@ -44,6 +49,7 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     let mut ordinary = Vec::new();
     let mut instrument_ident = None;
+    let mut instrument_schema_attrs = Vec::new();
     let mut metric_ident = None;
     let mut scenario_ident = None;
     for field in fields {
@@ -51,7 +57,15 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             syn::Error::new_spanned(&field, "FocusedPricingOverrides requires named fields")
         })?;
         match ident.to_string().as_str() {
-            INSTRUMENT_FIELD => instrument_ident = Some(ident),
+            INSTRUMENT_FIELD => {
+                instrument_schema_attrs = field
+                    .attrs
+                    .iter()
+                    .filter(|attr| attr.path().is_ident("doc") || attr.path().is_ident("schemars"))
+                    .cloned()
+                    .collect();
+                instrument_ident = Some(ident);
+            }
             METRIC_FIELD => metric_ident = Some(ident),
             SCENARIO_FIELD => scenario_ident = Some(ident),
             _ => ordinary.push(field),
@@ -91,7 +105,11 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             field
                 .attrs
                 .iter()
-                .filter(|attr| attr.path().is_ident("serde") || attr.path().is_ident("schemars"))
+                .filter(|attr| {
+                    attr.path().is_ident("doc")
+                        || attr.path().is_ident("serde")
+                        || attr.path().is_ident("schemars")
+                })
                 .collect()
         })
         .collect();
@@ -192,12 +210,14 @@ fn expand(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             ) -> schemars::Schema {
                 #[derive(schemars::JsonSchema)]
                 #[allow(dead_code)]
+                #(#schema_container_attrs)*
                 #serde_container
                 struct #schema_shadow {
                     #(
                         #(#ordinary_schema_attrs)*
                         #ordinary_idents: #ordinary_types,
                     )*
+                    #(#instrument_schema_attrs)*
                     #[serde(default)]
                     pricing_overrides:
                         crate::instruments::pricing_overrides::PricingOverridesWire,

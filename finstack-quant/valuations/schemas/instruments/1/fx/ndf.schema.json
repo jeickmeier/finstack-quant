@@ -137,10 +137,9 @@
           "properties": {
             "attributes": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-              "description": "Attributes for scenario selection and tagging."
+              "description": "Attributes for scenario selection and tagging"
             },
             "base_calendar_id": {
-              "default": null,
               "description": "Optional base currency calendar.",
               "type": [
                 "string",
@@ -152,7 +151,7 @@
               "description": "Base currency (restricted/non-deliverable currency, numerator)."
             },
             "contract_rate": {
-              "description": "Contract forward rate. Interpretation depends on `quote_convention`.",
+              "description": "Contract forward rate. Interpretation depends on `quote_convention`:\n- BasePerSettlement: base per settlement (e.g., 7.25 CNY per USD)\n- SettlementPerBase: settlement per base (e.g., 0.138 USD per CNY)",
               "format": "double",
               "type": "number"
             },
@@ -166,8 +165,7 @@
               "type": "string"
             },
             "fixing_rate": {
-              "default": null,
-              "description": "Observed fixing rate. Interpretation depends on `quote_convention`.",
+              "description": "Observed fixing rate. Interpretation depends on `quote_convention`.\nIf Some, NDF is post-fixing.",
               "format": "double",
               "type": [
                 "number",
@@ -183,8 +181,7 @@
                   "type": "null"
                 }
               ],
-              "default": null,
-              "description": "Official fixing source/benchmark enum for type-safe specification."
+              "description": "Official fixing source/benchmark enum for type-safe specification.\n\nUse this field for validated fixing sources.\nSee [`NdfFixingSource`] for supported benchmarks and their typical currencies."
             },
             "foreign_discount_curve_id": {
               "anyOf": [
@@ -195,12 +192,10 @@
                   "type": "null"
                 }
               ],
-              "default": null,
-              "description": "Optional foreign (base) currency discount curve ID."
+              "description": "Optional foreign (base) currency discount curve ID.\nRequired for pre-fixing forward estimation unless `forward_rate_override`\nis supplied."
             },
             "forward_rate_override": {
-              "default": null,
-              "description": "Explicit pre-fixing forward rate in `quote_convention` units.",
+              "description": "Explicit pre-fixing forward rate in `quote_convention` units.\n\nUse this for NDF market quotes or basis-adjusted forwards when a base\ncurrency discount curve is unavailable.",
               "format": "double",
               "type": [
                 "number",
@@ -243,10 +238,9 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Per-instrument pricing/sensitivity override knobs."
+              "description": "Attributes for tagging and selection.\nInstrument-owned pricing inputs."
             },
             "quote_calendar_id": {
-              "default": null,
               "description": "Optional settlement currency calendar.",
               "type": [
                 "string",
@@ -262,8 +256,7 @@
               "description": "Settlement currency (freely convertible, typically USD, denominator and PV currency)."
             },
             "spot_rate_override": {
-              "default": null,
-              "description": "Optional spot rate override for forward rate calculation.",
+              "description": "Optional spot rate override for forward rate calculation.\nInterpretation depends on `quote_convention`.",
               "format": "double",
               "type": [
                 "number",

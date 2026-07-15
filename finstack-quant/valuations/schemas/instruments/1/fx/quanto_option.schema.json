@@ -87,20 +87,20 @@
           "properties": {
             "attributes": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
-              "description": "Attributes for scenario selection and grouping."
+              "description": "Attributes for scenario selection and grouping"
             },
             "base_currency": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-              "description": "Base currency (equity denomination)."
+              "description": "Base currency (equity denomination)"
             },
             "correlation": {
-              "description": "Correlation between equity price and FX rate.",
+              "description": "Correlation between equity price and FX rate",
               "format": "double",
               "type": "number"
             },
             "day_count": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-              "description": "Day count convention."
+              "description": "Day count convention"
             },
             "div_yield_id": {
               "anyOf": [
@@ -111,29 +111,27 @@
                   "type": "null"
                 }
               ],
-              "default": null,
-              "description": "Optional dividend yield curve ID."
+              "description": "Optional dividend yield curve ID"
             },
             "domestic_discount_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Discount curve ID (domestic currency)."
+              "description": "Discount curve ID (domestic currency)"
             },
             "equity_strike": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-              "description": "Strike price for equity option."
+              "description": "Strike price for equity option"
             },
             "expiry": {
-              "description": "Option expiry date.",
+              "description": "Option expiry date",
               "format": "date",
               "type": "string"
             },
             "foreign_discount_curve_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Discount curve ID (foreign currency)."
+              "description": "Discount curve ID (foreign currency)"
             },
             "fx_rate_id": {
-              "default": null,
-              "description": "Optional FX rate identifier.",
+              "description": "Optional FX rate identifier.\n\nThe referenced scalar must be quoted as **quote currency per unit of\nbase currency** (e.g. for base JPY / quote USD, USD-per-JPY ≈ 0.0071,\nconventionally named `JPYUSD`). The pricer compounds it with\n`exp((r_quote − r_base)·t)` to obtain the ATM forward for the FX vol\nlookup, so an inverted quote (JPY-per-USD) silently mislocates the\nsmile. `validate()` rejects ids whose embedded pair name contradicts\nthis direction.",
               "type": [
                 "string",
                 "null"
@@ -148,24 +146,22 @@
                   "type": "null"
                 }
               ],
-              "default": null,
-              "description": "Optional FX volatility surface ID."
+              "description": "Optional FX volatility surface ID.\n\nMust be calibrated in the same **quote-per-base** direction as\n`fx_rate_id` so absolute-strike lookups at the CIRP forward land on\nthe correct smile. `validate()` rejects ids whose embedded pair name\ncontradicts this direction."
             },
             "id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Unique instrument identifier."
+              "description": "Unique instrument identifier"
             },
             "notional": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
-              "description": "Strike-equivalent domestic reference notional."
+              "description": "Strike-equivalent domestic reference notional.\n\nWhen `underlying_quantity` and `payoff_fx_rate` are supplied, this must\nequal `underlying_quantity * payoff_fx_rate * equity_strike.amount()`."
             },
             "option_type": {
               "$ref": "#/$defs/OptionType",
-              "description": "Option type (call or put)."
+              "description": "Option type (call or put)"
             },
             "payoff_fx_rate": {
-              "default": null,
-              "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.",
+              "description": "Fixed payoff FX conversion rate from base-currency payoff into quote currency.\n\nExample: for a JPY-underlying option settled in USD at a fixed 140 JPY/USD\nconversion, `payoff_fx_rate` is `1.0 / 140.0` USD per JPY.",
               "format": "double",
               "type": [
                 "number",
@@ -195,19 +191,18 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (manual price, yield, spread)."
+              "description": "Pricing overrides (manual price, yield, spread)\nInstrument-owned pricing inputs."
             },
             "quote_currency": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/currency.schema.json",
-              "description": "Quote currency (payment/settlement currency)."
+              "description": "Quote currency (payment/settlement currency)"
             },
             "spot_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Equity spot price identifier."
+              "description": "Equity spot price identifier"
             },
             "underlying_quantity": {
-              "default": null,
-              "description": "Number of underlying units covered by the option payoff.",
+              "description": "Number of underlying units covered by the option payoff.\n\nQuanto pricing is performed per unit of the underlying in the base currency.\nThis quantity converts the per-unit price into contract-level exposure.",
               "format": "double",
               "type": [
                 "number",
@@ -215,12 +210,12 @@
               ]
             },
             "underlying_ticker": {
-              "description": "Underlying equity ticker symbol.",
+              "description": "Underlying equity ticker symbol",
               "type": "string"
             },
             "vol_surface_id": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
-              "description": "Equity volatility surface ID."
+              "description": "Equity volatility surface ID"
             }
           },
           "required": [

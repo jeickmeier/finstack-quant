@@ -257,7 +257,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (implied vol, tree steps, etc.)."
+              "description": "Instrument-owned pricing inputs."
             },
             "quantity": {
               "description": "Contract quantity in units.",

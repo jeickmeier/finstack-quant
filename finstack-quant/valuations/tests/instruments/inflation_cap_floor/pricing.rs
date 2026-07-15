@@ -14,7 +14,7 @@ use finstack_quant_valuations::instruments::rates::inflation_cap_floor::{
     InflationCapFloor, InflationCapFloorType,
 };
 use finstack_quant_valuations::instruments::Attributes;
-use finstack_quant_valuations::instruments::PricingOverrides;
+use finstack_quant_valuations::instruments::InstrumentPricingOverrides;
 use finstack_quant_valuations::pricer::ModelKey;
 use rust_decimal::Decimal;
 use time::{Duration, Month};
@@ -58,7 +58,7 @@ fn test_caplet_intrinsic_after_fixing() {
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .lag_override_opt(None)
         .attributes(Attributes::new())
         .build()
@@ -120,7 +120,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .lag_override_opt(None)
         .attributes(Attributes::new())
         .build()
@@ -141,7 +141,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
         .inflation_index_id(CurveId::new("US-CPI-U"))
         .discount_curve_id(CurveId::new("USD-OIS"))
         .vol_surface_id(CurveId::new("US-CPI-VOL"))
-        .pricing_overrides(PricingOverrides::default())
+        .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .lag_override_opt(None)
         .attributes(Attributes::new())
         .build()
@@ -204,7 +204,7 @@ fn test_yoy_caplet_applies_convexity_adjustment() {
             // Zero lag so the fixing date is in the future and the convexity
             // adjustment (which requires t_fix > 0) is active.
             .lag_override_opt(Some(InflationLag::Months(0)))
-            .pricing_overrides(PricingOverrides::default())
+            .instrument_pricing_overrides(InstrumentPricingOverrides::default())
             .attributes(Attributes::new())
             .build()
             .unwrap()

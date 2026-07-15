@@ -214,7 +214,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for scenario selection and tagging"
+              "description": "Attributes for scenario selection and tagging\nInstrument-owned pricing inputs."
             },
             "side": {
               "$ref": "#/$defs/PayReceive",

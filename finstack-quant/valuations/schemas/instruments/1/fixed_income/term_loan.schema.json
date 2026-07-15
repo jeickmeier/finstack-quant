@@ -1396,7 +1396,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Pricing overrides (quoted price, seed, etc.)"
+              "description": "Pricing overrides (quoted price, seed, etc.)\nInstrument-owned pricing inputs."
             },
             "rate": {
               "$ref": "#/$defs/RateSpec",

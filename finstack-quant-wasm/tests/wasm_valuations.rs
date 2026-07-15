@@ -52,7 +52,7 @@ fn structured_credit_instrument_json() -> String {
         AssetPool, DealType, PoolAsset, StochasticDefaultSpec, StochasticPrepaySpec,
         StructuredCredit, Tranche, TrancheCoupon, TrancheSeniority, TrancheStructure,
     };
-    use finstack_quant_valuations::instruments::{InstrumentJson, PricingOverrides};
+    use finstack_quant_valuations::instruments::{InstrumentJson, InstrumentPricingOverrides};
     use time::Month;
 
     let closing = Date::from_calendar_date(2024, Month::January, 1).unwrap();
@@ -100,7 +100,7 @@ fn structured_credit_instrument_json() -> String {
     sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
         sc.credit_model.default_spec.clone(),
     ));
-    sc.pricing_overrides = PricingOverrides::default().with_mc_paths(1);
+    sc.instrument_pricing_overrides = InstrumentPricingOverrides::default().with_mc_paths(1);
 
     serde_json::to_string(&InstrumentJson::StructuredCredit(Box::new(sc))).unwrap()
 }

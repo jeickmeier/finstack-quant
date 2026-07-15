@@ -1,26 +1,26 @@
 {
   "$defs": {
     "BarrierType": {
-      "description": "Barrier type for barrier options.",
+      "description": "Four-state barrier option classification.",
       "oneOf": [
         {
           "const": "up_and_out",
-          "description": "Up-and-out: option knocked out if S >= B",
+          "description": "Up-and-out: knocked out when spot touches or rises above the barrier.",
           "type": "string"
         },
         {
           "const": "up_and_in",
-          "description": "Up-and-in: option activated if S >= B",
+          "description": "Up-and-in: activated when spot touches or rises above the barrier.",
           "type": "string"
         },
         {
           "const": "down_and_out",
-          "description": "Down-and-out: option knocked out if S <= B",
+          "description": "Down-and-out: knocked out when spot touches or falls below the barrier.",
           "type": "string"
         },
         {
           "const": "down_and_in",
-          "description": "Down-and-in: option activated if S <= B",
+          "description": "Down-and-in: activated when spot touches or falls below the barrier.",
           "type": "string"
         }
       ]

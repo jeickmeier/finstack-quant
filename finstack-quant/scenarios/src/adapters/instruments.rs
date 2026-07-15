@@ -1,7 +1,7 @@
 //! Instrument-level shock adapters.
 //!
 //! Applies price and spread shocks to instrument collections via pricing overrides.
-//! When instruments support `scenario_overrides_mut()`, shocks are applied functionally;
+//! When instruments support `get_scenario_pricing_overrides_mut()`, shocks are applied functionally;
 //! otherwise they are stored as metadata attributes for downstream processing.
 
 use crate::adapters::traits::ScenarioEffect;
@@ -134,7 +134,7 @@ where
 
         match kind {
             ShockKind::Price => {
-                if let Some(overrides) = instrument.scenario_overrides_mut() {
+                if let Some(overrides) = instrument.get_scenario_pricing_overrides_mut() {
                     overrides.scenario_price_shock_pct = Some(accumulate_optional_shock(
                         overrides.scenario_price_shock_pct,
                         delta,
@@ -158,7 +158,7 @@ where
                 // silently no-ops.
                 let routed = instrument.scenario_spread_shock_supported()
                     && instrument
-                        .scenario_overrides_mut()
+                        .get_scenario_pricing_overrides_mut()
                         .map(|overrides| {
                             overrides.scenario_spread_shock_bp = Some(accumulate_optional_shock(
                                 overrides.scenario_spread_shock_bp,

@@ -46,16 +46,16 @@
       ]
     },
     "Position": {
-      "description": "Position direction for futures and forwards.\n\nIndicates whether the holder is long (buyer) or short (seller) of the contract.",
+      "description": "Position direction for futures and forwards.",
       "oneOf": [
         {
           "const": "long",
-          "description": "Long position (buyer of futures/forward contract).\n\nProfits when the underlying price increases.",
+          "description": "Long position (buyer of the contract).",
           "type": "string"
         },
         {
           "const": "short",
-          "description": "Short position (seller of futures/forward contract).\n\nProfits when the underlying price decreases.",
+          "description": "Short position (seller of the contract).",
           "type": "string"
         }
       ]
@@ -238,7 +238,7 @@
                 "vol_surface_extrapolation": "error",
                 "ytm_bump_decimal": null
               },
-              "description": "Attributes for tagging and selection."
+              "description": "Instrument-owned pricing inputs."
             },
             "quantity": {
               "description": "Contract quantity in units.",

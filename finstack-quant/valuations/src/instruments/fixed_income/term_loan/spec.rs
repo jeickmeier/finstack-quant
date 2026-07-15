@@ -503,7 +503,7 @@ impl AmortizationSpec {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, finstack_quant_valuations_macros::FocusedPricingOverrides)]
 #[serde(deny_unknown_fields)]
 pub struct TermLoanSpec {
     /// Unique instrument identifier
